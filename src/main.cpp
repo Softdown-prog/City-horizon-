@@ -1,0 +1,2640 @@
+#include <SDL3/SDL.h>
+
+#include "audio_manager.h"
+#include "building_system.h"
+#include "economy_system.h"
+#include "farming_system.h"
+#include "land_system.h"
+#include "map_tile_occupancy.h"
+#include "mobile_animation.h"
+#include "navigation_network.h"
+#include "pedestrian_system.h"
+#include "population_system.h"
+#include "power_system.h"
+#include "road_system.h"
+#include "road_visual_catalog.h"
+#include "resource_system.h"
+#include "save_manager.h"
+#include "simulation_clock.h"
+#include "simulation_scheduler.h"
+#include "sidewalk_system.h"
+#include "ui_manager.h"
+#include "vehicle_system.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <filesystem>
+#include <iterator>
+#include <iostream>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+namespace {
+
+constexpr float kTileWidth = 128.0F;
+constexpr float kTileHeight = 64.0F;
+// A 48x48 logical map leaves a 32x32 owned starting parcel in the centre,
+// plus locked land around every side for the expansion flow.
+constexpr int kMapMin = -24;
+constexpr int kMapMax = 23;
+constexpr float kCameraKeyboardPanSpeed = 840.0F;
+constexpr float kCameraEdgePanSpeed = 720.0F;
+constexpr float kCameraEdgePanBand = 28.0F;
+constexpr float kCameraPanResponsiveness = 14.0F;
+
+// Opaque bounds recorded by the PNG pipeline for grass_isometric_01_clean.png.
+constexpr float kGrassOpaqueLeft = 53.0F;
+constexpr float kGrassOpaqueTop = 23.0F;
+constexpr float kGrassOpaqueWidth = 1175.0F;
+
+// The logical world never rotates.  CameraRotation only changes how that
+// world is projected, so saves, placement, topology and navigation retain
+// their existing N/E/S/W meaning.
+enum class CameraRotation : std::uint8_t { r0 = 0, r90 = 1, r180 = 2, r270 = 3 };
+
+struct Camera {
+    float pan_x = 0.0F;
+    float pan_y = 0.0F;
+    float pan_velocity_x = 0.0F;
+    float pan_velocity_y = 0.0F;
+    float zoom = 1.0F;
+    CameraRotation rotation = CameraRotation::r0;
+};
+
+struct CameraWorldPoint {
+    float x = 0.0F;
+    float y = 0.0F;
+};
+
+[[nodiscard]] constexpr std::uint8_t camera_rotation_turns(const CameraRotation rotation) {
+    return static_cast<std::uint8_t>(rotation);
+}
+
+[[nodiscard]] constexpr CameraRotation rotate_camera_clockwise(const CameraRotation rotation) {
+    return static_cast<CameraRotation>((camera_rotation_turns(rotation) + 1U) % 4U);
+}
+
+[[nodiscard]] constexpr CameraRotation rotate_camera_counter_clockwise(const CameraRotation rotation) {
+    return static_cast<CameraRotation>((camera_rotation_turns(rotation) + 3U) % 4U);
+}
+
+[[nodiscard]] const char* camera_rotation_label(const CameraRotation rotation) {
+    switch (rotation) {
+        case CameraRotation::r0: return "SOUTH";
+        case CameraRotation::r90: return "WEST";
+        case CameraRotation::r180: return "NORTH";
+        case CameraRotation::r270: return "EAST";
+    }
+    return "SOUTH";
+}
+
+// Converts logical world coordinates to camera-local coordinates.  The
+// inverse below keeps screen picking exactly aligned with the rotated view.
+[[nodiscard]] constexpr CameraWorldPoint camera_view_point(const float x, const float y, const CameraRotation rotation) {
+    switch (rotation) {
+        case CameraRotation::r0: return {x, y};
+        case CameraRotation::r90: return {y, -x};
+        case CameraRotation::r180: return {-x, -y};
+        case CameraRotation::r270: return {-y, x};
+    }
+    return {x, y};
+}
+
+[[nodiscard]] constexpr CameraWorldPoint logical_world_point(const float x, const float y, const CameraRotation rotation) {
+    switch (rotation) {
+        case CameraRotation::r0: return {x, y};
+        case CameraRotation::r90: return {-y, x};
+        case CameraRotation::r180: return {-x, -y};
+        case CameraRotation::r270: return {y, -x};
+    }
+    return {x, y};
+}
+
+// Sprite sheets use the top point of an isometric diamond as their origin.
+// With a rotated camera that point belongs to a different logical corner.
+[[nodiscard]] constexpr CameraWorldPoint tile_visual_top_world(const int tile_x, const int tile_y, const CameraRotation rotation) {
+    switch (rotation) {
+        case CameraRotation::r0: return {static_cast<float>(tile_x), static_cast<float>(tile_y)};
+        case CameraRotation::r90: return {static_cast<float>(tile_x + 1), static_cast<float>(tile_y)};
+        case CameraRotation::r180: return {static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1)};
+        case CameraRotation::r270: return {static_cast<float>(tile_x), static_cast<float>(tile_y + 1)};
+    }
+    return {static_cast<float>(tile_x), static_cast<float>(tile_y)};
+}
+
+[[nodiscard]] constexpr CameraWorldPoint building_visual_ground_world(const BuildingInstance& instance,
+                                                                        const BuildingFootprint footprint,
+                                                                        const CameraRotation rotation) {
+    switch (rotation) {
+        case CameraRotation::r0: return {static_cast<float>(instance.tile_x + footprint.width), static_cast<float>(instance.tile_y + footprint.height)};
+        case CameraRotation::r90: return {static_cast<float>(instance.tile_x), static_cast<float>(instance.tile_y + footprint.height)};
+        case CameraRotation::r180: return {static_cast<float>(instance.tile_x), static_cast<float>(instance.tile_y)};
+        case CameraRotation::r270: return {static_cast<float>(instance.tile_x + footprint.width), static_cast<float>(instance.tile_y)};
+    }
+    return {};
+}
+
+[[nodiscard]] constexpr float camera_depth_key(const float world_x, const float world_y, const Camera& camera) {
+    const CameraWorldPoint view = camera_view_point(world_x, world_y, camera.rotation);
+    return view.x + view.y;
+}
+
+[[nodiscard]] constexpr CardinalDirection camera_visual_direction(const CardinalDirection direction, const CameraRotation rotation) {
+    const int index = static_cast<int>(direction);
+    const int visual_index = (index - static_cast<int>(camera_rotation_turns(rotation)) + 4) % 4;
+    return static_cast<CardinalDirection>(visual_index);
+}
+
+[[nodiscard]] TileConnectionMask camera_visual_connections(const TileConnectionMask connections, const CameraRotation rotation) {
+    TileConnectionMask visual = 0;
+    for (const CardinalDirection direction : kCardinalDirections) {
+        if (has_connection(connections, direction)) visual |= connection_bit(camera_visual_direction(direction, rotation));
+    }
+    return visual;
+}
+
+[[nodiscard]] BuildingRotation camera_visual_rotation(const BuildingDefinition& definition, const BuildingRotation logical_rotation,
+                                                       const CameraRotation camera_rotation) {
+    const int visual = (static_cast<int>(logical_rotation) - static_cast<int>(camera_rotation_turns(camera_rotation)) + 4) % 4;
+    const BuildingRotation desired = static_cast<BuildingRotation>(visual);
+    // Older single-art definitions remain visible instead of disappearing in
+    // a view for which no authored directional variant exists.
+    return definition.supports_rotation(desired) ? desired : logical_rotation;
+}
+
+[[nodiscard]] int mobile_direction_index(const MobileEntityDirection direction) {
+    switch (direction) {
+        case MobileEntityDirection::north: return 0;
+        case MobileEntityDirection::east: return 1;
+        case MobileEntityDirection::south: return 2;
+        case MobileEntityDirection::west: return 3;
+    }
+    return 2;
+}
+
+[[nodiscard]] MobileEntityDirection mobile_direction_from_index(const int index) {
+    switch ((index + 4) % 4) {
+        case 0: return MobileEntityDirection::north;
+        case 1: return MobileEntityDirection::east;
+        case 2: return MobileEntityDirection::south;
+        case 3: return MobileEntityDirection::west;
+    }
+    return MobileEntityDirection::south;
+}
+
+[[nodiscard]] MobileEntityRenderData camera_relative_mobile_entity(const MobileEntityRenderData& entity,
+                                                                    const MobileAnimationCatalog& animations,
+                                                                    const CameraRotation rotation) {
+    MobileEntityRenderData result = entity;
+    result.spatial.direction = mobile_direction_from_index(mobile_direction_index(entity.spatial.direction) -
+                                                           static_cast<int>(camera_rotation_turns(rotation)));
+    if (const MobileAnimationClip* clip = animations.resolve_clip(result.animation_set_id, result.logical_state, result.spatial.direction);
+        clip != nullptr && !clip->frames.empty()) {
+        result.animation_clip_id = clip->id;
+        result.animation_frame_index = std::min(entity.animation_frame_index, clip->frames.size() - 1);
+        result.sprite_asset = clip->frames[result.animation_frame_index];
+    }
+    return result;
+}
+
+struct TextureAsset {
+    SDL_Texture* texture = nullptr;
+    float source_width = 0.0F;
+    float source_height = 0.0F;
+};
+
+class TextureCache {
+public:
+    [[nodiscard]] const TextureAsset* load(SDL_Renderer* renderer, const std::filesystem::path& path) {
+        const std::string key = path.generic_string();
+        if (const auto existing = textures_.find(key); existing != textures_.end()) {
+            return &existing->second;
+        }
+
+        TextureAsset asset;
+        SDL_Surface* surface = SDL_LoadPNG(path.string().c_str());
+        if (surface == nullptr) {
+            std::cerr << "Texture could not be loaded: " << path << "\nSDL error: " << SDL_GetError() << '\n';
+            return nullptr;
+        }
+        asset.texture = SDL_CreateTextureFromSurface(renderer, surface);
+        asset.source_width = static_cast<float>(surface->w);
+        asset.source_height = static_cast<float>(surface->h);
+        SDL_DestroySurface(surface);
+
+        if (asset.texture == nullptr) {
+            std::cerr << "Texture could not be created: " << path << "\nSDL error: " << SDL_GetError() << '\n';
+            return nullptr;
+        }
+        SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+        return &textures_.emplace(key, asset).first->second;
+    }
+
+    [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
+        const auto found = textures_.find(path.generic_string());
+        return found == textures_.end() ? nullptr : &found->second;
+    }
+
+    void clear() {
+        for (const auto& [path, asset] : textures_) {
+            (void)path;
+            if (asset.texture != nullptr) {
+                SDL_DestroyTexture(asset.texture);
+            }
+        }
+        textures_.clear();
+    }
+
+private:
+    std::unordered_map<std::string, TextureAsset> textures_;
+};
+
+[[nodiscard]] std::filesystem::path runtime_root() {
+    const char* base_path = SDL_GetBasePath();
+    return base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+}
+
+[[nodiscard]] SDL_FPoint world_to_screen(float world_x, float world_y, const Camera& camera, float viewport_width, float viewport_height) {
+    const CameraWorldPoint view = camera_view_point(world_x, world_y, camera.rotation);
+    return {
+        viewport_width * 0.5F + camera.pan_x + (view.x - view.y) * (kTileWidth * 0.5F) * camera.zoom,
+        viewport_height * 0.5F + camera.pan_y + (view.x + view.y) * (kTileHeight * 0.5F) * camera.zoom,
+    };
+}
+
+[[nodiscard]] std::pair<int, int> screen_to_tile(float screen_x, float screen_y, const Camera& camera, float viewport_width, float viewport_height) {
+    const float axis_x = (screen_x - viewport_width * 0.5F - camera.pan_x) / (kTileWidth * 0.5F * camera.zoom);
+    const float axis_y = (screen_y - viewport_height * 0.5F - camera.pan_y) / (kTileHeight * 0.5F * camera.zoom);
+    const CameraWorldPoint logical = logical_world_point((axis_y + axis_x) * 0.5F,
+                                                         (axis_y - axis_x) * 0.5F,
+                                                         camera.rotation);
+    return {static_cast<int>(std::floor(logical.x)), static_cast<int>(std::floor(logical.y))};
+}
+
+void render_tile_outline(SDL_Renderer* renderer, int x, int y, const Camera& camera, float viewport_width, float viewport_height) {
+    const SDL_FPoint top = world_to_screen(static_cast<float>(x), static_cast<float>(y), camera, viewport_width, viewport_height);
+    const SDL_FPoint right = world_to_screen(static_cast<float>(x + 1), static_cast<float>(y), camera, viewport_width, viewport_height);
+    const SDL_FPoint bottom = world_to_screen(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
+    const SDL_FPoint left = world_to_screen(static_cast<float>(x), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
+
+    SDL_RenderLine(renderer, top.x, top.y, right.x, right.y);
+    SDL_RenderLine(renderer, right.x, right.y, bottom.x, bottom.y);
+    SDL_RenderLine(renderer, bottom.x, bottom.y, left.x, left.y);
+    SDL_RenderLine(renderer, left.x, left.y, top.x, top.y);
+}
+
+void render_navigation_debug_path(SDL_Renderer* renderer, const NavigationPathResult& path,
+                                  const Camera& camera, float viewport_width, float viewport_height) {
+    if (path.status != NavigationPathStatus::found || path.tiles.empty()) return;
+
+    SDL_SetRenderDrawColor(renderer, 78, 212, 255, SDL_ALPHA_OPAQUE);
+    SDL_FPoint previous{};
+    bool has_previous = false;
+    for (const NavigationTile& tile : path.tiles) {
+        render_tile_outline(renderer, tile.x, tile.y, camera, viewport_width, viewport_height);
+        const SDL_FPoint center = world_to_screen(static_cast<float>(tile.x) + 0.5F, static_cast<float>(tile.y) + 0.5F,
+                                                  camera, viewport_width, viewport_height);
+        if (has_previous) SDL_RenderLine(renderer, previous.x, previous.y, center.x, center.y);
+        previous = center;
+        has_previous = true;
+    }
+
+    SDL_SetRenderDrawColor(renderer, 98, 238, 112, SDL_ALPHA_OPAQUE);
+    render_tile_outline(renderer, path.tiles.front().x, path.tiles.front().y, camera, viewport_width, viewport_height);
+    SDL_SetRenderDrawColor(renderer, 255, 194, 74, SDL_ALPHA_OPAQUE);
+    render_tile_outline(renderer, path.tiles.back().x, path.tiles.back().y, camera, viewport_width, viewport_height);
+}
+
+void render_footprint_outline(SDL_Renderer* renderer, const BuildingDefinition& definition, BuildingRotation rotation,
+                              int tile_x, int tile_y,
+                              const Camera& camera, float viewport_width, float viewport_height,
+                              Uint8 red, Uint8 green, Uint8 blue) {
+    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
+        for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
+            render_tile_outline(renderer, tile_x + offset_x, tile_y + offset_y, camera, viewport_width, viewport_height);
+        }
+    }
+}
+
+[[nodiscard]] TileCoordinate road_access_offset(const GridDirection direction) {
+    switch (direction) {
+        case GridDirection::north: return {0, -1};
+        case GridDirection::east: return {1, 0};
+        case GridDirection::south: return {0, 1};
+        case GridDirection::west: return {-1, 0};
+    }
+    return {};
+}
+
+void render_road_access_candidates(SDL_Renderer* renderer, const BuildingDefinition& definition,
+                                   const BuildingRotation rotation, const int tile_x, const int tile_y,
+                                   const RoadManager& roads, const Camera& camera,
+                                   const float viewport_width, const float viewport_height) {
+    if (!definition.requires_road_access || resolved_road_access_mode(definition) == RoadAccessMode::any_perimeter) return;
+    for (const BuildingAccessPoint& access : road_access_candidates(definition, rotation)) {
+        const TileCoordinate offset = road_access_offset(access.facing);
+        const int road_x = tile_x + access.local_x + offset.x;
+        const int road_y = tile_y + access.local_y + offset.y;
+        SDL_SetRenderDrawColor(renderer, roads.is_road(road_x, road_y) ? 112 : 255,
+                               roads.is_road(road_x, road_y) ? 232 : 160, 96, SDL_ALPHA_OPAQUE);
+        render_tile_outline(renderer, road_x, road_y, camera, viewport_width, viewport_height);
+    }
+}
+
+void render_grass_tile(SDL_Renderer* renderer, const TextureAsset& grass, int x, int y,
+                       const Camera& camera, float viewport_width, float viewport_height) {
+    const CameraWorldPoint visual_top = tile_visual_top_world(x, y, camera.rotation);
+    const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
+    const float scale = (kTileWidth / kGrassOpaqueWidth) * camera.zoom;
+    const SDL_FRect destination = {
+        top.x - (kTileWidth * camera.zoom * 0.5F) - (kGrassOpaqueLeft * scale),
+        top.y - (kGrassOpaqueTop * scale),
+        grass.source_width * scale,
+        grass.source_height * scale,
+    };
+    SDL_RenderTexture(renderer, grass.texture, nullptr, &destination);
+}
+
+void render_map(SDL_Renderer* renderer, const TextureAsset* grass, const Camera& camera, float viewport_width, float viewport_height) {
+    SDL_SetRenderDrawColor(renderer, 74, 104, 83, SDL_ALPHA_OPAQUE);
+    const SDL_FRect background = {0.0F, 0.0F, viewport_width, viewport_height};
+    SDL_RenderFillRect(renderer, &background);
+
+    if (grass == nullptr) {
+        SDL_SetRenderDrawColor(renderer, 117, 148, 122, 115);
+        for (int y = kMapMin; y <= kMapMax; ++y) {
+            for (int x = kMapMin; x <= kMapMax; ++x) {
+                render_tile_outline(renderer, x, y, camera, viewport_width, viewport_height);
+            }
+        }
+        return;
+    }
+
+    for (int depth = kMapMin * 2; depth <= kMapMax * 2; ++depth) {
+        const int first_x = std::max(kMapMin, depth - kMapMax);
+        const int last_x = std::min(kMapMax, depth - kMapMin);
+        for (int x = first_x; x <= last_x; ++x) {
+            render_grass_tile(renderer, *grass, x, depth - x, camera, viewport_width, viewport_height);
+        }
+    }
+}
+
+void render_road_tile(SDL_Renderer* renderer, int tile_x, int tile_y, const Camera& camera,
+                      float viewport_width, float viewport_height, SDL_FColor color) {
+    const SDL_FPoint top = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
+    const SDL_FPoint right = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
+    const SDL_FPoint bottom = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
+    const SDL_FPoint left = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = top;
+    vertices[1].position = right;
+    vertices[2].position = bottom;
+    vertices[3].position = left;
+    for (SDL_Vertex& vertex : vertices) {
+        vertex.color = color;
+    }
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+
+    SDL_SetRenderDrawColor(renderer, 45, 54, 57, static_cast<Uint8>(color.a * 255.0F));
+    render_tile_outline(renderer, tile_x, tile_y, camera, viewport_width, viewport_height);
+}
+
+void render_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y, const Camera& camera,
+                      float viewport_width, float viewport_height, const SDL_FColor color) {
+    const SDL_FPoint top = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
+    const SDL_FPoint right = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
+    const SDL_FPoint bottom = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
+    const SDL_FPoint left = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = top;
+    vertices[1].position = right;
+    vertices[2].position = bottom;
+    vertices[3].position = left;
+    for (SDL_Vertex& vertex : vertices) {
+        vertex.color = color;
+    }
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+}
+
+void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands, const LandParcel* hovered_parcel,
+                          const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height) {
+    for (const LandParcel& parcel : lands.parcels()) {
+        SDL_FColor color = {0.08F, 0.11F, 0.14F, 0.22F};
+        if (land_mode && &parcel == hovered_parcel) {
+            if (parcel.owned) {
+                color = {0.22F, 0.58F, 0.92F, 0.28F};
+            } else if (lands.can_purchase_parcel(parcel.id)) {
+                color = {0.25F, 0.82F, 0.42F, 0.42F};
+            } else {
+                color = {0.88F, 0.28F, 0.24F, 0.42F};
+            }
+        } else if (parcel.owned) {
+            continue;
+        }
+        for (int y = std::max(kMapMin, parcel.origin_y); y <= std::min(kMapMax, parcel.origin_y + parcel.height - 1); ++y) {
+            for (int x = std::max(kMapMin, parcel.origin_x); x <= std::min(kMapMax, parcel.origin_x + parcel.width - 1); ++x) {
+                render_tile_fill(renderer, x, y, camera, viewport_width, viewport_height, color);
+            }
+        }
+    }
+}
+
+[[nodiscard]] SDL_FColor road_placeholder_color(const RoadVisualType type) {
+    switch (type) {
+        case RoadVisualType::isolated: return {0.25F, 0.29F, 0.30F, 0.94F};
+        case RoadVisualType::end: return {0.25F, 0.39F, 0.47F, 0.94F};
+        case RoadVisualType::straight: return {0.24F, 0.28F, 0.28F, 0.94F};
+        case RoadVisualType::curve: return {0.35F, 0.29F, 0.48F, 0.94F};
+        case RoadVisualType::tee: return {0.48F, 0.34F, 0.20F, 0.94F};
+        case RoadVisualType::intersection: return {0.43F, 0.24F, 0.20F, 0.94F};
+    }
+    return {0.24F, 0.28F, 0.28F, 0.94F};
+}
+
+// Final road sprites are transparent 128x64 isometric diamonds, anchored at the
+// top point of their logical tile. This is intentionally separate from RoadManager.
+void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
+                        const Camera& camera, float viewport_width, float viewport_height) {
+    const CameraWorldPoint visual_top = tile_visual_top_world(tile_x, tile_y, camera.rotation);
+    const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y,
+                                            camera, viewport_width, viewport_height);
+    // A road sprite may extend below the 128x64 ground diamond for curbs and
+    // contact depth.  Width stays tied to the logical tile; height follows
+    // the authored asset rather than flattening that depth.
+    const float destination_height = kTileWidth * camera.zoom * texture.source_height / texture.source_width;
+    const SDL_FRect destination = {
+        top.x - kTileWidth * camera.zoom * 0.5F,
+        top.y,
+        kTileWidth * camera.zoom,
+        destination_height,
+    };
+    SDL_RenderTexture(renderer, texture.texture, nullptr, &destination);
+}
+
+void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVisualCatalog& visuals,
+                  const TextureCache& textures, const std::filesystem::path& asset_root, const Camera& camera,
+                  float viewport_width, float viewport_height) {
+    // Current terrain pass: all roads render before buildings. This keeps the
+    // existing pipeline stable; a future depth pass can merge road/building draw
+    // commands by tile depth without changing RoadManager or this catalog.
+    std::vector<const RoadTile*> sorted_tiles;
+    sorted_tiles.reserve(roads.tiles().size());
+    for (const RoadTile& tile : roads.tiles()) sorted_tiles.push_back(&tile);
+    std::sort(sorted_tiles.begin(), sorted_tiles.end(), [&camera](const RoadTile* left, const RoadTile* right) {
+        const float left_depth = camera_depth_key(static_cast<float>(left->tile_x + 1), static_cast<float>(left->tile_y + 1), camera);
+        const float right_depth = camera_depth_key(static_cast<float>(right->tile_x + 1), static_cast<float>(right->tile_y + 1), camera);
+        if (left_depth != right_depth) return left_depth < right_depth;
+        if (left->tile_y != right->tile_y) return left->tile_y < right->tile_y;
+        return left->tile_x < right->tile_x;
+    });
+    for (const RoadTile* tile : sorted_tiles) {
+        const RoadVisual* visual = visuals.get_for_mask(camera_visual_connections(tile->connections, camera.rotation));
+        const TextureAsset* texture = visual == nullptr ? nullptr : textures.find(asset_root / visual->texture_path);
+        if (texture != nullptr) {
+            render_road_sprite(renderer, *texture, tile->tile_x, tile->tile_y, camera, viewport_width, viewport_height);
+        } else {
+            render_road_tile(renderer, tile->tile_x, tile->tile_y, camera, viewport_width, viewport_height,
+                             road_placeholder_color(roads.visual_type(tile->tile_x, tile->tile_y)));
+        }
+    }
+}
+
+[[nodiscard]] std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMask connections) {
+    // This is intentionally only a visual lookup. SidewalkManager owns the
+    // N/E/S/W topology and never needs to know how an individual PNG is named.
+    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
+    const int mask = static_cast<int>(connections);
+    // The legacy "15" texture is a copy of the isolated-tile art, including
+    // raised curbs on all four sides. A fully connected tile must instead be
+    // borderless, otherwise a dense sidewalk network looks like overlapping
+    // individual slabs even though its topology is correct.
+    if (mask == 15) return base + "15_seamless.png";
+    const std::string suffix = mask < 10 ? "0" + std::to_string(mask) : std::to_string(mask);
+    return base + suffix + ".png";
+}
+void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, const TextureCache& textures,
+                      const std::filesystem::path& root, const Camera& camera, float vw, float vh) {
+    for (const SidewalkTile& tile : sidewalks.tiles()) {
+        const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
+        if (const TextureAsset* texture = textures.find(root / sidewalk_sprite(tile.style_id, visual_connections))) {
+            const CameraWorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
+            const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, vw, vh);
+            const float scale = (kTileWidth / texture->source_width) * camera.zoom;
+            SDL_FRect dst{top.x - texture->source_width * scale * 0.5F, top.y, texture->source_width * scale, texture->source_height * scale};
+            SDL_RenderTexture(renderer, texture->texture, nullptr, &dst);
+        }
+    }
+}
+
+void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const CropCatalog& crops,
+                    const TextureCache& textures, const std::filesystem::path& root, const Camera& camera,
+                    float viewport_width, float viewport_height) {
+    constexpr float kFarmOpaqueLeft = 16.0F;
+    constexpr float kFarmOpaqueTop = 151.0F;
+    constexpr float kFarmOpaqueWidth = 1220.0F;
+    for (const FarmTile& tile : farming.tiles()) {
+        const CameraWorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
+        const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
+        const CropDefinition* crop = tile.state == FarmTileState::prepared_soil ? nullptr : crops.find(tile.crop_id);
+        const bool legacy_composite = crop != nullptr && !crop->has_stage_overlays();
+
+        // Soil is a common terrain layer. The legacy composite branch remains
+        // only until matching plant-only overlays are supplied for old crops.
+        if (!legacy_composite) {
+            if (const TextureAsset* soil = textures.find(root / "assets/farming/prepared_soil/prepared_soil_01.png")) {
+                const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
+                const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
+                                               top.y - kFarmOpaqueTop * scale,
+                                               soil->source_width * scale, soil->source_height * scale};
+                SDL_RenderTexture(renderer, soil->texture, nullptr, &destination);
+            }
+        }
+        if (crop == nullptr || tile.stage < 0 || tile.stage >= crop->stage_count()) continue;
+        const TextureAsset* sprite = textures.find(root / crop->active_stage_sprites()[static_cast<std::size_t>(tile.stage)]);
+        if (sprite == nullptr) continue;
+        if (legacy_composite) {
+            const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
+            const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
+                                           top.y - kFarmOpaqueTop * scale,
+                                           sprite->source_width * scale, sprite->source_height * scale};
+            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
+        } else {
+            const float canvas_width = crop->overlay_canvas_width > 0 ? static_cast<float>(crop->overlay_canvas_width) : static_cast<float>(sprite->source_width);
+            const float canvas_height = crop->overlay_canvas_height > 0 ? static_cast<float>(crop->overlay_canvas_height) : static_cast<float>(sprite->source_height);
+            const float scale = (kTileWidth / canvas_width) * camera.zoom * crop->overlay_scale;
+            const SDL_FRect destination = {top.x - crop->overlay_anchor_x * canvas_width * scale,
+                                           top.y - crop->overlay_anchor_y * canvas_height * scale,
+                                           sprite->source_width * scale, sprite->source_height * scale};
+            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
+        }
+    }
+}
+
+[[nodiscard]] bool building_overlaps_road(const BuildingDefinition& definition, BuildingRotation rotation,
+                                          int tile_x, int tile_y, const RoadManager& roads) {
+    return roads.overlaps_building_footprint(definition, tile_x, tile_y, rotation);
+}
+
+[[nodiscard]] bool road_segment_is_valid(const std::vector<TileCoordinate>& tiles, const RoadManager& roads,
+                                          const BuildingManager& buildings) {
+    return std::all_of(tiles.begin(), tiles.end(), [&roads, &buildings](const TileCoordinate& tile) {
+        return roads.validate_placement(tile.x, tile.y, buildings) == RoadPlacementFailure::none;
+    });
+}
+
+[[nodiscard]] bool building_is_on_owned_land(const BuildingDefinition& definition, const BuildingRotation rotation,
+                                              const int tile_x, const int tile_y, const LandManager& lands) {
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    return lands.is_area_owned(tile_x, tile_y, footprint.width, footprint.height);
+}
+
+[[nodiscard]] bool building_overlaps_sidewalk(const BuildingDefinition& definition, const BuildingRotation rotation,
+                                              const int tile_x, const int tile_y, const SidewalkManager& sidewalks) {
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    for (int y = 0; y < footprint.height; ++y) {
+        for (int x = 0; x < footprint.width; ++x) {
+            if (sidewalks.is_sidewalk(tile_x + x, tile_y + y)) return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] bool building_overlaps_farm(const BuildingDefinition& definition, const BuildingRotation rotation,
+                                          const int tile_x, const int tile_y, const FarmingSystem& farming) {
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    for (int y = 0; y < footprint.height; ++y) {
+        for (int x = 0; x < footprint.width; ++x) {
+            if (farming.is_occupied(tile_x + x, tile_y + y)) return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] const char* placement_failure_text(PlacementFailure failure);
+
+struct BuildingPlacementValidation {
+    PlacementFailure failure = PlacementFailure::none;
+    bool affordable = false;
+    bool on_road = false;
+    bool on_sidewalk = false;
+    bool on_farm = false;
+    bool on_owned_land = false;
+    bool has_road_access = false;
+    bool has_power = false;
+
+    [[nodiscard]] bool valid() const {
+        // Buildings remain placeable during a power shortage.  Power is a
+        // city-wide operating state, not a spatial placement rule: blocking
+        // the catalogue at the base capacity made most civic/commercial
+        // buildings impossible to add before the player could expand power.
+        return failure == PlacementFailure::none && affordable && !on_road && !on_sidewalk && !on_farm &&
+               on_owned_land && has_road_access;
+    }
+};
+
+[[nodiscard]] BuildingPlacementValidation validate_building_placement(
+    const BuildingDefinition& definition, const BuildingRotation rotation, const int tile_x, const int tile_y,
+    const BuildingManager& buildings, const RoadManager& roads, const LandManager& lands,
+    const SidewalkManager& sidewalks, const FarmingSystem& farming, const CityEconomy& economy, const PowerSystem& power) {
+    return {
+        buildings.validate(definition, tile_x, tile_y, rotation),
+        economy.can_afford(definition.build_cost),
+        building_overlaps_road(definition, rotation, tile_x, tile_y, roads),
+        building_overlaps_sidewalk(definition, rotation, tile_x, tile_y, sidewalks),
+        building_overlaps_farm(definition, rotation, tile_x, tile_y, farming),
+        building_is_on_owned_land(definition, rotation, tile_x, tile_y, lands),
+        roads.has_required_road_access(definition, tile_x, tile_y, rotation),
+        power.can_support(definition),
+    };
+}
+
+[[nodiscard]] std::string placement_validation_text(const BuildingPlacementValidation& validation) {
+    if (validation.failure != PlacementFailure::none) {
+        return placement_failure_text(validation.failure);
+    }
+    if (!validation.on_owned_land) {
+        return "LAND NOT OWNED";
+    }
+    if (validation.on_road) {
+        return "AREA HAS ROAD";
+    }
+    if (validation.on_sidewalk) {
+        return "AREA HAS SIDEWALK";
+    }
+    if (validation.on_farm) {
+        return "BUILDING BLOCKED BY FARM TILE";
+    }
+    if (!validation.has_road_access) {
+        return "ROAD AT ENTRANCE REQUIRED";
+    }
+    if (!validation.affordable) {
+        return "NOT ENOUGH FUNDS";
+    }
+    return "VALID AREA";
+}
+
+[[nodiscard]] bool road_segment_is_on_owned_land(const std::vector<TileCoordinate>& tiles, const LandManager& lands) {
+    return !tiles.empty() && std::all_of(tiles.begin(), tiles.end(), [&lands](const TileCoordinate& tile) {
+        return lands.is_tile_owned(tile.x, tile.y);
+    });
+}
+
+[[nodiscard]] const char* tile_occupancy_label(const BuildingManager& buildings, const RoadManager& roads,
+                                                const SidewalkManager& sidewalks, const FarmingSystem& farming,
+                                                const int tile_x, const int tile_y) {
+    // A single diagnostic ordering makes layer conflicts visible in one place.
+    // Placement systems still validate their own footprint-specific rules.
+    const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, tile_x, tile_y);
+    if (occupancy.building) return "BUILDING";
+    if (occupancy.road) return "ROAD";
+    if (occupancy.sidewalk) return "SIDEWALK";
+    if (occupancy.farm) return "FARM";
+    return "EMPTY";
+}
+
+[[nodiscard]] std::string connection_label(const TileConnectionMask mask) {
+    return "N" + std::to_string(has_connection(mask, CardinalDirection::north)) +
+           " E" + std::to_string(has_connection(mask, CardinalDirection::east)) +
+           " S" + std::to_string(has_connection(mask, CardinalDirection::south)) +
+           " W" + std::to_string(has_connection(mask, CardinalDirection::west));
+}
+
+[[nodiscard]] const char* mobile_direction_label(const MobileEntityDirection direction) {
+    switch (direction) {
+        case MobileEntityDirection::north: return "NORTH";
+        case MobileEntityDirection::east: return "EAST";
+        case MobileEntityDirection::south: return "SOUTH";
+        case MobileEntityDirection::west: return "WEST";
+    }
+    return "SOUTH";
+}
+
+// This is the single visual geometry contract for every building sprite.  The
+// footprint is logical; the PNG may extend beyond it, but its declared anchor
+// always lands on the same footprint ground point.
+struct BuildingSpriteGeometry {
+    CameraWorldPoint ground;
+    SDL_FPoint screen_anchor;
+    SDL_FRect sprite_bounds;
+};
+
+void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text,
+               Uint8 red, Uint8 green, Uint8 blue);
+
+[[nodiscard]] BuildingSpriteGeometry building_sprite_geometry(const BuildingDefinition& definition,
+                                                               const BuildingInstance& instance,
+                                                               const BuildingRotation visual_rotation,
+                                                               const TextureAsset& texture,
+                                                               const Camera& camera,
+                                                               const float viewport_width,
+                                                               const float viewport_height) {
+    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+    const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
+    const SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
+    const float scale = definition.art_scale * camera.zoom;
+    const SDL_FRect bounds = {
+        anchor.x - texture.source_width * scale * definition.anchor_x_for(visual_rotation, instance.current_level),
+        anchor.y - texture.source_height * scale * definition.anchor_y_for(visual_rotation, instance.current_level),
+        texture.source_width * scale,
+        texture.source_height * scale,
+    };
+    return {ground, anchor, bounds};
+}
+
+void render_building(SDL_Renderer* renderer, const BuildingDefinition& definition, const BuildingInstance& instance,
+                     const BuildingRotation visual_rotation, const TextureAsset& texture, const Camera& camera,
+                     float viewport_width, float viewport_height,
+                     Uint8 alpha = SDL_ALPHA_OPAQUE) {
+    const BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
+                                                                       viewport_width, viewport_height);
+    SDL_SetTextureAlphaMod(texture.texture, alpha);
+    SDL_RenderTexture(renderer, texture.texture, nullptr, &geometry.sprite_bounds);
+    SDL_SetTextureAlphaMod(texture.texture, SDL_ALPHA_OPAQUE);
+}
+
+void render_anchor_cross(SDL_Renderer* renderer, const SDL_FPoint point, const float radius,
+                         const Uint8 red, const Uint8 green, const Uint8 blue) {
+    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, point.x - radius, point.y, point.x + radius, point.y);
+    SDL_RenderLine(renderer, point.x, point.y - radius, point.x, point.y + radius);
+}
+
+// F1 calibration overlay: it draws diagnostic geometry over exactly the same
+// projection and anchor calculation used by render_building above.  It must
+// never alter placement or asset offsets.
+void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDefinition& definition,
+                                       const BuildingInstance& instance, const BuildingRotation visual_rotation,
+                                       const TextureAsset& texture, const RoadManager& roads,
+                                       const Camera& camera, const float viewport_width, const float viewport_height) {
+    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+
+    // A deliberately small 2:1 reference grid makes a bad base/asset obvious
+    // without obscuring the actual map.
+    SDL_SetRenderDrawColor(renderer, 54, 134, 164, 175);
+    for (int y = instance.tile_y - 2; y < instance.tile_y + footprint.height + 2; ++y) {
+        for (int x = instance.tile_x - 2; x < instance.tile_x + footprint.width + 2; ++x) {
+            render_tile_outline(renderer, x, y, camera, viewport_width, viewport_height);
+        }
+    }
+
+    render_footprint_outline(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
+                             camera, viewport_width, viewport_height, 255, 208, 92);
+    render_road_access_candidates(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
+                                  roads, camera, viewport_width, viewport_height);
+
+    const BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
+                                                                       viewport_width, viewport_height);
+    SDL_SetRenderDrawColor(renderer, 238, 94, 224, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &geometry.sprite_bounds);
+    render_anchor_cross(renderer, geometry.screen_anchor, 8.0F, 72, 236, 255);
+
+    // The two projected world axes start at the logical footprint centre.
+    const float centre_x = static_cast<float>(instance.tile_x) + static_cast<float>(footprint.width) * 0.5F;
+    const float centre_y = static_cast<float>(instance.tile_y) + static_cast<float>(footprint.height) * 0.5F;
+    const SDL_FPoint centre = world_to_screen(centre_x, centre_y, camera, viewport_width, viewport_height);
+    const SDL_FPoint axis_x = world_to_screen(centre_x + 1.0F, centre_y, camera, viewport_width, viewport_height);
+    const SDL_FPoint axis_y = world_to_screen(centre_x, centre_y + 1.0F, camera, viewport_width, viewport_height);
+    render_anchor_cross(renderer, centre, 5.0F, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, 255, 92, 92, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, centre.x, centre.y, axis_x.x, axis_x.y);
+    SDL_SetRenderDrawColor(renderer, 104, 236, 124, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, centre.x, centre.y, axis_y.x, axis_y.y);
+    draw_text(renderer, axis_x.x + 4.0F, axis_x.y - 8.0F, "X", 255, 92, 92);
+    draw_text(renderer, axis_y.x + 4.0F, axis_y.y - 8.0F, "Y", 104, 236, 124);
+    draw_text(renderer, geometry.screen_anchor.x + 10.0F, geometry.screen_anchor.y - 10.0F, "A", 72, 236, 255);
+}
+
+void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager, const BuildingCatalog& catalog,
+                      const TextureCache& textures, const std::filesystem::path& asset_root,
+                      const Camera& camera, float viewport_width, float viewport_height) {
+    std::vector<const BuildingInstance*> sorted_instances;
+    for (const BuildingInstance& instance : manager.instances()) {
+        sorted_instances.push_back(&instance);
+    }
+    std::sort(sorted_instances.begin(), sorted_instances.end(), [&catalog, &camera](const BuildingInstance* left, const BuildingInstance* right) {
+        const BuildingDefinition* left_definition = catalog.find(left->definition_id);
+        const BuildingDefinition* right_definition = catalog.find(right->definition_id);
+        const BuildingFootprint left_footprint = left_definition == nullptr
+            ? BuildingFootprint{} : rotated_footprint(*left_definition, left->rotation);
+        const BuildingFootprint right_footprint = right_definition == nullptr
+            ? BuildingFootprint{} : rotated_footprint(*right_definition, right->rotation);
+        const CameraWorldPoint left_ground = building_visual_ground_world(*left, left_footprint, camera.rotation);
+        const CameraWorldPoint right_ground = building_visual_ground_world(*right, right_footprint, camera.rotation);
+        const float left_depth = camera_depth_key(left_ground.x, left_ground.y, camera);
+        const float right_depth = camera_depth_key(right_ground.x, right_ground.y, camera);
+        return left_depth == right_depth ? left->instance_id < right->instance_id : left_depth < right_depth;
+    });
+
+    for (const BuildingInstance* instance : sorted_instances) {
+        const BuildingDefinition* definition = catalog.find(instance->definition_id);
+        if (definition == nullptr) {
+            continue;
+        }
+        const BuildingRotation visual_rotation = camera_visual_rotation(*definition, instance->rotation, camera.rotation);
+        const TextureAsset* texture = textures.find(asset_root / definition->texture_path_for(visual_rotation, instance->current_level));
+        if (texture != nullptr) {
+            render_building(renderer, *definition, *instance, visual_rotation, *texture, camera, viewport_width, viewport_height);
+        }
+    }
+}
+
+void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,
+                           const BuildingCatalog& building_catalog, const std::vector<MobileEntityRenderData>& mobile_entities,
+                           const MobileAnimationCatalog& animations, const TextureCache& textures,
+                           const std::filesystem::path& root, const Camera& camera,
+                           float viewport_width, float viewport_height) {
+    struct EntityDraw {
+        enum class Kind { building, mobile_entity } kind = Kind::building;
+        float depth = 0.0F;
+        const BuildingInstance* building = nullptr;
+        const MobileEntityRenderData* mobile_entity = nullptr;
+    };
+    std::vector<EntityDraw> draws;
+    draws.reserve(buildings.instances().size() + mobile_entities.size());
+    for (const BuildingInstance& instance : buildings.instances()) {
+        const BuildingDefinition* definition = building_catalog.find(instance.definition_id);
+        if (definition == nullptr) continue;
+        const BuildingFootprint footprint = rotated_footprint(*definition, instance.rotation);
+        const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
+        draws.push_back({EntityDraw::Kind::building, camera_depth_key(ground.x, ground.y, camera), &instance, nullptr});
+    }
+    std::vector<MobileEntityRenderData> camera_relative_mobiles;
+    camera_relative_mobiles.reserve(mobile_entities.size());
+    for (const MobileEntityRenderData& entity : mobile_entities) {
+        camera_relative_mobiles.push_back(camera_relative_mobile_entity(entity, animations, camera.rotation));
+        const MobileEntityRenderData& visual = camera_relative_mobiles.back();
+        draws.push_back({EntityDraw::Kind::mobile_entity,
+                         camera_depth_key(visual.spatial.visual_world_x + visual.spatial.ground_anchor_x,
+                                          visual.spatial.visual_world_y + visual.spatial.ground_anchor_y, camera),
+                         nullptr, &visual});
+    }
+    std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {
+        return left.depth < right.depth;
+    });
+    for (const EntityDraw& draw : draws) {
+        if (draw.kind == EntityDraw::Kind::building) {
+            const BuildingDefinition* definition = building_catalog.find(draw.building->definition_id);
+            if (definition == nullptr) continue;
+            const BuildingRotation visual_rotation = camera_visual_rotation(*definition, draw.building->rotation, camera.rotation);
+            const TextureAsset* texture = textures.find(root / definition->texture_path_for(visual_rotation));
+            if (texture != nullptr) render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height);
+            continue;
+        }
+        const MobileEntityRenderData& entity = *draw.mobile_entity;
+        const TextureAsset* texture = textures.find(root / entity.sprite_asset);
+        if (texture == nullptr) continue;
+        const SDL_FPoint anchor = world_to_screen(entity.spatial.visual_world_x + entity.spatial.ground_anchor_x,
+                                                  entity.spatial.visual_world_y + entity.spatial.ground_anchor_y,
+                                                  camera, viewport_width, viewport_height);
+        const float scale = entity.art_scale * camera.zoom;
+        const SDL_FRect destination = {anchor.x - texture->source_width * scale * entity.sprite_anchor_x,
+                                       anchor.y - texture->source_height * scale * entity.sprite_anchor_y,
+                                       texture->source_width * scale, texture->source_height * scale};
+        SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
+    }
+}
+
+[[nodiscard]] std::string format_money(std::int64_t value) {
+    const bool negative = value < 0;
+    const std::uint64_t magnitude = negative
+        ? static_cast<std::uint64_t>(-(value + 1)) + 1U
+        : static_cast<std::uint64_t>(value);
+    std::string digits = std::to_string(magnitude);
+    for (int index = static_cast<int>(digits.size()) - 3; index > 0; index -= 3) {
+        digits.insert(static_cast<std::size_t>(index), ".");
+    }
+    return negative ? "-$" + digits : "$" + digits;
+}
+
+[[nodiscard]] std::string format_balance(const std::int64_t value) {
+    return value >= 0 ? "+" + format_money(value) : format_money(value);
+}
+
+[[nodiscard]] std::string format_date(const GameDate& date) {
+    return "DAY " + std::to_string(date.day) + " | MONTH " + std::to_string(date.month) + " | YEAR " + std::to_string(date.year);
+}
+
+[[nodiscard]] const char* placement_failure_text(PlacementFailure failure) {
+    switch (failure) {
+        case PlacementFailure::none: return "VALID AREA";
+        case PlacementFailure::unavailable_rotation: return "ROTATION NOT AVAILABLE";
+        case PlacementFailure::outside_map: return "OUTSIDE MAP";
+        case PlacementFailure::occupied: return "AREA OCCUPIED";
+    }
+    return "UNKNOWN";
+}
+
+[[nodiscard]] const char* category_label(std::string_view category) {
+    if (category == "commercial") {
+        return "COMERCIO";
+    }
+    if (category == "residential") {
+        return "RESIDENCIAL";
+    }
+    if (category == "agriculture") {
+        return "AGRICULTURA";
+    }
+    return "OUTRO";
+}
+
+[[nodiscard]] const char* direction_label(const GridDirection direction) {
+    switch (direction) {
+        case GridDirection::north: return "N";
+        case GridDirection::east: return "E";
+        case GridDirection::south: return "S";
+        case GridDirection::west: return "W";
+    }
+    return "?";
+}
+
+[[nodiscard]] std::string access_points_label(const BuildingDefinition& definition, const BuildingRotation rotation) {
+    const RoadAccessMode mode = resolved_road_access_mode(definition);
+    if (mode == RoadAccessMode::any_perimeter) return "ROAD ACCESS: ANY PERIMETER";
+    const std::vector<BuildingAccessPoint> access_points = road_access_candidates(definition, rotation);
+    if (access_points.empty()) {
+        return "ROAD ACCESS: " + std::string(road_access_mode_label(mode)) + " (NONE)";
+    }
+    std::string text = "ROAD ACCESS " + std::string(road_access_mode_label(mode)) + ":";
+    for (const BuildingAccessPoint& access_point : access_points) {
+        text += " (" + std::to_string(access_point.local_x) + "," + std::to_string(access_point.local_y) + ") " +
+                direction_label(access_point.facing);
+    }
+    return text;
+}
+
+void draw_panel(SDL_Renderer* renderer, float x, float y, float width, float height) {
+    SDL_SetRenderDrawColor(renderer, 16, 25, 30, 220);
+    const SDL_FRect panel = {x, y, width, height};
+    SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 178, 217, 186, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &panel);
+}
+
+void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text, Uint8 red = 238, Uint8 green = 244, Uint8 blue = 238) {
+    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+    SDL_RenderDebugText(renderer, x, y, text.c_str());
+}
+
+// The loading artwork is a single authored sheet. Keeping the crop layout
+// here makes it a presentation concern and leaves the gameplay UI independent.
+void render_loading_screen(SDL_Renderer* renderer, const TextureAsset& sheet,
+                           const int viewport_width, const int viewport_height,
+                           const float progress) {
+    const float width = static_cast<float>(viewport_width);
+    const float height = static_cast<float>(viewport_height);
+    const float ui_scale = std::min(width / 1491.0F, height / 1055.0F);
+    const float clamped_progress = std::clamp(progress, 0.0F, 1.0F);
+
+    SDL_SetRenderDrawColor(renderer, 4, 18, 29, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(renderer);
+
+    const SDL_FRect logo_source = {0.0F, 0.0F, 790.0F, 470.0F};
+    const SDL_FRect preview_source = {820.0F, 100.0F, 650.0F, 370.0F};
+    const SDL_FRect progress_source = {28.0F, 472.0F, 830.0F, 118.0F};
+    const SDL_FRect tip_source = {875.0F, 482.0F, 605.0F, 260.0F};
+    const SDL_FRect logo_destination = {width * 0.08F, height * 0.08F, 620.0F * ui_scale, 368.0F * ui_scale};
+    const SDL_FRect preview_destination = {width * 0.56F, height * 0.12F, 520.0F * ui_scale, 296.0F * ui_scale};
+    const SDL_FRect progress_destination = {width * 0.20F, height * 0.62F, 650.0F * ui_scale, 92.0F * ui_scale};
+    const SDL_FRect tip_destination = {width * 0.30F, height * 0.76F, 450.0F * ui_scale, 193.0F * ui_scale};
+    SDL_RenderTexture(renderer, sheet.texture, &logo_source, &logo_destination);
+    SDL_RenderTexture(renderer, sheet.texture, &preview_source, &preview_destination);
+    SDL_RenderTexture(renderer, sheet.texture, &progress_source, &progress_destination);
+    SDL_RenderTexture(renderer, sheet.texture, &tip_source, &tip_destination);
+
+    const SDL_FRect fill = {progress_destination.x + 28.0F * ui_scale,
+                            progress_destination.y + 35.0F * ui_scale,
+                            (progress_destination.w - 56.0F * ui_scale) * clamped_progress,
+                            26.0F * ui_scale};
+    SDL_SetRenderDrawColor(renderer, 42, 206, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &fill);
+    draw_text(renderer, width * 0.5F - 88.0F, progress_destination.y + progress_destination.h + 20.0F,
+              "PREPARANDO A CIDADE...");
+    draw_text(renderer, tip_destination.x + 42.0F * ui_scale, tip_destination.y + 72.0F * ui_scale,
+              "DICA: RUAS E CALCADAS", 188, 232, 252);
+    draw_text(renderer, tip_destination.x + 42.0F * ui_scale, tip_destination.y + 90.0F * ui_scale,
+              "ORGANIZAM A CIDADE.", 188, 232, 252);
+}
+
+void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& economy, const SimulationClock& clock,
+               const BuildingManager& manager,
+               const RoadManager& roads, const LandManager& lands, const BuildingCatalog& catalog, const RoadVisual* hovered_road_visual,
+               bool hovered_road_uses_asset, std::optional<std::uint64_t> selected_instance_id,
+               const std::pair<int, int>& mouse_tile, const BuildingDefinition* placement_definition,
+               BuildingRotation placement_rotation, PlacementFailure placement_failure,
+               bool placement_affordable, bool placement_on_road, bool placement_on_owned_land,
+               bool road_mode, bool road_removal_mode, bool road_preview_valid, bool road_preview_on_owned_land,
+               bool land_mode, bool debug_visible, const std::string& status) {
+    const float mode_panel_y = debug_visible ? 442.0F : 134.0F;
+    const float status_panel_y = debug_visible ? 516.0F : 208.0F;
+    draw_panel(renderer, 12.0F, 12.0F, debug_visible ? 590.0F : 350.0F, debug_visible ? 420.0F : 42.0F);
+    draw_text(renderer, 22.0F, 22.0F, "FUNDS: " + format_money(economy.funds()));
+    if (debug_visible) {
+        const MonthlyEconomySummary& monthly = economy.monthly_summary();
+        draw_text(renderer, 22.0F, 40.0F, format_date(clock.date()) + " | " + simulation_speed_label(clock.speed()));
+        draw_text(renderer, 22.0F, 58.0F, "MONTHLY REVENUE: " + format_money(monthly.revenue));
+        draw_text(renderer, 22.0F, 76.0F, "MONTHLY EXPENSES: " + format_money(monthly.expenses));
+        draw_text(renderer, 22.0F, 94.0F, "MONTHLY BALANCE: " + format_balance(monthly.balance));
+        draw_text(renderer, 22.0F, 112.0F, "TILE: " + std::to_string(mouse_tile.first) + "," + std::to_string(mouse_tile.second));
+        draw_text(renderer, 22.0F, 130.0F, "BUILDINGS: " + std::to_string(manager.instances().size()));
+        draw_text(renderer, 22.0F, 148.0F, "ROADS: " + std::to_string(roads.tiles().size()));
+        const TileOccupancy legacy_occupancy = roads.occupancy_at(mouse_tile.first, mouse_tile.second, manager);
+        const char* legacy_label = legacy_occupancy == TileOccupancy::building ? "BUILDING" :
+            (legacy_occupancy == TileOccupancy::road ? "ROAD" : "EMPTY");
+        draw_text(renderer, 22.0F, 166.0F, "OCCUPANCY: " + std::string(legacy_label));
+        if (const RoadTile* road = roads.tile_at(mouse_tile.first, mouse_tile.second)) {
+            draw_text(renderer, 22.0F, 184.0F, "ROAD: MASK " + std::to_string(road->connections) + " " + connection_label(road->connections));
+            const std::string resource = hovered_road_visual == nullptr ? "UNRESOLVED" : hovered_road_visual->texture_path;
+            draw_text(renderer, 22.0F, 202.0F, "VISUAL: " + std::string(hovered_road_uses_asset ? "ASSET " : "FALLBACK ") + resource);
+        }
+        const LandParcel* parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
+        if (parcel != nullptr) {
+            draw_text(renderer, 22.0F, 220.0F, "PARCEL: " + std::to_string(parcel->id) +
+                      (parcel->owned ? " OWNED" : " AVAILABLE") + " | COST " + format_money(parcel->purchase_cost));
+            draw_text(renderer, 22.0F, 238.0F, "ADJACENT TO OWNED: " + std::string(lands.is_adjacent_to_owned(*parcel) ? "YES" : "NO"));
+        } else {
+            draw_text(renderer, 22.0F, 220.0F, "PARCEL: OUTSIDE MAP");
+        }
+        draw_text(renderer, 22.0F, 256.0F, "TILE OWNED: " + std::string(lands.is_tile_owned(mouse_tile.first, mouse_tile.second) ? "YES" : "NO") +
+                  " | OWNED PARCELS: " + std::to_string(lands.owned_parcel_count()));
+        const BuildingDefinition* debug_definition = placement_definition;
+        BuildingRotation debug_rotation = placement_rotation;
+        if (debug_definition == nullptr && selected_instance_id) {
+            if (const BuildingInstance* selected = manager.find_by_id(*selected_instance_id)) {
+                debug_definition = catalog.find(selected->definition_id);
+                debug_rotation = selected->rotation;
+            }
+        }
+        if (debug_definition != nullptr) {
+            const BuildingFootprint footprint = rotated_footprint(*debug_definition, debug_rotation);
+            draw_text(renderer, 22.0F, 274.0F, "BUILDING: " + debug_definition->id + " " + rotation_label(debug_rotation));
+            draw_text(renderer, 22.0F, 292.0F, "FOOTPRINT: " + std::to_string(debug_definition->footprint_width) + "x" +
+                      std::to_string(debug_definition->footprint_height) + " -> " +
+                      std::to_string(footprint.width) + "x" + std::to_string(footprint.height));
+            draw_text(renderer, 22.0F, 310.0F, "SPRITE: " + debug_definition->texture_path_for(debug_rotation));
+            draw_text(renderer, 22.0F, 328.0F, access_points_label(*debug_definition, debug_rotation));
+        }
+        draw_text(renderer, 22.0F, 364.0F, "COMMA/PERIOD CAMERA | HOME RESET | F5 SAVE | F9 LOAD | F1 DEBUG | Q QUIT");
+    }
+
+    if (placement_definition != nullptr) {
+        draw_panel(renderer, 12.0F, mode_panel_y, 360.0F, 58.0F);
+        draw_text(renderer, 22.0F, mode_panel_y + 10.0F, "BUILD MODE: " + placement_definition->name + " " +
+                  rotation_label(placement_rotation) + (placement_definition->rotatable ? " | Z/X ROTATE" : " | FIXED"));
+        const bool valid = placement_failure == PlacementFailure::none && placement_affordable && !placement_on_road && placement_on_owned_land;
+        const std::string state = valid
+            ? "VALID - LCLICK PLACE | RIGHT/ESC CANCEL"
+            : "INVALID - " + std::string(!placement_on_owned_land ? "LAND NOT OWNED" : placement_on_road ? "AREA HAS ROAD" :
+                (placement_failure == PlacementFailure::none ? "NOT ENOUGH FUNDS" : placement_failure_text(placement_failure)));
+        draw_text(renderer, 22.0F, mode_panel_y + 28.0F, state, valid ? 135 : 255, valid ? 230 : 125, 125);
+    }
+
+    if (road_mode) {
+        draw_panel(renderer, 12.0F, mode_panel_y, 420.0F, 58.0F);
+        draw_text(renderer, 22.0F, mode_panel_y + 10.0F, road_removal_mode ? "ROAD REMOVE: LCLICK A ROAD TILE" :
+                                                         "ROAD MODE: $100/TILE, DRAG LMB TO DRAW");
+        draw_text(renderer, 22.0F, mode_panel_y + 28.0F, road_preview_valid ? "VALID - RIGHT/ESC CANCEL" :
+                      (road_removal_mode ? "INVALID - NO ROAD ON TILE" : (!road_preview_on_owned_land ? "INVALID - LAND NOT OWNED" : "INVALID - ROAD, BUILDING OR MAP LIMIT")),
+                  road_preview_valid ? 135 : 255, road_preview_valid ? 230 : 125, 125);
+    }
+
+    if (land_mode) {
+        const LandParcel* parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
+        draw_panel(renderer, 12.0F, mode_panel_y, 440.0F, 58.0F);
+        draw_text(renderer, 22.0F, mode_panel_y + 10.0F, "LAND MODE: SELECT A PARCEL | RIGHT/ESC CANCEL");
+        if (parcel == nullptr) {
+            draw_text(renderer, 22.0F, mode_panel_y + 28.0F, "INVALID - OUTSIDE MAP", 255, 125, 125);
+        } else if (parcel->owned) {
+            draw_text(renderer, 22.0F, mode_panel_y + 28.0F, "PARCEL " + std::to_string(parcel->id) + " OWNED", 135, 230, 125);
+        } else if (!lands.can_purchase_parcel(parcel->id)) {
+            draw_text(renderer, 22.0F, mode_panel_y + 28.0F, "LOCKED - MUST TOUCH OWNED LAND", 255, 125, 125);
+        } else if (!economy.can_afford(parcel->purchase_cost)) {
+            draw_text(renderer, 22.0F, mode_panel_y + 28.0F, "NOT ENOUGH FUNDS: " + format_money(parcel->purchase_cost), 255, 125, 125);
+        } else {
+            draw_text(renderer, 22.0F, mode_panel_y + 28.0F, "PARCEL " + std::to_string(parcel->id) + " - " +
+                      format_money(parcel->purchase_cost) + " | LCLICK BUY", 135, 230, 125);
+        }
+    }
+
+    if (selected_instance_id) {
+        const BuildingInstance* instance = manager.find_by_id(*selected_instance_id);
+        const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);
+        if (instance != nullptr && definition != nullptr) {
+            const float panel_x = static_cast<float>(viewport_width) - 270.0F;
+            draw_panel(renderer, panel_x, 12.0F, 258.0F, 176.0F);
+            draw_text(renderer, panel_x + 10.0F, 22.0F, definition->name);
+            draw_text(renderer, panel_x + 10.0F, 40.0F, category_label(definition->category));
+            draw_text(renderer, panel_x + 10.0F, 58.0F, "COST: " + format_money(definition->build_cost));
+            draw_text(renderer, panel_x + 10.0F, 76.0F, "MONTHLY TAX: " + format_money(definition->tax_revenue_per_month));
+            draw_text(renderer, panel_x + 10.0F, 94.0F, "MONTHLY MAINT: " + format_money(definition->maintenance_per_month));
+            draw_text(renderer, panel_x + 10.0F, 112.0F, "MONTHLY NET: " +
+                      format_balance(definition->tax_revenue_per_month - definition->maintenance_per_month));
+            draw_text(renderer, panel_x + 10.0F, 130.0F, "POSITION: " + std::to_string(instance->tile_x) + "," + std::to_string(instance->tile_y));
+            draw_text(renderer, panel_x + 10.0F, 148.0F,
+                      roads.has_required_road_access(*definition, instance->tile_x, instance->tile_y, instance->rotation)
+                          ? "ACCESS: ROAD CONNECTED"
+                          : "ACCESS: NO ROAD");
+            draw_text(renderer, panel_x + 10.0F, 166.0F, "ESC CLOSE | ID " + std::to_string(instance->instance_id));
+        }
+    }
+
+    if (!status.empty()) {
+        draw_panel(renderer, 12.0F, status_panel_y, 400.0F, 28.0F);
+        draw_text(renderer, 22.0F, status_panel_y + 10.0F, status);
+    }
+}
+
+}  // namespace
+
+int main() {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow(
+        "City Builder - comma/period: camera | F5: save | F9: load | F10: calibration | B: buildings | ESC: cancel/close",
+        1280,
+        800,
+        SDL_WINDOW_RESIZABLE
+    );
+    if (window == nullptr) {
+        std::cerr << "Window creation failed: " << SDL_GetError() << '\n';
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
+    if (renderer == nullptr) {
+        std::cerr << "Renderer creation failed: " << SDL_GetError() << '\n';
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    SDL_SetRenderVSync(renderer, 1);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    const std::filesystem::path asset_root = runtime_root();
+    AudioManager audio;
+    (void)audio.initialize(asset_root / "assets/audio");
+
+    TextureCache textures;
+    const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01_clean.png");
+    const TextureAsset* loading_ui_sheet = textures.load(renderer, asset_root / "assets/ui/loading/loading_ui_sheet.png");
+    const Uint64 loading_screen_started = SDL_GetTicks();
+    if (loading_ui_sheet != nullptr) {
+        render_loading_screen(renderer, *loading_ui_sheet, 1280, 800, 0.12F);
+        SDL_RenderPresent(renderer);
+    }
+
+    RoadVisualCatalog road_visuals;
+    (void)road_visuals.load_from_file(asset_root / "assets/definitions/road_visual_catalog.json");
+    for (std::uint8_t mask = 0; mask < 16; ++mask) {
+        const RoadVisual* visual = road_visuals.get_for_mask(mask);
+        if (visual != nullptr) {
+            const std::filesystem::path texture_path = asset_root / visual->texture_path;
+            if (std::filesystem::is_regular_file(texture_path)) {
+                (void)textures.load(renderer, texture_path);
+            }
+        }
+    }
+    for (int connections = 0; connections < 16; ++connections) {
+        const std::string suffix = connections < 10 ? "0" + std::to_string(connections) : std::to_string(connections);
+        (void)textures.load(renderer, asset_root / ("assets/sidewalks/concrete_01/sidewalk_concrete_" + suffix + ".png"));
+    }
+    (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
+    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
+
+    BuildingCatalog catalog;
+    if (!catalog.load_from_directory(asset_root / "assets/definitions")) {
+        std::cerr << "No valid building definitions were loaded.\n";
+        audio.shutdown();
+        textures.clear();
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    CropCatalog crop_catalog;
+    if (!crop_catalog.load_from_directory(asset_root / "assets/farming/crops")) {
+        std::cerr << "No valid crop definitions were loaded.\n";
+        audio.shutdown(); textures.clear(); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 1;
+    }
+    AgriculturalResourceCatalog resource_catalog;
+    if (!resource_catalog.load_from_directory(asset_root / "assets/farming/resources")) {
+        std::cerr << "No valid agricultural resource definitions were loaded.\n";
+        audio.shutdown(); textures.clear(); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 1;
+    }
+    for (const CropDefinition& crop : crop_catalog.definitions()) {
+        for (const std::string& sprite : crop.stage_overlay_sprites) {
+            (void)textures.load(renderer, asset_root / sprite);
+        }
+        for (const std::string& sprite : crop.legacy_composite_stage_sprites) {
+            (void)textures.load(renderer, asset_root / sprite);
+        }
+    }
+    for (const BuildingDefinition& definition : catalog.definitions()) {
+        for (const auto& lvl : definition.levels) {
+            for (std::uint8_t rotation = 0; rotation < 4; ++rotation) {
+                const BuildingRotation logical_rotation = static_cast<BuildingRotation>(rotation);
+                if (definition.supports_rotation(logical_rotation)) {
+                    (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
+                }
+            }
+        }
+    }
+    ServiceVehicleCatalog service_vehicle_catalog;
+    if (!service_vehicle_catalog.load_from_directory(asset_root / "assets/definitions/vehicles")) {
+        std::cerr << "No valid service vehicle definitions were loaded.\n";
+    }
+    MobileAnimationCatalog mobile_animations;
+    if (!mobile_animations.load_from_directory(asset_root / "assets/definitions/animations")) {
+        std::cerr << "No valid mobile animation sets were loaded; directional static sprites remain available.\n";
+    }
+    for (const ServiceVehicleDefinition& definition : service_vehicle_catalog.definitions()) {
+        for (const VehicleDirection direction : {VehicleDirection::south, VehicleDirection::east, VehicleDirection::north, VehicleDirection::west}) {
+            (void)textures.load(renderer, asset_root / definition.sprite_for(direction));
+        }
+    }
+    for (const std::string& frame_asset : mobile_animations.frame_assets()) {
+        (void)textures.load(renderer, asset_root / frame_asset);
+    }
+
+    BuildingManager buildings(kMapMin, kMapMax);
+    RoadManager roads(kMapMin, kMapMax);
+    SidewalkManager sidewalks(kMapMin, kMapMax);
+    FarmingSystem farming(kMapMin, kMapMax);
+    std::unordered_map<std::string, std::string> resource_storage_classes;
+    for (const AgriculturalResourceDefinition& resource : resource_catalog.definitions()) resource_storage_classes[resource.id] = resource.storage_class;
+    farming.register_resource_storage_classes(resource_storage_classes);
+    ServiceVehicleManager service_vehicles;
+    PedestrianSystem pedestrians{{"citizen_common", 0.45F, 0.5F, 0.88F}};
+    LandManager lands(kMapMin, kMapMax);
+    CityEconomy economy;
+    PopulationSystem population;
+    PowerSystem power;
+    SimulationClock simulation_clock;
+    SimulationScheduler simulation_scheduler(15.0F);
+    SaveManager save_manager;
+    const std::filesystem::path save_path = SaveManager::default_save_path();
+    const std::filesystem::path calibration_scenario_path = asset_root / "assets/scenarios/isometric_calibration.json";
+    const auto agricultural_infrastructure = [&]() {
+        struct State { bool barn = false; bool silo = false; } state;
+        for (const BuildingInstance& instance : buildings.instances()) {
+            const BuildingDefinition* definition = catalog.find(instance.definition_id);
+            if (definition == nullptr || !definition->provides_agricultural_storage) continue;
+            state.barn = state.barn || (definition->agricultural_infrastructure_role == "barn" &&
+                                        definition->agricultural_storage_capacity > 0);
+            state.silo = state.silo || (definition->agricultural_infrastructure_role == "silo" &&
+                                        definition->grain_storage_capacity > 0);
+        }
+        return state;
+    };
+    const auto rebuild_agricultural_storage = [&]() {
+        int general_capacity = 20;
+        int grain_capacity = 0;
+        for (const BuildingInstance& instance : buildings.instances()) {
+            if (const BuildingDefinition* definition = catalog.find(instance.definition_id)) {
+                if (!definition->provides_agricultural_storage) continue;
+                general_capacity += static_cast<int>(definition->agricultural_storage_capacity);
+                grain_capacity += static_cast<int>(definition->grain_storage_capacity);
+            }
+        }
+        farming.set_storage_capacities(general_capacity, grain_capacity);
+    };
+    for (const BuildingDefinition& definition : catalog.definitions()) {
+        if (!definition.initial_placement) {
+            continue;
+        }
+        const InitialBuildingPlacement& placement = *definition.initial_placement;
+        if (!buildings.place(definition, placement.tile_x, placement.tile_y, placement.rotation)) {
+            std::cerr << "Initial building could not be created from data: " << definition.id << '\n';
+            audio.shutdown();
+            textures.clear();
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+    }
+    population.rebuild_capacity(buildings, catalog);
+    power.rebuild(buildings, catalog);
+
+    Camera camera;
+    std::optional<std::uint64_t> selected_instance_id;
+    std::string placement_definition_id;
+    BuildingRotation placement_rotation = BuildingRotation::r0;
+    bool road_mode = false;
+    bool road_removal_mode = false;
+    bool road_dragging = false;
+    bool sidewalk_dragging = false;
+    bool harvest_dragging = false;
+    bool preparation_dragging = false;
+    bool planting_dragging = false;
+    bool camera_dragging = false;
+    bool land_mode = false;
+    bool sidewalk_mode = false;
+    bool decoration_mode = false;
+    bool agriculture_mode = false;
+    bool agriculture_panel_open = false;
+    std::string farming_selection_id;
+    bool build_panel_open = false;
+    TileCoordinate road_drag_start;
+    TileCoordinate sidewalk_drag_start;
+    TileCoordinate harvest_drag_start;
+    TileCoordinate preparation_drag_start;
+    TileCoordinate planting_drag_start;
+    std::string status = "CLICK A BUILDING TO SELECT IT";
+    bool debug_visible = false;
+    bool navigation_debug_uses_roads = true;
+    std::optional<NavigationTile> navigation_debug_start;
+    std::optional<NavigationTile> navigation_debug_goal;
+    bool running = true;
+    Uint64 last_simulation_ticks = SDL_GetTicks();
+    GameplayUi gameplay_ui;
+    const auto vehicle_traversable = [&](const int x, const int y) {
+        const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, x, y);
+        if (!lands.is_tile_owned(x, y) || occupancy.building || occupancy.road || occupancy.sidewalk) {
+            return false;
+        }
+        const FarmTile* tile = farming.tile_at(x, y);
+        return tile == nullptr || tile->state == FarmTileState::prepared_soil;
+    };
+    const auto mobile_render_entities = [&]() {
+        std::vector<MobileEntityRenderData> entities = service_vehicles.render_entities(service_vehicle_catalog, mobile_animations);
+        std::vector<MobileEntityRenderData> pedestrian_entities = pedestrians.render_entities(mobile_animations);
+        entities.insert(entities.end(), std::make_move_iterator(pedestrian_entities.begin()), std::make_move_iterator(pedestrian_entities.end()));
+        return entities;
+    };
+
+    const auto clear_map_modes = [&]() {
+        placement_definition_id.clear();
+        road_mode = false;
+        road_removal_mode = false;
+        road_dragging = false;
+        sidewalk_dragging = false;
+        harvest_dragging = false;
+        preparation_dragging = false;
+        planting_dragging = false;
+        land_mode = false;
+        sidewalk_mode = false;
+        agriculture_mode = false;
+        agriculture_panel_open = false;
+        farming_selection_id.clear();
+        decoration_mode = false;
+    };
+    const auto open_build_panel = [&]() {
+        clear_map_modes();
+        build_panel_open = true;
+        selected_instance_id.reset();
+        status = "BUILDINGS PANEL OPEN";
+        (void)audio.play(SoundEvent::ui_open_panel);
+    };
+    const auto begin_build_placement = [&](const std::string& definition_id) {
+        const BuildingDefinition* definition = catalog.find(definition_id);
+        if (definition == nullptr) {
+            status = "UNKNOWN BUILDING DEFINITION";
+            (void)audio.play(SoundEvent::ui_error);
+            return;
+        }
+        clear_map_modes();
+        build_panel_open = true;
+        placement_definition_id = definition->id;
+        placement_rotation = BuildingRotation::r0;
+        selected_instance_id.reset();
+        status = "BUILD MODE: " + definition->name;
+        (void)audio.play(SoundEvent::ui_confirm);
+    };
+    const auto begin_road_mode = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        road_mode = true;
+        selected_instance_id.reset();
+        status = "ROAD MODE: DRAG TO DRAW";
+        (void)audio.play(SoundEvent::ui_select);
+    };
+    const auto begin_remove_mode = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        road_mode = true;
+        road_removal_mode = true;
+        selected_instance_id.reset();
+        status = "DEMOLISH MODE: CLICK A BUILDING, SIDEWALK OR ROAD";
+        (void)audio.play(SoundEvent::ui_select);
+    };
+    const auto begin_land_mode = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        land_mode = true;
+        selected_instance_id.reset();
+        status = "LAND MODE: SELECT A NEIGHBORING PARCEL";
+        (void)audio.play(SoundEvent::ui_open_panel);
+    };
+    const auto begin_sidewalk_mode = [&]() {
+        clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
+        status = "SIDEWALK MODE: CLICK OWNED LAND"; (void)audio.play(SoundEvent::ui_select);
+    };
+    const auto begin_decoration_mode = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        decoration_mode = true;
+        selected_instance_id.reset();
+        status = "DECORATION WILL BE AVAILABLE SOON";
+        (void)audio.play(SoundEvent::ui_select);
+    };
+    const auto open_agriculture_panel = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        agriculture_mode = true;
+        agriculture_panel_open = true;
+        selected_instance_id.reset();
+        status = "AGRICULTURE: SELECT SOIL OR TOMATO";
+        (void)audio.play(SoundEvent::ui_open_panel);
+    };
+    const auto select_farming_item = [&](const std::string& id) {
+        const bool sell_resource = id.starts_with("sell_resource:") &&
+            resource_catalog.find(id.substr(std::string("sell_resource:").size())) != nullptr;
+        const bool vehicle_purchase = id.starts_with("purchase_vehicle:") &&
+            service_vehicle_catalog.find(id.substr(std::string("purchase_vehicle:").size())) != nullptr;
+        if (id != "prepared_soil_01" && id != "harvest_tool" && id != "prepare_soil_tool" && !sell_resource && !vehicle_purchase && crop_catalog.find(id) == nullptr) {
+            status = "UNKNOWN FARMING ITEM"; (void)audio.play(SoundEvent::ui_error); return;
+        }
+        if (sell_resource) {
+            const AgriculturalResourceDefinition* resource = resource_catalog.find(id.substr(std::string("sell_resource:").size()));
+            const int quantity = farming.inventory_count(resource->id);
+            if (quantity <= 0) { status = resource->display_name + ": NO STOCK TO SELL"; (void)audio.play(SoundEvent::ui_error); return; }
+            const std::int64_t revenue = static_cast<std::int64_t>(quantity) * resource->base_sell_price;
+            if (farming.try_remove_resource(resource->id, quantity)) economy.earn_agricultural_sale(revenue, simulation_clock.date());
+            status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);
+            (void)audio.play(SoundEvent::ui_confirm); return;
+        }
+        clear_map_modes();
+        build_panel_open = false;
+        agriculture_mode = true;
+        agriculture_panel_open = true;
+        farming_selection_id = id;
+        selected_instance_id.reset();
+        status = id == "prepared_soil_01" ? "AGRICULTURE: PLACE PREPARED SOIL" :
+            (id == "harvest_tool" ? "AGRICULTURE: DRAG TO HARVEST READY CROPS" :
+            (id == "prepare_soil_tool" ? "AGRICULTURE: DRAG AREA TO PREPARE" :
+            (vehicle_purchase ? "AGRICULTURE: CLICK EMPTY OWNED TILE FOR TRACTOR HOME" : "AGRICULTURE: PLANT " + crop_catalog.find(id)->display_name)));
+        (void)audio.play(SoundEvent::ui_confirm);
+    };
+    const auto rotate_placement = [&](const bool clockwise) {
+        if (const BuildingDefinition* placement = catalog.find(placement_definition_id);
+            placement != nullptr && placement->rotatable) {
+            placement_rotation = placement->next_supported_rotation(placement_rotation, clockwise);
+            status = "BUILD ROTATION: " + std::string(rotation_label(placement_rotation));
+            (void)audio.play(SoundEvent::ui_click);
+        }
+    };
+    const auto apply_ui_action = [&](const UiActionEvent& action) {
+        switch (action.action) {
+            case UiAction::open_build_panel: open_build_panel(); break;
+            case UiAction::select_building: begin_build_placement(action.payload); break;
+            case UiAction::activate_roads: begin_road_mode(); break;
+            case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
+            case UiAction::activate_land: begin_land_mode(); break;
+            case UiAction::activate_remove: begin_remove_mode(); break;
+            case UiAction::open_agriculture_panel: open_agriculture_panel(); break;
+            case UiAction::select_farming_item: select_farming_item(action.payload); break;
+            case UiAction::activate_decoration: begin_decoration_mode(); break;
+            case UiAction::rotate_left: rotate_placement(false); break;
+            case UiAction::rotate_right: rotate_placement(true); break;
+            case UiAction::toggle_pause:
+                simulation_clock.toggle_pause();
+                status = std::string("SIMULATION ") + simulation_speed_label(simulation_clock.speed());
+                (void)audio.play(SoundEvent::ui_click);
+                break;
+            case UiAction::settings_placeholder:
+                status = "SETTINGS WILL BE AVAILABLE SOON";
+                (void)audio.play(SoundEvent::ui_click);
+                break;
+            case UiAction::close_selection:
+                selected_instance_id.reset();
+                status = "INFO PANEL CLOSED";
+                (void)audio.play(SoundEvent::ui_close_panel);
+                break;
+            case UiAction::none: break;
+        }
+    };
+    const auto make_ui_model = [&](const std::pair<int, int>& hovered_tile) {
+        GameplayUiModel model;
+        const MonthlyEconomySummary& monthly = economy.monthly_summary();
+        model.funds = format_money(economy.funds());
+        model.date = format_date(simulation_clock.date());
+        model.day_month = "DAY " + std::to_string(simulation_clock.date().day) +
+                          " - MONTH " + std::to_string(simulation_clock.date().month);
+        model.year = "YEAR " + std::to_string(simulation_clock.date().year);
+        model.monthly_revenue = format_money(monthly.revenue);
+        model.monthly_expenses = format_money(monthly.expenses);
+        model.monthly_balance = format_balance(monthly.balance);
+        model.population = std::to_string(population.current_population());
+        model.residential_capacity = std::to_string(population.residential_capacity());
+        model.power_demand = std::to_string(power.power_demand());
+        model.power_capacity = std::to_string(power.power_capacity());
+        switch (simulation_clock.speed()) {
+            case SimulationSpeed::paused: model.speed = "PAUSED"; model.paused = true; break;
+            case SimulationSpeed::speed1: model.speed = "RUNNING"; break;
+            // v1 saves can contain these legacy speed values. They are never
+            // exposed by gameplay UI and are normalized on load below.
+            case SimulationSpeed::speed2: model.speed = "RUNNING"; break;
+            case SimulationSpeed::speed3: model.speed = "RUNNING"; break;
+        }
+        model.status = status;
+        model.build_panel_open = build_panel_open;
+        model.farming_panel_open = agriculture_panel_open;
+        model.selected_farming_id = farming_selection_id;
+        const auto infrastructure = agricultural_infrastructure();
+        model.farming_infrastructure = "INFRA: CELEIRO " + std::string(infrastructure.barn ? "[OK]" : "[X]") +
+            " | SILO " + (infrastructure.silo ? "[OK]" : "[X]");
+        model.farming_stock = "ARMAZENAMENTO GERAL " + std::to_string(farming.general_inventory_used()) + "/" +
+            std::to_string(farming.general_storage_capacity());
+        if (farming.grain_storage_capacity() > 0) {
+            model.farming_stock += " | GRAOS " + std::to_string(farming.grain_inventory()) + "/" +
+                std::to_string(farming.grain_storage_capacity());
+        }
+        if (const FarmTile* farm_tile = farming.tile_at(hovered_tile.first, hovered_tile.second)) {
+            if (farm_tile->state == FarmTileState::prepared_soil) {
+                model.farming_tile_status = "TERRA PREPARADA";
+            } else if (const CropDefinition* crop = crop_catalog.find(farm_tile->crop_id); crop != nullptr) {
+                if (farm_tile->state == FarmTileState::ready_to_harvest) {
+                    model.farming_tile_status = crop->display_name + ": PRONTO +" + std::to_string(crop->harvest_yield) +
+                        " | ESPACO " + std::to_string(farming.available_storage_for(*crop));
+                } else {
+                    const int elapsed = FarmingSystem::absolute_day(simulation_clock.date()) - farm_tile->planted_day;
+                    model.farming_tile_status = crop->display_name + " FASE " + std::to_string(farm_tile->stage + 1) +
+                        " | " + std::to_string(std::max(0, crop->growth_days_total - elapsed)) + " DIAS";
+                }
+            } else if (farm_tile->state == FarmTileState::ready_to_harvest) {
+                model.farming_tile_status = "CULTURA: COLHER";
+            } else {
+                model.farming_tile_status = "CULTURA FASE " + std::to_string(farm_tile->stage + 1);
+            }
+        } else {
+            model.farming_tile_status = "GRAMA";
+        }
+        if (farming.general_inventory_used() > farming.general_storage_capacity()) {
+            model.farming_tile_status = "SOBRE CAPACIDADE";
+        }
+        model.active_tool = UiTool::none;
+        if (decoration_mode) {
+            model.active_tool = UiTool::decoration;
+        } else if (land_mode) {
+            model.active_tool = UiTool::land;
+        } else if (sidewalk_mode) {
+            model.active_tool = UiTool::sidewalks;
+        } else if (agriculture_mode) {
+            model.active_tool = UiTool::agriculture;
+        } else if (road_mode) {
+            model.active_tool = road_removal_mode ? UiTool::remove : UiTool::roads;
+        } else if (!placement_definition_id.empty() || build_panel_open) {
+            model.active_tool = UiTool::buildings;
+        }
+        if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
+            model.placement_rotatable = placement->rotatable;
+        }
+        for (const BuildingDefinition& definition : catalog.definitions()) {
+            model.build_items.push_back({definition.id, definition.name, category_label(definition.category),
+                                         format_money(definition.build_cost), true,
+                                         (asset_root / definition.texture_path_for(BuildingRotation::r0)).string()});
+        }
+        model.farming_items.push_back({"prepared_soil_01", "Terra Preparada", "SOLO", "SEM CUSTO", true,
+                                       (asset_root / "assets/farming/prepared_soil/prepared_soil_01.png").string()});
+        model.farming_items.push_back({"harvest_tool", "Colher", "FERRAMENTA", "CLIQUE OU ARRASTE", true,
+                                       (asset_root / "assets/farming/prepared_soil/prepared_soil_01.png").string()});
+        model.farming_items.push_back({"prepare_soil_tool", "Preparar Terra", "FERRAMENTA", "REQUER TRATOR", true,
+                                       (asset_root / "assets/farming/prepared_soil/prepared_soil_01.png").string()});
+        for (const ServiceVehicleDefinition& vehicle : service_vehicle_catalog.definitions()) {
+            int owned = 0;
+            std::string vehicle_state = "DISPONIVEL";
+            for (const ServiceVehicleInstance& instance : service_vehicles.instances()) {
+                if (instance.vehicle_id != vehicle.id || !instance.owned) continue;
+                ++owned;
+                if (instance.state == ServiceVehicleState::working || instance.state == ServiceVehicleState::moving_to_job) vehicle_state = "TRABALHANDO";
+                else if (instance.state == ServiceVehicleState::returning && vehicle_state != "TRABALHANDO") vehicle_state = "RETORNANDO";
+            }
+            model.farming_items.push_back({"purchase_vehicle:" + vehicle.id, vehicle.display_name, "VEICULO",
+                                           format_money(vehicle.purchase_cost) + " | X" + std::to_string(owned) + " " + vehicle_state, true,
+                                           (asset_root / vehicle.sprite_south).string()});
+        }
+        for (const CropDefinition& crop : crop_catalog.definitions()) {
+            const bool planting_unlocked = infrastructure.barn && infrastructure.silo;
+            model.farming_items.push_back({crop.id, crop.display_name, "CULTURA",
+                                           planting_unlocked ? "COLHEITA: " + std::to_string(crop.harvest_yield) : "REQUER CELEIRO E SILO",
+                                           planting_unlocked,
+                                           (asset_root / crop.thumbnail_path()).string()});
+        }
+        for (const AgriculturalResourceDefinition& resource : resource_catalog.definitions()) {
+            model.farming_items.push_back({"sell_resource:" + resource.id, "Vender " + resource.display_name, "ESTOQUE / VENDA",
+                                           std::to_string(farming.inventory_count(resource.id)) + " x " + format_money(resource.base_sell_price) + " | VENDER TUDO", true, ""});
+        }
+        model.selected_building_id = placement_definition_id;
+        if (land_mode) {
+            const LandParcel* parcel = lands.parcel_at(hovered_tile.first, hovered_tile.second);
+            if (parcel == nullptr) {
+                model.land_details = UiLandDetails{"OUTSIDE MAP", "-", "LOCKED"};
+            } else if (parcel->owned) {
+                model.land_details = UiLandDetails{std::to_string(parcel->id), format_money(parcel->purchase_cost), "OWNED"};
+            } else if (!lands.can_purchase_parcel(parcel->id)) {
+                model.land_details = UiLandDetails{std::to_string(parcel->id), format_money(parcel->purchase_cost), "LOCKED"};
+            } else {
+                model.land_details = UiLandDetails{std::to_string(parcel->id), format_money(parcel->purchase_cost), "AVAILABLE"};
+            }
+        }
+        if (selected_instance_id) {
+            if (const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id)) {
+                if (const BuildingDefinition* definition = catalog.find(instance->definition_id)) {
+                    const auto& lvl_def = instance->current_level_definition(*definition);
+                    const auto* next_lvl_def = instance->next_level_definition(*definition);
+                    const bool is_max = instance->is_max_level(*definition);
+                    const std::string level_label = "NIVEL " + std::to_string(instance->current_level) + " / " + std::to_string(definition->levels.size());
+                    const std::string upgrade_btn_text = is_max
+                        ? "NIVEL MAXIMO"
+                        : ("EVOLUIR PARA NIVEL " + std::to_string(instance->current_level + 1) + " - " + format_money(next_lvl_def->upgrade_cost));
+                    const bool can_upgrade = !is_max && economy.can_afford(next_lvl_def->upgrade_cost);
+
+                    const std::uint32_t commercial_demand_percent = CityEconomy::commercial_demand_percent(
+                        *definition, population.current_population());
+                    const bool has_commercial_demand = definition->required_population_for_full_revenue != 0;
+                    const std::int64_t commercial_current_revenue = lvl_def.tax_revenue_per_month *
+                        static_cast<std::int64_t>(commercial_demand_percent) / 100;
+                    std::string local_supply;
+                    if (!definition->resource_inputs.empty()) {
+                        bool supplied = true; std::int64_t bonus = 0; std::string requirements;
+                        for (const BuildingResourceInput& input : definition->resource_inputs) {
+                            if (!requirements.empty()) requirements += ", ";
+                            const AgriculturalResourceDefinition* resource = resource_catalog.find(input.resource_id);
+                            requirements += (resource == nullptr ? input.resource_id : resource->display_name) + " " + std::to_string(input.amount_per_month) + "/MES";
+                            supplied = supplied && farming.inventory_count(input.resource_id) >= input.amount_per_month;
+                            bonus += input.local_supply_bonus;
+                        }
+                        local_supply = requirements + " | " + (supplied ? "ABASTECIDO +" + format_money(bonus) : "SEM ESTOQUE");
+                    }
+                    model.selected_building = UiSelectedBuilding{
+                        definition->name,
+                        std::string(category_label(definition->category)),
+                        format_money(definition->build_cost),
+                        format_money(lvl_def.tax_revenue_per_month),
+                        format_money(lvl_def.maintenance_per_month),
+                        format_balance(lvl_def.tax_revenue_per_month - lvl_def.maintenance_per_month),
+                        rotation_label(instance->rotation),
+                        roads.has_required_road_access(*definition, instance->tile_x, instance->tile_y, instance->rotation)
+                            ? "ROAD CONNECTED"
+                            : "NO ROAD",
+                        std::to_string(instance->instance_id),
+                        has_commercial_demand ? std::to_string(commercial_demand_percent) + "%" : "",
+                        (asset_root / definition->texture_path_for(instance->rotation, instance->current_level)).string(),
+                        definition->requires_road_access ? "REQUIRED" : "NOT REQUIRED",
+                        lvl_def.power_consumption == 0 ? "" : std::to_string(lvl_def.power_consumption),
+                        definition->power_production == 0 ? "" : "+" + std::to_string(definition->power_production),
+                        lvl_def.residential_capacity == 0 ? "" : std::to_string(lvl_def.residential_capacity),
+                        lvl_def.residential_capacity == 0 ? "" : format_money(definition->property_tax_per_year),
+                        has_commercial_demand ? format_money(commercial_current_revenue) : "",
+                        local_supply,
+                        level_label,
+                        upgrade_btn_text,
+                        can_upgrade,
+                        is_max,
+                    };
+                }
+            }
+        }
+        model.debug_visible = debug_visible;
+        if (debug_visible) {
+            const LandParcel* parcel = lands.parcel_at(hovered_tile.first, hovered_tile.second);
+            model.debug_lines = {
+                "TILE: " + std::to_string(hovered_tile.first) + "," + std::to_string(hovered_tile.second),
+                "BUILDINGS: " + std::to_string(buildings.instances().size()) + " | ROADS: " + std::to_string(roads.tiles().size()),
+                "OCCUPANCY: " + std::string(tile_occupancy_label(buildings, roads, sidewalks, farming, hovered_tile.first, hovered_tile.second)),
+                "ROAD: " + std::string(roads.is_drivable(hovered_tile.first, hovered_tile.second) ? "DRIVABLE " : "NO ") +
+                    connection_label(roads.connection_mask(hovered_tile.first, hovered_tile.second)),
+                "SIDEWALK: " + std::string(sidewalks.is_walkable(hovered_tile.first, hovered_tile.second) ? "WALKABLE " : "NO ") +
+                    connection_label(sidewalks.connection_mask(hovered_tile.first, hovered_tile.second)),
+                "PARCEL: " + (parcel == nullptr ? std::string("OUTSIDE MAP") : std::to_string(parcel->id) + (parcel->owned ? " OWNED" : " LOCKED")),
+                "TILE OWNED: " + std::string(lands.is_tile_owned(hovered_tile.first, hovered_tile.second) ? "YES" : "NO") +
+                    " | OWNED PARCELS: " + std::to_string(lands.owned_parcel_count()),
+                "POPULATION: " + std::to_string(population.current_population()) + " / " +
+                    std::to_string(population.residential_capacity()),
+                "ENERGY: " + std::to_string(power.power_demand()) + " / " + std::to_string(power.power_capacity()),
+                "F2 NETWORK | F3 START | F4 GOAL | F6 PEDESTRIAN | F5 SAVE | F9 LOAD | F10 CALIBRATION",
+            };
+            if (selected_instance_id) {
+                if (const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id)) {
+                    if (const BuildingDefinition* definition = catalog.find(instance->definition_id)) {
+                        const BuildingFootprint footprint = rotated_footprint(*definition, instance->rotation);
+                        const BuildingRotation visual_rotation = camera_visual_rotation(*definition, instance->rotation, camera.rotation);
+                        model.debug_lines.push_back("ISO AUDIT: " + std::string(rotation_label(instance->rotation)) +
+                                                    " | VISUAL " + rotation_label(visual_rotation) +
+                                                    " | CAMERA " + camera_rotation_label(camera.rotation));
+                        model.debug_lines.push_back("FOOTPRINT: " + std::to_string(footprint.width) + "x" +
+                                                    std::to_string(footprint.height) + " | TILE " +
+                                                    std::to_string(instance->tile_x) + "," + std::to_string(instance->tile_y));
+                        model.debug_lines.push_back("SPRITE ANCHOR: " + std::to_string(definition->anchor_x_for(visual_rotation)) +
+                                                    "," + std::to_string(definition->anchor_y_for(visual_rotation)) +
+                                                    " | FRONT " + access_points_label(*definition, instance->rotation));
+                        model.debug_lines.push_back("OVERLAY: yellow footprint | cyan anchor | magenta PNG bounds | red X | green Y");
+                    }
+                }
+            }
+            const std::vector<MobileEntityRenderData> entities = mobile_render_entities();
+            if (!entities.empty()) {
+                const MobileEntityRenderData& entity = entities.front();
+                model.debug_lines.push_back("MOBILE: " + entity.logical_state + " | " + mobile_direction_label(entity.spatial.direction));
+                model.debug_lines.push_back("ANIM: " + entity.animation_set_id + " | " + entity.animation_clip_id +
+                                            " | FRAME " + std::to_string(entity.animation_frame_index));
+            }
+            if (!pedestrians.instances().empty()) {
+                const PedestrianInstance& pedestrian = pedestrians.instances().front();
+                model.debug_lines.push_back("PEDESTRIAN: " + std::string(pedestrian.state == PedestrianState::walking ? "WALKING" : "IDLE") +
+                                            " | " + mobile_direction_label(pedestrian.spatial.direction) + " | TILE " +
+                                            std::to_string(pedestrian.spatial.logical_tile_x) + "," +
+                                            std::to_string(pedestrian.spatial.logical_tile_y));
+            }
+            if (!placement_definition_id.empty()) {
+                if (const BuildingDefinition* definition = catalog.find(placement_definition_id)) {
+                    const BuildingPlacementValidation validation = validate_building_placement(
+                        *definition, placement_rotation, hovered_tile.first, hovered_tile.second,
+                        buildings, roads, lands, sidewalks, farming, economy, power);
+                    model.debug_lines.push_back("PLACEMENT: " + std::string(validation.valid() ? "VALID" : placement_validation_text(validation)));
+                    model.debug_lines.push_back("FRONTAGE: " + std::string(road_access_mode_label(resolved_road_access_mode(*definition))) +
+                                                " | " + access_points_label(*definition, placement_rotation));
+                    std::string candidates = "ROAD CANDIDATES:";
+                    for (const BuildingAccessPoint& access : road_access_candidates(*definition, placement_rotation)) {
+                        const TileCoordinate offset = road_access_offset(access.facing);
+                        candidates += " " + std::to_string(hovered_tile.first + access.local_x + offset.x) + "," +
+                                      std::to_string(hovered_tile.second + access.local_y + offset.y);
+                    }
+                    if (candidates == "ROAD CANDIDATES:") candidates += " PERIMETER";
+                    model.debug_lines.push_back(std::move(candidates));
+                }
+            }
+            const std::string navigation_type = navigation_debug_uses_roads ? "ROAD" : "SIDEWALK";
+            if (!navigation_debug_start || !navigation_debug_goal) {
+                model.debug_lines.push_back("NAV " + navigation_type + ": F2 TYPE | F3 START | F4 GOAL");
+            } else {
+                NavigationPathResult navigation_path;
+                if (navigation_debug_uses_roads) {
+                    navigation_path = find_navigation_path(RoadNavigationNetwork{roads}, *navigation_debug_start, *navigation_debug_goal);
+                } else {
+                    navigation_path = find_navigation_path(SidewalkNavigationNetwork{sidewalks}, *navigation_debug_start, *navigation_debug_goal);
+                }
+                model.debug_lines.push_back("NAV " + navigation_type + " " + std::to_string(navigation_debug_start->x) + "," +
+                                            std::to_string(navigation_debug_start->y) + " -> " +
+                                            std::to_string(navigation_debug_goal->x) + "," + std::to_string(navigation_debug_goal->y) +
+                                            (navigation_path.status == NavigationPathStatus::found
+                                                ? " | PATH " + std::to_string(navigation_path.tiles.size())
+                                                : " | NO PATH"));
+            }
+        }
+        return model;
+    };
+
+    while (running) {
+        rebuild_agricultural_storage();
+        int viewport_width = 0;
+        int viewport_height = 0;
+        SDL_GetCurrentRenderOutputSize(renderer, &viewport_width, &viewport_height);
+
+        float event_mouse_x = 0.0F;
+        float event_mouse_y = 0.0F;
+        SDL_GetMouseState(&event_mouse_x, &event_mouse_y);
+        const auto event_mouse_tile = screen_to_tile(event_mouse_x, event_mouse_y, camera,
+                                                     static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_EVENT_QUIT) {
+                running = false;
+            } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                if (camera_dragging) {
+                    camera.pan_x += event.motion.xrel;
+                    camera.pan_y += event.motion.yrel;
+                    camera.pan_velocity_x = 0.0F;
+                    camera.pan_velocity_y = 0.0F;
+                    continue;
+                }
+                gameplay_ui.handle_mouse_motion(event.motion.x, event.motion.y);
+            } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+                float wheel_mouse_x = 0.0F;
+                float wheel_mouse_y = 0.0F;
+                SDL_GetMouseState(&wheel_mouse_x, &wheel_mouse_y);
+                if (gameplay_ui.handle_mouse_wheel(wheel_mouse_x, wheel_mouse_y, event.wheel.y)) {
+                    continue;
+                }
+                if (!gameplay_ui.consumes_point(wheel_mouse_x, wheel_mouse_y)) {
+                    camera.zoom = std::clamp(camera.zoom + event.wheel.y * 0.10F, 0.45F, 2.25F);
+                }
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                if (event.button.button == SDL_BUTTON_MIDDLE &&
+                    !gameplay_ui.consumes_point(event.button.x, event.button.y)) {
+                    camera_dragging = true;
+                    camera.pan_velocity_x = 0.0F;
+                    camera.pan_velocity_y = 0.0F;
+                    continue;
+                }
+                const UiInputResult ui_input = gameplay_ui.handle_mouse_button_down(
+                    event.button.x, event.button.y, event.button.button == SDL_BUTTON_LEFT);
+                if (ui_input.consumed) {
+                    if (ui_input.action) {
+                        apply_ui_action(*ui_input.action);
+                    }
+                    continue;
+                }
+                const auto clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
+                                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
+                    land_mode = false;
+                    status = "LAND MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && road_mode) {
+                    road_dragging = false;
+                    road_mode = false;
+                    road_removal_mode = false;
+                    status = "ROAD MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && sidewalk_mode) {
+                    sidewalk_mode = false;
+                    sidewalk_dragging = false;
+                    status = "SIDEWALK MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && agriculture_mode) {
+                    agriculture_mode = false;
+                    agriculture_panel_open = false;
+                    farming_selection_id.clear();
+                    harvest_dragging = false;
+                    preparation_dragging = false;
+                    status = "AGRICULTURE MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && decoration_mode) {
+                    decoration_mode = false;
+                    status = "DECORATION MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && !placement_definition_id.empty()) {
+                    placement_definition_id.clear();
+                    status = "BUILD MODE CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_LEFT) {
+                    if (land_mode) {
+                        const LandParcel* parcel = lands.parcel_at(clicked_tile.first, clicked_tile.second);
+                        if (parcel == nullptr) {
+                            status = "NO PARCEL AT THIS TILE";
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else if (parcel->owned) {
+                            status = "PARCEL ALREADY OWNED";
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else if (!lands.can_purchase_parcel(parcel->id)) {
+                            status = "PARCEL MUST TOUCH OWNED LAND";
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else if (!economy.can_afford(parcel->purchase_cost)) {
+                            status = "NOT ENOUGH FUNDS FOR LAND";
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else if (lands.purchase_parcel(parcel->id, economy, simulation_clock.date())) {
+                            status = "LAND PURCHASED: PARCEL " + std::to_string(parcel->id) + " - " +
+                                format_money(parcel->purchase_cost);
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else {
+                            status = "LAND PURCHASE FAILED";
+                            (void)audio.play(SoundEvent::ui_error);
+                        }
+                    } else if (road_mode && road_removal_mode) {
+                        const BuildingInstance* building = buildings.instance_at(clicked_tile.first, clicked_tile.second);
+                        const BuildingDefinition* definition = building == nullptr ? nullptr : catalog.find(building->definition_id);
+                        if (building != nullptr && definition != nullptr && buildings.remove_instance(*definition, building->instance_id)) {
+                            rebuild_agricultural_storage();
+                            population.rebuild_capacity(buildings, catalog);
+                            power.rebuild(buildings, catalog);
+                            selected_instance_id.reset();
+                            status = "BUILDING DEMOLISHED";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else if (sidewalks.remove_tile(clicked_tile.first, clicked_tile.second)) {
+                            status = "SIDEWALK REMOVED";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else if (roads.remove_tile(clicked_tile.first, clicked_tile.second)) {
+                            status = "ROAD REMOVED";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else {
+                            status = "NO BUILDING, SIDEWALK OR ROAD ON THIS TILE";
+                            (void)audio.play(SoundEvent::ui_error);
+                        }
+                    } else if (sidewalk_mode) {
+                        sidewalk_dragging = true;
+                        sidewalk_drag_start = {clicked_tile.first, clicked_tile.second};
+                    } else if (agriculture_mode && farming_selection_id == "harvest_tool") {
+                        harvest_dragging = true;
+                        harvest_drag_start = {clicked_tile.first, clicked_tile.second};
+                    } else if (agriculture_mode && farming_selection_id == "prepare_soil_tool") {
+                        preparation_dragging = true;
+                        preparation_drag_start = {clicked_tile.first, clicked_tile.second};
+                    } else if (agriculture_mode && crop_catalog.find(farming_selection_id) != nullptr) {
+                        planting_dragging = true;
+                        planting_drag_start = {clicked_tile.first, clicked_tile.second};
+                    } else if (agriculture_mode) {
+                        if (farming_selection_id.starts_with("purchase_vehicle:")) {
+                            const std::string vehicle_id = farming_selection_id.substr(std::string("purchase_vehicle:").size());
+                            const ServiceVehicleDefinition* vehicle = service_vehicle_catalog.find(vehicle_id);
+                            if (vehicle == nullptr) {
+                                status = "UNKNOWN FARM VEHICLE";
+                            } else if (!lands.is_tile_owned(clicked_tile.first, clicked_tile.second) || !vehicle_traversable(clicked_tile.first, clicked_tile.second)) {
+                                status = "TRACTOR HOME REQUIRES EMPTY OWNED TILE";
+                            } else if (!economy.try_spend(vehicle->purchase_cost)) {
+                                status = "NOT ENOUGH FUNDS FOR TRACTOR";
+                            } else if (service_vehicles.add({vehicle->id, static_cast<float>(clicked_tile.first), static_cast<float>(clicked_tile.second),
+                                                             static_cast<float>(clicked_tile.first), static_cast<float>(clicked_tile.second),
+                                                             static_cast<float>(clicked_tile.first), static_cast<float>(clicked_tile.second)}, service_vehicle_catalog)) {
+                                status = vehicle->display_name + " PURCHASED";
+                                farming_selection_id.clear();
+                                (void)audio.play(SoundEvent::ui_confirm);
+                            }
+                            continue;
+                        }
+                        const FarmTile* farm_tile = farming.tile_at(clicked_tile.first, clicked_tile.second);
+                        if (farm_tile != nullptr && farm_tile->state == FarmTileState::ready_to_harvest) {
+                            const CropDefinition* crop = crop_catalog.find(farm_tile->crop_id);
+                            const int harvested = farming.harvest(clicked_tile.first, clicked_tile.second, crop_catalog, simulation_clock.date());
+                            status = harvested > 0 ? crop->display_name + " HARVESTED: +" + std::to_string(harvested) :
+                                (crop != nullptr && farming.available_storage_for(*crop) < crop->harvest_yield ? "ARMAZENAMENTO INSUFICIENTE" : "HARVEST FAILED");
+                            (void)audio.play(harvested > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                        } else if (!lands.is_tile_owned(clicked_tile.first, clicked_tile.second)) {
+                            status = "AGRICULTURE REQUIRES OWNED LAND"; (void)audio.play(SoundEvent::ui_error);
+                        } else if (farming_selection_id == "prepared_soil_01") {
+                            if (roads.is_road(clicked_tile.first, clicked_tile.second) || sidewalks.is_sidewalk(clicked_tile.first, clicked_tile.second) ||
+                                buildings.is_occupied(clicked_tile.first, clicked_tile.second) || farming.is_occupied(clicked_tile.first, clicked_tile.second)) {
+                                status = "SOIL BLOCKED BY OCCUPIED TILE"; (void)audio.play(SoundEvent::ui_error);
+                            } else if (farming.prepare_soil(clicked_tile.first, clicked_tile.second)) {
+                                status = "PREPARED SOIL PLACED"; (void)audio.play(SoundEvent::ui_confirm);
+                            }
+                        } else if (const CropDefinition* crop = crop_catalog.find(farming_selection_id)) {
+                            const auto infrastructure = agricultural_infrastructure();
+                            if (!infrastructure.barn && !infrastructure.silo) {
+                                status = "CONSTRUA CELEIRO E SILO PARA LIBERAR O PLANTIO";
+                                (void)audio.play(SoundEvent::ui_error);
+                            } else if (!infrastructure.barn) {
+                                status = "CONSTRUA UM CELEIRO PARA INICIAR A AGRICULTURA";
+                                (void)audio.play(SoundEvent::ui_error);
+                            } else if (!infrastructure.silo) {
+                                status = "CONSTRUA UM SILO PARA INICIAR A AGRICULTURA";
+                                (void)audio.play(SoundEvent::ui_error);
+                            } else if (farming.plant(clicked_tile.first, clicked_tile.second, *crop, simulation_clock.date())) {
+                                status = crop->display_name + " PLANTED"; (void)audio.play(SoundEvent::ui_confirm);
+                            } else {
+                                status = "CROP REQUIRES PREPARED SOIL"; (void)audio.play(SoundEvent::ui_error);
+                            }
+                        } else {
+                            status = "SELECT SOIL OR A CROP"; (void)audio.play(SoundEvent::ui_error);
+                        }
+                    } else if (road_mode) {
+                        road_dragging = true;
+                        road_drag_start = {clicked_tile.first, clicked_tile.second};
+                    } else if (decoration_mode) {
+                        status = "DECORATION WILL BE AVAILABLE SOON";
+                    } else if (placement_definition_id.empty()) {
+                        const BuildingInstance* clicked = buildings.instance_at(clicked_tile.first, clicked_tile.second);
+                        if (clicked == nullptr) {
+                            selected_instance_id.reset();
+                        } else {
+                            selected_instance_id = clicked->instance_id;
+                            // Selection and its information panel are one action: one feedback sound only.
+                            (void)audio.play(SoundEvent::ui_select);
+                        }
+                        status = clicked == nullptr ? "NO BUILDING ON THIS TILE" : "BUILDING SELECTED";
+                    } else if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
+                        const BuildingPlacementValidation validation = validate_building_placement(
+                            *placement, placement_rotation, clicked_tile.first, clicked_tile.second,
+                            buildings, roads, lands, sidewalks, farming, economy, power);
+                        if (!validation.valid()) {
+                            status = placement_validation_text(validation);
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else if (const auto instance_id = buildings.place(*placement, clicked_tile.first, clicked_tile.second, placement_rotation)) {
+                            (void)economy.spend_for_building(placement->build_cost, simulation_clock.date(), *instance_id);
+                            population.rebuild_capacity(buildings, catalog);
+                            power.rebuild(buildings, catalog);
+                            selected_instance_id = *instance_id;
+                            status = placement->name + " BUILT: " + format_money(placement->build_cost) + " SPENT";
+                            if (power.power_available() < 0) {
+                                status += " | POWER DEFICIT " + std::to_string(-power.power_available());
+                            }
+                            (void)audio.play(SoundEvent::building_place);
+                        }
+                    }
+                }
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                if (event.button.button == SDL_BUTTON_MIDDLE) {
+                    camera_dragging = false;
+                    continue;
+                }
+                const bool ui_consumed = gameplay_ui.consumes_point(event.button.x, event.button.y);
+                gameplay_ui.handle_mouse_button_up(event.button.x, event.button.y);
+                if (ui_consumed) {
+                    // A road drag released over a panel is cancelled instead of
+                    // drawing through UI coordinates.
+                    road_dragging = false;
+                    sidewalk_dragging = false;
+                    harvest_dragging = false;
+                    preparation_dragging = false;
+                    planting_dragging = false;
+                    continue;
+                }
+                if (event.button.button != SDL_BUTTON_LEFT) {
+                    continue;
+                }
+                const auto released_tile = screen_to_tile(event.button.x, event.button.y, camera,
+                                                          static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                if (agriculture_mode && harvest_dragging) {
+                    int harvested_tiles = 0;
+                    int total_yield = 0;
+                    bool storage_full = false;
+                    const int min_x = std::min(harvest_drag_start.x, released_tile.first);
+                    const int max_x = std::max(harvest_drag_start.x, released_tile.first);
+                    const int min_y = std::min(harvest_drag_start.y, released_tile.second);
+                    const int max_y = std::max(harvest_drag_start.y, released_tile.second);
+                    for (int y = min_y; y <= max_y && !storage_full; ++y) {
+                        for (int x = min_x; x <= max_x; ++x) {
+                            const FarmTile* farm_tile = farming.tile_at(x, y);
+                            if (farm_tile == nullptr || farm_tile->state != FarmTileState::ready_to_harvest) {
+                                continue;
+                            }
+                            const CropDefinition* crop = crop_catalog.find(farm_tile->crop_id);
+                            if (crop == nullptr) {
+                                continue;
+                            }
+                            if (farming.available_storage_for(*crop) < crop->harvest_yield) {
+                                storage_full = true;
+                                break;
+                            }
+                            total_yield += farming.harvest(x, y, crop_catalog, simulation_clock.date());
+                            ++harvested_tiles;
+                        }
+                    }
+                    status = storage_full ? "ARMAZENAMENTO INSUFICIENTE" :
+                        (harvested_tiles == 0 ? "NO READY CROPS IN SELECTION" : "HARVESTED " + std::to_string(harvested_tiles) + " TILE(S): +" + std::to_string(total_yield));
+                    (void)audio.play(harvested_tiles > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                    harvest_dragging = false;
+                    continue;
+                }
+                if (agriculture_mode && preparation_dragging) {
+                    const int min_x = std::min(preparation_drag_start.x, released_tile.first);
+                    const int max_x = std::max(preparation_drag_start.x, released_tile.first);
+                    const int min_y = std::min(preparation_drag_start.y, released_tile.second);
+                    const int max_y = std::max(preparation_drag_start.y, released_tile.second);
+                    std::vector<TileCoordinate> tiles;
+                    for (int y = min_y; y <= max_y; ++y) {
+                        const bool left_to_right = ((y - min_y) % 2) == 0;
+                        for (int index = 0; index <= max_x - min_x; ++index) {
+                            const int x = left_to_right ? min_x + index : max_x - index;
+                            if (lands.is_tile_owned(x, y) && vehicle_traversable(x, y) && !farming.is_occupied(x, y) && !service_vehicles.is_reserved(x, y)) {
+                                tiles.push_back({x, y});
+                            }
+                        }
+                    }
+                    std::string vehicle_name;
+                    if (tiles.empty()) {
+                        status = "NO VALID TILES FOR SOIL PREPARATION";
+                        (void)audio.play(SoundEvent::ui_error);
+                    } else if (!service_vehicles.has_idle_vehicle_for_role("soil_preparation", service_vehicle_catalog)) {
+                        status = "NENHUM TRATOR DE PREPARO DISPONIVEL";
+                        (void)audio.play(SoundEvent::ui_error);
+                    } else {
+                        const std::size_t scheduled_count = tiles.size();
+                        if (service_vehicles.create_task("soil_preparation", std::move(tiles), service_vehicle_catalog, vehicle_traversable, &vehicle_name)) {
+                            status = "PREPARO AGENDADO: " + std::to_string(scheduled_count) + " TILES | " + vehicle_name + " | CUSTO 0";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else {
+                            status = "TRACTOR CANNOT REACH SELECTED AREA";
+                            (void)audio.play(SoundEvent::ui_error);
+                        }
+                    }
+                    preparation_dragging = false;
+                    continue;
+                }
+                if (agriculture_mode && planting_dragging) {
+                    const CropDefinition* crop = crop_catalog.find(farming_selection_id);
+                    const auto infrastructure = agricultural_infrastructure();
+                    if (crop == nullptr) {
+                        status = "SELECT A CROP TO PLANT";
+                        (void)audio.play(SoundEvent::ui_error);
+                    } else if (!infrastructure.barn || !infrastructure.silo) {
+                        status = !infrastructure.barn && !infrastructure.silo
+                            ? "CONSTRUA CELEIRO E SILO PARA LIBERAR O PLANTIO"
+                            : (!infrastructure.barn ? "CONSTRUA UM CELEIRO PARA INICIAR A AGRICULTURA"
+                                                    : "CONSTRUA UM SILO PARA INICIAR A AGRICULTURA");
+                        (void)audio.play(SoundEvent::ui_error);
+                    } else {
+                        const int min_x = std::min(planting_drag_start.x, released_tile.first);
+                        const int max_x = std::max(planting_drag_start.x, released_tile.first);
+                        const int min_y = std::min(planting_drag_start.y, released_tile.second);
+                        const int max_y = std::max(planting_drag_start.y, released_tile.second);
+                        int planted = 0;
+                        int skipped = 0;
+                        for (int y = min_y; y <= max_y; ++y) {
+                            for (int x = min_x; x <= max_x; ++x) {
+                                if (farming.plant(x, y, *crop, simulation_clock.date())) ++planted;
+                                else ++skipped;
+                            }
+                        }
+                        status = planted == 0 ? "CROP REQUIRES PREPARED SOIL" :
+                            crop->display_name + " PLANTED: " + std::to_string(planted) + " TILE(S)" +
+                            (skipped == 0 ? "" : " | " + std::to_string(skipped) + " SKIPPED");
+                        (void)audio.play(planted == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                    }
+                    planting_dragging = false;
+                    continue;
+                }
+                if (sidewalk_mode && sidewalk_dragging) {
+                    int placed = 0;
+                    int blocked = 0;
+                    for (const TileCoordinate& tile : roads.line_between(sidewalk_drag_start, {released_tile.first, released_tile.second})) {
+                        const SidewalkPlacementFailure failure = sidewalks.validate_placement(tile.x, tile.y, roads, buildings);
+                        if (!lands.is_tile_owned(tile.x, tile.y) || failure != SidewalkPlacementFailure::none || farming.is_occupied(tile.x, tile.y)) {
+                            ++blocked;
+                            continue;
+                        }
+                        if (sidewalks.place_tile(tile.x, tile.y, "concrete_01")) {
+                            ++placed;
+                        }
+                    }
+                    status = placed == 0 ? "SIDEWALK BLOCKED BY ROAD, BUILDING OR TILE" :
+                        "SIDEWALK PLACED: " + std::to_string(placed) + " TILE(S)" +
+                        (blocked == 0 ? "" : " | " + std::to_string(blocked) + " SKIPPED");
+                    (void)audio.play(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                    sidewalk_dragging = false;
+                    continue;
+                }
+                if (!road_mode || !road_dragging) {
+                    continue;
+                }
+                const std::vector<TileCoordinate> segment = roads.line_between(road_drag_start, {released_tile.first, released_tile.second});
+                if (!road_segment_is_on_owned_land(segment, lands)) {
+                    status = "ROAD REQUIRES OWNED LAND";
+                    (void)audio.play(SoundEvent::ui_error);
+                } else if (!road_segment_is_valid(segment, roads, buildings) || std::any_of(segment.begin(), segment.end(), [&farming](const TileCoordinate& tile) {
+                    return farming.is_occupied(tile.x, tile.y);
+                })) {
+                    status = "ROAD BLOCKED BY ROAD, BUILDING OR MAP LIMIT";
+                    (void)audio.play(SoundEvent::ui_error);
+                } else if (!economy.try_spend(static_cast<std::int64_t>(segment.size()) * kRoadCostPerTile)) {
+                    status = "NOT ENOUGH FUNDS FOR ROAD";
+                    (void)audio.play(SoundEvent::ui_error);
+                } else {
+                    const int placed = roads.place_segment(segment);
+                    status = placed == 0 ? "ROAD ALREADY EXISTS" : "ROAD PLACED: " + std::to_string(placed) + " TILE(S), " +
+                        format_money(static_cast<std::int64_t>(placed) * kRoadCostPerTile) + " SPENT";
+                }
+                road_dragging = false;
+            } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                switch (event.key.scancode) {
+                    case SDL_SCANCODE_K:
+                        if (service_vehicles.cancel_active_task(service_vehicle_catalog, vehicle_traversable)) {
+                            status = "FARM TASK CANCELLED: TRACTOR RETURNING";
+                            (void)audio.play(SoundEvent::ui_back);
+                        }
+                        break;
+                    case SDL_SCANCODE_ESCAPE:
+                        if (!placement_definition_id.empty()) {
+                            placement_definition_id.clear();
+                            status = "BUILD MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (build_panel_open) {
+                            build_panel_open = false;
+                            status = "BUILDINGS PANEL CLOSED";
+                            (void)audio.play(SoundEvent::ui_close_panel);
+                        } else if (land_mode) {
+                            land_mode = false;
+                            status = "LAND MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (road_mode) {
+                            road_dragging = false;
+                            road_mode = false;
+                            road_removal_mode = false;
+                            status = "ROAD MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (sidewalk_mode) {
+                            sidewalk_dragging = false;
+                            sidewalk_mode = false;
+                            status = "SIDEWALK MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (agriculture_mode) {
+                            agriculture_mode = false;
+                            agriculture_panel_open = false;
+                            farming_selection_id.clear();
+                            status = "AGRICULTURE MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (decoration_mode) {
+                            decoration_mode = false;
+                            status = "DECORATION MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (!placement_definition_id.empty()) {
+                            placement_definition_id.clear();
+                            status = "BUILD MODE CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
+                        } else if (selected_instance_id) {
+                            selected_instance_id.reset();
+                            status = "INFO PANEL CLOSED";
+                            (void)audio.play(SoundEvent::ui_close_panel);
+                        }
+                        break;
+                    case SDL_SCANCODE_B:
+                        open_build_panel();
+                        break;
+                    case SDL_SCANCODE_V:
+                        begin_road_mode();
+                        break;
+                    case SDL_SCANCODE_R:
+                        begin_remove_mode();
+                        break;
+                    case SDL_SCANCODE_L:
+                        begin_land_mode();
+                        break;
+                    case SDL_SCANCODE_C: begin_sidewalk_mode(); break;
+                    case SDL_SCANCODE_G: open_agriculture_panel(); break;
+                    case SDL_SCANCODE_Z:
+                        rotate_placement(false);
+                        break;
+                    case SDL_SCANCODE_X:
+                        rotate_placement(true);
+                        break;
+                    case SDL_SCANCODE_SPACE:
+                        apply_ui_action({UiAction::toggle_pause, {}});
+                        break;
+                    case SDL_SCANCODE_F5: {
+                        const SaveOperationResult result = save_manager.save(save_path, economy, simulation_clock, buildings, roads, sidewalks, farming, lands, population, &service_vehicles);
+                        status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
+                        (void)audio.play(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                        break;
+                    }
+                    case SDL_SCANCODE_F9: {
+                        const SaveOperationResult result = save_manager.load(save_path, catalog, economy, simulation_clock, buildings, roads, sidewalks, farming, lands, population,
+                                                                            &service_vehicle_catalog, &service_vehicles);
+                        if (result.success) {
+                            power.rebuild(buildings, catalog);
+                            selected_instance_id.reset();
+                            placement_definition_id.clear();
+                            build_panel_open = false;
+                            road_mode = false;
+                            road_removal_mode = false;
+                            road_dragging = false;
+                            sidewalk_dragging = false;
+                            land_mode = false;
+                            sidewalk_mode = false;
+                            agriculture_mode = false;
+                            agriculture_panel_open = false;
+                            farming_selection_id.clear();
+                            if (simulation_clock.speed() != SimulationSpeed::paused) {
+                                simulation_clock.set_speed(SimulationSpeed::speed1);
+                            }
+                            last_simulation_ticks = SDL_GetTicks();
+                            simulation_scheduler.reset();
+                            status = "LOAD COMPLETE: " + result.message;
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else {
+                            status = "LOAD FAILED: " + result.message;
+                            (void)audio.play(SoundEvent::ui_error);
+                        }
+                        break;
+                    }
+                    case SDL_SCANCODE_F10: {
+                        // Developer-only, read-only scenario load.  It never overwrites
+                        // the player save and exists solely to vet asset geometry before
+                        // a new building is accepted into the catalogue.
+                        const SaveOperationResult result = save_manager.load(calibration_scenario_path, catalog, economy, simulation_clock,
+                                                                            buildings, roads, sidewalks, farming, lands, population,
+                                                                            &service_vehicle_catalog, &service_vehicles);
+                        if (result.success) {
+                            power.rebuild(buildings, catalog);
+                            clear_map_modes();
+                            selected_instance_id.reset();
+                            simulation_clock.set_speed(SimulationSpeed::paused);
+                            last_simulation_ticks = SDL_GetTicks();
+                            simulation_scheduler.reset();
+                            status = "ISOMETRIC CALIBRATION LOADED - F1 THEN CLICK A BUILDING";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        } else {
+                            status = "CALIBRATION LOAD FAILED: " + result.message;
+                            (void)audio.play(SoundEvent::ui_error);
+                        }
+                        break;
+                    }
+                    case SDL_SCANCODE_F1: debug_visible = !debug_visible; break;
+                    case SDL_SCANCODE_F2:
+                        navigation_debug_uses_roads = !navigation_debug_uses_roads;
+                        status = std::string("NAVIGATION DEBUG: ") + (navigation_debug_uses_roads ? "ROAD" : "SIDEWALK");
+                        break;
+                    case SDL_SCANCODE_F3: {
+                        float debug_mouse_x = 0.0F;
+                        float debug_mouse_y = 0.0F;
+                        SDL_GetMouseState(&debug_mouse_x, &debug_mouse_y);
+                        const auto tile = screen_to_tile(debug_mouse_x, debug_mouse_y, camera,
+                                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                        const bool navigable = navigation_debug_uses_roads
+                            ? roads.is_drivable(tile.first, tile.second)
+                            : sidewalks.is_walkable(tile.first, tile.second);
+                        if (navigable) {
+                            navigation_debug_start = NavigationTile{tile.first, tile.second};
+                            status = "NAVIGATION START SET";
+                        } else {
+                            status = std::string("NAVIGATION START MUST BE ") +
+                                     (navigation_debug_uses_roads ? "A ROAD" : "A SIDEWALK");
+                        }
+                        break;
+                    }
+                    case SDL_SCANCODE_F4: {
+                        float debug_mouse_x = 0.0F;
+                        float debug_mouse_y = 0.0F;
+                        SDL_GetMouseState(&debug_mouse_x, &debug_mouse_y);
+                        const auto tile = screen_to_tile(debug_mouse_x, debug_mouse_y, camera,
+                                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                        const bool navigable = navigation_debug_uses_roads
+                            ? roads.is_drivable(tile.first, tile.second)
+                            : sidewalks.is_walkable(tile.first, tile.second);
+                        if (navigable) {
+                            navigation_debug_goal = NavigationTile{tile.first, tile.second};
+                            status = "NAVIGATION GOAL SET";
+                        } else {
+                            status = std::string("NAVIGATION GOAL MUST BE ") +
+                                     (navigation_debug_uses_roads ? "A ROAD" : "A SIDEWALK");
+                        }
+                        break;
+                    }
+                    case SDL_SCANCODE_F6:
+                        if (!navigation_debug_start || !navigation_debug_goal) {
+                            status = "PEDESTRIAN DEBUG: SET SIDEWALK START (F3) AND GOAL (F4)";
+                        } else if (!sidewalks.is_walkable(navigation_debug_start->x, navigation_debug_start->y) ||
+                                   !sidewalks.is_walkable(navigation_debug_goal->x, navigation_debug_goal->y)) {
+                            status = "PEDESTRIAN: START AND GOAL MUST BE SIDEWALKS";
+                        } else if (pedestrians.send_test_pedestrian(*navigation_debug_start, *navigation_debug_goal,
+                                                                     SidewalkNavigationNetwork{sidewalks})) {
+                            status = "PEDESTRIAN WALKING ON SIDEWALK";
+                        } else {
+                            status = "PEDESTRIAN: NO SIDEWALK PATH";
+                        }
+                        break;
+                    case SDL_SCANCODE_COMMA:
+                        camera.rotation = rotate_camera_counter_clockwise(camera.rotation);
+                        status = std::string("CAMERA FACING ") + camera_rotation_label(camera.rotation);
+                        break;
+                    case SDL_SCANCODE_PERIOD:
+                        camera.rotation = rotate_camera_clockwise(camera.rotation);
+                        status = std::string("CAMERA FACING ") + camera_rotation_label(camera.rotation);
+                        break;
+                    case SDL_SCANCODE_Q: running = false; break;
+                    case SDL_SCANCODE_HOME: camera = {}; break;
+                    default: break;
+                }
+            }
+        }
+
+        const Uint64 current_simulation_ticks = SDL_GetTicks();
+        const double elapsed_seconds = static_cast<double>(current_simulation_ticks - last_simulation_ticks) / 1000.0;
+        last_simulation_ticks = current_simulation_ticks;
+        const float frame_seconds = static_cast<float>(elapsed_seconds);
+        const bool* keyboard_state = SDL_GetKeyboardState(nullptr);
+        float camera_input_x = 0.0F;
+        float camera_input_y = 0.0F;
+        if (keyboard_state[SDL_SCANCODE_A] || keyboard_state[SDL_SCANCODE_LEFT]) {
+            camera_input_x += 1.0F;
+        }
+        if (keyboard_state[SDL_SCANCODE_D] || keyboard_state[SDL_SCANCODE_RIGHT]) {
+            camera_input_x -= 1.0F;
+        }
+        if (keyboard_state[SDL_SCANCODE_W] || keyboard_state[SDL_SCANCODE_UP]) {
+            camera_input_y += 1.0F;
+        }
+        if (keyboard_state[SDL_SCANCODE_S] || keyboard_state[SDL_SCANCODE_DOWN]) {
+            camera_input_y -= 1.0F;
+        }
+
+        float pan_speed = kCameraKeyboardPanSpeed;
+        float mouse_pan_x = 0.0F;
+        float mouse_pan_y = 0.0F;
+        SDL_GetMouseState(&mouse_pan_x, &mouse_pan_y);
+        if (!camera_dragging && !gameplay_ui.consumes_point(mouse_pan_x, mouse_pan_y)) {
+            if (mouse_pan_x < kCameraEdgePanBand) {
+                camera_input_x += (kCameraEdgePanBand - mouse_pan_x) / kCameraEdgePanBand;
+            } else if (mouse_pan_x > static_cast<float>(viewport_width) - kCameraEdgePanBand) {
+                camera_input_x -= (mouse_pan_x - (static_cast<float>(viewport_width) - kCameraEdgePanBand)) / kCameraEdgePanBand;
+            }
+            if (mouse_pan_y < kCameraEdgePanBand) {
+                camera_input_y += (kCameraEdgePanBand - mouse_pan_y) / kCameraEdgePanBand;
+            } else if (mouse_pan_y > static_cast<float>(viewport_height) - kCameraEdgePanBand) {
+                camera_input_y -= (mouse_pan_y - (static_cast<float>(viewport_height) - kCameraEdgePanBand)) / kCameraEdgePanBand;
+            }
+            pan_speed = kCameraEdgePanSpeed;
+        }
+        const float camera_input_length = std::sqrt(camera_input_x * camera_input_x + camera_input_y * camera_input_y);
+        if (camera_input_length > 1.0F) {
+            camera_input_x /= camera_input_length;
+            camera_input_y /= camera_input_length;
+        }
+        const float camera_delta_seconds = std::min(frame_seconds, 0.050F);
+        const float camera_blend = 1.0F - std::exp(-kCameraPanResponsiveness * camera_delta_seconds);
+        const float target_velocity_x = camera_input_x * pan_speed;
+        const float target_velocity_y = camera_input_y * pan_speed;
+        camera.pan_velocity_x += (target_velocity_x - camera.pan_velocity_x) * camera_blend;
+        camera.pan_velocity_y += (target_velocity_y - camera.pan_velocity_y) * camera_blend;
+        camera.pan_x += camera.pan_velocity_x * camera_delta_seconds;
+        camera.pan_y += camera.pan_velocity_y * camera_delta_seconds;
+        const SimulationAdvance time_advance = simulation_clock.advance_seconds(elapsed_seconds);
+        const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
+        for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
+            service_vehicles.update_tick(scheduled.mobile_tick_seconds, service_vehicle_catalog, vehicle_traversable);
+            pedestrians.update_tick(scheduled.mobile_tick_seconds, SidewalkNavigationNetwork{sidewalks});
+        }
+        for (const TileCoordinate& completed : service_vehicles.take_completed_tiles()) {
+            (void)farming.prepare_soil(completed.x, completed.y);
+        }
+        service_vehicles.interpolate_visual(frame_seconds);
+        service_vehicles.update_animation(frame_seconds, mobile_animations);
+        pedestrians.interpolate_visual(frame_seconds);
+        pedestrians.update_animation(frame_seconds, mobile_animations);
+        if (time_advance.days_advanced > 0) {
+            farming.on_day_changed(simulation_clock.date(), crop_catalog);
+        }
+        for (const GameDate& closing_date : time_advance.closed_months) {
+            const std::uint32_t arrivals = population.on_month_closed(buildings, catalog);
+            economy.on_month_closed(buildings, catalog, population, closing_date, &service_vehicle_catalog, &service_vehicles, &farming);
+            status = "MONTH CLOSED: " + format_balance(economy.monthly_summary().balance) + " NET | POP +" +
+                std::to_string(arrivals);
+        }
+
+        float mouse_x = 0.0F;
+        float mouse_y = 0.0F;
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        const auto mouse_tile = screen_to_tile(mouse_x, mouse_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        const BuildingInstance* hovered_instance = buildings.instance_at(mouse_tile.first, mouse_tile.second);
+        const BuildingDefinition* placement_definition = placement_definition_id.empty() ? nullptr : catalog.find(placement_definition_id);
+        const BuildingPlacementValidation placement_validation = placement_definition == nullptr
+            ? BuildingPlacementValidation{}
+            : validate_building_placement(*placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second,
+                                          buildings, roads, lands, sidewalks, farming, economy, power);
+        const std::vector<TileCoordinate> road_preview = road_mode && !road_removal_mode
+            ? roads.line_between(road_dragging ? road_drag_start : TileCoordinate{mouse_tile.first, mouse_tile.second},
+                                 {mouse_tile.first, mouse_tile.second})
+            : std::vector<TileCoordinate>{};
+        const std::vector<TileCoordinate> sidewalk_preview = sidewalk_mode
+            ? roads.line_between(sidewalk_dragging ? sidewalk_drag_start : TileCoordinate{mouse_tile.first, mouse_tile.second},
+                                 {mouse_tile.first, mouse_tile.second})
+            : std::vector<TileCoordinate>{};
+        const bool road_preview_on_owned_land = road_mode && !road_removal_mode && road_segment_is_on_owned_land(road_preview, lands);
+        const bool road_preview_valid = road_mode && (road_removal_mode
+            ? roads.is_road(mouse_tile.first, mouse_tile.second)
+            : road_segment_is_valid(road_preview, roads, buildings) &&
+              road_preview_on_owned_land &&
+              economy.can_afford(static_cast<std::int64_t>(road_preview.size()) * kRoadCostPerTile));
+        std::optional<NavigationPathResult> navigation_debug_path;
+        if (debug_visible && navigation_debug_start && navigation_debug_goal) {
+            if (navigation_debug_uses_roads) {
+                navigation_debug_path = find_navigation_path(RoadNavigationNetwork{roads}, *navigation_debug_start, *navigation_debug_goal);
+            } else {
+                navigation_debug_path = find_navigation_path(SidewalkNavigationNetwork{sidewalks}, *navigation_debug_start, *navigation_debug_goal);
+            }
+        }
+        render_map(renderer, grass, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        const LandParcel* hovered_parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
+        render_land_overlays(renderer, lands, hovered_parcel, land_mode, camera,
+                             static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
+                     static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        render_sidewalks(renderer, sidewalks, textures, asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        render_farming(renderer, farming, crop_catalog, textures, asset_root, camera,
+                       static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+
+        if (road_mode) {
+            const SDL_FColor preview_color = road_preview_valid
+                ? (road_removal_mode ? SDL_FColor{0.94F, 0.68F, 0.20F, 0.72F} : SDL_FColor{0.34F, 0.78F, 0.52F, 0.62F})
+                : SDL_FColor{0.92F, 0.25F, 0.22F, 0.62F};
+            if (road_removal_mode) {
+                render_road_tile(renderer, mouse_tile.first, mouse_tile.second, camera, static_cast<float>(viewport_width),
+                                 static_cast<float>(viewport_height), preview_color);
+            } else {
+                for (const TileCoordinate& tile : road_preview) {
+                    render_road_tile(renderer, tile.x, tile.y, camera, static_cast<float>(viewport_width),
+                                     static_cast<float>(viewport_height), preview_color);
+                }
+            }
+        }
+        if (sidewalk_mode) {
+            for (const TileCoordinate& tile : sidewalk_preview) {
+                const bool valid = lands.is_tile_owned(tile.x, tile.y) &&
+                    sidewalks.validate_placement(tile.x, tile.y, roads, buildings) == SidewalkPlacementFailure::none &&
+                    !farming.is_occupied(tile.x, tile.y);
+                SDL_SetRenderDrawColor(renderer, valid ? 112 : 245, valid ? 232 : 82, 96, SDL_ALPHA_OPAQUE);
+                render_tile_outline(renderer, tile.x, tile.y, camera,
+                                    static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+            }
+        }
+
+        if (placement_definition != nullptr) {
+            const bool valid_preview = placement_validation.valid();
+            render_footprint_outline(renderer, *placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second, camera,
+                                     static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                      valid_preview ? 116 : 255, valid_preview ? 238 : 90, 90);
+            if (debug_visible) {
+                render_road_access_candidates(renderer, *placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second,
+                                              roads, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+            }
+        }
+        if (agriculture_mode) {
+            const auto render_farming_preview = [&](const int x, const int y) {
+                const FarmTile* farm_tile = farming.tile_at(x, y);
+                bool valid = false;
+                if (farming_selection_id == "harvest_tool") {
+                    valid = farm_tile != nullptr && farm_tile->state == FarmTileState::ready_to_harvest;
+                } else if (farming_selection_id == "prepared_soil_01") {
+                    valid = lands.is_tile_owned(x, y) && !roads.is_road(x, y) && !sidewalks.is_sidewalk(x, y) &&
+                        !buildings.is_occupied(x, y) && !farming.is_occupied(x, y);
+                } else if (crop_catalog.find(farming_selection_id) != nullptr) {
+                    valid = farm_tile != nullptr && farm_tile->state == FarmTileState::prepared_soil;
+                }
+                SDL_SetRenderDrawColor(renderer, valid ? 112 : 245, valid ? 232 : 82, 96, SDL_ALPHA_OPAQUE);
+                render_tile_outline(renderer, x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+            };
+            const TileCoordinate* drag_start = planting_dragging ? &planting_drag_start :
+                (harvest_dragging ? &harvest_drag_start : nullptr);
+            if (drag_start != nullptr) {
+                const int min_x = std::min(drag_start->x, mouse_tile.first);
+                const int max_x = std::max(drag_start->x, mouse_tile.first);
+                const int min_y = std::min(drag_start->y, mouse_tile.second);
+                const int max_y = std::max(drag_start->y, mouse_tile.second);
+                for (int y = min_y; y <= max_y; ++y) {
+                    for (int x = min_x; x <= max_x; ++x) render_farming_preview(x, y);
+                }
+            } else {
+                render_farming_preview(mouse_tile.first, mouse_tile.second);
+            }
+        }
+
+        const std::vector<MobileEntityRenderData> mobile_entities = mobile_render_entities();
+        render_world_entities(renderer, buildings, catalog, mobile_entities, mobile_animations, textures,
+                              asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        if (navigation_debug_path) {
+            render_navigation_debug_path(renderer, *navigation_debug_path, camera,
+                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        }
+
+        if (placement_definition != nullptr) {
+            const BuildingRotation visual_rotation = camera_visual_rotation(*placement_definition, placement_rotation, camera.rotation);
+            if (const TextureAsset* preview_texture = textures.find(asset_root / placement_definition->texture_path_for(visual_rotation))) {
+                BuildingInstance preview;
+                preview.definition_id = placement_definition->id;
+                preview.tile_x = mouse_tile.first;
+                preview.tile_y = mouse_tile.second;
+                preview.rotation = placement_rotation;
+                render_building(renderer, *placement_definition, preview, visual_rotation, *preview_texture, camera,
+                                static_cast<float>(viewport_width), static_cast<float>(viewport_height), 115);
+            }
+        }
+
+        if (hovered_instance != nullptr) {
+            if (const BuildingDefinition* definition = catalog.find(hovered_instance->definition_id)) {
+                render_footprint_outline(renderer, *definition, hovered_instance->rotation, hovered_instance->tile_x, hovered_instance->tile_y, camera,
+                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height), 92, 206, 255);
+            }
+        }
+        if (selected_instance_id) {
+            if (const BuildingInstance* selected = buildings.find_by_id(*selected_instance_id)) {
+                if (const BuildingDefinition* definition = catalog.find(selected->definition_id)) {
+                    render_footprint_outline(renderer, *definition, selected->rotation, selected->tile_x, selected->tile_y, camera,
+                                             static_cast<float>(viewport_width), static_cast<float>(viewport_height), 255, 208, 92);
+                    if (debug_visible) {
+                        const BuildingRotation visual_rotation = camera_visual_rotation(*definition, selected->rotation, camera.rotation);
+                        if (const TextureAsset* texture = textures.find(asset_root / definition->texture_path_for(visual_rotation, selected->current_level))) {
+                            render_building_calibration_debug(renderer, *definition, *selected, visual_rotation, *texture, roads, camera,
+                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                        }
+                    }
+                }
+            }
+        }
+
+        gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));
+        gameplay_ui.render(renderer);
+        if (loading_ui_sheet != nullptr) {
+            constexpr Uint64 kLoadingScreenMinimumMs = 1400;
+            const Uint64 loading_elapsed = SDL_GetTicks() - loading_screen_started;
+            if (loading_elapsed < kLoadingScreenMinimumMs) {
+                render_loading_screen(renderer, *loading_ui_sheet, viewport_width, viewport_height,
+                                      0.12F + 0.88F * static_cast<float>(loading_elapsed) /
+                                      static_cast<float>(kLoadingScreenMinimumMs));
+            }
+        }
+        SDL_RenderPresent(renderer);
+    }
+
+    audio.shutdown();
+    gameplay_ui.release_renderer_resources();
+    textures.clear();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return 0;
+}

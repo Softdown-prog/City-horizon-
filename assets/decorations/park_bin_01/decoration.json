@@ -1,0 +1,8 @@
+{
+  "id": "park_bin_01",
+  "displayName": "Lixeira de Parque",
+  "category": "street_furniture",
+  "texturePath": "assets/decorations/park_bin_01/park_bin_01.png",
+  "footprint": { "width": 1, "height": 1 },
+  "render": { "anchor": "bottom_center", "layer": "decoration", "scale": 1.0 }
+}

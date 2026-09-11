@@ -1,0 +1,76 @@
+{
+  "id": "house_suburban_02",
+  "name": "Casa Suburbana 02",
+  "category": "residential",
+  "texture": "assets/buildings/house_suburban_02_lvl1.png",
+  "anchor": { "x": 0.5114, "y": 0.9982 },
+  "rotatable": false,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 1800,
+  "propertyTaxPerYear": 240,
+  "residentialCapacity": 4,
+  "powerConsumption": 1,
+  "artScale": 0.9242,
+  "levels": [
+    {
+      "level": 1,
+      "name": "Casa Básica",
+      "upgradeCost": 0,
+      "residentialCapacity": 4,
+      "powerConsumption": 1,
+      "maintenancePerMonth": 0,
+      "taxRevenuePerMonth": 0,
+      "sprite": "assets/buildings/house_suburban_02_lvl1.png",
+      "anchor": { "x": 0.5114, "y": 0.9982 }
+    },
+    {
+      "level": 2,
+      "name": "Casa com Alpendre",
+      "upgradeCost": 1200,
+      "residentialCapacity": 8,
+      "powerConsumption": 2,
+      "maintenancePerMonth": 35,
+      "taxRevenuePerMonth": 240,
+      "sprite": "assets/buildings/house_suburban_02_lvl2.png",
+      "anchor": { "x": 0.5118, "y": 0.9982 }
+    },
+    {
+      "level": 3,
+      "name": "Casa Completa Suburbana",
+      "upgradeCost": 2400,
+      "residentialCapacity": 12,
+      "powerConsumption": 3,
+      "maintenancePerMonth": 50,
+      "taxRevenuePerMonth": 380,
+      "sprite": "assets/buildings/house_suburban_02_lvl3.png",
+      "anchor": { "x": 0.5652, "y": 0.9982 }
+    },
+    {
+      "level": 4,
+      "name": "Casa Ampliada",
+      "upgradeCost": 3600,
+      "residentialCapacity": 16,
+      "powerConsumption": 4,
+      "maintenancePerMonth": 70,
+      "taxRevenuePerMonth": 540,
+      "sprite": "assets/buildings/house_suburban_02_lvl4.png",
+      "anchor": { "x": 0.5452, "y": 0.9982 }
+    },
+    {
+      "level": 5,
+      "name": "Casa Suburbana Monumental",
+      "upgradeCost": 5000,
+      "residentialCapacity": 24,
+      "powerConsumption": 5,
+      "maintenancePerMonth": 100,
+      "taxRevenuePerMonth": 800,
+      "sprite": "assets/buildings/house_suburban_02_lvl5.png",
+      "anchor": { "x": 0.5615, "y": 0.9982 }
+    }
+  ]
+}

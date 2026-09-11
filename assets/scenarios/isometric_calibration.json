@@ -1,0 +1,25 @@
+{
+  "saveVersion": 7,
+  "cityFunds": 50000,
+  "simulation": { "day": 1, "month": 1, "year": 1, "speed": 0 },
+  "nextBuildingInstanceId": 5,
+  "currentPopulation": 0,
+  "lastPropertyTaxYear": 0,
+  "ownedParcelIds": [5],
+  "buildings": [
+    {"instanceId":1,"definitionId":"house_suburban_01","tileX":-7,"tileY":-2,"rotation":0},
+    {"instanceId":2,"definitionId":"cafe_01","tileX":1,"tileY":-7,"rotation":1},
+    {"instanceId":3,"definitionId":"mini_market_01","tileX":-3,"tileY":1,"rotation":2},
+    {"instanceId":4,"definitionId":"house_suburban_01","tileX":-2,"tileY":-5,"rotation":3}
+  ],
+  "roads": [
+    {"tileX":-9,"tileY":0},{"tileX":-8,"tileY":0},{"tileX":-7,"tileY":0},{"tileX":-6,"tileY":0},{"tileX":-5,"tileY":0},{"tileX":-4,"tileY":0},{"tileX":-3,"tileY":0},{"tileX":-2,"tileY":0},{"tileX":-1,"tileY":0},{"tileX":0,"tileY":0},{"tileX":1,"tileY":0},{"tileX":2,"tileY":0},{"tileX":3,"tileY":0},{"tileX":4,"tileY":0},{"tileX":5,"tileY":0},{"tileX":6,"tileY":0},{"tileX":7,"tileY":0},{"tileX":8,"tileY":0},{"tileX":9,"tileY":0},
+    {"tileX":0,"tileY":-9},{"tileX":0,"tileY":-8},{"tileX":0,"tileY":-7},{"tileX":0,"tileY":-6},{"tileX":0,"tileY":-5},{"tileX":0,"tileY":-4},{"tileX":0,"tileY":-3},{"tileX":0,"tileY":-2},{"tileX":0,"tileY":-1},{"tileX":0,"tileY":1},{"tileX":0,"tileY":2},{"tileX":0,"tileY":3},{"tileX":0,"tileY":4},{"tileX":0,"tileY":5},{"tileX":0,"tileY":6},{"tileX":0,"tileY":7},{"tileX":0,"tileY":8},{"tileX":0,"tileY":9}
+  ],
+  "sidewalks": [
+    {"tileX":3,"tileY":1},{"tileX":4,"tileY":1},{"tileX":5,"tileY":1},{"tileX":6,"tileY":1},{"tileX":7,"tileY":1},{"tileX":8,"tileY":1}
+  ],
+  "farmingTiles": [],
+  "agriculturalInventory": [],
+  "serviceVehicles": []
+}

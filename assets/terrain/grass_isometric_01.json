@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "grass_isometric_01",
+  "source": "1-Photo-1.jpg",
+  "image": "grass_isometric_01.png",
+  "category": "terrain",
+  "subtype": "grass",
+  "displayName": "Grama Isométrica",
+  "gridFootprint": {
+    "width": 1,
+    "height": 1
+  },
+  "tier": "1",
+  "tags": [
+    "grama",
+    "terreno",
+    "tile",
+    "isometrico"
+  ],
+  "author": "Referência fornecida pelo usuário",
+  "notes": "Tile-base 1x1 para o mapa; o renderizador usa os limites opacos para alinhar seus vértices ao grid.",
+  "imageSize": {
+    "width": 1280,
+    "height": 640
+  },
+  "opaqueBounds": {
+    "left": 53,
+    "top": 23,
+    "right": 1228,
+    "bottom": 618,
+    "width": 1175,
+    "height": 595
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 1.0
+  },
+  "processing": {
+    "backgroundMode": "border-connected auto palette",
+    "tolerance": 52,
+    "featherPixels": 2,
+    "shrinkPixels": 1,
+    "trimTransparentBounds": false,
+    "detectedBackgroundPalette": [
+      "#000000"
+    ]
+  }
+}

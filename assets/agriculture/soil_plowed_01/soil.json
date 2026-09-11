@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "agriculture_soil_plowed_01",
+  "displayName": "Terra Arada",
+  "category": "agriculture_soil",
+  "state": "prepared",
+  "image": "soil_plowed_01.png",
+  "texturePath": "assets/agriculture/soil_plowed_01/soil_plowed_01.png",
+  "gridFootprint": {
+    "width": 1,
+    "height": 1
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 1.0
+  },
+  "imageSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "opaqueBounds": {
+    "left": 16,
+    "top": 151,
+    "right": 1236,
+    "bottom": 1166,
+    "width": 1220,
+    "height": 1015
+  },
+  "processing": {
+    "backgroundMode": "transparent extraction",
+    "haloTreatment": "edge anti-alias cleanup",
+    "source": "user-provided plowed-soil tile"
+  }
+}

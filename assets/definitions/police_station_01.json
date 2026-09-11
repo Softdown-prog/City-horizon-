@@ -1,0 +1,52 @@
+{
+  "id": "police_station_01",
+  "name": "Delegacia Pequena",
+  "category": "civic",
+  "texture": "assets/buildings/police_station_01_rot0.png",
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "sprites": {
+    "0": "assets/buildings/police_station_01_rot0.png",
+    "1": "assets/buildings/police_station_01_rot1.png",
+    "2": "assets/buildings/police_station_01_rot2.png",
+    "3": "assets/buildings/police_station_01_rot3.png"
+  },
+  "footprint": {
+    "width": 3,
+    "height": 3
+  },
+  "buildCost": 4500,
+  "powerConsumption": 5,
+  "artScale": 0.3,
+  "accessPoints": [
+    {
+      "x": 1,
+      "y": 2,
+      "facing": "south"
+    }
+  ],
+  "anchor": {
+    "x": 0.5,
+    "y": 1.0
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.4945,
+      "y": 0.8547
+    },
+    "1": {
+      "x": 0.4551,
+      "y": 0.8187
+    },
+    "2": {
+      "x": 0.6215,
+      "y": 0.8313
+    },
+    "3": {
+      "x": 0.6184,
+      "y": 0.8313
+    }
+  }
+}

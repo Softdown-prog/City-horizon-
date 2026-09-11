@@ -1,0 +1,48 @@
+{
+  "saveVersion": 7,
+  "cityFunds": 125000,
+  "simulation": { "day": 18, "month": 3, "year": 1, "speed": 0 },
+  "nextBuildingInstanceId": 26,
+  "currentPopulation": 24,
+  "lastPropertyTaxYear": 0,
+  "ownedParcelIds": [5],
+  "buildings": [
+    {"instanceId":1,"definitionId":"clinic_small_01","tileX":-10,"tileY":-3,"rotation":0},
+    {"instanceId":2,"definitionId":"city_hall_01","tileX":-6,"tileY":-3,"rotation":0},
+    {"instanceId":3,"definitionId":"basic_school_01","tileX":2,"tileY":-3,"rotation":0},
+    {"instanceId":4,"definitionId":"police_station_01","tileX":7,"tileY":-3,"rotation":0},
+    {"instanceId":5,"definitionId":"bakery_01","tileX":-10,"tileY":1,"rotation":2},
+    {"instanceId":6,"definitionId":"cafe_01","tileX":-7,"tileY":1,"rotation":2},
+    {"instanceId":7,"definitionId":"mini_market_01","tileX":-4,"tileY":1,"rotation":2},
+    {"instanceId":8,"definitionId":"fire_station_small_01","tileX":2,"tileY":1,"rotation":2},
+    {"instanceId":9,"definitionId":"gas_station_01","tileX":6,"tileY":1,"rotation":2},
+    {"instanceId":10,"definitionId":"house_suburban_01","tileX":-10,"tileY":4,"rotation":0},
+    {"instanceId":11,"definitionId":"house_suburban_02","tileX":-7,"tileY":4,"rotation":0},
+    {"instanceId":12,"definitionId":"house_suburban_01","tileX":-4,"tileY":4,"rotation":0},
+    {"instanceId":13,"definitionId":"house_suburban_02","tileX":2,"tileY":4,"rotation":0},
+    {"instanceId":14,"definitionId":"house_suburban_01","tileX":5,"tileY":4,"rotation":0},
+    {"instanceId":15,"definitionId":"house_suburban_02","tileX":8,"tileY":4,"rotation":0},
+    {"instanceId":16,"definitionId":"house_suburban_02","tileX":-10,"tileY":7,"rotation":2},
+    {"instanceId":17,"definitionId":"house_suburban_01","tileX":-7,"tileY":7,"rotation":2},
+    {"instanceId":18,"definitionId":"house_suburban_02","tileX":-4,"tileY":7,"rotation":2},
+    {"instanceId":19,"definitionId":"house_suburban_01","tileX":2,"tileY":7,"rotation":2},
+    {"instanceId":20,"definitionId":"house_suburban_02","tileX":5,"tileY":7,"rotation":2},
+    {"instanceId":21,"definitionId":"house_suburban_01","tileX":8,"tileY":7,"rotation":2},
+    {"instanceId":22,"definitionId":"plaza_01","tileX":8,"tileY":10,"rotation":0},
+    {"instanceId":23,"definitionId":"small_barn_01","tileX":-14,"tileY":10,"rotation":0},
+    {"instanceId":24,"definitionId":"small_silo_01","tileX":-11,"tileY":10,"rotation":0},
+    {"instanceId":25,"definitionId":"tractor_red_01","tileX":-8,"tileY":10,"rotation":0}
+  ],
+  "roads": [
+    {"tileX":-11,"tileY":0},{"tileX":-10,"tileY":0},{"tileX":-9,"tileY":0},{"tileX":-8,"tileY":0},{"tileX":-7,"tileY":0},{"tileX":-6,"tileY":0},{"tileX":-5,"tileY":0},{"tileX":-4,"tileY":0},{"tileX":-3,"tileY":0},{"tileX":-2,"tileY":0},{"tileX":-1,"tileY":0},{"tileX":0,"tileY":0},{"tileX":1,"tileY":0},{"tileX":2,"tileY":0},{"tileX":3,"tileY":0},{"tileX":4,"tileY":0},{"tileX":5,"tileY":0},{"tileX":6,"tileY":0},{"tileX":7,"tileY":0},{"tileX":8,"tileY":0},{"tileX":9,"tileY":0},{"tileX":10,"tileY":0},{"tileX":11,"tileY":0},
+    {"tileX":-11,"tileY":6},{"tileX":-10,"tileY":6},{"tileX":-9,"tileY":6},{"tileX":-8,"tileY":6},{"tileX":-7,"tileY":6},{"tileX":-6,"tileY":6},{"tileX":-5,"tileY":6},{"tileX":-4,"tileY":6},{"tileX":-3,"tileY":6},{"tileX":-2,"tileY":6},{"tileX":-1,"tileY":6},{"tileX":0,"tileY":6},{"tileX":1,"tileY":6},{"tileX":2,"tileY":6},{"tileX":3,"tileY":6},{"tileX":4,"tileY":6},{"tileX":5,"tileY":6},{"tileX":6,"tileY":6},{"tileX":7,"tileY":6},{"tileX":8,"tileY":6},{"tileX":9,"tileY":6},{"tileX":10,"tileY":6},{"tileX":11,"tileY":6},
+    {"tileX":0,"tileY":-4},{"tileX":0,"tileY":-3},{"tileX":0,"tileY":-2},{"tileX":0,"tileY":-1},{"tileX":0,"tileY":1},{"tileX":0,"tileY":2},{"tileX":0,"tileY":3},{"tileX":0,"tileY":4},{"tileX":0,"tileY":5}
+  ],
+  "sidewalks": [],
+  "farmingTiles": [
+    {"tileX":-15,"tileY":13,"state":2,"cropId":"crop_coffee","plantedDay":40,"stage":4,"harvestCycleCount":0},{"tileX":-14,"tileY":13,"state":2,"cropId":"crop_coffee","plantedDay":40,"stage":4,"harvestCycleCount":0},{"tileX":-13,"tileY":13,"state":2,"cropId":"crop_tomato","plantedDay":40,"stage":4,"harvestCycleCount":0},{"tileX":-12,"tileY":13,"state":2,"cropId":"crop_tomato","plantedDay":40,"stage":4,"harvestCycleCount":0},{"tileX":-11,"tileY":13,"state":2,"cropId":"crop_corn","plantedDay":40,"stage":5,"harvestCycleCount":0},{"tileX":-10,"tileY":13,"state":2,"cropId":"crop_corn","plantedDay":40,"stage":5,"harvestCycleCount":0},
+    {"tileX":-15,"tileY":14,"state":2,"cropId":"crop_wheat","plantedDay":40,"stage":5,"harvestCycleCount":0},{"tileX":-14,"tileY":14,"state":2,"cropId":"crop_wheat","plantedDay":40,"stage":5,"harvestCycleCount":0},{"tileX":-13,"tileY":14,"state":2,"cropId":"crop_sugar_cane","plantedDay":40,"stage":4,"harvestCycleCount":0},{"tileX":-12,"tileY":14,"state":2,"cropId":"crop_sugar_cane","plantedDay":40,"stage":4,"harvestCycleCount":0}
+  ],
+  "agriculturalInventory": [{"cropId":"resource_coffee","quantity":12},{"cropId":"resource_wheat","quantity":15},{"cropId":"resource_tomato","quantity":10},{"cropId":"resource_corn","quantity":10},{"cropId":"resource_sugar_cane","quantity":8}],
+  "serviceVehicles": [{"vehicleId":"tractor_tillage_01","tileX":-8,"tileY":12,"homeTileX":-8,"homeTileY":12,"direction":0,"state":0}]
+}

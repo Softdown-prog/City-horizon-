@@ -1,0 +1,14 @@
+{
+  "id": "citizen_common",
+  "fallbacks": [],
+  "clips": [
+    { "id": "idle_south", "state": "idle", "direction": "south", "frames": ["assets/pedestrians/citizen_common/frames/walk_front_01.png"], "fps": 1, "loop": true },
+    { "id": "idle_north", "state": "idle", "direction": "north", "frames": ["assets/pedestrians/citizen_common/frames/walk_back_01.png"], "fps": 1, "loop": true },
+    { "id": "idle_east", "state": "idle", "direction": "east", "frames": ["assets/pedestrians/citizen_common/frames/walk_right_01.png"], "fps": 1, "loop": true },
+    { "id": "idle_west", "state": "idle", "direction": "west", "frames": ["assets/pedestrians/citizen_common/frames/walk_left_01.png"], "fps": 1, "loop": true },
+    { "id": "walking_south", "state": "walking", "direction": "south", "frames": ["assets/pedestrians/citizen_common/frames/walk_front_01.png", "assets/pedestrians/citizen_common/frames/walk_front_02.png", "assets/pedestrians/citizen_common/frames/walk_front_03.png", "assets/pedestrians/citizen_common/frames/walk_front_04.png", "assets/pedestrians/citizen_common/frames/walk_front_05.png"], "fps": 6, "loop": true },
+    { "id": "walking_north", "state": "walking", "direction": "north", "frames": ["assets/pedestrians/citizen_common/frames/walk_back_01.png", "assets/pedestrians/citizen_common/frames/walk_back_02.png", "assets/pedestrians/citizen_common/frames/walk_back_03.png", "assets/pedestrians/citizen_common/frames/walk_back_04.png", "assets/pedestrians/citizen_common/frames/walk_back_05.png"], "fps": 6, "loop": true },
+    { "id": "walking_east", "state": "walking", "direction": "east", "frames": ["assets/pedestrians/citizen_common/frames/walk_right_01.png", "assets/pedestrians/citizen_common/frames/walk_right_02.png", "assets/pedestrians/citizen_common/frames/walk_right_03.png", "assets/pedestrians/citizen_common/frames/walk_right_04.png", "assets/pedestrians/citizen_common/frames/walk_right_05.png"], "fps": 6, "loop": true },
+    { "id": "walking_west", "state": "walking", "direction": "west", "frames": ["assets/pedestrians/citizen_common/frames/walk_left_01.png", "assets/pedestrians/citizen_common/frames/walk_left_02.png", "assets/pedestrians/citizen_common/frames/walk_left_03.png", "assets/pedestrians/citizen_common/frames/walk_left_04.png", "assets/pedestrians/citizen_common/frames/walk_left_05.png"], "fps": 6, "loop": true }
+  ]
+}

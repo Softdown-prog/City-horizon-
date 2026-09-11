@@ -1,0 +1,82 @@
+{
+  "id": "cafe_01",
+  "name": "Cafeteria",
+  "category": "commercial",
+  "texture": "assets/buildings/cafe_01_lvl1.png",
+  "rotatable": false,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 2500,
+  "maintenancePerMonth": 80,
+  "taxRevenuePerMonth": 220,
+  "requiredPopulationForFullRevenue": 20,
+  "powerConsumption": 3,
+  "resourceInputs": [
+    {
+      "resourceId": "resource_coffee",
+      "amountPerMonth": 2,
+      "localSupplyBonus": 45
+    }
+  ],
+  "artScale": 1.3617,
+  "anchor": {
+    "x": 0.4654,
+    "y": 0.9932
+  },
+  "levels": [
+    {
+      "level": 1,
+      "name": "Cafeteria Simples",
+      "upgradeCost": 0,
+      "taxRevenuePerMonth": 220,
+      "maintenancePerMonth": 80,
+      "powerConsumption": 3,
+      "sprite": "assets/buildings/cafe_01_lvl1.png",
+      "anchor": { "x": 0.4654, "y": 0.9932 }
+    },
+    {
+      "level": 2,
+      "name": "Fachada Melhorada",
+      "upgradeCost": 1500,
+      "taxRevenuePerMonth": 450,
+      "maintenancePerMonth": 150,
+      "powerConsumption": 5,
+      "sprite": "assets/buildings/cafe_01_lvl2.png",
+      "anchor": { "x": 0.4868, "y": 0.9940 }
+    },
+    {
+      "level": 3,
+      "name": "Expansão e Mesas",
+      "upgradeCost": 3000,
+      "taxRevenuePerMonth": 850,
+      "maintenancePerMonth": 280,
+      "powerConsumption": 8,
+      "sprite": "assets/buildings/cafe_01_lvl3.png",
+      "anchor": { "x": 0.5051, "y": 0.9940 }
+    },
+    {
+      "level": 4,
+      "name": "Cafeteria Moderna",
+      "upgradeCost": 5500,
+      "taxRevenuePerMonth": 1500,
+      "maintenancePerMonth": 480,
+      "powerConsumption": 12,
+      "sprite": "assets/buildings/cafe_01_lvl4.png",
+      "anchor": { "x": 0.5462, "y": 0.9954 }
+    },
+    {
+      "level": 5,
+      "name": "Premium e Gourmet",
+      "upgradeCost": 9000,
+      "taxRevenuePerMonth": 2400,
+      "maintenancePerMonth": 750,
+      "powerConsumption": 18,
+      "sprite": "assets/buildings/cafe_01_lvl5.png",
+      "anchor": { "x": 0.5341, "y": 0.9955 }
+    }
+  ]
+}

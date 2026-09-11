@@ -1,0 +1,24 @@
+{
+  "id": "plaza_01",
+  "name": "Praça",
+  "category": "civic",
+  "texture": "assets/buildings/plaza_01_rot0.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 3,
+    "height": 3
+  },
+  "buildCost": 1500,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.815
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.6168,
+      "y": 0.8148
+    }
+  }
+}

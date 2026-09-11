@@ -1,0 +1,31 @@
+{
+  "id": "small_barn_01",
+  "name": "Celeiro Pequeno",
+  "category": "agriculture",
+  "texture": "assets/buildings/small_barn_01.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 1500,
+  "maintenancePerMonth": 15,
+  "providesAgriculturalStorage": true,
+  "agriculturalInfrastructureRole": "barn",
+  "agriculturalStorageCapacity": 200,
+  "acceptedStorageClasses": [
+    "agricultural"
+  ],
+  "artScale": 0.25,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.823
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.4969,
+      "y": 0.8234
+    }
+  }
+}

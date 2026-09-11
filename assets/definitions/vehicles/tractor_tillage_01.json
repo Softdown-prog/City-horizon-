@@ -1,0 +1,20 @@
+{
+  "id": "tractor_tillage_01",
+  "displayName": "Trator de Preparo",
+  "category": "farming_vehicle",
+  "role": "soil_preparation",
+  "purchaseCost": 2800,
+  "monthlyMaintenance": 35,
+  "moveSpeed": 2.0,
+  "workSpeed": 0.7,
+  "animationSet": "tractor_tillage_01",
+  "spriteSouth": "assets/vehicles/farming/tractor_tillage_01/tractor_tillage_01_south.png",
+  "spriteEast": "assets/vehicles/farming/tractor_tillage_01/tractor_tillage_01_east.png",
+  "spriteNorth": "assets/vehicles/farming/tractor_tillage_01/tractor_tillage_01_north.png",
+  "spriteWest": "assets/vehicles/farming/tractor_tillage_01/tractor_tillage_01_west.png",
+  "requiresOwnedFarmVehicle": true,
+  "workTool": "disc_harrow",
+  "artScale": 0.085,
+  "anchorX": 0.5,
+  "anchorY": 0.82
+}
