@@ -1,0 +1,20 @@
+{
+  "id": "beach_umbrella_closed",
+  "name": "Guarda-Sol Fechado e Cooler",
+  "category": "decor",
+  "texture": "assets/decor/beach/beach_umbrella_closed.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 200,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

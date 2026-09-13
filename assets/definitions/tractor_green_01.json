@@ -1,0 +1,26 @@
+{
+  "id": "tractor_green_01",
+  "name": "Trator Verde com Grade",
+  "category": "agriculture",
+  "texture": "assets/vehicles/tractor_green/tractor_green_01.png",
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "sprites": {
+    "0": "assets/vehicles/tractor_green/tractor_green_rot0.png",
+    "1": "assets/vehicles/tractor_green/tractor_green_rot1.png",
+    "2": "assets/vehicles/tractor_green/tractor_green_rot2.png",
+    "3": "assets/vehicles/tractor_green/tractor_green_rot3.png"
+  },
+  "buildCost": 750,
+  "maintenancePerMonth": 0,
+  "artScale": 0.38,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.82
+  },
+  "playerBuildable": true
+}

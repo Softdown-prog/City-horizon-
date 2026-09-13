@@ -37,6 +37,9 @@ struct MobileAnimationPlayer {
     std::string clip_id;
     std::size_t frame_index = 0;
     float accumulated_seconds = 0.0F;
+    // Instance-local visual cadence. It never changes the selected clips or
+    // entity movement and lets a temporary gait calibration compare timing.
+    float playback_rate = 1.0F;
 };
 
 class MobileAnimationCatalog {

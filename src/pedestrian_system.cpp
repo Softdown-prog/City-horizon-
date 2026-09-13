@@ -17,6 +17,18 @@ namespace {
 PedestrianSystem::PedestrianSystem(PedestrianVisualDefinition visual_definition)
     : visual_definition_(std::move(visual_definition)) {}
 
+void PedestrianSystem::configure_visual_test(PedestrianVisualDefinition visual_definition) {
+    visual_definition_ = std::move(visual_definition);
+    for (PedestrianInstance& pedestrian : instances_) {
+        pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
+        pedestrian.animation.animation_set_id = visual_definition_.animation_set_id;
+        pedestrian.animation.clip_id.clear();
+        pedestrian.animation.frame_index = 0;
+        pedestrian.animation.accumulated_seconds = 0.0F;
+        pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
+    }
+}
+
 bool PedestrianSystem::send_test_pedestrian(const NavigationTile start, const NavigationTile destination,
                                             const NavigationNetwork& network) {
     const NavigationPathResult path = find_navigation_path(network, start, destination);
@@ -29,12 +41,16 @@ bool PedestrianSystem::send_test_pedestrian(const NavigationTile start, const Na
         instances_.push_back(std::move(pedestrian));
     }
     PedestrianInstance& pedestrian = instances_.front();
+    pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
+    pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
     pedestrian.spatial.logical_world_x = static_cast<float>(start.x);
     pedestrian.spatial.logical_world_y = static_cast<float>(start.y);
     pedestrian.spatial.logical_tile_x = start.x;
     pedestrian.spatial.logical_tile_y = start.y;
     pedestrian.spatial.visual_world_x = pedestrian.spatial.logical_world_x;
     pedestrian.spatial.visual_world_y = pedestrian.spatial.logical_world_y;
+    pedestrian.spatial.ground_anchor_x = visual_definition_.lane_ground_anchor_x;
+    pedestrian.spatial.ground_anchor_y = visual_definition_.lane_ground_anchor_y;
     pedestrian.route = path.tiles;
     pedestrian.next_waypoint = path.tiles.size() > 1 ? 1 : path.tiles.size();
     pedestrian.destination = destination;

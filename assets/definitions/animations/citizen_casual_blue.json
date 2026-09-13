@@ -1,0 +1,14 @@
+{
+  "id": "citizen_casual_blue",
+  "fallbacks": ["worker_cleaner_female"],
+  "clips": [
+    { "id": "idle_east", "state": "idle", "direction": "east", "frames": ["assets/pedestrians/citizen_casual_blue/se/frame_00.png"], "fps": 1, "loop": true },
+    { "id": "idle_south", "state": "idle", "direction": "south", "frames": ["assets/pedestrians/citizen_casual_blue/sw/frame_00.png"], "fps": 1, "loop": true },
+    { "id": "idle_west", "state": "idle", "direction": "west", "frames": ["assets/pedestrians/citizen_casual_blue/nw/frame_00.png"], "fps": 1, "loop": true },
+    { "id": "idle_north", "state": "idle", "direction": "north", "frames": ["assets/pedestrians/citizen_casual_blue/ne/frame_00.png"], "fps": 1, "loop": true },
+    { "id": "walking_east", "state": "walking", "direction": "east", "frames": ["assets/pedestrians/citizen_casual_blue/se/frame_00.png", "assets/pedestrians/citizen_casual_blue/se/frame_01.png", "assets/pedestrians/citizen_casual_blue/se/frame_02.png", "assets/pedestrians/citizen_casual_blue/se/frame_03.png"], "fps": 8, "loop": true },
+    { "id": "walking_south", "state": "walking", "direction": "south", "frames": ["assets/pedestrians/citizen_casual_blue/sw/frame_00.png", "assets/pedestrians/citizen_casual_blue/sw/frame_01.png", "assets/pedestrians/citizen_casual_blue/sw/frame_02.png", "assets/pedestrians/citizen_casual_blue/sw/frame_03.png"], "fps": 8, "loop": true },
+    { "id": "walking_west", "state": "walking", "direction": "west", "frames": ["assets/pedestrians/citizen_casual_blue/nw/frame_00.png", "assets/pedestrians/citizen_casual_blue/nw/frame_01.png", "assets/pedestrians/citizen_casual_blue/nw/frame_02.png", "assets/pedestrians/citizen_casual_blue/nw/frame_03.png"], "fps": 8, "loop": true },
+    { "id": "walking_north", "state": "walking", "direction": "north", "frames": ["assets/pedestrians/citizen_casual_blue/ne/frame_00.png", "assets/pedestrians/citizen_casual_blue/ne/frame_01.png", "assets/pedestrians/citizen_casual_blue/ne/frame_02.png", "assets/pedestrians/citizen_casual_blue/ne/frame_03.png"], "fps": 8, "loop": true }
+  ]
+}

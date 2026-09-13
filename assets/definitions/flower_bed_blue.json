@@ -1,0 +1,20 @@
+{
+  "id": "flower_bed_blue",
+  "name": "Canteiro de Flores Azuis",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/flower_bed_blue.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 70,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

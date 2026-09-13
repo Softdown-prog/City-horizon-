@@ -1,0 +1,27 @@
+{
+  "id": "mixamo_walk_se",
+  "fallbacks": [],
+  "clips": [
+    {
+      "id": "idle_east",
+      "state": "idle",
+      "direction": "east",
+      "frames": ["assets/pedestrians/mixamo_walk_se/frames/frame_00.png"],
+      "fps": 1,
+      "loop": true
+    },
+    {
+      "id": "walking_east",
+      "state": "walking",
+      "direction": "east",
+      "frames": [
+        "assets/pedestrians/mixamo_walk_se/frames/frame_00.png",
+        "assets/pedestrians/mixamo_walk_se/frames/frame_01.png",
+        "assets/pedestrians/mixamo_walk_se/frames/frame_02.png",
+        "assets/pedestrians/mixamo_walk_se/frames/frame_03.png"
+      ],
+      "fps": 8,
+      "loop": true
+    }
+  ]
+}

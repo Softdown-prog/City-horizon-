@@ -1,0 +1,20 @@
+{
+  "id": "beach_yacht_small",
+  "name": "Iate Pequeno",
+  "category": "decor",
+  "texture": "assets/decor/waterfront/beach_yacht_small.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 2,
+    "height": 1
+  },
+  "buildCost": 3000,
+  "maintenancePerMonth": 0,
+  "artScale": 0.35,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

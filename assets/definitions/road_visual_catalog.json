@@ -16,5 +16,6 @@
     "13": "assets/roads/premium_01/road_13.png",
     "14": "assets/roads/premium_01/road_14.png",
     "15": "assets/roads/premium_01/road_15.png"
-  }
+  },
+  "playerBuildable": true
 }

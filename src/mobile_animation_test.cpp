@@ -28,4 +28,20 @@ int main(int argc, char** argv) {
 
     catalog.update_player(player, "returning", MobileEntityDirection::north, 0.25F);
     assert(player.clip_id == "moving_north" && player.frame_index == 0);
+
+    // The SE gait calibration changes only this per-player visual rate.  The
+    // canonical clip stays at 8 FPS (125 ms), so 125/150 must hold frame zero
+    // for 149 ms and advance only after the full 150 ms preset duration.
+    MobileAnimationPlayer gait{.animation_set_id = "canonical_walk", .playback_rate = 125.0F / 150.0F};
+    catalog.update_player(gait, "walking", MobileEntityDirection::east, 0.149F);
+    assert(gait.clip_id == "walking_east" && gait.frame_index == 0);
+    catalog.update_player(gait, "walking", MobileEntityDirection::east, 0.002F);
+    assert(gait.frame_index == 1);
+
+    // The same canonical action has one real render for every camera-relative
+    // cardinal direction; all clips must retain the exact four-frame cadence.
+    for (const MobileEntityDirection direction : directions) {
+        const MobileAnimationClip* walking = catalog.resolve_clip("canonical_walk", "walking", direction);
+        assert(walking != nullptr && walking->frames.size() == 4 && walking->frames_per_second == 8.0F);
+    }
 }

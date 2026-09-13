@@ -42,6 +42,19 @@ void test_roads() {
     assert(find_navigation_path(network, {-1, 0}, {0, 1}).status == NavigationPathStatus::no_path);
 }
 
+void test_pedestrian_lanes_derive_from_roads() {
+    RoadManager roads{-8, 8};
+    PedestrianLaneNavigationNetwork pedestrians{roads};
+    for (int x = 0; x < 6; ++x) assert(roads.place_tile(x, 0));
+
+    // No SidewalkManager data is required: the same N/E/S/W mask that carries
+    // vehicles exposes a separate pedestrian-lane graph for the renderer.
+    assert(pedestrians.can_move({0, 0}, CardinalDirection::east));
+    assert_path(find_navigation_path(pedestrians, {0, 0}, {5, 0}), {0, 0}, {5, 0}, 6);
+    assert(roads.remove_tile(3, 0));
+    assert(find_navigation_path(pedestrians, {0, 0}, {5, 0}).status == NavigationPathStatus::no_path);
+}
+
 void test_sidewalks() {
     RoadManager roads{-8, 8};
     SidewalkManager sidewalks{-8, 8};
@@ -72,5 +85,6 @@ void test_sidewalks() {
 
 int main() {
     test_roads();
+    test_pedestrian_lanes_derive_from_roads();
     test_sidewalks();
 }

@@ -89,5 +89,6 @@
         "y": 0.9982
       }
     }
-  ]
+  ],
+  "playerBuildable": true
 }

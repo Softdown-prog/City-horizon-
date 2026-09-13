@@ -32,6 +32,18 @@ private:
     const RoadManager& roads_;
 };
 
+// Pedestrians share the road topology but not the vehicle route semantics.
+// The visual lane offset is owned by the pedestrian presentation definition;
+// this graph deliberately derives its N/E/S/W edges straight from RoadManager.
+class PedestrianLaneNavigationNetwork final : public NavigationNetwork {
+public:
+    explicit PedestrianLaneNavigationNetwork(const RoadManager& roads) : roads_(roads) {}
+    [[nodiscard]] bool is_navigable(NavigationTile tile) const override;
+    [[nodiscard]] bool is_connected(NavigationTile tile, CardinalDirection direction) const override;
+private:
+    const RoadManager& roads_;
+};
+
 class SidewalkNavigationNetwork final : public NavigationNetwork {
 public:
     explicit SidewalkNavigationNetwork(const SidewalkManager& sidewalks) : sidewalks_(sidewalks) {}

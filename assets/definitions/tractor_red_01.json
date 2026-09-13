@@ -2,29 +2,19 @@
   "id": "tractor_red_01",
   "name": "Trator Vermelho",
   "category": "agriculture",
-  "texture": "assets/vehicles/tractor_red/frames/drive_front_01.png",
+  "texture": "assets/vehicles/tractor_red/tractor_red_01.png",
   "rotatable": false,
   "requiresRoadAccess": false,
-  "initialPlacement": {
-    "tileX": 3,
-    "tileY": 3,
-    "rotation": 0
-  },
   "footprint": {
-    "width": 1,
-    "height": 1
+    "width": 2,
+    "height": 2
   },
   "buildCost": 650,
   "maintenancePerMonth": 0,
-  "artScale": 0.11,
+  "artScale": 0.22,
   "anchor": {
     "x": 0.5,
-    "y": 0.739
+    "y": 0.82
   },
-  "spriteAnchors": {
-    "0": {
-      "x": 0.6823,
-      "y": 0.739
-    }
-  }
+  "playerBuildable": true
 }

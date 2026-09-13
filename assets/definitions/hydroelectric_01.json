@@ -1,0 +1,27 @@
+{
+  "id": "hydroelectric_01",
+  "name": "Usina Hidrelétrica",
+  "category": "infrastructure",
+  "texture": "assets/buildings/hydroelectric_01.png",
+  "preplaced": true,
+  "playerBuildable": false,
+  "unlockRequirement": "clean_energy",
+  "generationCapacity": 0,
+  "footprint": {
+    "width": 4,
+    "height": 4
+  },
+  "initialPlacement": {
+    "tileX": -18,
+    "tileY": 12,
+    "rotation": 0
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "powerProduction": 0,
+  "artScale": 0.4,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  }
+}

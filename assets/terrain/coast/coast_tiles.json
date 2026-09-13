@@ -1,0 +1,479 @@
+{
+  "catalog": "coast_terrain_and_water_catalog",
+  "logicalTileWidth": 128,
+  "logicalTileHeight": 64,
+  "visualAssetWidth": 170,
+  "visualAssetHeight": 85,
+  "terrain_base_tiles": [
+    {
+      "id": "coast_sand_center_01",
+      "name": "Areia Centro",
+      "texture": "assets/terrain/coast/coast_sand_center_01.png"
+    },
+    {
+      "id": "coast_sand_wet_01",
+      "name": "Areia Molhada Centro",
+      "texture": "assets/terrain/coast/coast_sand_wet_01.png"
+    },
+    {
+      "id": "coast_grass_sand_transition",
+      "name": "Transição Grama-Areia",
+      "texture": "assets/terrain/coast/coast_grass_sand_transition.png"
+    },
+    {
+      "id": "coast_shallow_transition",
+      "name": "Transição Rasa",
+      "texture": "assets/terrain/coast/coast_shallow_transition.png"
+    },
+    {
+      "id": "coast_water_shallow",
+      "name": "Água Rasa Base",
+      "texture": "assets/terrain/coast/coast_water_shallow.png"
+    },
+    {
+      "id": "coast_water_deep",
+      "name": "Água Profunda Base",
+      "texture": "assets/terrain/coast/coast_water_deep.png"
+    },
+    {
+      "id": "coast_border_north",
+      "name": "Borda Norte",
+      "texture": "assets/terrain/coast/coast_border_north.png"
+    },
+    {
+      "id": "coast_border_south",
+      "name": "Borda Sul",
+      "texture": "assets/terrain/coast/coast_border_south.png"
+    },
+    {
+      "id": "coast_border_east",
+      "name": "Borda Leste",
+      "texture": "assets/terrain/coast/coast_border_east.png"
+    },
+    {
+      "id": "coast_border_west",
+      "name": "Borda Oeste",
+      "texture": "assets/terrain/coast/coast_border_west.png"
+    },
+    {
+      "id": "coast_corner_outer_ne",
+      "name": "Canto Externo NE",
+      "texture": "assets/terrain/coast/coast_corner_outer_ne.png"
+    },
+    {
+      "id": "coast_corner_outer_nw",
+      "name": "Canto Externo NW",
+      "texture": "assets/terrain/coast/coast_corner_outer_nw.png"
+    },
+    {
+      "id": "coast_corner_outer_se",
+      "name": "Canto Externo SE",
+      "texture": "assets/terrain/coast/coast_corner_outer_se.png"
+    },
+    {
+      "id": "coast_corner_outer_sw",
+      "name": "Canto Externo SW",
+      "texture": "assets/terrain/coast/coast_corner_outer_sw.png"
+    },
+    {
+      "id": "coast_corner_inner_ne",
+      "name": "Canto Interno NE",
+      "texture": "assets/terrain/coast/coast_corner_inner_ne.png"
+    },
+    {
+      "id": "coast_corner_inner_nw",
+      "name": "Canto Interno NW",
+      "texture": "assets/terrain/coast/coast_corner_inner_nw.png"
+    },
+    {
+      "id": "coast_corner_inner_se",
+      "name": "Canto Interno SE",
+      "texture": "assets/terrain/coast/coast_corner_inner_se.png"
+    },
+    {
+      "id": "coast_corner_inner_sw",
+      "name": "Canto Interno SW",
+      "texture": "assets/terrain/coast/coast_corner_inner_sw.png"
+    }
+  ],
+  "ocean_deep_variants": [
+    {
+      "id": "ocean_deep_01",
+      "name": "Oceano Profundo Plano 01",
+      "texture": "assets/terrain/coast/ocean_deep_01.png"
+    },
+    {
+      "id": "ocean_deep_02",
+      "name": "Oceano Profundo Plano 02",
+      "texture": "assets/terrain/coast/ocean_deep_02.png"
+    },
+    {
+      "id": "ocean_deep_03",
+      "name": "Oceano Profundo Plano 03",
+      "texture": "assets/terrain/coast/ocean_deep_03.png"
+    },
+    {
+      "id": "ocean_deep_04",
+      "name": "Oceano Profundo Plano 04",
+      "texture": "assets/terrain/coast/ocean_deep_04.png"
+    },
+    {
+      "id": "ocean_deep_05",
+      "name": "Oceano Profundo Plano 05",
+      "texture": "assets/terrain/coast/ocean_deep_05.png"
+    },
+    {
+      "id": "ocean_deep_06",
+      "name": "Oceano Profundo Plano 06",
+      "texture": "assets/terrain/coast/ocean_deep_06.png"
+    }
+  ],
+  "ocean_shallow_variants": [
+    {
+      "id": "ocean_shallow_01",
+      "name": "Oceano Raso Plano 01",
+      "texture": "assets/terrain/coast/ocean_shallow_01.png"
+    },
+    {
+      "id": "ocean_shallow_02",
+      "name": "Oceano Raso Plano 02",
+      "texture": "assets/terrain/coast/ocean_shallow_02.png"
+    },
+    {
+      "id": "ocean_shallow_03",
+      "name": "Oceano Raso Plano 03",
+      "texture": "assets/terrain/coast/ocean_shallow_03.png"
+    },
+    {
+      "id": "ocean_shallow_04",
+      "name": "Oceano Raso Plano 04",
+      "texture": "assets/terrain/coast/ocean_shallow_04.png"
+    },
+    {
+      "id": "ocean_shallow_05",
+      "name": "Oceano Raso Plano 05",
+      "texture": "assets/terrain/coast/ocean_shallow_05.png"
+    },
+    {
+      "id": "ocean_shallow_06",
+      "name": "Oceano Raso Plano 06",
+      "texture": "assets/terrain/coast/ocean_shallow_06.png"
+    }
+  ],
+  "shoreline_overlays": {
+    "foam_ne_sw": [
+      {
+        "id": "shoreline_foam_ne_sw_01",
+        "frame": 1,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_01.png"
+      },
+      {
+        "id": "shoreline_foam_ne_sw_02",
+        "frame": 2,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_02.png"
+      },
+      {
+        "id": "shoreline_foam_ne_sw_03",
+        "frame": 3,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_03.png"
+      },
+      {
+        "id": "shoreline_foam_ne_sw_04",
+        "frame": 4,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_04.png"
+      },
+      {
+        "id": "shoreline_foam_ne_sw_05",
+        "frame": 5,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_05.png"
+      },
+      {
+        "id": "shoreline_foam_ne_sw_06",
+        "frame": 6,
+        "texture": "assets/terrain/coast/shoreline_foam_ne_sw_06.png"
+      }
+    ],
+    "foam_nw_se": [
+      {
+        "id": "shoreline_foam_nw_se_01",
+        "frame": 1,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_01.png"
+      },
+      {
+        "id": "shoreline_foam_nw_se_02",
+        "frame": 2,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_02.png"
+      },
+      {
+        "id": "shoreline_foam_nw_se_03",
+        "frame": 3,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_03.png"
+      },
+      {
+        "id": "shoreline_foam_nw_se_04",
+        "frame": 4,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_04.png"
+      },
+      {
+        "id": "shoreline_foam_nw_se_05",
+        "frame": 5,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_05.png"
+      },
+      {
+        "id": "shoreline_foam_nw_se_06",
+        "frame": 6,
+        "texture": "assets/terrain/coast/shoreline_foam_nw_se_06.png"
+      }
+    ]
+  },
+  "local_water_vfx": {
+    "ripple_loop": [
+      {
+        "id": "water_ripple_01",
+        "frame": 1,
+        "texture": "assets/terrain/coast/water_ripple_01.png"
+      },
+      {
+        "id": "water_ripple_02",
+        "frame": 2,
+        "texture": "assets/terrain/coast/water_ripple_02.png"
+      },
+      {
+        "id": "water_ripple_03",
+        "frame": 3,
+        "texture": "assets/terrain/coast/water_ripple_03.png"
+      },
+      {
+        "id": "water_ripple_04",
+        "frame": 4,
+        "texture": "assets/terrain/coast/water_ripple_04.png"
+      },
+      {
+        "id": "water_ripple_05",
+        "frame": 5,
+        "texture": "assets/terrain/coast/water_ripple_05.png"
+      },
+      {
+        "id": "water_ripple_06",
+        "frame": 6,
+        "texture": "assets/terrain/coast/water_ripple_06.png"
+      }
+    ],
+    "pump_splash_loop": [
+      {
+        "id": "water_pump_splash_01",
+        "frame": 1,
+        "texture": "assets/terrain/coast/water_pump_splash_01.png"
+      },
+      {
+        "id": "water_pump_splash_02",
+        "frame": 2,
+        "texture": "assets/terrain/coast/water_pump_splash_02.png"
+      },
+      {
+        "id": "water_pump_splash_03",
+        "frame": 3,
+        "texture": "assets/terrain/coast/water_pump_splash_03.png"
+      },
+      {
+        "id": "water_pump_splash_04",
+        "frame": 4,
+        "texture": "assets/terrain/coast/water_pump_splash_04.png"
+      },
+      {
+        "id": "water_pump_splash_05",
+        "frame": 5,
+        "texture": "assets/terrain/coast/water_pump_splash_05.png"
+      },
+      {
+        "id": "water_pump_splash_06",
+        "frame": 6,
+        "texture": "assets/terrain/coast/water_pump_splash_06.png"
+      }
+    ],
+    "caustics_overlay": [
+      {
+        "id": "water_caustics_01",
+        "frame": 1,
+        "texture": "assets/terrain/coast/water_caustics_01.png"
+      },
+      {
+        "id": "water_caustics_02",
+        "frame": 2,
+        "texture": "assets/terrain/coast/water_caustics_02.png"
+      },
+      {
+        "id": "water_caustics_03",
+        "frame": 3,
+        "texture": "assets/terrain/coast/water_caustics_03.png"
+      },
+      {
+        "id": "water_caustics_04",
+        "frame": 4,
+        "texture": "assets/terrain/coast/water_caustics_04.png"
+      },
+      {
+        "id": "water_caustics_05",
+        "frame": 5,
+        "texture": "assets/terrain/coast/water_caustics_05.png"
+      },
+      {
+        "id": "water_caustics_06",
+        "frame": 6,
+        "texture": "assets/terrain/coast/water_caustics_06.png"
+      }
+    ]
+  },
+  "tiles": [
+    {
+      "id": "coast_sand_center_01",
+      "name": "Areia Centro",
+      "texture": "assets/terrain/coast/coast_sand_center_01.png"
+    },
+    {
+      "id": "coast_sand_wet_01",
+      "name": "Areia Molhada Centro",
+      "texture": "assets/terrain/coast/coast_sand_wet_01.png"
+    },
+    {
+      "id": "coast_grass_sand_transition",
+      "name": "Transição Grama-Areia",
+      "texture": "assets/terrain/coast/coast_grass_sand_transition.png"
+    },
+    {
+      "id": "coast_shallow_transition",
+      "name": "Transição Rasa",
+      "texture": "assets/terrain/coast/coast_shallow_transition.png"
+    },
+    {
+      "id": "coast_water_shallow",
+      "name": "Água Rasa Base",
+      "texture": "assets/terrain/coast/coast_water_shallow.png"
+    },
+    {
+      "id": "coast_water_deep",
+      "name": "Água Profunda Base",
+      "texture": "assets/terrain/coast/coast_water_deep.png"
+    },
+    {
+      "id": "coast_border_north",
+      "name": "Borda Norte",
+      "texture": "assets/terrain/coast/coast_border_north.png"
+    },
+    {
+      "id": "coast_border_south",
+      "name": "Borda Sul",
+      "texture": "assets/terrain/coast/coast_border_south.png"
+    },
+    {
+      "id": "coast_border_east",
+      "name": "Borda Leste",
+      "texture": "assets/terrain/coast/coast_border_east.png"
+    },
+    {
+      "id": "coast_border_west",
+      "name": "Borda Oeste",
+      "texture": "assets/terrain/coast/coast_border_west.png"
+    },
+    {
+      "id": "coast_corner_outer_ne",
+      "name": "Canto Externo NE",
+      "texture": "assets/terrain/coast/coast_corner_outer_ne.png"
+    },
+    {
+      "id": "coast_corner_outer_nw",
+      "name": "Canto Externo NW",
+      "texture": "assets/terrain/coast/coast_corner_outer_nw.png"
+    },
+    {
+      "id": "coast_corner_outer_se",
+      "name": "Canto Externo SE",
+      "texture": "assets/terrain/coast/coast_corner_outer_se.png"
+    },
+    {
+      "id": "coast_corner_outer_sw",
+      "name": "Canto Externo SW",
+      "texture": "assets/terrain/coast/coast_corner_outer_sw.png"
+    },
+    {
+      "id": "coast_corner_inner_ne",
+      "name": "Canto Interno NE",
+      "texture": "assets/terrain/coast/coast_corner_inner_ne.png"
+    },
+    {
+      "id": "coast_corner_inner_nw",
+      "name": "Canto Interno NW",
+      "texture": "assets/terrain/coast/coast_corner_inner_nw.png"
+    },
+    {
+      "id": "coast_corner_inner_se",
+      "name": "Canto Interno SE",
+      "texture": "assets/terrain/coast/coast_corner_inner_se.png"
+    },
+    {
+      "id": "coast_corner_inner_sw",
+      "name": "Canto Interno SW",
+      "texture": "assets/terrain/coast/coast_corner_inner_sw.png"
+    },
+    {
+      "id": "ocean_deep_01",
+      "name": "Oceano Profundo Plano 01",
+      "texture": "assets/terrain/coast/ocean_deep_01.png"
+    },
+    {
+      "id": "ocean_deep_02",
+      "name": "Oceano Profundo Plano 02",
+      "texture": "assets/terrain/coast/ocean_deep_02.png"
+    },
+    {
+      "id": "ocean_deep_03",
+      "name": "Oceano Profundo Plano 03",
+      "texture": "assets/terrain/coast/ocean_deep_03.png"
+    },
+    {
+      "id": "ocean_deep_04",
+      "name": "Oceano Profundo Plano 04",
+      "texture": "assets/terrain/coast/ocean_deep_04.png"
+    },
+    {
+      "id": "ocean_deep_05",
+      "name": "Oceano Profundo Plano 05",
+      "texture": "assets/terrain/coast/ocean_deep_05.png"
+    },
+    {
+      "id": "ocean_deep_06",
+      "name": "Oceano Profundo Plano 06",
+      "texture": "assets/terrain/coast/ocean_deep_06.png"
+    },
+    {
+      "id": "ocean_shallow_01",
+      "name": "Oceano Raso Plano 01",
+      "texture": "assets/terrain/coast/ocean_shallow_01.png"
+    },
+    {
+      "id": "ocean_shallow_02",
+      "name": "Oceano Raso Plano 02",
+      "texture": "assets/terrain/coast/ocean_shallow_02.png"
+    },
+    {
+      "id": "ocean_shallow_03",
+      "name": "Oceano Raso Plano 03",
+      "texture": "assets/terrain/coast/ocean_shallow_03.png"
+    },
+    {
+      "id": "ocean_shallow_04",
+      "name": "Oceano Raso Plano 04",
+      "texture": "assets/terrain/coast/ocean_shallow_04.png"
+    },
+    {
+      "id": "ocean_shallow_05",
+      "name": "Oceano Raso Plano 05",
+      "texture": "assets/terrain/coast/ocean_shallow_05.png"
+    },
+    {
+      "id": "ocean_shallow_06",
+      "name": "Oceano Raso Plano 06",
+      "texture": "assets/terrain/coast/ocean_shallow_06.png"
+    }
+  ]
+}

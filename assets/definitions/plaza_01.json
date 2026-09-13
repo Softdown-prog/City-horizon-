@@ -2,6 +2,7 @@
   "id": "plaza_01",
   "name": "Praça",
   "category": "civic",
+  "playerBuildable": true,
   "texture": "assets/buildings/plaza_01_rot0.png",
   "rotatable": false,
   "requiresRoadAccess": false,

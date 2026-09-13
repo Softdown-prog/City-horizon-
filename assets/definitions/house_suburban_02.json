@@ -3,7 +3,10 @@
   "name": "Casa Suburbana 02",
   "category": "residential",
   "texture": "assets/buildings/house_suburban_02_lvl1.png",
-  "anchor": { "x": 0.5114, "y": 0.9982 },
+  "anchor": {
+    "x": 0.5114,
+    "y": 0.9982
+  },
   "rotatable": false,
   "requiresRoadAccess": true,
   "roadAccessMode": "any_perimeter",
@@ -26,7 +29,10 @@
       "maintenancePerMonth": 0,
       "taxRevenuePerMonth": 0,
       "sprite": "assets/buildings/house_suburban_02_lvl1.png",
-      "anchor": { "x": 0.5114, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5114,
+        "y": 0.9982
+      }
     },
     {
       "level": 2,
@@ -37,7 +43,10 @@
       "maintenancePerMonth": 35,
       "taxRevenuePerMonth": 240,
       "sprite": "assets/buildings/house_suburban_02_lvl2.png",
-      "anchor": { "x": 0.5118, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5118,
+        "y": 0.9982
+      }
     },
     {
       "level": 3,
@@ -48,7 +57,10 @@
       "maintenancePerMonth": 50,
       "taxRevenuePerMonth": 380,
       "sprite": "assets/buildings/house_suburban_02_lvl3.png",
-      "anchor": { "x": 0.5652, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5652,
+        "y": 0.9982
+      }
     },
     {
       "level": 4,
@@ -59,7 +71,10 @@
       "maintenancePerMonth": 70,
       "taxRevenuePerMonth": 540,
       "sprite": "assets/buildings/house_suburban_02_lvl4.png",
-      "anchor": { "x": 0.5452, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5452,
+        "y": 0.9982
+      }
     },
     {
       "level": 5,
@@ -70,7 +85,11 @@
       "maintenancePerMonth": 100,
       "taxRevenuePerMonth": 800,
       "sprite": "assets/buildings/house_suburban_02_lvl5.png",
-      "anchor": { "x": 0.5615, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5615,
+        "y": 0.9982
+      }
     }
-  ]
+  ],
+  "playerBuildable": true
 }

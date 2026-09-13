@@ -3,6 +3,10 @@
   "name": "Padaria",
   "category": "commercial",
   "texture": "assets/buildings/bakery_01_lvl1.png",
+  "anchor": {
+    "x": 0.4729,
+    "y": 0.9982
+  },
   "rotatable": false,
   "requiresRoadAccess": true,
   "roadAccessMode": "any_perimeter",
@@ -22,11 +26,7 @@
       "localSupplyBonus": 40
     }
   ],
-  "artScale": 1.3474,
-  "anchor": {
-    "x": 0.5029,
-    "y": 0.9966
-  },
+  "artScale": 0.9446,
   "levels": [
     {
       "level": 1,
@@ -38,13 +38,13 @@
       "taxRevenuePerMonth": 180,
       "sprite": "assets/buildings/bakery_01_lvl1.png",
       "anchor": {
-        "x": 0.5029,
-        "y": 0.9966
+        "x": 0.4729,
+        "y": 0.9982
       }
     },
     {
       "level": 2,
-      "name": "Fachada com Toldo",
+      "name": "Padaria com Toldo",
       "upgradeCost": 1500,
       "residentialCapacity": 0,
       "powerConsumption": 3,
@@ -52,13 +52,13 @@
       "taxRevenuePerMonth": 320,
       "sprite": "assets/buildings/bakery_01_lvl2.png",
       "anchor": {
-        "x": 0.4797,
-        "y": 0.9972
+        "x": 0.4889,
+        "y": 0.9982
       }
     },
     {
       "level": 3,
-      "name": "Padaria Clássica",
+      "name": "Padaria Completa",
       "upgradeCost": 3000,
       "residentialCapacity": 0,
       "powerConsumption": 4,
@@ -66,13 +66,13 @@
       "taxRevenuePerMonth": 500,
       "sprite": "assets/buildings/bakery_01_lvl3.png",
       "anchor": {
-        "x": 0.5109,
-        "y": 0.9974
+        "x": 0.5504,
+        "y": 0.9982
       }
     },
     {
       "level": 4,
-      "name": "Padaria Moderna",
+      "name": "Padaria Moderna & Café",
       "upgradeCost": 5000,
       "residentialCapacity": 0,
       "powerConsumption": 5,
@@ -80,13 +80,13 @@
       "taxRevenuePerMonth": 780,
       "sprite": "assets/buildings/bakery_01_lvl4.png",
       "anchor": {
-        "x": 0.5522,
-        "y": 0.9979
+        "x": 0.5139,
+        "y": 0.9982
       }
     },
     {
       "level": 5,
-      "name": "Padaria Gourmet e Bistrô",
+      "name": "Complexo de Panificação Monumental",
       "upgradeCost": 8000,
       "residentialCapacity": 0,
       "powerConsumption": 7,
@@ -94,9 +94,10 @@
       "taxRevenuePerMonth": 1200,
       "sprite": "assets/buildings/bakery_01_lvl5.png",
       "anchor": {
-        "x": 0.519,
-        "y": 0.9981
+        "x": 0.4758,
+        "y": 0.9982
       }
     }
-  ]
+  ],
+  "playerBuildable": true
 }

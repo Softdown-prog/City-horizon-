@@ -203,7 +203,9 @@ void MobileAnimationCatalog::update_player(MobileAnimationPlayer& player, const 
     }
     if (desired->frames.size() <= 1 || desired->frames_per_second <= 0.0F || frame_seconds <= 0.0F) return;
     player.accumulated_seconds += frame_seconds;
-    const float frame_seconds_per_frame = 1.0F / desired->frames_per_second;
+    const float effective_frames_per_second = desired->frames_per_second * std::max(0.0F, player.playback_rate);
+    if (effective_frames_per_second <= 0.0F) return;
+    const float frame_seconds_per_frame = 1.0F / effective_frames_per_second;
     while (player.accumulated_seconds >= frame_seconds_per_frame) {
         player.accumulated_seconds -= frame_seconds_per_frame;
         if (player.frame_index + 1 < desired->frames.size()) ++player.frame_index;

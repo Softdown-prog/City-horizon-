@@ -1,0 +1,29 @@
+{
+  "id": "crop_tomato",
+  "displayName": "Tomate",
+  "stageOverlaySprites": [
+    "assets/farming/crops/tomato/overlays/tomato_overlay_stage_01.png",
+    "assets/farming/crops/tomato/overlays/tomato_overlay_stage_02.png",
+    "assets/farming/crops/tomato/overlays/tomato_overlay_stage_03.png",
+    "assets/farming/crops/tomato/overlays/tomato_overlay_stage_04.png",
+    "assets/farming/crops/tomato/overlays/tomato_overlay_stage_05.png"
+  ],
+  "overlayCanvasWidth": 1254,
+  "overlayCanvasHeight": 1254,
+  "overlayAnchorX": 0.5,
+  "overlayAnchorY": 0.1204,
+  "legacyCompositeStageSprites": [
+    "assets/farming/crops/tomato/tomato_stage_01.png",
+    "assets/farming/crops/tomato/tomato_stage_02.png",
+    "assets/farming/crops/tomato/tomato_stage_03.png",
+    "assets/farming/crops/tomato/tomato_stage_04.png",
+    "assets/farming/crops/tomato/tomato_stage_05.png"
+  ],
+  "stageCount": 5,
+  "growthDaysTotal": 30,
+  "harvestYield": 4,
+  "harvestResourceId": "resource_tomato",
+  "storageClass": "produce",
+  "harvestBehavior": "return_to_prepared_soil",
+  "returnsToPreparedSoilAfterHarvest": true
+}

@@ -4,6 +4,7 @@
 #include "economy_system.h"
 #include "farming_system.h"
 #include "land_system.h"
+#include "mission_system.h"
 #include "population_system.h"
 #include "road_system.h"
 #include "simulation_clock.h"
@@ -33,6 +34,8 @@ struct SaveSnapshot {
     std::uint64_t next_building_instance_id = 1;
     std::uint32_t current_population = 0;
     int last_property_tax_year = 0;
+    int months_without_power = 0;
+    int crisis_recovery_month = 0;
     std::vector<BuildingInstance> buildings;
     std::vector<TileCoordinate> roads;
     std::vector<SidewalkTile> sidewalks;
@@ -40,6 +43,7 @@ struct SaveSnapshot {
     std::unordered_map<std::string, int> agricultural_inventory;
     std::vector<std::uint32_t> owned_parcel_ids;
     std::vector<ServiceVehicleInstance> vehicles;
+    std::vector<std::string> completed_missions;
 };
 
 [[nodiscard]] std::string read_file(const std::filesystem::path& path) {
@@ -213,6 +217,62 @@ template <typename Number>
     }
 }
 
+[[nodiscard]] std::optional<std::vector<std::string>> json_string_array(const std::string_view json, const std::string_view key) {
+    const auto array = json_container(json, key, '[', ']');
+    if (!array) {
+        return std::nullopt;
+    }
+    std::vector<std::string> result;
+    std::size_t position = 1;
+    while (true) {
+        position = skip_whitespace(*array, position);
+        if (position >= array->size() - 1) {
+            return result;
+        }
+        if ((*array)[position] != '"') {
+            return std::nullopt;
+        }
+        std::string str;
+        bool escaped = false;
+        std::size_t index = position + 1;
+        bool found_quote = false;
+        for (; index < array->size() - 1; ++index) {
+            const char c = (*array)[index];
+            if (escaped) {
+                switch (c) {
+                    case '\\': str += '\\'; break;
+                    case '"': str += '"'; break;
+                    case 'n': str += '\n'; break;
+                    case 'r': str += '\r'; break;
+                    case 't': str += '\t'; break;
+                    default: return std::nullopt;
+                }
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                found_quote = true;
+                break;
+            } else {
+                str += c;
+            }
+        }
+        if (!found_quote) {
+            return std::nullopt;
+        }
+        result.push_back(str);
+        position = skip_whitespace(*array, index + 1);
+        if (position >= array->size() - 1) {
+            return result;
+        }
+        if ((*array)[position] == ',') {
+            ++position;
+            continue;
+        }
+        return (*array)[position] == ']' ? std::optional(result) : std::nullopt;
+    }
+}
+
 [[nodiscard]] bool parse_snapshot(const std::string_view json, SaveSnapshot& snapshot, std::string& error) {
     const auto version = json_number<int>(json, "saveVersion");
     if (!version) {
@@ -262,6 +322,12 @@ template <typename Number>
         // already passed as settled, avoiding a retroactive duplicate charge.
         snapshot.last_property_tax_year = snapshot.date.year;
     }
+    if (*version >= 8) {
+        const auto months_no_power = json_number<int>(json, "monthsWithoutPower");
+        const auto crisis_month = json_number<int>(json, "crisisRecoveryMonth");
+        if (months_no_power) snapshot.months_without_power = std::max(0, *months_no_power);
+        if (crisis_month) snapshot.crisis_recovery_month = std::max(0, *crisis_month);
+    }
 
     const auto saved_buildings = json_object_array(json, "buildings");
     const auto saved_roads = json_object_array(json, "roads");
@@ -269,6 +335,12 @@ template <typename Number>
     const auto saved_farming_tiles = *version >= 5 ? json_object_array(json, "farmingTiles") : std::optional<std::vector<std::string_view>>{{}};
     const auto saved_inventory = *version >= 5 ? json_object_array(json, "agriculturalInventory") : std::optional<std::vector<std::string_view>>{{}};
     const auto saved_vehicles = *version >= 7 ? json_object_array(json, "serviceVehicles") : std::optional<std::vector<std::string_view>>{{}};
+    const auto saved_missions = json_string_array(json, "completedMissions");
+    if (saved_missions) {
+        for (const std::string& m : *saved_missions) {
+            snapshot.completed_missions.push_back(m);
+        }
+    }
     const auto owned_parcels = json_number_array<std::uint32_t>(json, "ownedParcelIds");
     if (!saved_buildings) {
         error = "buildings array is invalid";
@@ -377,7 +449,8 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
                                       const SimulationClock& clock, const BuildingManager& buildings,
                                       const RoadManager& roads, const SidewalkManager& sidewalks, const FarmingSystem& farming,
                                       const LandManager& lands,
-                                      const PopulationSystem& population, const ServiceVehicleManager* vehicles) const {
+                                       const PopulationSystem& population, const ServiceVehicleManager* vehicles,
+                                       const MissionManager* missions) const {
     std::error_code error;
     std::filesystem::create_directories(path.parent_path(), error);
     if (error) {
@@ -395,6 +468,8 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
            << ", \"year\": " << clock.date().year << ", \"speed\": " << static_cast<int>(clock.speed()) << " },\n"
            << "  \"nextBuildingInstanceId\": " << buildings.next_instance_id() << ",\n"
            << "  \"currentPopulation\": " << population.current_population() << ",\n"
+           << "  \"monthsWithoutPower\": " << population.months_without_power() << ",\n"
+           << "  \"crisisRecoveryMonth\": " << population.crisis_recovery_month() << ",\n"
            << "  \"lastPropertyTaxYear\": " << economy.last_property_tax_year() << ",\n"
            << "  \"buildings\": [\n";
     for (std::size_t index = 0; index < buildings.instances().size(); ++index) {
@@ -449,6 +524,13 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
                    << ", \"state\": " << static_cast<int>(vehicle.state) << " }" << (index + 1U == instances.size() ? "\n" : ",\n");
         }
     }
+    output << "  ],\n  \"completedMissions\": [\n";
+    if (missions != nullptr) {
+        const auto completed = missions->completed_mission_ids();
+        for (std::size_t index = 0; index < completed.size(); ++index) {
+            output << "    \"" << escape_json(completed[index]) << "\"" << (index + 1U == completed.size() ? "\n" : ",\n");
+        }
+    }
     output << "  ]\n}\n";
     if (!output) {
         return {false, "could not finish writing save file"};
@@ -460,7 +542,7 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
                                       CityEconomy& economy, SimulationClock& clock, BuildingManager& buildings,
                                       RoadManager& roads, SidewalkManager& sidewalks, FarmingSystem& farming,
                                       LandManager& lands, PopulationSystem& population, const ServiceVehicleCatalog* vehicle_catalog,
-                                      ServiceVehicleManager* vehicles) const {
+                                      ServiceVehicleManager* vehicles, MissionManager* missions) const {
     const std::string serialized = read_file(path);
     if (serialized.empty()) {
         return {false, "save file does not exist or is empty"};
@@ -486,6 +568,7 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
     sidewalks.clear();
     farming.clear();
     if (vehicles != nullptr) vehicles->clear();
+    if (missions != nullptr) missions->restore_completed_missions(snapshot.completed_missions);
 
     for (const BuildingInstance& saved : snapshot.buildings) {
         const BuildingDefinition* definition = catalog.find(saved.definition_id);
@@ -495,13 +578,21 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
             continue;
         }
         const BuildingFootprint footprint = rotated_footprint(*definition, saved.rotation);
-        if (!lands.is_area_owned(saved.tile_x, saved.tile_y, footprint.width, footprint.height) ||
-            !buildings.restore_instance(*definition, saved)) {
+        const bool area_valid = definition->preplaced || lands.is_area_owned(saved.tile_x, saved.tile_y, footprint.width, footprint.height);
+        if (!area_valid || !buildings.restore_instance(*definition, saved)) {
             ++result.skipped_buildings;
             std::cerr << "Save skipped invalid building instance " << saved.instance_id << '\n';
         }
     }
     buildings.set_next_instance_id(snapshot.next_building_instance_id);
+    if (missions != nullptr) {
+        if (missions->is_completed("clean_energy")) {
+            buildings.set_operational_by_definition("hydroelectric_01", true);
+        }
+        if (missions->is_completed("city_water")) {
+            buildings.set_operational_by_definition("water_intake_01", true);
+        }
+    }
     for (const TileCoordinate& saved : snapshot.roads) {
         if (!lands.is_tile_owned(saved.x, saved.y) || buildings.is_occupied(saved.x, saved.y) ||
             !roads.place_tile(saved.x, saved.y)) {
@@ -529,7 +620,7 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
             }
         }
     }
-    population.restore_current_population(snapshot.current_population, buildings, catalog);
+    population.restore_current_population(snapshot.current_population, buildings, catalog, nullptr, nullptr, snapshot.months_without_power, snapshot.crisis_recovery_month);
     economy.rebuild_monthly_summary(buildings, catalog, population);
     result.message = "loaded " + std::to_string(buildings.instances().size()) + " buildings and " +
         std::to_string(roads.tiles().size()) + " roads and " + std::to_string(sidewalks.tiles().size()) + " sidewalks";

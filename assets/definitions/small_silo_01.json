@@ -2,9 +2,14 @@
   "id": "small_silo_01",
   "name": "Silo Pequeno",
   "category": "agriculture",
-  "texture": "assets/buildings/small_silo_01.png",
+  "texture": "assets/buildings/small_silo_01_lvl1.png",
+  "anchor": {
+    "x": 0.4774,
+    "y": 0.9982
+  },
   "rotatable": false,
   "requiresRoadAccess": false,
+  "roadAccessMode": "any_perimeter",
   "footprint": {
     "width": 2,
     "height": 2
@@ -17,15 +22,68 @@
   "acceptedStorageClasses": [
     "grain"
   ],
-  "artScale": 0.28,
-  "anchor": {
-    "x": 0.5,
-    "y": 0.979
-  },
-  "spriteAnchors": {
-    "0": {
-      "x": 0.5,
-      "y": 0.9793
+  "artScale": 0.9343,
+  "levels": [
+    {
+      "level": 1,
+      "name": "Silo Pequeno de Grãos",
+      "upgradeCost": 0,
+      "grainStorageCapacity": 300,
+      "maintenancePerMonth": 20,
+      "sprite": "assets/buildings/small_silo_01_lvl1.png",
+      "anchor": {
+        "x": 0.4774,
+        "y": 0.9982
+      }
+    },
+    {
+      "level": 2,
+      "name": "Silo com Toldo de Carga",
+      "upgradeCost": 1500,
+      "grainStorageCapacity": 600,
+      "maintenancePerMonth": 35,
+      "sprite": "assets/buildings/small_silo_01_lvl2.png",
+      "anchor": {
+        "x": 0.4895,
+        "y": 0.9982
+      }
+    },
+    {
+      "level": 3,
+      "name": "Silo Completo com Ensacadora",
+      "upgradeCost": 3000,
+      "grainStorageCapacity": 1100,
+      "maintenancePerMonth": 65,
+      "sprite": "assets/buildings/small_silo_01_lvl3.png",
+      "anchor": {
+        "x": 0.4825,
+        "y": 0.9982
+      }
+    },
+    {
+      "level": 4,
+      "name": "Complexo de Silos em Bateria",
+      "upgradeCost": 5500,
+      "grainStorageCapacity": 1800,
+      "maintenancePerMonth": 110,
+      "sprite": "assets/buildings/small_silo_01_lvl4.png",
+      "anchor": {
+        "x": 0.5284,
+        "y": 0.9982
+      }
+    },
+    {
+      "level": 5,
+      "name": "Complexo de Silagem Monumental",
+      "upgradeCost": 10000,
+      "grainStorageCapacity": 3000,
+      "maintenancePerMonth": 180,
+      "sprite": "assets/buildings/small_silo_01_lvl5.png",
+      "anchor": {
+        "x": 0.5217,
+        "y": 0.9982
+      }
     }
-  }
+  ],
+  "playerBuildable": true
 }

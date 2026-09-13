@@ -14,6 +14,14 @@ struct PedestrianVisualDefinition {
     float art_scale = 0.45F;
     float sprite_anchor_x = 0.5F;
     float sprite_anchor_y = 0.88F;
+    // Per-visual tuning belongs to the presentation definition; navigation
+    // still supplies the continuous route and never knows animation timing.
+    float movement_speed_tiles_per_second = 2.25F;
+    float animation_playback_rate = 1.0F;
+    // A shared lane offset inside each road tile. It deliberately moves only
+    // the ground contact, not the source sprite pivot or world projection.
+    float lane_ground_anchor_x = 0.5F;
+    float lane_ground_anchor_y = 0.5F;
 };
 
 struct PedestrianInstance {
@@ -34,6 +42,10 @@ struct PedestrianInstance {
 class PedestrianSystem {
 public:
     explicit PedestrianSystem(PedestrianVisualDefinition visual_definition);
+
+    // Test-only visual retune: it reuses the same entity, route and catalogue
+    // while resetting the player so a new cadence begins at frame zero.
+    void configure_visual_test(PedestrianVisualDefinition visual_definition);
 
     [[nodiscard]] bool send_test_pedestrian(NavigationTile start, NavigationTile destination,
                                             const NavigationNetwork& network);

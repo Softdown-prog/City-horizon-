@@ -2,6 +2,7 @@
 #include "economy_system.h"
 #include "farming_system.h"
 #include "land_system.h"
+#include "mission_system.h"
 #include "population_system.h"
 #include "power_system.h"
 #include "road_system.h"
@@ -115,8 +116,12 @@ int main(const int argc, char** argv) {
         return 1;
     }
 
+    MissionManager missions;
+    missions.register_mission("clean_energy", "Energia Limpa");
+    missions.complete_mission("clean_energy");
+
     SaveManager saves;
-    if (!require(saves.save(save_file, economy, clock, buildings, roads, sidewalks, farming, lands, population).success, "small city saves")) {
+    if (!require(saves.save(save_file, economy, clock, buildings, roads, sidewalks, farming, lands, population, nullptr, &missions).success, "small city saves")) {
         return 1;
     }
 
@@ -129,7 +134,9 @@ int main(const int argc, char** argv) {
     economy.restore_funds(1);
     (void)clock.restore_state({1, 1, 1}, SimulationSpeed::speed1);
     PopulationSystem loaded_population;
-    const SaveOperationResult loaded = saves.load(save_file, catalog, economy, clock, buildings, roads, sidewalks, farming, lands, loaded_population);
+    MissionManager loaded_missions;
+    loaded_missions.register_mission("clean_energy", "Energia Limpa");
+    const SaveOperationResult loaded = saves.load(save_file, catalog, economy, clock, buildings, roads, sidewalks, farming, lands, loaded_population, nullptr, nullptr, &loaded_missions);
     if (!require(loaded.success, "saved city loads") ||
         !require(economy.funds() == 35'799 && economy.last_property_tax_year() == 2, "funds and fiscal marker round trip") ||
         !require(clock.date().day == 12 && clock.date().month == 5 && clock.date().year == 2 &&
@@ -146,7 +153,8 @@ int main(const int argc, char** argv) {
         !require(roads.tiles().size() == 3 && roads.connection_mask(11, 10) == static_cast<std::uint8_t>(road_west | road_south),
                  "road tiles and connectivity are rebuilt") ||
         !require(sidewalks.tiles().size() == 1, "sidewalk data round trips") ||
-        !require(lands.is_tile_owned(16, 0) && lands.owned_parcel_count() == 2, "purchased parcels round trip")) {
+        !require(lands.is_tile_owned(16, 0) && lands.owned_parcel_count() == 2, "purchased parcels round trip") ||
+        !require(loaded_missions.is_completed("clean_energy"), "completed missions round trip")) {
         return 1;
     }
     if (!require(loaded_population.current_population() == 3 && loaded_population.residential_capacity() == 4,
@@ -155,8 +163,8 @@ int main(const int argc, char** argv) {
     }
     PowerSystem loaded_power;
     loaded_power.rebuild(buildings, catalog);
-    if (!require(loaded_power.power_capacity() == 20 && loaded_power.power_demand() == 10 &&
-                     loaded_power.power_available() == 10,
+    if (!require(loaded_power.power_capacity() == 1000 && loaded_power.power_demand() == 10 &&
+                     loaded_power.power_available() == 990,
                  "power values are rebuilt from loaded buildings without save fields")) {
         return 1;
     }

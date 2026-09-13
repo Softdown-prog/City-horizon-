@@ -1,0 +1,33 @@
+{
+  "id": "water_intake_01",
+  "name": "Estação de Captação de Água",
+  "category": "infrastructure",
+  "texture": "assets/buildings/water_intake_01.png",
+  "preplaced": true,
+  "playerBuildable": false,
+  "unlockRequirement": "city_water",
+  "waterIntakeCapacity": 0,
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "initialPlacement": {
+    "tileX": -16,
+    "tileY": 18,
+    "rotation": 0
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "powerConsumption": 0,
+  "powerProduction": 0,
+  "artScale": 0.4,
+  "animation": {
+    "frameCount": 10,
+    "frameDurationMs": 120,
+    "layout": "horizontal"
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  }
+}

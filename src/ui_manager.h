@@ -72,9 +72,12 @@ struct UiBuildItem {
     std::string category;
     std::string build_cost;
     bool enabled = true;
-    // The catalog's R0 sprite is the default thumbnail until a dedicated
-    // thumbnail field is introduced in a future content schema.
+    // This is a small, fixed-canvas catalog asset, deliberately separate
+    // from the world sprite. It keeps the build menu legible even when the
+    // source art includes large transparent padding or ground decoration.
     std::string thumbnail_path;
+    std::string footprint;
+    std::string requirements;
 };
 
 struct UiSelectedBuilding {
@@ -135,6 +138,7 @@ struct GameplayUiModel {
     std::string selected_building_id;
     bool paused = false;
     std::vector<UiBuildItem> build_items;
+    std::vector<UiBuildItem> decor_items;
     std::optional<UiSelectedBuilding> selected_building;
     std::optional<UiLandDetails> land_details;
     bool debug_visible = false;
@@ -150,6 +154,7 @@ struct UiButton {
     bool active = false;
     UiButtonState state = UiButtonState::normal;
     std::string detail;
+    std::string requirements;
     std::string thumbnail_path;
     bool build_card = false;
 };

@@ -1,0 +1,20 @@
+{
+  "id": "beach_chairs_set",
+  "name": "Conjunto de Espreguiçadeiras",
+  "category": "decor",
+  "texture": "assets/decor/beach/beach_chairs_set.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 250,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

@@ -26,11 +26,13 @@ struct SaveOperationResult {
     std::size_t unknown_parcels = 0;
 };
 
+class MissionManager;
+
 // JSON save-game boundary. Gameplay systems expose narrow restore APIs, while
 // file format, version checks and user-data paths remain centralized here.
 class SaveManager {
 public:
-    static constexpr int kSaveVersion = 7;
+    static constexpr int kSaveVersion = 8;
 
     [[nodiscard]] static std::filesystem::path default_save_path();
     // Reserved path for a later timer-driven autosave; no automatic writes yet.
@@ -41,12 +43,14 @@ public:
                                            const BuildingManager& buildings, const RoadManager& roads,
                                            const SidewalkManager& sidewalks, const FarmingSystem& farming,
                                            const LandManager& lands, const PopulationSystem& population,
-                                           const ServiceVehicleManager* vehicles = nullptr) const;
+                                           const ServiceVehicleManager* vehicles = nullptr,
+                                           const MissionManager* missions = nullptr) const;
     [[nodiscard]] SaveOperationResult load(const std::filesystem::path& path,
                                            const BuildingCatalog& catalog, CityEconomy& economy,
                                            SimulationClock& clock, BuildingManager& buildings,
                                            RoadManager& roads, SidewalkManager& sidewalks, FarmingSystem& farming,
                                            LandManager& lands, PopulationSystem& population,
                                            const ServiceVehicleCatalog* vehicle_catalog = nullptr,
-                                           ServiceVehicleManager* vehicles = nullptr) const;
+                                           ServiceVehicleManager* vehicles = nullptr,
+                                           MissionManager* missions = nullptr) const;
 };

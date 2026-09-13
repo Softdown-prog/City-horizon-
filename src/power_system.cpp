@@ -25,8 +25,12 @@ void PowerSystem::rebuild(const BuildingManager& buildings, const BuildingCatalo
             continue;
         }
         const auto& level_def = instance.current_level_definition(*definition);
-        saturating_add(power_capacity_, definition->power_production);
         saturating_add(power_demand_, level_def.power_consumption);
+
+        if (instance.operational) {
+            const std::uint32_t output = definition->generation_capacity > 0 ? definition->generation_capacity : definition->power_production;
+            saturating_add(power_capacity_, output);
+        }
     }
 }
 

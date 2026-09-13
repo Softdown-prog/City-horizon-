@@ -1,0 +1,20 @@
+{
+  "id": "tree_palm_01",
+  "name": "Palmeira Tropical",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/tree_palm_01.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 200,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.9
+  },
+  "playerBuildable": true
+}

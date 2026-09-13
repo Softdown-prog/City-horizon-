@@ -58,8 +58,8 @@ int main(const int argc, char** argv) {
     }
 
     CityEconomy economy;
-    if (!require(population.advance_month(buildings, catalog) == 1 && population.current_population() == 1,
-                 "population grows by one resident per monthly tick")) {
+    if (!require(population.advance_month(buildings, catalog) == 4 && population.current_population() == 4,
+                 "population grows up to available powered capacity in monthly settlement")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 2, 1});
@@ -118,7 +118,7 @@ int main(const int argc, char** argv) {
     }
     (void)population.advance_month(buildings, catalog);
     if (!require(population.residents_for(*first_house, buildings, catalog) == 4 &&
-                     population.residents_for(*second_house, buildings, catalog) == 1,
+                     population.residents_for(*second_house, buildings, catalog) == 4,
                  "residents are deterministically assigned to newly available homes")) {
         return 1;
     }

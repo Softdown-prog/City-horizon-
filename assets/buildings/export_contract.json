@@ -1,0 +1,19 @@
+{
+  "schema": "city_horizon.building_export_contract/v1",
+  "format": {
+    "mode": "RGBA"
+  },
+  "matteResidue": {
+    "maxAlpha": 8,
+    "minimumSaturation": 100
+  },
+  "bottomGuide": {
+    "bandHeight": 8,
+    "faintMaxAlpha": 8,
+    "faintMinimumSaturation": 100,
+    "opaqueMinAlpha": 20,
+    "minimumComponentWidth": 32,
+    "maximumComponentHeight": 8,
+    "fringeRows": 3
+  }
+}

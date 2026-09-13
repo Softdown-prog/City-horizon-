@@ -215,6 +215,11 @@ template <typename Number>
     definition.residential_capacity = json_number<std::uint32_t>(json, "residentialCapacity").value_or(0);
     definition.power_consumption = json_number<std::uint32_t>(json, "powerConsumption").value_or(0);
     definition.power_production = json_number<std::uint32_t>(json, "powerProduction").value_or(0);
+    definition.generation_capacity = json_number<std::uint32_t>(json, "generationCapacity").value_or(0);
+    definition.water_intake_capacity = json_number<std::uint32_t>(json, "waterIntakeCapacity").value_or(0);
+    definition.preplaced = json_bool(json, "preplaced").value_or(false);
+    definition.player_buildable = json_bool(json, "playerBuildable").value_or(true);
+    definition.unlock_requirement = json_string(json, "unlockRequirement").value_or("");
     definition.agricultural_storage_capacity = json_number<std::uint32_t>(json, "agriculturalStorageCapacity").value_or(0);
     definition.grain_storage_capacity = json_number<std::uint32_t>(json, "grainStorageCapacity").value_or(0);
     definition.provides_agricultural_storage = json_bool(json, "providesAgriculturalStorage").value_or(false);
@@ -244,6 +249,14 @@ template <typename Number>
     if (const auto anchor = json_object(json, "anchor")) {
         definition.anchor_x = json_number<float>(*anchor, "x").value_or(0.5F);
         definition.anchor_y = json_number<float>(*anchor, "y").value_or(1.0F);
+    }
+    if (const auto anim = json_object(json, "animation")) {
+        const int frame_count = json_number<int>(*anim, "frameCount").value_or(1);
+        const int frame_duration_ms = json_number<int>(*anim, "frameDurationMs").value_or(120);
+        const std::string layout = json_string(*anim, "layout").value_or("horizontal");
+        if (frame_count > 1) {
+            definition.animation = {frame_count, frame_duration_ms, layout};
+        }
     }
     definition.sprite_anchor_x.fill(definition.anchor_x);
     definition.sprite_anchor_y.fill(definition.anchor_y);
@@ -658,6 +671,7 @@ std::optional<std::uint64_t> BuildingManager::place(const BuildingDefinition& de
     instance.tile_x = tile_x;
     instance.tile_y = tile_y;
     instance.rotation = definition.rotatable ? rotation : BuildingRotation::r0;
+    instance.operational = !definition.preplaced || definition.unlock_requirement.empty();
     instances_.push_back(instance);
 
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
@@ -742,6 +756,28 @@ bool BuildingManager::is_occupied(int tile_x, int tile_y) const {
 
 const std::vector<BuildingInstance>& BuildingManager::instances() const {
     return instances_;
+}
+
+bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) {
+        return false;
+    }
+    found->operational = operational;
+    return true;
+}
+
+std::size_t BuildingManager::set_operational_by_definition(const std::string_view definition_id, const bool operational) {
+    std::size_t count = 0;
+    for (BuildingInstance& instance : instances_) {
+        if (instance.definition_id == definition_id) {
+            instance.operational = operational;
+            count++;
+        }
+    }
+    return count;
 }
 
 bool BuildingManager::is_inside_map(int tile_x, int tile_y) const {

@@ -1,0 +1,20 @@
+{
+  "id": "beach_yacht_large",
+  "name": "Iate Grande de Luxo",
+  "category": "decor",
+  "texture": "assets/decor/waterfront/beach_yacht_large.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 3,
+    "height": 2
+  },
+  "buildCost": 5000,
+  "maintenancePerMonth": 0,
+  "artScale": 0.35,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

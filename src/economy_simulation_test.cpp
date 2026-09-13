@@ -119,15 +119,15 @@ int main(int argc, char** argv) {
         return 1;
     }
     const std::uint32_t arrivals_after_first_house = population.advance_month(buildings, catalog);
-    if (!require(arrivals_after_first_house == 1 && population.current_population() == 1,
-                 "first occupied residence adds one resident")) {
+    if (!require(arrivals_after_first_house == 4 && population.current_population() == 4,
+                 "first occupied residence fills up to powered capacity")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 3, 1});
-    if (!require(economy.monthly_summary().revenue == 44 && economy.monthly_summary().expenses == 160 &&
-                 economy.monthly_summary().balance == -116,
-                 "residences do not change normal monthly commercial revenue or expenses") ||
-        !require(economy.funds() == 42'910, "mixed building monthly balance changes funds exactly")) {
+    if (!require(economy.monthly_summary().revenue == 88 && economy.monthly_summary().expenses == 160 &&
+                 economy.monthly_summary().balance == -72,
+                 "residences scale commercial demand according to population") ||
+        !require(economy.funds() == 42'954, "mixed building monthly balance changes funds exactly")) {
         return 1;
     }
 

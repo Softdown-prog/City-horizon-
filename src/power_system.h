@@ -7,10 +7,10 @@ class BuildingCatalog;
 class BuildingManager;
 
 // v1 uses one city-wide power pool. It deliberately owns no map connectivity,
-// cables, assets, or save data: all of its values are derived from buildings.
+// cables, assets, or save data: all of its values are derived from active building instances.
 class PowerSystem {
 public:
-    static constexpr std::uint64_t kBasePowerCapacity = 20;
+    static constexpr std::uint64_t kBasePowerCapacity = 1000;
 
     void rebuild(const BuildingManager& buildings, const BuildingCatalog& catalog);
 

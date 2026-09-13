@@ -1,0 +1,20 @@
+{
+  "id": "bush_green",
+  "name": "Arbusto Verde",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/bush_green.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 60,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

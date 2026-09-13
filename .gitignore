@@ -2,3 +2,6 @@
 /.cache/
 /.tools/
 /.codex-remote-attachments/
+/setup-downloads/
+__pycache__/
+*.pyc

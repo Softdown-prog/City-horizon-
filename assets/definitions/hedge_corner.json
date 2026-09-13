@@ -1,0 +1,20 @@
+{
+  "id": "hedge_corner",
+  "name": "Cerca Viva de Canto",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/hedge_corner.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 90,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

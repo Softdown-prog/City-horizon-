@@ -1,0 +1,20 @@
+{
+  "id": "tree_oak_small",
+  "name": "Carvalho Pequeno",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/tree_oak_small.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 120,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

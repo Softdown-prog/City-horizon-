@@ -1,0 +1,20 @@
+{
+  "id": "tree_flowering_red",
+  "name": "Árvore com Flores Vermelhas",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/tree_flowering_red.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 220,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

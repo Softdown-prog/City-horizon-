@@ -1,0 +1,20 @@
+{
+  "id": "gazebo_island_01",
+  "name": "Ilha Especial Gazebo",
+  "category": "decor",
+  "texture": "assets/special/islands/gazebo_island_01.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 3,
+    "height": 3
+  },
+  "buildCost": 3500,
+  "maintenancePerMonth": 0,
+  "artScale": 0.45,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

@@ -5,14 +5,9 @@ project(city_builder LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# This Windows installation localizes MSVC /showIncludes output, which makes
-# CMake's NMake dependency scanner miss header changes. Keep an explicit
-# project-header dependency for our own source files: header edits rebuild game
-# code and tests, but never force SDL or other third-party dependencies.
 if(MSVC)
-    file(GLOB CITY_BUILDER_SOURCE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-    file(GLOB CITY_BUILDER_HEADER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
+    file(GLOB_RECURSE CITY_BUILDER_SOURCE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+    file(GLOB_RECURSE CITY_BUILDER_HEADER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
     set_source_files_properties(${CITY_BUILDER_SOURCE_FILES}
         PROPERTIES OBJECT_DEPENDS "${CITY_BUILDER_HEADER_FILES}")
 endif()
@@ -58,6 +53,31 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_mixer)
 
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG v2.12.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(pybind11)
+
+add_library(ch_core STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/projection.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/map_document.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/validation.cpp
+)
+target_include_directories(ch_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+pybind11_add_module(city_horizon_native
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_native/bindings.cpp
+)
+target_link_libraries(city_horizon_native PRIVATE ch_core)
+set_target_properties(city_horizon_native PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
+)
+
 add_executable(city_builder
     src/main.cpp
     src/audio_manager.cpp
@@ -65,6 +85,7 @@ add_executable(city_builder
     src/economy_system.cpp
     src/farming_system.cpp
     src/land_system.cpp
+    src/mission_system.cpp
     src/mobile_animation.cpp
     src/mobile_entity.h
     src/navigation_network.cpp
@@ -81,10 +102,18 @@ add_executable(city_builder
     src/ui_manager.cpp
     src/vehicle_system.cpp
 )
-target_link_libraries(city_builder PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer)
+target_link_libraries(city_builder PRIVATE ch_core SDL3::SDL3 SDL3_mixer::SDL3_mixer)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ch_core_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/ch_core_test.cpp
+    )
+    target_link_libraries(ch_core_test PRIVATE ch_core)
+    add_test(
+        NAME ch_core_test
+        COMMAND ch_core_test "${CMAKE_SOURCE_DIR}/assets/scenarios/initial_city.json"
+    )
     add_executable(building_system_test
         src/building_system_test.cpp
         src/building_system.cpp
@@ -92,6 +121,7 @@ if(BUILD_TESTING)
         src/farming_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
@@ -121,7 +151,9 @@ if(BUILD_TESTING)
         src/farming_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
+        src/road_system.cpp
         src/simulation_clock.cpp
         src/vehicle_system.cpp
     )
@@ -149,6 +181,7 @@ if(BUILD_TESTING)
         src/farming_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
         src/road_system.cpp
         src/sidewalk_system.cpp
@@ -176,6 +209,7 @@ if(BUILD_TESTING)
         src/mobile_animation.cpp
         src/navigation_network.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
         src/road_system.cpp
         src/sidewalk_system.cpp
@@ -195,6 +229,7 @@ if(BUILD_TESTING)
         src/navigation_network.cpp
         src/pedestrian_system.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
         src/road_system.cpp
         src/sidewalk_system.cpp
@@ -213,6 +248,7 @@ if(BUILD_TESTING)
         src/land_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
@@ -232,6 +268,7 @@ if(BUILD_TESTING)
         src/economy_system.cpp
         src/farming_system.cpp
         src/land_system.cpp
+        src/mission_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
         src/power_system.cpp
@@ -255,7 +292,9 @@ if(BUILD_TESTING)
         src/farming_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
+        src/power_system.cpp
         src/resource_system.cpp
+        src/road_system.cpp
         src/simulation_clock.cpp
         src/vehicle_system.cpp
     )
@@ -270,10 +309,12 @@ if(BUILD_TESTING)
         src/building_system.cpp
         src/economy_system.cpp
         src/farming_system.cpp
+        src/mission_system.cpp
         src/mobile_animation.cpp
         src/population_system.cpp
         src/power_system.cpp
         src/resource_system.cpp
+        src/road_system.cpp
         src/simulation_clock.cpp
         src/vehicle_system.cpp
     )
@@ -281,6 +322,27 @@ if(BUILD_TESTING)
     add_test(
         NAME power_system_test
         COMMAND power_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
+    )
+
+    add_executable(mission_system_test
+        src/mission_system_test.cpp
+        src/building_system.cpp
+        src/economy_system.cpp
+        src/farming_system.cpp
+        src/land_system.cpp
+        src/mission_system.cpp
+        src/mobile_animation.cpp
+        src/population_system.cpp
+        src/power_system.cpp
+        src/resource_system.cpp
+        src/road_system.cpp
+        src/simulation_clock.cpp
+        src/vehicle_system.cpp
+    )
+    set_target_properties(mission_system_test PROPERTIES OUTPUT_NAME mission_system_test_run)
+    add_test(
+        NAME mission_system_test
+        COMMAND mission_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
     )
 
     add_executable(ui_manager_test
@@ -296,8 +358,10 @@ endif()
 
 if(MSVC)
     target_compile_options(city_builder PRIVATE /W4 /permissive-)
+    target_compile_options(ch_core PRIVATE /W4 /permissive-)
 else()
     target_compile_options(city_builder PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(ch_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 # Keep the runtime asset path independent from the IDE's working directory.

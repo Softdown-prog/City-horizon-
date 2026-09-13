@@ -29,6 +29,14 @@ bool RoadNavigationNetwork::is_connected(const NavigationTile tile, const Cardin
     return roads_.is_connected_to(tile.x, tile.y, direction);
 }
 
+bool PedestrianLaneNavigationNetwork::is_navigable(const NavigationTile tile) const {
+    return roads_.is_road(tile.x, tile.y);
+}
+
+bool PedestrianLaneNavigationNetwork::is_connected(const NavigationTile tile, const CardinalDirection direction) const {
+    return roads_.is_connected_to(tile.x, tile.y, direction);
+}
+
 bool SidewalkNavigationNetwork::is_navigable(const NavigationTile tile) const {
     return sidewalks_.is_walkable(tile.x, tile.y);
 }

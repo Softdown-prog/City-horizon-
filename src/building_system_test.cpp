@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
     const BuildingDefinition* city_hall = catalog.find("city_hall_01");
     if (!require(city_hall != nullptr, "city_hall_01 definition is available") ||
         !require(city_hall->name == "Prefeitura" && city_hall->category == "civic" &&
-                     city_hall->footprint_width == 4 && city_hall->footprint_height == 4 && !city_hall->rotatable &&
+                     city_hall->footprint_width == 3 && city_hall->footprint_height == 3 && !city_hall->rotatable &&
                      city_hall->requires_road_access && city_hall->power_consumption == 4,
                  "city hall uses the generic civic definition contract") ||
         !require(city_hall->texture_path_for(BuildingRotation::r0) == "assets/buildings/city_hall_01_lvl1.png" &&

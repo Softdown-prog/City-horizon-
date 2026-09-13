@@ -72,6 +72,12 @@ struct BuildingLevelDefinition {
     std::array<float, 4> sprite_anchor_y = {1.0F, 1.0F, 1.0F, 1.0F};
 };
 
+struct BuildingAnimationDefinition {
+    int frame_count = 1;
+    int frame_duration_ms = 120;
+    std::string layout = "horizontal";
+};
+
 struct BuildingDefinition {
     std::string id;
     std::string name;
@@ -110,6 +116,11 @@ struct BuildingDefinition {
     // instances. Zero means this building neither consumes nor produces power.
     std::uint32_t power_consumption = 0;
     std::uint32_t power_production = 0;
+    std::uint32_t generation_capacity = 0;
+    std::uint32_t water_intake_capacity = 0;
+    bool preplaced = false;
+    bool player_buildable = true;
+    std::string unlock_requirement;
     std::uint32_t agricultural_storage_capacity = 0;
     std::uint32_t grain_storage_capacity = 0;
     bool provides_agricultural_storage = false;
@@ -126,6 +137,7 @@ struct BuildingDefinition {
     std::array<float, 4> sprite_anchor_y = {1.0F, 1.0F, 1.0F, 1.0F};
     std::vector<BuildingAccessPoint> access_points;
     std::optional<InitialBuildingPlacement> initial_placement;
+    std::optional<BuildingAnimationDefinition> animation;
 
     // Multi-level progression data (Nível 1 a Nível N).
     std::vector<BuildingLevelDefinition> levels;
@@ -151,6 +163,7 @@ struct BuildingInstance {
     // it never rotates a texture at runtime.
     BuildingRotation rotation = BuildingRotation::r0;
     int current_level = 1;
+    bool operational = true;
 
     [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition& current_level_definition(const BuildingDefinition& definition) const;
@@ -209,6 +222,8 @@ public:
     [[nodiscard]] const BuildingInstance* instance_at(int tile_x, int tile_y) const;
     [[nodiscard]] bool is_occupied(int tile_x, int tile_y) const;
     [[nodiscard]] bool remove_instance(const BuildingDefinition& definition, std::uint64_t instance_id);
+    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+    std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
 
 private:

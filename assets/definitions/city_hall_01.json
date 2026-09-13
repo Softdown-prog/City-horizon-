@@ -7,17 +7,17 @@
   "requiresRoadAccess": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
-    "width": 4,
-    "height": 4
+    "width": 3,
+    "height": 3
   },
   "buildCost": 5000,
   "maintenancePerMonth": 200,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 4,
-  "artScale": 2.6947,
+  "artScale": 1.6,
   "anchor": {
-    "x": 0.4683,
-    "y": 0.9941
+    "x": 0.5,
+    "y": 0.99
   },
   "levels": [
     {
@@ -27,7 +27,10 @@
       "maintenancePerMonth": 200,
       "powerConsumption": 4,
       "sprite": "assets/buildings/city_hall_01_lvl1.png",
-      "anchor": { "x": 0.4683, "y": 0.9941 }
+      "anchor": {
+        "x": 0.5,
+        "y": 0.99
+      }
     },
     {
       "level": 2,
@@ -36,7 +39,10 @@
       "maintenancePerMonth": 450,
       "powerConsumption": 8,
       "sprite": "assets/buildings/city_hall_01_lvl2.png",
-      "anchor": { "x": 0.4474, "y": 0.9931 }
+      "anchor": {
+        "x": 0.5,
+        "y": 0.99
+      }
     },
     {
       "level": 3,
@@ -45,7 +51,10 @@
       "maintenancePerMonth": 900,
       "powerConsumption": 14,
       "sprite": "assets/buildings/city_hall_01_lvl3.png",
-      "anchor": { "x": 0.5048, "y": 0.9938 }
+      "anchor": {
+        "x": 0.5,
+        "y": 0.99
+      }
     },
     {
       "level": 4,
@@ -54,7 +63,10 @@
       "maintenancePerMonth": 1600,
       "powerConsumption": 22,
       "sprite": "assets/buildings/city_hall_01_lvl4.png",
-      "anchor": { "x": 0.5051, "y": 0.9957 }
+      "anchor": {
+        "x": 0.5,
+        "y": 0.99
+      }
     },
     {
       "level": 5,
@@ -63,7 +75,11 @@
       "maintenancePerMonth": 2500,
       "powerConsumption": 32,
       "sprite": "assets/buildings/city_hall_01_lvl5.png",
-      "anchor": { "x": 0.4938, "y": 0.9962 }
+      "anchor": {
+        "x": 0.5,
+        "y": 0.99
+      }
     }
-  ]
+  ],
+  "playerBuildable": true
 }

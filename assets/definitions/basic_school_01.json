@@ -3,7 +3,10 @@
   "name": "Escola Básica",
   "category": "civic",
   "texture": "assets/buildings/basic_school_01_lvl1.png",
-  "anchor": { "x": 0.4914, "y": 0.9982 },
+  "anchor": {
+    "x": 0.4914,
+    "y": 0.9982
+  },
   "rotatable": false,
   "requiresRoadAccess": true,
   "roadAccessMode": "any_perimeter",
@@ -25,7 +28,10 @@
       "powerConsumption": 6,
       "maintenancePerMonth": 150,
       "sprite": "assets/buildings/basic_school_01_lvl1.png",
-      "anchor": { "x": 0.4914, "y": 0.9982 }
+      "anchor": {
+        "x": 0.4914,
+        "y": 0.9982
+      }
     },
     {
       "level": 2,
@@ -35,7 +41,10 @@
       "powerConsumption": 10,
       "maintenancePerMonth": 250,
       "sprite": "assets/buildings/basic_school_01_lvl2.png",
-      "anchor": { "x": 0.5277, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5277,
+        "y": 0.9982
+      }
     },
     {
       "level": 3,
@@ -45,7 +54,10 @@
       "powerConsumption": 16,
       "maintenancePerMonth": 400,
       "sprite": "assets/buildings/basic_school_01_lvl3.png",
-      "anchor": { "x": 0.5285, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5285,
+        "y": 0.9982
+      }
     },
     {
       "level": 4,
@@ -55,7 +67,10 @@
       "powerConsumption": 24,
       "maintenancePerMonth": 650,
       "sprite": "assets/buildings/basic_school_01_lvl4.png",
-      "anchor": { "x": 0.4746, "y": 0.9982 }
+      "anchor": {
+        "x": 0.4746,
+        "y": 0.9982
+      }
     },
     {
       "level": 5,
@@ -65,7 +80,11 @@
       "powerConsumption": 35,
       "maintenancePerMonth": 1000,
       "sprite": "assets/buildings/basic_school_01_lvl5.png",
-      "anchor": { "x": 0.5457, "y": 0.9982 }
+      "anchor": {
+        "x": 0.5457,
+        "y": 0.9982
+      }
     }
-  ]
+  ],
+  "playerBuildable": true
 }

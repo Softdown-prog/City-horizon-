@@ -350,10 +350,13 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                true, model.active_tool == UiTool::decoration);
 
 
-    if (model.build_panel_open || model.farming_panel_open) {
-        constexpr float panel_width = 370.0F;
+    if (model.build_panel_open || model.farming_panel_open || model.active_tool == UiTool::decoration) {
+        constexpr float panel_width = 410.0F;
         const float header_height = model.farming_panel_open ? 60.0F : 42.0F;
-        constexpr float card_height = 72.0F;
+        // Every catalog entry has a fixed-canvas thumbnail and the essential
+        // placement facts. This avoids asking players to infer footprint or
+        // infrastructure requirements from a world-sized sprite.
+        constexpr float card_height = 96.0F;
         constexpr float card_gap = 6.0F;
         const float panel_y = 84.0F;
         const float panel_height = std::max(120.0F, toolbar_y - panel_y - 8.0F);
@@ -361,7 +364,13 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         add_panel(panel_bounds);
         build_panel_bounds_ = panel_bounds;
         const float visible_height = panel_height - header_height - 8.0F;
-        const std::vector<UiBuildItem>& panel_items = model.farming_panel_open ? model.farming_items : model.build_items;
+        const std::vector<UiBuildItem>& panel_items =
+            model.farming_panel_open ? model.farming_items
+            : (model.active_tool == UiTool::decoration ? model.decor_items : model.build_items);
+        const UiAction panel_action =
+            model.farming_panel_open ? UiAction::select_farming_item : UiAction::select_building;
+        const std::string& panel_selected_id =
+            model.farming_panel_open ? model.selected_farming_id : model.selected_building_id;
         const float content_height = static_cast<float>(panel_items.size()) * (card_height + card_gap);
         build_scroll_max_ = std::max(0.0F, content_height - visible_height);
         build_scroll_offset_ = std::clamp(build_scroll_offset_, 0.0F, build_scroll_max_);
@@ -371,8 +380,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
             if (card_bounds.y >= panel_bounds.y + header_height &&
                 card_bounds.y + card_bounds.height <= panel_bounds.y + panel_bounds.height - 6.0F) {
                 add_build_card(card_bounds, item,
-                               item.definition_id == (model.farming_panel_open ? model.selected_farming_id : model.selected_building_id),
-                               model.farming_panel_open ? UiAction::select_farming_item : UiAction::select_building);
+                               item.definition_id == panel_selected_id,
+                               panel_action);
             }
             item_y += card_height + card_gap;
         }
@@ -695,7 +704,14 @@ const std::vector<UiRect>& GameplayUi::panels() const {
 }
 
 void GameplayUi::add_button(UiRect bounds, std::string label, UiAction action, bool enabled, bool active, std::string payload) {
-    buttons_.push_back({bounds, std::move(label), action, std::move(payload), enabled, active});
+    UiButton button;
+    button.bounds = bounds;
+    button.label = std::move(label);
+    button.action = action;
+    button.payload = std::move(payload);
+    button.enabled = enabled;
+    button.active = active;
+    buttons_.push_back(std::move(button));
 }
 
 void GameplayUi::add_build_card(UiRect bounds, const UiBuildItem& item, bool active, UiAction action) {
@@ -706,7 +722,8 @@ void GameplayUi::add_build_card(UiRect bounds, const UiBuildItem& item, bool act
     card.payload = item.definition_id;
     card.enabled = item.enabled;
     card.active = active;
-    card.detail = item.category + "  |  " + item.build_cost;
+    card.detail = item.category + "  |  " + item.build_cost + "  |  " + item.footprint;
+    card.requirements = item.requirements;
     card.thumbnail_path = item.thumbnail_path;
     card.build_card = true;
     buttons_.push_back(std::move(card));
@@ -758,7 +775,7 @@ void GameplayUi::render_build_card(SDL_Renderer* renderer, const UiButton& butto
                            button.active ? 218 : 148, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &card);
 
-    const SDL_FRect preview = {button.bounds.x + 7.0F, button.bounds.y + 7.0F, 62.0F, 58.0F};
+    const SDL_FRect preview = {button.bounds.x + 7.0F, button.bounds.y + 7.0F, 82.0F, 82.0F};
     SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &preview);
         if (const UiThumbnail* thumbnail = thumbnail_for(renderer, button.thumbnail_path)) {
@@ -774,12 +791,18 @@ void GameplayUi::render_build_card(SDL_Renderer* renderer, const UiButton& butto
                 draw_text(renderer, preview.x + 25.0F, preview.y + 22.0F, "$", 182, 210, 111);
             }
         }
-    draw_text(renderer, button.bounds.x + 78.0F, button.bounds.y + 11.0F, button.label,
-              button.enabled ? 236 : 142, button.enabled ? 244 : 149, button.enabled ? 246 : 154);
-    draw_text(renderer, button.bounds.x + 78.0F, button.bounds.y + 30.0F, button.detail,
-              button.enabled ? 165 : 113, button.enabled ? 193 : 126, button.enabled ? 204 : 135);
+    const float text_x = button.bounds.x + 101.0F;
+    const float text_width = button.bounds.width - 109.0F;
+    draw_text_fit(renderer, text_x, button.bounds.y + 10.0F, text_width, button.label,
+                  button.enabled ? 236 : 142, button.enabled ? 244 : 149, button.enabled ? 246 : 154);
+    draw_text_fit(renderer, text_x, button.bounds.y + 28.0F, text_width, button.detail,
+                  button.enabled ? 165 : 113, button.enabled ? 193 : 126, button.enabled ? 204 : 135);
+    draw_text_fit(renderer, text_x, button.bounds.y + 46.0F, text_width, button.requirements,
+                  button.enabled ? 177 : 122, button.enabled ? 207 : 135, button.enabled ? 215 : 143);
     if (button.active) {
-        draw_text(renderer, button.bounds.x + 78.0F, button.bounds.y + 48.0F, "SELECIONADO", 173, 231, 245);
+        draw_text(renderer, text_x, button.bounds.y + 66.0F, "SELECIONADO", 173, 231, 245);
+    } else if (!button.enabled) {
+        draw_text(renderer, text_x, button.bounds.y + 66.0F, "INDISPONIVEL", 205, 144, 135);
     }
 }
 

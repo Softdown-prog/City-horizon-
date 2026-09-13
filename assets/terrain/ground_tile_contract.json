@@ -1,0 +1,28 @@
+{
+  "schema": "city_horizon.ground_tile_contract/v1",
+  "logicalTile": { "width": 128, "height": 64 },
+  "tolerancePixels": 0,
+  "profiles": {
+    "grass": {
+      "reference": "assets/terrain/grass_isometric_01_clean.png",
+      "canvas": { "width": 1280, "height": 640 },
+      "opaqueBounds": { "left": 53, "top": 23, "right": 1228, "bottom": 618 }
+    },
+    "prepared-soil": {
+      "reference": "assets/farming/prepared_soil/prepared_soil_01.png",
+      "canvas": { "width": 1254, "height": 1254 },
+      "opaqueBounds": { "left": 16, "top": 151, "right": 1236, "bottom": 917 },
+      "maxContentY": 916
+    },
+    "plowed-soil": {
+      "reference": "assets/agriculture/soil_plowed_01/soil_plowed_01.png",
+      "canvas": { "width": 1254, "height": 1254 },
+      "opaqueBounds": { "left": 16, "top": 151, "right": 1236, "bottom": 917 },
+      "maxContentY": 916
+    },
+    "coast": {
+      "catalog": "assets/terrain/coast/coast_tiles.json",
+      "canvas": { "width": 170, "height": 85 }
+    }
+  }
+}

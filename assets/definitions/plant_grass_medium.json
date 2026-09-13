@@ -1,0 +1,20 @@
+{
+  "id": "plant_grass_medium",
+  "name": "Grama Média",
+  "category": "decor",
+  "texture": "assets/decor/vegetation/plant_grass_medium.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 30,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.88
+  },
+  "playerBuildable": true
+}

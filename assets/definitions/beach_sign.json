@@ -1,0 +1,20 @@
+{
+  "id": "beach_sign",
+  "name": "Placa Indicativa de Praia",
+  "category": "decor",
+  "texture": "assets/decor/beach/beach_sign.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 150,
+  "maintenancePerMonth": 0,
+  "artScale": 0.3,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.85
+  },
+  "playerBuildable": true
+}

@@ -2,6 +2,7 @@
   "id": "police_station_01",
   "name": "Delegacia Pequena",
   "category": "civic",
+  "playerBuildable": true,
   "texture": "assets/buildings/police_station_01_rot0.png",
   "rotatable": true,
   "requiresRoadAccess": true,
