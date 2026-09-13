@@ -6,17 +6,34 @@
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/validation.h"
+#include "src/ch_core/semantic_contracts.h"
+#include "src/ch_core/semantic_grid.h"
+#include "src/ch_core/placement_contracts.h"
+#include "src/ch_core/placement_engine.h"
+#include "src/ch_core/transaction_contracts.h"
+#include "src/ch_core/transaction_manager.h"
+#include "src/ch_core/shoreline_contracts.h"
+#include "src/ch_core/shoreline_autotile.h"
+#include "src/ch_render/map_renderer.h"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(city_horizon_native, m) {
-    m.doc() = "City Horizon Native C++20 Core Bindings (CH_GRID_V1 / CH_MAP_V1 / CH_RENDER_V1)";
+    m.doc() = "City Horizon Native C++20 Core Bindings (CH_GRID_V1 / CH_MAP_V1 / CH_RENDER_V1 / CH_SEMANTIC_STATE_V1 / CH_PLACEMENT_V1 / CH_TRANSACTION_V1 / CH_SHORELINE_V1)";
 
     // Core identity & contract versions
     m.attr("core_version") = "1.0.0";
     m.attr("grid_contract") = ch::contracts::kGridContract;
     m.attr("map_contract") = ch::contracts::kMapContract;
     m.attr("render_contract") = ch::contracts::kRenderContract;
+    m.attr("anchor_contract") = ch::kAnchorContract;
+    m.attr("footprint_contract") = ch::kFootprintContract;
+    m.attr("connector_contract") = ch::kConnectorContract;
+    m.attr("semantic_overlay_contract") = ch::kSemanticOverlayContract;
+    m.attr("semantic_state_contract") = ch::kSemanticStateContract;
+    m.attr("placement_contract") = ch::kPlacementContract;
+    m.attr("transaction_contract") = ch::kTransactionContract;
+    m.attr("shoreline_contract") = ch::kShorelineContract;
 
     // Locked constants
     m.attr("kTileWidth") = ch::contracts::kTileWidth;
@@ -115,6 +132,27 @@ PYBIND11_MODULE(city_horizon_native, m) {
         .def("is_road_at", &ch::MapDocument::is_road_at, py::arg("tile_x"), py::arg("tile_y"))
         .def_static("load_from_file", &ch::MapDocument::load_from_file, py::arg("filepath"));
 
+    // BuildingCatalog & BuildingManager (Game Runtime representation)
+    py::class_<BuildingCatalog>(m, "BuildingCatalog")
+        .def(py::init<>())
+        .def("load_from_directory", [](BuildingCatalog& self, const std::string& dir) {
+            return self.load_from_directory(dir);
+        }, py::arg("directory"));
+
+    py::class_<BuildingManager>(m, "BuildingManager")
+        .def(py::init<int, int>(), py::arg("map_min") = ch::contracts::kMapMin, py::arg("map_max") = ch::contracts::kMapMax)
+        .def("restore_instance", [](BuildingManager& self, const BuildingCatalog& catalog, const std::string& def_id, int x, int y, int rot) {
+            const BuildingDefinition* def = catalog.find(def_id);
+            if (def == nullptr) return false;
+            BuildingInstance inst;
+            inst.instance_id = self.next_instance_id();
+            inst.definition_id = def_id;
+            inst.tile_x = x;
+            inst.tile_y = y;
+            inst.rotation = static_cast<BuildingRotation>(rot);
+            return self.restore_instance(*def, inst);
+        }, py::arg("catalog"), py::arg("definition_id"), py::arg("tile_x"), py::arg("tile_y"), py::arg("rotation") = 0);
+
     // Validation Report & Function
     py::class_<ch::MapValidationReport>(m, "MapValidationReport")
         .def_readonly("valid", &ch::MapValidationReport::valid)
@@ -123,4 +161,247 @@ PYBIND11_MODULE(city_horizon_native, m) {
         .def_readonly("legacy_debt", &ch::MapValidationReport::legacy_debt);
 
     m.def("validate_map_document", &ch::validate_map_document, py::arg("document"));
+
+    m.def("compute_document_geometry_signature",
+          py::overload_cast<const ch::MapDocument&, const BuildingCatalog&, const ch::CameraState&, float, float>(&ch::MapRenderer::compute_geometry_signature),
+          py::arg("document"), py::arg("catalog"), py::arg("camera"), py::arg("viewport_w"), py::arg("viewport_h"));
+
+    m.def("compute_game_geometry_signature",
+          py::overload_cast<const BuildingManager&, const BuildingCatalog&, const ch::CameraState&, float, float>(&ch::MapRenderer::compute_geometry_signature),
+          py::arg("manager"), py::arg("catalog"), py::arg("camera"), py::arg("viewport_w"), py::arg("viewport_h"));
+
+    // Geometry Records, Signatures & Diff
+    py::class_<ch::RenderGeometryRecord>(m, "RenderGeometryRecord")
+        .def(py::init<>())
+        .def_readwrite("layer", &ch::RenderGeometryRecord::layer)
+        .def_readwrite("asset_id", &ch::RenderGeometryRecord::asset_id)
+        .def_readwrite("grid_x", &ch::RenderGeometryRecord::grid_x)
+        .def_readwrite("grid_y", &ch::RenderGeometryRecord::grid_y)
+        .def_readwrite("screen_x", &ch::RenderGeometryRecord::screen_x)
+        .def_readwrite("screen_y", &ch::RenderGeometryRecord::screen_y)
+        .def_readwrite("dest_w", &ch::RenderGeometryRecord::dest_w)
+        .def_readwrite("dest_h", &ch::RenderGeometryRecord::dest_h)
+        .def_readwrite("anchor_x", &ch::RenderGeometryRecord::anchor_x)
+        .def_readwrite("anchor_y", &ch::RenderGeometryRecord::anchor_y)
+        .def_readwrite("art_scale", &ch::RenderGeometryRecord::art_scale)
+        .def_readwrite("depth_key", &ch::RenderGeometryRecord::depth_key)
+        .def_readwrite("footprint_w", &ch::RenderGeometryRecord::footprint_w)
+        .def_readwrite("footprint_h", &ch::RenderGeometryRecord::footprint_h);
+
+    py::class_<ch::RenderGeometryDiff>(m, "RenderGeometryDiff")
+        .def(py::init<>())
+        .def_readwrite("match", &ch::RenderGeometryDiff::match)
+        .def_readwrite("report", &ch::RenderGeometryDiff::report);
+
+    py::class_<ch::RenderGeometrySignature>(m, "RenderGeometrySignature")
+        .def(py::init<>())
+        .def_readwrite("records", &ch::RenderGeometrySignature::records)
+        .def("compute_hash", &ch::RenderGeometrySignature::compute_hash);
+
+    m.def("compare_signatures", &ch::compare_signatures, py::arg("game_sig"), py::arg("forge_sig"));
+
+    // Native SDL3 Viewport
+    py::class_<ch::MapForgeNativeViewport>(m, "MapForgeNativeViewport")
+        .def(py::init<>())
+        .def("initialize", [](ch::MapForgeNativeViewport& self, std::uintptr_t hwnd, int w, int h, const std::string& root) {
+            return self.initialize(reinterpret_cast<void*>(hwnd), w, h, root);
+        }, py::arg("win32_hwnd"), py::arg("physical_width"), py::arg("physical_height"), py::arg("asset_root"))
+        .def("resize", &ch::MapForgeNativeViewport::resize, py::arg("physical_width"), py::arg("physical_height"))
+        .def("set_camera", &ch::MapForgeNativeViewport::set_camera, py::arg("camera"))
+        .def("load_map_document", &ch::MapForgeNativeViewport::load_map_document, py::arg("document"))
+        .def("render_frame", &ch::MapForgeNativeViewport::render_frame)
+        .def("compute_geometry_signature", &ch::MapForgeNativeViewport::compute_geometry_signature, py::arg("catalog"))
+        .def("shutdown", &ch::MapForgeNativeViewport::shutdown)
+        .def("is_initialized", &ch::MapForgeNativeViewport::is_initialized)
+        .def("set_view_mode", &ch::MapForgeNativeViewport::set_view_mode, py::arg("mode"))
+        .def("view_mode", &ch::MapForgeNativeViewport::view_mode)
+        .def("set_active_channels", &ch::MapForgeNativeViewport::set_active_channels, py::arg("channel_bitmask"))
+        .def("active_channels", &ch::MapForgeNativeViewport::active_channels)
+        .def("set_channel_opacity", &ch::MapForgeNativeViewport::set_channel_opacity, py::arg("opacity"))
+        .def("channel_opacity", &ch::MapForgeNativeViewport::channel_opacity);
+
+    // Phase D — Semantic Grid & Governance Bindings
+    py::enum_<ch::SemanticState>(m, "SemanticState")
+        .value("VALID", ch::SemanticState::valid)
+        .value("INVALID", ch::SemanticState::invalid)
+        .value("NOT_DECLARED", ch::SemanticState::not_declared)
+        .value("NOT_APPLICABLE", ch::SemanticState::not_applicable)
+        .export_values();
+
+    py::enum_<ch::AnchorType>(m, "AnchorType")
+        .value("GROUND_ANCHOR", ch::AnchorType::ground_anchor)
+        .value("TRUNK_CONTACT", ch::AnchorType::trunk_contact)
+        .value("FEET_CONTACT", ch::AnchorType::feet_contact)
+        .value("TILE_CENTER", ch::AnchorType::tile_center)
+        .value("LAND_WATER_CONNECTOR", ch::AnchorType::land_water_connector)
+        .export_values();
+
+    py::enum_<ch::ConnectorType>(m, "ConnectorType")
+        .value("ROAD_N", ch::ConnectorType::road_n)
+        .value("ROAD_E", ch::ConnectorType::road_e)
+        .value("ROAD_S", ch::ConnectorType::road_s)
+        .value("ROAD_W", ch::ConnectorType::road_w)
+        .value("SIDEWALK", ch::ConnectorType::sidewalk)
+        .value("ENTRANCE", ch::ConnectorType::entrance)
+        .value("GROUND", ch::ConnectorType::ground)
+        .value("WATER_EDGE", ch::ConnectorType::water_edge)
+        .value("PEDESTRIAN", ch::ConnectorType::pedestrian)
+        .value("SERVICE", ch::ConnectorType::service)
+        .export_values();
+
+    py::class_<ch::TileSemanticInfo>(m, "TileSemanticInfo")
+        .def(py::init<>())
+        .def_readwrite("tile", &ch::TileSemanticInfo::tile)
+        .def_readwrite("terrain_type", &ch::TileSemanticInfo::terrain_type)
+        .def_readwrite("footprint_state", &ch::TileSemanticInfo::footprint_state)
+        .def_readwrite("occupancy_state", &ch::TileSemanticInfo::occupancy_state)
+        .def_readwrite("buildable_state", &ch::TileSemanticInfo::buildable_state)
+        .def_readwrite("road_state", &ch::TileSemanticInfo::road_state)
+        .def_readwrite("sidewalk_state", &ch::TileSemanticInfo::sidewalk_state)
+        .def_readwrite("water_state", &ch::TileSemanticInfo::water_state)
+        .def_readwrite("pivot_state", &ch::TileSemanticInfo::pivot_state)
+        .def_readwrite("entrance_state", &ch::TileSemanticInfo::entrance_state)
+        .def_readwrite("connector_state", &ch::TileSemanticInfo::connector_state)
+        .def_readwrite("no_build_state", &ch::TileSemanticInfo::no_build_state)
+        .def_readwrite("navigation_state", &ch::TileSemanticInfo::navigation_state)
+        .def_readwrite("region_state", &ch::TileSemanticInfo::region_state)
+        .def_readwrite("occupied_by_asset", &ch::TileSemanticInfo::occupied_by_asset)
+        .def_readwrite("footprint_width", &ch::TileSemanticInfo::footprint_width)
+        .def_readwrite("footprint_height", &ch::TileSemanticInfo::footprint_height);
+
+    py::class_<ch::SemanticDivergence>(m, "SemanticDivergence")
+        .def(py::init<>())
+        .def_readwrite("object_id", &ch::SemanticDivergence::object_id)
+        .def_readwrite("tile", &ch::SemanticDivergence::tile)
+        .def_readwrite("contract", &ch::SemanticDivergence::contract)
+        .def_readwrite("field", &ch::SemanticDivergence::field)
+        .def_readwrite("expected", &ch::SemanticDivergence::expected)
+        .def_readwrite("actual", &ch::SemanticDivergence::actual)
+        .def_readwrite("delta", &ch::SemanticDivergence::delta)
+        .def_readwrite("status", &ch::SemanticDivergence::status)
+        .def("to_formatted_string", &ch::SemanticDivergence::to_formatted_string);
+
+    m.def("inspect_tile_channels", [](const ch::MapDocument& doc, int tile_x, int tile_y) {
+        ch::SemanticWorldView world;
+        world.map_document = &doc;
+        return ch::SemanticGrid::inspect_tile_channels(world, ch::GridCoord(tile_x, tile_y));
+    }, py::arg("document"), py::arg("tile_x"), py::arg("tile_y"));
+
+    struct BuildingCatalogAdapter : public ch::IAssetCatalogView {
+        const BuildingCatalog& catalog;
+        explicit BuildingCatalogAdapter(const BuildingCatalog& c) : catalog(c) {}
+        ch::AssetFootprintInfo get_footprint(std::string_view asset_id) const override {
+            const BuildingDefinition* def = catalog.find(std::string(asset_id));
+            if (!def) return {1, 1, false};
+            return {def->footprint_width, def->footprint_height, true};
+        }
+    };
+
+    m.def("validate_map_semantics", [](const ch::MapDocument& doc, const BuildingCatalog& catalog) {
+        ch::SemanticWorldView world;
+        world.map_document = &doc;
+        BuildingCatalogAdapter adapter(catalog);
+        return ch::SemanticGrid::validate_map_semantics(world, adapter);
+    }, py::arg("document"), py::arg("catalog"));
+
+    // Phase E — Deterministic Placement Engine Bindings
+    py::enum_<ch::PlacementCategory>(m, "PlacementCategory")
+        .value("BUILDING", ch::PlacementCategory::building)
+        .value("ROAD", ch::PlacementCategory::road)
+        .value("TREE", ch::PlacementCategory::tree)
+        .value("DECORATION", ch::PlacementCategory::decoration)
+        .value("WATER_STRUCTURE", ch::PlacementCategory::water_structure)
+        .export_values();
+
+    py::enum_<ch::PlacementViolation>(m, "PlacementViolation")
+        .value("CH_PLACE_BOUNDS", ch::PlacementViolation::bounds_exceeded)
+        .value("CH_PLACE_OCCUPIED", ch::PlacementViolation::occupied)
+        .value("CH_PLACE_TERRAIN", ch::PlacementViolation::terrain_incompatible)
+        .value("CH_PLACE_ANCHOR", ch::PlacementViolation::anchor_invalid)
+        .value("CH_PLACE_CONNECTOR", ch::PlacementViolation::connector_missing)
+        .value("CH_PLACE_ROAD_REQUIRED", ch::PlacementViolation::road_required)
+        .value("CH_PLACE_WATER_REQUIRED", ch::PlacementViolation::water_required)
+        .value("CH_PLACE_CATEGORY_RULE", ch::PlacementViolation::category_rule)
+        .export_values();
+
+    py::class_<ch::PlacementRequest>(m, "PlacementRequest")
+        .def(py::init<>())
+        .def_readwrite("object_id", &ch::PlacementRequest::object_id)
+        .def_readwrite("category", &ch::PlacementRequest::category)
+        .def_readwrite("origin", &ch::PlacementRequest::origin)
+        .def_readwrite("rotation", &ch::PlacementRequest::rotation);
+
+    py::class_<ch::PlacementResult>(m, "PlacementResult")
+        .def(py::init<>())
+        .def_readwrite("object_id", &ch::PlacementResult::object_id)
+        .def_readwrite("state", &ch::PlacementResult::state)
+        .def_readwrite("violations", &ch::PlacementResult::violations)
+        .def_readwrite("affected_tiles", &ch::PlacementResult::affected_tiles)
+        .def_readwrite("resolved_origin", &ch::PlacementResult::resolved_origin)
+        .def_readwrite("conflicting_tile", &ch::PlacementResult::conflicting_tile)
+        .def_readwrite("expected_connector", &ch::PlacementResult::expected_connector)
+        .def("to_formatted_string", &ch::PlacementResult::to_formatted_string);
+
+    m.def("can_place", [](const ch::MapDocument& doc, const BuildingCatalog& catalog, const ch::PlacementRequest& req) {
+        ch::SemanticWorldView world;
+        world.map_document = &doc;
+        BuildingCatalogAdapter adapter(catalog);
+        return ch::PlacementEngine::can_place(req, world, adapter);
+    }, py::arg("document"), py::arg("catalog"), py::arg("request"));
+
+    // Phase F — Transaction Engine Bindings
+    py::class_<ch::TransactionManager>(m, "TransactionManager")
+        .def(py::init<std::size_t>(), py::arg("max_depth") = 100)
+        .def("begin_transaction", &ch::TransactionManager::begin_transaction, py::arg("description"))
+        .def("commit_transaction", &ch::TransactionManager::commit_transaction)
+        .def("cancel_transaction", &ch::TransactionManager::cancel_transaction)
+        .def("can_undo", &ch::TransactionManager::can_undo)
+        .def("can_redo", &ch::TransactionManager::can_redo)
+        .def("clear_history", &ch::TransactionManager::clear_history)
+        .def("undo_stack_size", &ch::TransactionManager::undo_stack_size)
+        .def("redo_stack_size", &ch::TransactionManager::redo_stack_size)
+        .def("is_in_batch", &ch::TransactionManager::is_in_batch);
+
+    // Phase H — Shoreline Autotiling Engine Bindings
+    py::enum_<ch::ShorelinePiece>(m, "ShorelinePiece")
+        .value("BORDER_NORTH", ch::ShorelinePiece::border_north)
+        .value("BORDER_EAST", ch::ShorelinePiece::border_east)
+        .value("BORDER_SOUTH", ch::ShorelinePiece::border_south)
+        .value("BORDER_WEST", ch::ShorelinePiece::border_west)
+        .value("OUTER_NE", ch::ShorelinePiece::outer_ne)
+        .value("OUTER_SE", ch::ShorelinePiece::outer_se)
+        .value("OUTER_SW", ch::ShorelinePiece::outer_sw)
+        .value("OUTER_NW", ch::ShorelinePiece::outer_nw)
+        .value("INNER_NE", ch::ShorelinePiece::inner_ne)
+        .value("INNER_SE", ch::ShorelinePiece::inner_se)
+        .value("INNER_SW", ch::ShorelinePiece::inner_sw)
+        .value("INNER_NW", ch::ShorelinePiece::inner_nw)
+        .export_values();
+
+    py::class_<ch::ShorelineRecipe>(m, "ShorelineRecipe")
+        .def(py::init<>())
+        .def_readwrite("pieces", &ch::ShorelineRecipe::pieces)
+        .def("normalize", &ch::ShorelineRecipe::normalize);
+
+    py::class_<ch::ShorelineEdit>(m, "ShorelineEdit")
+        .def(py::init<>())
+        .def_readwrite("tile", &ch::ShorelineEdit::tile)
+        .def_readwrite("recipe", &ch::ShorelineEdit::recipe);
+
+    py::class_<ch::AutotileResult>(m, "AutotileResult")
+        .def(py::init<>())
+        .def_readwrite("edits", &ch::AutotileResult::edits);
+
+    m.def("resolve_shoreline", &ch::ShorelineAutotiler::resolve_shoreline, py::arg("mask"));
+
+    m.def("evaluate_shoreline", [](const ch::MapDocument& doc, int min_x, int min_y, int max_x, int max_y) {
+        ch::SemanticWorldView world;
+        world.map_document = &doc;
+        ch::GridBounds bounds;
+        bounds.min_x = min_x; bounds.min_y = min_y;
+        bounds.max_x = max_x; bounds.max_y = max_y;
+        return ch::ShorelineAutotiler::evaluate_shoreline(world, bounds);
+    }, py::arg("document"), py::arg("min_x") = -24, py::arg("min_y") = -24, py::arg("max_x") = 23, py::arg("max_y") = 23);
 }
+
+

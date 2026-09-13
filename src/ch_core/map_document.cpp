@@ -53,7 +53,9 @@ std::optional<int> json_int(const std::string_view json, const std::string_view 
 } // namespace
 
 MapDocument::MapDocument(std::string raw_json_content)
-    : raw_content_(std::move(raw_json_content)) {}
+    : raw_content_(std::move(raw_json_content)) {
+    parse_all();
+}
 
 std::optional<MapDocument> MapDocument::load_from_file(const std::string& filepath) {
     std::ifstream file(filepath);
@@ -64,116 +66,113 @@ std::optional<MapDocument> MapDocument::load_from_file(const std::string& filepa
     return MapDocument(ss.str());
 }
 
-std::vector<TerrainTileEntry> MapDocument::terrain_tiles() const {
-    std::vector<TerrainTileEntry> result;
+void MapDocument::parse_all() {
+    // 1. Terrain Tiles
     const std::size_t terrain_pos = raw_content_.find("\"terrain\"");
-    if (terrain_pos == std::string::npos) return result;
+    if (terrain_pos != std::string::npos) {
+        const std::size_t array_start = raw_content_.find('[', terrain_pos);
+        const std::size_t array_end = raw_content_.find(']', array_start);
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
+            std::size_t pos = 0;
+            while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
+                const std::size_t end_obj = array_str.find('}', pos);
+                if (end_obj == std::string_view::npos) break;
 
-    const std::size_t array_start = raw_content_.find('[', terrain_pos);
-    const std::size_t array_end = raw_content_.find(']', array_start);
-    if (array_start == std::string::npos || array_end == std::string::npos) return result;
+                std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
+                const auto tx = json_int(obj, "tileX");
+                const auto ty = json_int(obj, "tileY");
+                const auto tex = json_string(obj, "texture");
 
-    std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
-    std::size_t pos = 0;
-    while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
-        const std::size_t end_obj = array_str.find('}', pos);
-        if (end_obj == std::string_view::npos) break;
-
-        std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
-        const auto tx = json_int(obj, "tileX");
-        const auto ty = json_int(obj, "tileY");
-        const auto tex = json_string(obj, "texture");
-
-        if (tx && ty && tex) {
-            result.push_back({*tx, *ty, *tex});
+                if (tx && ty && tex) {
+                    std::size_t idx = cached_terrain_.size();
+                    cached_terrain_.push_back({*tx, *ty, *tex});
+                    terrain_index_[pack_key(*tx, *ty)] = idx;
+                }
+                pos = end_obj + 1;
+            }
         }
-        pos = end_obj + 1;
     }
-    return result;
-}
 
-std::vector<BuildingInstanceEntry> MapDocument::buildings() const {
-    std::vector<BuildingInstanceEntry> result;
+    // 2. Buildings
     const std::size_t b_pos = raw_content_.find("\"buildings\"");
-    if (b_pos == std::string::npos) return result;
+    if (b_pos != std::string::npos) {
+        const std::size_t array_start = raw_content_.find('[', b_pos);
+        const std::size_t array_end = raw_content_.find(']', array_start);
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
+            std::size_t pos = 0;
+            while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
+                const std::size_t end_obj = array_str.find('}', pos);
+                if (end_obj == std::string_view::npos) break;
 
-    const std::size_t array_start = raw_content_.find('[', b_pos);
-    const std::size_t array_end = raw_content_.find(']', array_start);
-    if (array_start == std::string::npos || array_end == std::string::npos) return result;
+                std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
+                const auto iid = json_int(obj, "instanceId");
+                const auto did = json_string(obj, "definitionId");
+                const auto tx = json_int(obj, "tileX");
+                const auto ty = json_int(obj, "tileY");
+                const auto rot = json_int(obj, "rotation");
 
-    std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
-    std::size_t pos = 0;
-    while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
-        const std::size_t end_obj = array_str.find('}', pos);
-        if (end_obj == std::string_view::npos) break;
-
-        std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
-        const auto iid = json_int(obj, "instanceId");
-        const auto did = json_string(obj, "definitionId");
-        const auto tx = json_int(obj, "tileX");
-        const auto ty = json_int(obj, "tileY");
-        const auto rot = json_int(obj, "rotation");
-
-        if (did && tx && ty) {
-            result.push_back({
-                static_cast<std::size_t>(iid.value_or(0)),
-                *did,
-                *tx,
-                *ty,
-                rot.value_or(0)
-            });
+                if (did && tx && ty) {
+                    std::size_t idx = cached_buildings_.size();
+                    cached_buildings_.push_back({
+                        static_cast<std::size_t>(iid.value_or(0)),
+                        *did,
+                        *tx,
+                        *ty,
+                        rot.value_or(0)
+                    });
+                    building_index_[pack_key(*tx, *ty)] = idx;
+                }
+                pos = end_obj + 1;
+            }
         }
-        pos = end_obj + 1;
     }
-    return result;
-}
 
-std::vector<RoadTileEntry> MapDocument::roads() const {
-    std::vector<RoadTileEntry> result;
+    // 3. Roads
     const std::size_t r_pos = raw_content_.find("\"roads\"");
-    if (r_pos == std::string::npos) return result;
+    if (r_pos != std::string::npos) {
+        const std::size_t array_start = raw_content_.find('[', r_pos);
+        const std::size_t array_end = raw_content_.find(']', array_start);
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
+            std::size_t pos = 0;
+            while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
+                const std::size_t end_obj = array_str.find('}', pos);
+                if (end_obj == std::string_view::npos) break;
 
-    const std::size_t array_start = raw_content_.find('[', r_pos);
-    const std::size_t array_end = raw_content_.find(']', array_start);
-    if (array_start == std::string::npos || array_end == std::string::npos) return result;
+                std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
+                const auto tx = json_int(obj, "tileX");
+                const auto ty = json_int(obj, "tileY");
 
-    std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
-    std::size_t pos = 0;
-    while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
-        const std::size_t end_obj = array_str.find('}', pos);
-        if (end_obj == std::string_view::npos) break;
-
-        std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
-        const auto tx = json_int(obj, "tileX");
-        const auto ty = json_int(obj, "tileY");
-
-        if (tx && ty) {
-            result.push_back({*tx, *ty});
+                if (tx && ty) {
+                    cached_roads_.push_back({*tx, *ty});
+                    road_index_.insert(pack_key(*tx, *ty));
+                }
+                pos = end_obj + 1;
+            }
         }
-        pos = end_obj + 1;
     }
-    return result;
 }
 
 std::optional<TerrainTileEntry> MapDocument::get_terrain_at(const int tile_x, const int tile_y) const {
-    for (const auto& t : terrain_tiles()) {
-        if (t.tile_x == tile_x && t.tile_y == tile_y) return t;
+    auto it = terrain_index_.find(pack_key(tile_x, tile_y));
+    if (it != terrain_index_.end()) {
+        return cached_terrain_[it->second];
     }
     return std::nullopt;
 }
 
 std::optional<BuildingInstanceEntry> MapDocument::get_building_at(const int tile_x, const int tile_y) const {
-    for (const auto& b : buildings()) {
-        if (b.tile_x == tile_x && b.tile_y == tile_y) return b;
+    auto it = building_index_.find(pack_key(tile_x, tile_y));
+    if (it != building_index_.end()) {
+        return cached_buildings_[it->second];
     }
     return std::nullopt;
 }
 
 bool MapDocument::is_road_at(const int tile_x, const int tile_y) const {
-    for (const auto& r : roads()) {
-        if (r.tile_x == tile_x && r.tile_y == tile_y) return true;
-    }
-    return false;
+    return road_index_.find(pack_key(tile_x, tile_y)) != road_index_.end();
 }
 
 } // namespace ch

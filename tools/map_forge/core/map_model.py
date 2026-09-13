@@ -78,10 +78,59 @@ class MapModel:
         for b in self.buildings:
             if b.get("tileX") == tile_x and b.get("tileY") == tile_y:
                 return b
-        return None
-
     def is_road_at(self, tile_x: int, tile_y: int) -> bool:
         for r in self.roads:
             if r.get("tileX") == tile_x and r.get("tileY") == tile_y:
                 return True
         return False
+
+    @property
+    def raw_json(self) -> str:
+        """Returns JSON string of raw data."""
+        import json
+        return json.dumps(self._raw_data, indent=2, ensure_ascii=False)
+
+    def set_terrain(self, tile_x: int, tile_y: int, texture_path: str) -> None:
+        """Sets or updates custom terrain entry at (tile_x, tile_y)."""
+        terrain_list = self._raw_data.setdefault("terrain", [])
+        for entry in terrain_list:
+            if entry.get("tileX") == tile_x and entry.get("tileY") == tile_y:
+                entry["texture"] = texture_path
+                return
+        terrain_list.append({"tileX": tile_x, "tileY": tile_y, "texture": texture_path})
+
+    def add_building(self, definition_id: str, tile_x: int, tile_y: int, rotation: int = 0, instance_id: Optional[int] = None) -> int:
+        """Allocates next instance ID or uses provided instance_id and adds building instance."""
+        buildings_list = self._raw_data.setdefault("buildings", [])
+        if instance_id is None:
+            instance_id = self._raw_data.get("nextBuildingInstanceId", 1)
+            self._raw_data["nextBuildingInstanceId"] = instance_id + 1
+
+        building_entry = {
+            "instanceId": instance_id,
+            "definitionId": definition_id,
+            "tileX": tile_x,
+            "tileY": tile_y,
+            "rotation": rotation
+        }
+        buildings_list.append(building_entry)
+        return instance_id
+
+    def remove_building_at(self, tile_x: int, tile_y: int) -> Optional[Dict[str, Any]]:
+        """Removes building at (tile_x, tile_y). Returns removed building dict or None."""
+        buildings_list = self._raw_data.get("buildings", [])
+        for i, b in enumerate(buildings_list):
+            if b.get("tileX") == tile_x and b.get("tileY") == tile_y:
+                return buildings_list.pop(i)
+        return None
+
+    def set_road(self, tile_x: int, tile_y: int, present: bool = True) -> None:
+        """Adds or removes road tile at (tile_x, tile_y)."""
+        roads_list = self._raw_data.setdefault("roads", [])
+        for i, r in enumerate(roads_list):
+            if r.get("tileX") == tile_x and r.get("tileY") == tile_y:
+                if not present:
+                    roads_list.pop(i)
+                return
+        if present:
+            roads_list.append({"tileX": tile_x, "tileY": tile_y})

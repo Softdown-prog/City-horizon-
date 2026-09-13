@@ -17,6 +17,7 @@ from tools.map_forge.exporters.game_exporter import verify_round_trip
 from tools.map_forge.core.projection import tile_visual_top_world, world_to_screen, screen_to_tile, Camera
 from tools.map_forge.core.validator import validate_map
 from tools.map_forge.core.command_executor import ReadOnlyCommandExecutor
+from tools.map_forge.recipes.coastal_forest_hydroelectric import build_coastal_forest_hydroelectric
 
 
 class TestMapForgePhase1(unittest.TestCase):
@@ -80,6 +81,17 @@ class TestMapForgePhase1(unittest.TestCase):
         res_mutation = executor.execute({"action": "paint_terrain"})
         self.assertFalse(res_mutation.get("success", True))
         self.assertIn("Phase 1 Read-Only Mode", res_mutation.get("error", ""))
+
+    def test_05_coastal_recipe_is_non_destructive_and_valid(self):
+        source = load_scenario(self.scenario_path)
+        catalog = load_building_catalog(self.asset_root)
+        generated = build_coastal_forest_hydroelectric(source.raw_data, catalog)
+        self.assertEqual(len(source.buildings), 35)
+        self.assertEqual(len(generated["buildings"]), 45)
+        self.assertIn("hydroelectric_01", [entry["definitionId"] for entry in generated["buildings"]])
+        generated_model = type(source)(generated)
+        result = validate_map(generated_model, self.asset_root, catalog)
+        self.assertTrue(result["valid"], result["errors"])
 
 
 if __name__ == "__main__":

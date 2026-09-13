@@ -1,0 +1,87 @@
+{
+  "schema": "city_horizon.ui_button_states.v1",
+  "image": "button_states_v1.png",
+  "canvas": {
+    "width": 1448,
+    "height": 1086
+  },
+  "columns": [
+    "normal",
+    "hover",
+    "pressed",
+    "disabled"
+  ],
+  "families": {
+    "blue_wide": {
+      "origin": [
+        20,
+        90
+      ],
+      "stepX": 354,
+      "cell": [
+        354,
+        140
+      ]
+    },
+    "blue_wide_patterned": {
+      "origin": [
+        20,
+        236
+      ],
+      "stepX": 354,
+      "cell": [
+        354,
+        140
+      ]
+    },
+    "green_wide": {
+      "origin": [
+        20,
+        383
+      ],
+      "stepX": 354,
+      "cell": [
+        354,
+        142
+      ]
+    },
+    "red_wide": {
+      "origin": [
+        20,
+        535
+      ],
+      "stepX": 354,
+      "cell": [
+        354,
+        142
+      ]
+    },
+    "blue_compact": {
+      "origin": [
+        35,
+        688
+      ],
+      "stepX": 350,
+      "cell": [
+        330,
+        114
+      ]
+    },
+    "blue_circle": {
+      "origin": [
+        92,
+        810
+      ],
+      "stepX": 346,
+      "cell": [
+        224,
+        228
+      ]
+    }
+  },
+  "rules": {
+    "active": "uses pressed column",
+    "disabled": "always uses disabled column",
+    "background": "RGBA transparency; no matte"
+  }
+}

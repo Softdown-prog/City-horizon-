@@ -1,5 +1,6 @@
 #include "building_system.h"
 #include "economy_system.h"
+#include "ch_core/placement_engine.h"
 
 #include <algorithm>
 #include <cctype>
@@ -643,6 +644,34 @@ PlacementFailure BuildingManager::validate(const BuildingDefinition& definition,
     if (!definition.supports_rotation(rotation)) {
         return PlacementFailure::unavailable_rotation;
     }
+
+    ch::PlacementRequest req;
+    req.object_id = definition.id;
+    req.category = ch::PlacementCategory::building;
+    req.origin = ch::GridCoord(tile_x, tile_y);
+    req.rotation = static_cast<int>(rotation);
+
+    struct SingleCatalogAdapter : public ch::IAssetCatalogView {
+        const BuildingDefinition& def;
+        explicit SingleCatalogAdapter(const BuildingDefinition& d) : def(d) {}
+        ch::AssetFootprintInfo get_footprint(std::string_view) const override {
+            return {def.footprint_width, def.footprint_height, true};
+        }
+    };
+
+    ch::SemanticWorldView world;
+    world.map_min = map_min_;
+    world.map_max = map_max_;
+    SingleCatalogAdapter adapter(definition);
+    ch::PlacementResult res = ch::PlacementEngine::can_place(req, world, adapter);
+
+    if (res.state != ch::SemanticState::valid) {
+        for (const auto v : res.violations) {
+            if (v == ch::PlacementViolation::bounds_exceeded) return PlacementFailure::outside_map;
+            if (v == ch::PlacementViolation::occupied) return PlacementFailure::occupied;
+        }
+    }
+
     const BuildingFootprint footprint = rotated_footprint(definition, rotation);
     for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
         for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {

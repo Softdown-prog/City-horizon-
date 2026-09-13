@@ -1,6 +1,7 @@
 #include "ui_manager.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <filesystem>
 #include <utility>
@@ -10,7 +11,9 @@ namespace {
 // Rendering receives commercial-demand text only from the gameplay model.
 constexpr float kMargin = 12.0F;
 constexpr float kTopBarHeight = 64.0F;
-constexpr float kToolbarHeight = 50.0F;
+// The authored category buttons need enough vertical room to retain their
+// bevel, icon and label instead of being compressed into debug-style strips.
+constexpr float kToolbarHeight = 74.0F;
 constexpr float kButtonHeight = 30.0F;
 
 void draw_panel(SDL_Renderer* renderer, const UiRect& bounds) {
@@ -165,7 +168,7 @@ const char* icon_name_for(UiAction action) {
         case UiAction::open_agriculture_panel: return "agriculture";
         case UiAction::activate_decoration: return "decoration";
         case UiAction::toggle_pause: return "pause";
-        case UiAction::settings_placeholder: return "settings";
+        case UiAction::open_settings: return "settings";
         case UiAction::close_selection: return "close";
         case UiAction::rotate_left:
         case UiAction::rotate_right: return "rotate";
@@ -177,6 +180,105 @@ std::string ui_icon_path(const char* icon_name) {
     const char* base_path = SDL_GetBasePath();
     const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
     return (root / "assets" / "ui" / "icons" / (std::string(icon_name) + ".png")).string();
+}
+
+const char* chrome_name_for(const UiAction action) {
+    switch (action) {
+        case UiAction::open_build_panel: return "category_buildings";
+        case UiAction::activate_roads: return "category_roads";
+        case UiAction::open_agriculture_panel: return "category_agriculture";
+        default: return nullptr;
+    }
+}
+
+std::string ui_chrome_path(const char* chrome_name) {
+    const char* base_path = SDL_GetBasePath();
+    const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+    return (root / "assets" / "ui" / "chrome" / (std::string(chrome_name) + ".png")).string();
+}
+
+std::string ui_button_state_atlas_path() {
+    const char* base_path = SDL_GetBasePath();
+    const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+    return (root / "assets" / "ui" / "atlas" / "button_states_v1.png").string();
+}
+
+std::string ui_goals_controls_atlas_path() {
+    const char* base_path = SDL_GetBasePath();
+    const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+    return (root / "assets" / "ui" / "atlas" / "goals_controls_v1.png").string();
+}
+
+enum class UiAtlasButtonFamily : std::uint8_t {
+    blue_wide,
+    green_wide,
+    red_wide,
+    blue_compact,
+    blue_circle,
+};
+
+[[nodiscard]] UiAtlasButtonFamily atlas_family_for(const UiButton& button) {
+    const float aspect = button.bounds.height > 0.0F ? button.bounds.width / button.bounds.height : 1.0F;
+    if (aspect < 1.35F) return UiAtlasButtonFamily::blue_circle;
+    if (button.action == UiAction::settings_apply || button.action == UiAction::upgrade_building) {
+        return UiAtlasButtonFamily::green_wide;
+    }
+    if (button.action == UiAction::settings_cancel || button.action == UiAction::activate_remove) {
+        return UiAtlasButtonFamily::red_wide;
+    }
+    return aspect < 2.7F ? UiAtlasButtonFamily::blue_compact : UiAtlasButtonFamily::blue_wide;
+}
+
+// Coordinates are deliberately data-like and match button_states_v1.json.
+// Each family uses four columns: normal, hover, pressed/selected, disabled.
+[[nodiscard]] SDL_FRect atlas_source_for(const UiButton& button) {
+    const UiButtonState state = !button.enabled ? UiButtonState::disabled
+        : (button.active ? UiButtonState::pressed : button.state);
+    const int column = state == UiButtonState::hover ? 1
+        : state == UiButtonState::pressed ? 2
+        : state == UiButtonState::disabled ? 3 : 0;
+
+    switch (atlas_family_for(button)) {
+        case UiAtlasButtonFamily::blue_wide:
+            return {20.0F + 354.0F * static_cast<float>(column), 90.0F, 354.0F, 140.0F};
+        case UiAtlasButtonFamily::green_wide:
+            return {20.0F + 354.0F * static_cast<float>(column), 383.0F, 354.0F, 142.0F};
+        case UiAtlasButtonFamily::red_wide:
+            return {20.0F + 354.0F * static_cast<float>(column), 535.0F, 354.0F, 142.0F};
+        case UiAtlasButtonFamily::blue_compact:
+            return {35.0F + 350.0F * static_cast<float>(column), 688.0F, 330.0F, 114.0F};
+        case UiAtlasButtonFamily::blue_circle:
+            return {92.0F + 346.0F * static_cast<float>(column), 810.0F, 224.0F, 228.0F};
+    }
+    return {};
+}
+
+[[nodiscard]] SDL_FRect goals_close_source_for(const UiButtonState state) {
+    const int column = state == UiButtonState::hover ? 1
+        : state == UiButtonState::pressed ? 2
+        : state == UiButtonState::disabled ? 3 : 0;
+    static constexpr std::array<float, 4> kLeft = {704.0F, 837.0F, 985.0F, 1137.0F};
+    return {kLeft[static_cast<std::size_t>(column)], 61.0F, 68.0F, 68.0F};
+}
+
+[[nodiscard]] SDL_FRect goals_back_source_for(const UiButtonState state) {
+    const int column = state == UiButtonState::hover ? 1
+        : state == UiButtonState::pressed ? 2
+        : state == UiButtonState::disabled ? 3 : 0;
+    return {666.0F + 150.0F * static_cast<float>(column), 197.0F, 146.0F, 59.0F};
+}
+
+std::string ui_overlay_path(const UiOverlay overlay) {
+    const char* base_path = SDL_GetBasePath();
+    const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+    switch (overlay) {
+        case UiOverlay::pause: return (root / "assets" / "ui" / "screens" / "pause_menu.png").string();
+        case UiOverlay::administration: return (root / "assets" / "ui" / "panels" / "administration_panel.png").string();
+        case UiOverlay::reports: return (root / "assets" / "ui" / "panels" / "reports_panel.png").string();
+        case UiOverlay::settings: return (root / "assets" / "ui" / "panels" / "settings_panel.png").string();
+        case UiOverlay::none: break;
+    }
+    return {};
 }
 
 void draw_tool_icon(SDL_Renderer* renderer, float x, float y, UiAction action) {
@@ -254,28 +356,51 @@ void draw_hud_stat(SDL_Renderer* renderer, float x, HudIcon icon, const std::str
     }
 }
 
-void draw_button(SDL_Renderer* renderer, const UiButton& button) {
-    const bool hud_control = button.action == UiAction::toggle_pause || button.action == UiAction::settings_placeholder;
+void draw_button_content(SDL_Renderer* renderer, const UiButton& button) {
+    if (button.action == UiAction::open_settings) {
+        const float center_x = button.bounds.x + button.bounds.width * 0.5F;
+        const float center_y = button.bounds.y + button.bounds.height * 0.5F;
+        SDL_SetRenderDrawColor(renderer, button.enabled ? 218 : 135, button.enabled ? 242 : 140,
+                               button.enabled ? 251 : 145, SDL_ALPHA_OPAQUE);
+        SDL_RenderLine(renderer, center_x - 8.0F, center_y, center_x + 8.0F, center_y);
+        SDL_RenderLine(renderer, center_x, center_y - 8.0F, center_x, center_y + 8.0F);
+        const SDL_FRect gear_center = {center_x - 4.0F, center_y - 4.0F, 8.0F, 8.0F};
+        SDL_RenderRect(renderer, &gear_center);
+        return;
+    }
     const bool primary_tool = is_primary_tool_action(button.action);
-    Uint8 red = hud_control ? 23 : (primary_tool ? 23 : 52);
-    Uint8 green = hud_control ? 78 : (primary_tool ? 57 : 80);
-    Uint8 blue = hud_control ? 109 : (primary_tool ? 76 : 66);
+    if (primary_tool) {
+        draw_tool_icon(renderer, button.bounds.x + 10.0F, button.bounds.y + 7.0F, button.action);
+    }
+    const bool icon_text_control = button.action == UiAction::toggle_pause || button.action == UiAction::rotate_left ||
+                                   button.action == UiAction::rotate_right;
+    const float label_x = primary_tool ? 40.0F : (icon_text_control ? 36.0F : 8.0F);
+    draw_text(renderer, button.bounds.x + label_x, button.bounds.y + 13.0F, button.label,
+              button.enabled ? 238 : 135, button.enabled ? 244 : 140, button.enabled ? 238 : 145);
+}
+
+void draw_button(SDL_Renderer* renderer, const UiButton& button) {
+    const bool hud_control = button.action == UiAction::toggle_pause || button.action == UiAction::open_administration ||
+                             button.action == UiAction::open_settings;
+    Uint8 red = hud_control ? 23 : 52;
+    Uint8 green = hud_control ? 78 : 80;
+    Uint8 blue = hud_control ? 109 : 66;
     if (!button.enabled) {
         red = 42;
         green = 47;
         blue = 48;
     } else if (button.state == UiButtonState::pressed) {
-        red = hud_control ? 31 : (primary_tool ? 34 : 70);
-        green = hud_control ? 108 : (primary_tool ? 91 : 126);
-        blue = hud_control ? 142 : (primary_tool ? 118 : 91);
+        red = hud_control ? 31 : 70;
+        green = hud_control ? 108 : 126;
+        blue = hud_control ? 142 : 91;
     } else if (button.state == UiButtonState::hover) {
-        red = primary_tool ? 36 : 73;
-        green = primary_tool ? 84 : 112;
-        blue = primary_tool ? 107 : 88;
+        red = 73;
+        green = 112;
+        blue = 88;
     } else if (button.active) {
-        red = hud_control ? 28 : (primary_tool ? 31 : 63);
-        green = hud_control ? 113 : (primary_tool ? 120 : 137);
-        blue = hud_control ? 145 : (primary_tool ? 150 : 95);
+        red = hud_control ? 28 : 63;
+        green = hud_control ? 113 : 137;
+        blue = hud_control ? 145 : 95;
     }
 
     SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
@@ -285,23 +410,7 @@ void draw_button(SDL_Renderer* renderer, const UiButton& button) {
                            button.enabled ? (hud_control ? 171 : 229) : 100,
                            button.enabled ? (hud_control ? 205 : 205) : 104, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &rect);
-    if (button.action == UiAction::settings_placeholder) {
-        const float center_x = button.bounds.x + button.bounds.width * 0.5F;
-        const float center_y = button.bounds.y + button.bounds.height * 0.5F;
-        SDL_RenderLine(renderer, center_x - 8.0F, center_y, center_x + 8.0F, center_y);
-        SDL_RenderLine(renderer, center_x, center_y - 8.0F, center_x, center_y + 8.0F);
-        const SDL_FRect gear_center = {center_x - 4.0F, center_y - 4.0F, 8.0F, 8.0F};
-        SDL_RenderRect(renderer, &gear_center);
-        return;
-    }
-    if (primary_tool) {
-        draw_tool_icon(renderer, button.bounds.x + 10.0F, button.bounds.y + 7.0F, button.action);
-    }
-    const bool icon_text_control = button.action == UiAction::toggle_pause || button.action == UiAction::rotate_left ||
-                                   button.action == UiAction::rotate_right;
-    const float label_x = primary_tool ? 40.0F : (icon_text_control ? 36.0F : 8.0F);
-    draw_text(renderer, button.bounds.x + label_x, button.bounds.y + 13.0F, button.label,
-              button.enabled ? 238 : 135, button.enabled ? 244 : 140, button.enabled ? 238 : 145);
+    draw_button_content(renderer, button);
 }
 
 }  // namespace
@@ -317,16 +426,19 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     buttons_.clear();
     panels_.clear();
     build_panel_bounds_.reset();
+    overlay_bounds_.reset();
 
     const float width = static_cast<float>(viewport_width_);
     const float height = static_cast<float>(viewport_height_);
     add_panel({kMargin, kMargin, std::max(100.0F, width - kMargin * 2.0F), kTopBarHeight});
 
-    const float settings_x = std::max(kMargin + 150.0F, width - 50.0F);
-    const float pause_x = std::max(kMargin, settings_x - 124.0F);
+    const float settings_x = std::max(kMargin + 270.0F, width - 50.0F);
+    const float administration_x = std::max(kMargin + 120.0F, settings_x - 112.0F);
+    const float pause_x = std::max(kMargin, administration_x - 124.0F);
     add_button({pause_x, 28.0F, 114.0F, kButtonHeight}, model.paused ? "PLAY" : "PAUSE", UiAction::toggle_pause,
                true, model.paused);
-    add_button({settings_x, 28.0F, 30.0F, kButtonHeight}, "SET", UiAction::settings_placeholder);
+    add_button({administration_x, 28.0F, 102.0F, kButtonHeight}, "ADMIN", UiAction::open_administration);
+    add_button({settings_x, 28.0F, 30.0F, kButtonHeight}, "SET", UiAction::open_settings);
 
     const float toolbar_y = height - kToolbarHeight - kMargin;
     const float toolbar_width = std::max(100.0F, width - kMargin * 2.0F);
@@ -334,8 +446,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     const float tools_width = std::max(1.0F, toolbar_width - context_width - 8.0F);
     const float tool_width = tools_width / 6.0F;
     add_panel({kMargin, toolbar_y, toolbar_width, kToolbarHeight});
-    const float tool_y = toolbar_y + 8.0F;
-    constexpr float tool_height = 34.0F;
+    const float tool_y = toolbar_y + 11.0F;
+    constexpr float tool_height = 52.0F;
     add_button({kMargin + 4.0F + tool_width * 0.0F, tool_y, tool_width - 6.0F, tool_height}, "CONSTRUCOES", UiAction::open_build_panel,
                true, model.active_tool == UiTool::buildings);
     add_button({kMargin + 4.0F + tool_width * 1.0F, tool_y, tool_width - 6.0F, tool_height}, "ESTRADAS", UiAction::activate_roads,
@@ -435,6 +547,47 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         add_panel({kMargin, 120.0F, 460.0F, debug_height});
     }
 
+    if (model.overlay != UiOverlay::none) {
+        // The supplied panels are authored on a 1280x960 canvas.  Preserve
+        // that aspect ratio at every game resolution; the image itself is the
+        // visual chrome while these transparent hit regions expose logic.
+        const float scale = std::min(width * 0.94F / 1280.0F, height * 0.90F / 960.0F);
+        const UiRect panel = {(width - 1280.0F * scale) * 0.5F, (height - 960.0F * scale) * 0.5F,
+                              1280.0F * scale, 960.0F * scale};
+        overlay_bounds_ = panel;
+        const auto source_rect = [&](const float x, const float y, const float w, const float h) {
+            return UiRect{panel.x + x * scale, panel.y + y * scale, w * scale, h * scale};
+        };
+        if (model.overlay != UiOverlay::pause) {
+            add_button(source_rect(1160.0F, 88.0F, 78.0F, 78.0F), "X", UiAction::close_modal);
+        }
+        if (model.overlay == UiOverlay::pause) {
+            // Continue is operational. The other pause-menu commands remain
+            // intentionally disabled until their underlying front-end/save
+            // flows own the operation rather than a visual mock.
+            add_button(source_rect(300.0F, 340.0F, 680.0F, 78.0F), "CONTINUAR", UiAction::resume_game);
+            add_button(source_rect(300.0F, 432.0F, 680.0F, 78.0F), "SALVAR", UiAction::none, false);
+            add_button(source_rect(300.0F, 522.0F, 680.0F, 78.0F), "CARREGAR", UiAction::none, false);
+            add_button(source_rect(300.0F, 612.0F, 680.0F, 78.0F), "CONFIGURACOES", UiAction::none, false);
+            add_button(source_rect(300.0F, 702.0F, 680.0F, 78.0F), "MENU PRINCIPAL", UiAction::none, false);
+            add_button(source_rect(300.0F, 792.0F, 680.0F, 78.0F), "SAIR DO JOGO", UiAction::none, false);
+        }
+        if (model.overlay == UiOverlay::administration) {
+            // Reports is a navigation target within the supplied Administration
+            // composition.  The art remains a single panel; only the logical
+            // region is interactive.
+            add_button(source_rect(926.0F, 820.0F, 286.0F, 72.0F), "RELATORIOS", UiAction::open_reports);
+        }
+        if (model.overlay == UiOverlay::reports) {
+            add_button(source_rect(1010.0F, 876.0F, 216.0F, 64.0F), "VOLTAR", UiAction::open_administration);
+        }
+        if (model.overlay == UiOverlay::settings) {
+            add_button(source_rect(132.0F, 848.0F, 320.0F, 70.0F), "PADRAO", UiAction::settings_reset);
+            add_button(source_rect(524.0F, 848.0F, 250.0F, 70.0F), "CANCELAR", UiAction::settings_cancel);
+            add_button(source_rect(830.0F, 848.0F, 290.0F, 70.0F), "APLICAR", UiAction::settings_apply);
+        }
+    }
+
     handle_mouse_motion(mouse_x_, mouse_y_);
 }
 
@@ -447,6 +600,9 @@ void GameplayUi::handle_mouse_motion(float mouse_x, float mouse_y) {
 }
 
 bool GameplayUi::handle_mouse_wheel(float mouse_x, float mouse_y, float wheel_y) {
+    if (model_.overlay != UiOverlay::none) {
+        return true;
+    }
     if (!build_panel_bounds_ || !build_panel_bounds_->contains(mouse_x, mouse_y) || build_scroll_max_ <= 0.0F) {
         return false;
     }
@@ -474,7 +630,8 @@ UiInputResult GameplayUi::handle_mouse_button_down(float mouse_x, float mouse_y,
     }
 
     primary_pressed_ = true;
-    for (UiButton& button : buttons_) {
+    for (auto it = buttons_.rbegin(); it != buttons_.rend(); ++it) {
+        UiButton& button = *it;
         button.state = state_for(button, mouse_x_, mouse_y_, true);
         if (!button.bounds.contains(mouse_x, mouse_y)) {
             continue;
@@ -493,6 +650,11 @@ void GameplayUi::handle_mouse_button_up(float mouse_x, float mouse_y) {
 }
 
 bool GameplayUi::consumes_point(float mouse_x, float mouse_y) const {
+    if (model_.overlay != UiOverlay::none) {
+        // A modal pauses map interaction everywhere, including the translucent
+        // area outside its artwork.
+        return true;
+    }
     return std::any_of(panels_.begin(), panels_.end(), [mouse_x, mouse_y](const UiRect& panel) {
         return panel.contains(mouse_x, mouse_y);
     });
@@ -510,6 +672,46 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                                            icon->width * scale, icon->height * scale};
             SDL_RenderTexture(renderer, icon->texture, nullptr, &destination);
         }
+    };
+    const auto draw_chrome_button = [&](const UiButton& button) -> bool {
+        const char* chrome_name = chrome_name_for(button.action);
+        if (chrome_name == nullptr) {
+            return false;
+        }
+        const UiThumbnail* chrome = thumbnail_for(renderer, ui_chrome_path(chrome_name));
+        if (chrome == nullptr) {
+            return false;
+        }
+        const SDL_FRect destination = {button.bounds.x, button.bounds.y, button.bounds.width, button.bounds.height};
+        SDL_RenderTexture(renderer, chrome->texture, nullptr, &destination);
+        if (!button.enabled) {
+            SDL_SetRenderDrawColor(renderer, 7, 13, 18, 150);
+            SDL_RenderFillRect(renderer, &destination);
+        } else if (button.active || button.state == UiButtonState::pressed) {
+            SDL_SetRenderDrawColor(renderer, 60, 222, 255, 58);
+            SDL_RenderFillRect(renderer, &destination);
+        } else if (button.state == UiButtonState::hover) {
+            SDL_SetRenderDrawColor(renderer, 176, 244, 255, 36);
+            SDL_RenderFillRect(renderer, &destination);
+        }
+        return true;
+    };
+    const auto draw_state_atlas_button = [&](const UiButton& button) -> bool {
+        // Build cards carry a different information-dense layout. Everything
+        // else uses the shared four-state atlas, including modal controls.
+        if (button.build_card) return false;
+        const UiButtonState state = !button.enabled ? UiButtonState::disabled
+            : (button.active ? UiButtonState::pressed : button.state);
+        const bool is_close = button.action == UiAction::close_modal || button.action == UiAction::close_selection;
+        const bool is_back = button.action == UiAction::open_administration && model_.overlay == UiOverlay::reports;
+        const UiThumbnail* atlas = thumbnail_for(renderer, is_close || is_back
+            ? ui_goals_controls_atlas_path() : ui_button_state_atlas_path());
+        if (atlas == nullptr) return false;
+        const SDL_FRect source = is_close ? goals_close_source_for(state)
+            : is_back ? goals_back_source_for(state) : atlas_source_for(button);
+        const SDL_FRect destination = {button.bounds.x, button.bounds.y, button.bounds.width, button.bounds.height};
+        SDL_RenderTexture(renderer, atlas->texture, &source, &destination);
+        return true;
     };
     for (std::size_t index = 0; index < panels_.size(); ++index) {
         if (index == 0) {
@@ -676,11 +878,24 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         if (button.build_card) {
             render_build_card(renderer, button);
         } else {
-            draw_button(renderer, button);
+            if (!draw_chrome_button(button)) {
+                if (draw_state_atlas_button(button)) {
+                    draw_button_content(renderer, button);
+                } else {
+                    draw_button(renderer, button);
+                }
+            }
         }
     }
     for (const UiButton& button : buttons_) {
         if (button.build_card) {
+            continue;
+        }
+        if (chrome_name_for(button.action) != nullptr) {
+            continue;
+        }
+        if (button.action == UiAction::close_selection || button.action == UiAction::close_modal) {
+            // The atlas cell already contains the X glyph.
             continue;
         }
         if (const char* icon_name = icon_name_for(button.action)) {
@@ -691,6 +906,41 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                     ? SDL_FRect{button.bounds.x + 2.0F, button.bounds.y + 2.0F, 14.0F, 14.0F}
                     : SDL_FRect{button.bounds.x + 5.0F, button.bounds.y + 5.0F, 22.0F, 22.0F});
             draw_ui_icon(icon_name, icon_bounds);
+        }
+    }
+
+    if (model_.overlay != UiOverlay::none && overlay_bounds_) {
+        const SDL_FRect screen = {0.0F, 0.0F, static_cast<float>(viewport_width_), static_cast<float>(viewport_height_)};
+        SDL_SetRenderDrawColor(renderer, 1, 9, 14, 178);
+        SDL_RenderFillRect(renderer, &screen);
+
+        const UiRect& panel = *overlay_bounds_;
+        const SDL_FRect destination = {panel.x, panel.y, panel.width, panel.height};
+        if (const UiThumbnail* artwork = thumbnail_for(renderer, ui_overlay_path(model_.overlay))) {
+            SDL_RenderTexture(renderer, artwork->texture, nullptr, &destination);
+        } else {
+            // Keep the game usable if an asset is missing in a development
+            // build; the state and controls still exist rather than failing
+            // silently behind a black screen.
+            draw_panel(renderer, panel);
+            draw_text(renderer, panel.x + 24.0F, panel.y + 24.0F, "UI ARTWORK NOT FOUND", 255, 160, 130);
+        }
+
+        const float scale = panel.width / 1280.0F;
+        const auto text_at = [&](const float x, const float y, const std::string& value, const Uint8 r = 232,
+                                 const Uint8 g = 244, const Uint8 b = 248) {
+            draw_text_fit(renderer, panel.x + x * scale, panel.y + y * scale, 210.0F * scale, value, r, g, b);
+        };
+        if (model_.overlay == UiOverlay::administration || model_.overlay == UiOverlay::reports) {
+            text_at(520.0F, 338.0F, model_.monthly_revenue, 112, 238, 135);
+            text_at(520.0F, 405.0F, model_.monthly_expenses, 255, 139, 139);
+            text_at(520.0F, 470.0F, model_.monthly_balance, 122, 225, 250);
+            text_at(900.0F, 340.0F, model_.population + " / " + model_.residential_capacity);
+            text_at(92.0F, 650.0F, model_.power_demand + " / " + model_.power_capacity);
+            text_at(330.0F, 852.0F, model_.administration_alerts, 188, 215, 228);
+        } else {
+            text_at(1080.0F, 316.0F, std::to_string(model_.master_volume_percent) + "%");
+            text_at(1080.0F, 351.0F, std::to_string(model_.effects_volume_percent) + "%");
         }
     }
 }

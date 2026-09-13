@@ -1,0 +1,7 @@
+{
+  "schema": "city_horizon.ui_settings_controls.v1",
+  "image": "settings_controls_v1.png",
+  "canvas": { "width": 1280, "height": 960 },
+  "available_for_future_panels": ["navigation_tabs", "close_button", "action_buttons", "checkboxes", "dropdowns", "sliders", "key_bindings", "section_headers"],
+  "background": "RGBA transparency; no matte"
+}

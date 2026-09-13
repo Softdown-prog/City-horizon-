@@ -1,6 +1,7 @@
 """
-Read-Only Command Line Interface for AI Agents (mapforge-cli).
-Provides structured JSON responses for agent inspection and validation.
+Controlled Command Line Interface for AI Agents (mapforge-cli).
+Inspection is read-only. Generation is restricted to named recipes that write
+to an explicit new output path after validation.
 """
 
 import sys
@@ -9,8 +10,9 @@ import argparse
 from typing import Dict, Any
 
 from tools.map_forge.importers.map_importer import load_scenario, load_building_catalog
-from tools.map_forge.exporters.game_exporter import verify_round_trip
+from tools.map_forge.exporters.game_exporter import verify_round_trip, save_scenario
 from tools.map_forge.core.command_executor import ReadOnlyCommandExecutor
+from tools.map_forge.recipes.coastal_forest_hydroelectric import build_coastal_forest_hydroelectric
 
 
 def run_cli(args: argparse.Namespace, asset_root: str, scenario_path: str):
@@ -36,6 +38,22 @@ def run_cli(args: argparse.Namespace, asset_root: str, scenario_path: str):
         map_model = load_scenario(scenario_path)
         success, message = verify_round_trip(map_model)
         result = {"success": success, "message": message}
+    elif args.action == "generate-coastal-district":
+        if not args.output:
+            result = {"success": False, "error": "--output is required; source scenarios are never overwritten."}
+        else:
+            map_model = load_scenario(scenario_path)
+            catalog = load_building_catalog(asset_root)
+            generated = build_coastal_forest_hydroelectric(map_model.raw_data, catalog)
+            generated_model = type(map_model)(generated)
+            validation = ReadOnlyCommandExecutor(generated_model, asset_root, catalog).execute({"action": "validate"})
+            if not validation["valid"]:
+                result = {"success": False, "error": "Generated scenario failed validation", "validation": validation}
+            else:
+                output = args.output
+                save_scenario(generated_model, output)
+                result = {"success": True, "output": output, "validation": validation,
+                          "message": "Generated coastal beach, forest and hydroelectric scenario."}
     else:
         result = {"success": False, "error": f"Unknown action '{args.action}' or action not permitted in Phase 1 Read-Only mode."}
 
@@ -48,12 +66,13 @@ def action_requires_map(action: str) -> bool:
 
 def main_cli():
     parser = argparse.ArgumentParser(description="City Horizon Map Forge — Read-Only Agent CLI")
-    parser.add_argument("action", choices=["validate", "inspect-tile", "inspect-building", "list-assets", "get-bounds", "roundtrip"], help="Action to execute")
+    parser.add_argument("action", choices=["validate", "inspect-tile", "inspect-building", "list-assets", "get-bounds", "roundtrip", "generate-coastal-district"], help="Action to execute")
     parser.add_argument("--x", type=int, default=0, help="Tile X coordinate")
     parser.add_argument("--y", type=int, default=0, help="Tile Y coordinate")
     parser.add_argument("--id", type=str, default="", help="Building ID or Instance ID")
     parser.add_argument("--asset-root", type=str, default=r"C:\Users\User\Documents\Codex\2026-09-05\ve\build", help="Asset root path")
     parser.add_argument("--scenario", type=str, default=r"C:\Users\User\Documents\Codex\2026-09-05\ve\build\assets\scenarios\initial_city.json", help="Scenario JSON path")
+    parser.add_argument("--output", type=str, default="", help="required output path for generation actions")
 
     args = parser.parse_args()
     run_cli(args, args.asset_root, args.scenario)

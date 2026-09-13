@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
+    add_compile_options(/FS)
     file(GLOB_RECURSE CITY_BUILDER_SOURCE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
     file(GLOB_RECURSE CITY_BUILDER_HEADER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
     set_source_files_properties(${CITY_BUILDER_SOURCE_FILES}
@@ -65,18 +66,37 @@ add_library(ch_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/projection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/map_document.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/validation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/semantic_grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/placement_engine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/transaction_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/shoreline_autotile.cpp
 )
 target_include_directories(ch_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 pybind11_add_module(city_horizon_native
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_native/bindings.cpp
 )
-target_link_libraries(city_horizon_native PRIVATE ch_core)
+target_link_libraries(city_horizon_native PRIVATE ch_core ch_render SDL3::SDL3)
 set_target_properties(city_horizon_native PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/map_forge_native"
 )
+
+add_library(ch_render STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/map_renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/semantic_renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/economy_stubs.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/shoreline_catalog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/building_system.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/farming_system.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/land_system.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/road_system.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/road_visual_catalog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sidewalk_system.cpp
+)
+target_include_directories(ch_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ch_render PRIVATE ch_core SDL3::SDL3)
 
 add_executable(city_builder
     src/main.cpp
@@ -102,7 +122,14 @@ add_executable(city_builder
     src/ui_manager.cpp
     src/vehicle_system.cpp
 )
-target_link_libraries(city_builder PRIVATE ch_core SDL3::SDL3 SDL3_mixer::SDL3_mixer)
+target_link_libraries(city_builder PRIVATE ch_core ch_render SDL3::SDL3 SDL3_mixer::SDL3_mixer)
+
+# Narrow visual-contract pilot.  It uses the production MapDocument and
+# MapRenderer path and exists solely to capture the approved 6x6 water proof.
+add_executable(water_surface_pilot_runtime
+    src/water_surface_pilot_runtime.cpp
+)
+target_link_libraries(water_surface_pilot_runtime PRIVATE ch_core ch_render SDL3::SDL3)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -128,6 +155,7 @@ if(BUILD_TESTING)
         src/sidewalk_system.cpp
         src/vehicle_system.cpp
     )
+    target_link_libraries(building_system_test PRIVATE ch_core)
     add_test(
         NAME building_system_test
         COMMAND building_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -160,6 +188,7 @@ if(BUILD_TESTING)
     # The normal target name stays stable; this avoids a file-lock collision
     # with a previously interrupted test process on this Windows session.
     set_target_properties(economy_simulation_test PROPERTIES OUTPUT_NAME economy_simulation_test_run)
+    target_link_libraries(economy_simulation_test PRIVATE ch_core)
     add_test(
         NAME economy_simulation_test
         COMMAND economy_simulation_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -187,6 +216,7 @@ if(BUILD_TESTING)
         src/sidewalk_system.cpp
         src/vehicle_system.cpp
     )
+    target_link_libraries(sidewalk_topology_test PRIVATE ch_core)
     add_test(
         NAME sidewalk_topology_test
         COMMAND sidewalk_topology_test
@@ -215,6 +245,7 @@ if(BUILD_TESTING)
         src/sidewalk_system.cpp
         src/vehicle_system.cpp
     )
+    target_link_libraries(navigation_network_test PRIVATE ch_core)
     add_test(
         NAME navigation_network_test
         COMMAND navigation_network_test
@@ -235,6 +266,7 @@ if(BUILD_TESTING)
         src/sidewalk_system.cpp
         src/vehicle_system.cpp
     )
+    target_link_libraries(pedestrian_system_test PRIVATE ch_core)
     add_test(
         NAME pedestrian_system_test
         COMMAND pedestrian_system_test
@@ -257,6 +289,7 @@ if(BUILD_TESTING)
     # Keep this target separate from an interrupted legacy process that can
     # retain its former executable on Windows.
     set_target_properties(land_system_test PROPERTIES OUTPUT_NAME land_system_test_run)
+    target_link_libraries(land_system_test PRIVATE ch_core)
     add_test(
         NAME land_system_test
         COMMAND land_system_test_run "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -280,6 +313,7 @@ if(BUILD_TESTING)
         src/vehicle_system.cpp
     )
     set_target_properties(save_manager_test PROPERTIES OUTPUT_NAME save_manager_test_run)
+    target_link_libraries(save_manager_test PRIVATE ch_core)
     add_test(
         NAME save_manager_test
         COMMAND save_manager_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -299,6 +333,7 @@ if(BUILD_TESTING)
         src/vehicle_system.cpp
     )
     set_target_properties(population_system_test PROPERTIES OUTPUT_NAME population_system_test_run)
+    target_link_libraries(population_system_test PRIVATE ch_core)
     add_test(
         NAME population_system_test
         COMMAND population_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -319,6 +354,7 @@ if(BUILD_TESTING)
         src/vehicle_system.cpp
     )
     set_target_properties(power_system_test PROPERTIES OUTPUT_NAME power_system_test_run)
+    target_link_libraries(power_system_test PRIVATE ch_core)
     add_test(
         NAME power_system_test
         COMMAND power_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -340,6 +376,7 @@ if(BUILD_TESTING)
         src/vehicle_system.cpp
     )
     set_target_properties(mission_system_test PROPERTIES OUTPUT_NAME mission_system_test_run)
+    target_link_libraries(mission_system_test PRIVATE ch_core)
     add_test(
         NAME mission_system_test
         COMMAND mission_system_test "${CMAKE_SOURCE_DIR}/assets/definitions"
@@ -354,6 +391,29 @@ if(BUILD_TESTING)
         NAME ui_manager_test
         COMMAND ui_manager_test
     )
+
+    add_executable(transaction_test
+        src/ch_core/transaction_test.cpp
+    )
+    target_link_libraries(transaction_test PRIVATE ch_core)
+    add_test(
+        NAME transaction_test
+        COMMAND transaction_test
+    )
+
+    add_executable(shoreline_autotile_test
+        src/ch_core/shoreline_autotile_test.cpp
+    )
+    target_link_libraries(shoreline_autotile_test PRIVATE ch_core)
+    add_test(
+        NAME shoreline_autotile_test
+        COMMAND shoreline_autotile_test
+    )
+
+    add_executable(shoreline_pilot_runtime
+        src/shoreline_pilot_runtime.cpp
+    )
+    target_link_libraries(shoreline_pilot_runtime PRIVATE ch_core ch_render SDL3::SDL3)
 endif()
 
 if(MSVC)

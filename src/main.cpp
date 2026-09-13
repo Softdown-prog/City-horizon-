@@ -5,6 +5,7 @@
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/validation.h"
+#include "src/ch_render/map_renderer.h"
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -29,6 +30,7 @@
 #include "vehicle_system.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -81,6 +83,15 @@ struct Camera {
 struct CameraWorldPoint {
     float x = 0.0F;
     float y = 0.0F;
+};
+
+// CH_WATER_V2: visual material only.  Logical water remains the terrain tile
+// already loaded from the scenario; no placement, navigation or save contract
+// changes are implied by this presentation layer.
+struct WaterSurfaceTile {
+    int tile_x = 0;
+    int tile_y = 0;
+    bool shallow = false;
 };
 
 [[nodiscard]] constexpr std::uint8_t camera_rotation_turns(const CameraRotation rotation) {
@@ -194,11 +205,7 @@ struct CameraWorldPoint {
     return result;
 }
 
-struct TextureAsset {
-    SDL_Texture* texture = nullptr;
-    float source_width = 0.0F;
-    float source_height = 0.0F;
-};
+using TextureAsset = ch::TextureAsset;
 
 class TextureCache {
 public:
@@ -265,15 +272,8 @@ private:
 }
 
 void render_tile_outline(SDL_Renderer* renderer, int x, int y, const Camera& camera, float viewport_width, float viewport_height) {
-    const SDL_FPoint top = world_to_screen(static_cast<float>(x), static_cast<float>(y), camera, viewport_width, viewport_height);
-    const SDL_FPoint right = world_to_screen(static_cast<float>(x + 1), static_cast<float>(y), camera, viewport_width, viewport_height);
-    const SDL_FPoint bottom = world_to_screen(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
-    const SDL_FPoint left = world_to_screen(static_cast<float>(x), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
-
-    SDL_RenderLine(renderer, top.x, top.y, right.x, right.y);
-    SDL_RenderLine(renderer, right.x, right.y, bottom.x, bottom.y);
-    SDL_RenderLine(renderer, bottom.x, bottom.y, left.x, left.y);
-    SDL_RenderLine(renderer, left.x, left.y, top.x, top.y);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_tile_outline(renderer, x, y, cs, viewport_width, viewport_height);
 }
 
 void render_navigation_debug_path(SDL_Renderer* renderer, const NavigationPathResult& path,
@@ -301,14 +301,9 @@ void render_navigation_debug_path(SDL_Renderer* renderer, const NavigationPathRe
 void render_footprint_outline(SDL_Renderer* renderer, const BuildingDefinition& definition, BuildingRotation rotation,
                               int tile_x, int tile_y,
                               const Camera& camera, float viewport_width, float viewport_height,
-                              Uint8 red, Uint8 green, Uint8 blue) {
-    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
-    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
-    for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
-        for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
-            render_tile_outline(renderer, tile_x + offset_x, tile_y + offset_y, camera, viewport_width, viewport_height);
-        }
-    }
+                              Uint8 red = 255, Uint8 green = 208, Uint8 blue = 92) {
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_footprint_outline(renderer, definition, rotation, tile_x, tile_y, cs, viewport_width, viewport_height, red, green, blue);
 }
 
 [[nodiscard]] TileCoordinate road_access_offset(const GridDirection direction) {
@@ -325,270 +320,95 @@ void render_road_access_candidates(SDL_Renderer* renderer, const BuildingDefinit
                                    const BuildingRotation rotation, const int tile_x, const int tile_y,
                                    const RoadManager& roads, const Camera& camera,
                                    const float viewport_width, const float viewport_height) {
-    if (!definition.requires_road_access || resolved_road_access_mode(definition) == RoadAccessMode::any_perimeter) return;
-    for (const BuildingAccessPoint& access : road_access_candidates(definition, rotation)) {
-        const TileCoordinate offset = road_access_offset(access.facing);
-        const int road_x = tile_x + access.local_x + offset.x;
-        const int road_y = tile_y + access.local_y + offset.y;
-        SDL_SetRenderDrawColor(renderer, roads.is_road(road_x, road_y) ? 112 : 255,
-                               roads.is_road(road_x, road_y) ? 232 : 160, 96, SDL_ALPHA_OPAQUE);
-        render_tile_outline(renderer, road_x, road_y, camera, viewport_width, viewport_height);
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_road_access_candidates(renderer, definition, rotation, tile_x, tile_y, roads, cs, viewport_width, viewport_height);
 }
 
 void render_grass_tile(SDL_Renderer* renderer, const TextureAsset& grass, int x, int y,
                        const Camera& camera, float viewport_width, float viewport_height) {
-    const CameraWorldPoint visual_top = tile_visual_top_world(x, y, camera.rotation);
-    const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
-    const float scale = (kTileWidth / kGrassOpaqueWidth) * camera.zoom;
-    const SDL_FRect destination = {
-        top.x - (kTileWidth * camera.zoom * 0.5F) - (kGrassOpaqueLeft * scale),
-        top.y - (kGrassOpaqueTop * scale),
-        grass.source_width * scale,
-        grass.source_height * scale,
-    };
-    SDL_RenderTexture(renderer, grass.texture, nullptr, &destination);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_grass_tile(renderer, grass, x, y, cs, viewport_width, viewport_height);
 }
 
 void render_custom_terrain_tile(SDL_Renderer* renderer, const TextureAsset& texture, int x, int y,
                                 const Camera& camera, float viewport_width, float viewport_height) {
-    const CameraWorldPoint visual_top = tile_visual_top_world(x, y, camera.rotation);
-    const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
-    const float scale = (kTileWidth / static_cast<float>(texture.source_width)) * camera.zoom;
-    const SDL_FRect destination = {
-        top.x - (kTileWidth * camera.zoom * 0.5F),
-        top.y,
-        texture.source_width * scale,
-        texture.source_height * scale,
-    };
-    SDL_RenderTexture(renderer, texture.texture, nullptr, &destination);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_custom_terrain_tile(renderer, texture, x, y, cs, viewport_width, viewport_height);
 }
 
 void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                 const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
                 const Camera& camera, float viewport_width, float viewport_height) {
-    SDL_SetRenderDrawColor(renderer, 74, 104, 83, SDL_ALPHA_OPAQUE);
-    const SDL_FRect background = {0.0F, 0.0F, viewport_width, viewport_height};
-    SDL_RenderFillRect(renderer, &background);
-
-    if (grass == nullptr) {
-        SDL_SetRenderDrawColor(renderer, 117, 148, 122, 115);
-        for (int y = kMapMin; y <= kMapMax; ++y) {
-            for (int x = kMapMin; x <= kMapMax; ++x) {
-                render_tile_outline(renderer, x, y, camera, viewport_width, viewport_height);
-            }
-        }
-        return;
-    }
-
-    for (int depth = kMapMin * 2; depth <= kMapMax * 2; ++depth) {
-        const int first_x = std::max(kMapMin, depth - kMapMax);
-        const int last_x = std::min(kMapMax, depth - kMapMin);
-        for (int x = first_x; x <= last_x; ++x) {
-            const int y = depth - x;
-            const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) |
-                                      static_cast<std::uint32_t>(y);
-            const auto it = scenario_terrain_textures.find(key);
-            if (it != scenario_terrain_textures.end() && it->second != nullptr) {
-                render_custom_terrain_tile(renderer, *it->second, x, y, camera, viewport_width, viewport_height);
-            } else {
-                render_grass_tile(renderer, *grass, x, y, camera, viewport_width, viewport_height);
-            }
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_map(renderer, grass, scenario_terrain_textures, cs, viewport_width, viewport_height);
 }
 
 void render_road_tile(SDL_Renderer* renderer, int tile_x, int tile_y, const Camera& camera,
                       float viewport_width, float viewport_height, SDL_FColor color) {
-    const SDL_FPoint top = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
-    const SDL_FPoint right = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
-    const SDL_FPoint bottom = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
-    const SDL_FPoint left = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
-    SDL_Vertex vertices[4] = {};
-    vertices[0].position = top;
-    vertices[1].position = right;
-    vertices[2].position = bottom;
-    vertices[3].position = left;
-    for (SDL_Vertex& vertex : vertices) {
-        vertex.color = color;
-    }
-    const int indices[] = {0, 1, 2, 0, 2, 3};
-    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
-
-    SDL_SetRenderDrawColor(renderer, 45, 54, 57, static_cast<Uint8>(color.a * 255.0F));
-    render_tile_outline(renderer, tile_x, tile_y, camera, viewport_width, viewport_height);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_road_tile(renderer, tile_x, tile_y, cs, viewport_width, viewport_height, color);
 }
 
 void render_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y, const Camera& camera,
                       float viewport_width, float viewport_height, const SDL_FColor color) {
-    const SDL_FPoint top = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
-    const SDL_FPoint right = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y), camera, viewport_width, viewport_height);
-    const SDL_FPoint bottom = world_to_screen(static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
-    const SDL_FPoint left = world_to_screen(static_cast<float>(tile_x), static_cast<float>(tile_y + 1), camera, viewport_width, viewport_height);
-    SDL_Vertex vertices[4] = {};
-    vertices[0].position = top;
-    vertices[1].position = right;
-    vertices[2].position = bottom;
-    vertices[3].position = left;
-    for (SDL_Vertex& vertex : vertices) {
-        vertex.color = color;
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_tile_fill(renderer, tile_x, tile_y, cs, viewport_width, viewport_height, color);
+}
+
+void render_water_v2_layers(SDL_Renderer* renderer, const std::vector<WaterSurfaceTile>& water_tiles,
+                            const TextureAsset* caustics, const Camera& camera,
+                            const float viewport_width, const float viewport_height) {
+    if (water_tiles.empty()) return;
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    constexpr SDL_FColor kDeepBase = {108.0F / 255.0F, 196.0F / 255.0F, 207.0F / 255.0F, 1.0F};
+    constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};
+    for (const WaterSurfaceTile& tile : water_tiles) {
+        ch::MapRenderer::render_tile_fill(renderer, tile.tile_x, tile.tile_y, cs, viewport_width, viewport_height,
+                                          tile.shallow ? kShallowBase : kDeepBase);
     }
-    const int indices[] = {0, 1, 2, 0, 2, 3};
-    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+    if (caustics == nullptr) return;
+    for (const WaterSurfaceTile& tile : water_tiles) {
+        ch::MapRenderer::render_water_caustics_overlay_tile(
+            renderer, *caustics, tile.tile_x, tile.tile_y, cs, viewport_width, viewport_height);
+    }
 }
 
 void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands, const LandParcel* hovered_parcel,
                           const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height) {
-    for (const LandParcel& parcel : lands.parcels()) {
-        SDL_FColor color = {0.08F, 0.11F, 0.14F, 0.22F};
-        if (land_mode && &parcel == hovered_parcel) {
-            if (parcel.owned) {
-                color = {0.22F, 0.58F, 0.92F, 0.28F};
-            } else if (lands.can_purchase_parcel(parcel.id)) {
-                color = {0.25F, 0.82F, 0.42F, 0.42F};
-            } else {
-                color = {0.88F, 0.28F, 0.24F, 0.42F};
-            }
-        } else if (parcel.owned) {
-            continue;
-        }
-        for (int y = std::max(kMapMin, parcel.origin_y); y <= std::min(kMapMax, parcel.origin_y + parcel.height - 1); ++y) {
-            for (int x = std::max(kMapMin, parcel.origin_x); x <= std::min(kMapMax, parcel.origin_x + parcel.width - 1); ++x) {
-                render_tile_fill(renderer, x, y, camera, viewport_width, viewport_height, color);
-            }
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height);
 }
 
-[[nodiscard]] SDL_FColor road_placeholder_color(const RoadVisualType type) {
-    switch (type) {
-        case RoadVisualType::isolated: return {0.25F, 0.29F, 0.30F, 0.94F};
-        case RoadVisualType::end: return {0.25F, 0.39F, 0.47F, 0.94F};
-        case RoadVisualType::straight: return {0.24F, 0.28F, 0.28F, 0.94F};
-        case RoadVisualType::curve: return {0.35F, 0.29F, 0.48F, 0.94F};
-        case RoadVisualType::tee: return {0.48F, 0.34F, 0.20F, 0.94F};
-        case RoadVisualType::intersection: return {0.43F, 0.24F, 0.20F, 0.94F};
-    }
-    return {0.24F, 0.28F, 0.28F, 0.94F};
-}
-
-// Final road sprites are transparent 128x64 isometric diamonds, anchored at the
-// top point of their logical tile. This is intentionally separate from RoadManager.
 void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
                         const Camera& camera, float viewport_width, float viewport_height) {
-    const CameraWorldPoint visual_top = tile_visual_top_world(tile_x, tile_y, camera.rotation);
-    const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y,
-                                            camera, viewport_width, viewport_height);
-    // A road sprite may extend below the 128x64 ground diamond for curbs and
-    // contact depth.  Width stays tied to the logical tile; height follows
-    // the authored asset rather than flattening that depth.
-    const float destination_height = kTileWidth * camera.zoom * texture.source_height / texture.source_width;
-    const SDL_FRect destination = {
-        top.x - kTileWidth * camera.zoom * 0.5F,
-        top.y,
-        kTileWidth * camera.zoom,
-        destination_height,
-    };
-    SDL_RenderTexture(renderer, texture.texture, nullptr, &destination);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_road_sprite(renderer, texture, tile_x, tile_y, cs, viewport_width, viewport_height);
 }
 
 void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVisualCatalog& visuals,
                   const TextureCache& textures, const std::filesystem::path& asset_root, const Camera& camera,
                   float viewport_width, float viewport_height) {
-    // Current terrain pass: all roads render before buildings. This keeps the
-    // existing pipeline stable; a future depth pass can merge road/building draw
-    // commands by tile depth without changing RoadManager or this catalog.
-    std::vector<const RoadTile*> sorted_tiles;
-    sorted_tiles.reserve(roads.tiles().size());
-    for (const RoadTile& tile : roads.tiles()) sorted_tiles.push_back(&tile);
-    std::sort(sorted_tiles.begin(), sorted_tiles.end(), [&camera](const RoadTile* left, const RoadTile* right) {
-        const float left_depth = camera_depth_key(static_cast<float>(left->tile_x + 1), static_cast<float>(left->tile_y + 1), camera);
-        const float right_depth = camera_depth_key(static_cast<float>(right->tile_x + 1), static_cast<float>(right->tile_y + 1), camera);
-        if (left_depth != right_depth) return left_depth < right_depth;
-        if (left->tile_y != right->tile_y) return left->tile_y < right->tile_y;
-        return left->tile_x < right->tile_x;
-    });
-    for (const RoadTile* tile : sorted_tiles) {
-        const RoadVisual* visual = visuals.get_for_mask(camera_visual_connections(tile->connections, camera.rotation));
-        const TextureAsset* texture = visual == nullptr ? nullptr : textures.find(asset_root / visual->texture_path);
-        if (texture != nullptr) {
-            render_road_sprite(renderer, *texture, tile->tile_x, tile->tile_y, camera, viewport_width, viewport_height);
-        } else {
-            render_road_tile(renderer, tile->tile_x, tile->tile_y, camera, viewport_width, viewport_height,
-                             road_placeholder_color(roads.visual_type(tile->tile_x, tile->tile_y)));
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_roads(renderer, roads, visuals,
+                                  [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                                  asset_root, cs, viewport_width, viewport_height);
 }
 
-[[nodiscard]] std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMask connections) {
-    // This is intentionally only a visual lookup. SidewalkManager owns the
-    // N/E/S/W topology and never needs to know how an individual PNG is named.
-    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
-    const int mask = static_cast<int>(connections);
-    // The legacy "15" texture is a copy of the isolated-tile art, including
-    // raised curbs on all four sides. A fully connected tile must instead be
-    // borderless, otherwise a dense sidewalk network looks like overlapping
-    // individual slabs even though its topology is correct.
-    if (mask == 15) return base + "15_seamless.png";
-    const std::string suffix = mask < 10 ? "0" + std::to_string(mask) : std::to_string(mask);
-    return base + suffix + ".png";
-}
 void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, const TextureCache& textures,
                       const std::filesystem::path& root, const Camera& camera, float vw, float vh) {
-    for (const SidewalkTile& tile : sidewalks.tiles()) {
-        const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
-        if (const TextureAsset* texture = textures.find(root / sidewalk_sprite(tile.style_id, visual_connections))) {
-            const CameraWorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
-            const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, vw, vh);
-            const float scale = (kTileWidth / texture->source_width) * camera.zoom;
-            SDL_FRect dst{top.x - texture->source_width * scale * 0.5F, top.y, texture->source_width * scale, texture->source_height * scale};
-            SDL_RenderTexture(renderer, texture->texture, nullptr, &dst);
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_sidewalks(renderer, sidewalks,
+                                     [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                                     root, cs, vw, vh);
 }
 
 void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const CropCatalog& crops,
                     const TextureCache& textures, const std::filesystem::path& root, const Camera& camera,
                     float viewport_width, float viewport_height) {
-    constexpr float kFarmOpaqueLeft = 16.0F;
-    constexpr float kFarmOpaqueTop = 151.0F;
-    constexpr float kFarmOpaqueWidth = 1220.0F;
-    for (const FarmTile& tile : farming.tiles()) {
-        const CameraWorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
-        const SDL_FPoint top = world_to_screen(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
-        const CropDefinition* crop = tile.state == FarmTileState::prepared_soil ? nullptr : crops.find(tile.crop_id);
-        const bool legacy_composite = crop != nullptr && !crop->has_stage_overlays();
-
-        // Soil is a common terrain layer. The legacy composite branch remains
-        // only until matching plant-only overlays are supplied for old crops.
-        if (!legacy_composite) {
-            if (const TextureAsset* soil = textures.find(root / "assets/farming/prepared_soil/prepared_soil_01.png")) {
-                const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
-                const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
-                                               top.y - kFarmOpaqueTop * scale,
-                                               soil->source_width * scale, soil->source_height * scale};
-                SDL_RenderTexture(renderer, soil->texture, nullptr, &destination);
-            }
-        }
-        if (crop == nullptr || tile.stage < 0 || tile.stage >= crop->stage_count()) continue;
-        const TextureAsset* sprite = textures.find(root / crop->active_stage_sprites()[static_cast<std::size_t>(tile.stage)]);
-        if (sprite == nullptr) continue;
-        if (legacy_composite) {
-            const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
-            const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
-                                           top.y - kFarmOpaqueTop * scale,
-                                           sprite->source_width * scale, sprite->source_height * scale};
-            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
-        } else {
-            const float canvas_width = crop->overlay_canvas_width > 0 ? static_cast<float>(crop->overlay_canvas_width) : static_cast<float>(sprite->source_width);
-            const float canvas_height = crop->overlay_canvas_height > 0 ? static_cast<float>(crop->overlay_canvas_height) : static_cast<float>(sprite->source_height);
-            const float scale = (kTileWidth / canvas_width) * camera.zoom * crop->overlay_scale;
-            const SDL_FRect destination = {top.x - crop->overlay_anchor_x * canvas_width * scale,
-                                           top.y - crop->overlay_anchor_y * canvas_height * scale,
-                                           sprite->source_width * scale, sprite->source_height * scale};
-            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_farming(renderer, farming, crops,
+                                    [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                                    root, cs, viewport_width, viewport_height);
 }
 
 [[nodiscard]] bool building_overlaps_road(const BuildingDefinition& definition, BuildingRotation rotation,
@@ -771,23 +591,10 @@ void render_building(SDL_Renderer* renderer, const BuildingDefinition& definitio
                      float viewport_width, float viewport_height,
                      Uint8 alpha = SDL_ALPHA_OPAQUE,
                      Uint8 red = 255, Uint8 green = 255, Uint8 blue = 255) {
-    const BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
-                                                                       viewport_width, viewport_height);
-    SDL_SetTextureAlphaMod(texture.texture, alpha);
-    SDL_SetTextureColorMod(texture.texture, red, green, blue);
-    if (definition.animation.has_value() && definition.animation->frame_count > 1) {
-        const int frame_count = std::max(1, definition.animation->frame_count);
-        const int duration_ms = std::max(1, definition.animation->frame_duration_ms);
-        const int frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
-        const float frame_w = static_cast<float>(texture.source_width) / static_cast<float>(frame_count);
-        const float frame_h = static_cast<float>(texture.source_height);
-        const SDL_FRect src_rect = { frame_index * frame_w, 0.0F, frame_w, frame_h };
-        SDL_RenderTexture(renderer, texture.texture, &src_rect, &geometry.sprite_bounds);
-    } else {
-        SDL_RenderTexture(renderer, texture.texture, nullptr, &geometry.sprite_bounds);
-    }
-    SDL_SetTextureColorMod(texture.texture, 255, 255, 255);
-    SDL_SetTextureAlphaMod(texture.texture, SDL_ALPHA_OPAQUE);
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_building(renderer, definition, instance, visual_rotation, texture.texture,
+                                     texture.source_width, texture.source_height, cs, viewport_width, viewport_height,
+                                     alpha, red, green, blue);
 }
 
 void render_anchor_cross(SDL_Renderer* renderer, const SDL_FPoint point, const float radius,
@@ -845,39 +652,10 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
 void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager, const BuildingCatalog& catalog,
                       const LandManager& lands, const TextureCache& textures, const std::filesystem::path& asset_root,
                       const Camera& camera, float viewport_width, float viewport_height) {
-    std::vector<const BuildingInstance*> sorted_instances;
-    for (const BuildingInstance& instance : manager.instances()) {
-        sorted_instances.push_back(&instance);
-    }
-    std::sort(sorted_instances.begin(), sorted_instances.end(), [&catalog, &camera](const BuildingInstance* left, const BuildingInstance* right) {
-        const BuildingDefinition* left_definition = catalog.find(left->definition_id);
-        const BuildingDefinition* right_definition = catalog.find(right->definition_id);
-        const BuildingFootprint left_footprint = left_definition == nullptr
-            ? BuildingFootprint{} : rotated_footprint(*left_definition, left->rotation);
-        const BuildingFootprint right_footprint = right_definition == nullptr
-            ? BuildingFootprint{} : rotated_footprint(*right_definition, right->rotation);
-        const CameraWorldPoint left_ground = building_visual_ground_world(*left, left_footprint, camera.rotation);
-        const CameraWorldPoint right_ground = building_visual_ground_world(*right, right_footprint, camera.rotation);
-        const float left_depth = camera_depth_key(left_ground.x, left_ground.y, camera);
-        const float right_depth = camera_depth_key(right_ground.x, right_ground.y, camera);
-        return left_depth == right_depth ? left->instance_id < right->instance_id : left_depth < right_depth;
-    });
-
-    for (const BuildingInstance* instance : sorted_instances) {
-        const BuildingDefinition* definition = catalog.find(instance->definition_id);
-        if (definition == nullptr) {
-            continue;
-        }
-        const BuildingRotation visual_rotation = camera_visual_rotation(*definition, instance->rotation, camera.rotation);
-        const TextureAsset* texture = textures.find(asset_root / definition->texture_path_for(visual_rotation, instance->current_level));
-        if (texture != nullptr) {
-            const bool is_owned = lands.is_tile_owned(instance->tile_x, instance->tile_y);
-            const Uint8 r = is_owned ? 255 : 140;
-            const Uint8 g = is_owned ? 255 : 145;
-            const Uint8 b = is_owned ? 255 : 155;
-            render_building(renderer, *definition, *instance, visual_rotation, *texture, camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
-        }
-    }
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    ch::MapRenderer::render_buildings(renderer, manager, catalog, lands,
+                                      [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                                      asset_root, cs, viewport_width, viewport_height);
 }
 
 void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,
@@ -995,6 +773,35 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
     return "OUTRO";
 }
 
+// Some waterfront assets are authored as `decor` because they do not affect
+// city simulation.  They are nevertheless player-built structures (rather
+// than small landscape props), so the construction catalogue must expose
+// them alongside buildings.  Keep this a UI classification only: changing
+// the simulation category would incorrectly make a pier or lighthouse behave
+// like a civic/commercial building.
+[[nodiscard]] bool belongs_in_construction_catalog(const BuildingDefinition& definition) {
+    if (definition.category != "decor") {
+        return true;
+    }
+
+    static constexpr std::array<std::string_view, 9> kBuiltStructures = {
+        "beach_lifeguard_tower",
+        "beach_lighthouse",
+        "beach_pier_small",
+        "beach_pier_large",
+        "dock_medium_01",
+        "dock_large_01",
+        "gazebo_01",
+        "gazebo_island_01",
+        "beach_dock_stairs",
+    };
+    return std::find(kBuiltStructures.begin(), kBuiltStructures.end(), definition.id) != kBuiltStructures.end();
+}
+
+[[nodiscard]] const char* construction_catalog_label(const BuildingDefinition& definition) {
+    return definition.category == "decor" ? "ESTRUTURA" : category_label(definition.category);
+}
+
 [[nodiscard]] std::string catalog_thumbnail_path(const std::filesystem::path& asset_root,
                                                   const BuildingDefinition& definition) {
     const std::filesystem::path dedicated = asset_root / "assets" / "ui" / "thumbnails" / "buildings" /
@@ -1059,44 +866,35 @@ void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text
     SDL_RenderDebugText(renderer, x, y, text.c_str());
 }
 
-// The loading artwork is a single authored sheet. Keeping the crop layout
-// here makes it a presentation concern and leaves the gameplay UI independent.
-void render_loading_screen(SDL_Renderer* renderer, const TextureAsset& sheet,
+// The loading artwork is a single authored 1280x906 composition. Gameplay
+// state only supplies the live progress and status; it never owns the art.
+void render_loading_screen(SDL_Renderer* renderer, const TextureAsset& artwork,
                            const int viewport_width, const int viewport_height,
                            const float progress) {
     const float width = static_cast<float>(viewport_width);
     const float height = static_cast<float>(viewport_height);
-    const float ui_scale = std::min(width / 1491.0F, height / 1055.0F);
+    const float ui_scale = std::min(width / 1280.0F, height / 906.0F);
     const float clamped_progress = std::clamp(progress, 0.0F, 1.0F);
 
     SDL_SetRenderDrawColor(renderer, 4, 18, 29, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
-    const SDL_FRect logo_source = {0.0F, 0.0F, 790.0F, 470.0F};
-    const SDL_FRect preview_source = {820.0F, 100.0F, 650.0F, 370.0F};
-    const SDL_FRect progress_source = {28.0F, 472.0F, 830.0F, 118.0F};
-    const SDL_FRect tip_source = {875.0F, 482.0F, 605.0F, 260.0F};
-    const SDL_FRect logo_destination = {width * 0.08F, height * 0.08F, 620.0F * ui_scale, 368.0F * ui_scale};
-    const SDL_FRect preview_destination = {width * 0.56F, height * 0.12F, 520.0F * ui_scale, 296.0F * ui_scale};
-    const SDL_FRect progress_destination = {width * 0.20F, height * 0.62F, 650.0F * ui_scale, 92.0F * ui_scale};
-    const SDL_FRect tip_destination = {width * 0.30F, height * 0.76F, 450.0F * ui_scale, 193.0F * ui_scale};
-    SDL_RenderTexture(renderer, sheet.texture, &logo_source, &logo_destination);
-    SDL_RenderTexture(renderer, sheet.texture, &preview_source, &preview_destination);
-    SDL_RenderTexture(renderer, sheet.texture, &progress_source, &progress_destination);
-    SDL_RenderTexture(renderer, sheet.texture, &tip_source, &tip_destination);
+    const SDL_FRect artwork_destination = {(width - 1280.0F * ui_scale) * 0.5F,
+                                            (height - 906.0F * ui_scale) * 0.5F,
+                                            1280.0F * ui_scale, 906.0F * ui_scale};
+    SDL_RenderTexture(renderer, artwork.texture, nullptr, &artwork_destination);
 
-    const SDL_FRect fill = {progress_destination.x + 28.0F * ui_scale,
-                            progress_destination.y + 35.0F * ui_scale,
-                            (progress_destination.w - 56.0F * ui_scale) * clamped_progress,
-                            26.0F * ui_scale};
+    const float origin_x = artwork_destination.x;
+    const float origin_y = artwork_destination.y;
+    const SDL_FRect fill = {origin_x + 66.0F * ui_scale, origin_y + 632.0F * ui_scale,
+                            618.0F * ui_scale * clamped_progress, 36.0F * ui_scale};
     SDL_SetRenderDrawColor(renderer, 42, 206, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &fill);
-    draw_text(renderer, width * 0.5F - 88.0F, progress_destination.y + progress_destination.h + 20.0F,
-              "PREPARANDO A CIDADE...");
-    draw_text(renderer, tip_destination.x + 42.0F * ui_scale, tip_destination.y + 72.0F * ui_scale,
-              "DICA: RUAS E CALCADAS", 188, 232, 252);
-    draw_text(renderer, tip_destination.x + 42.0F * ui_scale, tip_destination.y + 90.0F * ui_scale,
-              "ORGANIZAM A CIDADE.", 188, 232, 252);
+    draw_text(renderer, origin_x + 288.0F * ui_scale, origin_y + 724.0F * ui_scale, "PREPARANDO A CIDADE...");
+    draw_text(renderer, origin_x + 792.0F * ui_scale, origin_y + 650.0F * ui_scale,
+              "DICA: RUAS E ESTRADAS", 188, 232, 252);
+    draw_text(renderer, origin_x + 792.0F * ui_scale, origin_y + 670.0F * ui_scale,
+              "ORGANIZAM SEUS BAIRROS.", 188, 232, 252);
 }
 
 void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& economy, const SimulationClock& clock,
@@ -1263,7 +1061,7 @@ int main() {
 
     TextureCache textures;
     const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01_clean.png");
-    const TextureAsset* loading_ui_sheet = textures.load(renderer, asset_root / "assets/ui/loading/loading_ui_sheet.png");
+    const TextureAsset* loading_ui_sheet = textures.load(renderer, asset_root / "assets/ui/loading/city_horizon_loading.png");
     const Uint64 loading_screen_started = SDL_GetTicks();
     if (loading_ui_sheet != nullptr) {
         render_loading_screen(renderer, *loading_ui_sheet, 1280, 800, 0.12F);
@@ -1406,14 +1204,34 @@ int main() {
     power.rebuild(buildings, catalog);
 
     std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
+    std::vector<WaterSurfaceTile> scenario_water_tiles;
+    // The two opaque PNGs are material records generated from the approved
+    // Water V2 master. World coverage deliberately remains render_tile_fill,
+    // the seam-proven CH_GRID_V1 geometry, rather than their PNG rectangle.
+    const TextureAsset* water_base_deep = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_deep.png");
+    const TextureAsset* water_base_shallow = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_shallow.png");
+    const TextureAsset* water_caustics = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_caustics_overlay_01.png");
+    if (water_base_deep == nullptr || water_base_shallow == nullptr || water_caustics == nullptr) {
+        std::cerr << "CH_WATER_V2 assets unavailable; continuing with legacy terrain visuals\n";
+    }
     const std::filesystem::path initial_city_path = asset_root / "assets/scenarios/initial_city.json";
     if (const auto map_doc = ch::MapDocument::load_from_file(initial_city_path.string())) {
         for (const auto& tile : map_doc->terrain_tiles()) {
             const TextureAsset* loaded_tex = textures.load(renderer, asset_root / tile.texture);
             const std::uint64_t key = ch::tile_key(tile.tile_x, tile.tile_y);
             scenario_terrain_textures[key] = loaded_tex;
+            const bool shallow = tile.texture.find("coast_water_shallow") != std::string::npos ||
+                                 tile.texture.find("ocean_shallow") != std::string::npos;
+            const bool deep = tile.texture.find("coast_water_deep") != std::string::npos ||
+                              tile.texture.find("ocean_deep") != std::string::npos;
+            if (shallow || deep) scenario_water_tiles.push_back({tile.tile_x, tile.tile_y, shallow});
         }
     }
+    std::sort(scenario_water_tiles.begin(), scenario_water_tiles.end(), [](const WaterSurfaceTile& left, const WaterSurfaceTile& right) {
+        const int left_depth = left.tile_x + left.tile_y;
+        const int right_depth = right.tile_x + right.tile_y;
+        return left_depth == right_depth ? left.tile_x < right.tile_x : left_depth < right_depth;
+    });
 
     Camera camera;
     std::optional<std::uint64_t> selected_instance_id;
@@ -1440,6 +1258,7 @@ int main() {
     TileCoordinate preparation_drag_start;
     TileCoordinate planting_drag_start;
     std::string status = "CLICK A BUILDING TO SELECT IT";
+    UiOverlay active_overlay = UiOverlay::none;
     bool debug_visible = false;
     bool navigation_debug_uses_roads = true;
     std::optional<NavigationTile> navigation_debug_start;
@@ -1651,13 +1470,56 @@ int main() {
             case UiAction::rotate_left: rotate_placement(false); break;
             case UiAction::rotate_right: rotate_placement(true); break;
             case UiAction::toggle_pause:
-                simulation_clock.toggle_pause();
-                status = std::string("SIMULATION ") + simulation_speed_label(simulation_clock.speed());
+                if (active_overlay == UiOverlay::pause) {
+                    active_overlay = UiOverlay::none;
+                    if (simulation_clock.speed() == SimulationSpeed::paused) simulation_clock.toggle_pause();
+                    status = "SIMULATION RESUMED";
+                    (void)audio.play(SoundEvent::ui_close_panel);
+                } else {
+                    if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.toggle_pause();
+                    active_overlay = UiOverlay::pause;
+                    status = "GAME PAUSED";
+                    (void)audio.play(SoundEvent::ui_open_panel);
+                }
+                break;
+            case UiAction::resume_game:
+                active_overlay = UiOverlay::none;
+                if (simulation_clock.speed() == SimulationSpeed::paused) simulation_clock.toggle_pause();
+                status = "SIMULATION RESUMED";
+                (void)audio.play(SoundEvent::ui_close_panel);
+                break;
+            case UiAction::open_administration:
+                active_overlay = UiOverlay::administration;
+                status = "ADMINISTRATION OPEN";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::open_reports:
+                active_overlay = UiOverlay::reports;
+                status = "REPORTS OPEN";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::open_settings:
+                active_overlay = UiOverlay::settings;
+                status = "SETTINGS OPEN";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::close_modal:
+            case UiAction::settings_cancel:
+                active_overlay = UiOverlay::none;
+                status = "PANEL CLOSED";
+                (void)audio.play(SoundEvent::ui_close_panel);
+                break;
+            case UiAction::settings_reset:
+                // The controls are visually present and their data contract is
+                // ready.  Sliders are intentionally not wired until their
+                // input behavior is implemented as a cohesive settings pass.
+                status = "SETTINGS DEFAULTS READY TO APPLY";
                 (void)audio.play(SoundEvent::ui_click);
                 break;
-            case UiAction::settings_placeholder:
-                status = "SETTINGS WILL BE AVAILABLE SOON";
-                (void)audio.play(SoundEvent::ui_click);
+            case UiAction::settings_apply:
+                active_overlay = UiOverlay::none;
+                status = "SETTINGS APPLIED";
+                (void)audio.play(SoundEvent::ui_confirm);
                 break;
             case UiAction::close_selection:
                 selected_instance_id.reset();
@@ -1691,6 +1553,11 @@ int main() {
             case SimulationSpeed::speed3: model.speed = "RUNNING"; break;
         }
         model.status = status;
+        model.overlay = active_overlay;
+        model.administration_services = "ROAD / POWER / FARMING";
+        model.administration_alerts = status.empty() ? "NO ACTIVE ALERTS" : status;
+        model.master_volume_percent = static_cast<int>(std::lround(audio.volume_settings().master * 100.0F));
+        model.effects_volume_percent = static_cast<int>(std::lround(audio.volume_settings().effects * 100.0F));
         model.build_panel_open = build_panel_open;
         model.farming_panel_open = agriculture_panel_open;
         model.selected_farming_id = farming_selection_id;
@@ -1745,8 +1612,8 @@ int main() {
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;
-            if (definition.category == "decor" || definition.category == "agriculture") continue;  // decor and agriculture go to their respective tabs
-            model.build_items.push_back({definition.id, definition.name, category_label(definition.category),
+            if (definition.category == "agriculture" || !belongs_in_construction_catalog(definition)) continue;
+            model.build_items.push_back({definition.id, definition.name, construction_catalog_label(definition),
                                          format_money(definition.build_cost), true,
                                          catalog_thumbnail_path(asset_root, definition),
                                          catalog_footprint_label(definition),
@@ -1754,7 +1621,7 @@ int main() {
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;
-            if (definition.category != "decor") continue;
+            if (definition.category != "decor" || belongs_in_construction_catalog(definition)) continue;
             model.decor_items.push_back({definition.id, definition.name, "DECORACAO",
                                          format_money(definition.build_cost), true,
                                          catalog_thumbnail_path(asset_root, definition),
@@ -2341,6 +2208,21 @@ int main() {
                 }
                 road_dragging = false;
             } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                if (active_overlay != UiOverlay::none) {
+                    if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                        if (active_overlay == UiOverlay::pause) {
+                            apply_ui_action({UiAction::resume_game, {}});
+                        } else {
+                            active_overlay = UiOverlay::none;
+                            status = "PANEL CLOSED";
+                            (void)audio.play(SoundEvent::ui_close_panel);
+                        }
+                    }
+                    // Modal screens own keyboard focus.  Their future widgets
+                    // can opt in here without build, camera or debug hotkeys
+                    // leaking through to the city below.
+                    continue;
+                }
                 switch (event.key.scancode) {
                     case SDL_SCANCODE_K:
                         if (service_vehicles.cancel_active_task(service_vehicle_catalog, vehicle_traversable)) {
@@ -2390,6 +2272,8 @@ int main() {
                             selected_instance_id.reset();
                             status = "INFO PANEL CLOSED";
                             (void)audio.play(SoundEvent::ui_close_panel);
+                        } else {
+                            apply_ui_action({UiAction::toggle_pause, {}});
                         }
                         break;
                     case SDL_SCANCODE_B:
@@ -2674,6 +2558,10 @@ int main() {
             }
         }
         render_map(renderer, grass, scenario_terrain_textures, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        if (water_base_deep != nullptr && water_base_shallow != nullptr && water_caustics != nullptr) {
+            render_water_v2_layers(renderer, scenario_water_tiles, water_caustics, camera,
+                                   static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        }
         const LandParcel* hovered_parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
         render_land_overlays(renderer, lands, hovered_parcel, land_mode, camera,
                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));

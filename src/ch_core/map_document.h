@@ -6,6 +6,9 @@
 #include <vector>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <cstdint>
 
 namespace ch {
 
@@ -34,9 +37,9 @@ public:
 
     [[nodiscard]] const std::string& raw_content() const { return raw_content_; }
 
-    [[nodiscard]] std::vector<TerrainTileEntry> terrain_tiles() const;
-    [[nodiscard]] std::vector<BuildingInstanceEntry> buildings() const;
-    [[nodiscard]] std::vector<RoadTileEntry> roads() const;
+    [[nodiscard]] const std::vector<TerrainTileEntry>& terrain_tiles() const { return cached_terrain_; }
+    [[nodiscard]] const std::vector<BuildingInstanceEntry>& buildings() const { return cached_buildings_; }
+    [[nodiscard]] const std::vector<RoadTileEntry>& roads() const { return cached_roads_; }
 
     [[nodiscard]] std::optional<TerrainTileEntry> get_terrain_at(int tile_x, int tile_y) const;
     [[nodiscard]] std::optional<BuildingInstanceEntry> get_building_at(int tile_x, int tile_y) const;
@@ -45,7 +48,19 @@ public:
     [[nodiscard]] static std::optional<MapDocument> load_from_file(const std::string& filepath);
 
 private:
+    void parse_all();
+    static uint64_t pack_key(int x, int y) {
+        return (static_cast<uint64_t>(x) << 32) | (static_cast<uint64_t>(y) & 0xFFFFFFFFULL);
+    }
+
     std::string raw_content_;
+    std::vector<TerrainTileEntry> cached_terrain_;
+    std::vector<BuildingInstanceEntry> cached_buildings_;
+    std::vector<RoadTileEntry> cached_roads_;
+
+    std::unordered_map<uint64_t, std::size_t> terrain_index_;
+    std::unordered_map<uint64_t, std::size_t> building_index_;
+    std::unordered_set<uint64_t> road_index_;
 };
 
 } // namespace ch

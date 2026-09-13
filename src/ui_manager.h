@@ -51,9 +51,26 @@ enum class UiAction : std::uint8_t {
     rotate_left,
     rotate_right,
     toggle_pause,
-    settings_placeholder,
+    resume_game,
+    open_administration,
+    open_reports,
+    open_settings,
+    close_modal,
+    settings_reset,
+    settings_cancel,
+    settings_apply,
     close_selection,
     upgrade_building,
+};
+
+// These are presentation states only.  Simulation, finance and audio remain
+// owned by their existing systems and are supplied through GameplayUiModel.
+enum class UiOverlay : std::uint8_t {
+    none,
+    pause,
+    administration,
+    reports,
+    settings,
 };
 
 struct UiActionEvent {
@@ -126,6 +143,14 @@ struct GameplayUiModel {
     std::string power_capacity;
     std::string speed;
     std::string status;
+    UiOverlay overlay = UiOverlay::none;
+    // Live values used by the Administration screen.  Keeping them in the
+    // view model makes the art panel safe to bind without giving UI code
+    // authority over the city simulation.
+    std::string administration_services;
+    std::string administration_alerts;
+    int master_volume_percent = 100;
+    int effects_volume_percent = 100;
     UiTool active_tool = UiTool::none;
     bool build_panel_open = false;
     bool farming_panel_open = false;
@@ -197,6 +222,7 @@ private:
     float mouse_y_ = -1.0F;
     bool primary_pressed_ = false;
     std::optional<UiRect> build_panel_bounds_;
+    std::optional<UiRect> overlay_bounds_;
     int viewport_width_ = 1;
     int viewport_height_ = 1;
     float build_scroll_offset_ = 0.0F;

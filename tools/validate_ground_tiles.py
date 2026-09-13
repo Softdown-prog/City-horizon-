@@ -99,16 +99,19 @@ def report(path: Path, profile: str, problems: list[str], debug: bool) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", action="store_true", help="validate every canonical ground-tile profile")
-    parser.add_argument("--profile", choices=("grass", "prepared-soil", "plowed-soil", "coast"),
-                        help="profile for one or more explicit --file entries")
+    parser.add_argument("--profile", help="profile for one or more explicit --file entries")
     parser.add_argument("--file", type=Path, action="append", default=[], help="candidate PNG to validate")
+    parser.add_argument("--directory", type=Path, action="append", default=[],
+                        help="validate every top-level PNG in a candidate directory")
     parser.add_argument("--debug", action="store_true", help="also print each accepted tile")
     args = parser.parse_args()
-    if not args.all and (args.profile is None or not args.file):
-        parser.error("use --all, or provide both --profile and --file")
+    if not args.all and (args.profile is None or not (args.file or args.directory)):
+        parser.error("use --all, or provide --profile with --file and/or --directory")
 
     contract = load_contract()
     profiles = contract["profiles"]
+    if args.profile is not None and args.profile not in profiles:
+        parser.error("unknown profile '" + args.profile + "'; expected one of " + ", ".join(sorted(profiles)))
     targets: list[tuple[Path, str]] = []
     if args.all:
         targets.extend((ROOT / profiles[name]["reference"], name)
@@ -116,6 +119,11 @@ def main() -> None:
         targets.extend((path, "coast") for path in coast_paths(contract))
     else:
         targets.extend((path, args.profile) for path in args.file)
+        for directory in args.directory:
+            if not directory.is_dir():
+                targets.append((directory, args.profile))
+                continue
+            targets.extend((path, args.profile) for path in sorted(directory.glob("*.png")))
 
     accepted = 0
     rejected = 0

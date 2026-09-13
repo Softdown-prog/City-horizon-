@@ -1,15 +1,18 @@
 """
-Canonical Isometric Projection Engine (CH_GRID_V1)
-Matches City Horizon C++ engine projection, anchor math, and camera depth keys.
+Canonical Isometric Projection Engine (CH_GRID_V1).
+Delegates all projection, rotation, and depth key calculation to C++ city_horizon_native.
 """
 
 from dataclasses import dataclass
 from typing import Tuple
+from tools.map_forge.core.native_bridge import get_native_core
 
-TILE_WIDTH = 128.0
-TILE_HEIGHT = 64.0
-MAP_MIN = -24
-MAP_MAX = 23
+_ch = get_native_core()
+
+TILE_WIDTH = float(_ch.kTileWidth) if _ch else 128.0
+TILE_HEIGHT = float(_ch.kTileHeight) if _ch else 64.0
+MAP_MIN = int(_ch.kMapMin) if _ch else -24
+MAP_MAX = int(_ch.kMapMax) if _ch else 23
 
 
 @dataclass
@@ -21,42 +24,38 @@ class Camera:
 
 
 def tile_visual_top_world(tile_x: float, tile_y: float) -> Tuple[float, float]:
-    """
-    Calculates top vertex of tile in world coordinates matching main.cpp.
-    """
-    world_x = float(tile_x - tile_y)
-    world_y = float(tile_x + tile_y) * 0.5
-    return world_x, world_y
+    """Calculates top vertex of tile in world coordinates using C++ native core."""
+    ch = get_native_core()
+    pt = ch.tile_visual_top_world(int(tile_x), int(tile_y), ch.CameraRotation(0))
+    return pt.x, pt.y
 
 
 def world_to_screen(world_x: float, world_y: float, camera: Camera, viewport_w: float, viewport_h: float) -> Tuple[float, float]:
-    """
-    Converts world coordinates to screen pixel coordinates matching main.cpp.
-    """
-    screen_x = (viewport_w * 0.5) + (world_x - camera.world_x) * (64.0 * camera.zoom)
-    screen_y = (viewport_h * 0.5) + (world_y - camera.world_y) * (64.0 * camera.zoom)
-    return screen_x, screen_y
+    """Converts world coordinates to screen pixel coordinates using C++ native core."""
+    ch = get_native_core()
+    cs = ch.CameraState()
+    cs.pan_x = camera.world_x
+    cs.pan_y = camera.world_y
+    cs.zoom = camera.zoom
+    cs.rotation = ch.CameraRotation(camera.rotation)
+    sp = ch.world_to_screen_point(world_x, world_y, cs, viewport_w, viewport_h)
+    return sp.x, sp.y
 
 
 def screen_to_tile(screen_x: float, screen_y: float, camera: Camera, viewport_w: float, viewport_h: float) -> Tuple[int, int]:
-    """
-    Converts screen pixel coordinates back to logical integer tile (gridX, gridY).
-    """
-    world_x = camera.world_x + (screen_x - viewport_w * 0.5) / (64.0 * camera.zoom)
-    world_y = camera.world_y + (screen_y - viewport_h * 0.5) / (64.0 * camera.zoom)
-    
-    # Linear equation system:
-    # world_x = tile_x - tile_y
-    # 2 * world_y = tile_x + tile_y
-    # => tile_x = (2 * world_y + world_x) / 2
-    # => tile_y = (2 * world_y - world_x) / 2
-    tile_x = int((2.0 * world_y + world_x) // 2)
-    tile_y = int((2.0 * world_y - world_x) // 2)
-    return tile_x, tile_y
+    """Converts screen pixel coordinates back to logical integer tile using C++ native core."""
+    ch = get_native_core()
+    cs = ch.CameraState()
+    cs.pan_x = camera.world_x
+    cs.pan_y = camera.world_y
+    cs.zoom = camera.zoom
+    cs.rotation = ch.CameraRotation(camera.rotation)
+    gc = ch.screen_to_tile_coord(screen_x, screen_y, cs, viewport_w, viewport_h)
+    return gc.x, gc.y
 
 
 def camera_depth_key(tile_x: float, tile_y: float) -> float:
-    """
-    Calculates depth key for isometric depth sorting matching main.cpp.
-    """
-    return float(tile_x + tile_y)
+    """Calculates depth key for isometric depth sorting using C++ native core."""
+    ch = get_native_core()
+    cs = ch.CameraState()
+    return ch.camera_depth_key(float(tile_x), float(tile_y), cs)

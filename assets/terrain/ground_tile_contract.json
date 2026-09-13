@@ -23,6 +23,12 @@
     "coast": {
       "catalog": "assets/terrain/coast/coast_tiles.json",
       "canvas": { "width": 170, "height": 85 }
+    },
+    "atomic-path": {
+      "canvas": { "width": 128, "height": 64 },
+      "opaqueBounds": { "left": 0, "top": 0, "right": 128, "bottom": 64 },
+      "anchor": { "x": 0.5, "y": 0.92 },
+      "note": "Flat walkable path tile. Source must already be an exact 128x64 RGBA losango; intake never rescales presentation-sheet crops."
     }
   }
 }
