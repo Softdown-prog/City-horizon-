@@ -83,7 +83,7 @@ bool EditorDocument::loadScenario(const std::string& path, std::string* error) {
     int max_x = 0;
     int max_y = 0;
 
-    const auto includeCoordinate = [&](const int x, const int y) mutable {
+    auto includeCoordinate = [&](const int x, const int y) {
         if (!has_content) {
             min_x = max_x = x;
             min_y = max_y = y;
