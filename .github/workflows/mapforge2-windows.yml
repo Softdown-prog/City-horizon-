@@ -1,20 +1,13 @@
 name: Map Forge 2 Windows
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - map-forge-2-cpp
-    paths:
-      - 'C++/**'
-      - 'src/ch_core/projection.*'
-      - 'src/ch_core/map_document.*'
-      - '.github/workflows/mapforge2-windows.yml'
+    branches: [map-forge-2-cpp]
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +33,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist/MapForge2 | Out-Null
           Copy-Item build/mapforge2/Release/MapForge2.exe dist/MapForge2/MapForge2.exe
           windeployqt --release --no-translations --dir dist/MapForge2 dist/MapForge2/MapForge2.exe
-          Copy-Item C++/README.md dist/MapForge2/README.md
+          Copy-Item "C++/README.md" dist/MapForge2/README.md
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
