@@ -35,7 +35,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     tile_status_ = new QLabel("Tile: —", this);
     statusBar()->addPermanentWidget(tile_status_);
-    statusBar()->showMessage("Studio foundation ready. Content packs are validation-only; production scenario saving remains gated.");
+    statusBar()->showMessage("Studio ready. Open a scenario to enter the canonical ch_render / SDL3 inspection viewport.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
     canvas_->onHoverTileChanged = [this](const int x, const int y) {
@@ -69,13 +69,13 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::buildMenus() {
     auto* fileMenu = menuBar()->addMenu("&File");
 
-    auto* newAction = fileMenu->addAction("&New 64x64");
+    auto* newAction = fileMenu->addAction("&New 64x64 Scratch Map");
     connect(newAction, &QAction::triggered, this, [this]() {
-        canvas_->document().newEmpty(64, 64);
-        canvas_->history().clear();
-        canvas_->centerCamera();
+        canvas_->newScratchMap(64, 64);
+        setAuthoringEnabled(true);
         refreshHistoryActions();
-        statusBar()->showMessage("Created native 64x64 scratch map.", 4000);
+        statusBar()->showMessage("Created diagnostic 64x64 scratch map. Authoring tools are enabled here.", 5000);
+        setWindowTitle("City Horizon Studio / Map Forge 2 — Scratch Map");
     });
 
     auto* openAction = fileMenu->addAction("&Open Scenario…");
@@ -86,7 +86,7 @@ void MainWindow::buildMenus() {
     });
 
     fileMenu->addSeparator();
-    auto* saveNotice = fileMenu->addAction("Save (migration gate not yet enabled)");
+    auto* saveNotice = fileMenu->addAction("Save (lossless authoring gate not yet enabled)");
     saveNotice->setEnabled(false);
     fileMenu->addSeparator();
     auto* exitAction = fileMenu->addAction("E&xit");
@@ -124,10 +124,10 @@ void MainWindow::buildToolbar() {
         return action;
     };
 
-    addTool("Inspect", QKeySequence("1"), EditorTool::Inspect, true);
-    addTool("Terrain", QKeySequence("2"), EditorTool::Terrain);
-    addTool("Road", QKeySequence("3"), EditorTool::Road);
-    addTool("Erase", QKeySequence("4"), EditorTool::Erase);
+    inspect_action_ = addTool("Inspect", QKeySequence("1"), EditorTool::Inspect, true);
+    terrain_action_ = addTool("Terrain", QKeySequence("2"), EditorTool::Terrain);
+    road_action_ = addTool("Road", QKeySequence("3"), EditorTool::Road);
+    erase_action_ = addTool("Erase", QKeySequence("4"), EditorTool::Erase);
 
     toolbar->addSeparator();
     toolbar->addWidget(new QLabel("Terrain:", toolbar));
@@ -166,7 +166,7 @@ void MainWindow::buildDocks() {
     auto* terrainLayout = new QVBoxLayout(terrainPage);
     terrainLayout->addWidget(new QLabel(
         "Semantic terrain palette\n\n"
-        "Paint intent here. Technical edge/corner/shoreline sprites will never be exposed as user terrain choices.",
+        "Scratch-map authoring remains available for interaction testing. Canonical scenarios are inspection-only until the lossless mutable document gate is complete.",
         terrainPage));
     terrainLayout->addStretch(1);
     tabs->addTab(terrainPage, "Terrain");
@@ -175,7 +175,7 @@ void MainWindow::buildDocks() {
     auto* objectsLayout = new QVBoxLayout(objectsPage);
     objectsLayout->addWidget(new QLabel(
         "Object catalog migration target\n\n"
-        "Buildings, decorations, rotation, footprints and access points will be connected to the canonical C++ catalogs in the next milestones.",
+        "Canonical scenario inspection now renders terrain, connectivity-aware roads and building definitions through ch_render. Placement/rotation editing comes after lossless mutation.",
         objectsPage));
     objectsLayout->addStretch(1);
     tabs->addTab(objectsPage, "Objects");
@@ -184,13 +184,14 @@ void MainWindow::buildDocks() {
     auto* diagnosticsLayout = new QVBoxLayout(diagnosticsPage);
     diagnosticsLayout->addWidget(new QLabel(
         "Diagnostics\n\n"
-        "• C++ event loop\n"
-        "• canonical 2:1 projection\n"
-        "• stroke transaction = one undo entry\n"
-        "• Bresenham continuous drag\n"
-        "• CH_CONTENT_PACK_V1 validation foundation\n"
-        "• production save disabled until lossless serializer gate\n"
-        "• Python asset tools remain external/offline",
+        "• Qt6 owns desktop UI, input and the event loop\n"
+        "• SDL3 wraps the Qt-owned native viewport HWND\n"
+        "• ch_render owns canonical world drawing\n"
+        "• physical-pixel DPR conversion is explicit\n"
+        "• Qt schedules the canonical viewport at ~60 FPS\n"
+        "• canonical scenario mode is read-only in this pilot\n"
+        "• production Save remains disabled until lossless serialization\n"
+        "• CH_CONTENT_PACK_V1 remains the data-driven content boundary",
         diagnosticsPage));
     diagnosticsLayout->addStretch(1);
     tabs->addTab(diagnosticsPage, "Diagnostics");
@@ -200,26 +201,46 @@ void MainWindow::buildDocks() {
 }
 
 void MainWindow::setTool(const EditorTool tool) {
+    if (canvas_->canonicalMode() && tool != EditorTool::Inspect) {
+        if (inspect_action_ != nullptr) inspect_action_->setChecked(true);
+        canvas_->setTool(EditorTool::Inspect);
+        statusBar()->showMessage("Canonical viewport is inspection-only until the lossless mutation gate is implemented.", 4500);
+        return;
+    }
     canvas_->setTool(tool);
 }
 
+void MainWindow::setAuthoringEnabled(const bool enabled) {
+    if (terrain_action_ != nullptr) terrain_action_->setEnabled(enabled);
+    if (road_action_ != nullptr) road_action_->setEnabled(enabled);
+    if (erase_action_ != nullptr) erase_action_->setEnabled(enabled);
+    if (terrain_combo_ != nullptr) terrain_combo_->setEnabled(enabled);
+    if (brush_combo_ != nullptr) brush_combo_->setEnabled(enabled);
+
+    if (!enabled && inspect_action_ != nullptr) {
+        inspect_action_->setChecked(true);
+        canvas_->setTool(EditorTool::Inspect);
+    }
+}
+
 void MainWindow::refreshHistoryActions() {
-    if (undo_action_ != nullptr) undo_action_->setEnabled(canvas_->history().canUndo());
-    if (redo_action_ != nullptr) redo_action_->setEnabled(canvas_->history().canRedo());
+    const bool authoring = !canvas_->canonicalMode();
+    if (undo_action_ != nullptr) undo_action_->setEnabled(authoring && canvas_->history().canUndo());
+    if (redo_action_ != nullptr) redo_action_->setEnabled(authoring && canvas_->history().canRedo());
 }
 
 bool MainWindow::loadScenario(const QString& path) {
     std::string error;
-    if (!canvas_->document().loadScenario(path.toStdString(), &error)) {
-        QMessageBox::critical(this, "Map Forge 2", QString::fromStdString(error));
+    if (!canvas_->loadCanonicalScenario(path.toStdString(), &error)) {
+        QMessageBox::critical(this, "City Horizon Studio", QString::fromStdString(error));
         return false;
     }
 
-    canvas_->history().clear();
+    setAuthoringEnabled(false);
     refreshHistoryActions();
-    canvas_->centerCamera();
-    statusBar()->showMessage(QString("Loaded canonical scenario: %1").arg(path), 6000);
-    setWindowTitle(QString("City Horizon Studio / Map Forge 2 — %1").arg(QFileInfo(path).fileName()));
+    statusBar()->showMessage(
+        QString("Canonical renderer pilot active: %1 — inspection/pan/zoom only; Save remains gated.").arg(path), 8000);
+    setWindowTitle(QString("City Horizon Studio / Map Forge 2 — %1 [Canonical]").arg(QFileInfo(path).fileName()));
     canvas_->update();
     return true;
 }
