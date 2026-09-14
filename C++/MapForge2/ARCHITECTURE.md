@@ -18,7 +18,7 @@ Map Forge 2 is also the first native module of the broader **City Horizon Studio
 ## Native layers
 
 ```text
-Qt6 desktop UI
+Qt6 desktop UI / input / event loop
       |
 ch_editor / Studio adapters
       |
@@ -26,10 +26,10 @@ mapforge2_studio_core (typed content contracts / validation)
       |
 ch_core (MapDocument / projection / semantics / placement)
       |
-ch_render + SDL3 (canonical runtime rendering; next migration stage)
+ch_render + SDL3 (canonical City Horizon world presentation)
 ```
 
-Qt owns desktop chrome: menus, toolbars, docks, catalog lists, property inspectors and shortcuts. Qt does not become a second game renderer.
+Qt owns desktop chrome, authoring controls and the native child viewport. SDL3 wraps that Qt-owned HWND only for rendering. Qt remains the single input and event-loop authority.
 
 ## Phase 1 — bootable native editor shell (complete)
 
@@ -44,9 +44,9 @@ Qt owns desktop chrome: menus, toolbars, docks, catalog lists, property inspecto
 - one undo transaction per stroke
 - GitHub Actions Windows deployment artifact
 
-The Phase 1 canvas uses a lightweight diagnostic QPainter representation so the editor interaction core can be migrated independently. It is not the final visual renderer.
+The Phase 1 scratch canvas uses a lightweight diagnostic QPainter representation so the editor interaction core can be migrated independently. It is not the production visual renderer.
 
-## Phase 1.5 — City Horizon Studio content foundation (current branch)
+## Phase 1.5 — City Horizon Studio content foundation (complete foundation / not frozen)
 
 - Qt-independent `mapforge2_studio_core`
 - `CH_CONTENT_PACK_V1` typed package/definition model
@@ -56,14 +56,27 @@ The Phase 1 canvas uses a lightweight diagnostic QPainter representation so the 
 - cross-definition dependency validation
 - Qt JSON loading adapter
 - Studio dock tab with validation report
-- JSON Schema plus Circus validation example
+- JSON Schema plus a technical validation fixture
 - production scenario Save still intentionally disabled
 
 This phase does **not** generate C++ from content packs. C++ defines reusable engine capabilities; content packs describe and combine those capabilities.
 
-## Phase 2 — canonical renderer integration
+## Phase 2 — canonical renderer integration (current pilot)
 
-Replace diagnostic QPainter map drawing with `ch_render`/SDL3 output while keeping Qt for UI chrome. Runtime and editor must remain pixel-parity consumers of the same renderer path.
+Governed by `CH_STUDIO_CANONICAL_VIEWPORT_V1.md`.
+
+- SDL3 is built into the standalone Studio target.
+- A Studio-side adapter wraps the Qt-owned Win32 viewport HWND.
+- Terrain is rendered by canonical `MapRenderer` paths and game assets.
+- Roads use `RoadManager` connectivity plus `RoadVisualCatalog` and `MapRenderer`.
+- Buildings use `BuildingCatalog`, canonical anchors/footprints/rotation selection and `MapRenderer::render_building`.
+- Qt schedules rendering at ~60 FPS; SDL does not own editor input.
+- Qt logical pixels are converted explicitly to renderer physical pixels using DPR.
+- Loaded scenario bounds preserve negative coordinates and Center uses real content extents.
+- Canonical scenario mode is read-only until lossless mutation exists.
+- Scratch-map diagnostic authoring remains available separately.
+
+The renderer contract is **not frozen yet**. Windows build, manual DPI/resize smoke and runtime-vs-Studio parity capture must pass first.
 
 ## Phase 3 — lossless native document editing
 
@@ -76,7 +89,7 @@ Create `ch_editor` commands operating on a mutable canonical MapDocument represe
 - RotateEntityCommand
 - SetSemanticCommand
 
-Mutation must preserve unrelated scenario JSON/data. Only after round-trip parity gates pass is Save enabled.
+Mutation must preserve unrelated scenario JSON/data. Only after round-trip parity gates pass is Save enabled. This is also the point where canonical scenario authoring tools can be re-enabled without creating a second source of truth.
 
 ## Phase 4 — production catalogs
 
