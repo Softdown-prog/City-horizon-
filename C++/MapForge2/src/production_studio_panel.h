@@ -1,12 +1,15 @@
 #pragma once
 
+#include <QDir>
+#include <QFile>
+#include <QFont>
+#include <QPixmap>
 #include <QWidget>
 
 class QLabel;
 class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
-class QScrollArea;
 class QTabWidget;
 
 namespace ch::studio {
