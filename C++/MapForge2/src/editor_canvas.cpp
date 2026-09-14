@@ -1,11 +1,17 @@
 #include "editor_canvas.h"
+#include "canonical_viewport.h"
 
+#include "src/ch_core/contracts.h"
+#include "src/ch_core/map_document.h"
+
+#include <QCoreApplication>
 #include <QEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QPolygonF>
 #include <QResizeEvent>
+#include <QTimer>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -27,7 +33,8 @@ QColor terrainColor(const std::string& id) {
     return QColor(92, 151, 72);
 }
 
-QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera, const float viewportW, const float viewportH) {
+QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
+                      const float viewportW, const float viewportH) {
     const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, viewportW, viewportH);
     const auto b = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), camera, viewportW, viewportH);
     const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, viewportW, viewportH);
@@ -38,23 +45,91 @@ QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera, c
 } // namespace
 
 EditorCanvas::EditorCanvas(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent), canonical_viewport_(std::make_unique<CanonicalViewport>()) {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
+    setAttribute(Qt::WA_NativeWindow, true);
     setAttribute(Qt::WA_OpaquePaintEvent, true);
+    setAutoFillBackground(false);
     camera_.zoom = 1.0F;
+
+    render_timer_ = new QTimer(this);
+    render_timer_->setInterval(16);
+    render_timer_->setTimerType(Qt::PreciseTimer);
+    connect(render_timer_, &QTimer::timeout, this, [this]() {
+        if (canonical_mode_ && isVisible()) update();
+    });
 }
+
+EditorCanvas::~EditorCanvas() = default;
 
 std::uint64_t EditorCanvas::tileKey(const int x, const int y) {
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32U)
         | static_cast<std::uint32_t>(y);
 }
 
-void EditorCanvas::setTool(const EditorTool tool) {
-    if (stroke_active_) {
-        endStroke();
+float EditorCanvas::coordinateScale() const {
+    return canonical_mode_ ? static_cast<float>(devicePixelRatioF()) : 1.0F;
+}
+
+float EditorCanvas::viewportWidth() const {
+    return static_cast<float>(std::max(1, width())) * coordinateScale();
+}
+
+float EditorCanvas::viewportHeight() const {
+    return static_cast<float>(std::max(1, height())) * coordinateScale();
+}
+
+bool EditorCanvas::ensureCanonicalViewport(std::string* error) {
+    if (canonical_viewport_->isInitialized()) return true;
+
+    const int physicalWidth = std::max(1, static_cast<int>(std::lround(width() * devicePixelRatioF())));
+    const int physicalHeight = std::max(1, static_cast<int>(std::lround(height() * devicePixelRatioF())));
+    const QByteArray appPath = QCoreApplication::applicationDirPath().toUtf8();
+    return canonical_viewport_->initialize(
+        reinterpret_cast<void*>(winId()), physicalWidth, physicalHeight,
+        std::filesystem::path(appPath.constData()), error);
+}
+
+bool EditorCanvas::loadCanonicalScenario(const std::string& path, std::string* error) {
+    const auto parsed = ch::MapDocument::load_from_file(path);
+    if (!parsed) {
+        if (error != nullptr) *error = "Unable to open canonical scenario: " + path;
+        return false;
     }
-    tool_ = tool;
+
+    if (!document_.loadScenario(path, error)) return false;
+    if (!ensureCanonicalViewport(error)) return false;
+
+    canonical_viewport_->loadDocument(*parsed);
+    canonical_mode_ = true;
+    tool_ = EditorTool::Inspect;
+    history_.clear();
+    hover_tile_.reset();
+    camera_.zoom = 1.0F;
+    centerCamera();
+    render_timer_->start();
+    update();
+    return true;
+}
+
+void EditorCanvas::newScratchMap(const int width, const int height) {
+    render_timer_->stop();
+    canonical_mode_ = false;
+    canonical_viewport_->shutdown();
+    document_.newEmpty(width, height);
+    history_.clear();
+    hover_tile_.reset();
+    tool_ = EditorTool::Inspect;
+    camera_ = ch::CameraState{};
+    camera_.zoom = 1.0F;
+    centerCamera();
+    update();
+}
+
+void EditorCanvas::setTool(const EditorTool tool) {
+    if (stroke_active_) endStroke();
+    tool_ = canonical_mode_ ? EditorTool::Inspect : tool;
     update();
 }
 
@@ -71,15 +146,19 @@ void EditorCanvas::centerCamera() {
     ch::CameraState probe = camera_;
     probe.pan_x = 0.0F;
     probe.pan_y = 0.0F;
-    const float cx = static_cast<float>(document_.width()) * 0.5F;
-    const float cy = static_cast<float>(document_.height()) * 0.5F;
-    const auto screen = ch::world_to_screen_point(cx, cy, probe, static_cast<float>(width()), static_cast<float>(height()));
-    camera_.pan_x = static_cast<float>(width()) * 0.5F - screen.x;
-    camera_.pan_y = static_cast<float>(height()) * 0.5F - screen.y;
+
+    const float centerX = (static_cast<float>(document_.minX()) + static_cast<float>(document_.maxX()) + 1.0F) * 0.5F;
+    const float centerY = (static_cast<float>(document_.minY()) + static_cast<float>(document_.maxY()) + 1.0F) * 0.5F;
+    const float viewportW = viewportWidth();
+    const float viewportH = viewportHeight();
+    const auto screen = ch::world_to_screen_point(centerX, centerY, probe, viewportW, viewportH);
+    camera_.pan_x = viewportW * 0.5F - screen.x;
+    camera_.pan_y = viewportH * 0.5F - screen.y;
     update();
 }
 
 void EditorCanvas::undo() {
+    if (canonical_mode_) return;
     if (stroke_active_) endStroke();
     if (history_.undo(document_)) {
         update();
@@ -88,6 +167,7 @@ void EditorCanvas::undo() {
 }
 
 void EditorCanvas::redo() {
+    if (canonical_mode_) return;
     if (stroke_active_) endStroke();
     if (history_.redo(document_)) {
         update();
@@ -96,15 +176,21 @@ void EditorCanvas::redo() {
 }
 
 QPoint EditorCanvas::screenToTile(const QPointF& screen) const {
+    const float scale = coordinateScale();
     const auto tile = ch::screen_to_tile_coord(
-        static_cast<float>(screen.x()), static_cast<float>(screen.y()), camera_,
-        static_cast<float>(width()), static_cast<float>(height()));
+        static_cast<float>(screen.x()) * scale, static_cast<float>(screen.y()) * scale,
+        camera_, viewportWidth(), viewportHeight());
     return {tile.x, tile.y};
 }
 
 void EditorCanvas::updateHover(const QPointF& screen) {
     const QPoint tile = screenToTile(screen);
-    if (document_.inBounds(tile.x(), tile.y())) {
+    const bool inside = canonical_mode_
+        ? (tile.x() >= ch::contracts::kMapMin && tile.x() <= ch::contracts::kMapMax
+           && tile.y() >= ch::contracts::kMapMin && tile.y() <= ch::contracts::kMapMax)
+        : document_.inBounds(tile.x(), tile.y());
+
+    if (inside) {
         if (!hover_tile_ || *hover_tile_ != tile) {
             hover_tile_ = tile;
             if (onHoverTileChanged) onHoverTileChanged(tile.x(), tile.y());
@@ -145,7 +231,7 @@ std::vector<QPoint> EditorCanvas::bresenham(const QPoint& from, const QPoint& to
 }
 
 void EditorCanvas::beginStroke(const QPoint& tile) {
-    if (tool_ == EditorTool::Inspect || !document_.inBounds(tile.x(), tile.y())) return;
+    if (canonical_mode_ || tool_ == EditorTool::Inspect || !document_.inBounds(tile.x(), tile.y())) return;
     stroke_active_ = true;
     active_changes_.clear();
     last_stroke_tile_ = tile;
@@ -188,7 +274,7 @@ void EditorCanvas::paintBrushAt(const QPoint& tile) {
 }
 
 void EditorCanvas::mutateTile(const int x, const int y) {
-    if (!document_.inBounds(x, y)) return;
+    if (canonical_mode_ || !document_.inBounds(x, y)) return;
 
     const auto k = tileKey(x, y);
     if (!active_changes_.contains(k)) {
@@ -211,6 +297,17 @@ void EditorCanvas::mutateTile(const int x, const int y) {
 }
 
 void EditorCanvas::paintEvent(QPaintEvent*) {
+    if (canonical_mode_ && canonical_viewport_->isInitialized()) {
+        canonical_viewport_->setCamera(camera_);
+        if (hover_tile_) {
+            canonical_viewport_->setHover(hover_tile_->x(), hover_tile_->y(), 1, true);
+        } else {
+            canonical_viewport_->setHover(0, 0, 1, false);
+        }
+        canonical_viewport_->renderFrame();
+        return;
+    }
+
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
     painter.fillRect(rect(), QColor(44, 52, 55));
@@ -220,10 +317,11 @@ void EditorCanvas::paintEvent(QPaintEvent*) {
     QPen gridPen(QColor(45, 70, 55, 110));
     gridPen.setWidthF(1.0);
 
-    const int maxSum = document_.width() + document_.height() - 2;
-    for (int sum = 0; sum <= maxSum; ++sum) {
-        const int startX = std::max(0, sum - (document_.height() - 1));
-        const int endX = std::min(document_.width() - 1, sum);
+    const int minSum = document_.minX() + document_.minY();
+    const int maxSum = document_.maxX() + document_.maxY();
+    for (int sum = minSum; sum <= maxSum; ++sum) {
+        const int startX = std::max(document_.minX(), sum - document_.maxY());
+        const int endX = std::min(document_.maxX(), sum - document_.minY());
         for (int x = startX; x <= endX; ++x) {
             const int y = sum - x;
             const auto state = document_.tile(x, y);
@@ -269,8 +367,9 @@ void EditorCanvas::mousePressEvent(QMouseEvent* event) {
 void EditorCanvas::mouseMoveEvent(QMouseEvent* event) {
     if (pan_active_) {
         const QPointF delta = event->position() - last_pan_position_;
-        camera_.pan_x += static_cast<float>(delta.x());
-        camera_.pan_y += static_cast<float>(delta.y());
+        const float scale = coordinateScale();
+        camera_.pan_x += static_cast<float>(delta.x()) * scale;
+        camera_.pan_y += static_cast<float>(delta.y()) * scale;
         last_pan_position_ = event->position();
         update();
         return;
@@ -283,9 +382,7 @@ void EditorCanvas::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void EditorCanvas::mouseReleaseEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) {
-        endStroke();
-    }
+    if (event->button() == Qt::LeftButton) endStroke();
     if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton) {
         pan_active_ = false;
         unsetCursor();
@@ -307,6 +404,11 @@ void EditorCanvas::leaveEvent(QEvent*) {
 
 void EditorCanvas::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    if (canonical_mode_ && canonical_viewport_->isInitialized()) {
+        const int physicalWidth = std::max(1, static_cast<int>(std::lround(width() * devicePixelRatioF())));
+        const int physicalHeight = std::max(1, static_cast<int>(std::lround(height() * devicePixelRatioF())));
+        canonical_viewport_->resize(physicalWidth, physicalHeight);
+    }
 }
 
 } // namespace ch::editor
