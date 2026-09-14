@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -23,6 +22,10 @@ public:
 
     [[nodiscard]] int width() const { return width_; }
     [[nodiscard]] int height() const { return height_; }
+    [[nodiscard]] int minX() const { return min_x_; }
+    [[nodiscard]] int minY() const { return min_y_; }
+    [[nodiscard]] int maxX() const { return max_x_; }
+    [[nodiscard]] int maxY() const { return max_y_; }
     [[nodiscard]] bool inBounds(int x, int y) const;
     [[nodiscard]] TileState tile(int x, int y) const;
 
@@ -38,6 +41,10 @@ private:
 
     int width_ = 64;
     int height_ = 64;
+    int min_x_ = 0;
+    int min_y_ = 0;
+    int max_x_ = 63;
+    int max_y_ = 63;
     std::string source_path_;
     std::unordered_map<std::uint64_t, TileState> tiles_;
     std::uint64_t revision_ = 0;
