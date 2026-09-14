@@ -6,6 +6,7 @@ on:
       - map-forge-2-cpp
       - studio-foundation-v1
       - studio-canonical-viewport-v1
+      - studio-production-workbench-v1
   workflow_dispatch:
 
 jobs:
@@ -52,8 +53,10 @@ jobs:
           Copy-Item "C++/README.md" dist/MapForge2/README.md
           Copy-Item "C++/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md" dist/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md
           Copy-Item "C++/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md" dist/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md
+          Copy-Item "C++/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md" dist/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md
           New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
           Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
+          Copy-Item "C++/MapForge2/examples/studio_project/city_horizon_production_profile.json" dist/MapForge2/examples/city_horizon_production_profile.json
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
