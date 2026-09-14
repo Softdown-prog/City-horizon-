@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "studio_panel.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -24,7 +25,7 @@ namespace ch::editor {
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), canvas_(new EditorCanvas(this)) {
-    setWindowTitle("City Horizon Map Forge 2 — C++ / Qt6");
+    setWindowTitle("City Horizon Studio / Map Forge 2 — C++ / Qt6");
     resize(1440, 900);
     setCentralWidget(canvas_);
 
@@ -34,7 +35,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     tile_status_ = new QLabel("Tile: —", this);
     statusBar()->addPermanentWidget(tile_status_);
-    statusBar()->showMessage("Native editor core ready. Production saving is intentionally disabled in this migration milestone.");
+    statusBar()->showMessage("Studio foundation ready. Content packs are validation-only; production scenario saving remains gated.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
     canvas_->onHoverTileChanged = [this](const int x, const int y) {
@@ -53,6 +54,9 @@ MainWindow::MainWindow(QWidget* parent)
         QTabBar::tab:selected { background: #1f8ea8; color: white; }
         QLabel { color: #dfe8eb; }
         QComboBox { min-height: 26px; background: #313d42; color: #e8eef0; border: 1px solid #4b5a60; padding: 2px 6px; }
+        QPushButton { background: #313d42; color: #e8eef0; border: 1px solid #4b5a60; padding: 6px 10px; border-radius: 4px; }
+        QPushButton:hover { background: #3b4a50; }
+        QPlainTextEdit { background: #192125; color: #dfe8eb; border: 1px solid #3a474c; }
         QMenuBar, QMenu { background: #263238; color: #e8eef0; }
         QMenu::item:selected { background: #1f8ea8; }
         QStatusBar { background: #263238; color: #dfe8eb; }
@@ -151,11 +155,12 @@ void MainWindow::buildToolbar() {
 }
 
 void MainWindow::buildDocks() {
-    auto* dock = new QDockWidget("Map Forge 2", this);
+    auto* dock = new QDockWidget("City Horizon Studio", this);
     dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    dock->setMinimumWidth(300);
+    dock->setMinimumWidth(340);
 
     auto* tabs = new QTabWidget(dock);
+    tabs->addTab(new ch::studio::StudioPanel(tabs), "Studio");
 
     auto* terrainPage = new QWidget(tabs);
     auto* terrainLayout = new QVBoxLayout(terrainPage);
@@ -183,6 +188,7 @@ void MainWindow::buildDocks() {
         "• canonical 2:1 projection\n"
         "• stroke transaction = one undo entry\n"
         "• Bresenham continuous drag\n"
+        "• CH_CONTENT_PACK_V1 validation foundation\n"
         "• production save disabled until lossless serializer gate\n"
         "• Python asset tools remain external/offline",
         diagnosticsPage));
@@ -213,7 +219,7 @@ bool MainWindow::loadScenario(const QString& path) {
     refreshHistoryActions();
     canvas_->centerCamera();
     statusBar()->showMessage(QString("Loaded canonical scenario: %1").arg(path), 6000);
-    setWindowTitle(QString("City Horizon Map Forge 2 — %1").arg(QFileInfo(path).fileName()));
+    setWindowTitle(QString("City Horizon Studio / Map Forge 2 — %1").arg(QFileInfo(path).fileName()));
     canvas_->update();
     return true;
 }
