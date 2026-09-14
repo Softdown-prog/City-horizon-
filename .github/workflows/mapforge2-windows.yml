@@ -28,7 +28,7 @@ jobs:
 
       - name: Configure Map Forge 2
         shell: pwsh
-        run: cmake -S "C++/MapForge2" -B build/mapforge2 -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+        run: cmake -S "C++/MapForge2" -B build/mapforge2 -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
 
       - name: Build Map Forge 2
         shell: pwsh
