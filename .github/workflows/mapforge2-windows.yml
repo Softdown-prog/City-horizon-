@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - map-forge-2-cpp
+      - studio-foundation-v1
   workflow_dispatch:
 
 jobs:
@@ -41,6 +42,9 @@ jobs:
           Copy-Item build/mapforge2/Release/MapForge2.exe dist/MapForge2/MapForge2.exe
           C:/Qt/6.8.3/msvc2022_64/bin/windeployqt.exe --release --no-translations --dir dist/MapForge2 dist/MapForge2/MapForge2.exe
           Copy-Item "C++/README.md" dist/MapForge2/README.md
+          Copy-Item "C++/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md" dist/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md
+          New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
+          Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
