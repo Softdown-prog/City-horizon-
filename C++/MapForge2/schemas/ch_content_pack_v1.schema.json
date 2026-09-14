@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://city-horizon.local/schemas/ch_content_pack_v1.schema.json",
+  "title": "City Horizon Content Pack V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "packageId", "displayName", "version", "definitions"],
+  "properties": {
+    "contract": {
+      "const": "CH_CONTENT_PACK_V1"
+    },
+    "packageId": {
+      "$ref": "#/$defs/contentId"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "definitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/definition"
+      }
+    }
+  },
+  "$defs": {
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "kind": {
+      "enum": [
+        "terrain",
+        "road",
+        "sidewalk",
+        "building",
+        "decoration",
+        "actor",
+        "vehicle",
+        "ui_layout",
+        "scenario"
+      ]
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "kind"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/contentId"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "behaviorId": {
+          "$ref": "#/$defs/contentId"
+        },
+        "visualId": {
+          "$ref": "#/$defs/contentId"
+        },
+        "sourcePath": {
+          "type": "string"
+        },
+        "dependencies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/contentId"
+          }
+        }
+      }
+    }
+  }
+}
