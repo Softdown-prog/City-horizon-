@@ -5,6 +5,7 @@ on:
     branches:
       - map-forge-2-cpp
       - studio-foundation-v1
+      - studio-canonical-viewport-v1
   workflow_dispatch:
 
 jobs:
@@ -35,14 +36,22 @@ jobs:
         shell: pwsh
         run: cmake --build build/mapforge2 --config Release --target MapForge2 --parallel
 
-      - name: Deploy Qt runtime
+      - name: Deploy Studio runtime
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/MapForge2 | Out-Null
           Copy-Item build/mapforge2/Release/MapForge2.exe dist/MapForge2/MapForge2.exe
+
+          $sdl = Get-ChildItem build/mapforge2 -Filter SDL3.dll -Recurse | Select-Object -First 1
+          if ($null -eq $sdl) { throw "SDL3.dll was not produced by the Studio build." }
+          Copy-Item $sdl.FullName dist/MapForge2/SDL3.dll
+
           C:/Qt/6.8.3/msvc2022_64/bin/windeployqt.exe --release --no-translations --dir dist/MapForge2 dist/MapForge2/MapForge2.exe
+
+          Copy-Item "assets" -Destination "dist/MapForge2/assets" -Recurse
           Copy-Item "C++/README.md" dist/MapForge2/README.md
           Copy-Item "C++/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md" dist/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md
+          Copy-Item "C++/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md" dist/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md
           New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
           Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
 
