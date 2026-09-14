@@ -69,6 +69,7 @@ add_library(mapforge2_editor STATIC
     src/editor_canvas.cpp
     src/content_pack_qt.cpp
     src/studio_panel.cpp
+    src/production_studio_panel.cpp
     src/main_window.cpp
 )
 target_include_directories(mapforge2_editor PUBLIC
