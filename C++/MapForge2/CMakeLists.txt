@@ -19,10 +19,21 @@ add_library(mapforge2_canonical STATIC
 )
 target_include_directories(mapforge2_canonical PUBLIC ${CH_ROOT})
 
+# Qt-independent first layer of the future City Horizon Studio.
+# C++ defines stable capabilities/contracts; the Qt editor is only a visual client.
+add_library(mapforge2_studio_core STATIC
+    src/studio_content.cpp
+)
+target_include_directories(mapforge2_studio_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 add_library(mapforge2_editor STATIC
     src/editor_document.cpp
     src/editor_history.cpp
     src/editor_canvas.cpp
+    src/content_pack_qt.cpp
+    src/studio_panel.cpp
     src/main_window.cpp
 )
 target_include_directories(mapforge2_editor PUBLIC
@@ -31,6 +42,7 @@ target_include_directories(mapforge2_editor PUBLIC
 )
 target_link_libraries(mapforge2_editor PUBLIC
     mapforge2_canonical
+    mapforge2_studio_core
     Qt6::Widgets
 )
 
@@ -41,10 +53,12 @@ target_link_libraries(MapForge2 PRIVATE mapforge2_editor Qt6::Widgets)
 
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(mapforge2_studio_core PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_editor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2 PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(mapforge2_canonical PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(mapforge2_studio_core PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_editor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2 PRIVATE -Wall -Wextra -Wpedantic)
 endif()
