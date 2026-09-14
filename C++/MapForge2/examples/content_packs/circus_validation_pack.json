@@ -1,0 +1,39 @@
+{
+  "contract": "CH_CONTENT_PACK_V1",
+  "packageId": "expansion.circus.validation",
+  "displayName": "Circus Validation Pack",
+  "version": 1,
+  "definitions": [
+    {
+      "id": "building.circus.big_top.01",
+      "displayName": "Big Top",
+      "kind": "building",
+      "behaviorId": "building.basic",
+      "visualId": "circus.big_top.01",
+      "sourcePath": "assets/circus/big_top_01"
+    },
+    {
+      "id": "building.circus.ticket_booth.01",
+      "displayName": "Circus Ticket Booth",
+      "kind": "building",
+      "behaviorId": "commercial.basic",
+      "visualId": "circus.ticket_booth.01",
+      "sourcePath": "assets/circus/ticket_booth_01"
+    },
+    {
+      "id": "building.circus.carousel.01",
+      "displayName": "Carousel",
+      "kind": "building",
+      "behaviorId": "attraction.cycle",
+      "visualId": "circus.carousel.01",
+      "sourcePath": "assets/circus/carousel_01"
+    },
+    {
+      "id": "decoration.circus.banner.01",
+      "displayName": "Circus Banner",
+      "kind": "decoration",
+      "visualId": "circus.banner.01",
+      "sourcePath": "assets/circus/banner_01"
+    }
+  ]
+}
