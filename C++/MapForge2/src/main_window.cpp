@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "production_studio_panel.h"
 #include "studio_panel.h"
 
 #include <QAction>
@@ -35,7 +36,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     tile_status_ = new QLabel("Tile: —", this);
     statusBar()->addPermanentWidget(tile_status_);
-    statusBar()->showMessage("Studio ready. Open a scenario to enter the canonical ch_render / SDL3 inspection viewport.");
+    statusBar()->showMessage("Studio ready. Production Workbench V1 is additive; canonical ch_render / SDL3 inspection remains available.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
     canvas_->onHoverTileChanged = [this](const int x, const int y) {
@@ -54,6 +55,9 @@ MainWindow::MainWindow(QWidget* parent)
         QTabBar::tab:selected { background: #1f8ea8; color: white; }
         QLabel { color: #dfe8eb; }
         QComboBox { min-height: 26px; background: #313d42; color: #e8eef0; border: 1px solid #4b5a60; padding: 2px 6px; }
+        QLineEdit { min-height: 26px; background: #192125; color: #e8eef0; border: 1px solid #4b5a60; padding: 2px 6px; }
+        QListWidget { background: #192125; color: #dfe8eb; border: 1px solid #3a474c; }
+        QListWidget::item:selected { background: #1f8ea8; color: white; }
         QPushButton { background: #313d42; color: #e8eef0; border: 1px solid #4b5a60; padding: 6px 10px; border-radius: 4px; }
         QPushButton:hover { background: #3b4a50; }
         QPlainTextEdit { background: #192125; color: #dfe8eb; border: 1px solid #3a474c; }
@@ -157,9 +161,10 @@ void MainWindow::buildToolbar() {
 void MainWindow::buildDocks() {
     auto* dock = new QDockWidget("City Horizon Studio", this);
     dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    dock->setMinimumWidth(340);
+    dock->setMinimumWidth(420);
 
     auto* tabs = new QTabWidget(dock);
+    tabs->addTab(new ch::studio::ProductionStudioPanel(tabs), "Production");
     tabs->addTab(new ch::studio::StudioPanel(tabs), "Studio");
 
     auto* terrainPage = new QWidget(tabs);
@@ -191,6 +196,7 @@ void MainWindow::buildDocks() {
         "• Qt schedules the canonical viewport at ~60 FPS\n"
         "• canonical scenario mode is read-only in this pilot\n"
         "• production Save remains disabled until lossless serialization\n"
+        "• Production Workbench V1 never overwrites source assets\n"
         "• CH_CONTENT_PACK_V1 remains the data-driven content boundary",
         diagnosticsPage));
     diagnosticsLayout->addStretch(1);
