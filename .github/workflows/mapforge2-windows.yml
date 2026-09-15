@@ -3,10 +3,7 @@ name: Map Forge 2 Windows
 on:
   push:
     branches:
-      - map-forge-2-cpp
-      - studio-foundation-v1
-      - studio-canonical-viewport-v1
-      - studio-production-workbench-v1
+      - main
   workflow_dispatch:
 
 jobs:
