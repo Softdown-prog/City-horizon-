@@ -27,16 +27,18 @@ namespace ch::editor {
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), canvas_(new EditorCanvas(this)) {
     setWindowTitle("City Horizon Studio / Map Forge 2 — C++ / Qt6");
-    resize(1440, 900);
+    resize(1600, 960);
+    setDockNestingEnabled(true);
     setCentralWidget(canvas_);
 
     buildMenus();
-    buildToolbar();
     buildDocks();
+    buildToolbar();
 
     tile_status_ = new QLabel("Tile: —", this);
     statusBar()->addPermanentWidget(tile_status_);
-    statusBar()->showMessage("Studio ready. Production Workbench V1 is additive; canonical ch_render / SDL3 inspection remains available.");
+    statusBar()->showMessage(
+        "Viewport-first workspace ready. Use Studio Panels when you need production/catalog/diagnostic controls.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
     canvas_->onHoverTileChanged = [this](const int x, const int y) {
@@ -109,11 +111,21 @@ void MainWindow::buildMenus() {
     auto* centerAction = viewMenu->addAction("Center Map");
     centerAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(centerAction, &QAction::triggered, this, [this]() { canvas_->centerCamera(); });
+
+    studio_panels_action_ = viewMenu->addAction("Studio Panels");
+    studio_panels_action_->setCheckable(true);
+    studio_panels_action_->setChecked(false);
+    studio_panels_action_->setShortcut(QKeySequence("Tab"));
+    connect(studio_panels_action_, &QAction::toggled, this, [this](const bool visible) {
+        showStudioPanels(visible);
+    });
 }
 
 void MainWindow::buildToolbar() {
-    auto* toolbar = addToolBar("Editor");
+    auto* toolbar = addToolBar("Map Tools");
+    toolbar->setObjectName("MapToolsToolbar");
     toolbar->setMovable(false);
+    toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
 
     auto* toolGroup = new QActionGroup(this);
     toolGroup->setExclusive(true);
@@ -156,14 +168,23 @@ void MainWindow::buildToolbar() {
     auto* centerAction = toolbar->addAction("Center");
     centerAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(centerAction, &QAction::triggered, this, [this]() { canvas_->centerCamera(); });
+
+    toolbar->addSeparator();
+    if (studio_panels_action_ != nullptr) {
+        toolbar->addAction(studio_panels_action_);
+    }
 }
 
 void MainWindow::buildDocks() {
-    auto* dock = new QDockWidget("City Horizon Studio", this);
-    dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    dock->setMinimumWidth(420);
+    studio_dock_ = new QDockWidget("Studio Panels", this);
+    studio_dock_->setObjectName("StudioPanelsDock");
+    studio_dock_->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
+    studio_dock_->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    studio_dock_->setMinimumWidth(300);
+    studio_dock_->setMaximumWidth(560);
 
-    auto* tabs = new QTabWidget(dock);
+    auto* tabs = new QTabWidget(studio_dock_);
+    tabs->setDocumentMode(true);
     tabs->addTab(new ch::studio::ProductionStudioPanel(tabs), "Production");
     tabs->addTab(new ch::studio::StudioPanel(tabs), "Studio");
 
@@ -202,8 +223,28 @@ void MainWindow::buildDocks() {
     diagnosticsLayout->addStretch(1);
     tabs->addTab(diagnosticsPage, "Diagnostics");
 
-    dock->setWidget(tabs);
-    addDockWidget(Qt::RightDockWidgetArea, dock);
+    studio_dock_->setWidget(tabs);
+    addDockWidget(Qt::RightDockWidgetArea, studio_dock_);
+    studio_dock_->hide();
+
+    connect(studio_dock_, &QDockWidget::visibilityChanged, this, [this](const bool visible) {
+        if (studio_panels_action_ != nullptr && studio_panels_action_->isChecked() != visible) {
+            studio_panels_action_->blockSignals(true);
+            studio_panels_action_->setChecked(visible);
+            studio_panels_action_->blockSignals(false);
+        }
+    });
+}
+
+void MainWindow::showStudioPanels(const bool visible) {
+    if (studio_dock_ == nullptr) return;
+    studio_dock_->setVisible(visible);
+    if (visible) {
+        studio_dock_->raise();
+        studio_dock_->setFocus();
+    } else if (canvas_ != nullptr) {
+        canvas_->setFocus();
+    }
 }
 
 void MainWindow::setTool(const EditorTool tool) {
@@ -244,8 +285,10 @@ bool MainWindow::loadScenario(const QString& path) {
 
     setAuthoringEnabled(false);
     refreshHistoryActions();
+    showStudioPanels(false);
     statusBar()->showMessage(
-        QString("Canonical renderer pilot active: %1 — inspection/pan/zoom only; Save remains gated.").arg(path), 8000);
+        QString("Canonical renderer active: %1 — viewport is maximized; editing remains gated until lossless authoring is implemented.").arg(path),
+        8000);
     setWindowTitle(QString("City Horizon Studio / Map Forge 2 — %1 [Canonical]").arg(QFileInfo(path).fileName()));
     canvas_->update();
     return true;
