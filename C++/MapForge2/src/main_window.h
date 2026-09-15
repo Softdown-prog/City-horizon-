@@ -7,6 +7,7 @@
 
 class QAction;
 class QComboBox;
+class QDockWidget;
 class QLabel;
 
 namespace ch::editor {
@@ -24,8 +25,11 @@ private:
     void refreshHistoryActions();
     void setTool(EditorTool tool);
     void setAuthoringEnabled(bool enabled);
+    void showStudioPanels(bool visible);
 
     EditorCanvas* canvas_ = nullptr;
+    QDockWidget* studio_dock_ = nullptr;
+    QAction* studio_panels_action_ = nullptr;
     QAction* undo_action_ = nullptr;
     QAction* redo_action_ = nullptr;
     QAction* inspect_action_ = nullptr;
