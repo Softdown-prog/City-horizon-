@@ -1,0 +1,21 @@
+{
+  "contract": "CH_STUDIO_PROJECT_V1",
+  "projectId": "city_horizon",
+  "displayName": "City Horizon",
+  "gridContract": "CH_GRID_V1",
+  "tileWidth": 128,
+  "tileHeight": 64,
+  "diamondRatio": 2.0,
+  "camera": {
+    "projection": "orthographic_isometric",
+    "rotationDeg": 45.0,
+    "inclinationDeg": 35.264,
+    "locked": true
+  },
+  "production": {
+    "sourceAssetsImmutable": true,
+    "maskContract": "CH_MASK_V1",
+    "contentContract": "CH_CONTENT_PACK_V1",
+    "animatedPropContract": "CH_ANIMATED_PROP_V1"
+  }
+}
