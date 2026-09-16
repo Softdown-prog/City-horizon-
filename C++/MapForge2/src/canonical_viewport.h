@@ -5,9 +5,11 @@
 #include "src/ch_render/map_renderer.h"
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace ch::editor {
 
@@ -37,6 +39,8 @@ public:
 private:
     const TextureAsset* findTexture(const std::filesystem::path& path);
     void clearTextures();
+    void rebuildSceneCache();
+    void rebuildBuildingOrder();
     void renderRoads(float viewportWidth, float viewportHeight);
     void renderBuildings(float viewportWidth, float viewportHeight);
     void renderHover(float viewportWidth, float viewportHeight);
@@ -49,6 +53,15 @@ private:
     std::filesystem::path asset_root_;
     std::optional<MapDocument> document_;
     std::unordered_map<std::string, TextureAsset> texture_cache_;
+
+    // Canonical scenario preparation is cached on load. The Qt paint schedule
+    // may still wake the viewport, but expensive world preparation is not
+    // repeated until the document or camera rotation actually changes.
+    std::unordered_map<std::uint64_t, const TextureAsset*> terrain_textures_;
+    std::unique_ptr<RoadManager> road_manager_;
+    std::vector<BuildingInstanceEntry> sorted_buildings_;
+    bool frame_dirty_ = true;
+
     BuildingCatalog building_catalog_;
     RoadVisualCatalog road_visuals_;
 

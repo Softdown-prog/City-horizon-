@@ -93,9 +93,13 @@ bool CanonicalViewport::initialize(void* nativeWindowHandle, const int physicalW
 }
 
 void CanonicalViewport::shutdown() {
-    clearTextures();
+    terrain_textures_.clear();
+    road_manager_.reset();
+    sorted_buildings_.clear();
     document_.reset();
+    clearTextures();
     hover_visible_ = false;
+    frame_dirty_ = true;
 
     if (renderer_ != nullptr) {
         SDL_DestroyRenderer(renderer_);
@@ -110,24 +114,47 @@ void CanonicalViewport::shutdown() {
 }
 
 void CanonicalViewport::resize(const int physicalWidth, const int physicalHeight) {
-    physical_width_ = std::max(1, physicalWidth);
-    physical_height_ = std::max(1, physicalHeight);
+    const int nextWidth = std::max(1, physicalWidth);
+    const int nextHeight = std::max(1, physicalHeight);
+    if (physical_width_ == nextWidth && physical_height_ == nextHeight) return;
+
+    physical_width_ = nextWidth;
+    physical_height_ = nextHeight;
+    frame_dirty_ = true;
 }
 
 void CanonicalViewport::setCamera(const CameraState& camera) {
+    const bool rotationChanged = camera_.rotation != camera.rotation;
+    const bool changed = camera_.pan_x != camera.pan_x
+        || camera_.pan_y != camera.pan_y
+        || camera_.zoom != camera.zoom
+        || rotationChanged;
+    if (!changed) return;
+
     camera_ = camera;
+    if (rotationChanged) rebuildBuildingOrder();
+    frame_dirty_ = true;
 }
 
 bool CanonicalViewport::loadDocument(const MapDocument& document) {
     document_ = document;
+    rebuildSceneCache();
+    frame_dirty_ = true;
     return true;
 }
 
 void CanonicalViewport::setHover(const int tileX, const int tileY, const int brushSize, const bool visible) {
+    const int nextBrushSize = brushSize <= 1 ? 1 : (brushSize <= 3 ? 3 : 5);
+    if (hover_x_ == tileX && hover_y_ == tileY
+        && hover_brush_size_ == nextBrushSize && hover_visible_ == visible) {
+        return;
+    }
+
     hover_x_ = tileX;
     hover_y_ = tileY;
-    hover_brush_size_ = brushSize <= 1 ? 1 : (brushSize <= 3 ? 3 : 5);
+    hover_brush_size_ = nextBrushSize;
     hover_visible_ = visible;
+    frame_dirty_ = true;
 }
 
 const TextureAsset* CanonicalViewport::findTexture(const std::filesystem::path& path) {
@@ -161,33 +188,39 @@ void CanonicalViewport::clearTextures() {
     texture_cache_.clear();
 }
 
-void CanonicalViewport::renderRoads(const float viewportWidth, const float viewportHeight) {
+void CanonicalViewport::rebuildSceneCache() {
+    terrain_textures_.clear();
+    road_manager_ = std::make_unique<RoadManager>(contracts::kMapMin, contracts::kMapMax);
+    sorted_buildings_.clear();
+
     if (!document_.has_value()) return;
 
-    RoadManager roads(contracts::kMapMin, contracts::kMapMax);
-    for (const auto& road : document_->roads()) {
-        (void)roads.place_tile(road.tile_x, road.tile_y);
+    terrain_textures_.reserve(document_->terrain_tiles().size());
+    for (const auto& terrain : document_->terrain_tiles()) {
+        if (terrain.texture.empty()) continue;
+        if (const TextureAsset* texture = findTexture(terrain.texture)) {
+            terrain_textures_[tile_key(terrain.tile_x, terrain.tile_y)] = texture;
+        }
     }
 
-    MapRenderer::render_roads(
-        renderer_, roads, road_visuals_,
-        [this](const std::filesystem::path& path) { return findTexture(path); },
-        {}, camera_, viewportWidth, viewportHeight);
+    for (const auto& road : document_->roads()) {
+        (void)road_manager_->place_tile(road.tile_x, road.tile_y);
+    }
+
+    sorted_buildings_ = document_->buildings();
+    rebuildBuildingOrder();
 }
 
-void CanonicalViewport::renderBuildings(const float viewportWidth, const float viewportHeight) {
-    if (!document_.has_value()) return;
+void CanonicalViewport::rebuildBuildingOrder() {
+    if (sorted_buildings_.empty()) return;
 
-    std::vector<const BuildingInstanceEntry*> entries;
-    entries.reserve(document_->buildings().size());
-    for (const auto& entry : document_->buildings()) entries.push_back(&entry);
+    std::sort(sorted_buildings_.begin(), sorted_buildings_.end(),
+              [this](const BuildingInstanceEntry& left, const BuildingInstanceEntry& right) {
+        const BuildingDefinition* leftDefinition = building_catalog_.find(left.definition_id);
+        const BuildingDefinition* rightDefinition = building_catalog_.find(right.definition_id);
 
-    std::sort(entries.begin(), entries.end(), [this](const BuildingInstanceEntry* left, const BuildingInstanceEntry* right) {
-        const BuildingDefinition* leftDefinition = building_catalog_.find(left->definition_id);
-        const BuildingDefinition* rightDefinition = building_catalog_.find(right->definition_id);
-
-        const BuildingRotation leftRotation = safeRotation(left->rotation);
-        const BuildingRotation rightRotation = safeRotation(right->rotation);
+        const BuildingRotation leftRotation = safeRotation(left.rotation);
+        const BuildingRotation rightRotation = safeRotation(right.rotation);
         const BuildingFootprint leftFootprint = leftDefinition == nullptr
             ? BuildingFootprint{}
             : rotated_footprint(*leftDefinition, leftRotation);
@@ -196,24 +229,37 @@ void CanonicalViewport::renderBuildings(const float viewportWidth, const float v
             : rotated_footprint(*rightDefinition, rightRotation);
 
         const WorldPoint leftGround = building_visual_ground_world(
-            left->tile_x, left->tile_y, leftFootprint.width, leftFootprint.height, camera_.rotation);
+            left.tile_x, left.tile_y, leftFootprint.width, leftFootprint.height, camera_.rotation);
         const WorldPoint rightGround = building_visual_ground_world(
-            right->tile_x, right->tile_y, rightFootprint.width, rightFootprint.height, camera_.rotation);
+            right.tile_x, right.tile_y, rightFootprint.width, rightFootprint.height, camera_.rotation);
         const float leftDepth = camera_depth_key(leftGround.x, leftGround.y, camera_);
         const float rightDepth = camera_depth_key(rightGround.x, rightGround.y, camera_);
-        return leftDepth == rightDepth ? left->instance_id < right->instance_id : leftDepth < rightDepth;
+        return leftDepth == rightDepth ? left.instance_id < right.instance_id : leftDepth < rightDepth;
     });
+}
 
-    for (const BuildingInstanceEntry* entry : entries) {
-        const BuildingDefinition* definition = building_catalog_.find(entry->definition_id);
+void CanonicalViewport::renderRoads(const float viewportWidth, const float viewportHeight) {
+    if (road_manager_ == nullptr) return;
+
+    MapRenderer::render_roads(
+        renderer_, *road_manager_, road_visuals_,
+        [this](const std::filesystem::path& path) { return findTexture(path); },
+        {}, camera_, viewportWidth, viewportHeight);
+}
+
+void CanonicalViewport::renderBuildings(const float viewportWidth, const float viewportHeight) {
+    if (!document_.has_value()) return;
+
+    for (const auto& entry : sorted_buildings_) {
+        const BuildingDefinition* definition = building_catalog_.find(entry.definition_id);
         if (definition == nullptr) continue;
 
         BuildingInstance instance;
-        instance.instance_id = static_cast<std::uint64_t>(entry->instance_id);
-        instance.definition_id = entry->definition_id;
-        instance.tile_x = entry->tile_x;
-        instance.tile_y = entry->tile_y;
-        instance.rotation = safeRotation(entry->rotation);
+        instance.instance_id = static_cast<std::uint64_t>(entry.instance_id);
+        instance.definition_id = entry.definition_id;
+        instance.tile_x = entry.tile_x;
+        instance.tile_y = entry.tile_y;
+        instance.rotation = safeRotation(entry.rotation);
         instance.current_level = 1;
 
         const BuildingRotation visual = visualRotation(*definition, instance.rotation, camera_.rotation);
@@ -243,7 +289,7 @@ void CanonicalViewport::renderHover(const float viewportWidth, const float viewp
 }
 
 void CanonicalViewport::renderFrame() {
-    if (renderer_ == nullptr) return;
+    if (renderer_ == nullptr || !frame_dirty_) return;
 
     int width = physical_width_;
     int height = physical_height_;
@@ -252,21 +298,12 @@ void CanonicalViewport::renderFrame() {
     const float viewportHeight = static_cast<float>(std::max(1, height));
 
     const TextureAsset* grass = findTexture("assets/terrain/grass_isometric_01.png");
-    std::unordered_map<std::uint64_t, const TextureAsset*> terrainTextures;
-    if (document_.has_value()) {
-        for (const auto& terrain : document_->terrain_tiles()) {
-            if (terrain.texture.empty()) continue;
-            if (const TextureAsset* texture = findTexture(terrain.texture)) {
-                terrainTextures[tile_key(terrain.tile_x, terrain.tile_y)] = texture;
-            }
-        }
-    }
-
-    MapRenderer::render_map(renderer_, grass, terrainTextures, camera_, viewportWidth, viewportHeight);
+    MapRenderer::render_map(renderer_, grass, terrain_textures_, camera_, viewportWidth, viewportHeight);
     renderRoads(viewportWidth, viewportHeight);
     renderBuildings(viewportWidth, viewportHeight);
     renderHover(viewportWidth, viewportHeight);
     SDL_RenderPresent(renderer_);
+    frame_dirty_ = false;
 }
 
 } // namespace ch::editor
