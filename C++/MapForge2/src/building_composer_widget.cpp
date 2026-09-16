@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QPixmap>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSlider>
 #include <QVBoxLayout>
 
@@ -24,6 +25,7 @@ void applyPalette(BuildingComposerSpec& spec, const int index) {
             spec.trim_color = QColor("#f7f7f3");
             spec.glass_color = QColor("#7cb5c9");
             spec.door_color = QColor("#3f4b52");
+            spec.accent_color = QColor("#2f7f91");
             break;
         case 2:
             spec.wall_color = QColor("#d8b88a");
@@ -31,6 +33,7 @@ void applyPalette(BuildingComposerSpec& spec, const int index) {
             spec.trim_color = QColor("#f1dfbf");
             spec.glass_color = QColor("#82b7c7");
             spec.door_color = QColor("#5c3d2e");
+            spec.accent_color = QColor("#b46d37");
             break;
         default:
             spec.wall_color = QColor("#d8c3a5");
@@ -38,6 +41,7 @@ void applyPalette(BuildingComposerSpec& spec, const int index) {
             spec.trim_color = QColor("#f2eadf");
             spec.glass_color = QColor("#78b9d1");
             spec.door_color = QColor("#6d4c41");
+            spec.accent_color = QColor("#d79b38");
             break;
     }
 }
@@ -50,8 +54,8 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
-        "Parametric geometry is the editable source; PNG RGBA remains the runtime output. "
-        "The four views are generated from one structural definition so rotation never invents a different building.",
+        "One structural definition generates all four views. V0 now includes logical façade/roof sockets so "
+        "doors, awnings, signs and chimneys rotate with the building instead of being redrawn per sprite.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
@@ -71,11 +75,31 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     palette_combo_->addItems({"Warm residential", "Cool modern", "Earth / rural"});
     form->addRow("Material preset", palette_combo_);
 
+    detail_preset_combo_ = new QComboBox(this);
+    detail_preset_combo_->addItems({"Residence", "Small shop", "Utility / depot"});
+    form->addRow("Detail preset", detail_preset_combo_);
+
+    door_position_combo_ = new QComboBox(this);
+    door_position_combo_->addItems({"Left", "Center", "Right"});
+    door_position_combo_->setCurrentIndex(1);
+    form->addRow("Entrance socket", door_position_combo_);
+
+    window_pattern_combo_ = new QComboBox(this);
+    window_pattern_combo_->addItems({"Single", "Pair", "Strip"});
+    window_pattern_combo_->setCurrentIndex(1);
+    form->addRow("Window module", window_pattern_combo_);
+
     wall_height_slider_ = new QSlider(Qt::Horizontal, this);
     wall_height_slider_->setRange(48, 132);
     wall_height_slider_->setValue(spec_.wall_height_px);
     wall_height_slider_->setSingleStep(4);
     form->addRow("Wall height", wall_height_slider_);
+
+    roof_height_slider_ = new QSlider(Qt::Horizontal, this);
+    roof_height_slider_->setRange(10, 58);
+    roof_height_slider_->setValue(spec_.roof_height_px);
+    roof_height_slider_->setSingleStep(2);
+    form->addRow("Roof height", roof_height_slider_);
 
     root->addLayout(form);
 
@@ -84,10 +108,16 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     windows_check_->setChecked(true);
     door_check_ = new QCheckBox("South door", this);
     door_check_->setChecked(true);
+    awning_check_ = new QCheckBox("Awning", this);
+    sign_check_ = new QCheckBox("Sign", this);
+    chimney_check_ = new QCheckBox("Chimney", this);
     shadow_check_ = new QCheckBox("Contact shadow", this);
     shadow_check_->setChecked(true);
     flags->addWidget(windows_check_);
     flags->addWidget(door_check_);
+    flags->addWidget(awning_check_);
+    flags->addWidget(sign_check_);
+    flags->addWidget(chimney_check_);
     flags->addWidget(shadow_check_);
     flags->addStretch(1);
     root->addLayout(flags);
@@ -115,14 +145,68 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     connect(footprint_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(roof_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(palette_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(detail_preset_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
+        applyDetailPreset(index);
+        refreshSpecFromControls();
+        refreshPreview();
+    });
+    connect(door_position_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(window_pattern_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(wall_height_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(roof_height_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
     connect(windows_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
     connect(door_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
+    connect(awning_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
+    connect(sign_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
+    connect(chimney_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
     connect(shadow_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
     connect(export_button, &QPushButton::clicked, this, [this]() { exportAsset(); });
 
+    applyDetailPreset(0);
     refreshSpecFromControls();
     refreshPreview();
+}
+
+void BuildingComposerWidget::applyDetailPreset(const int index) {
+    if (door_check_ == nullptr) return;
+
+    const QSignalBlocker door_blocker(door_check_);
+    const QSignalBlocker windows_blocker(windows_check_);
+    const QSignalBlocker awning_blocker(awning_check_);
+    const QSignalBlocker sign_blocker(sign_check_);
+    const QSignalBlocker chimney_blocker(chimney_check_);
+    const QSignalBlocker door_position_blocker(door_position_combo_);
+    const QSignalBlocker window_pattern_blocker(window_pattern_combo_);
+
+    switch (index) {
+        case 1:
+            door_check_->setChecked(true);
+            windows_check_->setChecked(true);
+            awning_check_->setChecked(true);
+            sign_check_->setChecked(true);
+            chimney_check_->setChecked(false);
+            door_position_combo_->setCurrentIndex(0);
+            window_pattern_combo_->setCurrentIndex(2);
+            break;
+        case 2:
+            door_check_->setChecked(true);
+            windows_check_->setChecked(true);
+            awning_check_->setChecked(false);
+            sign_check_->setChecked(false);
+            chimney_check_->setChecked(false);
+            door_position_combo_->setCurrentIndex(2);
+            window_pattern_combo_->setCurrentIndex(0);
+            break;
+        default:
+            door_check_->setChecked(true);
+            windows_check_->setChecked(true);
+            awning_check_->setChecked(false);
+            sign_check_->setChecked(false);
+            chimney_check_->setChecked(true);
+            door_position_combo_->setCurrentIndex(1);
+            window_pattern_combo_->setCurrentIndex(1);
+            break;
+    }
 }
 
 void BuildingComposerWidget::refreshSpecFromControls() {
@@ -138,9 +222,22 @@ void BuildingComposerWidget::refreshSpecFromControls() {
     spec_.roof_style = roof == 1 ? BuildingRoofStyle::Pyramid
         : (roof == 2 ? BuildingRoofStyle::Flat : BuildingRoofStyle::Gable);
     spec_.wall_height_px = wall_height_slider_ != nullptr ? wall_height_slider_->value() : 82;
-    spec_.roof_height_px = spec_.roof_style == BuildingRoofStyle::Flat ? 10 : 34;
+    spec_.roof_height_px = roof_height_slider_ != nullptr ? roof_height_slider_->value() : 34;
+    if (spec_.roof_style == BuildingRoofStyle::Flat) spec_.roof_height_px = 10;
+
+    const int door_position = door_position_combo_ != nullptr ? door_position_combo_->currentIndex() : 1;
+    spec_.door_position = door_position == 0 ? BuildingDoorPosition::Left
+        : (door_position == 2 ? BuildingDoorPosition::Right : BuildingDoorPosition::Center);
+
+    const int window_pattern = window_pattern_combo_ != nullptr ? window_pattern_combo_->currentIndex() : 1;
+    spec_.window_pattern = window_pattern == 0 ? BuildingWindowPattern::Single
+        : (window_pattern == 2 ? BuildingWindowPattern::Strip : BuildingWindowPattern::Pair);
+
     spec_.windows = windows_check_ == nullptr || windows_check_->isChecked();
     spec_.south_door = door_check_ == nullptr || door_check_->isChecked();
+    spec_.south_awning = awning_check_ != nullptr && awning_check_->isChecked();
+    spec_.south_sign = sign_check_ != nullptr && sign_check_->isChecked();
+    spec_.roof_chimney = chimney_check_ != nullptr && chimney_check_->isChecked();
     spec_.cast_shadow = shadow_check_ == nullptr || shadow_check_->isChecked();
     applyPalette(spec_, palette_combo_ != nullptr ? palette_combo_->currentIndex() : 0);
 }
@@ -156,13 +253,22 @@ void BuildingComposerWidget::refreshPreview() {
         Qt::KeepAspectRatio,
         Qt::SmoothTransformation));
 
+    QStringList modules;
+    if (spec_.south_awning) modules << "awning";
+    if (spec_.south_sign) modules << "sign";
+    if (spec_.roof_chimney) modules << "chimney";
+    const QString module_text = modules.isEmpty() ? QStringLiteral("no optional modules") : modules.join(", ");
+
     summary_->setText(
-        QString("CH_BUILDING_COMPOSER_V0 / PILOT — %1×%2 tile footprint, %3 roof, %4 px walls. "
-                "Logical entrance stays on the south façade; the four views share one geometry and one palette. Runtime target: PNG RGBA bitmap.")
+        QString("CH_BUILDING_COMPOSER_V0 / socket_modules_1 — %1×%2 footprint, %3 roof, %4 px walls. "
+                "Entrance: south/%5. Windows: %6. Modules: %7. All four views share one geometry, palette and logical sockets.")
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
             .arg(BuildingComposer::roofName(spec_.roof_style))
-            .arg(spec_.wall_height_px));
+            .arg(spec_.wall_height_px)
+            .arg(BuildingComposer::doorPositionName(spec_.door_position))
+            .arg(BuildingComposer::windowPatternName(spec_.window_pattern))
+            .arg(module_text));
 }
 
 void BuildingComposerWidget::exportAsset() {

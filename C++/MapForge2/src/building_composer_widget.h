@@ -18,6 +18,7 @@ public:
 private:
     void refreshSpecFromControls();
     void refreshPreview();
+    void applyDetailPreset(int index);
     void exportAsset();
 
     BuildingComposerSpec spec_;
@@ -25,9 +26,16 @@ private:
     QComboBox* footprint_combo_ = nullptr;
     QComboBox* roof_combo_ = nullptr;
     QComboBox* palette_combo_ = nullptr;
+    QComboBox* detail_preset_combo_ = nullptr;
+    QComboBox* door_position_combo_ = nullptr;
+    QComboBox* window_pattern_combo_ = nullptr;
     QSlider* wall_height_slider_ = nullptr;
+    QSlider* roof_height_slider_ = nullptr;
     QCheckBox* windows_check_ = nullptr;
     QCheckBox* door_check_ = nullptr;
+    QCheckBox* awning_check_ = nullptr;
+    QCheckBox* sign_check_ = nullptr;
+    QCheckBox* chimney_check_ = nullptr;
     QCheckBox* shadow_check_ = nullptr;
     QLabel* preview_ = nullptr;
     QLabel* summary_ = nullptr;

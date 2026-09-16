@@ -111,6 +111,148 @@ void drawFaceDetail(QPainter& painter, const Point3 a, const Point3 b, const flo
     drawOutlinedPolygon(painter, polygon, fill, outline);
 }
 
+float doorCenter(const BuildingDoorPosition position) {
+    switch (position) {
+        case BuildingDoorPosition::Left: return 0.24F;
+        case BuildingDoorPosition::Center: return 0.50F;
+        case BuildingDoorPosition::Right: return 0.76F;
+    }
+    return 0.50F;
+}
+
+void drawWindows(QPainter& painter, const BuildingComposerSpec& spec,
+                 const Point3 a, const Point3 b, const int edge,
+                 const float wall_h, const BuildingView view, const QSize canvas) {
+    if (!spec.windows) return;
+
+    const float window_z0 = wall_h * 0.38F;
+    const float window_z1 = wall_h * 0.68F;
+    const QColor outline = scaledColor(spec.trim_color, 0.72F);
+    const bool entrance_edge = spec.south_door && edge == 2;
+
+    auto window = [&](const float t0, const float t1) {
+        drawFaceDetail(painter, a, b, t0, t1, window_z0, window_z1,
+                       view, canvas, spec.glass_color, outline);
+    };
+
+    if (entrance_edge) {
+        switch (spec.window_pattern) {
+            case BuildingWindowPattern::Single:
+                if (spec.door_position == BuildingDoorPosition::Left) window(0.58F, 0.82F);
+                else if (spec.door_position == BuildingDoorPosition::Right) window(0.18F, 0.42F);
+                else window(0.12F, 0.32F);
+                break;
+            case BuildingWindowPattern::Pair:
+                window(0.08F, 0.25F);
+                window(0.75F, 0.92F);
+                break;
+            case BuildingWindowPattern::Strip:
+                window(0.06F, 0.18F);
+                window(0.23F, 0.35F);
+                window(0.65F, 0.77F);
+                window(0.82F, 0.94F);
+                break;
+        }
+        return;
+    }
+
+    switch (spec.window_pattern) {
+        case BuildingWindowPattern::Single:
+            window(0.36F, 0.64F);
+            break;
+        case BuildingWindowPattern::Pair:
+            window(0.16F, 0.34F);
+            window(0.66F, 0.84F);
+            break;
+        case BuildingWindowPattern::Strip:
+            window(0.08F, 0.22F);
+            window(0.29F, 0.43F);
+            window(0.57F, 0.71F);
+            window(0.78F, 0.92F);
+            break;
+    }
+}
+
+void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
+                      const Point3 a, const Point3 b, const float wall_h,
+                      const BuildingView view, const QSize canvas) {
+    if (!spec.south_door) return;
+
+    const float center = doorCenter(spec.door_position);
+    const float half = 0.12F;
+    const float t0 = std::clamp(center - half, 0.05F, 0.80F);
+    const float t1 = std::clamp(center + half, 0.20F, 0.95F);
+
+    drawFaceDetail(painter, a, b, t0, t1, 1.0F, wall_h * 0.56F,
+                   view, canvas, spec.door_color, scaledColor(spec.trim_color, 0.68F));
+
+    if (spec.south_sign) {
+        const float sign_half = 0.15F;
+        drawFaceDetail(painter, a, b,
+                       std::clamp(center - sign_half, 0.04F, 0.76F),
+                       std::clamp(center + sign_half, 0.24F, 0.96F),
+                       wall_h * 0.70F, wall_h * 0.83F,
+                       view, canvas, spec.accent_color, scaledColor(spec.trim_color, 0.62F));
+    }
+
+    if (spec.south_awning) {
+        const float awning_half = 0.18F;
+        const Point3 inner0 = lerpPoint(a, b, std::clamp(center - awning_half, 0.03F, 0.70F), wall_h * 0.66F);
+        const Point3 inner1 = lerpPoint(a, b, std::clamp(center + awning_half, 0.30F, 0.97F), wall_h * 0.66F);
+        const Point3 outer0{inner0.x, inner0.y + 0.28F, wall_h * 0.59F};
+        const Point3 outer1{inner1.x, inner1.y + 0.28F, wall_h * 0.59F};
+
+        const QPolygonF canopy = {
+            projectPoint(inner0, view, canvas),
+            projectPoint(inner1, view, canvas),
+            projectPoint(outer1, view, canvas),
+            projectPoint(outer0, view, canvas),
+        };
+        drawOutlinedPolygon(painter, canopy, spec.accent_color, scaledColor(spec.trim_color, 0.62F));
+    }
+}
+
+void drawChimney(QPainter& painter, const BuildingComposerSpec& spec,
+                 const float half_w, const float half_d, const float wall_h, const float roof_h,
+                 const BuildingView view, const QSize canvas) {
+    if (!spec.roof_chimney) return;
+
+    const float cx = -half_w * 0.30F;
+    const float cy = -half_d * 0.18F;
+    constexpr float size = 0.16F;
+    const float z0 = wall_h + roof_h * 0.48F;
+    const float z1 = z0 + 24.0F;
+
+    const std::array<Point3, 4> corners = {
+        Point3{cx - size, cy - size, z0},
+        Point3{cx + size, cy - size, z0},
+        Point3{cx + size, cy + size, z0},
+        Point3{cx - size, cy + size, z0},
+    };
+
+    int near_index = 0;
+    float near_y = -1.0e9F;
+    for (int i = 0; i < 4; ++i) {
+        const float y = static_cast<float>(projectPoint(corners[i], view, canvas).y());
+        if (y > near_y) {
+            near_y = y;
+            near_index = i;
+        }
+    }
+
+    const std::array<int, 2> edges = {(near_index + 3) % 4, near_index};
+    for (const int edge : edges) {
+        const int next = (edge + 1) % 4;
+        const QPolygonF face = faceQuad(corners[edge], corners[next], z0, z1, view, canvas);
+        const float factor = face.boundingRect().center().x() < canvas.width() * 0.5F ? 0.78F : 0.92F;
+        drawOutlinedPolygon(painter, face, scaledColor(spec.door_color, factor));
+    }
+
+    QPolygonF cap;
+    for (const Point3& corner : corners) cap << projectPoint({corner.x, corner.y, z1}, view, canvas);
+    drawOutlinedPolygon(painter, cap, scaledColor(spec.door_color, 1.08F));
+}
+
 } // namespace
 
 QString BuildingComposer::viewName(const BuildingView view) {
@@ -130,6 +272,24 @@ QString BuildingComposer::roofName(const BuildingRoofStyle style) {
         case BuildingRoofStyle::Flat: return "flat";
     }
     return "unknown";
+}
+
+QString BuildingComposer::doorPositionName(const BuildingDoorPosition position) {
+    switch (position) {
+        case BuildingDoorPosition::Left: return "left";
+        case BuildingDoorPosition::Center: return "center";
+        case BuildingDoorPosition::Right: return "right";
+    }
+    return "center";
+}
+
+QString BuildingComposer::windowPatternName(const BuildingWindowPattern pattern) {
+    switch (pattern) {
+        case BuildingWindowPattern::Single: return "single";
+        case BuildingWindowPattern::Pair: return "pair";
+        case BuildingWindowPattern::Strip: return "strip";
+    }
+    return "pair";
 }
 
 QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const BuildingView view,
@@ -190,8 +350,8 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         const int next = (edge + 1) % 4;
         wall_faces.push_back({edge, faceQuad(corners[edge], corners[next], 0.0F, wall_h, view, canvas)});
     }
-    std::sort(wall_faces.begin(), wall_faces.end(), [](const FaceDraw& a, const FaceDraw& b) {
-        return averageY(a.polygon) < averageY(b.polygon);
+    std::sort(wall_faces.begin(), wall_faces.end(), [](const FaceDraw& lhs, const FaceDraw& rhs) {
+        return averageY(lhs.polygon) < averageY(rhs.polygon);
     });
 
     for (const FaceDraw& face : wall_faces) {
@@ -205,24 +365,9 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         const Point3 a = corners[edge];
         const Point3 b = corners[next];
 
-        if (spec.windows) {
-            const float window_z0 = wall_h * 0.38F;
-            const float window_z1 = wall_h * 0.68F;
-            const float edge_span = std::hypot(b.x - a.x, b.y - a.y);
-            if (edge_span > 1.4F) {
-                drawFaceDetail(painter, a, b, 0.16F, 0.34F, window_z0, window_z1,
-                               view, canvas, spec.glass_color, scaledColor(spec.trim_color, 0.72F));
-                drawFaceDetail(painter, a, b, 0.66F, 0.84F, window_z0, window_z1,
-                               view, canvas, spec.glass_color, scaledColor(spec.trim_color, 0.72F));
-            } else {
-                drawFaceDetail(painter, a, b, 0.30F, 0.58F, window_z0, window_z1,
-                               view, canvas, spec.glass_color, scaledColor(spec.trim_color, 0.72F));
-            }
-        }
-
-        if (spec.south_door && edge == 2) {
-            drawFaceDetail(painter, a, b, 0.38F, 0.62F, 1.0F, wall_h * 0.56F,
-                           view, canvas, spec.door_color, scaledColor(spec.trim_color, 0.68F));
+        drawWindows(painter, spec, a, b, edge, wall_h, view, canvas);
+        if (edge == 2) {
+            drawSouthModules(painter, spec, a, b, wall_h, view, canvas);
         }
     }
 
@@ -288,8 +433,8 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         }
     }
 
-    std::sort(roof_faces.begin(), roof_faces.end(), [](const RoofDraw& a, const RoofDraw& b) {
-        return averageY(a.polygon) < averageY(b.polygon);
+    std::sort(roof_faces.begin(), roof_faces.end(), [](const RoofDraw& lhs, const RoofDraw& rhs) {
+        return averageY(lhs.polygon) < averageY(rhs.polygon);
     });
     for (const RoofDraw& roof : roof_faces) {
         drawOutlinedPolygon(painter, roof.polygon, roof.color, QColor(52, 45, 43, 225));
@@ -300,6 +445,8 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         const int next = (edge + 1) % 4;
         painter.drawLine(top[edge], top[next]);
     }
+
+    drawChimney(painter, spec, half_w, half_d, wall_h, roof_h, view, canvas);
 
     painter.end();
     return image;
@@ -323,9 +470,9 @@ QImage BuildingComposer::renderReviewSheet(const BuildingComposerSpec& spec, con
 
     QPainter painter(&sheet);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    QFont font = painter.font();
+    QFont font(QStringLiteral("Arial"));
     font.setBold(true);
-    font.setPointSize(std::max(8, font.pointSize()));
+    font.setPointSize(9);
     painter.setFont(font);
 
     for (int i = 0; i < static_cast<int>(kViews.size()); ++i) {
@@ -359,9 +506,43 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
     QJsonArray views;
     for (const BuildingView view : kViews) views.append(viewName(view));
 
+    QJsonArray sockets;
+    if (spec.south_door) {
+        sockets.append(QJsonObject{
+            {"id", "entrance_south"},
+            {"kind", "entrance"},
+            {"edge", "south"},
+            {"position", doorPositionName(spec.door_position)},
+        });
+    }
+    if (spec.south_awning) {
+        sockets.append(QJsonObject{
+            {"id", "awning_south"},
+            {"kind", "awning"},
+            {"edge", "south"},
+            {"parent", "entrance_south"},
+        });
+    }
+    if (spec.south_sign) {
+        sockets.append(QJsonObject{
+            {"id", "sign_south"},
+            {"kind", "sign"},
+            {"edge", "south"},
+            {"parent", "entrance_south"},
+        });
+    }
+    if (spec.roof_chimney) {
+        sockets.append(QJsonObject{
+            {"id", "chimney_roof"},
+            {"kind", "chimney"},
+            {"surface", "roof"},
+        });
+    }
+
     QJsonObject metadata{
         {"generator", "City Horizon Studio Building/Asset Composer"},
         {"contractVersion", "CH_BUILDING_COMPOSER_V0"},
+        {"featureRevision", "socket_modules_1"},
         {"status", "PILOT"},
         {"sourceRepresentation", "parametric_vector_volume"},
         {"runtimeRepresentation", "PNG_RGBA_bitmap"},
@@ -393,11 +574,17 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
         {"trim", spec.trim_color.name(QColor::HexRgb)},
         {"glass", spec.glass_color.name(QColor::HexRgb)},
         {"door", spec.door_color.name(QColor::HexRgb)},
+        {"accent", spec.accent_color.name(QColor::HexRgb)},
     };
 
     QJsonObject features{
         {"windows", spec.windows},
+        {"windowPattern", windowPatternName(spec.window_pattern)},
         {"southDoor", spec.south_door},
+        {"doorPosition", doorPositionName(spec.door_position)},
+        {"southAwning", spec.south_awning},
+        {"southSign", spec.south_sign},
+        {"roofChimney", spec.roof_chimney},
         {"castShadow", spec.cast_shadow},
     };
 
@@ -407,6 +594,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
         {"projection", projection},
         {"palette", palette},
         {"features", features},
+        {"sockets", sockets},
     };
 }
 
