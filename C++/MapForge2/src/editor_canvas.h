@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
+class QKeyEvent;
 class QMouseEvent;
 class QPaintEvent;
 class QWheelEvent;
@@ -43,6 +44,7 @@ public:
 
     bool loadCanonicalScenario(const std::string& path, std::string* error = nullptr);
     void newScratchMap(int width = 64, int height = 64);
+    bool resizeScratchMap(int width, int height);
     [[nodiscard]] bool canonicalMode() const { return canonical_mode_; }
 
     void setTool(EditorTool tool);
@@ -53,6 +55,7 @@ public:
     void redo();
 
     std::function<void()> onHistoryChanged;
+    std::function<void()> onDocumentBoundsChanged;
     std::function<void(int, int)> onHoverTileChanged;
 
 protected:
@@ -61,6 +64,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     void leaveEvent(QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
@@ -79,6 +83,7 @@ private:
     void endStroke();
     void paintBrushAt(const QPoint& tile);
     void mutateTile(int x, int y);
+    void panBy(float dx, float dy);
 
     EditorDocument document_;
     EditorHistory history_;

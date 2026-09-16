@@ -8,6 +8,7 @@
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -35,12 +36,15 @@ MainWindow::MainWindow(QWidget* parent)
     buildDocks();
     buildToolbar();
 
+    map_status_ = new QLabel("Map: —", this);
     tile_status_ = new QLabel("Tile: —", this);
+    statusBar()->addPermanentWidget(map_status_);
     statusBar()->addPermanentWidget(tile_status_);
     statusBar()->showMessage(
-        "Viewport-first workspace ready. Use Studio Panels when you need production/catalog/diagnostic controls.");
+        "Viewport ready. Drag with Inspect (or RMB/MMB) to move the map; WASD/arrows pan; wheel zooms.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
+    canvas_->onDocumentBoundsChanged = [this]() { refreshMapStatus(); };
     canvas_->onHoverTileChanged = [this](const int x, const int y) {
         tile_status_->setText(QString("Tile: %1, %2").arg(x).arg(y));
     };
@@ -69,6 +73,7 @@ MainWindow::MainWindow(QWidget* parent)
     )");
 
     refreshHistoryActions();
+    refreshMapStatus();
     QTimer::singleShot(0, canvas_, [this]() { canvas_->centerCamera(); });
 }
 
@@ -80,7 +85,8 @@ void MainWindow::buildMenus() {
         canvas_->newScratchMap(64, 64);
         setAuthoringEnabled(true);
         refreshHistoryActions();
-        statusBar()->showMessage("Created diagnostic 64x64 scratch map. Authoring tools are enabled here.", 5000);
+        refreshMapStatus();
+        statusBar()->showMessage("Created diagnostic 64x64 scratch map. Authoring and map resize are enabled.", 5000);
         setWindowTitle("City Horizon Studio / Map Forge 2 — Scratch Map");
     });
 
@@ -107,9 +113,17 @@ void MainWindow::buildMenus() {
     redo_action_->setShortcut(QKeySequence::Redo);
     connect(redo_action_, &QAction::triggered, this, [this]() { canvas_->redo(); });
 
+    auto* mapMenu = menuBar()->addMenu("&Map");
+    auto* resizeAction = mapMenu->addAction("Resize Map Bounds…");
+    resizeAction->setShortcut(QKeySequence("Ctrl+Shift+R"));
+    connect(resizeAction, &QAction::triggered, this, [this]() { resizeMapInteractive(); });
+
+    auto* centerMapAction = mapMenu->addAction("Center Map");
+    centerMapAction->setShortcut(QKeySequence("Ctrl+0"));
+    connect(centerMapAction, &QAction::triggered, this, [this]() { canvas_->centerCamera(); });
+
     auto* viewMenu = menuBar()->addMenu("&View");
     auto* centerAction = viewMenu->addAction("Center Map");
-    centerAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(centerAction, &QAction::triggered, this, [this]() { canvas_->centerCamera(); });
 
     studio_panels_action_ = viewMenu->addAction("Studio Panels");
@@ -140,7 +154,7 @@ void MainWindow::buildToolbar() {
         return action;
     };
 
-    inspect_action_ = addTool("Inspect", QKeySequence("1"), EditorTool::Inspect, true);
+    inspect_action_ = addTool("Inspect / Pan", QKeySequence("1"), EditorTool::Inspect, true);
     terrain_action_ = addTool("Terrain", QKeySequence("2"), EditorTool::Terrain);
     road_action_ = addTool("Road", QKeySequence("3"), EditorTool::Road);
     erase_action_ = addTool("Erase", QKeySequence("4"), EditorTool::Erase);
@@ -169,6 +183,10 @@ void MainWindow::buildToolbar() {
     centerAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(centerAction, &QAction::triggered, this, [this]() { canvas_->centerCamera(); });
 
+    auto* resizeAction = toolbar->addAction("Map Size");
+    resizeAction->setToolTip("Resize editable scratch-map bounds while preserving in-bounds content");
+    connect(resizeAction, &QAction::triggered, this, [this]() { resizeMapInteractive(); });
+
     toolbar->addSeparator();
     if (studio_panels_action_ != nullptr) {
         toolbar->addAction(studio_panels_action_);
@@ -192,7 +210,7 @@ void MainWindow::buildDocks() {
     auto* terrainLayout = new QVBoxLayout(terrainPage);
     terrainLayout->addWidget(new QLabel(
         "Semantic terrain palette\n\n"
-        "Scratch-map authoring remains available for interaction testing. Canonical scenarios are inspection-only until the lossless mutable document gate is complete.",
+        "Scratch-map authoring remains available for interaction testing. Scratch bounds can now grow/shrink while preserving in-bounds tiles. Canonical scenarios remain lossless-read-only until the mutable document gate is complete.",
         terrainPage));
     terrainLayout->addStretch(1);
     tabs->addTab(terrainPage, "Terrain");
@@ -214,8 +232,10 @@ void MainWindow::buildDocks() {
         "• SDL3 wraps the Qt-owned native viewport HWND\n"
         "• ch_render owns canonical world drawing\n"
         "• physical-pixel DPR conversion is explicit\n"
-        "• Qt schedules the canonical viewport at ~60 FPS\n"
-        "• canonical scenario mode is read-only in this pilot\n"
+        "• canonical viewport redraw work is dirty-gated\n"
+        "• Inspect + left drag, RMB/MMB and WASD/arrows pan the map\n"
+        "• scratch map bounds can be resized without moving their minimum coordinate\n"
+        "• canonical scenario mode is still read-only until lossless serialization\n"
         "• production Save remains disabled until lossless serialization\n"
         "• Production Workbench V1 never overwrites source assets\n"
         "• CH_CONTENT_PACK_V1 remains the data-driven content boundary",
@@ -276,6 +296,46 @@ void MainWindow::refreshHistoryActions() {
     if (redo_action_ != nullptr) redo_action_->setEnabled(authoring && canvas_->history().canRedo());
 }
 
+void MainWindow::refreshMapStatus() {
+    if (map_status_ == nullptr || canvas_ == nullptr) return;
+    const auto& document = canvas_->document();
+    map_status_->setText(QString("Map: %1×%2  [%3,%4 → %5,%6]")
+        .arg(document.width()).arg(document.height())
+        .arg(document.minX()).arg(document.minY())
+        .arg(document.maxX()).arg(document.maxY()));
+}
+
+void MainWindow::resizeMapInteractive() {
+    if (canvas_->canonicalMode()) {
+        QMessageBox::information(
+            this,
+            "Resize Map",
+            "Imported canonical scenarios can now be moved freely in the viewport, but their logical bounds are still protected by the lossless-authoring gate.\n\n"
+            "Resize is enabled for editable scratch maps now. Canonical resize will be enabled together with real scenario mutation/save so the Studio never pretends to grow a map that it cannot serialize safely.");
+        return;
+    }
+
+    bool accepted = false;
+    const int width = QInputDialog::getInt(
+        this, "Resize Map", "Width in tiles:", canvas_->document().width(), 1, 256, 1, &accepted);
+    if (!accepted) return;
+
+    const int height = QInputDialog::getInt(
+        this, "Resize Map", "Height in tiles:", canvas_->document().height(), 1, 256, 1, &accepted);
+    if (!accepted) return;
+
+    if (canvas_->resizeScratchMap(width, height)) {
+        refreshHistoryActions();
+        refreshMapStatus();
+        statusBar()->showMessage(
+            QString("Map resized to %1×%2 tiles. Existing in-bounds terrain/roads were preserved; cropped cells were discarded.")
+                .arg(width).arg(height),
+            7000);
+    } else {
+        statusBar()->showMessage("Map size unchanged.", 2500);
+    }
+}
+
 bool MainWindow::loadScenario(const QString& path) {
     std::string error;
     if (!canvas_->loadCanonicalScenario(path.toStdString(), &error)) {
@@ -285,11 +345,13 @@ bool MainWindow::loadScenario(const QString& path) {
 
     setAuthoringEnabled(false);
     refreshHistoryActions();
+    refreshMapStatus();
     showStudioPanels(false);
     statusBar()->showMessage(
-        QString("Canonical renderer active: %1 — viewport is maximized; editing remains gated until lossless authoring is implemented.").arg(path),
-        8000);
+        QString("Canonical renderer active: %1 — drag with Inspect/RMB/MMB or use WASD/arrows to move the map; editing remains gated until lossless authoring is implemented.").arg(path),
+        9000);
     setWindowTitle(QString("City Horizon Studio / Map Forge 2 — %1 [Canonical]").arg(QFileInfo(path).fileName()));
+    canvas_->setFocus();
     canvas_->update();
     return true;
 }

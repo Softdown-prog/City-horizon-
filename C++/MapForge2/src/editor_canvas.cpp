@@ -6,6 +6,7 @@
 
 #include <QCoreApplication>
 #include <QEvent>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
@@ -109,6 +110,7 @@ bool EditorCanvas::loadCanonicalScenario(const std::string& path, std::string* e
     camera_.zoom = 1.0F;
     centerCamera();
     render_timer_->start();
+    if (onDocumentBoundsChanged) onDocumentBoundsChanged();
     update();
     return true;
 }
@@ -124,7 +126,25 @@ void EditorCanvas::newScratchMap(const int width, const int height) {
     camera_ = ch::CameraState{};
     camera_.zoom = 1.0F;
     centerCamera();
+    if (onDocumentBoundsChanged) onDocumentBoundsChanged();
     update();
+}
+
+bool EditorCanvas::resizeScratchMap(const int width, const int height) {
+    if (canonical_mode_) return false;
+    if (stroke_active_) endStroke();
+
+    if (!document_.resize(width, height)) return false;
+
+    history_.clear();
+    if (hover_tile_ && !document_.inBounds(hover_tile_->x(), hover_tile_->y())) {
+        hover_tile_.reset();
+    }
+    centerCamera();
+    if (onHistoryChanged) onHistoryChanged();
+    if (onDocumentBoundsChanged) onDocumentBoundsChanged();
+    update();
+    return true;
 }
 
 void EditorCanvas::setTool(const EditorTool tool) {
@@ -154,6 +174,12 @@ void EditorCanvas::centerCamera() {
     const auto screen = ch::world_to_screen_point(centerX, centerY, probe, viewportW, viewportH);
     camera_.pan_x = viewportW * 0.5F - screen.x;
     camera_.pan_y = viewportH * 0.5F - screen.y;
+    update();
+}
+
+void EditorCanvas::panBy(const float dx, const float dy) {
+    camera_.pan_x += dx * coordinateScale();
+    camera_.pan_y += dy * coordinateScale();
     update();
 }
 
@@ -352,7 +378,8 @@ void EditorCanvas::mousePressEvent(QMouseEvent* event) {
     setFocus();
     updateHover(event->position());
 
-    if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton) {
+    const bool inspectGrab = event->button() == Qt::LeftButton && tool_ == EditorTool::Inspect;
+    if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton || inspectGrab) {
         pan_active_ = true;
         last_pan_position_ = event->position();
         setCursor(Qt::ClosedHandCursor);
@@ -367,11 +394,8 @@ void EditorCanvas::mousePressEvent(QMouseEvent* event) {
 void EditorCanvas::mouseMoveEvent(QMouseEvent* event) {
     if (pan_active_) {
         const QPointF delta = event->position() - last_pan_position_;
-        const float scale = coordinateScale();
-        camera_.pan_x += static_cast<float>(delta.x()) * scale;
-        camera_.pan_y += static_cast<float>(delta.y()) * scale;
+        panBy(static_cast<float>(delta.x()), static_cast<float>(delta.y()));
         last_pan_position_ = event->position();
-        update();
         return;
     }
 
@@ -382,10 +406,13 @@ void EditorCanvas::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void EditorCanvas::mouseReleaseEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) endStroke();
-    if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton) {
+    if (event->button() == Qt::LeftButton && tool_ != EditorTool::Inspect) endStroke();
+
+    if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton
+        || (event->button() == Qt::LeftButton && tool_ == EditorTool::Inspect)) {
         pan_active_ = false;
         unsetCursor();
+        updateHover(event->position());
     }
 }
 
@@ -396,9 +423,53 @@ void EditorCanvas::wheelEvent(QWheelEvent* event) {
     update();
 }
 
+void EditorCanvas::keyPressEvent(QKeyEvent* event) {
+    const float step = (event->modifiers() & Qt::ShiftModifier) ? 96.0F : 48.0F;
+    switch (event->key()) {
+        case Qt::Key_Left:
+        case Qt::Key_A:
+            panBy(-step, 0.0F);
+            event->accept();
+            return;
+        case Qt::Key_Right:
+        case Qt::Key_D:
+            panBy(step, 0.0F);
+            event->accept();
+            return;
+        case Qt::Key_Up:
+        case Qt::Key_W:
+            panBy(0.0F, -step);
+            event->accept();
+            return;
+        case Qt::Key_Down:
+        case Qt::Key_S:
+            panBy(0.0F, step);
+            event->accept();
+            return;
+        case Qt::Key_Plus:
+        case Qt::Key_Equal:
+            camera_.zoom = std::clamp(camera_.zoom * 1.15F, 0.35F, 3.0F);
+            update();
+            event->accept();
+            return;
+        case Qt::Key_Minus:
+            camera_.zoom = std::clamp(camera_.zoom / 1.15F, 0.35F, 3.0F);
+            update();
+            event->accept();
+            return;
+        default:
+            break;
+    }
+    QWidget::keyPressEvent(event);
+}
+
 void EditorCanvas::leaveEvent(QEvent*) {
     hover_tile_.reset();
     if (stroke_active_) endStroke();
+    if (pan_active_) {
+        pan_active_ = false;
+        unsetCursor();
+    }
     update();
 }
 

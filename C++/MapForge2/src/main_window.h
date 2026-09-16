@@ -23,6 +23,8 @@ private:
     void buildToolbar();
     void buildDocks();
     void refreshHistoryActions();
+    void refreshMapStatus();
+    void resizeMapInteractive();
     void setTool(EditorTool tool);
     void setAuthoringEnabled(bool enabled);
     void showStudioPanels(bool visible);
@@ -37,6 +39,7 @@ private:
     QAction* road_action_ = nullptr;
     QAction* erase_action_ = nullptr;
     QLabel* tile_status_ = nullptr;
+    QLabel* map_status_ = nullptr;
     QComboBox* terrain_combo_ = nullptr;
     QComboBox* brush_combo_ = nullptr;
 };

@@ -3,6 +3,7 @@
 #include "src/ch_core/map_document.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace ch::editor {
@@ -12,6 +13,14 @@ EditorDocument::EditorDocument() = default;
 std::uint64_t EditorDocument::key(const int x, const int y) {
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32U)
         | static_cast<std::uint32_t>(y);
+}
+
+int EditorDocument::keyX(const std::uint64_t packed) {
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(packed >> 32U));
+}
+
+int EditorDocument::keyY(const std::uint64_t packed) {
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(packed & 0xFFFFFFFFULL));
 }
 
 bool EditorDocument::inBounds(const int x, const int y) const {
@@ -65,6 +74,34 @@ void EditorDocument::newEmpty(const int width, const int height) {
     source_path_.clear();
     tiles_.clear();
     ++revision_;
+}
+
+bool EditorDocument::resize(const int width, const int height) {
+    const int new_width = std::max(1, width);
+    const int new_height = std::max(1, height);
+    if (new_width == width_ && new_height == height_) {
+        return false;
+    }
+
+    const int new_max_x = min_x_ + new_width - 1;
+    const int new_max_y = min_y_ + new_height - 1;
+
+    for (auto it = tiles_.begin(); it != tiles_.end();) {
+        const int x = keyX(it->first);
+        const int y = keyY(it->first);
+        if (x < min_x_ || y < min_y_ || x > new_max_x || y > new_max_y) {
+            it = tiles_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    width_ = new_width;
+    height_ = new_height;
+    max_x_ = new_max_x;
+    max_y_ = new_max_y;
+    ++revision_;
+    return true;
 }
 
 bool EditorDocument::loadScenario(const std::string& path, std::string* error) {
