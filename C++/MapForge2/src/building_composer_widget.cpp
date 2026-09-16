@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace ch::studio {
@@ -54,8 +55,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
-        "One structural definition generates all four views. V0 now includes logical façade/roof sockets so "
-        "doors, awnings, signs and chimneys rotate with the building instead of being redrawn per sprite.",
+        "Geometry, sockets and material recipes are deterministic. Surface materials now add repeatable plaster, brick, concrete, timber and roof patterns without changing footprint or projection.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
@@ -73,11 +73,35 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     palette_combo_ = new QComboBox(this);
     palette_combo_->addItems({"Warm residential", "Cool modern", "Earth / rural"});
-    form->addRow("Material preset", palette_combo_);
+    form->addRow("Color palette", palette_combo_);
 
     detail_preset_combo_ = new QComboBox(this);
     detail_preset_combo_->addItems({"Residence", "Small shop", "Utility / depot"});
     form->addRow("Detail preset", detail_preset_combo_);
+
+    wall_material_combo_ = new QComboBox(this);
+    wall_material_combo_->addItems({"Plaster", "Brick", "Concrete", "Timber", "Solid"});
+    form->addRow("Wall material", wall_material_combo_);
+
+    roof_material_combo_ = new QComboBox(this);
+    roof_material_combo_->addItems({"Ceramic tile", "Metal seam", "Asphalt shingle", "Solid"});
+    form->addRow("Roof material", roof_material_combo_);
+
+    material_scale_combo_ = new QComboBox(this);
+    material_scale_combo_->addItems({"Fine", "Medium", "Coarse"});
+    material_scale_combo_->setCurrentIndex(1);
+    form->addRow("Texture scale", material_scale_combo_);
+
+    material_strength_slider_ = new QSlider(Qt::Horizontal, this);
+    material_strength_slider_->setRange(0, 100);
+    material_strength_slider_->setValue(45);
+    material_strength_slider_->setSingleStep(5);
+    form->addRow("Texture strength", material_strength_slider_);
+
+    material_seed_spin_ = new QSpinBox(this);
+    material_seed_spin_->setRange(0, 9999);
+    material_seed_spin_->setValue(17);
+    form->addRow("Material seed", material_seed_spin_);
 
     door_position_combo_ = new QComboBox(this);
     door_position_combo_->addItems({"Left", "Center", "Right"});
@@ -150,6 +174,11 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
         refreshSpecFromControls();
         refreshPreview();
     });
+    connect(wall_material_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(roof_material_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(material_scale_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(material_strength_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(material_seed_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [changed](int) { changed(); });
     connect(door_position_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(window_pattern_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(wall_height_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
@@ -177,6 +206,8 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
     const QSignalBlocker chimney_blocker(chimney_check_);
     const QSignalBlocker door_position_blocker(door_position_combo_);
     const QSignalBlocker window_pattern_blocker(window_pattern_combo_);
+    const QSignalBlocker wall_material_blocker(wall_material_combo_);
+    const QSignalBlocker roof_material_blocker(roof_material_combo_);
 
     switch (index) {
         case 1:
@@ -187,6 +218,8 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
             chimney_check_->setChecked(false);
             door_position_combo_->setCurrentIndex(0);
             window_pattern_combo_->setCurrentIndex(2);
+            wall_material_combo_->setCurrentIndex(2);
+            roof_material_combo_->setCurrentIndex(1);
             break;
         case 2:
             door_check_->setChecked(true);
@@ -196,6 +229,8 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
             chimney_check_->setChecked(false);
             door_position_combo_->setCurrentIndex(2);
             window_pattern_combo_->setCurrentIndex(0);
+            wall_material_combo_->setCurrentIndex(3);
+            roof_material_combo_->setCurrentIndex(1);
             break;
         default:
             door_check_->setChecked(true);
@@ -205,6 +240,8 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
             chimney_check_->setChecked(true);
             door_position_combo_->setCurrentIndex(1);
             window_pattern_combo_->setCurrentIndex(1);
+            wall_material_combo_->setCurrentIndex(0);
+            roof_material_combo_->setCurrentIndex(0);
             break;
     }
 }
@@ -233,6 +270,29 @@ void BuildingComposerWidget::refreshSpecFromControls() {
     spec_.window_pattern = window_pattern == 0 ? BuildingWindowPattern::Single
         : (window_pattern == 2 ? BuildingWindowPattern::Strip : BuildingWindowPattern::Pair);
 
+    const int wall_material = wall_material_combo_ != nullptr ? wall_material_combo_->currentIndex() : 0;
+    switch (wall_material) {
+        case 1: spec_.wall_material = BuildingWallMaterial::Brick; break;
+        case 2: spec_.wall_material = BuildingWallMaterial::Concrete; break;
+        case 3: spec_.wall_material = BuildingWallMaterial::Timber; break;
+        case 4: spec_.wall_material = BuildingWallMaterial::Solid; break;
+        default: spec_.wall_material = BuildingWallMaterial::Plaster; break;
+    }
+
+    const int roof_material = roof_material_combo_ != nullptr ? roof_material_combo_->currentIndex() : 0;
+    switch (roof_material) {
+        case 1: spec_.roof_material = BuildingRoofMaterial::MetalSeam; break;
+        case 2: spec_.roof_material = BuildingRoofMaterial::AsphaltShingle; break;
+        case 3: spec_.roof_material = BuildingRoofMaterial::Solid; break;
+        default: spec_.roof_material = BuildingRoofMaterial::CeramicTile; break;
+    }
+
+    const int texture_scale = material_scale_combo_ != nullptr ? material_scale_combo_->currentIndex() : 1;
+    spec_.material_scale = texture_scale == 0 ? 0.72F : (texture_scale == 2 ? 1.45F : 1.0F);
+    spec_.material_strength = material_strength_slider_ != nullptr
+        ? static_cast<float>(material_strength_slider_->value()) / 100.0F : 0.45F;
+    spec_.material_seed = material_seed_spin_ != nullptr ? material_seed_spin_->value() : 17;
+
     spec_.windows = windows_check_ == nullptr || windows_check_->isChecked();
     spec_.south_door = door_check_ == nullptr || door_check_->isChecked();
     spec_.south_awning = awning_check_ != nullptr && awning_check_->isChecked();
@@ -260,12 +320,16 @@ void BuildingComposerWidget::refreshPreview() {
     const QString module_text = modules.isEmpty() ? QStringLiteral("no optional modules") : modules.join(", ");
 
     summary_->setText(
-        QString("CH_BUILDING_COMPOSER_V0 / socket_modules_1 — %1×%2 footprint, %3 roof, %4 px walls. "
-                "Entrance: south/%5. Windows: %6. Modules: %7. All four views share one geometry, palette and logical sockets.")
+        QString("CH_BUILDING_COMPOSER_V0 / materials_1 — %1×%2 footprint, %3 roof. Walls: %4. Roof surface: %5. "
+                "Texture %6% / scale %7 / seed %8. Entrance: south/%9. Windows: %10. Modules: %11. Geometry is unchanged by materials.")
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
             .arg(BuildingComposer::roofName(spec_.roof_style))
-            .arg(spec_.wall_height_px)
+            .arg(BuildingComposer::wallMaterialName(spec_.wall_material))
+            .arg(BuildingComposer::roofMaterialName(spec_.roof_material))
+            .arg(static_cast<int>(spec_.material_strength * 100.0F))
+            .arg(spec_.material_scale, 0, 'f', 2)
+            .arg(spec_.material_seed)
             .arg(BuildingComposer::doorPositionName(spec_.door_position))
             .arg(BuildingComposer::windowPatternName(spec_.window_pattern))
             .arg(module_text));

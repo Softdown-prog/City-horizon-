@@ -8,6 +8,7 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QSlider;
+class QSpinBox;
 
 namespace ch::studio {
 
@@ -29,8 +30,13 @@ private:
     QComboBox* detail_preset_combo_ = nullptr;
     QComboBox* door_position_combo_ = nullptr;
     QComboBox* window_pattern_combo_ = nullptr;
+    QComboBox* wall_material_combo_ = nullptr;
+    QComboBox* roof_material_combo_ = nullptr;
+    QComboBox* material_scale_combo_ = nullptr;
     QSlider* wall_height_slider_ = nullptr;
     QSlider* roof_height_slider_ = nullptr;
+    QSlider* material_strength_slider_ = nullptr;
+    QSpinBox* material_seed_spin_ = nullptr;
     QCheckBox* windows_check_ = nullptr;
     QCheckBox* door_check_ = nullptr;
     QCheckBox* awning_check_ = nullptr;

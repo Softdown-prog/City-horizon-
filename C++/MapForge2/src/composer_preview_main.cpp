@@ -64,6 +64,11 @@ int main(int argc, char** argv) {
     residence.glass_color = QColor("#78b9d1");
     residence.door_color = QColor("#6d4c41");
     residence.accent_color = QColor("#d79b38");
+    residence.wall_material = ch::studio::BuildingWallMaterial::Plaster;
+    residence.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    residence.material_strength = 0.42F;
+    residence.material_scale = 1.0F;
+    residence.material_seed = 17;
     residence.roof_chimney = true;
     residence.door_position = ch::studio::BuildingDoorPosition::Center;
     residence.window_pattern = ch::studio::BuildingWindowPattern::Pair;
@@ -79,6 +84,9 @@ int main(int argc, char** argv) {
     shop.accent_color = QColor("#d79b38");
     shop.roof_style = ch::studio::BuildingRoofStyle::Flat;
     shop.roof_height_px = 10;
+    shop.wall_material = ch::studio::BuildingWallMaterial::Concrete;
+    shop.roof_material = ch::studio::BuildingRoofMaterial::MetalSeam;
+    shop.material_strength = 0.50F;
     shop.roof_chimney = false;
     shop.south_awning = true;
     shop.south_sign = true;
@@ -86,6 +94,23 @@ int main(int argc, char** argv) {
     shop.window_pattern = ch::studio::BuildingWindowPattern::Strip;
 
     if (!writeAsset(output_dir, "building_composer_shop_socket_gate", shop)) return 4;
+
+    ch::studio::BuildingComposerSpec material_gate = residence;
+    material_gate.footprint_width_tiles = 2;
+    material_gate.footprint_depth_tiles = 2;
+    material_gate.wall_color = QColor("#b97a63");
+    material_gate.roof_color = QColor("#8f493d");
+    material_gate.trim_color = QColor("#f0dfca");
+    material_gate.door_color = QColor("#684337");
+    material_gate.wall_material = ch::studio::BuildingWallMaterial::Brick;
+    material_gate.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    material_gate.material_strength = 0.72F;
+    material_gate.material_scale = 0.72F;
+    material_gate.material_seed = 83;
+    material_gate.roof_chimney = true;
+    material_gate.window_pattern = ch::studio::BuildingWindowPattern::Pair;
+
+    if (!writeAsset(output_dir, "building_composer_material_gate", material_gate)) return 5;
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;

@@ -5,12 +5,14 @@
 #include <QFont>
 #include <QJsonArray>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QPolygonF>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 namespace ch::studio {
@@ -68,6 +70,11 @@ QColor scaledColor(const QColor color, const float factor) {
         color.alphaF());
 }
 
+QColor alphaColor(QColor color, const int alpha) {
+    color.setAlpha(std::clamp(alpha, 0, 255));
+    return color;
+}
+
 Point3 lerpPoint(const Point3 a, const Point3 b, const float t, const float z) {
     return {
         a.x + (b.x - a.x) * t,
@@ -109,6 +116,159 @@ void drawFaceDetail(QPainter& painter, const Point3 a, const Point3 b, const flo
         projectPoint(lerpPoint(a, b, t0, z1), view, canvas),
     };
     drawOutlinedPolygon(painter, polygon, fill, outline);
+}
+
+std::uint32_t hashMix(std::uint32_t value) {
+    value ^= value >> 16U;
+    value *= 0x7feb352dU;
+    value ^= value >> 15U;
+    value *= 0x846ca68bU;
+    value ^= value >> 16U;
+    return value;
+}
+
+float hash01(const int seed, const int a, const int b, const int c = 0) {
+    std::uint32_t value = static_cast<std::uint32_t>(seed) * 0x9e3779b9U;
+    value ^= static_cast<std::uint32_t>(a + 101) * 0x85ebca6bU;
+    value ^= static_cast<std::uint32_t>(b + 211) * 0xc2b2ae35U;
+    value ^= static_cast<std::uint32_t>(c + 307) * 0x27d4eb2fU;
+    return static_cast<float>(hashMix(value) & 0x00ffffffU) / static_cast<float>(0x01000000U);
+}
+
+void drawWallMaterial(QPainter& painter, const BuildingComposerSpec& spec,
+                      const Point3 a, const Point3 b, const int edge, const float wall_h,
+                      const BuildingView view, const QSize canvas) {
+    if (spec.wall_material == BuildingWallMaterial::Solid || spec.material_strength <= 0.001F) return;
+
+    const float strength = std::clamp(spec.material_strength, 0.0F, 1.0F);
+    const float scale = std::clamp(spec.material_scale, 0.55F, 2.0F);
+    QColor dark = alphaColor(scaledColor(spec.wall_color, 0.60F), 35 + static_cast<int>(95.0F * strength));
+    QColor light = alphaColor(scaledColor(spec.wall_color, 1.16F), 20 + static_cast<int>(75.0F * strength));
+    const float edge_span = std::max(0.5F, std::hypot(b.x - a.x, b.y - a.y));
+
+    painter.save();
+    painter.setBrush(Qt::NoBrush);
+
+    if (spec.wall_material == BuildingWallMaterial::Plaster) {
+        const int samples = std::max(10, static_cast<int>((20.0F + 38.0F * strength) * edge_span / scale));
+        painter.setPen(QPen(dark, 1.0));
+        for (int i = 0; i < samples; ++i) {
+            const float t = 0.05F + hash01(spec.material_seed, edge, i) * 0.90F;
+            const float z = 4.0F + hash01(spec.material_seed, edge, i, 1) * std::max(5.0F, wall_h - 9.0F);
+            painter.drawPoint(projectPoint(lerpPoint(a, b, t, z), view, canvas));
+        }
+        painter.setPen(QPen(light, 1.0));
+        for (int i = 0; i < samples / 2; ++i) {
+            const float t = 0.06F + hash01(spec.material_seed + 71, edge, i) * 0.88F;
+            const float z = 5.0F + hash01(spec.material_seed + 71, edge, i, 2) * std::max(5.0F, wall_h - 10.0F);
+            painter.drawPoint(projectPoint(lerpPoint(a, b, t, z), view, canvas));
+        }
+    } else if (spec.wall_material == BuildingWallMaterial::Brick) {
+        const float course_px = std::max(7.0F, 11.0F * scale);
+        const int courses = std::max(3, static_cast<int>(wall_h / course_px));
+        const int columns = std::max(3, static_cast<int>((edge_span * 6.0F) / scale));
+        painter.setPen(QPen(dark, 0.9));
+        for (int row = 1; row < courses; ++row) {
+            const float z = wall_h * static_cast<float>(row) / static_cast<float>(courses);
+            painter.drawLine(projectPoint(lerpPoint(a, b, 0.0F, z), view, canvas),
+                             projectPoint(lerpPoint(a, b, 1.0F, z), view, canvas));
+        }
+        for (int row = 0; row < courses; ++row) {
+            const float z0 = wall_h * static_cast<float>(row) / static_cast<float>(courses);
+            const float z1 = wall_h * static_cast<float>(row + 1) / static_cast<float>(courses);
+            const float offset = (row % 2 == 0) ? 0.0F : 0.5F;
+            for (int col = 1; col < columns; ++col) {
+                const float t = (static_cast<float>(col) + offset) / static_cast<float>(columns);
+                if (t >= 0.98F) continue;
+                painter.drawLine(projectPoint(lerpPoint(a, b, t, z0), view, canvas),
+                                 projectPoint(lerpPoint(a, b, t, z1), view, canvas));
+            }
+        }
+    } else if (spec.wall_material == BuildingWallMaterial::Concrete) {
+        painter.setPen(QPen(dark, 1.0));
+        painter.drawLine(projectPoint(lerpPoint(a, b, 0.50F, 0.0F), view, canvas),
+                         projectPoint(lerpPoint(a, b, 0.50F, wall_h), view, canvas));
+        painter.drawLine(projectPoint(lerpPoint(a, b, 0.0F, wall_h * 0.50F), view, canvas),
+                         projectPoint(lerpPoint(a, b, 1.0F, wall_h * 0.50F), view, canvas));
+        painter.setPen(QPen(light, 1.0));
+        const int pores = std::max(5, static_cast<int>(10.0F * edge_span * strength / scale));
+        for (int i = 0; i < pores; ++i) {
+            const float t = 0.08F + hash01(spec.material_seed + 131, edge, i) * 0.84F;
+            const float z = 7.0F + hash01(spec.material_seed + 131, edge, i, 1) * std::max(5.0F, wall_h - 14.0F);
+            painter.drawPoint(projectPoint(lerpPoint(a, b, t, z), view, canvas));
+        }
+    } else if (spec.wall_material == BuildingWallMaterial::Timber) {
+        const int boards = std::max(4, static_cast<int>((edge_span * 8.0F) / scale));
+        painter.setPen(QPen(dark, 1.0));
+        for (int i = 1; i < boards; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(boards);
+            painter.drawLine(projectPoint(lerpPoint(a, b, t, 1.0F), view, canvas),
+                             projectPoint(lerpPoint(a, b, t, wall_h - 1.0F), view, canvas));
+        }
+        painter.setPen(QPen(light, 1.0));
+        for (int i = 0; i < std::max(2, boards / 3); ++i) {
+            const float t = 0.08F + hash01(spec.material_seed + 197, edge, i) * 0.84F;
+            const float z = wall_h * (0.18F + hash01(spec.material_seed + 197, edge, i, 1) * 0.64F);
+            painter.drawEllipse(projectPoint(lerpPoint(a, b, t, z), view, canvas), 1.4, 0.9);
+        }
+    }
+
+    painter.restore();
+}
+
+void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
+                      const QPolygonF& polygon, const int face_index) {
+    if (spec.roof_material == BuildingRoofMaterial::Solid || spec.material_strength <= 0.001F || polygon.isEmpty()) return;
+
+    const float strength = std::clamp(spec.material_strength, 0.0F, 1.0F);
+    const float scale = std::clamp(spec.material_scale, 0.55F, 2.0F);
+    QColor dark = alphaColor(scaledColor(spec.roof_color, 0.58F), 40 + static_cast<int>(105.0F * strength));
+    QColor light = alphaColor(scaledColor(spec.roof_color, 1.18F), 20 + static_cast<int>(70.0F * strength));
+    const QRectF bounds = polygon.boundingRect();
+    const float spacing = std::max(4.0F, 9.0F * scale);
+
+    QPainterPath path;
+    path.addPolygon(polygon);
+    path.closeSubpath();
+
+    painter.save();
+    painter.setClipPath(path);
+    painter.setBrush(Qt::NoBrush);
+
+    if (spec.roof_material == BuildingRoofMaterial::CeramicTile) {
+        painter.setPen(QPen(dark, 0.9));
+        int row = 0;
+        for (float y = static_cast<float>(bounds.top()) + spacing; y < bounds.bottom(); y += spacing, ++row) {
+            painter.drawLine(QPointF(bounds.left() - 2.0, y), QPointF(bounds.right() + 2.0, y));
+            const float stagger = (row % 2 == 0) ? 0.0F : spacing * 0.55F;
+            for (float x = static_cast<float>(bounds.left()) + stagger; x < bounds.right(); x += spacing * 1.10F) {
+                painter.drawLine(QPointF(x, y - spacing), QPointF(x, y));
+            }
+        }
+    } else if (spec.roof_material == BuildingRoofMaterial::MetalSeam) {
+        painter.setPen(QPen(dark, 1.1));
+        const float skew = (face_index % 2 == 0) ? spacing * 0.8F : -spacing * 0.8F;
+        for (float x = static_cast<float>(bounds.left()) - bounds.height(); x < bounds.right() + bounds.height(); x += spacing * 1.35F) {
+            painter.drawLine(QPointF(x, bounds.bottom() + 2.0), QPointF(x + skew, bounds.top() - 2.0));
+        }
+        painter.setPen(QPen(light, 0.7));
+        for (float x = static_cast<float>(bounds.left()) - bounds.height() + spacing * 0.35F;
+             x < bounds.right() + bounds.height(); x += spacing * 1.35F) {
+            painter.drawLine(QPointF(x, bounds.bottom()), QPointF(x + skew, bounds.top()));
+        }
+    } else if (spec.roof_material == BuildingRoofMaterial::AsphaltShingle) {
+        painter.setPen(QPen(dark, 0.9));
+        int row = 0;
+        for (float y = static_cast<float>(bounds.top()) + spacing; y < bounds.bottom(); y += spacing, ++row) {
+            painter.drawLine(QPointF(bounds.left() - 2.0, y), QPointF(bounds.right() + 2.0, y));
+            const float stagger = (row % 2 == 0) ? spacing * 0.45F : 0.0F;
+            for (float x = static_cast<float>(bounds.left()) + stagger; x < bounds.right(); x += spacing * 1.5F) {
+                painter.drawLine(QPointF(x, y - spacing * 0.45F), QPointF(x, y));
+            }
+        }
+    }
+
+    painter.restore();
 }
 
 float doorCenter(const BuildingDoorPosition position) {
@@ -292,6 +452,27 @@ QString BuildingComposer::windowPatternName(const BuildingWindowPattern pattern)
     return "pair";
 }
 
+QString BuildingComposer::wallMaterialName(const BuildingWallMaterial material) {
+    switch (material) {
+        case BuildingWallMaterial::Solid: return "solid";
+        case BuildingWallMaterial::Plaster: return "plaster";
+        case BuildingWallMaterial::Brick: return "brick";
+        case BuildingWallMaterial::Concrete: return "concrete";
+        case BuildingWallMaterial::Timber: return "timber";
+    }
+    return "solid";
+}
+
+QString BuildingComposer::roofMaterialName(const BuildingRoofMaterial material) {
+    switch (material) {
+        case BuildingRoofMaterial::Solid: return "solid";
+        case BuildingRoofMaterial::CeramicTile: return "ceramic_tile";
+        case BuildingRoofMaterial::MetalSeam: return "metal_seam";
+        case BuildingRoofMaterial::AsphaltShingle: return "asphalt_shingle";
+    }
+    return "solid";
+}
+
 QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const BuildingView view,
                                     const QSize canvas) {
     QImage image(canvas, QImage::Format_ARGB32_Premultiplied);
@@ -343,21 +524,25 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     struct FaceDraw {
         int edge = 0;
         QPolygonF polygon;
+        float shade = 1.0F;
     };
     std::vector<FaceDraw> wall_faces;
     wall_faces.reserve(2);
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
-        wall_faces.push_back({edge, faceQuad(corners[edge], corners[next], 0.0F, wall_h, view, canvas)});
+        QPolygonF polygon = faceQuad(corners[edge], corners[next], 0.0F, wall_h, view, canvas);
+        const float center_x = static_cast<float>(polygon.boundingRect().center().x());
+        const float shade = center_x < canvas.width() * 0.5F ? 0.84F : 1.0F;
+        wall_faces.push_back({edge, polygon, shade});
     }
     std::sort(wall_faces.begin(), wall_faces.end(), [](const FaceDraw& lhs, const FaceDraw& rhs) {
         return averageY(lhs.polygon) < averageY(rhs.polygon);
     });
 
     for (const FaceDraw& face : wall_faces) {
-        const float center_x = static_cast<float>(face.polygon.boundingRect().center().x());
-        const float factor = center_x < canvas.width() * 0.5F ? 0.84F : 1.0F;
-        drawOutlinedPolygon(painter, face.polygon, scaledColor(spec.wall_color, factor));
+        drawOutlinedPolygon(painter, face.polygon, scaledColor(spec.wall_color, face.shade));
+        const int next = (face.edge + 1) % 4;
+        drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
     }
 
     for (const int edge : visible_edges) {
@@ -374,13 +559,14 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     struct RoofDraw {
         QPolygonF polygon;
         QColor color;
+        int face_index = 0;
     };
     std::vector<RoofDraw> roof_faces;
 
     if (spec.roof_style == BuildingRoofStyle::Flat) {
         QPolygonF roof;
         for (const QPointF point : top) roof << point;
-        roof_faces.push_back({roof, spec.roof_color});
+        roof_faces.push_back({roof, spec.roof_color, 0});
     } else if (spec.roof_style == BuildingRoofStyle::Pyramid) {
         const Point3 apex{0.0F, 0.0F, wall_h + roof_h};
         for (const int edge : visible_edges) {
@@ -391,7 +577,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
                 projectPoint(apex, view, canvas),
             };
             const float factor = poly.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
-            roof_faces.push_back({poly, scaledColor(spec.roof_color, factor)});
+            roof_faces.push_back({poly, scaledColor(spec.roof_color, factor), edge});
         }
     } else {
         const bool ridge_along_x = spec.footprint_width_tiles >= spec.footprint_depth_tiles;
@@ -429,7 +615,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
                 }
             }
             const float factor = poly.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
-            roof_faces.push_back({poly, scaledColor(spec.roof_color, factor)});
+            roof_faces.push_back({poly, scaledColor(spec.roof_color, factor), edge});
         }
     }
 
@@ -438,6 +624,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     });
     for (const RoofDraw& roof : roof_faces) {
         drawOutlinedPolygon(painter, roof.polygon, roof.color, QColor(52, 45, 43, 225));
+        drawRoofMaterial(painter, spec, roof.polygon, roof.face_index);
     }
 
     painter.setPen(QPen(spec.trim_color, 1.6));
@@ -542,7 +729,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
     QJsonObject metadata{
         {"generator", "City Horizon Studio Building/Asset Composer"},
         {"contractVersion", "CH_BUILDING_COMPOSER_V0"},
-        {"featureRevision", "socket_modules_1"},
+        {"featureRevision", "materials_1"},
         {"status", "PILOT"},
         {"sourceRepresentation", "parametric_vector_volume"},
         {"runtimeRepresentation", "PNG_RGBA_bitmap"},
@@ -577,6 +764,16 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
         {"accent", spec.accent_color.name(QColor::HexRgb)},
     };
 
+    QJsonObject materials{
+        {"wall", wallMaterialName(spec.wall_material)},
+        {"roof", roofMaterialName(spec.roof_material)},
+        {"strength", static_cast<double>(std::clamp(spec.material_strength, 0.0F, 1.0F))},
+        {"scale", static_cast<double>(std::clamp(spec.material_scale, 0.55F, 2.0F))},
+        {"seed", spec.material_seed},
+        {"sampling", "logical_surface_v0"},
+        {"geometryMutation", false},
+    };
+
     QJsonObject features{
         {"windows", spec.windows},
         {"windowPattern", windowPatternName(spec.window_pattern)},
@@ -593,6 +790,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
         {"geometry", geometry},
         {"projection", projection},
         {"palette", palette},
+        {"materials", materials},
         {"features", features},
         {"sockets", sockets},
     };
