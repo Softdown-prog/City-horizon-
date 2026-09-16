@@ -31,6 +31,8 @@ constexpr std::array<BuildingView, 4> kViews = {
     BuildingView::North,
 };
 
+constexpr int kRenderSupersampleScale = 2;
+
 int quarterTurns(const BuildingView view) {
     switch (view) {
         case BuildingView::South: return 0;
@@ -549,11 +551,16 @@ QString BuildingComposer::roofMaterialName(const BuildingRoofMaterial material) 
 
 QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const BuildingView view,
                                     const QSize canvas) {
-    QImage image(canvas, QImage::Format_ARGB32_Premultiplied);
+    const QSize supersampled_canvas(
+        canvas.width() * kRenderSupersampleScale,
+        canvas.height() * kRenderSupersampleScale);
+    QImage image(supersampled_canvas, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
 
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.scale(static_cast<qreal>(kRenderSupersampleScale),
+                  static_cast<qreal>(kRenderSupersampleScale));
 
     const float half_w = std::max(1, spec.footprint_width_tiles) * 0.5F;
     const float half_d = std::max(1, spec.footprint_depth_tiles) * 0.5F;
@@ -738,7 +745,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     drawChimney(painter, spec, half_w, half_d, wall_h, roof_h, view, canvas);
 
     painter.end();
-    return image;
+    return image.scaled(canvas, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 }
 
 QImage BuildingComposer::renderSpriteSheet(const BuildingComposerSpec& spec, const QSize cell) {
