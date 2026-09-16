@@ -19,6 +19,10 @@ public:
 
     bool loadScenario(const std::string& path, std::string* error = nullptr);
     void newEmpty(int width = 64, int height = 64);
+    // Resizes the editable map bounds while preserving all tiles that remain
+    // inside the new rectangle. The current minimum grid coordinate is kept
+    // stable so growing a map never shifts authored content.
+    bool resize(int width, int height);
 
     [[nodiscard]] int width() const { return width_; }
     [[nodiscard]] int height() const { return height_; }
@@ -38,6 +42,8 @@ public:
 
 private:
     static std::uint64_t key(int x, int y);
+    static int keyX(std::uint64_t packed);
+    static int keyY(std::uint64_t packed);
 
     int width_ = 64;
     int height_ = 64;
