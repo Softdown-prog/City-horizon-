@@ -83,6 +83,13 @@ Point3 lerpPoint(const Point3 a, const Point3 b, const float t, const float z) {
     };
 }
 
+QPointF lerpScreen(const QPointF& a, const QPointF& b, const float t) {
+    return {
+        a.x() + (b.x() - a.x()) * t,
+        a.y() + (b.y() - a.y()) * t,
+    };
+}
+
 QPolygonF faceQuad(const Point3 a, const Point3 b, const float z0, const float z1,
                    const BuildingView view, const QSize canvas) {
     return {
@@ -216,16 +223,51 @@ void drawWallMaterial(QPainter& painter, const BuildingComposerSpec& spec,
     painter.restore();
 }
 
+std::array<QPointF, 2> roofRowEndpoints(const QPolygonF& polygon, const float v) {
+    const float clamped_v = std::clamp(v, 0.0F, 1.0F);
+    if (polygon.size() == 3) {
+        const QPointF apex = polygon[2];
+        return {
+            lerpScreen(apex, polygon[0], clamped_v),
+            lerpScreen(apex, polygon[1], clamped_v),
+        };
+    }
+    if (polygon.size() >= 4) {
+        return {
+            lerpScreen(polygon[3], polygon[0], clamped_v),
+            lerpScreen(polygon[2], polygon[1], clamped_v),
+        };
+    }
+    const QPointF fallback = polygon.isEmpty() ? QPointF() : polygon.front();
+    return {fallback, fallback};
+}
+
+QPointF roofRowPoint(const std::array<QPointF, 2>& row, const float u) {
+    return lerpScreen(row[0], row[1], std::clamp(u, 0.0F, 1.0F));
+}
+
+float screenDistance(const QPointF& a, const QPointF& b) {
+    return static_cast<float>(std::hypot(b.x() - a.x(), b.y() - a.y()));
+}
+
 void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                       const QPolygonF& polygon, const int face_index) {
-    if (spec.roof_material == BuildingRoofMaterial::Solid || spec.material_strength <= 0.001F || polygon.isEmpty()) return;
+    if (spec.roof_material == BuildingRoofMaterial::Solid ||
+        spec.material_strength <= 0.001F || polygon.size() < 3) {
+        return;
+    }
 
     const float strength = std::clamp(spec.material_strength, 0.0F, 1.0F);
     const float scale = std::clamp(spec.material_scale, 0.55F, 2.0F);
-    QColor dark = alphaColor(scaledColor(spec.roof_color, 0.58F), 40 + static_cast<int>(105.0F * strength));
-    QColor light = alphaColor(scaledColor(spec.roof_color, 1.18F), 20 + static_cast<int>(70.0F * strength));
-    const QRectF bounds = polygon.boundingRect();
-    const float spacing = std::max(4.0F, 9.0F * scale);
+    const QColor dark_base = scaledColor(spec.roof_color, 0.54F);
+    const QColor light_base = scaledColor(spec.roof_color, 1.16F);
+    const auto ridge_row = roofRowEndpoints(polygon, 0.0F);
+    const auto eave_row = roofRowEndpoints(polygon, 1.0F);
+    const QPointF ridge_center = lerpScreen(ridge_row[0], ridge_row[1], 0.5F);
+    const QPointF eave_center = lerpScreen(eave_row[0], eave_row[1], 0.5F);
+    const float slope_length = std::max(8.0F, screenDistance(ridge_center, eave_center));
+    const float nominal_course = std::max(5.0F, 8.0F * scale);
+    const int courses = std::max(2, static_cast<int>(std::round(slope_length / nominal_course)));
 
     QPainterPath path;
     path.addPolygon(polygon);
@@ -236,34 +278,66 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
     painter.setBrush(Qt::NoBrush);
 
     if (spec.roof_material == BuildingRoofMaterial::CeramicTile) {
-        painter.setPen(QPen(dark, 0.9));
-        int row = 0;
-        for (float y = static_cast<float>(bounds.top()) + spacing; y < bounds.bottom(); y += spacing, ++row) {
-            painter.drawLine(QPointF(bounds.left() - 2.0, y), QPointF(bounds.right() + 2.0, y));
-            const float stagger = (row % 2 == 0) ? 0.0F : spacing * 0.55F;
-            for (float x = static_cast<float>(bounds.left()) + stagger; x < bounds.right(); x += spacing * 1.10F) {
-                painter.drawLine(QPointF(x, y - spacing), QPointF(x, y));
+        for (int row_index = 1; row_index <= courses; ++row_index) {
+            const float v0 = static_cast<float>(row_index - 1) / static_cast<float>(courses);
+            const float v1 = static_cast<float>(row_index) / static_cast<float>(courses);
+            const auto previous_row = roofRowEndpoints(polygon, v0);
+            const auto current_row = roofRowEndpoints(polygon, v1);
+            const float row_variation = 0.88F + hash01(spec.material_seed + 401, face_index, row_index) * 0.20F;
+            QColor course_color = alphaColor(
+                scaledColor(dark_base, row_variation),
+                48 + static_cast<int>(118.0F * strength));
+            painter.setPen(QPen(course_color, 0.95));
+            painter.drawLine(current_row[0], current_row[1]);
+
+            const float width = std::max(8.0F, screenDistance(current_row[0], current_row[1]));
+            const int tiles = std::max(2, static_cast<int>(std::round(width / std::max(8.0F, 12.0F * scale))));
+            const float stagger = (row_index % 2 == 0) ? 0.5F : 0.0F;
+            for (int tile = 1; tile < tiles; ++tile) {
+                const float u = (static_cast<float>(tile) + stagger) / static_cast<float>(tiles);
+                if (u >= 0.98F) continue;
+                const QPointF seam_top = roofRowPoint(previous_row, u);
+                const QPointF seam_bottom = roofRowPoint(current_row, u);
+                const QPointF seam_start = lerpScreen(seam_top, seam_bottom, 0.50F);
+                painter.drawLine(seam_start, seam_bottom);
             }
+
+            QColor highlight = alphaColor(light_base, 12 + static_cast<int>(42.0F * strength));
+            painter.setPen(QPen(highlight, 0.65));
+            const QPointF h0 = lerpScreen(previous_row[0], current_row[0], 0.88F);
+            const QPointF h1 = lerpScreen(previous_row[1], current_row[1], 0.88F);
+            painter.drawLine(h0, h1);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::MetalSeam) {
-        painter.setPen(QPen(dark, 1.1));
-        const float skew = (face_index % 2 == 0) ? spacing * 0.8F : -spacing * 0.8F;
-        for (float x = static_cast<float>(bounds.left()) - bounds.height(); x < bounds.right() + bounds.height(); x += spacing * 1.35F) {
-            painter.drawLine(QPointF(x, bounds.bottom() + 2.0), QPointF(x + skew, bounds.top() - 2.0));
-        }
-        painter.setPen(QPen(light, 0.7));
-        for (float x = static_cast<float>(bounds.left()) - bounds.height() + spacing * 0.35F;
-             x < bounds.right() + bounds.height(); x += spacing * 1.35F) {
-            painter.drawLine(QPointF(x, bounds.bottom()), QPointF(x + skew, bounds.top()));
+        const float eave_width = std::max(12.0F, screenDistance(eave_row[0], eave_row[1]));
+        const int seams = std::max(3, static_cast<int>(std::round(eave_width / std::max(12.0F, 18.0F * scale))));
+        for (int seam = 1; seam < seams; ++seam) {
+            const float u = static_cast<float>(seam) / static_cast<float>(seams);
+            const QPointF start = roofRowPoint(ridge_row, u);
+            const QPointF end = roofRowPoint(eave_row, u);
+            painter.setPen(QPen(alphaColor(dark_base, 65 + static_cast<int>(110.0F * strength)), 1.35));
+            painter.drawLine(start, end);
+            painter.setPen(QPen(alphaColor(light_base, 28 + static_cast<int>(66.0F * strength)), 0.55));
+            painter.drawLine(start, end);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::AsphaltShingle) {
-        painter.setPen(QPen(dark, 0.9));
-        int row = 0;
-        for (float y = static_cast<float>(bounds.top()) + spacing; y < bounds.bottom(); y += spacing, ++row) {
-            painter.drawLine(QPointF(bounds.left() - 2.0, y), QPointF(bounds.right() + 2.0, y));
-            const float stagger = (row % 2 == 0) ? spacing * 0.45F : 0.0F;
-            for (float x = static_cast<float>(bounds.left()) + stagger; x < bounds.right(); x += spacing * 1.5F) {
-                painter.drawLine(QPointF(x, y - spacing * 0.45F), QPointF(x, y));
+        for (int row_index = 1; row_index <= courses; ++row_index) {
+            const float v0 = static_cast<float>(row_index - 1) / static_cast<float>(courses);
+            const float v1 = static_cast<float>(row_index) / static_cast<float>(courses);
+            const auto previous_row = roofRowEndpoints(polygon, v0);
+            const auto current_row = roofRowEndpoints(polygon, v1);
+            painter.setPen(QPen(alphaColor(dark_base, 45 + static_cast<int>(98.0F * strength)), 0.85));
+            painter.drawLine(current_row[0], current_row[1]);
+
+            const float width = std::max(8.0F, screenDistance(current_row[0], current_row[1]));
+            const int tabs = std::max(2, static_cast<int>(std::round(width / std::max(11.0F, 16.0F * scale))));
+            const float stagger = (row_index % 2 == 0) ? 0.5F : 0.0F;
+            for (int tab = 1; tab < tabs; ++tab) {
+                const float u = (static_cast<float>(tab) + stagger) / static_cast<float>(tabs);
+                if (u >= 0.98F) continue;
+                const QPointF top = roofRowPoint(previous_row, u);
+                const QPointF bottom = roofRowPoint(current_row, u);
+                painter.drawLine(lerpScreen(top, bottom, 0.62F), bottom);
             }
         }
     }
@@ -563,17 +637,33 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     };
     std::vector<RoofDraw> roof_faces;
 
+    const float roof_overhang = spec.roof_style == BuildingRoofStyle::Flat ? 0.04F : 0.10F;
+    const float roof_half_w = half_w + roof_overhang;
+    const float roof_half_d = half_d + roof_overhang;
+    const std::array<Point3, 4> roof_corners = {
+        Point3{-roof_half_w, -roof_half_d, wall_h},
+        Point3{roof_half_w, -roof_half_d, wall_h},
+        Point3{roof_half_w, roof_half_d, wall_h},
+        Point3{-roof_half_w, roof_half_d, wall_h},
+    };
+    std::array<QPointF, 4> roof_top{};
+    for (int i = 0; i < 4; ++i) roof_top[i] = projectPoint(roof_corners[i], view, canvas);
+
+    Point3 ridge0{};
+    Point3 ridge1{};
+    bool has_ridge = false;
+
     if (spec.roof_style == BuildingRoofStyle::Flat) {
         QPolygonF roof;
-        for (const QPointF point : top) roof << point;
+        for (const QPointF point : roof_top) roof << point;
         roof_faces.push_back({roof, spec.roof_color, 0});
     } else if (spec.roof_style == BuildingRoofStyle::Pyramid) {
         const Point3 apex{0.0F, 0.0F, wall_h + roof_h};
         for (const int edge : visible_edges) {
             const int next = (edge + 1) % 4;
             QPolygonF poly = {
-                top[edge],
-                top[next],
+                roof_top[edge],
+                roof_top[next],
                 projectPoint(apex, view, canvas),
             };
             const float factor = poly.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
@@ -581,37 +671,36 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         }
     } else {
         const bool ridge_along_x = spec.footprint_width_tiles >= spec.footprint_depth_tiles;
-        Point3 ridge0;
-        Point3 ridge1;
+        has_ridge = true;
         if (ridge_along_x) {
-            ridge0 = {-half_w, 0.0F, wall_h + roof_h};
-            ridge1 = {half_w, 0.0F, wall_h + roof_h};
+            ridge0 = {-roof_half_w, 0.0F, wall_h + roof_h};
+            ridge1 = {roof_half_w, 0.0F, wall_h + roof_h};
         } else {
-            ridge0 = {0.0F, -half_d, wall_h + roof_h};
-            ridge1 = {0.0F, half_d, wall_h + roof_h};
+            ridge0 = {0.0F, -roof_half_d, wall_h + roof_h};
+            ridge1 = {0.0F, roof_half_d, wall_h + roof_h};
         }
 
         for (const int edge : visible_edges) {
             QPolygonF poly;
             if (ridge_along_x) {
                 if (edge == 0) {
-                    poly = {top[0], top[1], projectPoint(ridge1, view, canvas), projectPoint(ridge0, view, canvas)};
+                    poly = {roof_top[0], roof_top[1], projectPoint(ridge1, view, canvas), projectPoint(ridge0, view, canvas)};
                 } else if (edge == 2) {
-                    poly = {top[2], top[3], projectPoint(ridge0, view, canvas), projectPoint(ridge1, view, canvas)};
+                    poly = {roof_top[2], roof_top[3], projectPoint(ridge0, view, canvas), projectPoint(ridge1, view, canvas)};
                 } else if (edge == 1) {
-                    poly = {top[1], top[2], projectPoint(ridge1, view, canvas)};
+                    poly = {roof_top[1], roof_top[2], projectPoint(ridge1, view, canvas)};
                 } else {
-                    poly = {top[3], top[0], projectPoint(ridge0, view, canvas)};
+                    poly = {roof_top[3], roof_top[0], projectPoint(ridge0, view, canvas)};
                 }
             } else {
                 if (edge == 1) {
-                    poly = {top[1], top[2], projectPoint(ridge1, view, canvas), projectPoint(ridge0, view, canvas)};
+                    poly = {roof_top[1], roof_top[2], projectPoint(ridge1, view, canvas), projectPoint(ridge0, view, canvas)};
                 } else if (edge == 3) {
-                    poly = {top[3], top[0], projectPoint(ridge0, view, canvas), projectPoint(ridge1, view, canvas)};
+                    poly = {roof_top[3], roof_top[0], projectPoint(ridge0, view, canvas), projectPoint(ridge1, view, canvas)};
                 } else if (edge == 0) {
-                    poly = {top[0], top[1], projectPoint(ridge0, view, canvas)};
+                    poly = {roof_top[0], roof_top[1], projectPoint(ridge0, view, canvas)};
                 } else {
-                    poly = {top[2], top[3], projectPoint(ridge1, view, canvas)};
+                    poly = {roof_top[2], roof_top[3], projectPoint(ridge1, view, canvas)};
                 }
             }
             const float factor = poly.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
@@ -627,10 +716,23 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawRoofMaterial(painter, spec, roof.polygon, roof.face_index);
     }
 
-    painter.setPen(QPen(spec.trim_color, 1.6));
+    const QColor eave_dark = scaledColor(spec.roof_color, 0.48F);
+    const QColor eave_light = scaledColor(spec.roof_color, 1.10F);
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
-        painter.drawLine(top[edge], top[next]);
+        painter.setPen(QPen(eave_dark, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(roof_top[edge], roof_top[next]);
+        painter.setPen(QPen(alphaColor(eave_light, 155), 0.75, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(roof_top[edge], roof_top[next]);
+    }
+
+    if (has_ridge) {
+        const QPointF ridge_start = projectPoint(ridge0, view, canvas);
+        const QPointF ridge_end = projectPoint(ridge1, view, canvas);
+        painter.setPen(QPen(scaledColor(spec.roof_color, 0.46F), 2.8, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(ridge_start, ridge_end);
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 1.20F), 185), 0.9, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(ridge_start, ridge_end);
     }
 
     drawChimney(painter, spec, half_w, half_d, wall_h, roof_h, view, canvas);
