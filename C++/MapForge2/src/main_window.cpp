@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "building_composer_widget.h"
 #include "production_studio_panel.h"
 #include "studio_panel.h"
 
@@ -204,6 +205,7 @@ void MainWindow::buildDocks() {
     auto* tabs = new QTabWidget(studio_dock_);
     tabs->setDocumentMode(true);
     tabs->addTab(new ch::studio::ProductionStudioPanel(tabs), "Production");
+    tabs->addTab(new ch::studio::BuildingComposerWidget(tabs), "Building Composer");
     tabs->addTab(new ch::studio::StudioPanel(tabs), "Studio");
 
     auto* terrainPage = new QWidget(tabs);
@@ -235,6 +237,7 @@ void MainWindow::buildDocks() {
         "• canonical viewport redraw work is dirty-gated\n"
         "• Inspect + left drag, RMB/MMB and WASD/arrows pan the map\n"
         "• scratch map bounds can be resized without moving their minimum coordinate\n"
+        "• Building Composer V0 generates four bitmap views from one parametric definition\n"
         "• canonical scenario mode is still read-only until lossless serialization\n"
         "• production Save remains disabled until lossless serialization\n"
         "• Production Workbench V1 never overwrites source assets\n"

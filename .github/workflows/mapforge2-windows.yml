@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Map Forge 2
         shell: pwsh
-        run: cmake --build build/mapforge2 --config Release --target MapForge2 --parallel
+        run: cmake --build build/mapforge2 --config Release --target MapForge2 MapForge2ComposerPreview --parallel
 
       - name: Deploy Studio runtime
         shell: pwsh
@@ -51,9 +51,20 @@ jobs:
           Copy-Item "C++/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md" dist/MapForge2/CH_STUDIO_ARCHITECTURE_V1.md
           Copy-Item "C++/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md" dist/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md
           Copy-Item "C++/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md" dist/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md
+          Copy-Item "C++/MapForge2/CH_BUILDING_COMPOSER_V0.md" dist/MapForge2/CH_BUILDING_COMPOSER_V0.md
           New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
           Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
           Copy-Item "C++/MapForge2/examples/studio_project/city_horizon_production_profile.json" dist/MapForge2/examples/city_horizon_production_profile.json
+
+      - name: Generate Building Composer visual gate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/MapForge2/visual_tests | Out-Null
+          $env:QT_QPA_PLATFORM="offscreen"
+          build/mapforge2/Release/MapForge2ComposerPreview.exe dist/MapForge2/visual_tests
+          if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_review.png)) { throw "Building Composer review image was not generated." }
+          if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_4view.png)) { throw "Building Composer sprite sheet was not generated." }
+          if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_manifest.json)) { throw "Building Composer manifest was not generated." }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4

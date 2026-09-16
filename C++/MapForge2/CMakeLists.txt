@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Gui)
 
 include(FetchContent)
 set(SDL_TESTS OFF CACHE BOOL "Disable SDL tests for the Studio build" FORCE)
@@ -62,6 +62,17 @@ target_include_directories(mapforge2_studio_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Deterministic parametric building source -> bitmap output. This is intentionally
+# separate from the map renderer so CI and future automation can invoke it directly.
+add_library(mapforge2_asset_composer STATIC
+    src/building_composer.cpp
+)
+target_include_directories(mapforge2_asset_composer PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CH_ROOT}
+)
+target_link_libraries(mapforge2_asset_composer PUBLIC Qt6::Gui)
+
 add_library(mapforge2_editor STATIC
     src/editor_document.cpp
     src/editor_history.cpp
@@ -70,6 +81,7 @@ add_library(mapforge2_editor STATIC
     src/content_pack_qt.cpp
     src/studio_panel.cpp
     src/production_studio_panel.cpp
+    src/building_composer_widget.cpp
     src/main_window.cpp
 )
 target_include_directories(mapforge2_editor PUBLIC
@@ -80,6 +92,7 @@ target_link_libraries(mapforge2_editor PUBLIC
     mapforge2_canonical
     mapforge2_render
     mapforge2_studio_core
+    mapforge2_asset_composer
     SDL3::SDL3
     Qt6::Widgets
 )
@@ -89,18 +102,29 @@ add_executable(MapForge2 WIN32
 )
 target_link_libraries(MapForge2 PRIVATE mapforge2_editor Qt6::Widgets)
 
+# Headless/offscreen visual gate used by GitHub Actions. It exercises the same
+# BuildingComposer implementation that the Studio widget uses.
+add_executable(MapForge2ComposerPreview
+    src/composer_preview_main.cpp
+)
+target_link_libraries(MapForge2ComposerPreview PRIVATE mapforge2_asset_composer Qt6::Gui)
+
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_render PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_studio_core PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(mapforge2_asset_composer PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_editor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2 PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(mapforge2_canonical PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_render PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_studio_core PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(mapforge2_asset_composer PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_editor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2 PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 # A compiled Studio artifact must carry the exact assets consumed by ch_render.
