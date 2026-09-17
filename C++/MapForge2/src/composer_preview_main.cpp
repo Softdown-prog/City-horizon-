@@ -160,6 +160,27 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_door_gate", door_gate)) return 7;
 
+    // Wall finish gate: isolates the plaster surface and face shading so the
+    // house's final wall language can be judged without apertures or add-ons.
+    ch::studio::BuildingComposerSpec wall_gate = residence;
+    wall_gate.footprint_width_tiles = 2;
+    wall_gate.footprint_depth_tiles = 1;
+    wall_gate.wall_color = QColor("#d7c8ad");
+    wall_gate.roof_color = QColor("#9f5142");
+    wall_gate.trim_color = QColor("#f4eee4");
+    wall_gate.wall_material = ch::studio::BuildingWallMaterial::Plaster;
+    wall_gate.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    wall_gate.material_strength = 0.38F;
+    wall_gate.material_scale = 1.0F;
+    wall_gate.material_seed = 37;
+    wall_gate.windows = false;
+    wall_gate.south_door = false;
+    wall_gate.south_awning = false;
+    wall_gate.south_sign = false;
+    wall_gate.roof_chimney = false;
+
+    if (!writeAsset(output_dir, "building_composer_wall_finish_gate", wall_gate)) return 8;
+
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
 }
