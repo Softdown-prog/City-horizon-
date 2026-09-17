@@ -356,41 +356,99 @@ float doorCenter(const BuildingDoorPosition position) {
     return 0.50F;
 }
 
+struct FacadeAperture {
+    float t0 = 0.0F;
+    float t1 = 0.0F;
+};
+
+std::vector<FacadeAperture> entranceWindowLayout(const BuildingComposerSpec& spec) {
+    const int count = spec.window_pattern == BuildingWindowPattern::Single ? 1
+                    : spec.window_pattern == BuildingWindowPattern::Pair ? 2 : 4;
+
+    std::vector<FacadeAperture> result;
+    result.reserve(static_cast<std::size_t>(count));
+
+    constexpr float facade_min = 0.06F;
+    constexpr float facade_max = 0.94F;
+    constexpr float door_clear_half = 0.19F;
+    constexpr float side_gap = 0.035F;
+    const float center = doorCenter(spec.door_position);
+    const float left_end = std::max(facade_min, center - door_clear_half - side_gap);
+    const float right_start = std::min(facade_max, center + door_clear_half + side_gap);
+    const float left_span = std::max(0.0F, left_end - facade_min);
+    const float right_span = std::max(0.0F, facade_max - right_start);
+
+    int left_count = 0;
+    if (count == 1) {
+        left_count = left_span >= right_span ? 1 : 0;
+    } else {
+        const float total_span = std::max(0.001F, left_span + right_span);
+        left_count = static_cast<int>(std::round(static_cast<float>(count) * left_span / total_span));
+        left_count = std::clamp(left_count, left_span >= 0.10F ? 1 : 0, count - (right_span >= 0.10F ? 1 : 0));
+    }
+    const int right_count = count - left_count;
+
+    auto appendSegment = [&](const float start, const float end, const int segment_count) {
+        if (segment_count <= 0 || end <= start) return;
+        const float span = end - start;
+        const float gap = std::min(0.035F, span / static_cast<float>(segment_count * 4));
+        const float width = std::max(0.055F,
+            (span - gap * static_cast<float>(segment_count + 1)) / static_cast<float>(segment_count));
+        for (int i = 0; i < segment_count; ++i) {
+            const float t0 = start + gap + static_cast<float>(i) * (width + gap);
+            const float t1 = std::min(end - gap, t0 + width);
+            if (t1 - t0 >= 0.05F) result.push_back({t0, t1});
+        }
+    };
+
+    appendSegment(facade_min, left_end, left_count);
+    appendSegment(right_start, facade_max, right_count);
+    return result;
+}
+
+void drawWindowModule(QPainter& painter, const BuildingComposerSpec& spec,
+                      const Point3 a, const Point3 b, const float t0, const float t1,
+                      const float wall_h, const BuildingView view, const QSize canvas) {
+    const float z0 = wall_h * 0.36F;
+    const float z1 = wall_h * 0.70F;
+    const float width = std::max(0.04F, t1 - t0);
+    const float inset_t = std::min(width * 0.13F, 0.018F);
+    const float inset_z = wall_h * 0.025F;
+    const QColor frame = scaledColor(spec.trim_color, 0.90F);
+    const QColor frame_outline = scaledColor(spec.trim_color, 0.62F);
+
+    drawFaceDetail(painter, a, b, t0, t1, z0, z1,
+                   view, canvas, frame, frame_outline);
+    drawFaceDetail(painter, a, b, t0 + inset_t, t1 - inset_t,
+                   z0 + inset_z, z1 - inset_z,
+                   view, canvas, spec.glass_color, scaledColor(spec.glass_color, 0.64F));
+
+    painter.setPen(QPen(alphaColor(scaledColor(spec.glass_color, 1.32F), 170), 0.8));
+    const float highlight_z = z1 - inset_z - wall_h * 0.035F;
+    painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset_t * 1.8F, highlight_z), view, canvas),
+                     projectPoint(lerpPoint(a, b, t1 - inset_t * 1.8F, highlight_z), view, canvas));
+
+    painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), 1.15, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(projectPoint(lerpPoint(a, b, t0 - 0.006F, z0 - wall_h * 0.012F), view, canvas),
+                     projectPoint(lerpPoint(a, b, t1 + 0.006F, z0 - wall_h * 0.012F), view, canvas));
+}
+
 void drawWindows(QPainter& painter, const BuildingComposerSpec& spec,
                  const Point3 a, const Point3 b, const int edge,
                  const float wall_h, const BuildingView view, const QSize canvas) {
     if (!spec.windows) return;
 
-    const float window_z0 = wall_h * 0.38F;
-    const float window_z1 = wall_h * 0.68F;
-    const QColor outline = scaledColor(spec.trim_color, 0.72F);
     const bool entrance_edge = spec.south_door && edge == 2;
-
-    auto window = [&](const float t0, const float t1) {
-        drawFaceDetail(painter, a, b, t0, t1, window_z0, window_z1,
-                       view, canvas, spec.glass_color, outline);
-    };
-
     if (entrance_edge) {
-        switch (spec.window_pattern) {
-            case BuildingWindowPattern::Single:
-                if (spec.door_position == BuildingDoorPosition::Left) window(0.58F, 0.82F);
-                else if (spec.door_position == BuildingDoorPosition::Right) window(0.18F, 0.42F);
-                else window(0.12F, 0.32F);
-                break;
-            case BuildingWindowPattern::Pair:
-                window(0.08F, 0.25F);
-                window(0.75F, 0.92F);
-                break;
-            case BuildingWindowPattern::Strip:
-                window(0.06F, 0.18F);
-                window(0.23F, 0.35F);
-                window(0.65F, 0.77F);
-                window(0.82F, 0.94F);
-                break;
+        for (const FacadeAperture& aperture : entranceWindowLayout(spec)) {
+            drawWindowModule(painter, spec, a, b, aperture.t0, aperture.t1, wall_h, view, canvas);
         }
         return;
     }
+
+    auto window = [&](const float t0, const float t1) {
+        drawWindowModule(painter, spec, a, b, t0, t1, wall_h, view, canvas);
+    };
 
     switch (spec.window_pattern) {
         case BuildingWindowPattern::Single:
@@ -418,9 +476,22 @@ void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
     const float half = 0.12F;
     const float t0 = std::clamp(center - half, 0.05F, 0.80F);
     const float t1 = std::clamp(center + half, 0.20F, 0.95F);
+    const float frame_inset = 0.014F;
+    const float frame_z0 = 0.5F;
+    const float frame_z1 = wall_h * 0.585F;
 
+    drawFaceDetail(painter, a, b, t0 - frame_inset, t1 + frame_inset,
+                   frame_z0, frame_z1,
+                   view, canvas, scaledColor(spec.trim_color, 0.88F), scaledColor(spec.trim_color, 0.58F));
     drawFaceDetail(painter, a, b, t0, t1, 1.0F, wall_h * 0.56F,
-                   view, canvas, spec.door_color, scaledColor(spec.trim_color, 0.68F));
+                   view, canvas, spec.door_color, scaledColor(spec.door_color, 0.62F));
+
+    painter.setPen(QPen(alphaColor(scaledColor(spec.door_color, 1.28F), 140), 0.75));
+    painter.drawLine(projectPoint(lerpPoint(a, b, t0 + 0.025F, wall_h * 0.525F), view, canvas),
+                     projectPoint(lerpPoint(a, b, t1 - 0.025F, wall_h * 0.525F), view, canvas));
+    painter.setPen(QPen(scaledColor(spec.trim_color, 0.55F), 1.2, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(projectPoint(lerpPoint(a, b, t0 - frame_inset, 0.5F), view, canvas),
+                     projectPoint(lerpPoint(a, b, t1 + frame_inset, 0.5F), view, canvas));
 
     if (spec.south_sign) {
         const float sign_half = 0.15F;
@@ -838,7 +909,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
     QJsonObject metadata{
         {"generator", "City Horizon Studio Building/Asset Composer"},
         {"contractVersion", "CH_BUILDING_COMPOSER_V0"},
-        {"featureRevision", "materials_1"},
+        {"featureRevision", "facade_layout_1"},
         {"status", "PILOT"},
         {"sourceRepresentation", "parametric_vector_volume"},
         {"runtimeRepresentation", "PNG_RGBA_bitmap"},
