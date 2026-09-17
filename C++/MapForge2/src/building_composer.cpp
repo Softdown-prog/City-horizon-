@@ -110,7 +110,9 @@ float averageY(const QPolygonF& polygon) {
 
 void drawOutlinedPolygon(QPainter& painter, const QPolygonF& polygon, const QColor fill,
                          const QColor outline = QColor(45, 49, 51, 220)) {
-    painter.setPen(QPen(outline, 1.25));
+    QPen outline_pen(outline, 1.25, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    outline_pen.setMiterLimit(3.0);
+    painter.setPen(outline_pen);
     painter.setBrush(fill);
     painter.drawPolygon(polygon);
 }
