@@ -137,6 +137,29 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_window_gate", window_gate)) return 6;
 
+    // Door gate: isolates the entrance frame, inset panel and depth cues. Windows,
+    // sign, awning and chimney are disabled so the entrance can be judged alone.
+    ch::studio::BuildingComposerSpec door_gate = residence;
+    door_gate.footprint_width_tiles = 2;
+    door_gate.footprint_depth_tiles = 1;
+    door_gate.wall_color = QColor("#d7c8ad");
+    door_gate.roof_color = QColor("#9f5142");
+    door_gate.trim_color = QColor("#f4eee4");
+    door_gate.door_color = QColor("#69483d");
+    door_gate.wall_material = ch::studio::BuildingWallMaterial::Plaster;
+    door_gate.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    door_gate.material_strength = 0.32F;
+    door_gate.material_scale = 1.0F;
+    door_gate.material_seed = 31;
+    door_gate.roof_chimney = false;
+    door_gate.south_awning = false;
+    door_gate.south_sign = false;
+    door_gate.south_door = true;
+    door_gate.door_position = ch::studio::BuildingDoorPosition::Center;
+    door_gate.windows = false;
+
+    if (!writeAsset(output_dir, "building_composer_door_gate", door_gate)) return 7;
+
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
 }
