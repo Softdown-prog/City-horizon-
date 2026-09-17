@@ -112,6 +112,31 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_material_gate", material_gate)) return 5;
 
+    // Window gate: isolates facade aperture spacing, frame/glass readability and
+    // deterministic placement around an entrance without changing structure.
+    ch::studio::BuildingComposerSpec window_gate = residence;
+    window_gate.footprint_width_tiles = 2;
+    window_gate.footprint_depth_tiles = 1;
+    window_gate.wall_color = QColor("#d7c8ad");
+    window_gate.roof_color = QColor("#9f5142");
+    window_gate.trim_color = QColor("#f4eee4");
+    window_gate.glass_color = QColor("#70b8d2");
+    window_gate.door_color = QColor("#6a493d");
+    window_gate.wall_material = ch::studio::BuildingWallMaterial::Plaster;
+    window_gate.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    window_gate.material_strength = 0.38F;
+    window_gate.material_scale = 1.0F;
+    window_gate.material_seed = 29;
+    window_gate.roof_chimney = false;
+    window_gate.south_awning = false;
+    window_gate.south_sign = false;
+    window_gate.south_door = true;
+    window_gate.door_position = ch::studio::BuildingDoorPosition::Left;
+    window_gate.windows = true;
+    window_gate.window_pattern = ch::studio::BuildingWindowPattern::Strip;
+
+    if (!writeAsset(output_dir, "building_composer_window_gate", window_gate)) return 6;
+
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
 }
