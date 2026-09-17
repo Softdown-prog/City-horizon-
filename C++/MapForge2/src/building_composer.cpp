@@ -32,6 +32,10 @@ constexpr std::array<BuildingView, 4> kViews = {
 };
 
 constexpr int kRenderSupersampleScale = 2;
+constexpr qreal kStructuralOutlineWidth = 1.20;
+constexpr qreal kContactLineWidth = 1.20;
+constexpr qreal kRoofEdgeWidth = 1.35;
+constexpr qreal kHighlightLineWidth = 0.65;
 
 int quarterTurns(const BuildingView view) {
     switch (view) {
@@ -110,7 +114,7 @@ float averageY(const QPolygonF& polygon) {
 
 void drawOutlinedPolygon(QPainter& painter, const QPolygonF& polygon, const QColor fill,
                          const QColor outline = QColor(45, 49, 51, 220)) {
-    QPen outline_pen(outline, 1.25, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    QPen outline_pen(outline, kStructuralOutlineWidth, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
     outline_pen.setMiterLimit(3.0);
     painter.setPen(outline_pen);
     painter.setBrush(fill);
@@ -307,7 +311,7 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             }
 
             QColor highlight = alphaColor(light_base, 12 + static_cast<int>(42.0F * strength));
-            painter.setPen(QPen(highlight, 0.65));
+            painter.setPen(QPen(highlight, kHighlightLineWidth));
             const QPointF h0 = lerpScreen(previous_row[0], current_row[0], 0.88F);
             const QPointF h1 = lerpScreen(previous_row[1], current_row[1], 0.88F);
             painter.drawLine(h0, h1);
@@ -430,7 +434,7 @@ void drawWindowModule(QPainter& painter, const BuildingComposerSpec& spec,
     painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset_t * 1.8F, highlight_z), view, canvas),
                      projectPoint(lerpPoint(a, b, t1 - inset_t * 1.8F, highlight_z), view, canvas));
 
-    painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), 1.15, Qt::SolidLine, Qt::RoundCap));
+    painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), kStructuralOutlineWidth, Qt::SolidLine, Qt::RoundCap));
     painter.drawLine(projectPoint(lerpPoint(a, b, t0 - 0.006F, z0 - wall_h * 0.012F), view, canvas),
                      projectPoint(lerpPoint(a, b, t1 + 0.006F, z0 - wall_h * 0.012F), view, canvas));
 }
@@ -491,7 +495,7 @@ void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
     painter.setPen(QPen(alphaColor(scaledColor(spec.door_color, 1.28F), 140), 0.75));
     painter.drawLine(projectPoint(lerpPoint(a, b, t0 + 0.025F, wall_h * 0.525F), view, canvas),
                      projectPoint(lerpPoint(a, b, t1 - 0.025F, wall_h * 0.525F), view, canvas));
-    painter.setPen(QPen(scaledColor(spec.trim_color, 0.55F), 1.2, Qt::SolidLine, Qt::RoundCap));
+    painter.setPen(QPen(scaledColor(spec.trim_color, 0.55F), kStructuralOutlineWidth, Qt::SolidLine, Qt::RoundCap));
     painter.drawLine(projectPoint(lerpPoint(a, b, t0 - frame_inset, 0.5F), view, canvas),
                      projectPoint(lerpPoint(a, b, t1 + frame_inset, 0.5F), view, canvas));
 
@@ -707,7 +711,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     }
 
     const QColor wall_ground_contact = alphaColor(scaledColor(spec.wall_color, 0.50F), 115);
-    QPen wall_ground_contact_pen(wall_ground_contact, 1.35, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    QPen wall_ground_contact_pen(wall_ground_contact, kContactLineWidth, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
     wall_ground_contact_pen.setMiterLimit(3.0);
     painter.setPen(wall_ground_contact_pen);
     const float wall_ground_contact_z = 0.85F;
@@ -719,7 +723,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     }
 
     const QColor roof_wall_contact = alphaColor(scaledColor(spec.roof_color, 0.42F), 135);
-    QPen roof_wall_contact_pen(roof_wall_contact, 1.55, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    QPen roof_wall_contact_pen(roof_wall_contact, kContactLineWidth, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
     roof_wall_contact_pen.setMiterLimit(3.0);
     painter.setPen(roof_wall_contact_pen);
     const float roof_wall_contact_z = wall_h - 1.25F;
@@ -831,18 +835,18 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     const QColor eave_light = scaledColor(spec.roof_color, 1.10F);
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
-        painter.setPen(QPen(eave_dark, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(eave_dark, kRoofEdgeWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(roof_top[edge], roof_top[next]);
-        painter.setPen(QPen(alphaColor(eave_light, 155), 0.75, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(alphaColor(eave_light, 155), kHighlightLineWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(roof_top[edge], roof_top[next]);
     }
 
     if (has_ridge) {
         const QPointF ridge_start = projectPoint(ridge0, view, canvas);
         const QPointF ridge_end = projectPoint(ridge1, view, canvas);
-        painter.setPen(QPen(scaledColor(spec.roof_color, 0.46F), 2.8, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(scaledColor(spec.roof_color, 0.46F), kRoofEdgeWidth, Qt::SolidLine, Qt::RoundCap));
         painter.drawLine(ridge_start, ridge_end);
-        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 1.20F), 185), 0.9, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 1.20F), 185), kHighlightLineWidth, Qt::SolidLine, Qt::RoundCap));
         painter.drawLine(ridge_start, ridge_end);
     }
 
