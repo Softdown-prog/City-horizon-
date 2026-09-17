@@ -699,6 +699,18 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
     }
 
+    const QColor roof_wall_contact = alphaColor(scaledColor(spec.roof_color, 0.42F), 135);
+    QPen roof_wall_contact_pen(roof_wall_contact, 1.55, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    roof_wall_contact_pen.setMiterLimit(3.0);
+    painter.setPen(roof_wall_contact_pen);
+    const float roof_wall_contact_z = wall_h - 1.25F;
+    for (const int edge : visible_edges) {
+        const int next = (edge + 1) % 4;
+        painter.drawLine(
+            projectPoint({corners[edge].x, corners[edge].y, roof_wall_contact_z}, view, canvas),
+            projectPoint({corners[next].x, corners[next].y, roof_wall_contact_z}, view, canvas));
+    }
+
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
         const Point3 a = corners[edge];
