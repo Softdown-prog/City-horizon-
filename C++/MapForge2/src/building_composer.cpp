@@ -661,11 +661,18 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     }
 
     if (spec.cast_shadow) {
+        QPolygonF contact_shadow;
+        for (const Point3 corner : corners) {
+            contact_shadow << projectPoint({corner.x * 1.025F, corner.y * 1.025F, -1.5F}, view, canvas);
+        }
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0, 0, 0, 58));
+        painter.drawPolygon(contact_shadow);
+
         QPolygonF shadow;
         for (const Point3 corner : corners) {
             shadow << projectPoint({corner.x * 1.08F, corner.y * 1.08F, -4.0F}, view, canvas);
         }
-        painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(0, 0, 0, 46));
         painter.drawPolygon(shadow);
     }
@@ -697,6 +704,18 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawOutlinedPolygon(painter, face.polygon, scaledColor(spec.wall_color, face.shade));
         const int next = (face.edge + 1) % 4;
         drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
+    }
+
+    const QColor wall_ground_contact = alphaColor(scaledColor(spec.wall_color, 0.50F), 115);
+    QPen wall_ground_contact_pen(wall_ground_contact, 1.35, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    wall_ground_contact_pen.setMiterLimit(3.0);
+    painter.setPen(wall_ground_contact_pen);
+    const float wall_ground_contact_z = 0.85F;
+    for (const int edge : visible_edges) {
+        const int next = (edge + 1) % 4;
+        painter.drawLine(
+            projectPoint({corners[edge].x, corners[edge].y, wall_ground_contact_z}, view, canvas),
+            projectPoint({corners[next].x, corners[next].y, wall_ground_contact_z}, view, canvas));
     }
 
     const QColor roof_wall_contact = alphaColor(scaledColor(spec.roof_color, 0.42F), 135);
