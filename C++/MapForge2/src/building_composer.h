@@ -51,6 +51,30 @@ enum class BuildingRoofMaterial {
     AsphaltShingle,
 };
 
+// Canonical reusable architectural modules. A module describes the authored
+// component recipe; placement remains controlled by sockets/patterns in the
+// building spec. New buildings should reference these stable IDs instead of
+// duplicating the drawing recipe.
+enum class BuildingWindowModule {
+    ClassicFramed,
+};
+
+enum class BuildingDoorModule {
+    ClassicWood,
+};
+
+enum class BuildingAwningModule {
+    CanvasCanopy,
+};
+
+enum class BuildingSignModule {
+    FacadePlaque,
+};
+
+enum class BuildingChimneyModule {
+    MasonryCap,
+};
+
 // Global art-direction preset. This is intentionally separate from the
 // architectural/detail presets (Residence, Small shop, Utility / depot): those
 // can vary modules while this preset keeps the City Horizon visual language.
@@ -80,6 +104,14 @@ struct BuildingComposerSpec {
     bool cast_shadow = true;
     BuildingDoorPosition door_position = BuildingDoorPosition::Center;
     BuildingWindowPattern window_pattern = BuildingWindowPattern::Pair;
+
+    // Stable module references. The renderer consumes the same canonical
+    // module recipe anywhere the component is placed.
+    BuildingWindowModule window_module = BuildingWindowModule::ClassicFramed;
+    BuildingDoorModule door_module = BuildingDoorModule::ClassicWood;
+    BuildingAwningModule awning_module = BuildingAwningModule::CanvasCanopy;
+    BuildingSignModule sign_module = BuildingSignModule::FacadePlaque;
+    BuildingChimneyModule chimney_module = BuildingChimneyModule::MasonryCap;
 
     // Deterministic material recipes. Geometry and logical surfaces remain the
     // authority; these fields only change surface appearance. Strength controls
@@ -126,6 +158,46 @@ public:
                 return QStringLiteral("City Horizon Classic Tycoon");
         }
         return QStringLiteral("City Horizon Classic Tycoon");
+    }
+
+    static QString windowModuleId(BuildingWindowModule module) {
+        switch (module) {
+            case BuildingWindowModule::ClassicFramed:
+                return QStringLiteral("window.classic_framed.v1");
+        }
+        return QStringLiteral("window.classic_framed.v1");
+    }
+
+    static QString doorModuleId(BuildingDoorModule module) {
+        switch (module) {
+            case BuildingDoorModule::ClassicWood:
+                return QStringLiteral("door.classic_wood.v1");
+        }
+        return QStringLiteral("door.classic_wood.v1");
+    }
+
+    static QString awningModuleId(BuildingAwningModule module) {
+        switch (module) {
+            case BuildingAwningModule::CanvasCanopy:
+                return QStringLiteral("awning.canvas_canopy.v1");
+        }
+        return QStringLiteral("awning.canvas_canopy.v1");
+    }
+
+    static QString signModuleId(BuildingSignModule module) {
+        switch (module) {
+            case BuildingSignModule::FacadePlaque:
+                return QStringLiteral("sign.facade_plaque.v1");
+        }
+        return QStringLiteral("sign.facade_plaque.v1");
+    }
+
+    static QString chimneyModuleId(BuildingChimneyModule module) {
+        switch (module) {
+            case BuildingChimneyModule::MasonryCap:
+                return QStringLiteral("chimney.masonry_cap.v1");
+        }
+        return QStringLiteral("chimney.masonry_cap.v1");
     }
 
     static QImage renderView(const BuildingComposerSpec& spec, BuildingView view,
