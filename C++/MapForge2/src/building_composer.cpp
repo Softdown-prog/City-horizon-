@@ -185,6 +185,16 @@ void drawStructuralPlinth(QPainter& painter, const BuildingComposerSpec& spec,
     painter.drawLine(
         projectPoint({outer_a.x, outer_a.y, plinth_h * 0.28F}, view, canvas),
         projectPoint({outer_b.x, outer_b.y, plinth_h * 0.28F}, view, canvas));
+    // A narrow projecting cap makes the plinth read as a built element rather
+    // than a painted stripe, while remaining below the facade modules.
+    const float cap_lip_z0 = plinth_h - 0.65F;
+    const float cap_lip_z1 = plinth_h + 0.85F;
+    const Point3 lip_a{a.x * 1.026F, a.y * 1.026F, 0.0F};
+    const Point3 lip_b{b.x * 1.026F, b.y * 1.026F, 0.0F};
+    painter.setPen(QPen(alphaColor(scaledColor(spec.wall_color, face_shade * 0.58F), 105), 0.65));
+    painter.setBrush(scaledColor(spec.wall_color, face_shade * 0.88F));
+    painter.drawPolygon(faceQuad(lip_a, lip_b, cap_lip_z0, cap_lip_z1, view, canvas));
+
     painter.restore();
 }
 
@@ -649,13 +659,44 @@ void drawWindowModule(QPainter& painter, const BuildingComposerSpec& spec,
     painter.drawPolygon(side_reveal_shadow);
     painter.restore();
 
-    const float sill_t = 0.007F;
-    const float sill_z0 = z0 - wall_h * 0.018F;
+    // Controlled architectural micro-geometry: a shallow projecting head,
+    // narrow jamb returns and a two-step sill. These stay deliberately small so
+    // the opening gains thickness without turning into ornamental noise.
+    const float trim_projection_t = std::min(width * 0.045F, 0.006F);
+    const float head_z0 = z1 - wall_h * 0.010F;
+    const float head_z1 = z1 + wall_h * 0.026F;
+    drawFaceDetail(painter, a, b,
+                   t0 - trim_projection_t, t1 + trim_projection_t,
+                   head_z0, head_z1, view, canvas,
+                   scaledColor(spec.trim_color, 0.94F),
+                   scaledColor(spec.trim_color, 0.56F));
+
+    const float jamb_width = std::min(width * 0.055F, 0.008F);
+    drawFaceDetail(painter, a, b,
+                   t0 - trim_projection_t, t0 + jamb_width,
+                   z0, z1, view, canvas,
+                   scaledColor(spec.trim_color, 0.88F),
+                   scaledColor(spec.trim_color, 0.54F));
+    drawFaceDetail(painter, a, b,
+                   t1 - jamb_width, t1 + trim_projection_t,
+                   z0, z1, view, canvas,
+                   scaledColor(spec.trim_color, 0.84F),
+                   scaledColor(spec.trim_color, 0.52F));
+
+    const float sill_t = 0.010F;
+    const float sill_z0 = z0 - wall_h * 0.024F;
     const float sill_z1 = z0 + wall_h * 0.010F;
     drawFaceDetail(painter, a, b, t0 - sill_t, t1 + sill_t, sill_z0, sill_z1,
                    view, canvas,
-                   scaledColor(spec.trim_color, 0.82F),
-                   scaledColor(spec.trim_color, 0.52F));
+                   scaledColor(spec.trim_color, 0.88F),
+                   scaledColor(spec.trim_color, 0.50F));
+
+    // Thin drip edge under the sill gives the projection a readable lower lip.
+    drawFaceDetail(painter, a, b, t0 - sill_t * 0.72F, t1 + sill_t * 0.72F,
+                   sill_z0 - wall_h * 0.010F, sill_z0,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.70F),
+                   scaledColor(spec.trim_color, 0.46F));
 }
 
 void drawWindows(QPainter& painter, const BuildingComposerSpec& spec,
@@ -777,12 +818,41 @@ void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
     painter.drawPolygon(side_reveal_shadow);
     painter.restore();
 
-    const float threshold_t = 0.008F;
-    drawFaceDetail(painter, a, b, t0 - threshold_t, t1 + threshold_t,
-                   0.28F, 1.35F,
+    // Door surround: restrained projecting header and jambs establish real
+    // thickness while preserving the existing door design and proportions.
+    const float surround_t = 0.010F;
+    const float jamb_t = 0.012F;
+    const float surround_top = opening_z1 + wall_h * 0.028F;
+    drawFaceDetail(painter, a, b,
+                   t0 - surround_t, t1 + surround_t,
+                   opening_z1 - wall_h * 0.010F, surround_top,
                    view, canvas,
-                   scaledColor(spec.trim_color, 0.78F),
-                   scaledColor(spec.trim_color, 0.48F));
+                   scaledColor(spec.trim_color, 0.92F),
+                   scaledColor(spec.trim_color, 0.54F));
+    drawFaceDetail(painter, a, b,
+                   t0 - surround_t, t0 + jamb_t,
+                   0.65F, opening_z1,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.86F),
+                   scaledColor(spec.trim_color, 0.52F));
+    drawFaceDetail(painter, a, b,
+                   t1 - jamb_t, t1 + surround_t,
+                   0.65F, opening_z1,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.82F),
+                   scaledColor(spec.trim_color, 0.50F));
+
+    const float threshold_t = 0.012F;
+    drawFaceDetail(painter, a, b, t0 - threshold_t, t1 + threshold_t,
+                   0.24F, 1.35F,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.82F),
+                   scaledColor(spec.trim_color, 0.46F));
+    drawFaceDetail(painter, a, b, t0 - threshold_t * 0.72F, t1 + threshold_t * 0.72F,
+                   0.16F, 0.34F,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.68F),
+                   scaledColor(spec.trim_color, 0.44F));
 
     if (spec.south_sign) {
         const float sign_half = 0.15F;
@@ -1260,7 +1330,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
     QJsonObject metadata{
         {"generator", "City Horizon Studio Building/Asset Composer"},
         {"contractVersion", "CH_BUILDING_COMPOSER_V0"},
-        {"featureRevision", "facade_layout_1"},
+        {"featureRevision", "architectural_microgeometry_1"},
         {"status", "PILOT"},
         {"sourceRepresentation", "parametric_vector_volume"},
         {"runtimeRepresentation", "PNG_RGBA_bitmap"},
