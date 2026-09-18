@@ -1,0 +1,53 @@
+{
+  "id": "flexible_footprint_1",
+  "name": "Building Composer Flexible Footprint Contract",
+  "targetPlatform": "windows_pc",
+  "coordinateSpace": "logical_building_grid",
+  "supportedShapes": [
+    "rectangle",
+    "l_shape",
+    "courtyard",
+    "annex"
+  ],
+  "envelope": {
+    "minimumTilesPerAxis": 1,
+    "maximumTilesPerAxis": 8,
+    "customWidthAndDepth": true,
+    "quickSizesRemainAvailable": ["1x1", "2x1", "2x2", "3x2"]
+  },
+  "shapeRules": {
+    "rectangle": "all envelope cells are occupied",
+    "l_shape": "north-east cutout is removed from the envelope",
+    "courtyard": "a centered interior cutout is removed; minimum envelope is 3x3",
+    "annex": "main body occupies width-1 columns while the final column is occupied only for the authored annex depth and offset"
+  },
+  "authoringParameters": {
+    "cutoutWidthTiles": true,
+    "cutoutDepthTiles": true,
+    "annexDepthTiles": true,
+    "annexOffsetTiles": true,
+    "setbacks": ["front", "back", "left", "right"]
+  },
+  "placement": {
+    "usesOccupiedCellMask": true,
+    "boundingEnvelopeIsNotEquivalentToOccupiedCells": true,
+    "rotatesMaskWithBuilding": true,
+    "collisionChecksUseOccupiedCells": true,
+    "roadSocketMustTouchOccupiedEdgeCell": true,
+    "setbackReservationMustRemainInsideOwnedLot": true
+  },
+  "preview": {
+    "showOccupiedCellsOnTerrain": true,
+    "previewOnlyOverlay": true,
+    "overlayNotExportedIntoBuildingPng": true
+  },
+  "export": {
+    "manifestNode": "geometry.flexibleFootprint",
+    "recordsOccupiedCells": true,
+    "recordsEnvelope": true,
+    "recordsShapeParameters": true,
+    "recordsSetbacks": true,
+    "invalidMaskBlocksProductionExport": true
+  },
+  "rule": "The placement engine must use the exported occupied cell mask after building rotation. Bounding width/depth is only the authoring envelope and must not be treated as a fully occupied rectangle for non-rectangular shapes."
+}
