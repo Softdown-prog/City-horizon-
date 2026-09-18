@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_3",
+  "revision": "classic_tycoon_4",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "projection": {
@@ -56,6 +56,28 @@
       "sign": "sign.facade_plaque.v1",
       "chimney": "chimney.masonry_cap.v1"
     }
+  },
+  "roofEditor": {
+    "version": "roof_editor_1",
+    "supportedProfiles": [
+      "gable",
+      "hip",
+      "pyramid",
+      "flat",
+      "shed",
+      "mansard"
+    ],
+    "defaultProfile": "gable",
+    "pitchDegrees": 35.0,
+    "pitchRangeDegrees": [12.0, 60.0],
+    "overhang": 0.10,
+    "overhangRange": [0.0, 0.24],
+    "fasciaEnabled": true,
+    "fasciaThicknessPx": 2.8,
+    "ridgeEnabled": true,
+    "ridgeScale": 1.0,
+    "chimneyUsesArchitecturalModule": "chimney.masonry_cap.v1",
+    "singleParametricDefinitionForAllViews": true
   },
   "lighting": {
     "wallShadowFaceFactor": 0.84,
@@ -120,5 +142,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Architectural presets and per-building options may vary geometry, module placement, palette and material choice, but reusable architectural components must reference the canonical module library instead of duplicating recipes."
+  "authoringRule": "Architectural presets and per-building options may vary geometry, module placement, palette, material choice and roof profile, but reusable architectural components must reference the canonical module library and every roof view must derive from the same parametric roof definition."
 }
