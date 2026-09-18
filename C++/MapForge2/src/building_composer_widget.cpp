@@ -57,7 +57,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
         "New buildings start from the City Horizon Classic Tycoon visual preset. "
-        "Its renderer baseline keeps materials, AO, lighting, outlines, roof finish, base, windows and door treatment coherent while architectural presets vary the building itself.",
+        "Architectural components now reference the canonical reusable module library instead of duplicating per-building recipes.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
@@ -68,6 +68,11 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     visual_preset_label->setToolTip(
         "Official City Horizon renderer baseline. Architectural/detail presets may vary modules without replacing this visual contract.");
     form->addRow("Visual preset", visual_preset_label);
+
+    auto* module_library_label = new QLabel(QStringLiteral("architectural_modules_1"), this);
+    module_library_label->setToolTip(
+        "Stable reusable recipes for windows, doors, awnings, signs and chimneys. Exported manifests record the selected module IDs.");
+    form->addRow("Module library", module_library_label);
 
     footprint_combo_ = new QComboBox(this);
     footprint_combo_->addItems({"1×1", "2×1", "2×2", "3×2"});
@@ -133,7 +138,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     window_pattern_combo_ = new QComboBox(this);
     window_pattern_combo_->addItems({"Single", "Pair", "Strip"});
     window_pattern_combo_->setCurrentIndex(1);
-    form->addRow("Window module", window_pattern_combo_);
+    form->addRow("Window layout", window_pattern_combo_);
 
     wall_height_slider_ = new QSlider(Qt::Horizontal, this);
     wall_height_slider_->setRange(48, 132);
@@ -150,13 +155,13 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     root->addLayout(form);
 
     auto* flags = new QHBoxLayout();
-    windows_check_ = new QCheckBox("Windows", this);
+    windows_check_ = new QCheckBox("Window module", this);
     windows_check_->setChecked(true);
-    door_check_ = new QCheckBox("South door", this);
+    door_check_ = new QCheckBox("Door module", this);
     door_check_->setChecked(true);
-    awning_check_ = new QCheckBox("Awning", this);
-    sign_check_ = new QCheckBox("Sign", this);
-    chimney_check_ = new QCheckBox("Chimney", this);
+    awning_check_ = new QCheckBox("Awning module", this);
+    sign_check_ = new QCheckBox("Sign module", this);
+    chimney_check_ = new QCheckBox("Chimney module", this);
     shadow_check_ = new QCheckBox("Contact shadow", this);
     shadow_check_->setChecked(true);
     flags->addWidget(windows_check_);
@@ -271,9 +276,16 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
 }
 
 void BuildingComposerWidget::refreshSpecFromControls() {
-    // The visual preset is the renderer baseline and remains stable while the
-    // controls below describe the building authored on top of it.
     spec_.visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
+
+    // Module recipes are canonical library references; the controls only place
+    // or hide them. Future library revisions can add alternatives without
+    // changing socket/layout semantics.
+    spec_.window_module = BuildingWindowModule::ClassicFramed;
+    spec_.door_module = BuildingDoorModule::ClassicWood;
+    spec_.awning_module = BuildingAwningModule::CanvasCanopy;
+    spec_.sign_module = BuildingSignModule::FacadePlaque;
+    spec_.chimney_module = BuildingChimneyModule::MasonryCap;
 
     const int footprint = footprint_combo_ != nullptr ? footprint_combo_->currentIndex() : 1;
     switch (footprint) {
@@ -349,15 +361,17 @@ void BuildingComposerWidget::refreshPreview() {
         Qt::SmoothTransformation));
 
     QStringList modules;
-    if (spec_.south_awning) modules << "awning";
-    if (spec_.south_sign) modules << "sign";
-    if (spec_.roof_chimney) modules << "chimney";
-    const QString module_text = modules.isEmpty() ? QStringLiteral("no optional modules") : modules.join(", ");
+    if (spec_.windows) modules << BuildingComposer::windowModuleId(spec_.window_module);
+    if (spec_.south_door) modules << BuildingComposer::doorModuleId(spec_.door_module);
+    if (spec_.south_awning) modules << BuildingComposer::awningModuleId(spec_.awning_module);
+    if (spec_.south_sign) modules << BuildingComposer::signModuleId(spec_.sign_module);
+    if (spec_.roof_chimney) modules << BuildingComposer::chimneyModuleId(spec_.chimney_module);
+    const QString module_text = modules.isEmpty() ? QStringLiteral("none") : modules.join(", ");
 
     summary_->setText(
         QString("%1 / CH_BUILDING_COMPOSER_V0 — %2×%3 footprint, %4 roof. Walls: %5. Roof surface: %6. "
                 "Material intensity %7% / scale %8 / variation %9% / contrast %10% / seed %11. "
-                "Entrance: south/%12. Windows: %13. Modules: %14. Classic Tycoon calibration remains active.")
+                "Entrance: south/%12. Windows: %13. Reusable modules: %14.")
             .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
@@ -398,10 +412,14 @@ void BuildingComposerWidget::exportAsset() {
         summary_->setText("PNG exported, but manifest could not be written: " + manifest_path);
         return;
     }
-    manifest_file.write(QJsonDocument(BuildingComposer::manifest(spec_, frame)).toJson(QJsonDocument::Indented));
+
+    QJsonObject manifest = BuildingComposer::manifest(spec_, frame);
+    manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec_));
+    manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
     manifest_file.close();
 
-    summary_->setText("EXPORTED: " + path + " + " + manifest_path);
+    summary_->setText("EXPORTED: " + path + " + " + manifest_path +
+                      " / reusable module IDs recorded");
 }
 
 } // namespace ch::studio
