@@ -237,6 +237,21 @@ void drawWallMaterial(QPainter& painter, const BuildingComposerSpec& spec,
     painter.setBrush(Qt::NoBrush);
 
     if (spec.wall_material == BuildingWallMaterial::Plaster) {
+        const int patches = std::max(4, static_cast<int>((6.0F + 8.0F * strength) * edge_span / scale));
+        painter.setPen(Qt::NoPen);
+        for (int i = 0; i < patches; ++i) {
+            const float t = 0.07F + hash01(spec.material_seed + 239, edge, i) * 0.86F;
+            const float z = 6.0F + hash01(spec.material_seed + 239, edge, i, 1) * std::max(5.0F, wall_h - 12.0F);
+            const float tone = hash01(spec.material_seed + 239, edge, i, 2) < 0.5F ? 0.90F : 1.07F;
+            const int alpha = 7 + static_cast<int>(15.0F * strength);
+            painter.setBrush(alphaColor(scaledColor(spec.wall_color, tone), alpha));
+            const QPointF center = projectPoint(lerpPoint(a, b, t, z), view, canvas);
+            const qreal radius_x = 1.0 + hash01(spec.material_seed + 239, edge, i, 3) * 1.5;
+            const qreal radius_y = 0.65 + hash01(spec.material_seed + 313, edge, i) * 0.85;
+            painter.drawEllipse(center, radius_x, radius_y);
+        }
+
+        painter.setBrush(Qt::NoBrush);
         const int samples = std::max(10, static_cast<int>((20.0F + 38.0F * strength) * edge_span / scale));
         painter.setPen(QPen(dark, 1.0));
         for (int i = 0; i < samples; ++i) {
@@ -363,6 +378,18 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             const auto previous_row = roofRowEndpoints(polygon, v0);
             const auto current_row = roofRowEndpoints(polygon, v1);
             const float row_variation = 0.88F + hash01(spec.material_seed + 401, face_index, row_index) * 0.20F;
+
+            const QPolygonF course_band = {
+                previous_row[0], previous_row[1], current_row[1], current_row[0],
+            };
+            const float band_tone = 0.94F + hash01(spec.material_seed + 557, face_index, row_index) * 0.12F;
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(alphaColor(
+                scaledColor(spec.roof_color, band_tone),
+                10 + static_cast<int>(28.0F * strength)));
+            painter.drawPolygon(course_band);
+            painter.setBrush(Qt::NoBrush);
+
             QColor course_color = alphaColor(
                 scaledColor(dark_base, row_variation),
                 48 + static_cast<int>(118.0F * strength));
@@ -379,6 +406,20 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                 const QPointF seam_bottom = roofRowPoint(current_row, u);
                 const QPointF seam_start = lerpScreen(seam_top, seam_bottom, 0.50F);
                 painter.drawLine(seam_start, seam_bottom);
+            }
+
+            const QColor lip_shadow = alphaColor(
+                scaledColor(spec.roof_color, 0.50F),
+                12 + static_cast<int>(38.0F * strength));
+            painter.setPen(QPen(lip_shadow, 0.70));
+            const float tile_step = 1.0F / static_cast<float>(tiles);
+            for (int tile = 0; tile < tiles; ++tile) {
+                const float center_u = (static_cast<float>(tile) + 0.5F + stagger) * tile_step;
+                if (center_u <= 0.04F || center_u >= 0.96F) continue;
+                const float half_lip = tile_step * 0.22F;
+                painter.drawLine(
+                    roofRowPoint(current_row, center_u - half_lip),
+                    roofRowPoint(current_row, center_u + half_lip));
             }
         }
     } else if (spec.roof_material == BuildingRoofMaterial::MetalSeam) {
