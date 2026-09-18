@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_10",
+  "revision": "classic_tycoon_11",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -90,17 +90,8 @@
     "manualModeOptional": true,
     "supportedFacades": ["south", "east", "north", "west"],
     "supportedModules": [
-      "window",
-      "door",
-      "storefront",
-      "sign",
-      "awning",
-      "double_door",
-      "garage_door",
-      "balcony",
-      "marquee",
-      "hvac",
-      "planter"
+      "window", "door", "storefront", "sign", "awning", "double_door",
+      "garage_door", "balcony", "marquee", "hvac", "planter"
     ],
     "placementCoordinates": {
       "facadePosition": "normalized_0_to_1",
@@ -129,6 +120,7 @@
   },
   "streetIntegration": {
     "version": "sidewalk_road_socket_1",
+    "contractFile": "street_integration_contract.json",
     "sidewalk": {
       "enabledByDefault": true,
       "integratedWithLot": true,
@@ -150,6 +142,23 @@
     },
     "placementRule": "sidewalk_bridges_building_footprint_to_matching_road_socket"
   },
+  "urbanIntegrationValidation": {
+    "version": "urban_integration_validation_1",
+    "blocksProductionExport": true,
+    "checks": [
+      "sidewalk_touches_footprint_without_grass_gap",
+      "road_socket_fits_authored_facade",
+      "ground_floor_access_matches_socket_facade",
+      "access_aligns_with_socket_through_sidewalk",
+      "facade_modules_stay_inside_legal_bounds",
+      "ground_floor_projection_stays_clear_of_roadway",
+      "roof_overhang_stays_inside_visual_outset_allowance"
+    ],
+    "accessAlignmentToleranceNormalized": 0.12,
+    "groundProjectionAllowance": "sidewalk_depth_tiles + 0.08",
+    "maximumRoofOverhangTiles": 0.24,
+    "runtimeStillValidatesActualRoadPresence": true
+  },
   "environmentPreview": {
     "version": "environment_preview_1",
     "enabledByDefault": true,
@@ -161,7 +170,7 @@
     "sidewalkTouchesFootprint": true
   },
   "automaticExport": {
-    "version": "automatic_export_validation_1",
+    "version": "automatic_export_validation_2",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprint": true,
@@ -172,7 +181,16 @@
     "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "thumbnail", "manifest_json", "validation_json"],
     "validationGate": {
       "blocksInvalidProductionExport": true,
-      "checks": ["declared_footprint_range", "floor_count_range", "frame_fit_for_footprint_floors_and_roof", "ground_anchor_contact", "sprite_edge_clipping", "transparent_rgb_contamination", "extreme_low_alpha_white_or_black_halo"],
+      "checks": [
+        "declared_footprint_range",
+        "floor_count_range",
+        "frame_fit_for_footprint_floors_and_roof",
+        "ground_anchor_contact",
+        "sprite_edge_clipping",
+        "transparent_rgb_contamination",
+        "extreme_low_alpha_white_or_black_halo",
+        "urban_integration_validation_1"
+      ],
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
@@ -242,5 +260,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Buildings may start from an editable building_typology_presets_1 template, then vary footprint, floors, materials, roof and architectural_modules_2 placements freely. The manifest must retain the originating typology ID, every facade module keeps a stable module ID and normalized logical placement, all four views derive from one building definition, road sockets rotate with the building, preview environment stays out of production PNGs, and validated export remains mandatory."
+  "authoringRule": "Buildings may start from an editable building_typology_presets_1 template, then vary footprint, floors, materials, roof and architectural_modules_2 placements freely. Production export now also requires urban_integration_validation_1: sidewalk must touch the footprint without a grass gap, the road socket must fit its logical facade, ground-floor access must align to that socket through a short sidewalk connection, facade modules must remain inside legal bounds, ground-level projections may not intrude into roadway clearance, and roof visual outset must stay within allowance. Runtime placement must still verify that a compatible road really exists after rotation."
 }
