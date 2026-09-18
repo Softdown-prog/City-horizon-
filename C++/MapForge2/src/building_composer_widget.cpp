@@ -421,7 +421,7 @@ void BuildingComposerWidget::refreshPreview() {
             .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
-            .arg(BuildingComposer::roofName(spec_.roof_style))
+            .arg(BuildingRoofEditorRenderer::roofProfileName(spec_.roof_style))
             .arg(spec_.roof_pitch_degrees, 0, 'f', 0)
             .arg(spec_.roof_overhang, 0, 'f', 2)
             .arg(spec_.roof_fascia_thickness_px, 0, 'f', 1)
@@ -460,6 +460,9 @@ void BuildingComposerWidget::exportAsset() {
     }
 
     QJsonObject manifest = BuildingComposer::manifest(spec_, frame);
+    QJsonObject geometry = manifest.value(QStringLiteral("geometry")).toObject();
+    geometry.insert(QStringLiteral("roofStyle"), BuildingRoofEditorRenderer::roofProfileName(spec_.roof_style));
+    manifest.insert(QStringLiteral("geometry"), geometry);
     manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec_));
     manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec_));
     manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
