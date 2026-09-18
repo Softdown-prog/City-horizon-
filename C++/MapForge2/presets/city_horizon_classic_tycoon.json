@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_7",
+  "revision": "classic_tycoon_8",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -15,22 +15,8 @@
     "recipeVersion": "rich_materials_1",
     "wallDefault": "plaster",
     "roofDefault": "ceramic_tile",
-    "supportedWallRecipes": [
-      "plaster",
-      "brick",
-      "concrete",
-      "timber",
-      "stone",
-      "metal_panel",
-      "glass",
-      "solid"
-    ],
-    "supportedRoofRecipes": [
-      "ceramic_tile",
-      "metal_seam",
-      "asphalt_shingle",
-      "solid"
-    ],
+    "supportedWallRecipes": ["plaster", "brick", "concrete", "timber", "stone", "metal_panel", "glass", "solid"],
+    "supportedRoofRecipes": ["ceramic_tile", "metal_seam", "asphalt_shingle", "solid"],
     "strength": 0.45,
     "scale": 1.0,
     "variation": 0.35,
@@ -58,16 +44,35 @@
       "chimney": "chimney.masonry_cap.v1"
     }
   },
+  "floorSystem": {
+    "version": "floor_system_1",
+    "minimumFloors": 1,
+    "maximumFloors": 8,
+    "defaultFloors": 1,
+    "defaultFloorHeightPx": 82,
+    "floorHeightRangePx": [36, 132],
+    "floorBandsEnabledByDefault": true,
+    "totalWallHeightDerivedFromFloors": true,
+    "roofAnchorsToTopFloor": true,
+    "singleParametricDefinitionForAllViews": true
+  },
+  "facadeEditor": {
+    "version": "facade_editor_1",
+    "manualModeOptional": true,
+    "supportedFacades": ["south", "east", "north", "west"],
+    "supportedModules": ["window", "door", "storefront", "sign", "awning"],
+    "placementCoordinates": {
+      "facadePosition": "normalized_0_to_1",
+      "moduleWidth": "normalized_facade_fraction",
+      "floor": "zero_based_in_manifest_one_based_in_ui"
+    },
+    "editableWithoutCode": true,
+    "modulesRotateWithBuilding": true,
+    "legacyAutomaticFacadeAvailableWhenDisabled": true
+  },
   "roofEditor": {
     "version": "roof_editor_1",
-    "supportedProfiles": [
-      "gable",
-      "hip",
-      "pyramid",
-      "flat",
-      "shed",
-      "mansard"
-    ],
+    "supportedProfiles": ["gable", "hip", "pyramid", "flat", "shed", "mansard"],
     "defaultProfile": "gable",
     "pitchDegrees": 35.0,
     "pitchRangeDegrees": [12.0, 60.0],
@@ -95,18 +100,13 @@
       "enabledByDefault": true,
       "defaultEdge": "south",
       "defaultType": "local_street",
-      "supportedTypes": [
-        "local_street",
-        "avenue",
-        "service_road"
-      ],
+      "supportedTypes": ["local_street", "avenue", "service_road"],
       "position": 0.50,
       "widthTiles": 0.36,
       "requiresRoadAdjacency": true,
       "rotatesWithBuilding": true
     },
-    "placementRule": "sidewalk_bridges_building_footprint_to_matching_road_socket",
-    "purpose": "Give every authored building an explicit, rotation-safe street frontage contract so placement can reject lots without matching road access and avoid accidental grass gaps."
+    "placementRule": "sidewalk_bridges_building_footprint_to_matching_road_socket"
   },
   "environmentPreview": {
     "version": "environment_preview_1",
@@ -116,37 +116,20 @@
     "terrain": "grass_reference",
     "sidewalk": "uses_street_integration_contract",
     "road": "uses_road_socket_contract",
-    "sidewalkTouchesFootprint": true,
-    "purpose": "Validate gameplay-scale grounding, street access and accidental grass gaps before asset export."
+    "sidewalkTouchesFootprint": true
   },
   "automaticExport": {
     "version": "automatic_export_validation_1",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprint": true,
+    "automaticFrameIncludesFloorHeight": true,
     "frameIncrementPx": 32,
     "minimumFrame": [320, 280],
-    "package": [
-      "south_rgba_png",
-      "east_rgba_png",
-      "west_rgba_png",
-      "north_rgba_png",
-      "four_view_sheet",
-      "review_sheet",
-      "thumbnail",
-      "manifest_json",
-      "validation_json"
-    ],
+    "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "thumbnail", "manifest_json", "validation_json"],
     "validationGate": {
       "blocksInvalidProductionExport": true,
-      "checks": [
-        "declared_footprint_range",
-        "frame_fit_for_footprint_and_roof",
-        "ground_anchor_contact",
-        "sprite_edge_clipping",
-        "transparent_rgb_contamination",
-        "extreme_low_alpha_white_or_black_halo"
-      ],
+      "checks": ["declared_footprint_range", "floor_count_range", "frame_fit_for_footprint_floors_and_roof", "ground_anchor_contact", "sprite_edge_clipping", "transparent_rgb_contamination", "extreme_low_alpha_white_or_black_halo"],
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
@@ -216,5 +199,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Architectural presets and per-building options may vary geometry, module placement, palette, material choice, roof profile and street frontage, but reusable architectural components must reference the canonical module library, every roof view must derive from the same parametric roof definition, the road socket must rotate with the building, the integrated sidewalk must touch the footprint without a grass gap, environment context must remain preview-only, and production export must pass the automatic footprint/frame/anchor/halo validation gate before PNG and manifest outputs are accepted."
+  "authoringRule": "Buildings may use 1–8 floors and manual facade modules on any logical side. Facade modules must be authored by normalized socket placement and floor index rather than custom per-view drawing. All four views derive from the same building definition; roofs anchor to the computed top floor; road sockets rotate with the building; preview environment stays out of production PNGs; validated export remains mandatory."
 }
