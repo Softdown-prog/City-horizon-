@@ -1,5 +1,5 @@
 {
-  "id": "automatic_export_validation_2",
+  "id": "automatic_export_validation_3",
   "name": "Building Composer Automatic Export + Validation",
   "targetPlatform": "windows_pc",
   "gridContract": "CH_GRID_V1",
@@ -9,13 +9,13 @@
     "projection": "isometric_2_to_1"
   },
   "framePolicy": {
-    "automaticByFootprint": true,
+    "automaticByFootprintEnvelope": true,
     "minimumWidth": 320,
     "minimumHeight": 280,
     "roundToIncrementPx": 32,
     "accountsFor": [
-      "footprint_width",
-      "footprint_depth",
+      "footprint_envelope_width",
+      "footprint_envelope_depth",
       "floor_count",
       "floor_height",
       "roof_height",
@@ -25,24 +25,33 @@
   },
   "validation": {
     "blocking": true,
-    "footprintRangeTiles": {
+    "footprintEnvelopeRangeTiles": {
       "minimum": 1,
       "maximum": 8
     },
     "checks": [
-      "declared_footprint_range",
+      "flexible_footprint_1",
       "recommended_frame_fit",
       "ground_anchor_contact",
       "outer_frame_clipping",
       "fully_transparent_rgb_contamination",
       "extreme_low_alpha_white_or_black_fringe",
-      "urban_integration_validation_1"
+      "urban_integration_validation_2"
     ],
+    "flexibleFootprint": {
+      "contract": "flexible_footprint_contract.json",
+      "blocksExport": true,
+      "recordsOccupiedCells": true,
+      "requiresNonEmptyMask": true,
+      "validatesShapeMinimumEnvelope": true,
+      "validatesSetbackRange": true
+    },
     "urbanIntegration": {
       "contract": "street_integration_contract.json",
       "blocksExport": true,
       "checksSidewalkFootprintContact": true,
       "checksRoadSocketBounds": true,
+      "checksRoadSocketOccupiedFrontage": true,
       "checksGroundAccessAlignment": true,
       "checksFacadeModuleBounds": true,
       "checksRoadwayProjectionClearance": true,
@@ -62,7 +71,7 @@
     }
   },
   "package": {
-    "deterministicStem": "building_<typology>_<width>x<depth>_<floors>f_<roof_profile>_seed<material_seed>",
+    "deterministicStem": "building_<typology>_<footprint_shape>_<width>x<depth>_<floors>f_<roof_profile>_seed<material_seed>",
     "outputs": [
       "<stem>_south.png",
       "<stem>_east.png",
@@ -74,11 +83,17 @@
       "<stem>_manifest.json",
       "<stem>_validation.json"
     ],
+    "manifest": {
+      "footprintNode": "geometry.flexibleFootprint",
+      "recordsOccupiedCellMask": true,
+      "recordsSetbacks": true
+    },
     "png": {
       "rgba": true,
       "transparentBackground": true,
-      "environmentPreviewIncluded": false
+      "environmentPreviewIncluded": false,
+      "footprintMaskOverlayIncluded": false
     }
   },
-  "rule": "A production building package is accepted only after all four orientations pass footprint/frame/anchor/halo validation and the authored building passes urban_integration_validation_1. Preview terrain, sidewalk and road context never enter production PNG files; actual road existence is still checked later by runtime placement."
+  "rule": "A production building package is accepted only after the flexible footprint mask, frame, anchor, halo and urban-integration gates pass. Runtime collision uses occupied cells from geometry.flexibleFootprint rather than assuming the entire bounding envelope is occupied."
 }
