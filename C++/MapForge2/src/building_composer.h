@@ -8,97 +8,34 @@
 #include <QString>
 
 #include <algorithm>
+#include <vector>
 
 namespace ch::studio {
 
-enum class BuildingRoofStyle {
-    Gable,
-    Hip,
-    Pyramid,
-    Flat,
-    Shed,
-    Mansard,
-};
+enum class BuildingRoofStyle { Gable, Hip, Pyramid, Flat, Shed, Mansard };
+enum class BuildingView { South, East, West, North };
+enum class BuildingDoorPosition { Left, Center, Right };
+enum class BuildingWindowPattern { Single, Pair, Strip };
+enum class BuildingWallMaterial { Solid, Plaster, Brick, Concrete, Timber, Stone, MetalPanel, Glass };
+enum class BuildingRoofMaterial { Solid, CeramicTile, MetalSeam, AsphaltShingle };
+enum class BuildingStreetEdge { South, East, North, West };
+enum class BuildingRoadSocketType { LocalStreet, Avenue, ServiceRoad };
+enum class BuildingFacadeModuleKind { Window, Door, Storefront, Sign, Awning };
 
-enum class BuildingView {
-    South,
-    East,
-    West,
-    North,
-};
+enum class BuildingWindowModule { ClassicFramed };
+enum class BuildingDoorModule { ClassicWood };
+enum class BuildingAwningModule { CanvasCanopy };
+enum class BuildingSignModule { FacadePlaque };
+enum class BuildingChimneyModule { MasonryCap };
+enum class BuildingVisualPreset { CityHorizonClassicTycoon };
 
-enum class BuildingDoorPosition {
-    Left,
-    Center,
-    Right,
-};
-
-enum class BuildingWindowPattern {
-    Single,
-    Pair,
-    Strip,
-};
-
-enum class BuildingWallMaterial {
-    Solid,
-    Plaster,
-    Brick,
-    Concrete,
-    Timber,
-    Stone,
-    MetalPanel,
-    Glass,
-};
-
-enum class BuildingRoofMaterial {
-    Solid,
-    CeramicTile,
-    MetalSeam,
-    AsphaltShingle,
-};
-
-enum class BuildingStreetEdge {
-    South,
-    East,
-    North,
-    West,
-};
-
-enum class BuildingRoadSocketType {
-    LocalStreet,
-    Avenue,
-    ServiceRoad,
-};
-
-// Canonical reusable architectural modules. A module describes the authored
-// component recipe; placement remains controlled by sockets/patterns in the
-// building spec. New buildings should reference these stable IDs instead of
-// duplicating the drawing recipe.
-enum class BuildingWindowModule {
-    ClassicFramed,
-};
-
-enum class BuildingDoorModule {
-    ClassicWood,
-};
-
-enum class BuildingAwningModule {
-    CanvasCanopy,
-};
-
-enum class BuildingSignModule {
-    FacadePlaque,
-};
-
-enum class BuildingChimneyModule {
-    MasonryCap,
-};
-
-// Global art-direction preset. This is intentionally separate from the
-// architectural/detail presets (Residence, Small shop, Utility / depot): those
-// can vary modules while this preset keeps the City Horizon visual language.
-enum class BuildingVisualPreset {
-    CityHorizonClassicTycoon,
+struct BuildingFacadeModulePlacement {
+    BuildingFacadeModuleKind kind = BuildingFacadeModuleKind::Window;
+    BuildingStreetEdge edge = BuildingStreetEdge::South;
+    int floor_index = 0;
+    float position = 0.50F;
+    float width = 0.22F;
+    bool enabled = true;
 };
 
 struct BuildingComposerSpec {
@@ -106,13 +43,16 @@ struct BuildingComposerSpec {
 
     int footprint_width_tiles = 2;
     int footprint_depth_tiles = 1;
-    int wall_height_px = 82;
+    int wall_height_px = 82; // legacy single-storey height; renderer uses effectiveWallHeightPx().
+    int floor_count = 1;
+    int floor_height_px = 82;
+    bool floor_bands_enabled = true;
     int roof_height_px = 34;
     BuildingRoofStyle roof_style = BuildingRoofStyle::Gable;
 
-    // Roof editor parameters are style-independent where possible. Pitch is a
-    // visual multiplier over the authored roof height, while overhang/fascia/
-    // ridge controls keep a single parametric roof definition for all 4 views.
+    bool facade_editor_enabled = false;
+    std::vector<BuildingFacadeModulePlacement> facade_modules;
+
     float roof_pitch_degrees = 35.0F;
     float roof_overhang = 0.10F;
     float roof_fascia_thickness_px = 2.8F;
@@ -120,9 +60,6 @@ struct BuildingComposerSpec {
     bool roof_fascia_enabled = true;
     bool roof_ridge_enabled = true;
 
-    // Street integration is authored in logical building space and rotates with
-    // the building. The sidewalk is a placement/context contract, not pixels in
-    // the transparent building sprite.
     bool sidewalk_enabled = true;
     float sidewalk_depth_tiles = 0.30F;
     float sidewalk_lateral_margin_tiles = 0.55F;
@@ -166,28 +103,18 @@ struct BuildingComposerSpec {
 
 class BuildingComposer final {
 public:
-    static BuildingComposerSpec presetSpec(
-        BuildingVisualPreset preset = BuildingVisualPreset::CityHorizonClassicTycoon) {
+    static BuildingComposerSpec presetSpec(BuildingVisualPreset preset = BuildingVisualPreset::CityHorizonClassicTycoon) {
         BuildingComposerSpec spec;
         spec.visual_preset = preset;
         return spec;
     }
 
-    static QString visualPresetId(BuildingVisualPreset preset) {
-        switch (preset) {
-            case BuildingVisualPreset::CityHorizonClassicTycoon:
-                return QStringLiteral("city_horizon_classic_tycoon");
-        }
-        return QStringLiteral("city_horizon_classic_tycoon");
+    static int effectiveWallHeightPx(const BuildingComposerSpec& spec) {
+        return std::clamp(spec.floor_count, 1, 8) * std::clamp(spec.floor_height_px, 36, 132);
     }
 
-    static QString visualPresetName(BuildingVisualPreset preset) {
-        switch (preset) {
-            case BuildingVisualPreset::CityHorizonClassicTycoon:
-                return QStringLiteral("City Horizon Classic Tycoon");
-        }
-        return QStringLiteral("City Horizon Classic Tycoon");
-    }
+    static QString visualPresetId(BuildingVisualPreset) { return QStringLiteral("city_horizon_classic_tycoon"); }
+    static QString visualPresetName(BuildingVisualPreset) { return QStringLiteral("City Horizon Classic Tycoon"); }
 
     static QString streetEdgeName(BuildingStreetEdge edge) {
         switch (edge) {
@@ -197,6 +124,17 @@ public:
             case BuildingStreetEdge::West: return QStringLiteral("west");
         }
         return QStringLiteral("south");
+    }
+
+    static QString facadeModuleKindName(BuildingFacadeModuleKind kind) {
+        switch (kind) {
+            case BuildingFacadeModuleKind::Window: return QStringLiteral("window");
+            case BuildingFacadeModuleKind::Door: return QStringLiteral("door");
+            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront");
+            case BuildingFacadeModuleKind::Sign: return QStringLiteral("sign");
+            case BuildingFacadeModuleKind::Awning: return QStringLiteral("awning");
+        }
+        return QStringLiteral("window");
     }
 
     static QString roadSocketTypeName(BuildingRoadSocketType type) {
@@ -213,78 +151,56 @@ public:
     }
 
     static QJsonObject streetIntegration(const BuildingComposerSpec& spec) {
-        const double sidewalk_depth = static_cast<double>(
-            std::clamp(spec.sidewalk_depth_tiles, 0.0F, 1.0F));
-        const double sidewalk_margin = static_cast<double>(
-            std::clamp(spec.sidewalk_lateral_margin_tiles, 0.0F, 2.0F));
-        const double socket_position = static_cast<double>(
-            std::clamp(spec.road_socket_position, 0.0F, 1.0F));
-        const double socket_width = static_cast<double>(
-            std::clamp(spec.road_socket_width_tiles, 0.10F, 2.0F));
-
         return QJsonObject{
             {"version", QStringLiteral("sidewalk_road_socket_1")},
             {"sidewalk", QJsonObject{
-                {"enabled", spec.sidewalk_enabled},
-                {"integratedWithLot", true},
-                {"touchesFootprint", true},
-                {"depthTiles", sidewalk_depth},
-                {"lateralMarginTiles", sidewalk_margin},
-                {"exportedIntoBuildingSprite", false},
-                {"surfaceFamily", QStringLiteral("concrete_01")},
+                {"enabled", spec.sidewalk_enabled}, {"integratedWithLot", true}, {"touchesFootprint", true},
+                {"depthTiles", static_cast<double>(std::clamp(spec.sidewalk_depth_tiles, 0.0F, 1.0F))},
+                {"lateralMarginTiles", static_cast<double>(std::clamp(spec.sidewalk_lateral_margin_tiles, 0.0F, 2.0F))},
+                {"exportedIntoBuildingSprite", false}, {"surfaceFamily", QStringLiteral("concrete_01")},
             }},
             {"roadSocket", QJsonObject{
-                {"id", roadSocketId(spec)},
-                {"enabled", spec.road_socket_enabled},
-                {"edge", streetEdgeName(spec.road_socket_edge)},
-                {"type", roadSocketTypeName(spec.road_socket_type)},
-                {"position", socket_position},
-                {"widthTiles", socket_width},
-                {"requiresRoadAdjacency", true},
-                {"rotatesWithBuilding", true},
+                {"id", roadSocketId(spec)}, {"enabled", spec.road_socket_enabled},
+                {"edge", streetEdgeName(spec.road_socket_edge)}, {"type", roadSocketTypeName(spec.road_socket_type)},
+                {"position", static_cast<double>(std::clamp(spec.road_socket_position, 0.0F, 1.0F))},
+                {"widthTiles", static_cast<double>(std::clamp(spec.road_socket_width_tiles, 0.10F, 2.0F))},
+                {"requiresRoadAdjacency", true}, {"rotatesWithBuilding", true},
             }},
             {"placementRule", QStringLiteral("sidewalk_bridges_building_footprint_to_matching_road_socket")},
         };
     }
 
-    static QString windowModuleId(BuildingWindowModule module) {
-        switch (module) {
-            case BuildingWindowModule::ClassicFramed:
-                return QStringLiteral("window.classic_framed.v1");
-        }
-        return QStringLiteral("window.classic_framed.v1");
-    }
+    static QString windowModuleId(BuildingWindowModule) { return QStringLiteral("window.classic_framed.v1"); }
+    static QString doorModuleId(BuildingDoorModule) { return QStringLiteral("door.classic_wood.v1"); }
+    static QString awningModuleId(BuildingAwningModule) { return QStringLiteral("awning.canvas_canopy.v1"); }
+    static QString signModuleId(BuildingSignModule) { return QStringLiteral("sign.facade_plaque.v1"); }
+    static QString chimneyModuleId(BuildingChimneyModule) { return QStringLiteral("chimney.masonry_cap.v1"); }
 
-    static QString doorModuleId(BuildingDoorModule module) {
-        switch (module) {
-            case BuildingDoorModule::ClassicWood:
-                return QStringLiteral("door.classic_wood.v1");
+    static QJsonObject facadeEditorManifest(const BuildingComposerSpec& spec) {
+        QJsonArray placements;
+        for (const auto& module : spec.facade_modules) {
+            placements.append(QJsonObject{
+                {"kind", facadeModuleKindName(module.kind)},
+                {"edge", streetEdgeName(module.edge)},
+                {"floor", std::clamp(module.floor_index, 0, std::max(0, spec.floor_count - 1))},
+                {"position", static_cast<double>(std::clamp(module.position, 0.0F, 1.0F))},
+                {"width", static_cast<double>(std::clamp(module.width, 0.06F, 0.90F))},
+                {"enabled", module.enabled},
+            });
         }
-        return QStringLiteral("door.classic_wood.v1");
-    }
-
-    static QString awningModuleId(BuildingAwningModule module) {
-        switch (module) {
-            case BuildingAwningModule::CanvasCanopy:
-                return QStringLiteral("awning.canvas_canopy.v1");
-        }
-        return QStringLiteral("awning.canvas_canopy.v1");
-    }
-
-    static QString signModuleId(BuildingSignModule module) {
-        switch (module) {
-            case BuildingSignModule::FacadePlaque:
-                return QStringLiteral("sign.facade_plaque.v1");
-        }
-        return QStringLiteral("sign.facade_plaque.v1");
-    }
-
-    static QString chimneyModuleId(BuildingChimneyModule module) {
-        switch (module) {
-            case BuildingChimneyModule::MasonryCap:
-                return QStringLiteral("chimney.masonry_cap.v1");
-        }
-        return QStringLiteral("chimney.masonry_cap.v1");
+        return QJsonObject{
+            {"version", QStringLiteral("facade_editor_1")},
+            {"enabled", spec.facade_editor_enabled},
+            {"floorSystem", QJsonObject{
+                {"version", QStringLiteral("floor_system_1")},
+                {"count", std::clamp(spec.floor_count, 1, 8)},
+                {"floorHeightPx", std::clamp(spec.floor_height_px, 36, 132)},
+                {"totalWallHeightPx", effectiveWallHeightPx(spec)},
+                {"floorBands", spec.floor_bands_enabled},
+            }},
+            {"placements", placements},
+            {"placementCount", static_cast<int>(placements.size())},
+        };
     }
 
     static QJsonObject architecturalModules(const BuildingComposerSpec& spec) {
@@ -294,25 +210,18 @@ public:
         if (spec.south_awning) active.append(awningModuleId(spec.awning_module));
         if (spec.south_sign) active.append(signModuleId(spec.sign_module));
         if (spec.roof_chimney) active.append(chimneyModuleId(spec.chimney_module));
-
         return QJsonObject{
             {"libraryVersion", QStringLiteral("architectural_modules_1")},
-            {"window", windowModuleId(spec.window_module)},
-            {"door", doorModuleId(spec.door_module)},
-            {"awning", awningModuleId(spec.awning_module)},
-            {"sign", signModuleId(spec.sign_module)},
-            {"chimney", chimneyModuleId(spec.chimney_module)},
-            {"active", active},
-            {"streetIntegration", streetIntegration(spec)},
+            {"window", windowModuleId(spec.window_module)}, {"door", doorModuleId(spec.door_module)},
+            {"awning", awningModuleId(spec.awning_module)}, {"sign", signModuleId(spec.sign_module)},
+            {"chimney", chimneyModuleId(spec.chimney_module)}, {"active", active},
+            {"streetIntegration", streetIntegration(spec)}, {"facadeEditor", facadeEditorManifest(spec)},
         };
     }
 
-    static QImage renderView(const BuildingComposerSpec& spec, BuildingView view,
-                             QSize canvas = QSize(320, 280));
-    static QImage renderSpriteSheet(const BuildingComposerSpec& spec,
-                                    QSize cell = QSize(320, 280));
-    static QImage renderReviewSheet(const BuildingComposerSpec& spec,
-                                    QSize cell = QSize(300, 260));
+    static QImage renderView(const BuildingComposerSpec& spec, BuildingView view, QSize canvas = QSize(320, 280));
+    static QImage renderSpriteSheet(const BuildingComposerSpec& spec, QSize cell = QSize(320, 280));
+    static QImage renderReviewSheet(const BuildingComposerSpec& spec, QSize cell = QSize(300, 260));
     static QJsonObject manifest(const BuildingComposerSpec& spec, QSize frame = QSize(320, 280));
 
     static QString viewName(BuildingView view);
