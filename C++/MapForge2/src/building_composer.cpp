@@ -36,6 +36,7 @@ constexpr int kRenderSupersampleScale = 2;
 constexpr qreal kStructuralOutlineWidth = 1.20;
 constexpr qreal kContactLineWidth = 1.20;
 constexpr qreal kRoofEdgeWidth = 1.35;
+constexpr float kStructuralPlinthOutset = 1.018F;
 
 int quarterTurns(const BuildingView view) {
     switch (view) {
@@ -149,6 +150,31 @@ void drawFaceDetail(QPainter& painter, const Point3 a, const Point3 b, const flo
         projectPoint(lerpPoint(a, b, t0, z1), view, canvas),
     };
     drawOutlinedPolygon(painter, polygon, fill, outline);
+}
+
+void drawStructuralPlinth(QPainter& painter, const BuildingComposerSpec& spec,
+                          const Point3 a, const Point3 b, const float wall_h,
+                          const float face_shade, const BuildingView view, const QSize canvas) {
+    const float plinth_h = std::clamp(wall_h * 0.075F, 5.0F, 9.0F);
+    const Point3 outer_a{a.x * kStructuralPlinthOutset, a.y * kStructuralPlinthOutset, 0.0F};
+    const Point3 outer_b{b.x * kStructuralPlinthOutset, b.y * kStructuralPlinthOutset, 0.0F};
+    const QColor plinth_face = scaledColor(spec.wall_color, face_shade * 0.70F);
+    const QColor plinth_cap = scaledColor(spec.wall_color, face_shade * 0.82F);
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(plinth_face);
+    painter.drawPolygon(faceQuad(outer_a, outer_b, 0.0F, plinth_h, view, canvas));
+
+    const QPolygonF cap = {
+        projectPoint({outer_a.x, outer_a.y, plinth_h}, view, canvas),
+        projectPoint({outer_b.x, outer_b.y, plinth_h}, view, canvas),
+        projectPoint({b.x, b.y, plinth_h}, view, canvas),
+        projectPoint({a.x, a.y, plinth_h}, view, canvas),
+    };
+    painter.setBrush(plinth_cap);
+    painter.drawPolygon(cap);
+    painter.restore();
 }
 
 void drawEaveAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spec,
@@ -896,6 +922,8 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawLitWallPolygon(painter, face.polygon, spec.wall_color, face.shade);
         const int next = (face.edge + 1) % 4;
         drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
+        drawStructuralPlinth(
+            painter, spec, corners[face.edge], corners[next], wall_h, face.shade, view, canvas);
     }
 
     for (const int edge : visible_edges) {
@@ -915,8 +943,12 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
         painter.drawLine(
-            projectPoint({corners[edge].x, corners[edge].y, wall_ground_contact_z}, view, canvas),
-            projectPoint({corners[next].x, corners[next].y, wall_ground_contact_z}, view, canvas));
+            projectPoint({corners[edge].x * kStructuralPlinthOutset,
+                          corners[edge].y * kStructuralPlinthOutset,
+                          wall_ground_contact_z}, view, canvas),
+            projectPoint({corners[next].x * kStructuralPlinthOutset,
+                          corners[next].y * kStructuralPlinthOutset,
+                          wall_ground_contact_z}, view, canvas));
     }
 
     const QColor roof_wall_contact = alphaColor(scaledColor(spec.roof_color, 0.42F), 135);
