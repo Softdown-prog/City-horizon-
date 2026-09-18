@@ -1,5 +1,5 @@
 {
-  "id": "architectural_modules_1",
+  "id": "architectural_modules_2",
   "name": "City Horizon Architectural Module Library",
   "status": "official",
   "purpose": "Stable reusable architectural component recipes shared by Building Composer buildings.",
@@ -8,6 +8,8 @@
     "deterministic": true,
     "socketDrivenPlacement": true,
     "copyPerBuildingRecipes": false,
+    "supportsAnyLogicalFacade": true,
+    "supportsFloorIndex": true,
     "visualPreset": "city_horizon_classic_tycoon"
   },
   "modules": [
@@ -15,33 +17,89 @@
       "id": "window.classic_framed.v1",
       "kind": "window",
       "surface": "wall",
-      "placement": "facade_aperture",
-      "rendererRecipe": "drawWindowModule",
-      "features": ["recess", "frame", "glass", "inner_ao", "projecting_head", "jamb_returns", "two_step_sill", "drip_edge"]
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["frame", "glass", "center_mullion", "floor_aware"]
     },
     {
       "id": "door.classic_wood.v1",
       "kind": "door",
-      "surface": "south_wall",
-      "placement": "entrance_socket",
-      "rendererRecipe": "drawSouthModules",
-      "features": ["recess", "frame", "wood_leaf", "inner_ao", "projecting_header", "jamb_surround", "two_level_threshold"]
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["frame", "wood_leaf", "ground_or_upper_floor_authoring"]
     },
     {
-      "id": "awning.canvas_canopy.v1",
-      "kind": "awning",
-      "surface": "south_wall",
-      "placement": "entrance_child_socket",
-      "rendererRecipe": "drawSouthModules",
-      "features": ["projected_canopy", "accent_palette"]
+      "id": "storefront.classic_glass.v1",
+      "kind": "storefront",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["wide_glazing", "center_mullion", "commercial_ground_floor"]
     },
     {
       "id": "sign.facade_plaque.v1",
       "kind": "sign",
-      "surface": "south_wall",
-      "placement": "entrance_child_socket",
-      "rendererRecipe": "drawSouthModules",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
       "features": ["facade_plaque", "accent_palette"]
+    },
+    {
+      "id": "awning.canvas_canopy.v1",
+      "kind": "awning",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["projected_canopy", "accent_palette"]
+    },
+    {
+      "id": "door.double_glass.v1",
+      "kind": "double_door",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["double_leaf", "glazed_leaf", "center_mullion", "commercial_or_civic_entry"]
+    },
+    {
+      "id": "garage.rollup_panel.v1",
+      "kind": "garage_door",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["wide_opening", "horizontal_panels", "utility_or_residential_garage"]
+    },
+    {
+      "id": "balcony.classic_rail.v1",
+      "kind": "balcony",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["projected_slab", "guard_rail", "vertical_balusters", "upper_floor_friendly"]
+    },
+    {
+      "id": "marquee.flat_canopy.v1",
+      "kind": "marquee",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["deep_projection", "flat_canopy", "accent_edge", "commercial_entry"]
+    },
+    {
+      "id": "hvac.wall_unit.v1",
+      "kind": "hvac",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["wall_mounted_unit", "vent_line", "service_detail"]
+    },
+    {
+      "id": "planter.facade_box.v1",
+      "kind": "planter",
+      "surface": "wall",
+      "placement": "facade_floor_socket",
+      "rendererRecipe": "BuildingFacadeRenderer::drawModule",
+      "features": ["planter_box", "vegetation_stems", "residential_or_commercial_detail"]
     },
     {
       "id": "chimney.masonry_cap.v1",
@@ -52,5 +110,5 @@
       "features": ["two_visible_faces", "top_cap", "view_rotation"]
     }
   ],
-  "expansionPolicy": "New doors, windows, shopfronts, awnings, signs, canopies, balconies, HVAC units, water tanks and planters must be added as new stable module IDs instead of duplicating per-building drawing code."
+  "expansionPolicy": "Every new reusable architectural detail must receive a stable module ID and be positioned through logical facade/floor sockets rather than copied into individual building render code."
 }
