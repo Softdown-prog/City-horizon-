@@ -2,6 +2,7 @@
 
 #include "building_facade_renderer.h"
 #include "building_roof_editor_renderer.h"
+#include "building_urban_integration_validator.h"
 #include "src/ch_core/contracts.h"
 
 #include <QDir>
@@ -104,10 +105,15 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec));
     manifest.insert(QStringLiteral("facadeEditor"), BuildingFacadeRenderer::manifest(spec));
     manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec));
+    manifest.insert(QStringLiteral("urbanIntegrationValidation"),
+                    BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_1")},
-        {"packageValidated", validation.export_ready}, {"transparentRgba", true},
-        {"environmentContextExported", false}, {"validationFile", QStringLiteral("*_validation.json")},
+        {"version", QStringLiteral("automatic_export_validation_2")},
+        {"packageValidated", validation.export_ready},
+        {"urbanIntegrationValidated", validation.urban_integration_valid},
+        {"transparentRgba", true},
+        {"environmentContextExported", false},
+        {"validationFile", QStringLiteral("*_validation.json")},
     });
     return manifest;
 }
@@ -125,22 +131,31 @@ bool writeJson(const QString& path, const QJsonObject& object, QString* error) {
 } // namespace
 
 QString BuildingExportValidation::summary() const {
-    if (export_ready) return QStringLiteral("PASS — footprint, frame, anchor and halo validation passed");
-    return QStringLiteral("FAIL — footprint=%1 halo=%2 clipped=%3 contamination=%4 suspiciousHalo=%5 anchor=%6")
+    if (export_ready)
+        return QStringLiteral("PASS — footprint, frame, anchor, halo and urban integration validation passed");
+    return QStringLiteral("FAIL — footprint=%1 halo=%2 urban=%3 clipped=%4 contamination=%5 suspiciousHalo=%6 anchor=%7")
         .arg(footprint_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(halo_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
+        .arg(urban_integration_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(clipped_edge_pixels).arg(transparent_rgb_contamination).arg(suspicious_halo_pixels)
         .arg(anchor_contact ? QStringLiteral("ok") : QStringLiteral("missing"));
 }
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_1")}, {"exportReady", export_ready},
-        {"footprintValid", footprint_valid}, {"haloValid", halo_valid}, {"anchorContact", anchor_contact},
-        {"clippedEdgePixels", clipped_edge_pixels}, {"transparentRgbContamination", transparent_rgb_contamination},
-        {"suspiciousHaloPixels", suspicious_halo_pixels}, {"alphaBounds", rectJson(alpha_bounds)},
+        {"version", QStringLiteral("automatic_export_validation_2")},
+        {"exportReady", export_ready},
+        {"footprintValid", footprint_valid},
+        {"haloValid", halo_valid},
+        {"urbanIntegrationValid", urban_integration_valid},
+        {"anchorContact", anchor_contact},
+        {"clippedEdgePixels", clipped_edge_pixels},
+        {"transparentRgbContamination", transparent_rgb_contamination},
+        {"suspiciousHaloPixels", suspicious_halo_pixels},
+        {"alphaBounds", rectJson(alpha_bounds)},
         {"frame", QJsonObject{{"width", frame.width()}, {"height", frame.height()}}},
-        {"details", details}, {"summary", summary()},
+        {"details", details},
+        {"summary", summary()},
     };
 }
 
@@ -195,6 +210,9 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
             {"clippedEdgePixels", halo.clipped}, {"transparentRgbContamination", halo.contamination},
             {"suspiciousHaloPixels", halo.suspicious}, {"anchorContact", anchor}});
     }
+
+    const BuildingUrbanIntegrationValidation urban = BuildingUrbanIntegrationValidator::validate(spec);
+
     report.clipped_edge_pixels = total_clipped;
     report.transparent_rgb_contamination = total_contamination;
     report.suspicious_halo_pixels = total_suspicious;
@@ -202,14 +220,18 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
     report.alpha_bounds = aggregate_bounds;
     report.footprint_valid = declared_footprint && frame_fits && total_clipped == 0 && all_anchor_contacts;
     report.halo_valid = total_contamination == 0 && total_suspicious <= 12;
-    report.export_ready = report.footprint_valid && report.halo_valid;
+    report.urban_integration_valid = urban.valid;
+    report.export_ready = report.footprint_valid && report.halo_valid && report.urban_integration_valid;
     report.details = QJsonObject{
-        {"gridContract", QString::fromLatin1(ch::contracts::kGridContract)}, {"tileWidth", ch::contracts::kTileWidth},
-        {"tileHeight", ch::contracts::kTileHeight}, {"declaredFootprintValid", declared_footprint},
+        {"gridContract", QString::fromLatin1(ch::contracts::kGridContract)},
+        {"tileWidth", ch::contracts::kTileWidth},
+        {"tileHeight", ch::contracts::kTileHeight},
+        {"declaredFootprintValid", declared_footprint},
         {"floorCount", std::clamp(spec.floor_count, 1, 8)},
         {"recommendedFrame", QJsonObject{{"width", minimum_frame.width()}, {"height", minimum_frame.height()}}},
         {"frameFitsRecommendedMinimum", frame_fits},
         {"haloPolicy", QStringLiteral("reject hidden RGB contamination and extreme low-alpha white/black fringe")},
+        {"urbanIntegration", urban.toJson()},
         {"views", view_reports},
     };
     return report;
