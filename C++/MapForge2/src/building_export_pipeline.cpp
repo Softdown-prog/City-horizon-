@@ -2,6 +2,7 @@
 
 #include "building_facade_renderer.h"
 #include "building_footprint_model.h"
+#include "building_procedural_variation.h"
 #include "building_roof_editor_renderer.h"
 #include "building_urban_integration_validator.h"
 #include "src/ch_core/contracts.h"
@@ -107,13 +108,15 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec));
     manifest.insert(QStringLiteral("facadeEditor"), BuildingFacadeRenderer::manifest(spec));
     manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec));
+    manifest.insert(QStringLiteral("proceduralVariation"), BuildingProceduralVariation::manifest(spec));
     manifest.insert(QStringLiteral("urbanIntegrationValidation"),
                     BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_3")},
+        {"version", QStringLiteral("automatic_export_validation_4")},
         {"packageValidated", validation.export_ready},
         {"flexibleFootprintValidated", validation.footprint_valid},
         {"urbanIntegrationValidated", validation.urban_integration_valid},
+        {"proceduralVariationRecorded", true},
         {"transparentRgba", true},
         {"environmentContextExported", false},
         {"validationFile", QStringLiteral("*_validation.json")},
@@ -146,7 +149,7 @@ QString BuildingExportValidation::summary() const {
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_3")},
+        {"version", QStringLiteral("automatic_export_validation_4")},
         {"exportReady", export_ready},
         {"footprintValid", footprint_valid},
         {"haloValid", halo_valid},
@@ -181,12 +184,16 @@ QSize BuildingExportPipeline::recommendedFrame(const BuildingComposerSpec& spec)
 }
 
 QString BuildingExportPipeline::automaticStem(const BuildingComposerSpec& spec) {
-    return QStringLiteral("building_%1_%2_%3x%4_%5f_%6_seed%7")
+    const QString variant_suffix = spec.procedural_variation_applied
+        ? QStringLiteral("_v%1").arg(std::max(0, spec.procedural_variation_seed))
+        : QString();
+    return QStringLiteral("building_%1_%2_%3x%4_%5f_%6_seed%7%8")
         .arg(BuildingComposer::typologyId(spec.building_typology))
         .arg(BuildingFootprintModel::shapeId(spec.footprint_shape))
         .arg(std::max(1, spec.footprint_width_tiles)).arg(std::max(1, spec.footprint_depth_tiles))
         .arg(std::clamp(spec.floor_count, 1, 8))
-        .arg(BuildingRoofEditorRenderer::roofProfileName(spec.roof_style)).arg(std::max(0, spec.material_seed));
+        .arg(BuildingRoofEditorRenderer::roofProfileName(spec.roof_style)).arg(std::max(0, spec.material_seed))
+        .arg(variant_suffix);
 }
 
 BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposerSpec& spec, QSize frame) {
@@ -233,6 +240,7 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
         {"declaredFootprintValid", declared_footprint},
         {"flexibleFootprint", BuildingFootprintModel::manifest(spec)},
         {"footprintValidationReason", footprint_reason},
+        {"proceduralVariation", BuildingProceduralVariation::manifest(spec)},
         {"floorCount", std::clamp(spec.floor_count, 1, 8)},
         {"recommendedFrame", QJsonObject{{"width", minimum_frame.width()}, {"height", minimum_frame.height()}}},
         {"frameFitsRecommendedMinimum", frame_fits},
