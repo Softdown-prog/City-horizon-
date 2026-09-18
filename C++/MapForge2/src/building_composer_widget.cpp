@@ -1,6 +1,7 @@
 #include "building_composer_widget.h"
 #include "building_export_pipeline.h"
 #include "building_facade_renderer.h"
+#include "building_footprint_model.h"
 #include "building_roof_editor_renderer.h"
 
 #include "src/ch_core/contracts.h"
@@ -74,6 +75,15 @@ BuildingTypology typologyFromIndex(const int index) {
     }
 }
 
+BuildingFootprintShape footprintShapeFromIndex(const int index) {
+    switch (index) {
+        case 1: return BuildingFootprintShape::LShape;
+        case 2: return BuildingFootprintShape::Courtyard;
+        case 3: return BuildingFootprintShape::Annex;
+        default: return BuildingFootprintShape::Rectangle;
+    }
+}
+
 BuildingFacadeModuleKind moduleKindFromIndex(const int index) {
     switch (index) {
         case 1: return BuildingFacadeModuleKind::Door;
@@ -129,9 +139,26 @@ void drawTerrainGrid(QPainter& painter, const BuildingView view, const QSize can
     }
 }
 
+void drawFootprintMask(QPainter& painter, const BuildingComposerSpec& spec,
+                       const BuildingView view, const QSize canvas) {
+    const BuildingFootprintMask mask = BuildingFootprintModel::mask(spec);
+    const float origin_x = -static_cast<float>(mask.width) * 0.5F;
+    const float origin_y = -static_cast<float>(mask.depth) * 0.5F;
+    painter.save();
+    painter.setPen(QPen(QColor(239, 219, 164, 190), 1.05));
+    painter.setBrush(QColor(217, 176, 92, 46));
+    for (const QPoint& cell : mask.occupied_cells) {
+        const float x0 = origin_x + static_cast<float>(cell.x());
+        const float y0 = origin_y + static_cast<float>(cell.y());
+        painter.drawPolygon(previewQuad(x0, y0, x0 + 1.0F, y0 + 1.0F, view, canvas));
+    }
+    painter.restore();
+}
+
 void drawStreetContext(QPainter& painter, const BuildingComposerSpec& spec,
                        const BuildingView view, const QSize canvas) {
     drawTerrainGrid(painter, view, canvas);
+    drawFootprintMask(painter, spec, view, canvas);
     const float half_w = static_cast<float>(std::max(1, spec.footprint_width_tiles)) * 0.5F;
     const float half_d = static_cast<float>(std::max(1, spec.footprint_depth_tiles)) * 0.5F;
     const float sidewalk_margin = std::clamp(spec.sidewalk_lateral_margin_tiles, 0.0F, 2.0F);
@@ -194,19 +221,31 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     auto* root = new QVBoxLayout(this);
     auto* intro = new QLabel(
         "Building / Asset Composer — Windows PC\n"
-        "Typology presets are editable starting points. Facade Editor and floor system remain fully available after applying a preset.", this);
+        "Typology presets remain editable. Flexible footprint authoring adds rectangle, L, courtyard and annex placement masks with setbacks.", this);
     intro->setWordWrap(true); root->addWidget(intro);
 
     auto* form = new QFormLayout();
     form->addRow("Visual preset", new QLabel(BuildingComposer::visualPresetName(spec_.visual_preset), this));
-    form->addRow("Module library", new QLabel(QStringLiteral("architectural_modules_2 / facade_editor_2"), this));
+    form->addRow("Module library", new QLabel(QStringLiteral("architectural_modules_2 / facade_editor_2 / flexible_footprint_1"), this));
 
     typology_combo_ = new QComboBox(this);
     typology_combo_->addItems({"Custom", "Small house", "Suburban house", "Cafeteria", "Corner shop", "Market", "Warehouse", "Small town hall", "School", "Low-rise residential", "Low-rise office"});
     form->addRow("Building typology", typology_combo_);
 
-    footprint_combo_ = new QComboBox(this); footprint_combo_->addItems({"1×1", "2×1", "2×2", "3×2"}); footprint_combo_->setCurrentIndex(1);
-    form->addRow("Footprint", footprint_combo_);
+    footprint_combo_ = new QComboBox(this); footprint_combo_->addItems({"1×1", "2×1", "2×2", "3×2", "Custom"}); footprint_combo_->setCurrentIndex(1);
+    form->addRow("Footprint quick size", footprint_combo_);
+    footprint_shape_combo_ = new QComboBox(this); footprint_shape_combo_->addItems({"Rectangle", "L shape", "Courtyard", "Annex / stepped"});
+    form->addRow("Footprint shape", footprint_shape_combo_);
+    footprint_width_spin_ = new QSpinBox(this); footprint_width_spin_->setRange(1, 8); footprint_width_spin_->setValue(2); form->addRow("Footprint width", footprint_width_spin_);
+    footprint_depth_spin_ = new QSpinBox(this); footprint_depth_spin_->setRange(1, 8); footprint_depth_spin_->setValue(1); form->addRow("Footprint depth", footprint_depth_spin_);
+    footprint_cutout_width_spin_ = new QSpinBox(this); footprint_cutout_width_spin_->setRange(1, 6); footprint_cutout_width_spin_->setValue(1); form->addRow("Cutout width", footprint_cutout_width_spin_);
+    footprint_cutout_depth_spin_ = new QSpinBox(this); footprint_cutout_depth_spin_->setRange(1, 6); footprint_cutout_depth_spin_->setValue(1); form->addRow("Cutout depth", footprint_cutout_depth_spin_);
+    footprint_annex_depth_spin_ = new QSpinBox(this); footprint_annex_depth_spin_->setRange(1, 8); footprint_annex_depth_spin_->setValue(1); form->addRow("Annex depth", footprint_annex_depth_spin_);
+    footprint_annex_offset_spin_ = new QSpinBox(this); footprint_annex_offset_spin_->setRange(0, 7); footprint_annex_offset_spin_->setValue(0); form->addRow("Annex offset", footprint_annex_offset_spin_);
+    footprint_setback_front_spin_ = new QSpinBox(this); footprint_setback_front_spin_->setRange(0, 20); footprint_setback_front_spin_->setSuffix(" ×0.1 tile"); form->addRow("Front setback", footprint_setback_front_spin_);
+    footprint_setback_back_spin_ = new QSpinBox(this); footprint_setback_back_spin_->setRange(0, 20); footprint_setback_back_spin_->setSuffix(" ×0.1 tile"); form->addRow("Back setback", footprint_setback_back_spin_);
+    footprint_setback_left_spin_ = new QSpinBox(this); footprint_setback_left_spin_->setRange(0, 20); footprint_setback_left_spin_->setSuffix(" ×0.1 tile"); form->addRow("Left setback", footprint_setback_left_spin_);
+    footprint_setback_right_spin_ = new QSpinBox(this); footprint_setback_right_spin_->setRange(0, 20); footprint_setback_right_spin_->setSuffix(" ×0.1 tile"); form->addRow("Right setback", footprint_setback_right_spin_);
 
     floor_count_spin_ = new QSpinBox(this); floor_count_spin_->setRange(1, 8); floor_count_spin_->setValue(1);
     form->addRow("Floors", floor_count_spin_);
@@ -283,6 +322,11 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
         applyBuildingTypologyPreset(index); refreshSpecFromControls(); refreshFacadeModuleList(); refreshPreview();
     });
     connect(footprint_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int){ changed(); });
+    connect(footprint_shape_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int){ changed(); });
+    for (QSpinBox* spin : {footprint_width_spin_, footprint_depth_spin_, footprint_cutout_width_spin_, footprint_cutout_depth_spin_,
+                           footprint_annex_depth_spin_, footprint_annex_offset_spin_, footprint_setback_front_spin_, footprint_setback_back_spin_,
+                           footprint_setback_left_spin_, footprint_setback_right_spin_})
+        connect(spin, qOverload<int>(&QSpinBox::valueChanged), this, [changed](int){ changed(); });
     connect(floor_count_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this, changed](int value){ facade_floor_spin_->setMaximum(value); changed(); });
     connect(floor_height_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [changed](int){ changed(); });
     connect(floor_bands_check_, &QCheckBox::toggled, this, [changed](bool){ changed(); });
@@ -329,7 +373,7 @@ void BuildingComposerWidget::applyBuildingTypologyPreset(const int index) {
                          b9(detail_preset_combo_), b10(wall_material_combo_), b11(roof_material_combo_), b12(material_scale_combo_),
                          b13(material_strength_slider_), b14(material_variation_slider_), b15(material_contrast_slider_),
                          b16(facade_editor_check_), b17(windows_check_), b18(door_check_), b19(awning_check_),
-                         b20(sign_check_), b21(chimney_check_), b22(roof_height_slider_);
+                         b20(sign_check_), b21(chimney_check_), b22(roof_height_slider_), b23(footprint_shape_combo_);
 
     auto module = [this](BuildingFacadeModuleKind kind, BuildingStreetEdge edge, int floor,
                          float position, float width) {
@@ -342,6 +386,7 @@ void BuildingComposerWidget::applyBuildingTypologyPreset(const int index) {
     auto base = [this](int footprint, int floors, int floor_h, int roof, int pitch,
                        int palette, int detail, int wall_material, int roof_material) {
         footprint_combo_->setCurrentIndex(footprint);
+        footprint_shape_combo_->setCurrentIndex(0);
         floor_count_spin_->setValue(floors);
         floor_height_spin_->setValue(floor_h);
         floor_bands_check_->setChecked(floors > 1);
@@ -367,103 +412,74 @@ void BuildingComposerWidget::applyBuildingTypologyPreset(const int index) {
     };
 
     switch (index) {
-        case 1: // Small house
-            base(0, 1, 78, 0, 38, 0, 0, 0, 0);
-            chimney_check_->setChecked(true);
+        case 1:
+            base(0, 1, 78, 0, 38, 0, 0, 0, 0); chimney_check_->setChecked(true);
             module(BuildingFacadeModuleKind::Door, BuildingStreetEdge::South, 0, 0.50F, 0.20F);
             module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 0, 0.20F, 0.18F);
             module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 0, 0.80F, 0.18F);
-            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.20F, 0.20F);
-            break;
-        case 2: // Suburban house
-            base(1, 2, 72, 1, 32, 0, 0, 0, 0);
-            chimney_check_->setChecked(true);
+            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.20F, 0.20F); break;
+        case 2:
+            base(1, 2, 72, 1, 32, 0, 0, 0, 0); chimney_check_->setChecked(true);
             module(BuildingFacadeModuleKind::Door, BuildingStreetEdge::South, 0, 0.20F, 0.16F);
             module(BuildingFacadeModuleKind::GarageDoor, BuildingStreetEdge::South, 0, 0.70F, 0.36F);
-            windows(BuildingStreetEdge::South, 1);
-            module(BuildingFacadeModuleKind::Balcony, BuildingStreetEdge::South, 1, 0.50F, 0.34F);
-            windows(BuildingStreetEdge::East, 1);
-            break;
-        case 3: // Cafeteria
-            base(1, 1, 78, 3, 18, 1, 1, 2, 1);
-            roof_height_slider_->setValue(10);
+            windows(BuildingStreetEdge::South, 1); module(BuildingFacadeModuleKind::Balcony, BuildingStreetEdge::South, 1, 0.50F, 0.34F);
+            windows(BuildingStreetEdge::East, 1); break;
+        case 3:
+            base(1, 1, 78, 3, 18, 1, 1, 2, 1); roof_height_slider_->setValue(10);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::South, 0, 0.32F, 0.42F);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.76F, 0.20F);
             module(BuildingFacadeModuleKind::Marquee, BuildingStreetEdge::South, 0, 0.50F, 0.82F);
             module(BuildingFacadeModuleKind::Sign, BuildingStreetEdge::South, 0, 0.50F, 0.44F);
             module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.10F, 0.16F);
-            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.90F, 0.16F);
-            break;
-        case 4: // Corner shop
-            base(2, 2, 68, 3, 18, 0, 1, 1, 1);
-            roof_height_slider_->setValue(10);
+            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.90F, 0.16F); break;
+        case 4:
+            base(2, 2, 68, 3, 18, 0, 1, 1, 1); roof_height_slider_->setValue(10);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::South, 0, 0.38F, 0.48F);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.78F, 0.18F);
             module(BuildingFacadeModuleKind::Sign, BuildingStreetEdge::South, 0, 0.48F, 0.40F);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::East, 0, 0.50F, 0.56F);
-            windows(BuildingStreetEdge::South, 1); windows(BuildingStreetEdge::East, 1);
-            break;
-        case 5: // Market
-            base(3, 1, 88, 3, 15, 1, 1, 2, 1);
-            roof_height_slider_->setValue(10);
+            windows(BuildingStreetEdge::South, 1); windows(BuildingStreetEdge::East, 1); break;
+        case 5:
+            base(3, 1, 88, 3, 15, 1, 1, 2, 1); roof_height_slider_->setValue(10);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::South, 0, 0.28F, 0.42F);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.62F, 0.18F);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::South, 0, 0.84F, 0.20F);
             module(BuildingFacadeModuleKind::Marquee, BuildingStreetEdge::South, 0, 0.52F, 0.86F);
             module(BuildingFacadeModuleKind::Sign, BuildingStreetEdge::South, 0, 0.50F, 0.36F);
-            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 0, 0.72F, 0.20F);
-            break;
-        case 6: // Warehouse
+            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 0, 0.72F, 0.20F); break;
+        case 6:
             base(3, 1, 104, 4, 24, 1, 2, 5, 1);
             module(BuildingFacadeModuleKind::GarageDoor, BuildingStreetEdge::South, 0, 0.46F, 0.56F);
             module(BuildingFacadeModuleKind::Door, BuildingStreetEdge::South, 0, 0.87F, 0.12F);
             module(BuildingFacadeModuleKind::Sign, BuildingStreetEdge::South, 0, 0.50F, 0.30F);
-            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 0, 0.60F, 0.22F);
-            break;
-        case 7: // Small town hall
+            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 0, 0.60F, 0.22F); break;
+        case 7:
             base(3, 2, 76, 1, 34, 0, 0, 4, 0);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.50F, 0.20F);
-            windows(BuildingStreetEdge::South, 0); windows(BuildingStreetEdge::South, 1);
-            windows(BuildingStreetEdge::East, 0); windows(BuildingStreetEdge::East, 1);
+            windows(BuildingStreetEdge::South, 0); windows(BuildingStreetEdge::South, 1); windows(BuildingStreetEdge::East, 0); windows(BuildingStreetEdge::East, 1);
             module(BuildingFacadeModuleKind::Marquee, BuildingStreetEdge::South, 0, 0.50F, 0.34F);
             module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.18F, 0.18F);
-            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.82F, 0.18F);
-            break;
-        case 8: // School
+            module(BuildingFacadeModuleKind::Planter, BuildingStreetEdge::South, 0, 0.82F, 0.18F); break;
+        case 8:
             base(3, 2, 72, 0, 26, 0, 0, 1, 0);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.50F, 0.22F);
             module(BuildingFacadeModuleKind::Marquee, BuildingStreetEdge::South, 0, 0.50F, 0.34F);
-            for (float p : {0.14F, 0.32F, 0.68F, 0.86F})
-                module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 0, p, 0.12F);
-            for (float p : {0.14F, 0.32F, 0.50F, 0.68F, 0.86F})
-                module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 1, p, 0.12F);
-            windows(BuildingStreetEdge::East, 0); windows(BuildingStreetEdge::East, 1);
+            for (float p : {0.14F, 0.32F, 0.68F, 0.86F}) module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 0, p, 0.12F);
+            for (float p : {0.14F, 0.32F, 0.50F, 0.68F, 0.86F}) module(BuildingFacadeModuleKind::Window, BuildingStreetEdge::South, 1, p, 0.12F);
+            windows(BuildingStreetEdge::East, 0); windows(BuildingStreetEdge::East, 1); break;
+        case 9:
+            base(2, 4, 62, 3, 15, 0, 0, 0, 2); roof_height_slider_->setValue(10);
+            module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.50F, 0.18F); windows(BuildingStreetEdge::South, 0);
+            for (int floor = 1; floor < 4; ++floor) { windows(BuildingStreetEdge::South, floor); module(BuildingFacadeModuleKind::Balcony, BuildingStreetEdge::South, floor, 0.50F, 0.34F); windows(BuildingStreetEdge::East, floor); }
             break;
-        case 9: // Low-rise residential
-            base(2, 4, 62, 3, 15, 0, 0, 0, 2);
-            roof_height_slider_->setValue(10);
-            module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.50F, 0.18F);
-            windows(BuildingStreetEdge::South, 0);
-            for (int floor = 1; floor < 4; ++floor) {
-                windows(BuildingStreetEdge::South, floor);
-                module(BuildingFacadeModuleKind::Balcony, BuildingStreetEdge::South, floor, 0.50F, 0.34F);
-                windows(BuildingStreetEdge::East, floor);
-            }
-            break;
-        case 10: // Low-rise office
-            base(2, 4, 64, 3, 15, 1, 1, 2, 1);
-            roof_height_slider_->setValue(10);
+        case 10:
+            base(2, 4, 64, 3, 15, 1, 1, 2, 1); roof_height_slider_->setValue(10);
             module(BuildingFacadeModuleKind::Storefront, BuildingStreetEdge::South, 0, 0.32F, 0.38F);
             module(BuildingFacadeModuleKind::DoubleDoor, BuildingStreetEdge::South, 0, 0.72F, 0.20F);
             module(BuildingFacadeModuleKind::Marquee, BuildingStreetEdge::South, 0, 0.52F, 0.72F);
-            for (int floor = 1; floor < 4; ++floor) {
-                windows(BuildingStreetEdge::South, floor);
-                windows(BuildingStreetEdge::East, floor);
-            }
-            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 3, 0.82F, 0.16F);
-            break;
-        default:
-            break;
+            for (int floor = 1; floor < 4; ++floor) { windows(BuildingStreetEdge::South, floor); windows(BuildingStreetEdge::East, floor); }
+            module(BuildingFacadeModuleKind::Hvac, BuildingStreetEdge::East, 3, 0.82F, 0.16F); break;
+        default: break;
     }
 }
 
@@ -486,11 +502,21 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
 void BuildingComposerWidget::refreshSpecFromControls() {
     spec_.visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
     spec_.building_typology = typologyFromIndex(typology_combo_ ? typology_combo_->currentIndex() : 0);
+    spec_.footprint_shape = footprintShapeFromIndex(footprint_shape_combo_ ? footprint_shape_combo_->currentIndex() : 0);
     const int footprint = footprint_combo_ ? footprint_combo_->currentIndex() : 1;
     if (footprint == 0) { spec_.footprint_width_tiles = 1; spec_.footprint_depth_tiles = 1; }
+    else if (footprint == 1) { spec_.footprint_width_tiles = 2; spec_.footprint_depth_tiles = 1; }
     else if (footprint == 2) { spec_.footprint_width_tiles = 2; spec_.footprint_depth_tiles = 2; }
     else if (footprint == 3) { spec_.footprint_width_tiles = 3; spec_.footprint_depth_tiles = 2; }
-    else { spec_.footprint_width_tiles = 2; spec_.footprint_depth_tiles = 1; }
+    else { spec_.footprint_width_tiles = footprint_width_spin_ ? footprint_width_spin_->value() : 2; spec_.footprint_depth_tiles = footprint_depth_spin_ ? footprint_depth_spin_->value() : 1; }
+    spec_.footprint_cutout_width_tiles = footprint_cutout_width_spin_ ? footprint_cutout_width_spin_->value() : 1;
+    spec_.footprint_cutout_depth_tiles = footprint_cutout_depth_spin_ ? footprint_cutout_depth_spin_->value() : 1;
+    spec_.footprint_annex_depth_tiles = footprint_annex_depth_spin_ ? footprint_annex_depth_spin_->value() : 1;
+    spec_.footprint_annex_offset_tiles = footprint_annex_offset_spin_ ? footprint_annex_offset_spin_->value() : 0;
+    spec_.footprint_setback_front_tiles = footprint_setback_front_spin_ ? footprint_setback_front_spin_->value() / 10.0F : 0.0F;
+    spec_.footprint_setback_back_tiles = footprint_setback_back_spin_ ? footprint_setback_back_spin_->value() / 10.0F : 0.0F;
+    spec_.footprint_setback_left_tiles = footprint_setback_left_spin_ ? footprint_setback_left_spin_->value() / 10.0F : 0.0F;
+    spec_.footprint_setback_right_tiles = footprint_setback_right_spin_ ? footprint_setback_right_spin_->value() / 10.0F : 0.0F;
 
     spec_.floor_count = floor_count_spin_ ? floor_count_spin_->value() : 1;
     spec_.floor_height_px = floor_height_spin_ ? floor_height_spin_->value() : 82;
@@ -591,15 +617,20 @@ void BuildingComposerWidget::refreshPreview() {
     preview_->setPixmap(QPixmap::fromImage(image).scaled(qMax(240, preview_->width() - 12), qMax(190, preview_->height() - 12),
                                                       Qt::KeepAspectRatio, Qt::SmoothTransformation));
     const QSize export_frame = BuildingExportPipeline::recommendedFrame(spec_);
-    summary_->setText(QStringLiteral("%1 / %2 — %3×%4, %5 floor(s) × %6px = %7px wall height. %8 roof. Facade editor: %9 (%10 modules). Preview: %11. Auto-export frame: %12×%13.")
+    const BuildingFootprintMask footprint = BuildingFootprintModel::mask(spec_);
+    QString footprint_reason; const bool footprint_valid = BuildingFootprintModel::isValid(spec_, &footprint_reason);
+    summary_->setText(QStringLiteral("%1 / %2 — footprint %3 %4×%5 (%6 occupied cells, %7). %8 floor(s) × %9px = %10px wall height. %11 roof. Facade editor: %12 (%13 modules). Preview: %14. Auto-export frame: %15×%16.")
         .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
         .arg(BuildingComposer::typologyName(spec_.building_typology))
+        .arg(BuildingFootprintModel::shapeName(spec_.footprint_shape))
         .arg(spec_.footprint_width_tiles).arg(spec_.footprint_depth_tiles)
+        .arg(footprint.occupiedCount())
+        .arg(footprint_valid ? QStringLiteral("valid") : footprint_reason)
         .arg(spec_.floor_count).arg(spec_.floor_height_px).arg(BuildingComposer::effectiveWallHeightPx(spec_))
         .arg(BuildingRoofEditorRenderer::roofProfileName(spec_.roof_style))
         .arg(spec_.facade_editor_enabled ? QStringLiteral("manual") : QStringLiteral("legacy automatic"))
         .arg(spec_.facade_modules.size())
-        .arg(context_enabled ? QStringLiteral("terrain + sidewalk + road") : QStringLiteral("asset only"))
+        .arg(context_enabled ? QStringLiteral("terrain + sidewalk + road + footprint mask") : QStringLiteral("asset only"))
         .arg(export_frame.width()).arg(export_frame.height()));
 }
 
@@ -612,7 +643,7 @@ void BuildingComposerWidget::exportAsset() {
     if (!exported) {
         summary_->setText(QStringLiteral("EXPORT BLOCKED: %1. Validation report: %2").arg(error, validation_path)); return;
     }
-    summary_->setText(QStringLiteral("AUTO EXPORTED: %1/%2_* — %3. Typology origin, facade/floor contract and stable module IDs recorded in manifest.")
+    summary_->setText(QStringLiteral("AUTO EXPORTED: %1/%2_* — %3. Flexible footprint mask, typology origin and facade/floor contract recorded in manifest.")
         .arg(output_dir, stem, validation.summary()));
 }
 
