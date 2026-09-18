@@ -32,6 +32,7 @@ private:
 
     QComboBox* typology_combo_ = nullptr;
     QComboBox* footprint_combo_ = nullptr;
+    QComboBox* footprint_shape_combo_ = nullptr;
     QComboBox* roof_combo_ = nullptr;
     QComboBox* palette_combo_ = nullptr;
     QComboBox* detail_preset_combo_ = nullptr;
@@ -56,6 +57,16 @@ private:
     QSlider* facade_width_slider_ = nullptr;
 
     QSpinBox* material_seed_spin_ = nullptr;
+    QSpinBox* footprint_width_spin_ = nullptr;
+    QSpinBox* footprint_depth_spin_ = nullptr;
+    QSpinBox* footprint_cutout_width_spin_ = nullptr;
+    QSpinBox* footprint_cutout_depth_spin_ = nullptr;
+    QSpinBox* footprint_annex_depth_spin_ = nullptr;
+    QSpinBox* footprint_annex_offset_spin_ = nullptr;
+    QSpinBox* footprint_setback_front_spin_ = nullptr;
+    QSpinBox* footprint_setback_back_spin_ = nullptr;
+    QSpinBox* footprint_setback_left_spin_ = nullptr;
+    QSpinBox* footprint_setback_right_spin_ = nullptr;
     QSpinBox* floor_count_spin_ = nullptr;
     QSpinBox* floor_height_spin_ = nullptr;
     QSpinBox* facade_floor_spin_ = nullptr;
