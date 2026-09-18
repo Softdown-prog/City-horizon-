@@ -163,7 +163,8 @@ QSize BuildingExportPipeline::recommendedFrame(const BuildingComposerSpec& spec)
 }
 
 QString BuildingExportPipeline::automaticStem(const BuildingComposerSpec& spec) {
-    return QStringLiteral("building_%1x%2_%3f_%4_seed%5")
+    return QStringLiteral("building_%1_%2x%3_%4f_%5_seed%6")
+        .arg(BuildingComposer::typologyId(spec.building_typology))
         .arg(std::max(1, spec.footprint_width_tiles)).arg(std::max(1, spec.footprint_depth_tiles))
         .arg(std::clamp(spec.floor_count, 1, 8))
         .arg(BuildingRoofEditorRenderer::roofProfileName(spec.roof_style)).arg(std::max(0, spec.material_seed));
