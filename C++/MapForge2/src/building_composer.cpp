@@ -936,6 +936,25 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawRoofMaterial(painter, spec, roof.polygon, roof.face_index);
     }
 
+    constexpr float kEaveThickness = 2.4F;
+    const bool gable_ridge_along_x = spec.footprint_width_tiles >= spec.footprint_depth_tiles;
+    const QColor eave_fascia = scaledColor(spec.roof_color, 0.43F);
+    const QColor eave_fascia_outline = scaledColor(spec.roof_color, 0.32F);
+    for (const int edge : visible_edges) {
+        const bool physical_eave = spec.roof_style != BuildingRoofStyle::Gable ||
+            (gable_ridge_along_x ? (edge == 0 || edge == 2) : (edge == 1 || edge == 3));
+        if (!physical_eave) continue;
+
+        const int next = (edge + 1) % 4;
+        const QPolygonF fascia = {
+            roof_top[edge],
+            roof_top[next],
+            projectPoint({roof_corners[next].x, roof_corners[next].y, wall_h - kEaveThickness}, view, canvas),
+            projectPoint({roof_corners[edge].x, roof_corners[edge].y, wall_h - kEaveThickness}, view, canvas),
+        };
+        drawOutlinedPolygon(painter, fascia, eave_fascia, eave_fascia_outline);
+    }
+
     const QColor eave_dark = scaledColor(spec.roof_color, 0.48F);
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
