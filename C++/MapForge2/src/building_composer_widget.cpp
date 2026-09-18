@@ -1,4 +1,5 @@
 #include "building_composer_widget.h"
+#include "building_roof_editor_renderer.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -56,7 +57,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
-        "City Horizon Classic Tycoon remains the visual baseline. The roof editor now controls roof profile, pitch, overhang, fascia and ridge weight from one parametric definition.",
+        "City Horizon Classic Tycoon remains the visual baseline. The roof editor controls roof profile, pitch, overhang, fascia and ridge weight from one parametric definition.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
@@ -91,7 +92,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     form->addRow("Roof overhang", roof_overhang_slider_);
 
     roof_fascia_slider_ = new QSlider(Qt::Horizontal, this);
-    roof_fascia_slider_->setRange(1, 60);
+    roof_fascia_slider_->setRange(5, 60);
     roof_fascia_slider_->setValue(static_cast<int>(spec_.roof_fascia_thickness_px * 10.0F));
     roof_fascia_slider_->setSingleStep(2);
     form->addRow("Fascia thickness", roof_fascia_slider_);
@@ -398,7 +399,7 @@ void BuildingComposerWidget::refreshSpecFromControls() {
 void BuildingComposerWidget::refreshPreview() {
     if (preview_ == nullptr || summary_ == nullptr) return;
 
-    const QImage image = BuildingComposer::renderReviewSheet(spec_, QSize(300, 250));
+    const QImage image = BuildingRoofEditorRenderer::renderReviewSheet(spec_, QSize(300, 250));
     const QPixmap pixmap = QPixmap::fromImage(image);
     preview_->setPixmap(pixmap.scaled(
         qMax(240, preview_->width() - 12),
@@ -442,7 +443,7 @@ void BuildingComposerWidget::exportAsset() {
     if (path.isEmpty()) return;
 
     const QSize frame(320, 280);
-    const QImage sheet = BuildingComposer::renderSpriteSheet(spec_, frame);
+    const QImage sheet = BuildingRoofEditorRenderer::renderSpriteSheet(spec_, frame);
     if (!sheet.save(path, "PNG")) {
         summary_->setText("EXPORT ERROR: Could not write PNG.");
         return;
@@ -460,6 +461,7 @@ void BuildingComposerWidget::exportAsset() {
 
     QJsonObject manifest = BuildingComposer::manifest(spec_, frame);
     manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec_));
+    manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec_));
     manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
     manifest_file.close();
 
