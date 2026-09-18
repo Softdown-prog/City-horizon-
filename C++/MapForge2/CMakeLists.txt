@@ -60,6 +60,7 @@ target_include_directories(mapforge2_studio_core PUBLIC
 add_library(mapforge2_asset_composer STATIC
     src/building_composer.cpp
     src/building_footprint_model.cpp
+    src/building_procedural_variation.cpp
     src/building_roof_editor_renderer.cpp
     src/building_facade_renderer.cpp
     src/building_urban_integration_validator.cpp
