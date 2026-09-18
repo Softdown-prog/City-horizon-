@@ -1,5 +1,5 @@
 {
-  "id": "automatic_export_validation_1",
+  "id": "automatic_export_validation_2",
   "name": "Building Composer Automatic Export + Validation",
   "targetPlatform": "windows_pc",
   "gridContract": "CH_GRID_V1",
@@ -16,7 +16,8 @@
     "accountsFor": [
       "footprint_width",
       "footprint_depth",
-      "wall_height",
+      "floor_count",
+      "floor_height",
       "roof_height",
       "roof_pitch",
       "roof_overhang"
@@ -34,8 +35,20 @@
       "ground_anchor_contact",
       "outer_frame_clipping",
       "fully_transparent_rgb_contamination",
-      "extreme_low_alpha_white_or_black_fringe"
+      "extreme_low_alpha_white_or_black_fringe",
+      "urban_integration_validation_1"
     ],
+    "urbanIntegration": {
+      "contract": "street_integration_contract.json",
+      "blocksExport": true,
+      "checksSidewalkFootprintContact": true,
+      "checksRoadSocketBounds": true,
+      "checksGroundAccessAlignment": true,
+      "checksFacadeModuleBounds": true,
+      "checksRoadwayProjectionClearance": true,
+      "checksRoofVisualOutset": true,
+      "actualRoadPresenceIsRuntimePlacementResponsibility": true
+    },
     "halo": {
       "lowAlphaMaximum": 32,
       "opaqueNeighbourMinimum": 96,
@@ -49,7 +62,7 @@
     }
   },
   "package": {
-    "deterministicStem": "building_<width>x<depth>_<roof_profile>_seed<material_seed>",
+    "deterministicStem": "building_<typology>_<width>x<depth>_<floors>f_<roof_profile>_seed<material_seed>",
     "outputs": [
       "<stem>_south.png",
       "<stem>_east.png",
@@ -67,5 +80,5 @@
       "environmentPreviewIncluded": false
     }
   },
-  "rule": "A production building package is accepted only after all four rendered orientations pass footprint/frame/anchor/halo validation. Preview terrain, sidewalk and road context never enter production PNG files."
+  "rule": "A production building package is accepted only after all four orientations pass footprint/frame/anchor/halo validation and the authored building passes urban_integration_validation_1. Preview terrain, sidewalk and road context never enter production PNG files; actual road existence is still checked later by runtime placement."
 }
