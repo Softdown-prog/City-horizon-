@@ -1,6 +1,7 @@
 {
   "id": "city_horizon_street_integration",
   "version": "sidewalk_road_socket_1",
+  "validationVersion": "urban_integration_validation_1",
   "targetPlatform": "windows_pc",
   "coordinateSpace": "logical_building_space",
   "rotationPolicy": "rotate_with_building",
@@ -18,31 +19,45 @@
     "defaultEnabled": true,
     "defaultEdge": "south",
     "defaultType": "local_street",
-    "supportedEdges": [
-      "south",
-      "east",
-      "north",
-      "west"
-    ],
-    "supportedTypes": [
-      "local_street",
-      "avenue",
-      "service_road"
-    ],
+    "supportedEdges": ["south", "east", "north", "west"],
+    "supportedTypes": ["local_street", "avenue", "service_road"],
     "defaultPosition": 0.50,
     "defaultWidthTiles": 0.36,
     "requiresRoadAdjacency": true,
+    "mustFitInsideAuthoredFacade": true,
     "mustMatchAfterRotation": true,
     "stableIdPattern": "road_access_<edge>"
   },
-  "placementValidation": {
+  "authoringValidation": {
+    "blocksProductionExport": true,
+    "checks": [
+      "integrated_sidewalk_touches_footprint",
+      "road_socket_fits_inside_authored_facade",
+      "ground_floor_entrance_or_garage_on_socket_facade",
+      "entrance_or_garage_aligns_with_socket_through_short_sidewalk_connection",
+      "facade_module_position_and_width_stay_inside_facade",
+      "facade_module_floor_index_is_valid",
+      "ground_floor_projection_does_not_intrude_into_roadway_clearance",
+      "roof_overhang_stays_inside_visual_outset_allowance"
+    ],
+    "accessAlignmentToleranceNormalized": 0.12,
+    "groundProjectionAllowance": "sidewalk_depth_tiles + 0.08",
+    "maximumRoofOverhangTiles": 0.24,
+    "reportNode": "urbanIntegrationValidation"
+  },
+  "runtimePlacementValidation": {
+    "required": true,
     "rejectWhenRequiredRoadMissing": true,
-    "rejectWhenSocketDoesNotFaceRoad": true,
+    "rejectWhenRoadTypeIncompatible": true,
+    "rejectWhenSocketDoesNotFaceRoadAfterRotation": true,
+    "rejectWhenBuildingFootprintOverlapsRoad": true,
     "rejectWhenSidewalkWouldLeaveGrassGap": true,
+    "rejectWhenEntranceOrGarageCannotReachRoadSocket": true,
     "roadAndSidewalkRemainSeparateFromBuildingSprite": true
   },
   "export": {
     "manifestNode": "architecturalModules.streetIntegration",
+    "validationManifestNode": "urbanIntegrationValidation",
     "buildingSpriteRemainsTransparent": true
   }
 }
