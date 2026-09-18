@@ -5,14 +5,24 @@
 #include <QImage>
 #include <QJsonObject>
 #include <QSize>
+#include <QString>
 
 namespace ch::studio {
 
-// Advanced roof layer used by the Building Composer. It keeps the canonical
-// building renderer as the source for walls/modules, then replaces the roof cap
-// with a profile driven by the roof-editor parameters in BuildingComposerSpec.
 class BuildingRoofEditorRenderer final {
 public:
+    static QString roofProfileName(BuildingRoofStyle style) {
+        switch (style) {
+            case BuildingRoofStyle::Gable: return QStringLiteral("gable");
+            case BuildingRoofStyle::Hip: return QStringLiteral("hip");
+            case BuildingRoofStyle::Pyramid: return QStringLiteral("pyramid");
+            case BuildingRoofStyle::Flat: return QStringLiteral("flat");
+            case BuildingRoofStyle::Shed: return QStringLiteral("shed");
+            case BuildingRoofStyle::Mansard: return QStringLiteral("mansard");
+        }
+        return QStringLiteral("gable");
+    }
+
     static QImage renderView(const BuildingComposerSpec& spec, BuildingView view,
                              QSize canvas = QSize(320, 280));
     static QImage renderSpriteSheet(const BuildingComposerSpec& spec,
