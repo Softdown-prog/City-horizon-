@@ -4,6 +4,7 @@
 
 #include <QFont>
 #include <QJsonArray>
+#include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -117,6 +118,24 @@ void drawOutlinedPolygon(QPainter& painter, const QPolygonF& polygon, const QCol
     outline_pen.setMiterLimit(3.0);
     painter.setPen(outline_pen);
     painter.setBrush(fill);
+    painter.drawPolygon(polygon);
+}
+
+void drawLitWallPolygon(QPainter& painter, const QPolygonF& polygon,
+                        const QColor wall_color, const float face_shade) {
+    if (polygon.isEmpty()) return;
+
+    const QRectF bounds = polygon.boundingRect();
+    QLinearGradient gradient(bounds.topLeft(), bounds.bottomRight());
+    gradient.setColorAt(0.0, scaledColor(wall_color, face_shade * 1.045F));
+    gradient.setColorAt(0.55, scaledColor(wall_color, face_shade));
+    gradient.setColorAt(1.0, scaledColor(wall_color, face_shade * 0.94F));
+
+    QPen outline_pen(QColor(45, 49, 51, 220), kStructuralOutlineWidth,
+                     Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    outline_pen.setMiterLimit(3.0);
+    painter.setPen(outline_pen);
+    painter.setBrush(gradient);
     painter.drawPolygon(polygon);
 }
 
@@ -706,7 +725,7 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
     });
 
     for (const FaceDraw& face : wall_faces) {
-        drawOutlinedPolygon(painter, face.polygon, scaledColor(spec.wall_color, face.shade));
+        drawLitWallPolygon(painter, face.polygon, spec.wall_color, face.shade);
         const int next = (face.edge + 1) % 4;
         drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
     }
