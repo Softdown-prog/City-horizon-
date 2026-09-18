@@ -3,7 +3,6 @@
 #include "src/ch_core/contracts.h"
 
 #include <QFont>
-#include <QJsonArray>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -12,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 namespace ch::studio {
@@ -85,13 +85,6 @@ float averageY(const QPolygonF& polygon) {
     return polygon.isEmpty() ? 0.0F : total / static_cast<float>(polygon.size());
 }
 
-QPointF lerpScreen(const QPointF& a, const QPointF& b, const float t) {
-    return {
-        a.x() + (b.x() - a.x()) * t,
-        a.y() + (b.y() - a.y()) * t,
-    };
-}
-
 void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                       const QPolygonF& polygon, const int face_index) {
     if (spec.roof_material == BuildingRoofMaterial::Solid || polygon.size() < 3) return;
@@ -116,15 +109,18 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                                       65 + static_cast<int>(100.0F * strength)),
                             0.72 + 0.42 * contrast));
         for (qreal x = bounds.left() + spacing; x < bounds.right(); x += spacing) {
-            painter.drawLine(QPointF(x, bounds.top() - 8.0), QPointF(x - bounds.height() * 0.35, bounds.bottom() + 8.0));
+            painter.drawLine(QPointF(x, bounds.top() - 8.0),
+                             QPointF(x - bounds.height() * 0.35, bounds.bottom() + 8.0));
         }
         painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 1.16F),
                                       18 + static_cast<int>(52.0F * strength)), 0.48));
         for (qreal x = bounds.left() + spacing + 1.6; x < bounds.right(); x += spacing) {
-            painter.drawLine(QPointF(x, bounds.top() - 8.0), QPointF(x - bounds.height() * 0.35, bounds.bottom() + 8.0));
+            painter.drawLine(QPointF(x, bounds.top() - 8.0),
+                             QPointF(x - bounds.height() * 0.35, bounds.bottom() + 8.0));
         }
     } else {
-        const qreal course = std::max<qreal>(5.0, (spec.roof_material == BuildingRoofMaterial::CeramicTile ? 7.0 : 9.0) * scale);
+        const qreal course = std::max<qreal>(
+            5.0, (spec.roof_material == BuildingRoofMaterial::CeramicTile ? 7.0 : 9.0) * scale);
         const QColor dark = alphaColor(
             scaledColor(spec.roof_color, 0.62F - 0.16F * contrast),
             35 + static_cast<int>(95.0F * strength));
@@ -135,7 +131,8 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             const qreal tab = std::max<qreal>(8.0, 13.0 * scale);
             const qreal offset = (row % 2 == 0 ? 0.0 : tab * 0.5);
             for (qreal x = bounds.left() + offset; x < bounds.right(); x += tab) {
-                const qreal h = spec.roof_material == BuildingRoofMaterial::CeramicTile ? course * 0.55 : course * 0.45;
+                const qreal h = spec.roof_material == BuildingRoofMaterial::CeramicTile
+                    ? course * 0.55 : course * 0.45;
                 painter.drawLine(QPointF(x, y - h), QPointF(x, y));
             }
         }
@@ -158,7 +155,8 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
 void drawFace(QPainter& painter, const BuildingComposerSpec& spec,
               const RoofFace& face, const QSize canvas) {
     if (face.polygon.size() < 3) return;
-    const float factor = face.polygon.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
+    const float factor = face.polygon.boundingRect().center().x() < canvas.width() * 0.5F
+        ? 0.86F : 1.06F;
     const QColor fill = scaledColor(spec.roof_color, factor);
     const QColor outline = alphaColor(scaledColor(spec.roof_color, 0.34F), 225);
     QPen pen(outline, 1.20, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
@@ -172,7 +170,7 @@ void drawFace(QPainter& painter, const BuildingComposerSpec& spec,
 void drawCapLine(QPainter& painter, const BuildingComposerSpec& spec,
                  const QPointF& a, const QPointF& b, const qreal base_width) {
     if (!spec.roof_ridge_enabled) return;
-    const qreal scale = std::clamp<qreal>(spec.roof_ridge_scale, 0.5, 1.8);
+    const qreal scale = std::clamp<qreal>(static_cast<qreal>(spec.roof_ridge_scale), 0.5, 1.8);
     painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 0.30F), 220),
                         base_width * scale, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.drawLine(a, b);
@@ -206,9 +204,11 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
     body.roof_style = BuildingRoofStyle::Flat;
     body.roof_height_px = 8;
     body.roof_material = BuildingRoofMaterial::Solid;
-    body.roof_chimney = false;
     body.roof_color = spec.wall_color;
 
+    // The canonical chimney is deliberately kept in the base render. The
+    // advanced roof is drawn afterwards, so its lower contact is naturally
+    // occluded while the chimney body remains authored by one module recipe.
     QImage image = BuildingComposer::renderView(body, view, canvas);
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -254,12 +254,15 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
                 projectPoint(apex, view, canvas),
             }, edge});
         }
-        cap_lines.push_back({projectPoint(apex, view, canvas), projectPoint(eaves[near_index], view, canvas)});
+        cap_lines.push_back({projectPoint(apex, view, canvas),
+                             projectPoint(eaves[near_index], view, canvas)});
     };
 
     if (spec.roof_style == BuildingRoofStyle::Flat) {
         QPolygonF top;
-        for (const Point3& p : eaves) top << projectPoint({p.x, p.y, wall_h + 2.0F}, view, canvas);
+        for (const Point3& p : eaves) {
+            top << projectPoint({p.x, p.y, wall_h + 2.0F}, view, canvas);
+        }
         faces.push_back({top, 0});
     } else if (spec.roof_style == BuildingRoofStyle::Pyramid) {
         pushVisibleEdgeFacesToApex({0.0F, 0.0F, wall_h + roof_h});
@@ -291,7 +294,8 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
                 projectPoint(inner[next], view, canvas),
                 projectPoint(inner[edge], view, canvas),
             }, edge});
-            cap_lines.push_back({projectPoint(inner[edge], view, canvas), projectPoint(inner[next], view, canvas)});
+            cap_lines.push_back({projectPoint(inner[edge], view, canvas),
+                                 projectPoint(inner[next], view, canvas)});
         }
 
         const bool along_x = spec.footprint_width_tiles >= spec.footprint_depth_tiles;
@@ -307,7 +311,6 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
             ridge1 = {0.0F,  ridge_y, wall_h + roof_h};
         }
         for (const int edge : visible_edges) {
-            const int next = (edge + 1) % 4;
             QPolygonF upper;
             if (along_x) {
                 if (edge == 0) upper = {projectPoint(inner[0], view, canvas), projectPoint(inner[1], view, canvas), projectPoint(ridge1, view, canvas), projectPoint(ridge0, view, canvas)};
@@ -364,8 +367,10 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
         }
         cap_lines.push_back({projectPoint(ridge0, view, canvas), projectPoint(ridge1, view, canvas)});
         if (spec.roof_style == BuildingRoofStyle::Hip) {
-            cap_lines.push_back({projectPoint(ridge0, view, canvas), projectPoint(eaves[(along_x ? 3 : 0)], view, canvas)});
-            cap_lines.push_back({projectPoint(ridge1, view, canvas), projectPoint(eaves[(along_x ? 1 : 2)], view, canvas)});
+            cap_lines.push_back({projectPoint(ridge0, view, canvas),
+                                 projectPoint(eaves[(along_x ? 3 : 0)], view, canvas)});
+            cap_lines.push_back({projectPoint(ridge1, view, canvas),
+                                 projectPoint(eaves[(along_x ? 1 : 2)], view, canvas)});
         }
     }
 
@@ -379,25 +384,6 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
         drawFascia(painter, spec, eaves[edge], eaves[next], wall_h, view, canvas);
     }
     for (const auto& line : cap_lines) drawCapLine(painter, spec, line.first, line.second, 3.0);
-
-    if (spec.roof_chimney) {
-        // Reuse the canonical chimney recipe by compositing only its roof module
-        // from a transparent helper render. Keeping the module source canonical
-        // prevents a second chimney implementation in the roof editor.
-        BuildingComposerSpec helper = spec;
-        helper.wall_color.setAlpha(0);
-        helper.roof_color.setAlpha(0);
-        helper.trim_color.setAlpha(0);
-        helper.windows = false;
-        helper.south_door = false;
-        helper.south_awning = false;
-        helper.south_sign = false;
-        helper.cast_shadow = false;
-        helper.roof_style = BuildingRoofStyle::Flat;
-        helper.roof_material = BuildingRoofMaterial::Solid;
-        const QImage helper_image = BuildingComposer::renderView(helper, view, canvas);
-        painter.drawImage(0, 0, helper_image);
-    }
 
     painter.end();
     return image;
@@ -454,7 +440,7 @@ QImage BuildingRoofEditorRenderer::renderReviewSheet(const BuildingComposerSpec&
 QJsonObject BuildingRoofEditorRenderer::roofEditorManifest(const BuildingComposerSpec& spec) {
     return QJsonObject{
         {"version", "roof_editor_1"},
-        {"profile", BuildingComposer::roofName(spec.roof_style)},
+        {"profile", roofProfileName(spec.roof_style)},
         {"pitchDegrees", static_cast<double>(std::clamp(spec.roof_pitch_degrees, 12.0F, 60.0F))},
         {"overhang", static_cast<double>(std::clamp(spec.roof_overhang, 0.0F, 0.24F))},
         {"fasciaEnabled", spec.roof_fascia_enabled},
