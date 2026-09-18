@@ -20,18 +20,19 @@ enum class BuildingWallMaterial { Solid, Plaster, Brick, Concrete, Timber, Stone
 enum class BuildingRoofMaterial { Solid, CeramicTile, MetalSeam, AsphaltShingle };
 enum class BuildingStreetEdge { South, East, North, West };
 enum class BuildingRoadSocketType { LocalStreet, Avenue, ServiceRoad };
-enum class BuildingFacadeModuleKind {
-    Window,
-    Door,
-    Storefront,
-    Sign,
-    Awning,
-    DoubleDoor,
-    GarageDoor,
-    Balcony,
-    Marquee,
-    Hvac,
-    Planter,
+enum class BuildingFacadeModuleKind { Window, Door, Storefront, Sign, Awning, DoubleDoor, GarageDoor, Balcony, Marquee, Hvac, Planter };
+enum class BuildingTypology {
+    Custom,
+    SmallHouse,
+    SuburbanHouse,
+    Cafeteria,
+    CornerShop,
+    Market,
+    Warehouse,
+    SmallTownHall,
+    School,
+    LowRiseResidential,
+    LowRiseOffice,
 };
 
 enum class BuildingWindowModule { ClassicFramed };
@@ -52,6 +53,7 @@ struct BuildingFacadeModulePlacement {
 
 struct BuildingComposerSpec {
     BuildingVisualPreset visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
+    BuildingTypology building_typology = BuildingTypology::Custom;
 
     int footprint_width_tiles = 2;
     int footprint_depth_tiles = 1;
@@ -128,6 +130,40 @@ public:
     static QString visualPresetId(BuildingVisualPreset) { return QStringLiteral("city_horizon_classic_tycoon"); }
     static QString visualPresetName(BuildingVisualPreset) { return QStringLiteral("City Horizon Classic Tycoon"); }
 
+    static QString typologyId(BuildingTypology typology) {
+        switch (typology) {
+            case BuildingTypology::SmallHouse: return QStringLiteral("small_house");
+            case BuildingTypology::SuburbanHouse: return QStringLiteral("suburban_house");
+            case BuildingTypology::Cafeteria: return QStringLiteral("cafeteria");
+            case BuildingTypology::CornerShop: return QStringLiteral("corner_shop");
+            case BuildingTypology::Market: return QStringLiteral("market");
+            case BuildingTypology::Warehouse: return QStringLiteral("warehouse");
+            case BuildingTypology::SmallTownHall: return QStringLiteral("small_town_hall");
+            case BuildingTypology::School: return QStringLiteral("school");
+            case BuildingTypology::LowRiseResidential: return QStringLiteral("low_rise_residential");
+            case BuildingTypology::LowRiseOffice: return QStringLiteral("low_rise_office");
+            case BuildingTypology::Custom: return QStringLiteral("custom");
+        }
+        return QStringLiteral("custom");
+    }
+
+    static QString typologyName(BuildingTypology typology) {
+        switch (typology) {
+            case BuildingTypology::SmallHouse: return QStringLiteral("Small house");
+            case BuildingTypology::SuburbanHouse: return QStringLiteral("Suburban house");
+            case BuildingTypology::Cafeteria: return QStringLiteral("Cafeteria");
+            case BuildingTypology::CornerShop: return QStringLiteral("Corner shop");
+            case BuildingTypology::Market: return QStringLiteral("Market");
+            case BuildingTypology::Warehouse: return QStringLiteral("Warehouse");
+            case BuildingTypology::SmallTownHall: return QStringLiteral("Small town hall");
+            case BuildingTypology::School: return QStringLiteral("School");
+            case BuildingTypology::LowRiseResidential: return QStringLiteral("Low-rise residential");
+            case BuildingTypology::LowRiseOffice: return QStringLiteral("Low-rise office");
+            case BuildingTypology::Custom: return QStringLiteral("Custom");
+        }
+        return QStringLiteral("Custom");
+    }
+
     static QString streetEdgeName(BuildingStreetEdge edge) {
         switch (edge) {
             case BuildingStreetEdge::South: return QStringLiteral("south");
@@ -155,11 +191,11 @@ public:
         return QStringLiteral("window");
     }
 
-    static QString facadeModuleId(BuildingFacadeModuleKind kind) {
+    static QString facadeModuleStableId(BuildingFacadeModuleKind kind) {
         switch (kind) {
             case BuildingFacadeModuleKind::Window: return QStringLiteral("window.classic_framed.v1");
             case BuildingFacadeModuleKind::Door: return QStringLiteral("door.classic_wood.v1");
-            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront.classic_glass.v1");
+            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront.glass_bay.v1");
             case BuildingFacadeModuleKind::Sign: return QStringLiteral("sign.facade_plaque.v1");
             case BuildingFacadeModuleKind::Awning: return QStringLiteral("awning.canvas_canopy.v1");
             case BuildingFacadeModuleKind::DoubleDoor: return QStringLiteral("door.double_glass.v1");
@@ -216,7 +252,7 @@ public:
         for (const auto& module : spec.facade_modules) {
             placements.append(QJsonObject{
                 {"kind", facadeModuleKindName(module.kind)},
-                {"moduleId", facadeModuleId(module.kind)},
+                {"moduleId", facadeModuleStableId(module.kind)},
                 {"edge", streetEdgeName(module.edge)},
                 {"floor", std::clamp(module.floor_index, 0, std::max(0, spec.floor_count - 1))},
                 {"position", static_cast<double>(std::clamp(module.position, 0.0F, 1.0F))},
@@ -226,7 +262,11 @@ public:
         }
         return QJsonObject{
             {"version", QStringLiteral("facade_editor_2")},
-            {"moduleLibrary", QStringLiteral("architectural_modules_2")},
+            {"typologyPreset", QJsonObject{
+                {"id", typologyId(spec.building_typology)},
+                {"name", typologyName(spec.building_typology)},
+                {"editableAfterApply", true},
+            }},
             {"enabled", spec.facade_editor_enabled},
             {"floorSystem", QJsonObject{
                 {"version", QStringLiteral("floor_system_1")},
@@ -247,11 +287,6 @@ public:
         if (spec.south_awning) active.append(awningModuleId(spec.awning_module));
         if (spec.south_sign) active.append(signModuleId(spec.sign_module));
         if (spec.roof_chimney) active.append(chimneyModuleId(spec.chimney_module));
-        if (spec.facade_editor_enabled) {
-            for (const auto& module : spec.facade_modules) {
-                if (module.enabled) active.append(facadeModuleId(module.kind));
-            }
-        }
         return QJsonObject{
             {"libraryVersion", QStringLiteral("architectural_modules_2")},
             {"window", windowModuleId(spec.window_module)}, {"door", doorModuleId(spec.door_module)},
