@@ -36,6 +36,8 @@ private:
     QSlider* wall_height_slider_ = nullptr;
     QSlider* roof_height_slider_ = nullptr;
     QSlider* material_strength_slider_ = nullptr;
+    QSlider* material_variation_slider_ = nullptr;
+    QSlider* material_contrast_slider_ = nullptr;
     QSpinBox* material_seed_spin_ = nullptr;
     QCheckBox* windows_check_ = nullptr;
     QCheckBox* door_check_ = nullptr;
