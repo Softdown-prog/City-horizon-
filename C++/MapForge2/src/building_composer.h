@@ -20,6 +20,7 @@ enum class BuildingWallMaterial { Solid, Plaster, Brick, Concrete, Timber, Stone
 enum class BuildingRoofMaterial { Solid, CeramicTile, MetalSeam, AsphaltShingle };
 enum class BuildingStreetEdge { South, East, North, West };
 enum class BuildingRoadSocketType { LocalStreet, Avenue, ServiceRoad };
+enum class BuildingFootprintShape { Rectangle, LShape, Courtyard, Annex };
 enum class BuildingFacadeModuleKind { Window, Door, Storefront, Sign, Awning, DoubleDoor, GarageDoor, Balcony, Marquee, Hvac, Planter };
 enum class BuildingTypology {
     Custom,
@@ -55,8 +56,18 @@ struct BuildingComposerSpec {
     BuildingVisualPreset visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
     BuildingTypology building_typology = BuildingTypology::Custom;
 
+    BuildingFootprintShape footprint_shape = BuildingFootprintShape::Rectangle;
     int footprint_width_tiles = 2;
     int footprint_depth_tiles = 1;
+    int footprint_cutout_width_tiles = 1;
+    int footprint_cutout_depth_tiles = 1;
+    int footprint_annex_depth_tiles = 1;
+    int footprint_annex_offset_tiles = 0;
+    float footprint_setback_front_tiles = 0.0F;
+    float footprint_setback_back_tiles = 0.0F;
+    float footprint_setback_left_tiles = 0.0F;
+    float footprint_setback_right_tiles = 0.0F;
+
     int wall_height_px = 82; // legacy single-storey height; renderer uses effectiveWallHeightPx().
     int floor_count = 1;
     int floor_height_px = 82;
