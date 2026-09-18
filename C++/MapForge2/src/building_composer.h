@@ -121,6 +121,18 @@ struct BuildingComposerSpec {
     float material_contrast = 0.45F;
     int material_seed = 17;
 
+    // Controlled procedural variation never changes footprint, floor count, road
+    // socket or required ground-floor access. A seed therefore creates a stable
+    // cosmetic/architectural sibling of the authored base building.
+    bool procedural_variation_enabled = false;
+    bool procedural_variation_applied = false;
+    int procedural_variation_seed = 101;
+    float procedural_variation_strength = 0.35F;
+    bool procedural_vary_palette = true;
+    bool procedural_vary_materials = true;
+    bool procedural_vary_roof = true;
+    bool procedural_vary_modules = true;
+
     bool south_awning = false;
     bool south_sign = false;
     bool roof_chimney = false;
