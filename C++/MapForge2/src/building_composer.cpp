@@ -522,20 +522,73 @@ void drawWindowModule(QPainter& painter, const BuildingComposerSpec& spec,
     const float z0 = wall_h * 0.36F;
     const float z1 = wall_h * 0.70F;
     const float width = std::max(0.04F, t1 - t0);
-    const float inset_t = std::min(width * 0.13F, 0.018F);
-    const float inset_z = wall_h * 0.025F;
-    const QColor frame = scaledColor(spec.trim_color, 0.90F);
-    const QColor frame_outline = scaledColor(spec.trim_color, 0.62F);
+    const float reveal_t = std::min(width * 0.11F, 0.016F);
+    const float reveal_z = wall_h * 0.020F;
+    const float frame_t = std::min(width * 0.10F, 0.014F);
+    const float frame_z = wall_h * 0.022F;
+
+    const float reveal_t0 = t0 + reveal_t;
+    const float reveal_t1 = t1 - reveal_t;
+    const float reveal_z0 = z0 + reveal_z;
+    const float reveal_z1 = z1 - reveal_z;
+    const float glass_t0 = reveal_t0 + frame_t;
+    const float glass_t1 = reveal_t1 - frame_t;
+    const float glass_z0 = reveal_z0 + frame_z;
+    const float glass_z1 = reveal_z1 - frame_z;
+
+    const QColor recess = scaledColor(spec.wall_color, 0.46F);
+    const QColor recess_outline = scaledColor(spec.wall_color, 0.38F);
+    const QColor frame = scaledColor(spec.trim_color, 0.88F);
+    const QColor frame_outline = scaledColor(spec.trim_color, 0.55F);
 
     drawFaceDetail(painter, a, b, t0, t1, z0, z1,
+                   view, canvas, recess, recess_outline);
+    drawFaceDetail(painter, a, b, reveal_t0, reveal_t1, reveal_z0, reveal_z1,
                    view, canvas, frame, frame_outline);
-    drawFaceDetail(painter, a, b, t0 + inset_t, t1 - inset_t,
-                   z0 + inset_z, z1 - inset_z,
-                   view, canvas, spec.glass_color, scaledColor(spec.glass_color, 0.64F));
 
-    painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), kStructuralOutlineWidth, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(projectPoint(lerpPoint(a, b, t0 - 0.006F, z0 - wall_h * 0.012F), view, canvas),
-                     projectPoint(lerpPoint(a, b, t1 + 0.006F, z0 - wall_h * 0.012F), view, canvas));
+    const QPolygonF inner_opening = {
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t1, glass_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t1, glass_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z1), view, canvas),
+    };
+    drawOutlinedPolygon(
+        painter, inner_opening,
+        scaledColor(spec.glass_color, 0.84F),
+        scaledColor(spec.glass_color, 0.50F));
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    const QColor inner_shadow = alphaColor(scaledColor(spec.wall_color, 0.34F), 105);
+    const float shadow_t = std::min((glass_t1 - glass_t0) * 0.08F, 0.007F);
+    const float shadow_z = wall_h * 0.012F;
+
+    const QPolygonF top_reveal_shadow = {
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z1 - shadow_z), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t1, glass_z1 - shadow_z), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t1, glass_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z1), view, canvas),
+    };
+    painter.setBrush(inner_shadow);
+    painter.drawPolygon(top_reveal_shadow);
+
+    const QPolygonF side_reveal_shadow = {
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t0 + shadow_t, glass_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t0 + shadow_t, glass_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, glass_t0, glass_z1), view, canvas),
+    };
+    painter.setBrush(alphaColor(scaledColor(spec.wall_color, 0.42F), 72));
+    painter.drawPolygon(side_reveal_shadow);
+    painter.restore();
+
+    const float sill_t = 0.007F;
+    const float sill_z0 = z0 - wall_h * 0.018F;
+    const float sill_z1 = z0 + wall_h * 0.010F;
+    drawFaceDetail(painter, a, b, t0 - sill_t, t1 + sill_t, sill_z0, sill_z1,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.82F),
+                   scaledColor(spec.trim_color, 0.52F));
 }
 
 void drawWindows(QPainter& painter, const BuildingComposerSpec& spec,
