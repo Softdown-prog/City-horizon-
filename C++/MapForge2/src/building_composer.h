@@ -48,7 +48,17 @@ enum class BuildingRoofMaterial {
     AsphaltShingle,
 };
 
+// Global art-direction preset. This is intentionally separate from the
+// architectural/detail presets (Residence, Small shop, Utility / depot): those
+// can vary modules while this preset keeps the City Horizon visual language.
+enum class BuildingVisualPreset {
+    CityHorizonClassicTycoon,
+};
+
 struct BuildingComposerSpec {
+    // New buildings always start from the official City Horizon visual preset.
+    BuildingVisualPreset visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
+
     int footprint_width_tiles = 2;
     int footprint_depth_tiles = 1;
     int wall_height_px = 82;
@@ -85,6 +95,32 @@ struct BuildingComposerSpec {
 
 class BuildingComposer final {
 public:
+    // Canonical starting point for newly-authored buildings. Renderer-level
+    // calibration (materials, AO, lighting, outlines, roof finish, plinth,
+    // windows and door treatment) is the current Classic Tycoon baseline.
+    static BuildingComposerSpec presetSpec(
+        BuildingVisualPreset preset = BuildingVisualPreset::CityHorizonClassicTycoon) {
+        BuildingComposerSpec spec;
+        spec.visual_preset = preset;
+        return spec;
+    }
+
+    static QString visualPresetId(BuildingVisualPreset preset) {
+        switch (preset) {
+            case BuildingVisualPreset::CityHorizonClassicTycoon:
+                return QStringLiteral("city_horizon_classic_tycoon");
+        }
+        return QStringLiteral("city_horizon_classic_tycoon");
+    }
+
+    static QString visualPresetName(BuildingVisualPreset preset) {
+        switch (preset) {
+            case BuildingVisualPreset::CityHorizonClassicTycoon:
+                return QStringLiteral("City Horizon Classic Tycoon");
+        }
+        return QStringLiteral("City Horizon Classic Tycoon");
+    }
+
     static QImage renderView(const BuildingComposerSpec& spec, BuildingView view,
                              QSize canvas = QSize(320, 280));
     static QImage renderSpriteSheet(const BuildingComposerSpec& spec,
