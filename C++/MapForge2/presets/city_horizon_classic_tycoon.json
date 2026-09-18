@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_8",
+  "revision": "classic_tycoon_9",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -34,7 +34,7 @@
     }
   },
   "architecturalModules": {
-    "library": "architectural_modules_1",
+    "library": "architectural_modules_2",
     "stableIds": true,
     "defaults": {
       "window": "window.classic_framed.v1",
@@ -42,7 +42,16 @@
       "awning": "awning.canvas_canopy.v1",
       "sign": "sign.facade_plaque.v1",
       "chimney": "chimney.masonry_cap.v1"
-    }
+    },
+    "expandedFacadeModules": [
+      "storefront.classic_glass.v1",
+      "door.double_glass.v1",
+      "garage.rollup_panel.v1",
+      "balcony.classic_rail.v1",
+      "marquee.flat_canopy.v1",
+      "hvac.wall_unit.v1",
+      "planter.facade_box.v1"
+    ]
   },
   "floorSystem": {
     "version": "floor_system_1",
@@ -57,15 +66,29 @@
     "singleParametricDefinitionForAllViews": true
   },
   "facadeEditor": {
-    "version": "facade_editor_1",
+    "version": "facade_editor_2",
+    "moduleLibrary": "architectural_modules_2",
     "manualModeOptional": true,
     "supportedFacades": ["south", "east", "north", "west"],
-    "supportedModules": ["window", "door", "storefront", "sign", "awning"],
+    "supportedModules": [
+      "window",
+      "door",
+      "storefront",
+      "sign",
+      "awning",
+      "double_door",
+      "garage_door",
+      "balcony",
+      "marquee",
+      "hvac",
+      "planter"
+    ],
     "placementCoordinates": {
       "facadePosition": "normalized_0_to_1",
       "moduleWidth": "normalized_facade_fraction",
       "floor": "zero_based_in_manifest_one_based_in_ui"
     },
+    "stableModuleIdsInManifest": true,
     "editableWithoutCode": true,
     "modulesRotateWithBuilding": true,
     "legacyAutomaticFacadeAvailableWhenDisabled": true
@@ -199,5 +222,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Buildings may use 1–8 floors and manual facade modules on any logical side. Facade modules must be authored by normalized socket placement and floor index rather than custom per-view drawing. All four views derive from the same building definition; roofs anchor to the computed top floor; road sockets rotate with the building; preview environment stays out of production PNGs; validated export remains mandatory."
+  "authoringRule": "Buildings may use 1–8 floors and architectural_modules_2 placements on any logical facade. Every reusable facade component must keep a stable module ID, floor index and normalized facade placement instead of custom per-view drawing. All four views derive from one building definition; roofs anchor to the computed top floor; road sockets rotate with the building; preview environment stays out of production PNGs; validated export remains mandatory."
 }
