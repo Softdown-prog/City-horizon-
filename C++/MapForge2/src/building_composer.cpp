@@ -1136,20 +1136,23 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
 
     Point3 ridge0{};
     Point3 ridge1{};
+    Point3 pyramid_apex{};
     bool has_ridge = false;
+    bool has_pyramid_apex = false;
 
     if (spec.roof_style == BuildingRoofStyle::Flat) {
         QPolygonF roof;
         for (const QPointF point : roof_top) roof << point;
         roof_faces.push_back({roof, spec.roof_color, 0});
     } else if (spec.roof_style == BuildingRoofStyle::Pyramid) {
-        const Point3 apex{0.0F, 0.0F, wall_h + roof_h};
+        pyramid_apex = {0.0F, 0.0F, wall_h + roof_h};
+        has_pyramid_apex = true;
         for (const int edge : visible_edges) {
             const int next = (edge + 1) % 4;
             QPolygonF poly = {
                 roof_top[edge],
                 roof_top[next],
-                projectPoint(apex, view, canvas),
+                projectPoint(pyramid_apex, view, canvas),
             };
             const float factor = poly.boundingRect().center().x() < canvas.width() * 0.5F ? 0.86F : 1.06F;
             roof_faces.push_back({poly, scaledColor(spec.roof_color, factor), edge});
@@ -1201,37 +1204,123 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawRoofMaterial(painter, spec, roof.polygon, roof.face_index);
     }
 
-    constexpr float kEaveThickness = 2.4F;
+    // Roof finish pass: give eaves, rakes, hips and ridge physical visual weight
+    // without changing the underlying roof geometry.
+    constexpr float kEaveThickness = 2.8F;
     const bool gable_ridge_along_x = spec.footprint_width_tiles >= spec.footprint_depth_tiles;
-    const QColor eave_fascia = scaledColor(spec.roof_color, 0.43F);
-    const QColor eave_fascia_outline = scaledColor(spec.roof_color, 0.32F);
+    const QColor eave_fascia = scaledColor(spec.roof_color, 0.46F);
+    const QColor eave_fascia_outline = scaledColor(spec.roof_color, 0.30F);
+    const QColor roof_joint_dark = alphaColor(scaledColor(spec.roof_color, 0.34F), 220);
+    const QColor roof_joint_body = alphaColor(scaledColor(spec.roof_color, 0.72F), 235);
+    const QColor roof_joint_highlight = alphaColor(scaledColor(spec.roof_color, 1.06F), 150);
+
     for (const int edge : visible_edges) {
         const bool physical_eave = spec.roof_style != BuildingRoofStyle::Gable ||
             (gable_ridge_along_x ? (edge == 0 || edge == 2) : (edge == 1 || edge == 3));
         if (!physical_eave) continue;
 
         const int next = (edge + 1) % 4;
+        const QPointF lower_start = projectPoint(
+            {roof_corners[edge].x, roof_corners[edge].y, wall_h - kEaveThickness}, view, canvas);
+        const QPointF lower_end = projectPoint(
+            {roof_corners[next].x, roof_corners[next].y, wall_h - kEaveThickness}, view, canvas);
         const QPolygonF fascia = {
             roof_top[edge],
             roof_top[next],
-            projectPoint({roof_corners[next].x, roof_corners[next].y, wall_h - kEaveThickness}, view, canvas),
-            projectPoint({roof_corners[edge].x, roof_corners[edge].y, wall_h - kEaveThickness}, view, canvas),
+            lower_end,
+            lower_start,
         };
         drawOutlinedPolygon(painter, fascia, eave_fascia, eave_fascia_outline);
-    }
 
-    const QColor eave_dark = scaledColor(spec.roof_color, 0.48F);
-    for (const int edge : visible_edges) {
-        const int next = (edge + 1) % 4;
-        painter.setPen(QPen(eave_dark, kRoofEdgeWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        // Lower drip lip prevents the fascia from reading as a flat painted strip.
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 0.24F), 220),
+                            0.95, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+        painter.drawLine(lower_start, lower_end);
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 0.82F), 115),
+                            0.52, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
         painter.drawLine(roof_top[edge], roof_top[next]);
     }
 
+    // Finish the lower roof perimeter. Physical eaves are stronger; non-eave
+    // gable bases stay quieter so the sloped rake trim becomes the dominant edge.
+    for (const int edge : visible_edges) {
+        const int next = (edge + 1) % 4;
+        const bool physical_eave = spec.roof_style != BuildingRoofStyle::Gable ||
+            (gable_ridge_along_x ? (edge == 0 || edge == 2) : (edge == 1 || edge == 3));
+        const qreal edge_width = physical_eave ? kRoofEdgeWidth + 0.30 : kRoofEdgeWidth * 0.72;
+        const int edge_alpha = physical_eave ? 220 : 150;
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 0.42F), edge_alpha),
+                            edge_width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(roof_top[edge], roof_top[next]);
+    }
+
+    // Gable rakes: draw the two sloped trim pieces on a visible gable instead of
+    // treating its wall-level base as if it were a conventional eave.
+    if (spec.roof_style == BuildingRoofStyle::Gable) {
+        for (const int edge : visible_edges) {
+            const bool physical_eave = gable_ridge_along_x ? (edge == 0 || edge == 2)
+                                                           : (edge == 1 || edge == 3);
+            if (physical_eave) continue;
+
+            const int next = (edge + 1) % 4;
+            Point3 rake_apex{};
+            if (gable_ridge_along_x) {
+                rake_apex = edge == 1 ? ridge1 : ridge0;
+            } else {
+                rake_apex = edge == 0 ? ridge0 : ridge1;
+            }
+            const QPointF apex_screen = projectPoint(rake_apex, view, canvas);
+            for (const QPointF& start : {roof_top[edge], roof_top[next]}) {
+                painter.setPen(QPen(roof_joint_dark, 2.30, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.drawLine(start, apex_screen);
+                painter.setPen(QPen(roof_joint_body, 1.35, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.drawLine(start, apex_screen);
+                painter.setPen(QPen(roof_joint_highlight, 0.48, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.drawLine(start, apex_screen);
+            }
+        }
+    }
+
+    // Pyramid roofs get one explicit hip junction between the two visible planes.
+    if (has_pyramid_apex) {
+        const QPointF apex_screen = projectPoint(pyramid_apex, view, canvas);
+        const QPointF hip_end = roof_top[near_index];
+        painter.setPen(QPen(roof_joint_dark, 2.10, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(apex_screen, hip_end);
+        painter.setPen(QPen(roof_joint_body, 1.20, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(apex_screen, hip_end);
+        painter.setPen(QPen(roof_joint_highlight, 0.44, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(apex_screen, hip_end);
+    }
+
+    // The gable ridge is now a layered cap rather than a single outline. Short
+    // cross-joints suggest individual ridge pieces at normal gameplay scale.
     if (has_ridge) {
         const QPointF ridge_start = projectPoint(ridge0, view, canvas);
         const QPointF ridge_end = projectPoint(ridge1, view, canvas);
-        painter.setPen(QPen(scaledColor(spec.roof_color, 0.46F), kRoofEdgeWidth, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(roof_joint_dark, 3.20, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(ridge_start, ridge_end);
+        painter.setPen(QPen(roof_joint_body, 2.15, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(ridge_start, ridge_end);
+        painter.setPen(QPen(roof_joint_highlight, 0.72, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(ridge_start, ridge_end);
+
+        const float ridge_length = std::max(1.0F, screenDistance(ridge_start, ridge_end));
+        const int cap_segments = std::max(2, static_cast<int>(std::round(ridge_length / 14.0F)));
+        const float dx = static_cast<float>(ridge_end.x() - ridge_start.x()) / ridge_length;
+        const float dy = static_cast<float>(ridge_end.y() - ridge_start.y()) / ridge_length;
+        const float nx = -dy;
+        const float ny = dx;
+        painter.setPen(QPen(alphaColor(scaledColor(spec.roof_color, 0.30F), 135),
+                            0.62, Qt::SolidLine, Qt::RoundCap));
+        for (int segment = 1; segment < cap_segments; ++segment) {
+            const float t = static_cast<float>(segment) / static_cast<float>(cap_segments);
+            const QPointF center = lerpScreen(ridge_start, ridge_end, t);
+            const qreal half_joint = 1.35;
+            painter.drawLine(
+                QPointF(center.x() - nx * half_joint, center.y() - ny * half_joint),
+                QPointF(center.x() + nx * half_joint, center.y() + ny * half_joint));
+        }
     }
 
     drawChimney(painter, spec, half_w, half_d, wall_h, roof_h, view, canvas);
@@ -1330,7 +1419,7 @@ QJsonObject BuildingComposer::manifest(const BuildingComposerSpec& spec, const Q
     QJsonObject metadata{
         {"generator", "City Horizon Studio Building/Asset Composer"},
         {"contractVersion", "CH_BUILDING_COMPOSER_V0"},
-        {"featureRevision", "architectural_microgeometry_1"},
+        {"featureRevision", "roof_finish_1"},
         {"status", "PILOT"},
         {"sourceRepresentation", "parametric_vector_volume"},
         {"runtimeRepresentation", "PNG_RGBA_bitmap"},
