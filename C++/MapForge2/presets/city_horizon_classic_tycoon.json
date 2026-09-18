@@ -1,0 +1,92 @@
+{
+  "id": "city_horizon_classic_tycoon",
+  "name": "City Horizon Classic Tycoon",
+  "revision": "classic_tycoon_1",
+  "status": "official",
+  "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
+  "projection": {
+    "type": "isometric_2_to_1",
+    "orthographic": true,
+    "rotationDegrees": 45.0,
+    "inclinationDegrees": 35.264
+  },
+  "materials": {
+    "wallDefault": "plaster",
+    "roofDefault": "ceramic_tile",
+    "strength": 0.45,
+    "scale": 1.0,
+    "seed": 17,
+    "palette": {
+      "wall": "#d8c3a5",
+      "roof": "#a94e3f",
+      "trim": "#f2eadf",
+      "glass": "#78b9d1",
+      "door": "#6d4c41",
+      "accent": "#d79b38"
+    }
+  },
+  "lighting": {
+    "wallShadowFaceFactor": 0.84,
+    "wallLitFaceFactor": 1.0,
+    "wallGradientTopFactor": 1.045,
+    "wallGradientBottomFactor": 0.94,
+    "roofShadowFaceFactor": 0.86,
+    "roofLitFaceFactor": 1.06,
+    "castShadowEnabled": true,
+    "contactShadowAlpha": 58,
+    "castShadowAlpha": 46
+  },
+  "ambientOcclusion": {
+    "eaveDepthPx": 6.0,
+    "eaveAlphaBands": [42, 30, 20, 12, 6],
+    "cornerWorldSpan": 0.075,
+    "cornerAlphaBands": [30, 20, 12, 5],
+    "wallGroundContactAlpha": 115,
+    "roofWallContactAlpha": 135
+  },
+  "outlines": {
+    "structuralWidth": 1.20,
+    "contactWidth": 1.20,
+    "roofEdgeWidth": 1.35,
+    "structuralColor": "#2d3133dc"
+  },
+  "roofFinish": {
+    "defaultStyle": "gable",
+    "defaultHeightPx": 34,
+    "nonFlatOverhang": 0.10,
+    "flatOverhang": 0.04,
+    "eaveThicknessPx": 2.8,
+    "ridgeLayeredCap": true,
+    "gableRakeTrim": true,
+    "pyramidHipJoint": true,
+    "dripEdge": true
+  },
+  "base": {
+    "structuralPlinth": true,
+    "plinthHeightWallRatio": 0.075,
+    "plinthHeightMinPx": 5.0,
+    "plinthHeightMaxPx": 9.0,
+    "plinthOutset": 1.018,
+    "projectingCapOutset": 1.026
+  },
+  "windows": {
+    "enabled": true,
+    "defaultPattern": "pair",
+    "recessed": true,
+    "innerAo": true,
+    "projectingHead": true,
+    "jambReturns": true,
+    "twoStepSill": true,
+    "dripEdge": true
+  },
+  "door": {
+    "enabled": true,
+    "defaultPosition": "center",
+    "recessed": true,
+    "innerAo": true,
+    "projectingHeader": true,
+    "jambSurround": true,
+    "twoLevelThreshold": true
+  },
+  "authoringRule": "Architectural presets and per-building options may vary geometry, modules, palette and material choice, but all new buildings inherit this visual baseline unless a future official visual preset is explicitly selected."
+}
