@@ -1,5 +1,5 @@
 {
-  "id": "facade_floor_authoring_1",
+  "id": "facade_floor_authoring_2",
   "name": "Building Composer Facade + Floor Authoring Contract",
   "targetPlatform": "windows_pc",
   "floorSystem": {
@@ -12,14 +12,28 @@
     "floorBandsOptional": true
   },
   "facadeEditor": {
-    "version": "facade_editor_1",
+    "version": "facade_editor_2",
+    "moduleLibrary": "architectural_modules_2",
     "logicalFacades": ["south", "east", "north", "west"],
-    "moduleKinds": ["window", "door", "storefront", "sign", "awning"],
+    "moduleKinds": [
+      "window",
+      "door",
+      "storefront",
+      "sign",
+      "awning",
+      "double_door",
+      "garage_door",
+      "balcony",
+      "marquee",
+      "hvac",
+      "planter"
+    ],
     "placement": {
       "floorIndex": "0..floor_count-1",
       "position": "normalized_0_to_1_along_logical_facade",
       "width": "normalized_facade_fraction_0_06_to_0_90",
-      "rotatesWithBuilding": true
+      "rotatesWithBuilding": true,
+      "stableModuleIdRequired": true
     },
     "manualMode": {
       "disablesLegacyAutomaticFacadeModules": true,
@@ -29,8 +43,9 @@
   "export": {
     "manifestRecordsFloorSystem": true,
     "manifestRecordsEveryFacadePlacement": true,
+    "manifestRecordsStableModuleId": true,
     "automaticFrameAccountsForTotalFloorHeight": true,
     "haloAndFootprintValidationStillRequired": true
   },
-  "rule": "A facade module is authored once in logical building space. SOUTH/EAST/NORTH/WEST rendered views must be projections of that same placement; no per-view hand-authored duplicate is allowed."
+  "rule": "A facade module is authored once in logical building space with a stable architectural_modules_2 ID. SOUTH/EAST/NORTH/WEST rendered views must be projections of that same placement; no per-view hand-authored duplicate is allowed."
 }
