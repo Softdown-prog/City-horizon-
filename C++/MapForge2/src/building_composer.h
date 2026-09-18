@@ -195,7 +195,7 @@ public:
         switch (kind) {
             case BuildingFacadeModuleKind::Window: return QStringLiteral("window.classic_framed.v1");
             case BuildingFacadeModuleKind::Door: return QStringLiteral("door.classic_wood.v1");
-            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront.glass_bay.v1");
+            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront.classic_glass.v1");
             case BuildingFacadeModuleKind::Sign: return QStringLiteral("sign.facade_plaque.v1");
             case BuildingFacadeModuleKind::Awning: return QStringLiteral("awning.canvas_canopy.v1");
             case BuildingFacadeModuleKind::DoubleDoor: return QStringLiteral("door.double_glass.v1");
