@@ -50,17 +50,24 @@ void applyPalette(BuildingComposerSpec& spec, const int index) {
 } // namespace
 
 BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent),
+      spec_(BuildingComposer::presetSpec(BuildingVisualPreset::CityHorizonClassicTycoon)) {
     auto* root = new QVBoxLayout(this);
 
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
-        "Geometry, sockets and material recipes are deterministic. Surface materials now add repeatable plaster, brick, concrete, timber and roof patterns without changing footprint or projection.",
+        "New buildings start from the City Horizon Classic Tycoon visual preset. "
+        "Its renderer baseline keeps materials, AO, lighting, outlines, roof finish, base, windows and door treatment coherent while architectural presets vary the building itself.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
 
     auto* form = new QFormLayout();
+
+    auto* visual_preset_label = new QLabel(BuildingComposer::visualPresetName(spec_.visual_preset), this);
+    visual_preset_label->setToolTip(
+        "Official City Horizon renderer baseline. Architectural/detail presets may vary modules without replacing this visual contract.");
+    form->addRow("Visual preset", visual_preset_label);
 
     footprint_combo_ = new QComboBox(this);
     footprint_combo_->addItems({"1×1", "2×1", "2×2", "3×2"});
@@ -247,6 +254,10 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
 }
 
 void BuildingComposerWidget::refreshSpecFromControls() {
+    // The visual preset is the renderer baseline and remains stable while the
+    // controls below describe the building authored on top of it.
+    spec_.visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
+
     const int footprint = footprint_combo_ != nullptr ? footprint_combo_->currentIndex() : 1;
     switch (footprint) {
         case 0: spec_.footprint_width_tiles = 1; spec_.footprint_depth_tiles = 1; break;
@@ -320,8 +331,10 @@ void BuildingComposerWidget::refreshPreview() {
     const QString module_text = modules.isEmpty() ? QStringLiteral("no optional modules") : modules.join(", ");
 
     summary_->setText(
-        QString("CH_BUILDING_COMPOSER_V0 / materials_1 — %1×%2 footprint, %3 roof. Walls: %4. Roof surface: %5. "
-                "Texture %6% / scale %7 / seed %8. Entrance: south/%9. Windows: %10. Modules: %11. Geometry is unchanged by materials.")
+        QString("%1 / CH_BUILDING_COMPOSER_V0 — %2×%3 footprint, %4 roof. Walls: %5. Roof surface: %6. "
+                "Texture %7% / scale %8 / seed %9. Entrance: south/%10. Windows: %11. Modules: %12. "
+                "Classic Tycoon calibration is active for materials, AO, light, outlines, roof finish, base, windows and door.")
+            .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
             .arg(BuildingComposer::roofName(spec_.roof_style))
