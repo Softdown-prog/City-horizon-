@@ -1,0 +1,860 @@
+Claro. Eu transformaria isso numa diretriz oficial de estilo visual do City Horizon, para servir como contrato de arte e também como referência para Codex, Building Composer e futuros assets.
+
+Diretriz Oficial de Estilo Visual — City Horizon
+
+1. Objetivo visual
+
+O City Horizon deve buscar uma estética inspirada nos Tycoons clássicos do final dos anos 1990 e início dos anos 2000, especialmente na forma como esses jogos apresentam construções, terreno, vegetação, caminhos e elementos decorativos dentro de uma cena isométrica coerente.
+
+A intenção não é copiar assets, texturas ou construções específicas desses jogos.
+
+O objetivo é reproduzir os princípios visuais que tornam esse tipo de gráfico agradável:
+
+leitura rápida;
+
+riqueza de detalhes sem excesso;
+
+aspecto pintado/pré-renderizado;
+
+boa integração entre construção e terreno;
+
+materiais reconhecíveis;
+
+iluminação suave;
+
+silhuetas claras;
+
+coerência entre todos os elementos do mapa.
+
+
+O resultado desejado pode ser resumido como:
+
+> “Tycoon clássico com acabamento técnico moderno, mantendo charme artesanal e evitando aparência vetorial ou 3D genérica.”
+
+
+
+
+---
+
+2. Perspectiva e câmera
+
+Este ponto é obrigatório e não deve variar entre assets.
+
+O jogo usa:
+
+projeção isométrica ortográfica fixa;
+
+rotação horizontal de aproximadamente 45°;
+
+inclinação correspondente à isometria clássica, aproximadamente 35,264°;
+
+tiles em losango 2:1;
+
+ausência de perspectiva cônica;
+
+ausência de deformação por distância.
+
+
+Todos os elementos devem obedecer à mesma câmera:
+
+prédios;
+
+ruas;
+
+calçadas;
+
+árvores;
+
+cercas;
+
+objetos urbanos;
+
+decoração;
+
+infraestrutura;
+
+agricultura;
+
+portos;
+
+terreno.
+
+
+Um asset que pareça bom isoladamente, mas use câmera diferente, deve ser considerado incompatível.
+
+
+---
+
+3. Filosofia de detalhe
+
+O City Horizon não deve perseguir hiper-realismo.
+
+O nível ideal é detalhe médio com forte legibilidade.
+
+Um prédio deve continuar sendo reconhecível quando exibido em tamanho relativamente pequeno dentro do mapa.
+
+Priorizar:
+
+grandes volumes;
+
+silhueta;
+
+telhado;
+
+portas;
+
+janelas;
+
+molduras;
+
+base;
+
+elementos arquitetônicos característicos.
+
+
+Detalhes muito pequenos só devem existir quando contribuem visualmente após redução.
+
+Evitar:
+
+microtextura excessiva;
+
+ruído visual;
+
+ornamentos minúsculos;
+
+excesso de linhas;
+
+elementos que só funcionam em zoom extremo.
+
+
+A regra geral é:
+
+> Se o detalhe desaparece completamente no tamanho real de jogo, ele provavelmente não deveria dominar o asset.
+
+
+
+
+---
+
+4. Construções
+
+As construções devem parecer objetos físicos, não desenhos vetoriais planos.
+
+Cada edifício deve possuir leitura clara de:
+
+volume principal;
+
+base;
+
+paredes;
+
+cobertura;
+
+aberturas;
+
+elementos projetados;
+
+contatos entre materiais.
+
+
+É desejável haver pequenas diferenças de profundidade entre:
+
+parede e janela;
+
+parede e porta;
+
+parede e rodapé;
+
+telhado e parede;
+
+moldura e abertura;
+
+cobertura e fascia.
+
+
+Essas diferenças devem ser discretas.
+
+A microgeometria deve reforçar a construção sem transformar o prédio em uma coleção de relevos.
+
+
+---
+
+5. Telhados
+
+O telhado é um dos elementos mais importantes para a leitura isométrica.
+
+Deve possuir:
+
+massa visual clara;
+
+inclinação facilmente reconhecível;
+
+material coerente;
+
+cumeeira legível;
+
+beiral bem definido;
+
+fascia;
+
+junções estruturais;
+
+terminação limpa das telhas.
+
+
+Evitar telhados que pareçam simplesmente um polígono preenchido.
+
+Telhados cerâmicos, por exemplo, podem utilizar:
+
+fileiras discretas;
+
+divisões de peças;
+
+variação de tonalidade;
+
+sombra entre planos;
+
+acabamento da cumeeira.
+
+
+Mas sem exagerar na quantidade de linhas.
+
+
+---
+
+6. Paredes
+
+Paredes não devem utilizar uma cor completamente uniforme.
+
+Mesmo materiais simples precisam de variação muito sutil.
+
+Exemplos:
+
+Reboco
+
+pequenas mudanças de tonalidade;
+
+imperfeições suaves;
+
+manchas quase imperceptíveis;
+
+ausência de ruído agressivo.
+
+
+Tijolo
+
+padrão reconhecível;
+
+juntas discretas;
+
+variação moderada entre peças.
+
+
+Concreto
+
+superfície levemente irregular;
+
+pequenas diferenças de luminosidade.
+
+
+Madeira
+
+sentido dos veios coerente com a construção;
+
+juntas estruturais legíveis.
+
+
+O material deve ser percebido antes do padrão.
+
+
+---
+
+7. Iluminação
+
+A iluminação deve ser globalmente consistente.
+
+O jogo deve utilizar uma direção de luz fixa para todos os assets.
+
+A luz não precisa ser fisicamente perfeita; precisa ser visualmente coerente.
+
+Características desejadas:
+
+iluminação suave;
+
+contraste moderado;
+
+sombras não completamente pretas;
+
+faces voltadas para a luz ligeiramente mais claras;
+
+faces opostas um pouco mais escuras;
+
+diferenças perceptíveis, mas não dramáticas.
+
+
+Evitar:
+
+highlights brilhantes demais;
+
+sombras extremamente duras;
+
+iluminação cinematográfica;
+
+HDR exagerado.
+
+
+O objetivo é que a construção pareça pertencer ao mapa, e não estar sendo fotografada separadamente.
+
+
+---
+
+8. Ambient Occlusion e contatos
+
+AO deve ser usado principalmente para comunicar contato e profundidade.
+
+Aplicações importantes:
+
+telhado contra parede;
+
+beiral contra parede;
+
+base contra chão;
+
+janela contra parede;
+
+porta contra parede;
+
+molduras;
+
+junções estruturais;
+
+encontros entre grandes volumes.
+
+
+AO deve ser:
+
+curto;
+
+suave;
+
+localizado;
+
+mais forte próximo da junção;
+
+rapidamente dissipado.
+
+
+Evitar faixas escuras longas que pareçam pintadas na superfície.
+
+
+---
+
+9. Sombras projetadas
+
+As sombras externas devem:
+
+seguir a mesma direção global;
+
+ter bordas relativamente suaves;
+
+possuir transparência;
+
+reforçar a posição do objeto sobre o terreno.
+
+
+Não usar preto puro.
+
+As sombras também devem respeitar escala.
+
+Uma árvore, um prédio pequeno e um edifício alto não devem produzir sombras visualmente idênticas.
+
+
+---
+
+10. Paleta de cores
+
+A paleta deve ser rica, porém levemente controlada.
+
+O visual clássico dos Tycoons funciona muito bem porque utiliza cores identificáveis, mas raramente extremamente saturadas em todas as superfícies.
+
+Direção recomendada:
+
+verdes naturais;
+
+tons terrosos;
+
+concreto moderadamente quente;
+
+telhados com cores fortes mas não neon;
+
+madeira quente;
+
+metais menos saturados;
+
+água e vidro com tons frios moderados.
+
+
+Elementos de gameplay podem possuir cores mais evidentes.
+
+Exemplo:
+
+placas;
+
+ícones;
+
+toldos;
+
+sinalização;
+
+objetos interativos.
+
+
+Assim o ambiente continua natural enquanto elementos importantes permanecem legíveis.
+
+
+---
+
+11. Textura e aparência pintada
+
+Um dos objetivos centrais é evitar a aparência de:
+
+vetor puro;
+
+desenho geométrico excessivamente limpo;
+
+material procedural genérico;
+
+3D plástico.
+
+
+As superfícies devem possuir uma pequena quantidade de irregularidade.
+
+Porém:
+
+> “Pintado” não significa borrado.
+
+
+
+As bordas estruturais precisam continuar limpas.
+
+A textura deve existir dentro do material, enquanto a silhueta permanece clara.
+
+
+---
+
+12. Bordas e outlines
+
+Não utilizar outline preto grosso ao redor de todos os objetos.
+
+As bordas podem ser definidas por:
+
+contraste;
+
+sombra;
+
+AO;
+
+diferenças de material;
+
+linhas estruturais discretas.
+
+
+Quando uma linha for necessária, utilizar cor derivada do próprio material ou um tom escuro neutro.
+
+Exemplo:
+
+telhado vermelho → borda vinho/marrom escuro.
+
+Não:
+
+telhado vermelho → contorno preto cartoon.
+
+
+---
+
+13. Vegetação
+
+Árvores, arbustos e flores são fundamentais para reproduzir o aspecto rico dos Tycoons clássicos.
+
+A vegetação deve possuir:
+
+silhueta irregular;
+
+variação de altura;
+
+agrupamento de folhas;
+
+pequenas diferenças de cor;
+
+sombras;
+
+troncos legíveis quando necessário.
+
+
+Evitar árvores extremamente simétricas.
+
+Dentro de uma mesma espécie, permitir pequenas variações.
+
+O cenário deve possuir densidade suficiente para parecer vivo, mas sem esconder completamente construções e caminhos.
+
+
+---
+
+14. Terreno
+
+O terreno não deve parecer uma malha de quadrados repetidos.
+
+Mesmo quando tecnicamente baseado em tiles, visualmente deve buscar continuidade.
+
+Priorizar:
+
+textura com variação;
+
+transições suaves;
+
+pequenas mudanças de tonalidade;
+
+bordas naturais;
+
+integração entre grama, terra, areia, pedra e água.
+
+
+Repetição evidente é um problema visual prioritário.
+
+O jogador não deve identificar facilmente:
+
+> “aqui termina exatamente um tile e começa o seguinte”.
+
+
+
+
+---
+
+15. Ruas e calçadas
+
+Ruas e calçadas fazem parte da linguagem visual da construção.
+
+Prédios não devem parecer pousados arbitrariamente em uma área verde.
+
+Deve existir integração clara entre:
+
+lote;
+
+calçada;
+
+entrada;
+
+rua;
+
+estacionamento;
+
+jardim;
+
+área de serviço.
+
+
+No City Horizon, sempre que possível, construções urbanas devem se conectar visualmente à calçada.
+
+Evitar faixas de grama involuntárias entre fachada e rua.
+
+
+---
+
+16. Cercas, postes e props
+
+Props são essenciais para quebrar a sensação de mapa vazio.
+
+Exemplos:
+
+bancos;
+
+lixeiras;
+
+luminárias;
+
+placas;
+
+caixas elétricas;
+
+hidrantes;
+
+vasos;
+
+floreiras;
+
+cercas;
+
+muros;
+
+sinalização;
+
+pequenas estruturas técnicas.
+
+
+Esses elementos devem possuir menos contraste que o prédio principal.
+
+Eles complementam a cena; não disputam atenção com ela.
+
+
+---
+
+17. Escala
+
+A escala visual deve permanecer consistente mesmo quando não for arquitetonicamente perfeita.
+
+O jogador precisa acreditar que:
+
+uma porta cabe uma pessoa;
+
+uma árvore possui altura plausível;
+
+uma rua comporta veículos;
+
+uma calçada possui largura plausível;
+
+um banco possui proporção correta;
+
+uma janela pertence àquele tipo de prédio.
+
+
+É melhor usar uma escala levemente estilizada e consistente do que uma escala realista, porém inconsistente.
+
+
+---
+
+18. Integração do asset com o mapa
+
+Nenhum asset deve ser aprovado somente olhando para PNG transparente.
+
+Todo asset importante deve ser testado:
+
+sobre grama;
+
+ao lado de uma rua;
+
+junto de calçada;
+
+próximo de árvores;
+
+ao lado de outro prédio.
+
+
+Pergunta obrigatória:
+
+> “Ele parece fazer parte do mesmo jogo?”
+
+
+
+Se a resposta for não, o asset ainda não está pronto.
+
+
+---
+
+19. Resolução e nitidez
+
+Os assets podem ser renderizados em resolução maior e reduzidos para o tamanho final.
+
+Esse processo ajuda a criar:
+
+antialiasing;
+
+bordas suaves;
+
+acabamento semelhante a arte pré-renderizada.
+
+
+Porém a redução não deve destruir:
+
+janelas;
+
+portas;
+
+cumeeiras;
+
+bordas;
+
+pequenos elementos estruturais.
+
+
+O tamanho de produção deve ser escolhido pensando sempre no tamanho final exibido dentro do jogo.
+
+
+---
+
+20. Transparência
+
+Todos os assets finais devem ser exportados como:
+
+PNG RGBA
+
+O fundo deve ser realmente transparente.
+
+Não aceitar:
+
+halo claro;
+
+halo escuro;
+
+borda contaminada;
+
+matte branco;
+
+pixels de fundo presos à silhueta.
+
+
+Assets devem ser testados sobre:
+
+fundo claro;
+
+fundo escuro;
+
+grama;
+
+asfalto.
+
+
+
+---
+
+21. O que evitar
+
+O City Horizon não deve caminhar para:
+
+pixel art;
+
+cartoon exagerado;
+
+low-poly visível;
+
+hiper-realismo;
+
+render PBR moderno;
+
+vetor excessivamente limpo;
+
+outlines grossos;
+
+saturação extrema;
+
+assets gerados com perspectivas diferentes;
+
+detalhes minúsculos demais;
+
+texturas fotográficas cruas;
+
+iluminação diferente entre objetos.
+
+
+
+---
+
+22. Regra de consistência
+
+A consistência é mais importante que a complexidade individual.
+
+Um prédio tecnicamente simples que combine com o restante do jogo é preferível a um prédio espetacular que pareça pertencer a outro jogo.
+
+Sempre priorizar:
+
+coerência > quantidade de detalhe
+
+e
+
+legibilidade > realismo
+
+
+---
+
+23. Referência de qualidade
+
+As referências de Tycoons clássicos devem ser utilizadas para avaliar:
+
+densidade visual;
+
+legibilidade;
+
+riqueza ambiental;
+
+proporção de detalhe;
+
+integração entre elementos;
+
+composição;
+
+sensação artesanal.
+
+
+Não devem ser utilizadas para copiar:
+
+edifícios;
+
+texturas;
+
+personagens;
+
+interface;
+
+mapas;
+
+assets proprietários.
+
+
+
+---
+
+24. Gate visual obrigatório
+
+Antes de um asset ser considerado pronto, ele deve passar por estas perguntas:
+
+A perspectiva está correta?
+
+A escala está coerente?
+
+A silhueta é fácil de entender?
+
+Os materiais são reconhecíveis?
+
+A iluminação combina com os demais assets?
+
+Existe profundidade suficiente?
+
+O asset ainda funciona no tamanho real do jogo?
+
+Existem halos?
+
+O nível de detalhe está equilibrado?
+
+Ele se integra ao terreno?
+
+Parece um asset do City Horizon?
+
+
+Se qualquer resposta importante for “não”, o asset deve voltar para refinamento.
+
+
+---
+
+25. Meta final
+
+O City Horizon deve transmitir a sensação de um city builder clássico cuidadosamente ilustrado:
+
+vivo, legível, detalhado e acolhedor, sem depender de tecnologia gráfica moderna para impressionar.
+
+O jogador deve olhar para o mapa e sentir que cada construção pertence naturalmente ao mesmo mundo.
+
+A estética final deve possuir o charme visual dos Tycoons clássicos, mas com:
+
+maior consistência;
+
+melhor resolução;
+
+melhor antialiasing;
+
+pipeline procedural;
+
+materiais mais controlados;
+
+integração técnica moderna.
+
+
+Esse deve ser o contrato visual oficial do projeto daqui para frente.
