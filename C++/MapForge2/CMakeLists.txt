@@ -24,8 +24,6 @@ FetchContent_MakeAvailable(SDL3)
 
 get_filename_component(CH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
-# Canonical game-side state required by ch_render.  This standalone Studio
-# build compiles the same source files instead of introducing Qt copies.
 add_library(mapforge2_canonical STATIC
     ${CH_ROOT}/src/ch_core/projection.cpp
     ${CH_ROOT}/src/ch_core/map_document.cpp
@@ -37,7 +35,6 @@ add_library(mapforge2_canonical STATIC
 )
 target_include_directories(mapforge2_canonical PUBLIC ${CH_ROOT})
 
-# Canonical City Horizon renderer.  Qt never reimplements game artwork.
 add_library(mapforge2_render STATIC
     ${CH_ROOT}/src/ch_render/map_renderer.cpp
     ${CH_ROOT}/src/ch_render/semantic_renderer.cpp
@@ -53,8 +50,6 @@ add_library(mapforge2_render STATIC
 target_include_directories(mapforge2_render PUBLIC ${CH_ROOT})
 target_link_libraries(mapforge2_render PUBLIC mapforge2_canonical SDL3::SDL3)
 
-# Qt-independent first layer of the future City Horizon Studio.
-# C++ defines stable capabilities/contracts; the Qt editor is only a visual client.
 add_library(mapforge2_studio_core STATIC
     src/studio_content.cpp
 )
@@ -62,10 +57,9 @@ target_include_directories(mapforge2_studio_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Deterministic parametric building source -> bitmap output. This is intentionally
-# separate from the map renderer so CI and future automation can invoke it directly.
 add_library(mapforge2_asset_composer STATIC
     src/building_composer.cpp
+    src/building_roof_editor_renderer.cpp
 )
 target_include_directories(mapforge2_asset_composer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -102,8 +96,6 @@ add_executable(MapForge2 WIN32
 )
 target_link_libraries(MapForge2 PRIVATE mapforge2_editor Qt6::Widgets)
 
-# Headless/offscreen visual gate used by GitHub Actions. It exercises the same
-# BuildingComposer implementation that the Studio widget uses.
 add_executable(MapForge2ComposerPreview
     src/composer_preview_main.cpp
 )
@@ -127,8 +119,6 @@ else()
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# A compiled Studio artifact must carry the exact assets consumed by ch_render.
-# Keeping them next to the executable also makes the IDE working directory irrelevant.
 add_custom_command(TARGET MapForge2 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CH_ROOT}/assets"
