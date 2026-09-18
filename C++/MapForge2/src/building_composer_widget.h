@@ -35,6 +35,10 @@ private:
     QComboBox* material_scale_combo_ = nullptr;
     QSlider* wall_height_slider_ = nullptr;
     QSlider* roof_height_slider_ = nullptr;
+    QSlider* roof_pitch_slider_ = nullptr;
+    QSlider* roof_overhang_slider_ = nullptr;
+    QSlider* roof_fascia_slider_ = nullptr;
+    QSlider* roof_ridge_slider_ = nullptr;
     QSlider* material_strength_slider_ = nullptr;
     QSlider* material_variation_slider_ = nullptr;
     QSlider* material_contrast_slider_ = nullptr;
@@ -45,6 +49,8 @@ private:
     QCheckBox* sign_check_ = nullptr;
     QCheckBox* chimney_check_ = nullptr;
     QCheckBox* shadow_check_ = nullptr;
+    QCheckBox* roof_fascia_check_ = nullptr;
+    QCheckBox* roof_ridge_check_ = nullptr;
     QLabel* preview_ = nullptr;
     QLabel* summary_ = nullptr;
 };
