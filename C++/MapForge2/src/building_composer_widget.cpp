@@ -1,10 +1,12 @@
 #include "building_composer_widget.h"
+#include "building_export_pipeline.h"
 #include "building_roof_editor_renderer.h"
 
 #include "src/ch_core/contracts.h"
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFont>
@@ -115,48 +117,49 @@ void drawStreetContext(QPainter& painter, const BuildingComposerSpec& spec,
 
     const float half_w = static_cast<float>(std::max(1, spec.footprint_width_tiles)) * 0.5F;
     const float half_d = static_cast<float>(std::max(1, spec.footprint_depth_tiles)) * 0.5F;
-    const float street_half_width = std::max(half_w + 0.55F, 1.65F);
+    const float sidewalk_margin = std::clamp(spec.sidewalk_lateral_margin_tiles, 0.0F, 2.0F);
+    const float sidewalk_depth = std::clamp(spec.sidewalk_depth_tiles, 0.0F, 1.0F);
+    const float street_half_width = std::max(half_w + sidewalk_margin, 1.65F);
 
-    // The logical south edge is the authored entrance frontage. The sidewalk
-    // touches the footprint directly so the preview exposes accidental grass gaps.
+    // Logical south remains the authored frontage in this preview. The actual
+    // road socket edge is exported as logical metadata and rotates with placement.
     const float sidewalk_y0 = half_d;
-    const float sidewalk_y1 = half_d + 0.30F;
-    const QPolygonF sidewalk = previewQuad(-street_half_width, sidewalk_y0,
-                                           street_half_width, sidewalk_y1,
-                                           view, canvas);
-    painter.setPen(QPen(QColor("#77766f"), 0.85));
-    painter.setBrush(QColor("#b7b3aa"));
-    painter.drawPolygon(sidewalk);
+    const float sidewalk_y1 = half_d + (spec.sidewalk_enabled ? sidewalk_depth : 0.0F);
+    if (spec.sidewalk_enabled && sidewalk_depth > 0.001F) {
+        const QPolygonF sidewalk = previewQuad(-street_half_width, sidewalk_y0,
+                                               street_half_width, sidewalk_y1,
+                                               view, canvas);
+        painter.setPen(QPen(QColor("#77766f"), 0.85));
+        painter.setBrush(QColor("#b7b3aa"));
+        painter.drawPolygon(sidewalk);
 
-    // Inner paving joints keep the sidewalk readable at gameplay scale without
-    // turning the context into a competing asset.
-    painter.setPen(QPen(QColor(133, 131, 124, 150), 0.55));
-    for (float x = -street_half_width + 0.45F; x < street_half_width; x += 0.45F) {
-        painter.drawLine(projectPreviewPoint({x, sidewalk_y0}, view, canvas),
-                         projectPreviewPoint({x, sidewalk_y1}, view, canvas));
+        painter.setPen(QPen(QColor(133, 131, 124, 150), 0.55));
+        for (float x = -street_half_width + 0.45F; x < street_half_width; x += 0.45F) {
+            painter.drawLine(projectPreviewPoint({x, sidewalk_y0}, view, canvas),
+                             projectPreviewPoint({x, sidewalk_y1}, view, canvas));
+        }
     }
 
-    const float road_y0 = sidewalk_y1;
-    const float road_y1 = sidewalk_y1 + 0.82F;
-    const QPolygonF road = previewQuad(-street_half_width - 0.25F, road_y0,
-                                       street_half_width + 0.25F, road_y1,
-                                       view, canvas);
-    painter.setPen(QPen(QColor("#343a3d"), 1.0));
-    painter.setBrush(QColor("#4a5052"));
-    painter.drawPolygon(road);
+    if (spec.road_socket_enabled) {
+        const float road_y0 = sidewalk_y1;
+        const float road_y1 = sidewalk_y1 + 0.82F;
+        const QPolygonF road = previewQuad(-street_half_width - 0.25F, road_y0,
+                                           street_half_width + 0.25F, road_y1,
+                                           view, canvas);
+        painter.setPen(QPen(QColor("#343a3d"), 1.0));
+        painter.setBrush(QColor("#4a5052"));
+        painter.drawPolygon(road);
 
-    // Curb contact and a restrained center marking make road orientation obvious.
-    painter.setPen(QPen(QColor("#d0cbc0"), 1.0));
-    painter.drawLine(projectPreviewPoint({-street_half_width, road_y0}, view, canvas),
-                     projectPreviewPoint({street_half_width, road_y0}, view, canvas));
+        painter.setPen(QPen(QColor("#d0cbc0"), 1.0));
+        painter.drawLine(projectPreviewPoint({-street_half_width, road_y0}, view, canvas),
+                         projectPreviewPoint({street_half_width, road_y0}, view, canvas));
 
-    const float lane_y = road_y0 + (road_y1 - road_y0) * 0.54F;
-    painter.setPen(QPen(QColor(211, 198, 143, 178), 0.9, Qt::DashLine));
-    painter.drawLine(projectPreviewPoint({-street_half_width + 0.25F, lane_y}, view, canvas),
-                     projectPreviewPoint({street_half_width - 0.25F, lane_y}, view, canvas));
+        const float lane_y = road_y0 + (road_y1 - road_y0) * 0.54F;
+        painter.setPen(QPen(QColor(211, 198, 143, 178), 0.9, Qt::DashLine));
+        painter.drawLine(projectPreviewPoint({-street_half_width + 0.25F, lane_y}, view, canvas),
+                         projectPreviewPoint({street_half_width - 0.25F, lane_y}, view, canvas));
+    }
 
-    // A thin lot contact line makes it easy to see whether the building base and
-    // sidewalk meet correctly; it is preview-only and never enters exported PNGs.
     painter.setPen(QPen(QColor(238, 227, 199, 150), 0.65));
     painter.drawLine(projectPreviewPoint({-half_w, half_d}, view, canvas),
                      projectPreviewPoint({half_w, half_d}, view, canvas));
@@ -373,7 +376,9 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     root->addWidget(summary_);
 
     auto* buttons = new QHBoxLayout();
-    auto* export_button = new QPushButton("Export 4-view PNG + Manifest…", this);
+    auto* export_button = new QPushButton("Auto Export Validated Package…", this);
+    export_button->setToolTip(
+        "Exports individual RGBA views, 4-view sheet, review, thumbnail, manifest and validation report. Invalid footprint/halo blocks production output.");
     buttons->addWidget(export_button);
     buttons->addStretch(1);
     root->addLayout(buttons);
@@ -577,11 +582,12 @@ void BuildingComposerWidget::refreshPreview() {
     if (spec_.south_sign) modules << BuildingComposer::signModuleId(spec_.sign_module);
     if (spec_.roof_chimney) modules << BuildingComposer::chimneyModuleId(spec_.chimney_module);
     const QString module_text = modules.isEmpty() ? QStringLiteral("none") : modules.join(", ");
+    const QSize export_frame = BuildingExportPipeline::recommendedFrame(spec_);
 
     summary_->setText(
         QString("%1 — %2×%3, %4 roof. Pitch %5°, overhang %6, fascia %7px, ridge %8x. "
                 "Walls: %9. Roof material: %10. Material %11% / variation %12% / contrast %13%. "
-                "Modules: %14. Preview context: %15.")
+                "Modules: %14. Preview context: %15. Auto-export frame: %16×%17.")
             .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
@@ -597,55 +603,35 @@ void BuildingComposerWidget::refreshPreview() {
             .arg(static_cast<int>(spec_.material_contrast * 100.0F))
             .arg(module_text)
             .arg(context_enabled ? QStringLiteral("terrain + integrated sidewalk + road frontage")
-                                 : QStringLiteral("asset only")));
+                                 : QStringLiteral("asset only"))
+            .arg(export_frame.width())
+            .arg(export_frame.height()));
 }
 
 void BuildingComposerWidget::exportAsset() {
-    const QString path = QFileDialog::getSaveFileName(
+    const QString output_dir = QFileDialog::getExistingDirectory(
         this,
-        "Export Building Composer sprite sheet",
-        "building_composer_4view.png",
-        "PNG image (*.png)");
-    if (path.isEmpty()) return;
+        "Auto Export Validated Building Package",
+        QString());
+    if (output_dir.isEmpty()) return;
 
-    const QSize frame(320, 280);
-    // Environment context is intentionally preview-only. Runtime/export assets
-    // remain clean transparent PNGs and retain the canonical ground anchor.
-    const QImage sheet = BuildingRoofEditorRenderer::renderSpriteSheet(spec_, frame);
-    if (!sheet.save(path, "PNG")) {
-        summary_->setText("EXPORT ERROR: Could not write PNG.");
+    QString stem;
+    QString error;
+    BuildingExportValidation validation;
+    const bool exported = BuildingExportPipeline::exportPackage(
+        spec_, output_dir, &stem, &validation, &error);
+
+    const QString validation_path = QDir(output_dir).filePath(stem + QStringLiteral("_validation.json"));
+    if (!exported) {
+        summary_->setText(
+            QStringLiteral("EXPORT BLOCKED: %1. Validation report: %2")
+                .arg(error, validation_path));
         return;
     }
 
-    QString manifest_path = path;
-    if (manifest_path.endsWith(".png", Qt::CaseInsensitive)) manifest_path.chop(4);
-    manifest_path += ".json";
-
-    QFile manifest_file(manifest_path);
-    if (!manifest_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        summary_->setText("PNG exported, but manifest could not be written: " + manifest_path);
-        return;
-    }
-
-    QJsonObject manifest = BuildingComposer::manifest(spec_, frame);
-    QJsonObject geometry = manifest.value(QStringLiteral("geometry")).toObject();
-    geometry.insert(QStringLiteral("roofStyle"), BuildingRoofEditorRenderer::roofProfileName(spec_.roof_style));
-    manifest.insert(QStringLiteral("geometry"), geometry);
-    manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec_));
-    manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec_));
-    manifest.insert(QStringLiteral("previewContext"), QJsonObject{
-        {"version", QStringLiteral("environment_preview_1")},
-        {"exportedIntoSprite", false},
-        {"terrain", QStringLiteral("grass_reference")},
-        {"sidewalk", QStringLiteral("integrated_frontage")},
-        {"road", QStringLiteral("south_frontage")},
-        {"targetPlatform", QStringLiteral("windows_pc")},
-    });
-    manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
-    manifest_file.close();
-
-    summary_->setText("EXPORTED: " + path + " + " + manifest_path +
-                      " / transparent building asset; environment context remains preview-only");
+    summary_->setText(
+        QStringLiteral("AUTO EXPORTED: %1/%2_* — %3. Package includes SOUTH/EAST/WEST/NORTH RGBA PNGs, 4-view sheet, review sheet, thumbnail, manifest and validation report. Environment preview remains excluded.")
+            .arg(output_dir, stem, validation.summary()));
 }
 
 } // namespace ch::studio
