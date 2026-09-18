@@ -634,19 +634,58 @@ void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
     const float half = 0.12F;
     const float t0 = std::clamp(center - half, 0.05F, 0.80F);
     const float t1 = std::clamp(center + half, 0.20F, 0.95F);
-    const float frame_inset = 0.014F;
-    const float frame_z0 = 0.5F;
-    const float frame_z1 = wall_h * 0.585F;
+    const float opening_t = 0.016F;
+    const float frame_t = 0.013F;
+    const float opening_z0 = 0.45F;
+    const float opening_z1 = wall_h * 0.595F;
+    const float frame_z0 = 0.75F;
+    const float frame_z1 = wall_h * 0.575F;
+    const float leaf_t0 = t0 + opening_t + frame_t;
+    const float leaf_t1 = t1 - opening_t - frame_t;
+    const float leaf_z0 = 1.15F;
+    const float leaf_z1 = wall_h * 0.545F;
 
-    drawFaceDetail(painter, a, b, t0 - frame_inset, t1 + frame_inset,
-                   frame_z0, frame_z1,
-                   view, canvas, scaledColor(spec.trim_color, 0.88F), scaledColor(spec.trim_color, 0.58F));
-    drawFaceDetail(painter, a, b, t0, t1, 1.0F, wall_h * 0.56F,
-                   view, canvas, spec.door_color, scaledColor(spec.door_color, 0.62F));
+    const QColor recess = scaledColor(spec.wall_color, 0.43F);
+    const QColor recess_outline = scaledColor(spec.wall_color, 0.34F);
+    const QColor frame = scaledColor(spec.trim_color, 0.86F);
+    const QColor frame_outline = scaledColor(spec.trim_color, 0.52F);
 
-    painter.setPen(QPen(scaledColor(spec.trim_color, 0.55F), kStructuralOutlineWidth, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(projectPoint(lerpPoint(a, b, t0 - frame_inset, 0.5F), view, canvas),
-                     projectPoint(lerpPoint(a, b, t1 + frame_inset, 0.5F), view, canvas));
+    drawFaceDetail(painter, a, b, t0, t1, opening_z0, opening_z1,
+                   view, canvas, recess, recess_outline);
+    drawFaceDetail(painter, a, b, t0 + opening_t, t1 - opening_t, frame_z0, frame_z1,
+                   view, canvas, frame, frame_outline);
+    drawFaceDetail(painter, a, b, leaf_t0, leaf_t1, leaf_z0, leaf_z1,
+                   view, canvas, scaledColor(spec.door_color, 0.90F), scaledColor(spec.door_color, 0.52F));
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    const float shadow_t = std::min((leaf_t1 - leaf_t0) * 0.08F, 0.008F);
+    const float shadow_z = wall_h * 0.014F;
+    const QPolygonF top_reveal_shadow = {
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z1 - shadow_z), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t1, leaf_z1 - shadow_z), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t1, leaf_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z1), view, canvas),
+    };
+    painter.setBrush(alphaColor(scaledColor(spec.wall_color, 0.30F), 112));
+    painter.drawPolygon(top_reveal_shadow);
+
+    const QPolygonF side_reveal_shadow = {
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t0 + shadow_t, leaf_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t0 + shadow_t, leaf_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z1), view, canvas),
+    };
+    painter.setBrush(alphaColor(scaledColor(spec.wall_color, 0.38F), 78));
+    painter.drawPolygon(side_reveal_shadow);
+    painter.restore();
+
+    const float threshold_t = 0.008F;
+    drawFaceDetail(painter, a, b, t0 - threshold_t, t1 + threshold_t,
+                   0.28F, 1.35F,
+                   view, canvas,
+                   scaledColor(spec.trim_color, 0.78F),
+                   scaledColor(spec.trim_color, 0.48F));
 
     if (spec.south_sign) {
         const float sign_half = 0.15F;
