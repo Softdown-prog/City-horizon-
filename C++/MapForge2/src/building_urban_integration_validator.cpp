@@ -41,6 +41,12 @@ bool intervalsOverlap(const float a0, const float a1, const float b0, const floa
     return std::max(a0, b0) <= std::min(a1, b1);
 }
 
+bool intervalsConnectThroughSidewalk(const float a0, const float a1,
+                                     const float b0, const float b1) {
+    constexpr float kAccessAlignmentTolerance = 0.12F;
+    return intervalsOverlap(a0, a1, b0 - kAccessAlignmentTolerance, b1 + kAccessAlignmentTolerance);
+}
+
 QJsonArray stringArray(const QStringList& values) {
     QJsonArray result;
     for (const QString& value : values) result.append(value);
@@ -99,7 +105,7 @@ BuildingUrbanIntegrationValidation BuildingUrbanIntegrationValidator::validate(c
                     continue;
                 const float module_min = module.position - module.width * 0.5F;
                 const float module_max = module.position + module.width * 0.5F;
-                if (intervalsOverlap(module_min, module_max, socket_min, socket_max)) {
+                if (intervalsConnectThroughSidewalk(module_min, module_max, socket_min, socket_max)) {
                     access_found = true;
                     break;
                 }
@@ -110,7 +116,7 @@ BuildingUrbanIntegrationValidation BuildingUrbanIntegrationValidator::validate(c
     }
     result.access_alignment_valid = access_found;
     if (!result.access_alignment_valid)
-        result.issues << QStringLiteral("ground-floor entrance/garage must overlap the road socket on the same facade");
+        result.issues << QStringLiteral("ground-floor entrance/garage must align with the road socket on the same facade");
 
     bool facade_clearance = true;
     float largest_projection = 0.0F;
@@ -150,6 +156,7 @@ BuildingUrbanIntegrationValidation BuildingUrbanIntegrationValidator::validate(c
         {"socketWidthTiles", static_cast<double>(socket_width)},
         {"socketNormalizedMin", static_cast<double>(socket_min)},
         {"socketNormalizedMax", static_cast<double>(socket_max)},
+        {"accessAlignmentToleranceNormalized", 0.12},
         {"sidewalkDepthTiles", static_cast<double>(spec.sidewalk_depth_tiles)},
         {"largestGroundProjectionTiles", static_cast<double>(largest_projection)},
         {"allowedGroundProjectionTiles", static_cast<double>(allowed_ground_projection)},
