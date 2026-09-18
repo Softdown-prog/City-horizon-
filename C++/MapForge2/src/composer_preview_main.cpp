@@ -1,4 +1,5 @@
 #include "building_composer.h"
+#include "building_roof_editor_renderer.h"
 
 #include <QDir>
 #include <QFile>
@@ -17,11 +18,11 @@ bool writeAsset(const QString& output_dir, const QString& stem,
     const QString sheet_path = QDir(output_dir).filePath(stem + "_4view.png");
     const QString manifest_path = QDir(output_dir).filePath(stem + "_manifest.json");
 
-    if (!ch::studio::BuildingComposer::renderReviewSheet(spec, QSize(300, 250)).save(review_path, "PNG")) {
+    if (!ch::studio::BuildingRoofEditorRenderer::renderReviewSheet(spec, QSize(300, 250)).save(review_path, "PNG")) {
         std::cerr << "Unable to save review image.\n";
         return false;
     }
-    if (!ch::studio::BuildingComposer::renderSpriteSheet(spec, frame).save(sheet_path, "PNG")) {
+    if (!ch::studio::BuildingRoofEditorRenderer::renderSpriteSheet(spec, frame).save(sheet_path, "PNG")) {
         std::cerr << "Unable to save sprite sheet.\n";
         return false;
     }
@@ -31,7 +32,16 @@ bool writeAsset(const QString& output_dir, const QString& stem,
         std::cerr << "Unable to save manifest.\n";
         return false;
     }
-    manifest_file.write(QJsonDocument(ch::studio::BuildingComposer::manifest(spec, frame)).toJson(QJsonDocument::Indented));
+    QJsonObject manifest = ch::studio::BuildingComposer::manifest(spec, frame);
+    QJsonObject geometry = manifest.value(QStringLiteral("geometry")).toObject();
+    geometry.insert(QStringLiteral("roofStyle"),
+                    ch::studio::BuildingRoofEditorRenderer::roofProfileName(spec.roof_style));
+    manifest.insert(QStringLiteral("geometry"), geometry);
+    manifest.insert(QStringLiteral("architecturalModules"),
+                    ch::studio::BuildingComposer::architecturalModules(spec));
+    manifest.insert(QStringLiteral("roofEditor"),
+                    ch::studio::BuildingRoofEditorRenderer::roofEditorManifest(spec));
+    manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
     manifest_file.close();
 
     std::cout << review_path.toStdString() << "\n"
@@ -52,7 +62,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    ch::studio::BuildingComposerSpec residence;
+    ch::studio::BuildingComposerSpec residence =
+        ch::studio::BuildingComposer::presetSpec(ch::studio::BuildingVisualPreset::CityHorizonClassicTycoon);
     residence.footprint_width_tiles = 2;
     residence.footprint_depth_tiles = 1;
     residence.wall_height_px = 82;
@@ -112,8 +123,6 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_material_gate", material_gate)) return 5;
 
-    // Window gate: isolates facade aperture spacing, frame/glass readability and
-    // deterministic placement around an entrance without changing structure.
     ch::studio::BuildingComposerSpec window_gate = residence;
     window_gate.footprint_width_tiles = 2;
     window_gate.footprint_depth_tiles = 1;
@@ -137,8 +146,6 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_window_gate", window_gate)) return 6;
 
-    // Door gate: isolates the entrance frame, inset panel and depth cues. Windows,
-    // sign, awning and chimney are disabled so the entrance can be judged alone.
     ch::studio::BuildingComposerSpec door_gate = residence;
     door_gate.footprint_width_tiles = 2;
     door_gate.footprint_depth_tiles = 1;
@@ -160,8 +167,6 @@ int main(int argc, char** argv) {
 
     if (!writeAsset(output_dir, "building_composer_door_gate", door_gate)) return 7;
 
-    // Wall finish gate: isolates the plaster surface and face shading so the
-    // house's final wall language can be judged without apertures or add-ons.
     ch::studio::BuildingComposerSpec wall_gate = residence;
     wall_gate.footprint_width_tiles = 2;
     wall_gate.footprint_depth_tiles = 1;
@@ -180,6 +185,22 @@ int main(int argc, char** argv) {
     wall_gate.roof_chimney = false;
 
     if (!writeAsset(output_dir, "building_composer_wall_finish_gate", wall_gate)) return 8;
+
+    // Roof-editor gate: exercises a profile that did not exist in the original
+    // Composer plus the independent pitch/overhang/fascia/ridge controls.
+    ch::studio::BuildingComposerSpec roof_gate = residence;
+    roof_gate.footprint_width_tiles = 3;
+    roof_gate.footprint_depth_tiles = 2;
+    roof_gate.roof_style = ch::studio::BuildingRoofStyle::Mansard;
+    roof_gate.roof_height_px = 38;
+    roof_gate.roof_pitch_degrees = 42.0F;
+    roof_gate.roof_overhang = 0.14F;
+    roof_gate.roof_fascia_thickness_px = 3.2F;
+    roof_gate.roof_ridge_scale = 1.15F;
+    roof_gate.roof_chimney = true;
+    roof_gate.material_strength = 0.48F;
+
+    if (!writeAsset(output_dir, "building_composer_roof_editor_gate", roof_gate)) return 9;
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
