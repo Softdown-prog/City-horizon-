@@ -1,0 +1,71 @@
+{
+  "id": "automatic_export_validation_1",
+  "name": "Building Composer Automatic Export + Validation",
+  "targetPlatform": "windows_pc",
+  "gridContract": "CH_GRID_V1",
+  "tile": {
+    "width": 128,
+    "height": 64,
+    "projection": "isometric_2_to_1"
+  },
+  "framePolicy": {
+    "automaticByFootprint": true,
+    "minimumWidth": 320,
+    "minimumHeight": 280,
+    "roundToIncrementPx": 32,
+    "accountsFor": [
+      "footprint_width",
+      "footprint_depth",
+      "wall_height",
+      "roof_height",
+      "roof_pitch",
+      "roof_overhang"
+    ]
+  },
+  "validation": {
+    "blocking": true,
+    "footprintRangeTiles": {
+      "minimum": 1,
+      "maximum": 8
+    },
+    "checks": [
+      "declared_footprint_range",
+      "recommended_frame_fit",
+      "ground_anchor_contact",
+      "outer_frame_clipping",
+      "fully_transparent_rgb_contamination",
+      "extreme_low_alpha_white_or_black_fringe"
+    ],
+    "halo": {
+      "lowAlphaMaximum": 32,
+      "opaqueNeighbourMinimum": 96,
+      "channelDeltaThreshold": 92,
+      "suspiciousPixelTolerance": 12
+    },
+    "failureBehavior": {
+      "writeValidationJson": true,
+      "writeProductionPngs": false,
+      "writeProductionManifest": false
+    }
+  },
+  "package": {
+    "deterministicStem": "building_<width>x<depth>_<roof_profile>_seed<material_seed>",
+    "outputs": [
+      "<stem>_south.png",
+      "<stem>_east.png",
+      "<stem>_west.png",
+      "<stem>_north.png",
+      "<stem>_4view.png",
+      "<stem>_review.png",
+      "<stem>_thumb.png",
+      "<stem>_manifest.json",
+      "<stem>_validation.json"
+    ],
+    "png": {
+      "rgba": true,
+      "transparentBackground": true,
+      "environmentPreviewIncluded": false
+    }
+  },
+  "rule": "A production building package is accepted only after all four rendered orientations pass footprint/frame/anchor/halo validation. Preview terrain, sidewalk and road context never enter production PNG files."
+}
