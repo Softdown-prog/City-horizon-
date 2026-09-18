@@ -1,0 +1,56 @@
+{
+  "id": "architectural_modules_1",
+  "name": "City Horizon Architectural Module Library",
+  "status": "official",
+  "purpose": "Stable reusable architectural component recipes shared by Building Composer buildings.",
+  "rules": {
+    "stableIds": true,
+    "deterministic": true,
+    "socketDrivenPlacement": true,
+    "copyPerBuildingRecipes": false,
+    "visualPreset": "city_horizon_classic_tycoon"
+  },
+  "modules": [
+    {
+      "id": "window.classic_framed.v1",
+      "kind": "window",
+      "surface": "wall",
+      "placement": "facade_aperture",
+      "rendererRecipe": "drawWindowModule",
+      "features": ["recess", "frame", "glass", "inner_ao", "projecting_head", "jamb_returns", "two_step_sill", "drip_edge"]
+    },
+    {
+      "id": "door.classic_wood.v1",
+      "kind": "door",
+      "surface": "south_wall",
+      "placement": "entrance_socket",
+      "rendererRecipe": "drawSouthModules",
+      "features": ["recess", "frame", "wood_leaf", "inner_ao", "projecting_header", "jamb_surround", "two_level_threshold"]
+    },
+    {
+      "id": "awning.canvas_canopy.v1",
+      "kind": "awning",
+      "surface": "south_wall",
+      "placement": "entrance_child_socket",
+      "rendererRecipe": "drawSouthModules",
+      "features": ["projected_canopy", "accent_palette"]
+    },
+    {
+      "id": "sign.facade_plaque.v1",
+      "kind": "sign",
+      "surface": "south_wall",
+      "placement": "entrance_child_socket",
+      "rendererRecipe": "drawSouthModules",
+      "features": ["facade_plaque", "accent_palette"]
+    },
+    {
+      "id": "chimney.masonry_cap.v1",
+      "kind": "chimney",
+      "surface": "roof",
+      "placement": "roof_socket",
+      "rendererRecipe": "drawChimney",
+      "features": ["two_visible_faces", "top_cap", "view_rotation"]
+    }
+  ],
+  "expansionPolicy": "New doors, windows, shopfronts, awnings, signs, canopies, balconies, HVAC units, water tanks and planters must be added as new stable module IDs instead of duplicating per-building drawing code."
+}
