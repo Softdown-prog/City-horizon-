@@ -87,7 +87,10 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     form->addRow("Detail preset", detail_preset_combo_);
 
     wall_material_combo_ = new QComboBox(this);
-    wall_material_combo_->addItems({"Plaster", "Brick", "Concrete", "Timber", "Solid"});
+    wall_material_combo_->addItems({
+        "Plaster", "Brick", "Concrete", "Timber",
+        "Stone", "Metal panel", "Glass", "Solid"
+    });
     form->addRow("Wall material", wall_material_combo_);
 
     roof_material_combo_ = new QComboBox(this);
@@ -101,13 +104,25 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     material_strength_slider_ = new QSlider(Qt::Horizontal, this);
     material_strength_slider_->setRange(0, 100);
-    material_strength_slider_->setValue(45);
+    material_strength_slider_->setValue(static_cast<int>(spec_.material_strength * 100.0F));
     material_strength_slider_->setSingleStep(5);
-    form->addRow("Texture strength", material_strength_slider_);
+    form->addRow("Material intensity", material_strength_slider_);
+
+    material_variation_slider_ = new QSlider(Qt::Horizontal, this);
+    material_variation_slider_->setRange(0, 100);
+    material_variation_slider_->setValue(static_cast<int>(spec_.material_variation * 100.0F));
+    material_variation_slider_->setSingleStep(5);
+    form->addRow("Tone variation", material_variation_slider_);
+
+    material_contrast_slider_ = new QSlider(Qt::Horizontal, this);
+    material_contrast_slider_->setRange(0, 100);
+    material_contrast_slider_->setValue(static_cast<int>(spec_.material_contrast * 100.0F));
+    material_contrast_slider_->setSingleStep(5);
+    form->addRow("Material contrast", material_contrast_slider_);
 
     material_seed_spin_ = new QSpinBox(this);
     material_seed_spin_->setRange(0, 9999);
-    material_seed_spin_->setValue(17);
+    material_seed_spin_->setValue(spec_.material_seed);
     form->addRow("Material seed", material_seed_spin_);
 
     door_position_combo_ = new QComboBox(this);
@@ -185,6 +200,8 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     connect(roof_material_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(material_scale_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(material_strength_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(material_variation_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(material_contrast_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
     connect(material_seed_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [changed](int) { changed(); });
     connect(door_position_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(window_pattern_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
@@ -286,7 +303,10 @@ void BuildingComposerWidget::refreshSpecFromControls() {
         case 1: spec_.wall_material = BuildingWallMaterial::Brick; break;
         case 2: spec_.wall_material = BuildingWallMaterial::Concrete; break;
         case 3: spec_.wall_material = BuildingWallMaterial::Timber; break;
-        case 4: spec_.wall_material = BuildingWallMaterial::Solid; break;
+        case 4: spec_.wall_material = BuildingWallMaterial::Stone; break;
+        case 5: spec_.wall_material = BuildingWallMaterial::MetalPanel; break;
+        case 6: spec_.wall_material = BuildingWallMaterial::Glass; break;
+        case 7: spec_.wall_material = BuildingWallMaterial::Solid; break;
         default: spec_.wall_material = BuildingWallMaterial::Plaster; break;
     }
 
@@ -302,6 +322,10 @@ void BuildingComposerWidget::refreshSpecFromControls() {
     spec_.material_scale = texture_scale == 0 ? 0.72F : (texture_scale == 2 ? 1.45F : 1.0F);
     spec_.material_strength = material_strength_slider_ != nullptr
         ? static_cast<float>(material_strength_slider_->value()) / 100.0F : 0.45F;
+    spec_.material_variation = material_variation_slider_ != nullptr
+        ? static_cast<float>(material_variation_slider_->value()) / 100.0F : 0.35F;
+    spec_.material_contrast = material_contrast_slider_ != nullptr
+        ? static_cast<float>(material_contrast_slider_->value()) / 100.0F : 0.45F;
     spec_.material_seed = material_seed_spin_ != nullptr ? material_seed_spin_->value() : 17;
 
     spec_.windows = windows_check_ == nullptr || windows_check_->isChecked();
@@ -332,8 +356,8 @@ void BuildingComposerWidget::refreshPreview() {
 
     summary_->setText(
         QString("%1 / CH_BUILDING_COMPOSER_V0 — %2×%3 footprint, %4 roof. Walls: %5. Roof surface: %6. "
-                "Texture %7% / scale %8 / seed %9. Entrance: south/%10. Windows: %11. Modules: %12. "
-                "Classic Tycoon calibration is active for materials, AO, light, outlines, roof finish, base, windows and door.")
+                "Material intensity %7% / scale %8 / variation %9% / contrast %10% / seed %11. "
+                "Entrance: south/%12. Windows: %13. Modules: %14. Classic Tycoon calibration remains active.")
             .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
@@ -342,6 +366,8 @@ void BuildingComposerWidget::refreshPreview() {
             .arg(BuildingComposer::roofMaterialName(spec_.roof_material))
             .arg(static_cast<int>(spec_.material_strength * 100.0F))
             .arg(spec_.material_scale, 0, 'f', 2)
+            .arg(static_cast<int>(spec_.material_variation * 100.0F))
+            .arg(static_cast<int>(spec_.material_contrast * 100.0F))
             .arg(spec_.material_seed)
             .arg(BuildingComposer::doorPositionName(spec_.door_position))
             .arg(BuildingComposer::windowPatternName(spec_.window_pattern))
