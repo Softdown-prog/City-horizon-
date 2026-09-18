@@ -132,6 +132,25 @@ void drawFaceDetail(QPainter& painter, const Point3 a, const Point3 b, const flo
     drawOutlinedPolygon(painter, polygon, fill, outline);
 }
 
+void drawEaveAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spec,
+                              const Point3 a, const Point3 b, const float wall_h,
+                              const BuildingView view, const QSize canvas) {
+    constexpr float kAoDepth = 6.0F;
+    constexpr std::array<int, 5> kAoAlpha = {42, 30, 20, 12, 6};
+    const QColor ao_base = scaledColor(spec.wall_color, 0.55F);
+    const float band_height = kAoDepth / static_cast<float>(kAoAlpha.size());
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    for (int band = 0; band < static_cast<int>(kAoAlpha.size()); ++band) {
+        const float z1 = wall_h - static_cast<float>(band) * band_height;
+        const float z0 = wall_h - static_cast<float>(band + 1) * band_height;
+        painter.setBrush(alphaColor(ao_base, kAoAlpha[band]));
+        painter.drawPolygon(faceQuad(a, b, z0, z1, view, canvas));
+    }
+    painter.restore();
+}
+
 std::uint32_t hashMix(std::uint32_t value) {
     value ^= value >> 16U;
     value *= 0x7feb352dU;
@@ -690,6 +709,12 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
         drawOutlinedPolygon(painter, face.polygon, scaledColor(spec.wall_color, face.shade));
         const int next = (face.edge + 1) % 4;
         drawWallMaterial(painter, spec, corners[face.edge], corners[next], face.edge, wall_h, view, canvas);
+    }
+
+    for (const int edge : visible_edges) {
+        const int next = (edge + 1) % 4;
+        drawEaveAmbientOcclusion(
+            painter, spec, corners[edge], corners[next], wall_h, view, canvas);
     }
 
     const QColor wall_ground_contact = alphaColor(scaledColor(spec.wall_color, 0.50F), 115);
