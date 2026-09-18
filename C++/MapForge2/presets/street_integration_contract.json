@@ -1,7 +1,8 @@
 {
   "id": "city_horizon_street_integration",
   "version": "sidewalk_road_socket_1",
-  "validationVersion": "urban_integration_validation_1",
+  "validationVersion": "urban_integration_validation_2",
+  "footprintContract": "flexible_footprint_1",
   "targetPlatform": "windows_pc",
   "coordinateSpace": "logical_building_space",
   "rotationPolicy": "rotate_with_building",
@@ -10,10 +11,10 @@
     "defaultDepthTiles": 0.30,
     "defaultLateralMarginTiles": 0.55,
     "surfaceFamily": "concrete_01",
-    "mustTouchBuildingFootprint": true,
+    "mustConnectToOccupiedFootprintFrontage": true,
     "allowGrassGap": false,
     "partOfTransparentBuildingSprite": false,
-    "role": "bridge building frontage to adjacent road edge"
+    "role": "bridge occupied building frontage to adjacent road edge"
   },
   "roadSocket": {
     "defaultEnabled": true,
@@ -25,14 +26,17 @@
     "defaultWidthTiles": 0.36,
     "requiresRoadAdjacency": true,
     "mustFitInsideAuthoredFacade": true,
+    "mustOverlapOccupiedEdgeCell": true,
     "mustMatchAfterRotation": true,
     "stableIdPattern": "road_access_<edge>"
   },
   "authoringValidation": {
     "blocksProductionExport": true,
     "checks": [
-      "integrated_sidewalk_touches_footprint",
+      "flexible_footprint_mask_is_valid",
+      "integrated_sidewalk_connects_to_occupied_frontage",
       "road_socket_fits_inside_authored_facade",
+      "road_socket_overlaps_occupied_edge_cell",
       "ground_floor_entrance_or_garage_on_socket_facade",
       "entrance_or_garage_aligns_with_socket_through_short_sidewalk_connection",
       "facade_module_position_and_width_stay_inside_facade",
@@ -47,16 +51,19 @@
   },
   "runtimePlacementValidation": {
     "required": true,
+    "collisionSource": "geometry.flexibleFootprint.occupiedCells",
     "rejectWhenRequiredRoadMissing": true,
     "rejectWhenRoadTypeIncompatible": true,
     "rejectWhenSocketDoesNotFaceRoadAfterRotation": true,
-    "rejectWhenBuildingFootprintOverlapsRoad": true,
+    "rejectWhenOccupiedFootprintCellOverlapsRoadOrBuilding": true,
     "rejectWhenSidewalkWouldLeaveGrassGap": true,
     "rejectWhenEntranceOrGarageCannotReachRoadSocket": true,
+    "setbackReservationMustRemainInsideOwnedLot": true,
     "roadAndSidewalkRemainSeparateFromBuildingSprite": true
   },
   "export": {
     "manifestNode": "architecturalModules.streetIntegration",
+    "footprintManifestNode": "geometry.flexibleFootprint",
     "validationManifestNode": "urbanIntegrationValidation",
     "buildingSpriteRemainsTransparent": true
   }
