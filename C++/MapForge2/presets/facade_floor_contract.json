@@ -1,0 +1,36 @@
+{
+  "id": "facade_floor_authoring_1",
+  "name": "Building Composer Facade + Floor Authoring Contract",
+  "targetPlatform": "windows_pc",
+  "floorSystem": {
+    "version": "floor_system_1",
+    "minimumFloors": 1,
+    "maximumFloors": 8,
+    "floorHeightRangePx": [36, 132],
+    "totalWallHeightFormula": "floor_count * floor_height_px",
+    "roofUsesComputedTopFloor": true,
+    "floorBandsOptional": true
+  },
+  "facadeEditor": {
+    "version": "facade_editor_1",
+    "logicalFacades": ["south", "east", "north", "west"],
+    "moduleKinds": ["window", "door", "storefront", "sign", "awning"],
+    "placement": {
+      "floorIndex": "0..floor_count-1",
+      "position": "normalized_0_to_1_along_logical_facade",
+      "width": "normalized_facade_fraction_0_06_to_0_90",
+      "rotatesWithBuilding": true
+    },
+    "manualMode": {
+      "disablesLegacyAutomaticFacadeModules": true,
+      "keepsMaterialsLightingAoAndRoofPipeline": true
+    }
+  },
+  "export": {
+    "manifestRecordsFloorSystem": true,
+    "manifestRecordsEveryFacadePlacement": true,
+    "automaticFrameAccountsForTotalFloorHeight": true,
+    "haloAndFootprintValidationStillRequired": true
+  },
+  "rule": "A facade module is authored once in logical building space. SOUTH/EAST/NORTH/WEST rendered views must be projections of that same placement; no per-view hand-authored duplicate is allowed."
+}
