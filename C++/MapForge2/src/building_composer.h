@@ -7,6 +7,8 @@
 #include <QSize>
 #include <QString>
 
+#include <algorithm>
+
 namespace ch::studio {
 
 enum class BuildingRoofStyle {
@@ -53,6 +55,19 @@ enum class BuildingRoofMaterial {
     CeramicTile,
     MetalSeam,
     AsphaltShingle,
+};
+
+enum class BuildingStreetEdge {
+    South,
+    East,
+    North,
+    West,
+};
+
+enum class BuildingRoadSocketType {
+    LocalStreet,
+    Avenue,
+    ServiceRoad,
 };
 
 // Canonical reusable architectural modules. A module describes the authored
@@ -104,6 +119,18 @@ struct BuildingComposerSpec {
     float roof_ridge_scale = 1.0F;
     bool roof_fascia_enabled = true;
     bool roof_ridge_enabled = true;
+
+    // Street integration is authored in logical building space and rotates with
+    // the building. The sidewalk is a placement/context contract, not pixels in
+    // the transparent building sprite.
+    bool sidewalk_enabled = true;
+    float sidewalk_depth_tiles = 0.30F;
+    float sidewalk_lateral_margin_tiles = 0.55F;
+    bool road_socket_enabled = true;
+    BuildingStreetEdge road_socket_edge = BuildingStreetEdge::South;
+    BuildingRoadSocketType road_socket_type = BuildingRoadSocketType::LocalStreet;
+    float road_socket_position = 0.50F;
+    float road_socket_width_tiles = 0.36F;
 
     QColor wall_color = QColor("#d8c3a5");
     QColor roof_color = QColor("#a94e3f");
@@ -162,6 +189,64 @@ public:
         return QStringLiteral("City Horizon Classic Tycoon");
     }
 
+    static QString streetEdgeName(BuildingStreetEdge edge) {
+        switch (edge) {
+            case BuildingStreetEdge::South: return QStringLiteral("south");
+            case BuildingStreetEdge::East: return QStringLiteral("east");
+            case BuildingStreetEdge::North: return QStringLiteral("north");
+            case BuildingStreetEdge::West: return QStringLiteral("west");
+        }
+        return QStringLiteral("south");
+    }
+
+    static QString roadSocketTypeName(BuildingRoadSocketType type) {
+        switch (type) {
+            case BuildingRoadSocketType::LocalStreet: return QStringLiteral("local_street");
+            case BuildingRoadSocketType::Avenue: return QStringLiteral("avenue");
+            case BuildingRoadSocketType::ServiceRoad: return QStringLiteral("service_road");
+        }
+        return QStringLiteral("local_street");
+    }
+
+    static QString roadSocketId(const BuildingComposerSpec& spec) {
+        return QStringLiteral("road_access_%1").arg(streetEdgeName(spec.road_socket_edge));
+    }
+
+    static QJsonObject streetIntegration(const BuildingComposerSpec& spec) {
+        const double sidewalk_depth = static_cast<double>(
+            std::clamp(spec.sidewalk_depth_tiles, 0.0F, 1.0F));
+        const double sidewalk_margin = static_cast<double>(
+            std::clamp(spec.sidewalk_lateral_margin_tiles, 0.0F, 2.0F));
+        const double socket_position = static_cast<double>(
+            std::clamp(spec.road_socket_position, 0.0F, 1.0F));
+        const double socket_width = static_cast<double>(
+            std::clamp(spec.road_socket_width_tiles, 0.10F, 2.0F));
+
+        return QJsonObject{
+            {"version", QStringLiteral("sidewalk_road_socket_1")},
+            {"sidewalk", QJsonObject{
+                {"enabled", spec.sidewalk_enabled},
+                {"integratedWithLot", true},
+                {"touchesFootprint", true},
+                {"depthTiles", sidewalk_depth},
+                {"lateralMarginTiles", sidewalk_margin},
+                {"exportedIntoBuildingSprite", false},
+                {"surfaceFamily", QStringLiteral("concrete_01")},
+            }},
+            {"roadSocket", QJsonObject{
+                {"id", roadSocketId(spec)},
+                {"enabled", spec.road_socket_enabled},
+                {"edge", streetEdgeName(spec.road_socket_edge)},
+                {"type", roadSocketTypeName(spec.road_socket_type)},
+                {"position", socket_position},
+                {"widthTiles", socket_width},
+                {"requiresRoadAdjacency", true},
+                {"rotatesWithBuilding", true},
+            }},
+            {"placementRule", QStringLiteral("sidewalk_bridges_building_footprint_to_matching_road_socket")},
+        };
+    }
+
     static QString windowModuleId(BuildingWindowModule module) {
         switch (module) {
             case BuildingWindowModule::ClassicFramed:
@@ -218,6 +303,7 @@ public:
             {"sign", signModuleId(spec.sign_module)},
             {"chimney", chimneyModuleId(spec.chimney_module)},
             {"active", active},
+            {"streetIntegration", streetIntegration(spec)},
         };
     }
 
