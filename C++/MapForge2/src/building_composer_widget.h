@@ -24,11 +24,13 @@ private:
     void addFacadeModule();
     void removeSelectedFacadeModule();
     void clearSelectedFacade();
+    void applyBuildingTypologyPreset(int index);
     void applyDetailPreset(int index);
     void exportAsset();
 
     BuildingComposerSpec spec_;
 
+    QComboBox* typology_combo_ = nullptr;
     QComboBox* footprint_combo_ = nullptr;
     QComboBox* roof_combo_ = nullptr;
     QComboBox* palette_combo_ = nullptr;
