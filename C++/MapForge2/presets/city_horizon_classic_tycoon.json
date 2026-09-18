@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_5",
+  "revision": "classic_tycoon_6",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -80,14 +80,42 @@
     "chimneyUsesArchitecturalModule": "chimney.masonry_cap.v1",
     "singleParametricDefinitionForAllViews": true
   },
+  "streetIntegration": {
+    "version": "sidewalk_road_socket_1",
+    "sidewalk": {
+      "enabledByDefault": true,
+      "integratedWithLot": true,
+      "touchesFootprint": true,
+      "depthTiles": 0.30,
+      "lateralMarginTiles": 0.55,
+      "surfaceFamily": "concrete_01",
+      "exportedIntoBuildingSprite": false
+    },
+    "roadSocket": {
+      "enabledByDefault": true,
+      "defaultEdge": "south",
+      "defaultType": "local_street",
+      "supportedTypes": [
+        "local_street",
+        "avenue",
+        "service_road"
+      ],
+      "position": 0.50,
+      "widthTiles": 0.36,
+      "requiresRoadAdjacency": true,
+      "rotatesWithBuilding": true
+    },
+    "placementRule": "sidewalk_bridges_building_footprint_to_matching_road_socket",
+    "purpose": "Give every authored building an explicit, rotation-safe street frontage contract so placement can reject lots without matching road access and avoid accidental grass gaps."
+  },
   "environmentPreview": {
     "version": "environment_preview_1",
     "enabledByDefault": true,
     "previewOnly": true,
     "exportedIntoBuildingSprite": false,
     "terrain": "grass_reference",
-    "sidewalk": "integrated_south_frontage",
-    "road": "south_frontage",
+    "sidewalk": "uses_street_integration_contract",
+    "road": "uses_road_socket_contract",
     "sidewalkTouchesFootprint": true,
     "purpose": "Validate gameplay-scale grounding, street access and accidental grass gaps before asset export."
   },
@@ -154,5 +182,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Architectural presets and per-building options may vary geometry, module placement, palette, material choice and roof profile, but reusable architectural components must reference the canonical module library, every roof view must derive from the same parametric roof definition, and environment context must remain preview-only so exported building PNGs stay clean and transparent."
+  "authoringRule": "Architectural presets and per-building options may vary geometry, module placement, palette, material choice, roof profile and street frontage, but reusable architectural components must reference the canonical module library, every roof view must derive from the same parametric roof definition, the road socket must rotate with the building, the integrated sidewalk must touch the footprint without a grass gap, and environment context must remain preview-only so exported building PNGs stay clean and transparent."
 }
