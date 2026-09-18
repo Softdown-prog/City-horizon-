@@ -55,6 +55,7 @@ private:
     QSlider* material_contrast_slider_ = nullptr;
     QSlider* facade_position_slider_ = nullptr;
     QSlider* facade_width_slider_ = nullptr;
+    QSlider* procedural_variation_strength_slider_ = nullptr;
 
     QSpinBox* material_seed_spin_ = nullptr;
     QSpinBox* footprint_width_spin_ = nullptr;
@@ -70,6 +71,7 @@ private:
     QSpinBox* floor_count_spin_ = nullptr;
     QSpinBox* floor_height_spin_ = nullptr;
     QSpinBox* facade_floor_spin_ = nullptr;
+    QSpinBox* procedural_variation_seed_spin_ = nullptr;
 
     QCheckBox* windows_check_ = nullptr;
     QCheckBox* door_check_ = nullptr;
@@ -82,6 +84,11 @@ private:
     QCheckBox* context_preview_check_ = nullptr;
     QCheckBox* facade_editor_check_ = nullptr;
     QCheckBox* floor_bands_check_ = nullptr;
+    QCheckBox* procedural_variation_check_ = nullptr;
+    QCheckBox* procedural_vary_palette_check_ = nullptr;
+    QCheckBox* procedural_vary_materials_check_ = nullptr;
+    QCheckBox* procedural_vary_roof_check_ = nullptr;
+    QCheckBox* procedural_vary_modules_check_ = nullptr;
 
     QListWidget* facade_module_list_ = nullptr;
     QLabel* preview_ = nullptr;
