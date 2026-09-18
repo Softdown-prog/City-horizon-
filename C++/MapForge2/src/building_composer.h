@@ -39,6 +39,9 @@ enum class BuildingWallMaterial {
     Brick,
     Concrete,
     Timber,
+    Stone,
+    MetalPanel,
+    Glass,
 };
 
 enum class BuildingRoofMaterial {
@@ -79,11 +82,15 @@ struct BuildingComposerSpec {
     BuildingWindowPattern window_pattern = BuildingWindowPattern::Pair;
 
     // Deterministic material recipes. Geometry and logical surfaces remain the
-    // authority; these fields only change surface appearance.
+    // authority; these fields only change surface appearance. Strength controls
+    // overall visibility, variation controls local tone drift, and contrast
+    // controls the separation between recesses/highlights inside the recipe.
     BuildingWallMaterial wall_material = BuildingWallMaterial::Plaster;
     BuildingRoofMaterial roof_material = BuildingRoofMaterial::CeramicTile;
     float material_strength = 0.45F;
     float material_scale = 1.0F;
+    float material_variation = 0.35F;
+    float material_contrast = 0.45F;
     int material_seed = 17;
 
     // Named socket modules. These are authored once in logical building space
