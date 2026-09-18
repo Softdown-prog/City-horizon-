@@ -1,0 +1,133 @@
+{
+  "id": "building_typology_presets_1",
+  "name": "City Horizon Building Typology Presets",
+  "status": "official",
+  "targetPlatform": "windows_pc",
+  "visualPreset": "city_horizon_classic_tycoon",
+  "moduleLibrary": "architectural_modules_2",
+  "facadeEditor": "facade_editor_2",
+  "floorSystem": "floor_system_1",
+  "editableAfterApply": true,
+  "purpose": "Provide production-ready editable starting points for common City Horizon building families without creating separate render pipelines.",
+  "presets": [
+    {
+      "id": "small_house",
+      "name": "Small house",
+      "category": "residential",
+      "footprint": [1, 1],
+      "floors": 1,
+      "roof": "gable",
+      "wallMaterial": "plaster",
+      "roofMaterial": "ceramic_tile",
+      "signatureModules": ["door.classic_wood.v1", "window.classic_framed.v1", "planter.facade_box.v1"]
+    },
+    {
+      "id": "suburban_house",
+      "name": "Suburban house",
+      "category": "residential",
+      "footprint": [2, 1],
+      "floors": 2,
+      "roof": "hip",
+      "wallMaterial": "plaster",
+      "roofMaterial": "ceramic_tile",
+      "signatureModules": ["door.classic_wood.v1", "garage.rollup_panel.v1", "balcony.classic_rail.v1", "window.classic_framed.v1"]
+    },
+    {
+      "id": "cafeteria",
+      "name": "Cafeteria",
+      "category": "commercial",
+      "footprint": [2, 1],
+      "floors": 1,
+      "roof": "flat",
+      "wallMaterial": "concrete",
+      "roofMaterial": "metal_seam",
+      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "planter.facade_box.v1"]
+    },
+    {
+      "id": "corner_shop",
+      "name": "Corner shop",
+      "category": "commercial",
+      "footprint": [2, 2],
+      "floors": 2,
+      "roof": "flat",
+      "wallMaterial": "brick",
+      "roofMaterial": "metal_seam",
+      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "sign.facade_plaque.v1", "window.classic_framed.v1"]
+    },
+    {
+      "id": "market",
+      "name": "Market",
+      "category": "commercial",
+      "footprint": [3, 2],
+      "floors": 1,
+      "roof": "flat",
+      "wallMaterial": "concrete",
+      "roofMaterial": "metal_seam",
+      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "hvac.wall_unit.v1"]
+    },
+    {
+      "id": "warehouse",
+      "name": "Warehouse",
+      "category": "utility_industrial",
+      "footprint": [3, 2],
+      "floors": 1,
+      "roof": "shed",
+      "wallMaterial": "metal_panel",
+      "roofMaterial": "metal_seam",
+      "signatureModules": ["garage.rollup_panel.v1", "door.classic_wood.v1", "sign.facade_plaque.v1", "hvac.wall_unit.v1"]
+    },
+    {
+      "id": "small_town_hall",
+      "name": "Small town hall",
+      "category": "civic",
+      "footprint": [3, 2],
+      "floors": 2,
+      "roof": "hip",
+      "wallMaterial": "stone",
+      "roofMaterial": "ceramic_tile",
+      "signatureModules": ["door.double_glass.v1", "window.classic_framed.v1", "marquee.flat_canopy.v1", "planter.facade_box.v1"]
+    },
+    {
+      "id": "school",
+      "name": "School",
+      "category": "civic",
+      "footprint": [3, 2],
+      "floors": 2,
+      "roof": "gable",
+      "wallMaterial": "brick",
+      "roofMaterial": "ceramic_tile",
+      "signatureModules": ["door.double_glass.v1", "marquee.flat_canopy.v1", "window.classic_framed.v1"]
+    },
+    {
+      "id": "low_rise_residential",
+      "name": "Low-rise residential",
+      "category": "residential",
+      "footprint": [2, 2],
+      "floors": 4,
+      "roof": "flat",
+      "wallMaterial": "plaster",
+      "roofMaterial": "asphalt_shingle",
+      "signatureModules": ["door.double_glass.v1", "window.classic_framed.v1", "balcony.classic_rail.v1"]
+    },
+    {
+      "id": "low_rise_office",
+      "name": "Low-rise office",
+      "category": "commercial",
+      "footprint": [2, 2],
+      "floors": 4,
+      "roof": "flat",
+      "wallMaterial": "concrete",
+      "roofMaterial": "metal_seam",
+      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "window.classic_framed.v1", "hvac.wall_unit.v1"]
+    }
+  ],
+  "rules": {
+    "singleParametricBuildingDefinition": true,
+    "allViewsDerivedFromSamePresetState": true,
+    "presetApplicationReplacesCurrentFacadePlacements": true,
+    "userMayEditEveryFieldAfterApply": true,
+    "exportManifestRecordsTypologyOrigin": true,
+    "automaticExportStemIncludesTypologyId": true,
+    "roadSidewalkHaloAndFootprintValidationRemainMandatory": true
+  }
+}
