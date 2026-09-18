@@ -56,8 +56,7 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
 
     auto* intro = new QLabel(
         "Building / Asset Composer — PILOT\n"
-        "New buildings start from the City Horizon Classic Tycoon visual preset. "
-        "Architectural components now reference the canonical reusable module library instead of duplicating per-building recipes.",
+        "City Horizon Classic Tycoon remains the visual baseline. The roof editor now controls roof profile, pitch, overhang, fascia and ridge weight from one parametric definition.",
         this);
     intro->setWordWrap(true);
     root->addWidget(intro);
@@ -65,13 +64,9 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     auto* form = new QFormLayout();
 
     auto* visual_preset_label = new QLabel(BuildingComposer::visualPresetName(spec_.visual_preset), this);
-    visual_preset_label->setToolTip(
-        "Official City Horizon renderer baseline. Architectural/detail presets may vary modules without replacing this visual contract.");
     form->addRow("Visual preset", visual_preset_label);
 
     auto* module_library_label = new QLabel(QStringLiteral("architectural_modules_1"), this);
-    module_library_label->setToolTip(
-        "Stable reusable recipes for windows, doors, awnings, signs and chimneys. Exported manifests record the selected module IDs.");
     form->addRow("Module library", module_library_label);
 
     footprint_combo_ = new QComboBox(this);
@@ -80,8 +75,32 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     form->addRow("Footprint", footprint_combo_);
 
     roof_combo_ = new QComboBox(this);
-    roof_combo_->addItems({"Gable", "Pyramid", "Flat"});
-    form->addRow("Roof", roof_combo_);
+    roof_combo_->addItems({"Gable", "Hip", "Pyramid", "Flat", "Shed", "Mansard"});
+    form->addRow("Roof profile", roof_combo_);
+
+    roof_pitch_slider_ = new QSlider(Qt::Horizontal, this);
+    roof_pitch_slider_->setRange(12, 60);
+    roof_pitch_slider_->setValue(static_cast<int>(spec_.roof_pitch_degrees));
+    roof_pitch_slider_->setSingleStep(1);
+    form->addRow("Roof pitch (deg)", roof_pitch_slider_);
+
+    roof_overhang_slider_ = new QSlider(Qt::Horizontal, this);
+    roof_overhang_slider_->setRange(0, 24);
+    roof_overhang_slider_->setValue(static_cast<int>(spec_.roof_overhang * 100.0F));
+    roof_overhang_slider_->setSingleStep(1);
+    form->addRow("Roof overhang", roof_overhang_slider_);
+
+    roof_fascia_slider_ = new QSlider(Qt::Horizontal, this);
+    roof_fascia_slider_->setRange(1, 60);
+    roof_fascia_slider_->setValue(static_cast<int>(spec_.roof_fascia_thickness_px * 10.0F));
+    roof_fascia_slider_->setSingleStep(2);
+    form->addRow("Fascia thickness", roof_fascia_slider_);
+
+    roof_ridge_slider_ = new QSlider(Qt::Horizontal, this);
+    roof_ridge_slider_->setRange(50, 180);
+    roof_ridge_slider_->setValue(static_cast<int>(spec_.roof_ridge_scale * 100.0F));
+    roof_ridge_slider_->setSingleStep(5);
+    form->addRow("Ridge weight", roof_ridge_slider_);
 
     palette_combo_ = new QComboBox(this);
     palette_combo_->addItems({"Warm residential", "Cool modern", "Earth / rural"});
@@ -147,12 +166,22 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     form->addRow("Wall height", wall_height_slider_);
 
     roof_height_slider_ = new QSlider(Qt::Horizontal, this);
-    roof_height_slider_->setRange(10, 58);
+    roof_height_slider_->setRange(10, 64);
     roof_height_slider_->setValue(spec_.roof_height_px);
     roof_height_slider_->setSingleStep(2);
-    form->addRow("Roof height", roof_height_slider_);
+    form->addRow("Roof base height", roof_height_slider_);
 
     root->addLayout(form);
+
+    auto* roof_flags = new QHBoxLayout();
+    roof_fascia_check_ = new QCheckBox("Fascia", this);
+    roof_fascia_check_->setChecked(spec_.roof_fascia_enabled);
+    roof_ridge_check_ = new QCheckBox("Ridge / hip cap", this);
+    roof_ridge_check_->setChecked(spec_.roof_ridge_enabled);
+    roof_flags->addWidget(roof_fascia_check_);
+    roof_flags->addWidget(roof_ridge_check_);
+    roof_flags->addStretch(1);
+    root->addLayout(roof_flags);
 
     auto* flags = new QHBoxLayout();
     windows_check_ = new QCheckBox("Window module", this);
@@ -195,6 +224,12 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     };
     connect(footprint_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(roof_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
+    connect(roof_pitch_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(roof_overhang_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(roof_fascia_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(roof_ridge_slider_, &QSlider::valueChanged, this, [changed](int) { changed(); });
+    connect(roof_fascia_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
+    connect(roof_ridge_check_, &QCheckBox::toggled, this, [changed](bool) { changed(); });
     connect(palette_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [changed](int) { changed(); });
     connect(detail_preset_combo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
         applyDetailPreset(index);
@@ -277,10 +312,6 @@ void BuildingComposerWidget::applyDetailPreset(const int index) {
 
 void BuildingComposerWidget::refreshSpecFromControls() {
     spec_.visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
-
-    // Module recipes are canonical library references; the controls only place
-    // or hide them. Future library revisions can add alternatives without
-    // changing socket/layout semantics.
     spec_.window_module = BuildingWindowModule::ClassicFramed;
     spec_.door_module = BuildingDoorModule::ClassicWood;
     spec_.awning_module = BuildingAwningModule::CanvasCanopy;
@@ -295,11 +326,26 @@ void BuildingComposerWidget::refreshSpecFromControls() {
         default: spec_.footprint_width_tiles = 2; spec_.footprint_depth_tiles = 1; break;
     }
 
-    const int roof = roof_combo_ != nullptr ? roof_combo_->currentIndex() : 0;
-    spec_.roof_style = roof == 1 ? BuildingRoofStyle::Pyramid
-        : (roof == 2 ? BuildingRoofStyle::Flat : BuildingRoofStyle::Gable);
+    switch (roof_combo_ != nullptr ? roof_combo_->currentIndex() : 0) {
+        case 1: spec_.roof_style = BuildingRoofStyle::Hip; break;
+        case 2: spec_.roof_style = BuildingRoofStyle::Pyramid; break;
+        case 3: spec_.roof_style = BuildingRoofStyle::Flat; break;
+        case 4: spec_.roof_style = BuildingRoofStyle::Shed; break;
+        case 5: spec_.roof_style = BuildingRoofStyle::Mansard; break;
+        default: spec_.roof_style = BuildingRoofStyle::Gable; break;
+    }
+
     spec_.wall_height_px = wall_height_slider_ != nullptr ? wall_height_slider_->value() : 82;
     spec_.roof_height_px = roof_height_slider_ != nullptr ? roof_height_slider_->value() : 34;
+    spec_.roof_pitch_degrees = roof_pitch_slider_ != nullptr ? static_cast<float>(roof_pitch_slider_->value()) : 35.0F;
+    spec_.roof_overhang = roof_overhang_slider_ != nullptr
+        ? static_cast<float>(roof_overhang_slider_->value()) / 100.0F : 0.10F;
+    spec_.roof_fascia_thickness_px = roof_fascia_slider_ != nullptr
+        ? static_cast<float>(roof_fascia_slider_->value()) / 10.0F : 2.8F;
+    spec_.roof_ridge_scale = roof_ridge_slider_ != nullptr
+        ? static_cast<float>(roof_ridge_slider_->value()) / 100.0F : 1.0F;
+    spec_.roof_fascia_enabled = roof_fascia_check_ == nullptr || roof_fascia_check_->isChecked();
+    spec_.roof_ridge_enabled = roof_ridge_check_ == nullptr || roof_ridge_check_->isChecked();
     if (spec_.roof_style == BuildingRoofStyle::Flat) spec_.roof_height_px = 10;
 
     const int door_position = door_position_combo_ != nullptr ? door_position_combo_->currentIndex() : 1;
@@ -369,22 +415,21 @@ void BuildingComposerWidget::refreshPreview() {
     const QString module_text = modules.isEmpty() ? QStringLiteral("none") : modules.join(", ");
 
     summary_->setText(
-        QString("%1 / CH_BUILDING_COMPOSER_V0 — %2×%3 footprint, %4 roof. Walls: %5. Roof surface: %6. "
-                "Material intensity %7% / scale %8 / variation %9% / contrast %10% / seed %11. "
-                "Entrance: south/%12. Windows: %13. Reusable modules: %14.")
+        QString("%1 — %2×%3, %4 roof. Pitch %5°, overhang %6, fascia %7px, ridge %8x. "
+                "Walls: %9. Roof material: %10. Material %11% / variation %12% / contrast %13%. Modules: %14.")
             .arg(BuildingComposer::visualPresetName(spec_.visual_preset))
             .arg(spec_.footprint_width_tiles)
             .arg(spec_.footprint_depth_tiles)
             .arg(BuildingComposer::roofName(spec_.roof_style))
+            .arg(spec_.roof_pitch_degrees, 0, 'f', 0)
+            .arg(spec_.roof_overhang, 0, 'f', 2)
+            .arg(spec_.roof_fascia_thickness_px, 0, 'f', 1)
+            .arg(spec_.roof_ridge_scale, 0, 'f', 2)
             .arg(BuildingComposer::wallMaterialName(spec_.wall_material))
             .arg(BuildingComposer::roofMaterialName(spec_.roof_material))
             .arg(static_cast<int>(spec_.material_strength * 100.0F))
-            .arg(spec_.material_scale, 0, 'f', 2)
             .arg(static_cast<int>(spec_.material_variation * 100.0F))
             .arg(static_cast<int>(spec_.material_contrast * 100.0F))
-            .arg(spec_.material_seed)
-            .arg(BuildingComposer::doorPositionName(spec_.door_position))
-            .arg(BuildingComposer::windowPatternName(spec_.window_pattern))
             .arg(module_text));
 }
 
@@ -419,7 +464,7 @@ void BuildingComposerWidget::exportAsset() {
     manifest_file.close();
 
     summary_->setText("EXPORTED: " + path + " + " + manifest_path +
-                      " / reusable module IDs recorded");
+                      " / roof editor parameters and reusable module IDs recorded");
 }
 
 } // namespace ch::studio
