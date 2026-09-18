@@ -158,13 +158,18 @@ void drawStructuralPlinth(QPainter& painter, const BuildingComposerSpec& spec,
     const float plinth_h = std::clamp(wall_h * 0.075F, 5.0F, 9.0F);
     const Point3 outer_a{a.x * kStructuralPlinthOutset, a.y * kStructuralPlinthOutset, 0.0F};
     const Point3 outer_b{b.x * kStructuralPlinthOutset, b.y * kStructuralPlinthOutset, 0.0F};
-    const QColor plinth_face = scaledColor(spec.wall_color, face_shade * 0.70F);
-    const QColor plinth_cap = scaledColor(spec.wall_color, face_shade * 0.82F);
+    const QPolygonF plinth_face = faceQuad(outer_a, outer_b, 0.0F, plinth_h, view, canvas);
+    const QRectF plinth_bounds = plinth_face.boundingRect();
+    QLinearGradient plinth_gradient(plinth_bounds.topLeft(), plinth_bounds.bottomLeft());
+    plinth_gradient.setColorAt(0.0, scaledColor(spec.wall_color, face_shade * 0.78F));
+    plinth_gradient.setColorAt(0.62, scaledColor(spec.wall_color, face_shade * 0.70F));
+    plinth_gradient.setColorAt(1.0, scaledColor(spec.wall_color, face_shade * 0.62F));
+    const QColor plinth_cap = scaledColor(spec.wall_color, face_shade * 0.84F);
 
     painter.save();
     painter.setPen(Qt::NoPen);
-    painter.setBrush(plinth_face);
-    painter.drawPolygon(faceQuad(outer_a, outer_b, 0.0F, plinth_h, view, canvas));
+    painter.setBrush(plinth_gradient);
+    painter.drawPolygon(plinth_face);
 
     const QPolygonF cap = {
         projectPoint({outer_a.x, outer_a.y, plinth_h}, view, canvas),
@@ -174,6 +179,12 @@ void drawStructuralPlinth(QPainter& painter, const BuildingComposerSpec& spec,
     };
     painter.setBrush(plinth_cap);
     painter.drawPolygon(cap);
+
+    painter.setPen(QPen(alphaColor(scaledColor(spec.wall_color, face_shade * 0.52F), 72), 0.75));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawLine(
+        projectPoint({outer_a.x, outer_a.y, plinth_h * 0.28F}, view, canvas),
+        projectPoint({outer_b.x, outer_b.y, plinth_h * 0.28F}, view, canvas));
     painter.restore();
 }
 
@@ -263,32 +274,33 @@ void drawWallMaterial(QPainter& painter, const BuildingComposerSpec& spec,
     painter.setBrush(Qt::NoBrush);
 
     if (spec.wall_material == BuildingWallMaterial::Plaster) {
-        const int patches = std::max(4, static_cast<int>((6.0F + 8.0F * strength) * edge_span / scale));
+        const int patches = std::max(6, static_cast<int>((8.0F + 10.0F * strength) * edge_span / scale));
         painter.setPen(Qt::NoPen);
         for (int i = 0; i < patches; ++i) {
-            const float t = 0.07F + hash01(spec.material_seed + 239, edge, i) * 0.86F;
-            const float z = 6.0F + hash01(spec.material_seed + 239, edge, i, 1) * std::max(5.0F, wall_h - 12.0F);
-            const float tone = hash01(spec.material_seed + 239, edge, i, 2) < 0.5F ? 0.90F : 1.07F;
-            const int alpha = 7 + static_cast<int>(15.0F * strength);
+            const float t = 0.06F + hash01(spec.material_seed + 239, edge, i) * 0.88F;
+            const float z = 5.0F + hash01(spec.material_seed + 239, edge, i, 1) * std::max(5.0F, wall_h - 10.0F);
+            const float tone_pick = hash01(spec.material_seed + 239, edge, i, 2);
+            const float tone = tone_pick < 0.34F ? 0.88F : (tone_pick < 0.68F ? 0.96F : 1.08F);
+            const int alpha = 8 + static_cast<int>(17.0F * strength);
             painter.setBrush(alphaColor(scaledColor(spec.wall_color, tone), alpha));
             const QPointF center = projectPoint(lerpPoint(a, b, t, z), view, canvas);
-            const qreal radius_x = 1.0 + hash01(spec.material_seed + 239, edge, i, 3) * 1.5;
-            const qreal radius_y = 0.65 + hash01(spec.material_seed + 313, edge, i) * 0.85;
+            const qreal radius_x = 0.9 + hash01(spec.material_seed + 239, edge, i, 3) * 1.8;
+            const qreal radius_y = 0.55 + hash01(spec.material_seed + 313, edge, i) * 1.0;
             painter.drawEllipse(center, radius_x, radius_y);
         }
 
         painter.setBrush(Qt::NoBrush);
-        const int samples = std::max(10, static_cast<int>((20.0F + 38.0F * strength) * edge_span / scale));
-        painter.setPen(QPen(dark, 1.0));
+        const int samples = std::max(14, static_cast<int>((24.0F + 42.0F * strength) * edge_span / scale));
+        painter.setPen(QPen(dark, 0.85));
         for (int i = 0; i < samples; ++i) {
-            const float t = 0.05F + hash01(spec.material_seed, edge, i) * 0.90F;
-            const float z = 4.0F + hash01(spec.material_seed, edge, i, 1) * std::max(5.0F, wall_h - 9.0F);
+            const float t = 0.04F + hash01(spec.material_seed, edge, i) * 0.92F;
+            const float z = 3.5F + hash01(spec.material_seed, edge, i, 1) * std::max(5.0F, wall_h - 7.0F);
             painter.drawPoint(projectPoint(lerpPoint(a, b, t, z), view, canvas));
         }
-        painter.setPen(QPen(light, 1.0));
+        painter.setPen(QPen(light, 0.85));
         for (int i = 0; i < samples / 2; ++i) {
-            const float t = 0.06F + hash01(spec.material_seed + 71, edge, i) * 0.88F;
-            const float z = 5.0F + hash01(spec.material_seed + 71, edge, i, 2) * std::max(5.0F, wall_h - 10.0F);
+            const float t = 0.05F + hash01(spec.material_seed + 71, edge, i) * 0.90F;
+            const float z = 4.0F + hash01(spec.material_seed + 71, edge, i, 2) * std::max(5.0F, wall_h - 8.0F);
             painter.drawPoint(projectPoint(lerpPoint(a, b, t, z), view, canvas));
         }
     } else if (spec.wall_material == BuildingWallMaterial::Brick) {
@@ -414,6 +426,31 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                 scaledColor(spec.roof_color, band_tone),
                 10 + static_cast<int>(28.0F * strength)));
             painter.drawPolygon(course_band);
+
+            const float width = std::max(8.0F, screenDistance(current_row[0], current_row[1]));
+            const int tiles = std::max(2, static_cast<int>(std::round(width / std::max(8.0F, 12.0F * scale))));
+            const float stagger = (row_index % 2 == 0) ? 0.5F : 0.0F;
+            const float tile_step = 1.0F / static_cast<float>(tiles);
+            for (int tile = 0; tile < tiles; ++tile) {
+                float u0 = static_cast<float>(tile) * tile_step;
+                float u1 = static_cast<float>(tile + 1) * tile_step;
+                if (stagger > 0.0F) {
+                    u0 = std::clamp(u0 + tile_step * 0.5F, 0.0F, 1.0F);
+                    u1 = std::clamp(u1 + tile_step * 0.5F, 0.0F, 1.0F);
+                }
+                if (u1 - u0 < 0.02F) continue;
+                const float tile_tone = 0.90F + hash01(spec.material_seed + 613, face_index, row_index, tile) * 0.20F;
+                const QPolygonF tile_body = {
+                    roofRowPoint(previous_row, u0),
+                    roofRowPoint(previous_row, u1),
+                    roofRowPoint(current_row, u1),
+                    roofRowPoint(current_row, u0),
+                };
+                painter.setBrush(alphaColor(
+                    scaledColor(spec.roof_color, tile_tone),
+                    6 + static_cast<int>(22.0F * strength)));
+                painter.drawPolygon(tile_body);
+            }
             painter.setBrush(Qt::NoBrush);
 
             QColor course_color = alphaColor(
@@ -422,9 +459,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             painter.setPen(QPen(course_color, 0.95));
             painter.drawLine(current_row[0], current_row[1]);
 
-            const float width = std::max(8.0F, screenDistance(current_row[0], current_row[1]));
-            const int tiles = std::max(2, static_cast<int>(std::round(width / std::max(8.0F, 12.0F * scale))));
-            const float stagger = (row_index % 2 == 0) ? 0.5F : 0.0F;
             for (int tile = 1; tile < tiles; ++tile) {
                 const float u = (static_cast<float>(tile) + stagger) / static_cast<float>(tiles);
                 if (u >= 0.98F) continue;
@@ -438,7 +472,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                 scaledColor(spec.roof_color, 0.50F),
                 12 + static_cast<int>(38.0F * strength));
             painter.setPen(QPen(lip_shadow, 0.70));
-            const float tile_step = 1.0F / static_cast<float>(tiles);
             for (int tile = 0; tile < tiles; ++tile) {
                 const float center_u = (static_cast<float>(tile) + 0.5F + stagger) * tile_step;
                 if (center_u <= 0.04F || center_u >= 0.96F) continue;
@@ -578,10 +611,18 @@ void drawWindowModule(QPainter& painter, const BuildingComposerSpec& spec,
         projectPoint(lerpPoint(a, b, glass_t1, glass_z1), view, canvas),
         projectPoint(lerpPoint(a, b, glass_t0, glass_z1), view, canvas),
     };
-    drawOutlinedPolygon(
-        painter, inner_opening,
-        scaledColor(spec.glass_color, 0.84F),
-        scaledColor(spec.glass_color, 0.50F));
+    const QRectF glass_bounds = inner_opening.boundingRect();
+    QLinearGradient glass_gradient(glass_bounds.topLeft(), glass_bounds.bottomRight());
+    glass_gradient.setColorAt(0.0, scaledColor(spec.glass_color, 0.60F));
+    glass_gradient.setColorAt(0.38, scaledColor(spec.glass_color, 0.78F));
+    glass_gradient.setColorAt(0.72, scaledColor(spec.glass_color, 0.94F));
+    glass_gradient.setColorAt(1.0, scaledColor(spec.glass_color, 0.70F));
+    QPen glass_outline(scaledColor(spec.glass_color, 0.44F), kStructuralOutlineWidth,
+                       Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    glass_outline.setMiterLimit(3.0);
+    painter.setPen(glass_outline);
+    painter.setBrush(glass_gradient);
+    painter.drawPolygon(inner_opening);
 
     painter.save();
     painter.setPen(Qt::NoPen);
@@ -680,8 +721,38 @@ void drawSouthModules(QPainter& painter, const BuildingComposerSpec& spec,
                    view, canvas, recess, recess_outline);
     drawFaceDetail(painter, a, b, t0 + opening_t, t1 - opening_t, frame_z0, frame_z1,
                    view, canvas, frame, frame_outline);
-    drawFaceDetail(painter, a, b, leaf_t0, leaf_t1, leaf_z0, leaf_z1,
-                   view, canvas, scaledColor(spec.door_color, 0.90F), scaledColor(spec.door_color, 0.52F));
+
+    const QPolygonF door_leaf = {
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t1, leaf_z0), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t1, leaf_z1), view, canvas),
+        projectPoint(lerpPoint(a, b, leaf_t0, leaf_z1), view, canvas),
+    };
+    const QRectF door_bounds = door_leaf.boundingRect();
+    QLinearGradient door_gradient(door_bounds.topLeft(), door_bounds.bottomRight());
+    door_gradient.setColorAt(0.0, scaledColor(spec.door_color, 0.78F));
+    door_gradient.setColorAt(0.50, scaledColor(spec.door_color, 0.94F));
+    door_gradient.setColorAt(1.0, scaledColor(spec.door_color, 0.72F));
+    QPen door_outline(scaledColor(spec.door_color, 0.48F), kStructuralOutlineWidth,
+                      Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+    door_outline.setMiterLimit(3.0);
+    painter.setPen(door_outline);
+    painter.setBrush(door_gradient);
+    painter.drawPolygon(door_leaf);
+
+    painter.save();
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(alphaColor(scaledColor(spec.door_color, 0.48F), 78), 0.70));
+    constexpr int kWoodGrainLines = 4;
+    for (int i = 1; i <= kWoodGrainLines; ++i) {
+        const float t = leaf_t0 + (leaf_t1 - leaf_t0) * static_cast<float>(i) /
+                                     static_cast<float>(kWoodGrainLines + 1);
+        const float wobble = (hash01(spec.material_seed + 809, i, 0) - 0.5F) * 0.004F;
+        painter.drawLine(
+            projectPoint(lerpPoint(a, b, t + wobble, leaf_z0 + wall_h * 0.035F), view, canvas),
+            projectPoint(lerpPoint(a, b, t - wobble, leaf_z1 - wall_h * 0.035F), view, canvas));
+    }
+    painter.restore();
 
     painter.save();
     painter.setPen(Qt::NoPen);
