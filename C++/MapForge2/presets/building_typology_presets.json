@@ -41,7 +41,7 @@
       "roof": "flat",
       "wallMaterial": "concrete",
       "roofMaterial": "metal_seam",
-      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "planter.facade_box.v1"]
+      "signatureModules": ["storefront.classic_glass.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "planter.facade_box.v1"]
     },
     {
       "id": "corner_shop",
@@ -52,7 +52,7 @@
       "roof": "flat",
       "wallMaterial": "brick",
       "roofMaterial": "metal_seam",
-      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "sign.facade_plaque.v1", "window.classic_framed.v1"]
+      "signatureModules": ["storefront.classic_glass.v1", "door.double_glass.v1", "sign.facade_plaque.v1", "window.classic_framed.v1"]
     },
     {
       "id": "market",
@@ -63,7 +63,7 @@
       "roof": "flat",
       "wallMaterial": "concrete",
       "roofMaterial": "metal_seam",
-      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "hvac.wall_unit.v1"]
+      "signatureModules": ["storefront.classic_glass.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "sign.facade_plaque.v1", "hvac.wall_unit.v1"]
     },
     {
       "id": "warehouse",
@@ -118,7 +118,7 @@
       "roof": "flat",
       "wallMaterial": "concrete",
       "roofMaterial": "metal_seam",
-      "signatureModules": ["storefront.glass_bay.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "window.classic_framed.v1", "hvac.wall_unit.v1"]
+      "signatureModules": ["storefront.classic_glass.v1", "door.double_glass.v1", "marquee.flat_canopy.v1", "window.classic_framed.v1", "hvac.wall_unit.v1"]
     }
   ],
   "rules": {
