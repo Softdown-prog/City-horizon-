@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QImage>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSize>
 #include <QString>
@@ -198,6 +199,25 @@ public:
                 return QStringLiteral("chimney.masonry_cap.v1");
         }
         return QStringLiteral("chimney.masonry_cap.v1");
+    }
+
+    static QJsonObject architecturalModules(const BuildingComposerSpec& spec) {
+        QJsonArray active;
+        if (spec.windows) active.append(windowModuleId(spec.window_module));
+        if (spec.south_door) active.append(doorModuleId(spec.door_module));
+        if (spec.south_awning) active.append(awningModuleId(spec.awning_module));
+        if (spec.south_sign) active.append(signModuleId(spec.sign_module));
+        if (spec.roof_chimney) active.append(chimneyModuleId(spec.chimney_module));
+
+        return QJsonObject{
+            {"libraryVersion", QStringLiteral("architectural_modules_1")},
+            {"window", windowModuleId(spec.window_module)},
+            {"door", doorModuleId(spec.door_module)},
+            {"awning", awningModuleId(spec.awning_module)},
+            {"sign", signModuleId(spec.sign_module)},
+            {"chimney", chimneyModuleId(spec.chimney_module)},
+            {"active", active},
+        };
     }
 
     static QImage renderView(const BuildingComposerSpec& spec, BuildingView view,
