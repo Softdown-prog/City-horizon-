@@ -12,6 +12,7 @@ namespace ch::studio {
 struct BuildingExportValidation {
     bool footprint_valid = false;
     bool halo_valid = false;
+    bool urban_integration_valid = false;
     bool export_ready = false;
     bool anchor_contact = false;
     int clipped_edge_pixels = 0;
@@ -39,9 +40,8 @@ public:
         const BuildingComposerSpec& spec,
         QSize frame = QSize());
 
-    // Writes the complete production package only when validation passes:
-    // 4 individual RGBA views, 4-view sheet, review sheet, thumbnail, manifest
-    // and validation report. Environment preview pixels are never exported.
+    // Writes the complete production package only when footprint/frame/anchor,
+    // halo and urban-integration authoring validation all pass.
     static bool exportPackage(
         const BuildingComposerSpec& spec,
         const QString& output_directory,
