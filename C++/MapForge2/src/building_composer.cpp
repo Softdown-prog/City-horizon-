@@ -170,6 +170,41 @@ void drawEaveAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spe
     painter.restore();
 }
 
+void drawCornerAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spec,
+                                const Point3 a, const Point3 b, const bool shade_start,
+                                const float wall_h, const BuildingView view, const QSize canvas) {
+    constexpr float kCornerWorldSpan = 0.075F;
+    constexpr std::array<int, 4> kCornerAlpha = {30, 20, 12, 5};
+    const float edge_span = std::max(0.5F, std::hypot(b.x - a.x, b.y - a.y));
+    const float total_t = std::clamp(kCornerWorldSpan / edge_span, 0.018F, 0.075F);
+    const float band_t = total_t / static_cast<float>(kCornerAlpha.size());
+    const QColor ao_base = scaledColor(spec.wall_color, 0.48F);
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    for (int band = 0; band < static_cast<int>(kCornerAlpha.size()); ++band) {
+        float t0 = 0.0F;
+        float t1 = 0.0F;
+        if (shade_start) {
+            t0 = static_cast<float>(band) * band_t;
+            t1 = static_cast<float>(band + 1) * band_t;
+        } else {
+            t0 = 1.0F - static_cast<float>(band + 1) * band_t;
+            t1 = 1.0F - static_cast<float>(band) * band_t;
+        }
+
+        const QPolygonF band_polygon = {
+            projectPoint(lerpPoint(a, b, t0, 0.8F), view, canvas),
+            projectPoint(lerpPoint(a, b, t1, 0.8F), view, canvas),
+            projectPoint(lerpPoint(a, b, t1, wall_h - 1.0F), view, canvas),
+            projectPoint(lerpPoint(a, b, t0, wall_h - 1.0F), view, canvas),
+        };
+        painter.setBrush(alphaColor(ao_base, kCornerAlpha[band]));
+        painter.drawPolygon(band_polygon);
+    }
+    painter.restore();
+}
+
 std::uint32_t hashMix(std::uint32_t value) {
     value ^= value >> 16U;
     value *= 0x7feb352dU;
@@ -732,6 +767,9 @@ QImage BuildingComposer::renderView(const BuildingComposerSpec& spec, const Buil
 
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
+        const bool shade_start = edge == near_index;
+        drawCornerAmbientOcclusion(
+            painter, spec, corners[edge], corners[next], shade_start, wall_h, view, canvas);
         drawEaveAmbientOcclusion(
             painter, spec, corners[edge], corners[next], wall_h, view, canvas);
     }
