@@ -1,6 +1,7 @@
 #include "building_export_pipeline.h"
 
 #include "building_facade_renderer.h"
+#include "building_footprint_model.h"
 #include "building_roof_editor_renderer.h"
 #include "building_urban_integration_validator.h"
 #include "src/ch_core/contracts.h"
@@ -101,6 +102,7 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
         {"frameWidth", frame.width()}, {"frameHeight", frame.height()},
         {"groundAnchorX", frame.width() / 2}, {"groundAnchorY", frame.height() - 42},
     });
+    geometry.insert(QStringLiteral("flexibleFootprint"), BuildingFootprintModel::manifest(spec));
     manifest.insert(QStringLiteral("geometry"), geometry);
     manifest.insert(QStringLiteral("architecturalModules"), BuildingComposer::architecturalModules(spec));
     manifest.insert(QStringLiteral("facadeEditor"), BuildingFacadeRenderer::manifest(spec));
@@ -108,8 +110,9 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("urbanIntegrationValidation"),
                     BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_2")},
+        {"version", QStringLiteral("automatic_export_validation_3")},
         {"packageValidated", validation.export_ready},
+        {"flexibleFootprintValidated", validation.footprint_valid},
         {"urbanIntegrationValidated", validation.urban_integration_valid},
         {"transparentRgba", true},
         {"environmentContextExported", false},
@@ -132,7 +135,7 @@ bool writeJson(const QString& path, const QJsonObject& object, QString* error) {
 
 QString BuildingExportValidation::summary() const {
     if (export_ready)
-        return QStringLiteral("PASS — footprint, frame, anchor, halo and urban integration validation passed");
+        return QStringLiteral("PASS — flexible footprint, frame, anchor, halo and urban integration validation passed");
     return QStringLiteral("FAIL — footprint=%1 halo=%2 urban=%3 clipped=%4 contamination=%5 suspiciousHalo=%6 anchor=%7")
         .arg(footprint_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(halo_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
@@ -143,7 +146,7 @@ QString BuildingExportValidation::summary() const {
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_2")},
+        {"version", QStringLiteral("automatic_export_validation_3")},
         {"exportReady", export_ready},
         {"footprintValid", footprint_valid},
         {"haloValid", halo_valid},
@@ -178,8 +181,9 @@ QSize BuildingExportPipeline::recommendedFrame(const BuildingComposerSpec& spec)
 }
 
 QString BuildingExportPipeline::automaticStem(const BuildingComposerSpec& spec) {
-    return QStringLiteral("building_%1_%2x%3_%4f_%5_seed%6")
+    return QStringLiteral("building_%1_%2_%3x%4_%5f_%6_seed%7")
         .arg(BuildingComposer::typologyId(spec.building_typology))
+        .arg(BuildingFootprintModel::shapeId(spec.footprint_shape))
         .arg(std::max(1, spec.footprint_width_tiles)).arg(std::max(1, spec.footprint_depth_tiles))
         .arg(std::clamp(spec.floor_count, 1, 8))
         .arg(BuildingRoofEditorRenderer::roofProfileName(spec.roof_style)).arg(std::max(0, spec.material_seed));
@@ -189,9 +193,9 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
     BuildingExportValidation report;
     if (!frame.isValid()) frame = recommendedFrame(spec);
     report.frame = frame;
-    const bool declared_footprint = spec.footprint_width_tiles >= 1 && spec.footprint_width_tiles <= 8 &&
-                                    spec.footprint_depth_tiles >= 1 && spec.footprint_depth_tiles <= 8 &&
-                                    spec.floor_count >= 1 && spec.floor_count <= 8;
+    QString footprint_reason;
+    const bool flexible_footprint_valid = BuildingFootprintModel::isValid(spec, &footprint_reason);
+    const bool declared_footprint = flexible_footprint_valid && spec.floor_count >= 1 && spec.floor_count <= 8;
     const QSize minimum_frame = recommendedFrame(spec);
     const bool frame_fits = frame.width() >= minimum_frame.width() && frame.height() >= minimum_frame.height();
     int total_clipped = 0, total_contamination = 0, total_suspicious = 0;
@@ -227,6 +231,8 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
         {"tileWidth", ch::contracts::kTileWidth},
         {"tileHeight", ch::contracts::kTileHeight},
         {"declaredFootprintValid", declared_footprint},
+        {"flexibleFootprint", BuildingFootprintModel::manifest(spec)},
+        {"footprintValidationReason", footprint_reason},
         {"floorCount", std::clamp(spec.floor_count, 1, 8)},
         {"recommendedFrame", QJsonObject{{"width", minimum_frame.width()}, {"height", minimum_frame.height()}}},
         {"frameFitsRecommendedMinimum", frame_fits},
