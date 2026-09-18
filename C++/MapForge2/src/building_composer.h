@@ -11,8 +11,11 @@ namespace ch::studio {
 
 enum class BuildingRoofStyle {
     Gable,
+    Hip,
     Pyramid,
     Flat,
+    Shed,
+    Mansard,
 };
 
 enum class BuildingView {
@@ -84,7 +87,6 @@ enum class BuildingVisualPreset {
 };
 
 struct BuildingComposerSpec {
-    // New buildings always start from the official City Horizon visual preset.
     BuildingVisualPreset visual_preset = BuildingVisualPreset::CityHorizonClassicTycoon;
 
     int footprint_width_tiles = 2;
@@ -92,6 +94,16 @@ struct BuildingComposerSpec {
     int wall_height_px = 82;
     int roof_height_px = 34;
     BuildingRoofStyle roof_style = BuildingRoofStyle::Gable;
+
+    // Roof editor parameters are style-independent where possible. Pitch is a
+    // visual multiplier over the authored roof height, while overhang/fascia/
+    // ridge controls keep a single parametric roof definition for all 4 views.
+    float roof_pitch_degrees = 35.0F;
+    float roof_overhang = 0.10F;
+    float roof_fascia_thickness_px = 2.8F;
+    float roof_ridge_scale = 1.0F;
+    bool roof_fascia_enabled = true;
+    bool roof_ridge_enabled = true;
 
     QColor wall_color = QColor("#d8c3a5");
     QColor roof_color = QColor("#a94e3f");
@@ -106,18 +118,12 @@ struct BuildingComposerSpec {
     BuildingDoorPosition door_position = BuildingDoorPosition::Center;
     BuildingWindowPattern window_pattern = BuildingWindowPattern::Pair;
 
-    // Stable module references. The renderer consumes the same canonical
-    // module recipe anywhere the component is placed.
     BuildingWindowModule window_module = BuildingWindowModule::ClassicFramed;
     BuildingDoorModule door_module = BuildingDoorModule::ClassicWood;
     BuildingAwningModule awning_module = BuildingAwningModule::CanvasCanopy;
     BuildingSignModule sign_module = BuildingSignModule::FacadePlaque;
     BuildingChimneyModule chimney_module = BuildingChimneyModule::MasonryCap;
 
-    // Deterministic material recipes. Geometry and logical surfaces remain the
-    // authority; these fields only change surface appearance. Strength controls
-    // overall visibility, variation controls local tone drift, and contrast
-    // controls the separation between recesses/highlights inside the recipe.
     BuildingWallMaterial wall_material = BuildingWallMaterial::Plaster;
     BuildingRoofMaterial roof_material = BuildingRoofMaterial::CeramicTile;
     float material_strength = 0.45F;
@@ -126,8 +132,6 @@ struct BuildingComposerSpec {
     float material_contrast = 0.45F;
     int material_seed = 17;
 
-    // Named socket modules. These are authored once in logical building space
-    // and rotate with the same structural definition as the building.
     bool south_awning = false;
     bool south_sign = false;
     bool roof_chimney = false;
@@ -135,9 +139,6 @@ struct BuildingComposerSpec {
 
 class BuildingComposer final {
 public:
-    // Canonical starting point for newly-authored buildings. Renderer-level
-    // calibration (materials, AO, lighting, outlines, roof finish, plinth,
-    // windows and door treatment) is the current Classic Tycoon baseline.
     static BuildingComposerSpec presetSpec(
         BuildingVisualPreset preset = BuildingVisualPreset::CityHorizonClassicTycoon) {
         BuildingComposerSpec spec;
