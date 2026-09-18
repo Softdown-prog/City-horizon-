@@ -64,6 +64,12 @@ BuildingFacadeModuleKind moduleKindFromIndex(const int index) {
         case 2: return BuildingFacadeModuleKind::Storefront;
         case 3: return BuildingFacadeModuleKind::Sign;
         case 4: return BuildingFacadeModuleKind::Awning;
+        case 5: return BuildingFacadeModuleKind::DoubleDoor;
+        case 6: return BuildingFacadeModuleKind::GarageDoor;
+        case 7: return BuildingFacadeModuleKind::Balcony;
+        case 8: return BuildingFacadeModuleKind::Marquee;
+        case 9: return BuildingFacadeModuleKind::Hvac;
+        case 10: return BuildingFacadeModuleKind::Planter;
         default: return BuildingFacadeModuleKind::Window;
     }
 }
@@ -172,12 +178,12 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     auto* root = new QVBoxLayout(this);
     auto* intro = new QLabel(
         "Building / Asset Composer — Windows PC\n"
-        "Facade Editor: author reusable modules per facade and floor. Floor System: 1–8 storeys from one parametric building definition.", this);
+        "Facade Editor: author reusable modules per facade and floor. Expanded library includes commercial, residential and utility facade pieces.", this);
     intro->setWordWrap(true); root->addWidget(intro);
 
     auto* form = new QFormLayout();
     form->addRow("Visual preset", new QLabel(BuildingComposer::visualPresetName(spec_.visual_preset), this));
-    form->addRow("Module library", new QLabel(QStringLiteral("architectural_modules_1 / facade_editor_1"), this));
+    form->addRow("Module library", new QLabel(QStringLiteral("architectural_modules_2 / facade_editor_2"), this));
 
     footprint_combo_ = new QComboBox(this); footprint_combo_->addItems({"1×1", "2×1", "2×2", "3×2"}); footprint_combo_->setCurrentIndex(1);
     form->addRow("Footprint", footprint_combo_);
@@ -215,7 +221,9 @@ BuildingComposerWidget::BuildingComposerWidget(QWidget* parent)
     facade_form->addRow("Facade editor", facade_editor_check_);
     facade_edge_combo_ = new QComboBox(this); facade_edge_combo_->addItems({"South", "East", "North", "West"}); facade_form->addRow("Facade", facade_edge_combo_);
     facade_floor_spin_ = new QSpinBox(this); facade_floor_spin_->setRange(1, 1); facade_floor_spin_->setValue(1); facade_form->addRow("Floor", facade_floor_spin_);
-    facade_module_combo_ = new QComboBox(this); facade_module_combo_->addItems({"Window", "Door", "Storefront", "Sign", "Awning"}); facade_form->addRow("Module", facade_module_combo_);
+    facade_module_combo_ = new QComboBox(this);
+    facade_module_combo_->addItems({"Window", "Door", "Storefront", "Sign", "Awning", "Double door", "Garage door", "Balcony", "Marquee", "Air conditioner", "Planter"});
+    facade_form->addRow("Module", facade_module_combo_);
     facade_position_slider_ = new QSlider(Qt::Horizontal, this); facade_position_slider_->setRange(5, 95); facade_position_slider_->setValue(50); facade_form->addRow("Position", facade_position_slider_);
     facade_width_slider_ = new QSlider(Qt::Horizontal, this); facade_width_slider_->setRange(6, 90); facade_width_slider_->setValue(22); facade_form->addRow("Width", facade_width_slider_);
     root->addLayout(facade_form);
@@ -413,7 +421,7 @@ void BuildingComposerWidget::refreshPreview() {
     preview_->setPixmap(QPixmap::fromImage(image).scaled(qMax(240, preview_->width() - 12), qMax(190, preview_->height() - 12),
                                                       Qt::KeepAspectRatio, Qt::SmoothTransformation));
     const QSize export_frame = BuildingExportPipeline::recommendedFrame(spec_);
-    summary_->setText(QStringLiteral("%1 — %2×%3, %4 floor(s) × %5px = %6px wall height. %7 roof. Facade editor: %8 (%9 modules). Preview: %10. Auto-export frame: %11×%12.")
+    summary_->setText(QStringLiteral("%1 — %2×%3, %4 floor(s) × %5px = %6px wall height. %7 roof. Facade editor: %8 (%9 modules / library v2). Preview: %10. Auto-export frame: %11×%12.")
         .arg(BuildingComposer::visualPresetName(spec_.visual_preset)).arg(spec_.footprint_width_tiles).arg(spec_.footprint_depth_tiles)
         .arg(spec_.floor_count).arg(spec_.floor_height_px).arg(BuildingComposer::effectiveWallHeightPx(spec_))
         .arg(BuildingRoofEditorRenderer::roofProfileName(spec_.roof_style))
@@ -432,7 +440,7 @@ void BuildingComposerWidget::exportAsset() {
     if (!exported) {
         summary_->setText(QStringLiteral("EXPORT BLOCKED: %1. Validation report: %2").arg(error, validation_path)); return;
     }
-    summary_->setText(QStringLiteral("AUTO EXPORTED: %1/%2_* — %3. Facade/floor contract recorded in manifest.")
+    summary_->setText(QStringLiteral("AUTO EXPORTED: %1/%2_* — %3. Facade/floor contract and stable module IDs recorded in manifest.")
         .arg(output_dir, stem, validation.summary()));
 }
 
