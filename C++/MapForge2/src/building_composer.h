@@ -20,7 +20,19 @@ enum class BuildingWallMaterial { Solid, Plaster, Brick, Concrete, Timber, Stone
 enum class BuildingRoofMaterial { Solid, CeramicTile, MetalSeam, AsphaltShingle };
 enum class BuildingStreetEdge { South, East, North, West };
 enum class BuildingRoadSocketType { LocalStreet, Avenue, ServiceRoad };
-enum class BuildingFacadeModuleKind { Window, Door, Storefront, Sign, Awning };
+enum class BuildingFacadeModuleKind {
+    Window,
+    Door,
+    Storefront,
+    Sign,
+    Awning,
+    DoubleDoor,
+    GarageDoor,
+    Balcony,
+    Marquee,
+    Hvac,
+    Planter,
+};
 
 enum class BuildingWindowModule { ClassicFramed };
 enum class BuildingDoorModule { ClassicWood };
@@ -133,8 +145,31 @@ public:
             case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront");
             case BuildingFacadeModuleKind::Sign: return QStringLiteral("sign");
             case BuildingFacadeModuleKind::Awning: return QStringLiteral("awning");
+            case BuildingFacadeModuleKind::DoubleDoor: return QStringLiteral("double_door");
+            case BuildingFacadeModuleKind::GarageDoor: return QStringLiteral("garage_door");
+            case BuildingFacadeModuleKind::Balcony: return QStringLiteral("balcony");
+            case BuildingFacadeModuleKind::Marquee: return QStringLiteral("marquee");
+            case BuildingFacadeModuleKind::Hvac: return QStringLiteral("hvac");
+            case BuildingFacadeModuleKind::Planter: return QStringLiteral("planter");
         }
         return QStringLiteral("window");
+    }
+
+    static QString facadeModuleId(BuildingFacadeModuleKind kind) {
+        switch (kind) {
+            case BuildingFacadeModuleKind::Window: return QStringLiteral("window.classic_framed.v1");
+            case BuildingFacadeModuleKind::Door: return QStringLiteral("door.classic_wood.v1");
+            case BuildingFacadeModuleKind::Storefront: return QStringLiteral("storefront.classic_glass.v1");
+            case BuildingFacadeModuleKind::Sign: return QStringLiteral("sign.facade_plaque.v1");
+            case BuildingFacadeModuleKind::Awning: return QStringLiteral("awning.canvas_canopy.v1");
+            case BuildingFacadeModuleKind::DoubleDoor: return QStringLiteral("door.double_glass.v1");
+            case BuildingFacadeModuleKind::GarageDoor: return QStringLiteral("garage.rollup_panel.v1");
+            case BuildingFacadeModuleKind::Balcony: return QStringLiteral("balcony.classic_rail.v1");
+            case BuildingFacadeModuleKind::Marquee: return QStringLiteral("marquee.flat_canopy.v1");
+            case BuildingFacadeModuleKind::Hvac: return QStringLiteral("hvac.wall_unit.v1");
+            case BuildingFacadeModuleKind::Planter: return QStringLiteral("planter.facade_box.v1");
+        }
+        return QStringLiteral("window.classic_framed.v1");
     }
 
     static QString roadSocketTypeName(BuildingRoadSocketType type) {
@@ -181,6 +216,7 @@ public:
         for (const auto& module : spec.facade_modules) {
             placements.append(QJsonObject{
                 {"kind", facadeModuleKindName(module.kind)},
+                {"moduleId", facadeModuleId(module.kind)},
                 {"edge", streetEdgeName(module.edge)},
                 {"floor", std::clamp(module.floor_index, 0, std::max(0, spec.floor_count - 1))},
                 {"position", static_cast<double>(std::clamp(module.position, 0.0F, 1.0F))},
@@ -189,7 +225,8 @@ public:
             });
         }
         return QJsonObject{
-            {"version", QStringLiteral("facade_editor_1")},
+            {"version", QStringLiteral("facade_editor_2")},
+            {"moduleLibrary", QStringLiteral("architectural_modules_2")},
             {"enabled", spec.facade_editor_enabled},
             {"floorSystem", QJsonObject{
                 {"version", QStringLiteral("floor_system_1")},
@@ -210,8 +247,13 @@ public:
         if (spec.south_awning) active.append(awningModuleId(spec.awning_module));
         if (spec.south_sign) active.append(signModuleId(spec.sign_module));
         if (spec.roof_chimney) active.append(chimneyModuleId(spec.chimney_module));
+        if (spec.facade_editor_enabled) {
+            for (const auto& module : spec.facade_modules) {
+                if (module.enabled) active.append(facadeModuleId(module.kind));
+            }
+        }
         return QJsonObject{
-            {"libraryVersion", QStringLiteral("architectural_modules_1")},
+            {"libraryVersion", QStringLiteral("architectural_modules_2")},
             {"window", windowModuleId(spec.window_module)}, {"door", doorModuleId(spec.door_module)},
             {"awning", awningModuleId(spec.awning_module)}, {"sign", signModuleId(spec.sign_module)},
             {"chimney", chimneyModuleId(spec.chimney_module)}, {"active", active},
