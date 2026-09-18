@@ -51,6 +51,7 @@ private:
     QCheckBox* shadow_check_ = nullptr;
     QCheckBox* roof_fascia_check_ = nullptr;
     QCheckBox* roof_ridge_check_ = nullptr;
+    QCheckBox* context_preview_check_ = nullptr;
     QLabel* preview_ = nullptr;
     QLabel* summary_ = nullptr;
 };
