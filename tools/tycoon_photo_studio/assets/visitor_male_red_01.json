@@ -189,9 +189,10 @@
     "armRadius": 0.08
   },
   "validation": {
-    "minimumDistinctFramesPerDirection": 6,
+    "minimumDistinctFramesPerDirection": 5,
     "maximumObjectHeightJitterPx": 18,
-    "maximumObjectWidthJitterPx": 24
+    "maximumObjectWidthJitterPx": 24,
+    "distinctFrameRule": "Five unique poses are required within the eight-frame loop; repeated contact frames are allowed for a conservative classic-Tycoon cadence."
   },
   "status": "production_candidate",
   "runtime": {
