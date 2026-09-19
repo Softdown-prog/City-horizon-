@@ -5,12 +5,12 @@
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
   "materials": {
-    "waterDeep": {"name": "WaterDeepClassic", "rgba": [0.025, 0.22, 0.42, 1.0], "roughness": 0.28, "metallic": 0.02}
+    "waterDeep": {"name": "WaterDeepClassic", "rgba": [0.025, 0.22, 0.42, 1.0], "roughness": 0.16, "metallic": 0.02, "recipe": "water_classic"}
   },
   "parts": [{
     "type": "water_surface", "name": "WaterDeepPlane", "material": "waterDeep",
-    "location": [0.0, 0.0, 0.015], "size": [3.0, 3.0], "subdivisions": 40,
-    "waveAmplitude": 0.018, "waveFrequency": 3.15, "waveDetail": 0.34, "wavePhase": 0.0,
+    "location": [0.0, 0.0, 0.0], "size": [3.0, 3.0], "subdivisions": 40,
+    "waveAmplitude": 0.010, "waveFrequency": 3.15, "waveDetail": 0.34, "wavePhase": 0.0,
     "roughness": 0.28
   }]
 }
