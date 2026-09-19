@@ -1,8 +1,8 @@
 {
-  "id": "animation_visual_sources_2",
+  "id": "animation_visual_sources_3",
   "name": "City Horizon Animation Visual Sources",
   "status": "canonical",
-  "purpose": "Allow each persistent animation node to render a stable authored visual source instead of regenerating independent per-frame artwork.",
+  "purpose": "Allow each persistent animation node to render a stable authored visual source with deterministic per-frame presentation variants instead of regenerating independent artwork.",
   "supportedKinds": [
     "none",
     "primitive_rectangle",
@@ -11,11 +11,7 @@
     "building_render",
     "library_part"
   ],
-  "productionPreferredKinds": [
-    "raster_sprite",
-    "building_render",
-    "library_part"
-  ],
+  "productionPreferredKinds": ["raster_sprite", "building_render", "library_part"],
   "primitivePolicy": {
     "supportedForQaAndFallback": true,
     "recommendedForFinalArt": false
@@ -41,29 +37,33 @@
   "libraryPart": {
     "stableIdRequired": true,
     "registeredNamespaceRequired": true,
-    "firstRegisteredLibrary": "carousel_parts_1",
+    "firstRegisteredLibrary": "carousel_parts_2",
     "firstNamespace": "carousel.*",
     "deterministicRenderer": true,
     "transparentRgba": true,
     "perNodePrimaryColorSupported": true,
     "perNodeOutlineColorSupported": true,
+    "visualVariantSupported": true,
+    "variantIndexStoredInNodeState": true,
     "sourceMustResolveBeforeProductionExport": true
   },
   "coherence": {
     "nodeVisualSourceStableAcrossClip": true,
     "nodePivotStableAcrossClip": true,
     "visualSourceNotRegeneratedFromRandomPromptPerFrame": true,
-    "sameNodeSourceUsedForEveryFrame": true,
+    "sameNodeSourceIdentityUsedForEveryFrame": true,
+    "presentationVariantMayChangePerFrame": true,
     "hierarchicalTransformsAppliedAfterSourceResolution": true
   },
   "export": {
-    "version": "animation_export_3",
+    "version": "animation_export_4",
     "visualSourcesValidatedBeforeBake": true,
     "manifestRecordsVisualKind": true,
+    "manifestRecordsVisualVariant": true,
     "manifestRecordsRasterPathWhenUsed": true,
     "manifestRecordsBuildingRenderIdentityWhenUsed": true,
     "manifestRecordsLibraryPartIdWhenUsed": true,
     "runtimeReceivesBakedFrames": true
   },
-  "authoringRule": "A node owns one stable visual source for the clip. Motion comes from timeline tracks and parent transforms; raster, building or registered library pixels are resolved from the same authored source for every sampled frame."
+  "authoringRule": "A node owns one stable visual source identity for the clip. Motion and presentation come from deterministic timeline tracks and parent transforms; a visual variant may select an authored directional presentation of that same source without replacing the node or changing its pivot identity."
 }
