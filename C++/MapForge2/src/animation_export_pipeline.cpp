@@ -40,6 +40,8 @@ QJsonObject frameSampleJson(const AnimationFrameSample& sample) {
             {"scale", static_cast<double>(node.scale)},
             {"opacity", static_cast<double>(node.opacity)},
             {"visible", node.visible},
+            {"drawOrder", node.draw_order},
+            {"visualVariant", node.visual_variant},
         });
     }
     return QJsonObject{
@@ -128,9 +130,11 @@ AnimationExportResult AnimationExportPipeline::exportClip(const AnimatedAssetSpe
         {"previewFile", preview_name},
         {"manifestFile", manifest_name},
         {"hierarchicalNodeStatesRecorded", true},
+        {"dynamicDrawOrderRecorded", true},
+        {"visualVariantStateRecorded", true},
         {"visualSourcesValidatedBeforeBake", true},
         {"visualSourceVersion", QString::fromLatin1(AnimationVisualSourceRenderer::kVersion)},
-        {"runtimeContract", QStringLiteral("SDL consumes ordered baked frame cells and clip timing; hierarchy and visual-source declarations remain authoring/debug metadata")},
+        {"runtimeContract", QStringLiteral("SDL consumes ordered baked frame cells and clip timing; hierarchy, resolved draw order and visual variants remain authoring/debug metadata")},
     });
     manifest.insert(QStringLiteral("frameSamples"), frame_samples);
 
