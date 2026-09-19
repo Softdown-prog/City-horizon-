@@ -203,7 +203,7 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     voronoi.location = (-500, -120)
     voronoi.voronoi_dimensions = "4D"
     voronoi.feature = "DISTANCE_TO_EDGE"
-    voronoi.inputs["Scale"].default_value = 7.0
+    voronoi.inputs["Scale"].default_value = 5.6
     voronoi.inputs["Randomness"].default_value = 0.72
     if "W" in voronoi.inputs:
         voronoi.inputs["W"].default_value = 0.0
@@ -219,16 +219,16 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
 
     caustics = tree.nodes.new("ShaderNodeValToRGB")
     caustics.location = (-120, -100)
-    caustics.color_ramp.elements[0].position = 0.05
+    caustics.color_ramp.elements[0].position = 0.08
     caustics.color_ramp.elements[0].color = (1.0, 1.0, 1.0, 1.0)
-    caustics.color_ramp.elements[1].position = 0.20
+    caustics.color_ramp.elements[1].position = 0.30
     caustics.color_ramp.elements[1].color = (0.0, 0.0, 0.0, 1.0)
     caustics.color_ramp.interpolation = "CONSTANT"
 
     screen = tree.nodes.new("ShaderNodeMixRGB")
     screen.location = (180, 180)
     screen.blend_type = "SCREEN"
-    screen.inputs["Fac"].default_value = 0.34
+    screen.inputs["Fac"].default_value = 0.50
     bump = tree.nodes.new("ShaderNodeBump")
     bump.location = (260, -160)
     bump.inputs["Strength"].default_value = 0.07
