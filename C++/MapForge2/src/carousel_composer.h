@@ -1,6 +1,7 @@
 #pragma once
 
 #include "animation_core.h"
+#include "src/ch_core/projection.h"
 
 #include <QColor>
 #include <QJsonObject>
@@ -24,17 +25,20 @@ struct CarouselComposerSpec {
     QPointF anchor_normalized = QPointF(0.50, 0.90);
 
     int horse_count = 8;
-    float platform_radius_px = 72.0F;
+    float platform_radius_world_tiles = 0.80F;
 
-    // Locked to the City Horizon canonical 2:1 projection (CH_GRID_V1).
-    // Kept in the authoring spec for manifest/backward compatibility; callers
-    // must use 0.50 so the carousel cannot silently drift to another camera.
+    // Backward-compatible authoring metadata only. These values are ignored by
+    // projection and must never be used as proof of camera equivalence.
+    float platform_radius_px = 72.0F;
     float isometric_depth_scale = 0.50F;
 
     float horse_bob_amplitude_px = 9.0F;
     float duration_seconds = 2.4F;
     int frame_count = 16;
     bool clockwise = true;
+
+    ch::CameraRotation camera_rotation = ch::CameraRotation::r0;
+    float camera_zoom = 1.0F;
 
     bool dynamic_depth_ordering = true;
     bool directional_horses = true;
@@ -61,7 +65,7 @@ struct CarouselPalette {
 
 class CarouselComposer final {
 public:
-    static constexpr const char* kVersion = "carousel_composer_3";
+    static constexpr const char* kVersion = "carousel_composer_4";
 
     static QString paletteId(CarouselPaletteProfile palette);
     static CarouselPalette palette(CarouselPaletteProfile profile);
