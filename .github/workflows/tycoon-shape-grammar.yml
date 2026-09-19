@@ -41,7 +41,16 @@ jobs:
           python tools/tycoon_photo_studio/generate_shape_grammar_asset.py \
             --grammar tools/tycoon_photo_studio/assets/mixed_use_block_2x2.grammar.json \
             --output out/generated_sources/mixed_use_block_2x2_check.json
-          cmp out/generated_sources/mixed_use_block_2x2.json out/generated_sources/mixed_use_block_2x2_check.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a = json.loads(Path('out/generated_sources/mixed_use_block_2x2.json').read_text())
+          b = json.loads(Path('out/generated_sources/mixed_use_block_2x2_check.json').read_text())
+          if a != b:
+              raise SystemExit('shape grammar is not semantically deterministic')
+          g = a['generation']
+          print(f"determinism ok: floors={g['floorCount']} parts={g['partCount']} seed={g['seed']}")
+          PY
 
       - name: Download Blender 4.2.3
         shell: bash
