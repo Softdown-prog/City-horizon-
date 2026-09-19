@@ -1,40 +1,27 @@
 {
-  "id": "carousel_engine_camera_1",
-  "name": "City Horizon Carousel Engine Camera Contract",
+  "id": "carousel_engine_camera_2",
+  "name": "City Horizon Carousel Runtime Camera Contract",
   "status": "canonical",
-  "purpose": "Lock Carousel Composer motion to the same world-to-screen basis used by the City Horizon engine instead of an arbitrary screen-space ellipse or parent rotation.",
-  "engineGridContract": "CH_GRID_V1",
-  "projection": {
-    "tileWidth": 128,
-    "tileHeight": 64,
-    "diamondRatio": 2.0,
-    "horizontalWorldRotationDegrees": 45.0,
-    "isometricInclinationDegrees": 35.264,
-    "groundPlaneBasis": {
-      "screenX": "(worldX - worldY) * tileWidth/2",
-      "screenY": "(worldX + worldY) * tileHeight/2"
-    }
+  "purpose": "Make the runtime projection implementation the only source of truth for carousel world-to-screen placement.",
+  "sourceOfTruth": {
+    "file": "src/ch_core/projection.cpp",
+    "function": "ch::world_to_screen_point",
+    "cameraStateType": "ch::CameraState",
+    "adapter": "engine_projection_adapter_1"
+  },
+  "descriptiveMetadataNotAuthority": {
+    "gridContract": "CH_GRID_V1",
+    "nominalTwoToOneDiamond": true,
+    "nominalAnglesMayBeDocumented": true,
+    "nominalAnglesMayBeUsedAsProof": false
   },
   "carouselOrbit": {
     "authoredInWorldPlane": true,
+    "radiusUnit": "logical_world_tiles",
     "screenSpaceParentRotationForbidden": true,
-    "horseOffsetXGeneratedFromWorldOrbit": true,
-    "horseOffsetYGeneratedFromWorldOrbit": true,
-    "verticalBobAddedAfterGroundProjection": true,
-    "canonicalDepthScale": 0.5,
-    "depthScaleAuthorOverrideForbidden": true
+    "screenOffsetsProducedByRuntimeProjection": true,
+    "verticalBobAppliedAfterGroundProjection": true
   },
-  "directionAndDepth": {
-    "horseDirectionDerivedFromProjectedWorldTangent": true,
-    "depthOrderingDerivedFromProjectedWorldPosition": true,
-    "directionalVariants": ["east", "south", "west", "north"]
-  },
-  "coherence": {
-    "sameCameraAsEngineGrid": true,
-    "sameTwoToOneDiamond": true,
-    "noMockupCameraInference": true,
-    "deterministicAcrossFrames": true,
-    "loopClosureRequired": true
-  },
-  "authoringRule": "Carousel motion is authored in the logical world plane and projected through CH_GRID_V1. Never rotate the horse hierarchy as a flat screen-space group to simulate an isometric orbit."
+  "calibrationGate": "engine_projection_calibration_1",
+  "authoringRule": "If runtime projection and Composer projection differ at any calibration sample, carousel export QA fails. Do not reimplement the runtime projection in MapForge."
 }
