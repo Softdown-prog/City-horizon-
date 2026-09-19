@@ -1,0 +1,15 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "house_small_02",
+  "variantId": "aged",
+  "sha256Inputs": {
+    "base": "f8f110a257a5eb451d5b847b25cc3362fa52af8e41a870715c5e9fd85d4fbf1a",
+    "colorMask": "bcf430a1cc59d92000c29b703cd0bcef8d1f7009eada6eebc2d756bb56364793",
+    "wearMask": "09a33910cb243ebc4bb1b3c691c628059f44c4653d5b617f9956e5484fb359b3",
+    "variantsManifest": "0c28fc6d6ecf73bd7c9e88c0b86b457708efd57a926e18d300db65b40ba12e60"
+  },
+  "sha256Output": "00c9006bb9aa3d93578ec1220cd24c1115023a58c25a66593ceebabc9aa3d04a"
+}

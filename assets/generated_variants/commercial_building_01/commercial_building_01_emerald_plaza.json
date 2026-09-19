@@ -1,0 +1,12 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "commercial_building_01",
+  "variantId": "emerald_plaza",
+  "base_sha256": "c8536cc62f7a721161e19383eba1bf6b9b496b965c97e1fca3472ddb54a992f6",
+  "semantic_mask_sha256": "ff844cbf238a0b4f2bae7a72b92d8f5c04e7fb6ce03399775eb6a5e7d2759321",
+  "manifest_sha256": "01dc033ba93b709cf892e6b388271f9af3318f5de46cff386622a3f5307a25ce",
+  "output_sha256": "ffd4a2a6c4a6ea1205c4c55dc341ea1c8ccb7e3c03f0e4b8b04d420fca819f55"
+}

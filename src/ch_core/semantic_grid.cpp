@@ -1,4 +1,5 @@
 #include "semantic_grid.h"
+#include "terrain_semantics_catalog.h"
 #include <cmath>
 
 namespace ch {
@@ -14,20 +15,26 @@ TileSemanticInfo SemanticGrid::inspect_tile_channels(const SemanticWorldView& wo
 
     const auto& doc = *world.map_document;
 
-    // 1. Terrain channel
+    // 1. Terrain channel — only a CH_TERRAIN_SEMANTICS_V1 definition may
+    // establish terrain gameplay. Images are deliberately not consulted.
     auto terrain = doc.get_terrain_at(tile.x, tile.y);
-    if (terrain.has_value()) {
-        if (!terrain->texture.empty()) {
-            info.terrain_type = terrain->texture;
-        }
-    }
+    std::string terrain_def_id = terrain.has_value() ? terrain->terrain_definition : "";
+    const TerrainSemanticsCatalog& catalog = TerrainSemanticsCatalog::global_instance();
+    const TerrainSemanticsDefinition* def = !terrain_def_id.empty() ? catalog.find(terrain_def_id) : nullptr;
 
-    if (info.terrain_type == "water" || info.terrain_type.find("water") != std::string::npos || info.terrain_type.find("ocean") != std::string::npos) {
-        info.water_state = SemanticState::valid;
+    if (!def) {
+        // Fail-closed safety: missing/unknown terrainDefinitionId MUST NOT silently become buildable or walkable.
+        info.terrain_type = terrain_def_id.empty() ? "unresolved_legacy_terrain" : terrain_def_id;
         info.buildable_state = SemanticState::invalid;
+        info.navigation_state = SemanticState::invalid;
+        info.sidewalk_state = SemanticState::not_declared;
+        info.water_state = SemanticState::not_declared;
     } else {
-        info.water_state = SemanticState::not_applicable;
-        info.buildable_state = SemanticState::valid;
+        info.terrain_type = def->id;
+        info.buildable_state = def->buildable ? SemanticState::valid : SemanticState::invalid;
+        info.water_state = def->water ? SemanticState::valid : SemanticState::not_applicable;
+        info.sidewalk_state = (def->surface == "sidewalk") ? SemanticState::valid : SemanticState::not_applicable;
+        info.navigation_state = (def->navigation_type == "pedestrian") ? SemanticState::valid : SemanticState::not_applicable;
     }
 
     // 2. Road channel

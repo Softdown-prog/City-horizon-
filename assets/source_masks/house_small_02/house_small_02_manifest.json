@@ -1,0 +1,103 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "house_small_02",
+  "base": "../../buildings/house_suburban_02_lvl1.png",
+  "semanticMask": "house_small_02_semantic_mask.png",
+  "regions": {
+    "wall": 1,
+    "roof": 2,
+    "trim": 3
+  },
+  "variants": [
+    {
+      "id": "terracotta_cream",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            220,
+            190,
+            150
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            180,
+            70,
+            50
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            60,
+            45,
+            35
+          ]
+        }
+      },
+      "wear": 0.15
+    },
+    {
+      "id": "slate_blue",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            150,
+            175,
+            195
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            60,
+            75,
+            95
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            220,
+            220,
+            220
+          ]
+        }
+      },
+      "wear": 0.1
+    },
+    {
+      "id": "sage_green",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            160,
+            180,
+            155
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            110,
+            80,
+            60
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            240,
+            235,
+            220
+          ]
+        }
+      },
+      "wear": 0.05
+    }
+  ]
+}

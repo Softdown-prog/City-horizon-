@@ -37,6 +37,7 @@
 #include <fstream>
 #include <iterator>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -92,6 +93,12 @@ struct WaterSurfaceTile {
     int tile_x = 0;
     int tile_y = 0;
     bool shallow = false;
+};
+
+struct ShorelineOverlayTile {
+    int tile_x = 0;
+    int tile_y = 0;
+    const ch::TextureAsset* texture = nullptr;
 };
 
 [[nodiscard]] constexpr std::uint8_t camera_rotation_turns(const CameraRotation rotation) {
@@ -269,6 +276,72 @@ private:
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
     const ch::GridCoord gc = ch::screen_to_tile_coord(screen_x, screen_y, cs, viewport_width, viewport_height);
     return {gc.x, gc.y};
+}
+
+struct OwnedTileBounds {
+    int min_x = 0;
+    int min_y = 0;
+    int max_x = 0; // Exclusive.
+    int max_y = 0; // Exclusive.
+};
+
+[[nodiscard]] OwnedTileBounds owned_tile_bounds(const LandManager& lands) {
+    bool found = false;
+    OwnedTileBounds bounds;
+    for (const LandParcel& parcel : lands.parcels()) {
+        if (!parcel.owned) continue;
+        if (!found) {
+            bounds = {parcel.origin_x, parcel.origin_y, parcel.origin_x + parcel.width, parcel.origin_y + parcel.height};
+            found = true;
+        } else {
+            bounds.min_x = std::min(bounds.min_x, parcel.origin_x);
+            bounds.min_y = std::min(bounds.min_y, parcel.origin_y);
+            bounds.max_x = std::max(bounds.max_x, parcel.origin_x + parcel.width);
+            bounds.max_y = std::max(bounds.max_y, parcel.origin_y + parcel.height);
+        }
+    }
+    return bounds;
+}
+
+[[nodiscard]] std::pair<int, int> nearest_owned_tile(const std::pair<int, int>& requested, const LandManager& lands) {
+    if (lands.is_tile_owned(requested.first, requested.second)) return requested;
+    int best_x = requested.first;
+    int best_y = requested.second;
+    int best_distance_squared = std::numeric_limits<int>::max();
+    for (const LandParcel& parcel : lands.parcels()) {
+        if (!parcel.owned) continue;
+        const int x = std::clamp(requested.first, parcel.origin_x, parcel.origin_x + parcel.width - 1);
+        const int y = std::clamp(requested.second, parcel.origin_y, parcel.origin_y + parcel.height - 1);
+        const int dx = x - requested.first;
+        const int dy = y - requested.second;
+        const int distance_squared = dx * dx + dy * dy;
+        if (distance_squared < best_distance_squared) {
+            best_distance_squared = distance_squared;
+            best_x = x;
+            best_y = y;
+        }
+    }
+    return {best_x, best_y};
+}
+
+void clamp_camera_to_owned_land(Camera& camera, const LandManager& lands, const float viewport_width, const float viewport_height) {
+    const OwnedTileBounds bounds = owned_tile_bounds(lands);
+    const float half_world_span = 0.5F * (
+        viewport_width / (kTileWidth * camera.zoom) + viewport_height / (kTileHeight * camera.zoom));
+    const float axis_x = -camera.pan_x / (kTileWidth * 0.5F * camera.zoom);
+    const float axis_y = -camera.pan_y / (kTileHeight * 0.5F * camera.zoom);
+    CameraWorldPoint center = logical_world_point((axis_y + axis_x) * 0.5F, (axis_y - axis_x) * 0.5F, camera.rotation);
+    const float min_center_x = static_cast<float>(bounds.min_x) + half_world_span;
+    const float max_center_x = static_cast<float>(bounds.max_x) - half_world_span;
+    const float min_center_y = static_cast<float>(bounds.min_y) + half_world_span;
+    const float max_center_y = static_cast<float>(bounds.max_y) - half_world_span;
+    center.x = min_center_x <= max_center_x ? std::clamp(center.x, min_center_x, max_center_x)
+                                             : (static_cast<float>(bounds.min_x + bounds.max_x) * 0.5F);
+    center.y = min_center_y <= max_center_y ? std::clamp(center.y, min_center_y, max_center_y)
+                                             : (static_cast<float>(bounds.min_y + bounds.max_y) * 0.5F);
+    const CameraWorldPoint view = camera_view_point(center.x, center.y, camera.rotation);
+    camera.pan_x = -(view.x - view.y) * (kTileWidth * 0.5F) * camera.zoom;
+    camera.pan_y = -(view.x + view.y) * (kTileHeight * 0.5F) * camera.zoom;
 }
 
 void render_tile_outline(SDL_Renderer* renderer, int x, int y, const Camera& camera, float viewport_width, float viewport_height) {
@@ -721,6 +794,38 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
     }
 }
 
+void render_seagull_flight(SDL_Renderer* renderer, const TextureCache& textures, const std::filesystem::path& root,
+                           const char* variant_id, const char* filename_prefix, const char* filename_suffix, const float time_seconds,
+                           const float route_x, const float route_start_y, const float route_end_y, const float route_progress,
+                           const Camera& camera, const float viewport_width, const float viewport_height) {
+    const int frame = static_cast<int>(time_seconds * 3.5F) % 8;
+    const std::string filename = std::string(filename_prefix) + (frame < 10 ? "0" : "") + std::to_string(frame) + filename_suffix + ".png";
+    const auto path = root / "assets/ambient" / variant_id / "frames" / filename;
+    const TextureAsset* texture = textures.find(path);
+    if (texture == nullptr) return;
+    // Ambient aerial pass is presentation-only: no navigation, placement,
+    // occupancy, or simulation state is attached to the sprite.
+    const float y = route_start_y + (route_end_y - route_start_y) * std::clamp(route_progress, 0.0F, 1.0F);
+    const SDL_FPoint screen = world_to_screen(route_x, y, camera, viewport_width, viewport_height);
+    const float size = 54.0F * camera.zoom;
+    const SDL_FRect destination = {screen.x - size * 0.5F, screen.y - 86.0F * camera.zoom, size, size};
+    SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
+}
+
+void render_seagull_north(SDL_Renderer* renderer, const TextureCache& textures, const std::filesystem::path& root,
+                          const float time_seconds, const float route_x, const float route_start_y, const float route_end_y,
+                          const float route_progress, const Camera& camera, const float viewport_width, const float viewport_height) {
+    render_seagull_flight(renderer, textures, root, "seagull_north", "flight_north_", "", time_seconds,
+                          route_x, route_start_y, route_end_y, route_progress, camera, viewport_width, viewport_height);
+}
+
+void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, const std::filesystem::path& root,
+                          const float time_seconds, const float route_x, const float route_start_y, const float route_end_y,
+                          const float route_progress, const Camera& camera, const float viewport_width, const float viewport_height) {
+    render_seagull_flight(renderer, textures, root, "seagull_south", "seagull_south_frame_", "_ocean_blue", time_seconds,
+                          route_x, route_start_y, route_end_y, route_progress, camera, viewport_width, viewport_height);
+}
+
 [[nodiscard]] std::string format_money(std::int64_t value) {
     const bool negative = value < 0;
     const std::uint64_t magnitude = negative
@@ -1084,6 +1189,7 @@ int main() {
         (void)textures.load(renderer, asset_root / ("assets/sidewalks/concrete_01/sidewalk_concrete_" + suffix + ".png"));
     }
     (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
+    (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
     (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
 
     BuildingCatalog catalog;
@@ -1205,25 +1311,41 @@ int main() {
 
     std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
     std::vector<WaterSurfaceTile> scenario_water_tiles;
+    std::unordered_map<std::uint64_t, std::string> scenario_terrain_paths;
+    std::vector<ShorelineOverlayTile> shoreline_overlays;
     // The two opaque PNGs are material records generated from the approved
     // Water V2 master. World coverage deliberately remains render_tile_fill,
     // the seam-proven CH_GRID_V1 geometry, rather than their PNG rectangle.
     const TextureAsset* water_base_deep = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_deep.png");
     const TextureAsset* water_base_shallow = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_shallow.png");
-    const TextureAsset* water_caustics = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_caustics_overlay_01.png");
+    const TextureAsset* water_caustics = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_caustics_01.png");
     if (water_base_deep == nullptr || water_base_shallow == nullptr || water_caustics == nullptr) {
         std::cerr << "CH_WATER_V2 assets unavailable; continuing with legacy terrain visuals\n";
     }
-    const std::filesystem::path initial_city_path = asset_root / "assets/scenarios/initial_city.json";
-    if (const auto map_doc = ch::MapDocument::load_from_file(initial_city_path.string())) {
-        for (const auto& tile : map_doc->terrain_tiles()) {
+    const std::filesystem::path scenarios_root = asset_root / "assets/scenarios";
+    std::filesystem::path initial_city_path = scenarios_root / "initial_city.json";
+    // Map Forge exports this one-line runtime selection marker.  Only a plain
+    // filename under the canonical scenario directory is accepted, so an
+    // external path can never be injected into the game's asset lookup.
+    const std::filesystem::path active_scenario_marker = scenarios_root / "active_scenario.txt";
+    if (std::ifstream marker{active_scenario_marker}; marker.good()) {
+        std::string selected_name;
+        std::getline(marker, selected_name);
+        const std::filesystem::path selected_path{selected_name};
+        if (selected_path.filename() == selected_path && selected_path.extension() == ".json" &&
+            std::filesystem::exists(scenarios_root / selected_path)) {
+            initial_city_path = scenarios_root / selected_path;
+        }
+    }
+    const std::optional<ch::MapDocument> active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
+    if (active_map_doc.has_value()) {
+        for (const auto& tile : active_map_doc->terrain_tiles()) {
             const TextureAsset* loaded_tex = textures.load(renderer, asset_root / tile.texture);
             const std::uint64_t key = ch::tile_key(tile.tile_x, tile.tile_y);
             scenario_terrain_textures[key] = loaded_tex;
-            const bool shallow = tile.texture.find("coast_water_shallow") != std::string::npos ||
-                                 tile.texture.find("ocean_shallow") != std::string::npos;
-            const bool deep = tile.texture.find("coast_water_deep") != std::string::npos ||
-                              tile.texture.find("ocean_deep") != std::string::npos;
+            scenario_terrain_paths[key] = tile.terrain_definition;
+            const bool shallow = tile.terrain_definition == "water_shallow";
+            const bool deep = tile.terrain_definition == "water_deep";
             if (shallow || deep) scenario_water_tiles.push_back({tile.tile_x, tile.tile_y, shallow});
         }
     }
@@ -1232,8 +1354,44 @@ int main() {
         const int right_depth = right.tile_x + right.tile_y;
         return left_depth == right_depth ? left.tile_x < right.tile_x : left_depth < right_depth;
     });
+    // CH_SHORELINE_V1: choose existing directional art from topology.  This is
+    // intentionally separate from Water V2 and does not alter water tiles.
+    const auto has_water_at = [&scenario_terrain_paths](const int x, const int y) {
+        const auto it = scenario_terrain_paths.find(ch::tile_key(x, y));
+        return it != scenario_terrain_paths.end() &&
+               (it->second == "water_shallow" || it->second == "water_deep");
+    };
+    for (const auto& [key, texture_path] : scenario_terrain_paths) {
+        if (texture_path != "sand") continue;
+        const int x = static_cast<int>(static_cast<std::uint32_t>(key >> 32));
+        const int y = static_cast<int>(static_cast<std::uint32_t>(key));
+        const bool north = has_water_at(x, y - 1), east = has_water_at(x + 1, y);
+        const bool south = has_water_at(x, y + 1), west = has_water_at(x - 1, y);
+        const int adjacent = static_cast<int>(north) + static_cast<int>(east) + static_cast<int>(south) + static_cast<int>(west);
+        std::string suffix;
+        if (adjacent == 1) suffix = north ? "north" : east ? "east" : south ? "south" : "west";
+        else if (adjacent == 2 && ((north && east) || (east && south) || (south && west) || (west && north))) {
+            suffix = north && east ? "inner_ne" : east && south ? "inner_se" : south && west ? "inner_sw" : "inner_nw";
+        } else if (adjacent == 0) {
+            if (has_water_at(x + 1, y - 1)) suffix = "outer_ne";
+            else if (has_water_at(x + 1, y + 1)) suffix = "outer_se";
+            else if (has_water_at(x - 1, y + 1)) suffix = "outer_sw";
+            else if (has_water_at(x - 1, y - 1)) suffix = "outer_nw";
+        }
+        if (suffix.empty()) continue;
+        const std::string name = suffix.rfind("inner_", 0) == 0 || suffix.rfind("outer_", 0) == 0
+            ? "coast_corner_" + suffix + ".png" : "coast_border_" + suffix + ".png";
+        if (const TextureAsset* overlay = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted" / name)) {
+            shoreline_overlays.push_back({x, y, overlay});
+        }
+    }
 
     Camera camera;
+    float seagull_seconds = 0.0F;
+    float seagull_pass_elapsed = 0.0F;
+    float seagull_next_pass_in = 8.0F;
+    std::uint32_t seagull_pass_index = 0;
+    bool seagull_pass_active = false;
     std::optional<std::uint64_t> selected_instance_id;
     std::string placement_definition_id;
     BuildingRotation placement_rotation = BuildingRotation::r0;
@@ -1400,7 +1558,7 @@ int main() {
     };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
-        status = "SIDEWALK MODE: CLICK OWNED LAND"; (void)audio.play(SoundEvent::ui_select);
+        status = "CEMENT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);
     };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
@@ -1827,8 +1985,10 @@ int main() {
         float event_mouse_x = 0.0F;
         float event_mouse_y = 0.0F;
         SDL_GetMouseState(&event_mouse_x, &event_mouse_y);
-        const auto event_mouse_tile = screen_to_tile(event_mouse_x, event_mouse_y, camera,
-                                                     static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        const auto event_mouse_tile = land_mode
+            ? screen_to_tile(event_mouse_x, event_mouse_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height))
+            : nearest_owned_tile(screen_to_tile(event_mouse_x, event_mouse_y, camera,
+                                                static_cast<float>(viewport_width), static_cast<float>(viewport_height)), lands);
         gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));
 
         SDL_Event event;
@@ -1841,6 +2001,7 @@ int main() {
                     camera.pan_y += event.motion.yrel;
                     camera.pan_velocity_x = 0.0F;
                     camera.pan_velocity_y = 0.0F;
+                    clamp_camera_to_owned_land(camera, lands, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
                     continue;
                 }
                 gameplay_ui.handle_mouse_motion(event.motion.x, event.motion.y);
@@ -1852,7 +2013,8 @@ int main() {
                     continue;
                 }
                 if (!gameplay_ui.consumes_point(wheel_mouse_x, wheel_mouse_y)) {
-                    camera.zoom = std::clamp(camera.zoom + event.wheel.y * 0.10F, 0.45F, 2.25F);
+                    camera.zoom = std::clamp(camera.zoom + event.wheel.y * 0.10F, 0.65F, 1.65F);
+                    clamp_camera_to_owned_land(camera, lands, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
                 }
             } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (event.button.button == SDL_BUTTON_MIDDLE &&
@@ -1870,8 +2032,9 @@ int main() {
                     }
                     continue;
                 }
-                const auto clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
-                                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                const auto raw_clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
+                                                             static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                const auto clicked_tile = land_mode ? raw_clicked_tile : nearest_owned_tile(raw_clicked_tile, lands);
                 if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
                     land_mode = false;
                     status = "LAND MODE CANCELLED";
@@ -2175,12 +2338,12 @@ int main() {
                             ++blocked;
                             continue;
                         }
-                        if (sidewalks.place_tile(tile.x, tile.y, "concrete_01")) {
+                        if (sidewalks.place_tile(tile.x, tile.y, "cement_path")) {
                             ++placed;
                         }
                     }
-                    status = placed == 0 ? "SIDEWALK BLOCKED BY ROAD, BUILDING OR TILE" :
-                        "SIDEWALK PLACED: " + std::to_string(placed) + " TILE(S)" +
+                    status = placed == 0 ? "CEMENT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
+                        "CEMENT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " SKIPPED");
                     (void)audio.play(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;
@@ -2448,6 +2611,22 @@ int main() {
         const double elapsed_seconds = static_cast<double>(current_simulation_ticks - last_simulation_ticks) / 1000.0;
         last_simulation_ticks = current_simulation_ticks;
         const float frame_seconds = static_cast<float>(elapsed_seconds);
+        seagull_seconds += std::min(frame_seconds, 0.050F);
+        if (seagull_pass_active) {
+            seagull_pass_elapsed += std::min(frame_seconds, 0.050F);
+            if (seagull_pass_elapsed >= 10.0F) {
+                seagull_pass_active = false;
+                // Deterministic, varied pauses: 14, 18, 22, or 26 seconds.
+                seagull_next_pass_in = 14.0F + static_cast<float>((seagull_pass_index % 4U) * 4U);
+            }
+        } else {
+            seagull_next_pass_in -= std::min(frame_seconds, 0.050F);
+            if (seagull_next_pass_in <= 0.0F) {
+                seagull_pass_active = true;
+                seagull_pass_elapsed = 0.0F;
+                ++seagull_pass_index;
+            }
+        }
         const bool* keyboard_state = SDL_GetKeyboardState(nullptr);
         float camera_input_x = 0.0F;
         float camera_input_y = 0.0F;
@@ -2494,6 +2673,7 @@ int main() {
         camera.pan_velocity_y += (target_velocity_y - camera.pan_velocity_y) * camera_blend;
         camera.pan_x += camera.pan_velocity_x * camera_delta_seconds;
         camera.pan_y += camera.pan_velocity_y * camera_delta_seconds;
+        clamp_camera_to_owned_land(camera, lands, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         const SimulationAdvance time_advance = simulation_clock.advance_seconds(elapsed_seconds);
         const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
         for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
@@ -2528,7 +2708,8 @@ int main() {
         float mouse_x = 0.0F;
         float mouse_y = 0.0F;
         SDL_GetMouseState(&mouse_x, &mouse_y);
-        const auto mouse_tile = screen_to_tile(mouse_x, mouse_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        const auto raw_mouse_tile = screen_to_tile(mouse_x, mouse_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        const auto mouse_tile = land_mode ? raw_mouse_tile : nearest_owned_tile(raw_mouse_tile, lands);
         const BuildingInstance* hovered_instance = buildings.instance_at(mouse_tile.first, mouse_tile.second);
         const BuildingDefinition* placement_definition = placement_definition_id.empty() ? nullptr : catalog.find(placement_definition_id);
         const BuildingPlacementValidation placement_validation = placement_definition == nullptr
@@ -2557,10 +2738,19 @@ int main() {
                 navigation_debug_path = find_navigation_path(SidewalkNavigationNetwork{sidewalks}, *navigation_debug_start, *navigation_debug_goal);
             }
         }
-        render_map(renderer, grass, scenario_terrain_textures, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-        if (water_base_deep != nullptr && water_base_shallow != nullptr && water_caustics != nullptr) {
-            render_water_v2_layers(renderer, scenario_water_tiles, water_caustics, camera,
-                                   static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        if (active_map_doc.has_value()) {
+            const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+            ch::MapRenderer::render_world_terrain_and_water(
+                renderer,
+                *active_map_doc,
+                [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                asset_root,
+                cs,
+                static_cast<float>(viewport_width),
+                static_cast<float>(viewport_height)
+            );
+        } else {
+            render_map(renderer, grass, scenario_terrain_textures, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         }
         const LandParcel* hovered_parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
         render_land_overlays(renderer, lands, hovered_parcel, land_mode, camera,
@@ -2639,6 +2829,23 @@ int main() {
         const std::vector<MobileEntityRenderData> mobile_entities = mobile_render_entities();
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities, mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        if (seagull_pass_active) {
+            const OwnedTileBounds bounds = owned_tile_bounds(lands);
+            const bool southbound = (seagull_pass_index % 2U) == 0U;
+            const float route_progress = seagull_pass_elapsed / 10.0F;
+            const float route_x = southbound
+                ? static_cast<float>(bounds.min_x) + 0.68F * static_cast<float>(bounds.max_x - bounds.min_x)
+                : static_cast<float>(bounds.min_x) + 0.32F * static_cast<float>(bounds.max_x - bounds.min_x);
+            const float north_edge = static_cast<float>(bounds.min_y) - 4.0F;
+            const float south_edge = static_cast<float>(bounds.max_y) + 4.0F;
+            if (southbound) {
+                render_seagull_south(renderer, textures, asset_root, seagull_seconds, route_x, north_edge, south_edge,
+                                     route_progress, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+            } else {
+                render_seagull_north(renderer, textures, asset_root, seagull_seconds, route_x, south_edge, north_edge,
+                                     route_progress, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+            }
+        }
         if (navigation_debug_path) {
             render_navigation_debug_path(renderer, *navigation_debug_path, camera,
                                          static_cast<float>(viewport_width), static_cast<float>(viewport_height));

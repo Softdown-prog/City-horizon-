@@ -90,14 +90,24 @@ class MapModel:
         import json
         return json.dumps(self._raw_data, indent=2, ensure_ascii=False)
 
-    def set_terrain(self, tile_x: int, tile_y: int, texture_path: str) -> None:
-        """Sets or updates custom terrain entry at (tile_x, tile_y)."""
+    def set_terrain(self, tile_x: int, tile_y: int, texture_path: str, terrain_definition: Optional[str] = None,
+                    apply_semantics: bool = False) -> None:
+        """Updates appearance; semantic ID changes only when explicitly requested."""
         terrain_list = self._raw_data.setdefault("terrain", [])
         for entry in terrain_list:
             if entry.get("tileX") == tile_x and entry.get("tileY") == tile_y:
                 entry["texture"] = texture_path
+                if apply_semantics:
+                    if terrain_definition is None:
+                        entry.pop("terrainDefinition", None)
+                    else:
+                        entry["terrainDefinition"] = terrain_definition
                 return
-        terrain_list.append({"tileX": tile_x, "tileY": tile_y, "texture": texture_path})
+        entry = {"tileX": tile_x, "tileY": tile_y, "texture": texture_path}
+        if apply_semantics:
+            if terrain_definition is not None:
+                entry["terrainDefinition"] = terrain_definition
+        terrain_list.append(entry)
 
     def add_building(self, definition_id: str, tile_x: int, tile_y: int, rotation: int = 0, instance_id: Optional[int] = None) -> int:
         """Allocates next instance ID or uses provided instance_id and adds building instance."""

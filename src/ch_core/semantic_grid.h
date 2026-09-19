@@ -2,6 +2,7 @@
 
 #include "semantic_contracts.h"
 #include "map_document.h"
+#include "terrain_semantics.h"
 #include <vector>
 #include <memory>
 #include <string_view>
@@ -24,6 +25,7 @@ public:
 // View structure referencing existing world authorities (no logic duplicated)
 struct SemanticWorldView {
     const MapDocument* map_document{nullptr};
+    const TerrainSemanticCatalog* terrain_catalog{nullptr};
     int map_min{contracts::kMapMin};
     int map_max{contracts::kMapMax};
 };

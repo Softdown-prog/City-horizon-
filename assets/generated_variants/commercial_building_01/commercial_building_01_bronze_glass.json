@@ -1,0 +1,12 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "commercial_building_01",
+  "variantId": "bronze_glass",
+  "base_sha256": "c8536cc62f7a721161e19383eba1bf6b9b496b965c97e1fca3472ddb54a992f6",
+  "semantic_mask_sha256": "ff844cbf238a0b4f2bae7a72b92d8f5c04e7fb6ce03399775eb6a5e7d2759321",
+  "manifest_sha256": "01dc033ba93b709cf892e6b388271f9af3318f5de46cff386622a3f5307a25ce",
+  "output_sha256": "a9c72c547735a364998c7e2ec2019dc0aa0da3d577eeb965b36509cb4a8c7dd9"
+}

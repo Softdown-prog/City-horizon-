@@ -2198,13 +2198,6 @@
       "rotation": 0
     },
     {
-      "instanceId": 4,
-      "definitionId": "police_station_01",
-      "tileX": 7,
-      "tileY": -3,
-      "rotation": 0
-    },
-    {
       "instanceId": 5,
       "definitionId": "bakery_01",
       "tileX": -10,

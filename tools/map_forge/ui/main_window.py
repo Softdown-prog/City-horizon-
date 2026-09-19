@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QGroupBox
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence, QColor, QIcon, QPainter, QPixmap
 
 from tools.map_forge.importers.map_importer import load_scenario, load_building_catalog
 from tools.map_forge.exporters.game_exporter import (
@@ -21,6 +21,8 @@ from tools.map_forge.exporters.game_exporter import (
 from tools.map_forge.core.validator import validate_map
 from tools.map_forge.core.command_executor import CommandExecutor
 from tools.map_forge.ui.sdl_viewport import MapForgeSDLViewport
+from tools.map_forge.asset_catalog import building_catalog_entries, scenario_catalog, terrain_catalog, resolve_asset_path
+from tools.map_forge.core.terrain_semantics import load_terrain_semantic_catalog, TerrainSemanticContractError, native_catalog_json
 
 
 class MapForgeMainWindow(QMainWindow):
@@ -29,6 +31,7 @@ class MapForgeMainWindow(QMainWindow):
         self.asset_root = asset_root
         self.scenario_path = scenario_path
         self.building_catalog = load_building_catalog(asset_root)
+        self.terrain_semantic_catalog = load_terrain_semantic_catalog(asset_root)
         self.map_model = None
 
         self.setWindowTitle("City Horizon Map Forge — Native C++20 + SDL3 Engine [HUMAN EDITING & EXPORT MODE]")
@@ -37,8 +40,12 @@ class MapForgeMainWindow(QMainWindow):
         # Active Manual Tool State
         self.active_tool = "inspect"  # "inspect", "paint_terrain", "place_asset", "demolish", "road"
         self.selected_terrain_texture = "assets/terrain/coast_adjusted/coast_sand_center_01.png"
+        self.selected_terrain_definition = None
+        self.terrain_catalog_json = native_catalog_json(self.terrain_semantic_catalog)
         self.selected_asset_id = "beach_lighthouse"
         self.selected_rotation = 0
+        self.brush_radius = 0
+        self.stroke_visited_tiles = set()
 
         # Central native viewport widget
         self.canvas = MapForgeSDLViewport(asset_root, self.building_catalog, self)
@@ -47,6 +54,9 @@ class MapForgeMainWindow(QMainWindow):
         # Connect canvas signals
         self.canvas.hovered_tile_changed.connect(self._on_tile_hovered)
         self.canvas.tile_clicked.connect(self._on_tile_clicked)
+        self.canvas.brush_stroke_started.connect(self._on_stroke_started)
+        self.canvas.brush_tile_dragged.connect(self._on_stroke_dragged)
+        self.canvas.brush_stroke_ended.connect(self._on_stroke_ended)
 
         # Status Bar
         self.status_bar = QStatusBar(self)
@@ -167,6 +177,14 @@ class MapForgeMainWindow(QMainWindow):
         tool_layout.addWidget(rb_demolish)
         tool_layout.addWidget(rb_road)
 
+        brush_layout = QHBoxLayout()
+        brush_layout.addWidget(QLabel("Brush Size:"))
+        self.cbo_brush_size = QComboBox()
+        self.cbo_brush_size.addItems(["1x1 Tile (Radius 0)", "3x3 Tiles (Radius 1)", "5x5 Tiles (Radius 2)"])
+        self.cbo_brush_size.currentIndexChanged.connect(self._on_brush_size_changed)
+        brush_layout.addWidget(self.cbo_brush_size)
+        tool_layout.addLayout(brush_layout)
+
         hist_layout = QHBoxLayout()
         self.btn_undo = QPushButton("↩️ Undo (Ctrl+Z)")
         self.btn_undo.clicked.connect(self._perform_undo)
@@ -175,6 +193,10 @@ class MapForgeMainWindow(QMainWindow):
         hist_layout.addWidget(self.btn_undo)
         hist_layout.addWidget(self.btn_redo)
         tool_layout.addLayout(hist_layout)
+
+        btn_reload_cat = QPushButton("🔄 Reload Asset Catalogs (Hot-Reload)")
+        btn_reload_cat.clicked.connect(self._on_reload_catalogs_clicked)
+        tool_layout.addWidget(btn_reload_cat)
 
         layout.addWidget(grp_tools)
 
@@ -191,10 +213,36 @@ class MapForgeMainWindow(QMainWindow):
             ("Água Rasa Base", "assets/terrain/coast_adjusted/coast_water_shallow.png"),
             ("Água Profunda Base", "assets/terrain/coast_adjusted/coast_water_deep.png"),
         ]
+        discovered_terrain = terrain_catalog(self.asset_root)
+        if discovered_terrain:
+            self.terrain_options = [(entry.label, entry.relative_path) for entry in discovered_terrain]
         for name, path in self.terrain_options:
             self.cbo_terrain.addItem(name, path)
+            self.cbo_terrain.setItemIcon(self.cbo_terrain.count() - 1, self._thumbnail_icon(path, 42))
+        # Definitions are intentional, semantic-bearing choices; texture entries remain visual-only.
+        for definition in self.terrain_semantic_catalog.values():
+            semantic = definition["semantic"]
+            label = f"{definition['id']} — {semantic['surface']}"
+            self.cbo_terrain.addItem(label, {"texture": definition["visualMaterial"], "definition": definition["id"]})
+            self.cbo_terrain.setItemIcon(self.cbo_terrain.count() - 1, self._thumbnail_icon(definition["visualMaterial"], 42))
         self.cbo_terrain.currentIndexChanged.connect(self._on_terrain_selected)
         t_layout.addWidget(self.cbo_terrain)
+        self.grp_paint_mode = QButtonGroup(self)
+        self.rb_visual_only = QRadioButton("Visual Only — preserva lógica")
+        self.rb_visual_semantic = QRadioButton("Visual + Semantics — aplica definição")
+        self.rb_visual_only.setChecked(True)
+        self.grp_paint_mode.addButton(self.rb_visual_only, 0)
+        self.grp_paint_mode.addButton(self.rb_visual_semantic, 1)
+        t_layout.addWidget(self.rb_visual_only)
+        t_layout.addWidget(self.rb_visual_semantic)
+        self.lbl_terrain_semantics = QLabel("Semântica: não alterada (Visual Only)")
+        self.lbl_terrain_semantics.setWordWrap(True)
+        t_layout.addWidget(self.lbl_terrain_semantics)
+        self.lbl_terrain_preview = QLabel("Selecione um terreno para ver a miniatura.")
+        self.lbl_terrain_preview.setAlignment(Qt.AlignCenter)
+        self.lbl_terrain_preview.setMinimumHeight(92)
+        self.lbl_terrain_preview.setStyleSheet("background: #101820; border: 1px solid #28546b;")
+        t_layout.addWidget(self.lbl_terrain_preview)
         layout.addWidget(self.grp_terrain)
 
         # 3. Asset Selector & Rotation (Active when Place Asset selected)
@@ -210,6 +258,12 @@ class MapForgeMainWindow(QMainWindow):
         self.lst_assets.setFixedHeight(130)
         self.lst_assets.itemSelectionChanged.connect(self._on_asset_selected)
         a_layout.addWidget(self.lst_assets)
+        self.lbl_asset_preview = QLabel("Selecione um objeto para ver a miniatura.")
+        self.lbl_asset_preview.setAlignment(Qt.AlignCenter)
+        self.lbl_asset_preview.setMinimumHeight(120)
+        self.lbl_asset_preview.setWordWrap(True)
+        self.lbl_asset_preview.setStyleSheet("background: #101820; border: 1px solid #28546b;")
+        a_layout.addWidget(self.lbl_asset_preview)
 
         rot_layout = QHBoxLayout()
         rot_layout.addWidget(QLabel("Rotation:"))
@@ -225,6 +279,15 @@ class MapForgeMainWindow(QMainWindow):
 
         layout.addWidget(self.grp_asset_palette)
 
+        # 3b. Scenario browser: actual scenario previews, not opaque filenames.
+        grp_scenarios = QGroupBox("CENÁRIOS DISPONÍVEIS")
+        scenario_layout = QVBoxLayout(grp_scenarios)
+        self.lst_scenarios = QListWidget()
+        self.lst_scenarios.setFixedHeight(135)
+        self.lst_scenarios.itemSelectionChanged.connect(self._on_scenario_selected)
+        scenario_layout.addWidget(self.lst_scenarios)
+        layout.addWidget(grp_scenarios)
+
         # 4. MAP EXPORT SUITE
         grp_export = QGroupBox("MAP EXPORT & SAVING SUITE")
         exp_layout = QVBoxLayout(grp_export)
@@ -233,6 +296,11 @@ class MapForgeMainWindow(QMainWindow):
         btn_export_game.setStyleSheet("background-color: #204555; color: #40e0ff; font-weight: bold; padding: 6px;")
         btn_export_game.clicked.connect(self._export_game_scenario_dialog)
         exp_layout.addWidget(btn_export_game)
+
+        btn_export_activate = QPushButton("▶ Exportar e ativar no City Builder")
+        btn_export_activate.setStyleSheet("background-color: #1f6a32; color: white; font-weight: bold; padding: 6px;")
+        btn_export_activate.clicked.connect(self._export_and_activate_game_scenario_dialog)
+        exp_layout.addWidget(btn_export_activate)
 
         btn_export_png = QPushButton("📸 Export High-Res Preview PNG")
         btn_export_png.clicked.connect(self._export_map_preview_png_dialog)
@@ -286,22 +354,84 @@ class MapForgeMainWindow(QMainWindow):
 
         # Populate asset list
         self._populate_asset_list()
+        self._populate_scenario_list()
+        self._update_terrain_preview()
 
     def _populate_asset_list(self):
         self.lst_assets.clear()
         if not self.building_catalog:
             return
 
-        for asset_id in sorted(self.building_catalog.keys()):
-            bdef = self.building_catalog[asset_id]
-            name = bdef.get("name", asset_id)
-            cat = bdef.get("category", "building")
-            item = QListWidgetItem(f"{name} [{asset_id}] ({cat})")
-            item.setData(Qt.UserRole, asset_id)
+        for entry in building_catalog_entries(self.building_catalog):
+            item = QListWidgetItem(f"{entry.label} [{entry.id}] ({entry.category})")
+            item.setData(Qt.UserRole, entry.id)
+            item.setData(Qt.UserRole + 1, entry.relative_path)
+            item.setIcon(self._thumbnail_icon(entry.relative_path, 42))
             self.lst_assets.addItem(item)
 
         if self.lst_assets.count() > 0:
             self.lst_assets.setCurrentRow(0)
+
+    def _thumbnail_icon(self, relative_path: str, size: int) -> QIcon:
+        try:
+            pixmap = QPixmap(str(resolve_asset_path(self.asset_root, relative_path)))
+            if not pixmap.isNull():
+                return QIcon(pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        except (OSError, ValueError):
+            pass
+        return QIcon()
+
+    def _set_preview(self, label: QLabel, relative_path: str, caption: str, size: int = 112):
+        try:
+            pixmap = QPixmap(str(resolve_asset_path(self.asset_root, relative_path)))
+            if not pixmap.isNull():
+                label.setPixmap(pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                label.setToolTip(caption + "\n" + relative_path)
+                return
+        except (OSError, ValueError):
+            pass
+        label.setPixmap(QPixmap())
+        label.setText(caption + "\nMiniatura indisponível")
+
+    def _scenario_thumbnail(self, scenario_path: str) -> QIcon:
+        """Small deterministic semantic overview for a selectable scenario."""
+        image = QPixmap(128, 78)
+        image.fill(QColor("#112431"))
+        try:
+            model = load_scenario(scenario_path)
+            painter = QPainter(image)
+            for tile in model.terrain_tiles:
+                texture = str(tile.get("texture", ""))
+                color = QColor("#4e8f4d")
+                if "water" in texture or "ocean" in texture:
+                    color = QColor("#4ac6d5")
+                elif "sand" in texture or "beach" in texture:
+                    color = QColor("#d8bb70")
+                x = int(64 + (int(tile.get("tileX", 0)) - int(tile.get("tileY", 0))) * 1.4)
+                y = int(36 + (int(tile.get("tileX", 0)) + int(tile.get("tileY", 0))) * 0.65)
+                painter.setPen(color)
+                painter.drawPoint(x, y)
+            painter.setPen(QColor("#f4c95d"))
+            for building in model.buildings:
+                x = int(64 + (int(building.get("tileX", 0)) - int(building.get("tileY", 0))) * 1.4)
+                y = int(36 + (int(building.get("tileX", 0)) + int(building.get("tileY", 0))) * 0.65)
+                painter.drawRect(x - 1, y - 1, 3, 3)
+            painter.end()
+        except Exception:
+            pass
+        return QIcon(image)
+
+    def _populate_scenario_list(self):
+        self.lst_scenarios.blockSignals(True)
+        self.lst_scenarios.clear()
+        for path in scenario_catalog(self.asset_root):
+            item = QListWidgetItem(path.stem.replace("_", " ").title())
+            item.setData(Qt.UserRole, str(path))
+            item.setIcon(self._scenario_thumbnail(str(path)))
+            self.lst_scenarios.addItem(item)
+            if os.path.abspath(str(path)) == os.path.abspath(self.scenario_path):
+                item.setSelected(True)
+        self.lst_scenarios.blockSignals(False)
 
     def _filter_asset_list(self, text: str):
         search = text.lower().strip()
@@ -315,12 +445,37 @@ class MapForgeMainWindow(QMainWindow):
         self.lbl_mode.setText(f" MODE: MANUAL EDIT ({self.active_tool.upper()}) | CH_GRID_V1 ")
 
     def _on_terrain_selected(self, index: int):
-        self.selected_terrain_texture = self.cbo_terrain.currentData()
+        data = self.cbo_terrain.currentData()
+        if isinstance(data, dict):
+            self.selected_terrain_texture = data["texture"]
+            self.selected_terrain_definition = data["definition"]
+            semantic = self.terrain_semantic_catalog[data["definition"]]["semantic"]
+            self.lbl_terrain_semantics.setText(
+                f"Material: {data['texture']}\nSemantic: {semantic['surface']} | Pedestrian: {'YES' if semantic['pedestrianWalkable'] else 'NO'} | Vehicle: {'YES' if semantic['vehicleDriveable'] else 'NO'} | Buildable: {'YES' if semantic['buildable'] else 'NO'}")
+        else:
+            self.selected_terrain_texture = data
+            self.selected_terrain_definition = None
+            self.lbl_terrain_semantics.setText("Semântica: não declarada — Visual Only preserva os canais atuais.")
+        self._update_terrain_preview()
+
+    def _update_terrain_preview(self):
+        if hasattr(self, "lbl_terrain_preview"):
+            self._set_preview(self.lbl_terrain_preview, self.selected_terrain_texture or "", self.cbo_terrain.currentText(), 105)
 
     def _on_asset_selected(self):
         items = self.lst_assets.selectedItems()
         if items:
             self.selected_asset_id = items[0].data(Qt.UserRole)
+            self._set_preview(self.lbl_asset_preview, items[0].data(Qt.UserRole + 1), items[0].text(), 118)
+
+    def _on_scenario_selected(self):
+        items = self.lst_scenarios.selectedItems()
+        if not items:
+            return
+        selected = items[0].data(Qt.UserRole)
+        if selected and os.path.abspath(selected) != os.path.abspath(self.scenario_path):
+            self.scenario_path = selected
+            self._load_current_scenario()
 
     def _rotate_asset(self):
         self.selected_rotation = (self.selected_rotation + 1) % 4
@@ -336,8 +491,10 @@ class MapForgeMainWindow(QMainWindow):
         if os.path.exists(self.scenario_path):
             try:
                 self.map_model = load_scenario(self.scenario_path)
-                self.executor = CommandExecutor(self.map_model, self.asset_root, self.building_catalog, read_only=False)
+                self.executor = CommandExecutor(self.map_model, self.asset_root, self.building_catalog, read_only=False,
+                                                terrain_semantic_catalog=self.terrain_semantic_catalog)
                 self.canvas.set_map_model(self.map_model)
+                self.canvas.center_camera_on_content(self.canvas.map_document)
 
                 info_text = (
                     f"<b>Scenario Path:</b> {os.path.basename(self.scenario_path)}<br>"
@@ -365,7 +522,10 @@ class MapForgeMainWindow(QMainWindow):
         if path and os.path.exists(path):
             self.asset_root = path
             self.building_catalog = load_building_catalog(self.asset_root)
+            self.terrain_semantic_catalog = load_terrain_semantic_catalog(self.asset_root)
+            self.terrain_catalog_json = native_catalog_json(self.terrain_semantic_catalog)
             self._populate_asset_list()
+            self._populate_scenario_list()
             QMessageBox.information(self, "Asset Catalog Imported", f"Imported {len(self.building_catalog)} definitions from asset root.")
 
     def _save_current_map(self):
@@ -390,19 +550,33 @@ class MapForgeMainWindow(QMainWindow):
             self.scenario_path = path
             self._save_current_map()
 
-    def _export_game_scenario_dialog(self):
+    def _export_game_scenario_dialog(self, activate: bool = False):
         if not self.map_model:
             return
         default_dir = os.path.join(self.asset_root, "assets", "scenarios")
         default_file = os.path.join(default_dir, os.path.basename(self.scenario_path))
         path, _ = QFileDialog.getSaveFileName(self, "Export Scenario for Game Executable", default_file, "JSON Scenarios (*.json)")
         if path:
+            if activate:
+                # The runtime marker accepts only a filename under its scenario root.
+                path = os.path.join(default_dir, os.path.basename(path))
             result = export_game_scenario(self.map_model, path, self.asset_root, self.building_catalog)
+            if activate:
+                marker = os.path.join(default_dir, "active_scenario.txt")
+                with open(marker, "w", encoding="utf-8") as f:
+                    f.write(os.path.basename(path) + "\n")
+                result["active_marker"] = marker
             msg = f"🚀 Scenario exported successfully to:\n{result['target_path']}\n\n"
             if result['mirrored_paths']:
                 msg += f"Mirrored to Game Executable Debug path:\n{result['mirrored_paths'][0]}\n\n"
             msg += f"Buildings: {result['buildings_count']} | Terrain: {result['terrain_tiles_count']} | Roads: {result['roads_count']}"
+            if activate:
+                msg += "\n\n▶ This scenario is now selected for the next City Builder launch."
+            self._populate_scenario_list()
             QMessageBox.information(self, "Game Scenario Exported", msg)
+
+    def _export_and_activate_game_scenario_dialog(self):
+        self._export_game_scenario_dialog(activate=True)
 
     def _export_map_preview_png_dialog(self):
         if not self.canvas:
@@ -463,6 +637,138 @@ class MapForgeMainWindow(QMainWindow):
         if hasattr(self, 'btn_redo'):
             self.btn_redo.setEnabled(can_r)
 
+    def _on_brush_size_changed(self, index: int):
+        self.brush_radius = index  # 0 -> 1x1, 1 -> 3x3, 2 -> 5x5
+        self.canvas.set_hover_brush_radius(self.brush_radius)
+
+    def _on_reload_catalogs_clicked(self):
+        self.canvas.reload_catalogs()
+        self.status_bar.showMessage("🔄 Asset overlays & animated prop catalogs reloaded from disk.", 3000)
+
+    def _bresenham_line(self, x0: int, y0: int, x1: int, y1: int):
+        points = []
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+
+        curr_x, curr_y = x0, y0
+        while True:
+            points.append((curr_x, curr_y))
+            if curr_x == x1 and curr_y == y1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                curr_x += sx
+            if e2 < dx:
+                err += dx
+                curr_y += sy
+        return points
+
+    def _on_stroke_started(self, x: int, y: int, button: int):
+        if button != 1 or not self.map_model or not hasattr(self, 'executor') or not self.executor:
+            return
+        if self.active_tool == "inspect":
+            return
+
+        self.stroke_visited_tiles = set()
+        self.last_stroke_tile = (x, y)
+        desc = f"{self.active_tool.replace('_', ' ').title()} Stroke"
+        self.executor.execute({"action": "begin_transaction", "description": desc})
+        if self._apply_brush_at(x, y):
+            self.canvas.set_map_model(self.map_model)
+
+    def _on_stroke_dragged(self, x: int, y: int, button: int):
+        if button != 1 or not self.map_model or not hasattr(self, 'executor') or not self.executor:
+            return
+        if self.active_tool == "inspect":
+            return
+
+        last_x, last_y = getattr(self, 'last_stroke_tile', (x, y))
+        line_points = self._bresenham_line(last_x, last_y, x, y)
+        self.last_stroke_tile = (x, y)
+
+        modified = False
+        for px, py in line_points:
+            if self._apply_brush_at(px, py):
+                modified = True
+
+        if modified:
+            self.canvas.set_map_model(self.map_model)
+
+    def _on_stroke_ended(self, button: int):
+        if button != 1 or not hasattr(self, 'executor') or not self.executor:
+            return
+        if self.active_tool == "inspect":
+            return
+
+        if hasattr(self.executor, 'transaction_manager') and not self.executor.transaction_manager.active_batch:
+            return
+
+        if self.active_tool == "road" and self.map_model:
+            self.map_model.recompute_road_connections()
+
+        self.executor.execute({"action": "commit_transaction"})
+        self.stroke_visited_tiles.clear()
+        self.canvas.set_map_model(self.map_model)
+        self._update_scenario_info_label()
+        self._update_undo_redo_ui_state()
+
+    def _apply_brush_at(self, cx: int, cy: int) -> bool:
+        radius = self.brush_radius
+        modified = False
+
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                tx = cx + dx
+                ty = cy + dy
+                if tx < 0 or tx > 63 or ty < 0 or ty > 63:
+                    continue
+
+                if (tx, ty) in self.stroke_visited_tiles:
+                    continue
+
+                self.stroke_visited_tiles.add((tx, ty))
+
+                if self.active_tool == "paint_terrain":
+                    semantic_mode = self.rb_visual_semantic.isChecked()
+                    if semantic_mode and not self.selected_terrain_definition:
+                        continue
+                    res = self.executor.execute({
+                        "action": "paint_terrain",
+                        "x": tx, "y": ty,
+                        "texture": self.selected_terrain_texture,
+                        "terrainDefinition": self.selected_terrain_definition,
+                        "paintMode": "visual_plus_semantics" if semantic_mode else "visual_only"
+                    })
+                    if res.get("success"):
+                        modified = True
+
+                elif self.active_tool == "place_asset":
+                    if (tx, ty) == (cx, cy):
+                        res = self.executor.execute({
+                            "action": "place_building",
+                            "definitionId": self.selected_asset_id,
+                            "x": tx, "y": ty,
+                            "rotation": self.selected_rotation
+                        })
+                        if res.get("success"):
+                            modified = True
+
+                elif self.active_tool == "demolish":
+                    res = self.executor.execute({"action": "remove_building", "x": tx, "y": ty})
+                    if res.get("success"):
+                        modified = True
+
+                elif self.active_tool == "road":
+                    res = self.executor.execute({"action": "set_road", "x": tx, "y": ty, "present": True})
+                    if res.get("success"):
+                        modified = True
+
+        return modified
+
     def _on_tile_clicked(self, x: int, y: int, button: int):
         if not self.map_model or not hasattr(self, 'executor') or not self.executor:
             return
@@ -470,7 +776,13 @@ class MapForgeMainWindow(QMainWindow):
         executor = self.executor
 
         if self.active_tool == "paint_terrain":
-            res = executor.execute({"action": "paint_terrain", "x": x, "y": y, "texture": self.selected_terrain_texture})
+            semantic_mode = self.rb_visual_semantic.isChecked()
+            if semantic_mode and not self.selected_terrain_definition:
+                self.status_bar.showMessage("Visual + Semantics exige uma definição declarada; nenhuma inferência foi feita.", 4000)
+                return
+            res = executor.execute({"action": "paint_terrain", "x": x, "y": y, "texture": self.selected_terrain_texture,
+                                    "terrainDefinition": self.selected_terrain_definition,
+                                    "paintMode": "visual_plus_semantics" if semantic_mode else "visual_only"})
             if res.get("success"):
                 self.canvas.set_map_model(self.map_model)
                 self.status_bar.showMessage(f"Painted terrain at ({x}, {y})", 2000)
@@ -550,7 +862,8 @@ class MapForgeMainWindow(QMainWindow):
             try:
                 from tools.map_forge.core.native_bridge import get_native_core
                 core = get_native_core()
-                info = core.inspect_tile_channels(self.canvas.map_document, x, y)
+                info = core.inspect_tile_channels_with_terrain_catalog(
+                    self.canvas.map_document, x, y, self.terrain_catalog_json)
 
                 asset_str = info.occupied_by_asset if info.occupied_by_asset else "(none)"
                 info_text = (

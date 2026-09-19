@@ -1,0 +1,71 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "shop_cafe_01",
+  "base": "../../buildings/cafe_01_lvl1.png",
+  "colorMask": "shop_cafe_01_mask_color.png",
+  "wearMask": "shop_cafe_01_mask_wear.png",
+  "channels": {
+    "R": "wall",
+    "G": "awning",
+    "B": "details"
+  },
+  "variants": [
+    {
+      "id": "vibrant_blue",
+      "wall": [
+        240,
+        245,
+        255
+      ],
+      "awning": [
+        30,
+        130,
+        220
+      ],
+      "details": [
+        250,
+        250,
+        250
+      ],
+      "wear": 0.05
+    },
+    {
+      "id": "terracotta_retail",
+      "wall": [
+        235,
+        210,
+        175
+      ],
+      "awning": [
+        195,
+        65,
+        45
+      ],
+      "details": [
+        245,
+        235,
+        215
+      ],
+      "wear": 0.05
+    },
+    {
+      "id": "aged",
+      "wall": [
+        145,
+        140,
+        130
+      ],
+      "awning": [
+        80,
+        85,
+        90
+      ],
+      "details": [
+        115,
+        110,
+        105
+      ],
+      "wear": 0.45
+    }
+  ]
+}

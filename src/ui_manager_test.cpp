@@ -121,6 +121,18 @@ int main() {
     require(road_click.consumed && road_click.action && road_click.action->action == UiAction::activate_roads,
             "road mode button");
 
+    model.active_tool = UiTool::sidewalks;
+    ui.update_layout(1280, 800, model);
+    const auto cement_path_button = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::activate_sidewalks && button.label == "PISO";
+    });
+    require(cement_path_button != ui.buttons().end(), "cement path toolbar button exists beside roads");
+    const UiInputResult cement_path_click = ui.handle_mouse_button_down(cement_path_button->bounds.x + 4.0F,
+                                                                         cement_path_button->bounds.y + 4.0F, true);
+    require(cement_path_click.consumed && cement_path_click.action &&
+                cement_path_click.action->action == UiAction::activate_sidewalks,
+            "cement path mode button");
+
     model.active_tool = UiTool::land;
     ui.update_layout(1280, 800, model);
     const auto land_button = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {

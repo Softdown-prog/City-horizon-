@@ -1,0 +1,71 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "house_small_01",
+  "base": "../../buildings/house_suburban_01_lvl1.png",
+  "colorMask": "house_small_01_mask_color.png",
+  "wearMask": "house_small_01_mask_wear.png",
+  "channels": {
+    "R": "wall",
+    "G": "roof",
+    "B": "details"
+  },
+  "variants": [
+    {
+      "id": "coastal_blue",
+      "wall": [
+        235,
+        242,
+        250
+      ],
+      "roof": [
+        35,
+        120,
+        195
+      ],
+      "details": [
+        255,
+        255,
+        255
+      ],
+      "wear": 0.08
+    },
+    {
+      "id": "suburban_beige",
+      "wall": [
+        225,
+        190,
+        140
+      ],
+      "roof": [
+        185,
+        75,
+        45
+      ],
+      "details": [
+        245,
+        235,
+        210
+      ],
+      "wear": 0.05
+    },
+    {
+      "id": "aged",
+      "wall": [
+        135,
+        130,
+        120
+      ],
+      "roof": [
+        70,
+        72,
+        75
+      ],
+      "details": [
+        105,
+        100,
+        95
+      ],
+      "wear": 0.5
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "terrain_grass_base",
+  "variantId": "stone_surface",
+  "base_sha256": "dbe706cedf82ef74512292ae6cd1102043762cf4b2735f54868102dfa30d482e",
+  "semantic_mask_sha256": "e5ce39a2116f27aae33724e3d7652eba663fe8bb27322ac1818c190d9080aa29",
+  "manifest_sha256": "55663b63d4e24c08819fcad4060593add9072b77d1f668356be62d944b804058",
+  "output_sha256": "05f4bd6d3f02200a49c813c937bfc046a9f890958f5f6c31c48066b054fdc665",
+  "material_sha256": "3c2d67811422c543536850005957d923865901c4e9765996073ef470f9fa8402"
+}

@@ -7,6 +7,7 @@ exports game scenario packages, and renders high-res preview images.
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Tuple, Dict, Any
 from tools.map_forge.core.map_model import MapModel
 from tools.map_forge.core.validator import validate_map
@@ -32,12 +33,15 @@ def export_game_scenario(map_model: MapModel, target_path: str, asset_root: str 
     # 2. Save target scenario file
     save_scenario(map_model, target_path)
 
-    # 3. Mirror to build/Debug/assets/scenarios/initial_city.json if saving initial_city
+    # 3. Mirror into the selected runtime root, never a machine-specific path.
+    # This lets the human UI, a CI worker, and the game consume one package.
     mirrored_paths = []
-    if "initial_city.json" in os.path.basename(target_path).lower():
-        debug_dir = r"C:\Users\User\Documents\Codex\2026-09-05\ve\build\Debug\assets\scenarios"
-        if os.path.exists(debug_dir):
-            mirror_file = os.path.join(debug_dir, os.path.basename(target_path))
+    runtime_dir = Path(asset_root) / "assets" / "scenarios" if asset_root else None
+    if runtime_dir and runtime_dir.is_dir():
+        target_resolved = Path(target_path).resolve()
+        runtime_target = (runtime_dir / os.path.basename(target_path)).resolve()
+        if target_resolved != runtime_target:
+            mirror_file = str(runtime_target)
             save_scenario(map_model, mirror_file)
             mirrored_paths.append(mirror_file)
 

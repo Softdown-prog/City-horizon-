@@ -1,0 +1,12 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "clinic_small_01",
+  "variantId": "modern_teal",
+  "base_sha256": "cd40095bba39ee70d1ec0e4f01ba74fcf0ed4cc56a1b26e3af6291965d9a379e",
+  "semantic_mask_sha256": "222cc94d7d980c07dc18598570c5be090d041a78735e98255188e3f2ef95b27b",
+  "manifest_sha256": "a54001157bda2a4826b2532b9c3a9ff04252d7e2a55629c09b22cfa58746528c",
+  "output_sha256": "e56cf4f8d32c8e9bdde163a1cade4132918a6a9c428f519f787a6f64b72330b8"
+}

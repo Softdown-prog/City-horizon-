@@ -1,5 +1,7 @@
 #include "src/ch_render/map_renderer.h"
 #include "src/ch_render/semantic_renderer.h"
+#include "src/ch_core/shoreline_autotile.h"
+#include "src/ch_render/shoreline_catalog.h"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -8,6 +10,18 @@
 namespace ch {
 
 namespace {
+
+struct WaterSurfaceTileEntry {
+    int tile_x = 0;
+    int tile_y = 0;
+    bool shallow = false;
+};
+
+struct ShorelineOverlayEntry {
+    int tile_x = 0;
+    int tile_y = 0;
+    const TextureAsset* texture = nullptr;
+};
 
 constexpr float kTileWidth = static_cast<float>(contracts::kTileWidth);
 constexpr float kGrassOpaqueLeft = 53.0F;
@@ -62,6 +76,12 @@ TileConnectionMask camera_visual_connections(const TileConnectionMask connection
 }
 
 std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMask connections) {
+    // CH_MASK_V1 cement_path is a single, perspective-locked ground tile.
+    // Its material is independent of the sidewalk's simulation semantics, so
+    // connected cells may share the same visual without creating a new road.
+    if (style_id == "cement_path") {
+        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
+    }
     const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
     const int mask = static_cast<int>(connections);
     if (mask == 15) return base + "15_seamless.png";
@@ -237,6 +257,113 @@ void MapRenderer::render_map(SDL_Renderer* renderer, const TextureAsset* grass,
             } else {
                 render_grass_tile(renderer, *grass, x, y, camera, viewport_width, viewport_height);
             }
+        }
+    }
+}
+
+void MapRenderer::render_world_terrain_and_water(
+    SDL_Renderer* renderer,
+    const MapDocument& document,
+    const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
+    const std::filesystem::path& asset_root,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const float render_time
+) {
+    if (renderer == nullptr) return;
+
+    const TextureAsset* grass_base = find_texture("assets/terrain/grass_isometric_01.png");
+
+    std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
+    std::vector<WaterSurfaceTileEntry> water_tiles;
+
+    for (const auto& tile : document.terrain_tiles()) {
+        const std::uint64_t key = tile_key(tile.tile_x, tile.tile_y);
+        if (!tile.texture.empty()) {
+            if (const TextureAsset* tex = find_texture(tile.texture)) {
+                scenario_terrain_textures[key] = tex;
+            }
+        }
+
+        // Runtime water identity is semantic, never derived from a filename or pixels.
+        const bool shallow = tile.terrain_definition == "water_shallow";
+        const bool deep = tile.terrain_definition == "water_deep";
+        const bool is_water = shallow || deep;
+
+        if (is_water) {
+            water_tiles.push_back({tile.tile_x, tile.tile_y, shallow});
+        }
+    }
+
+    std::sort(water_tiles.begin(), water_tiles.end(), [](const WaterSurfaceTileEntry& left, const WaterSurfaceTileEntry& right) {
+        const int left_depth = left.tile_x + left.tile_y;
+        const int right_depth = right.tile_x + right.tile_y;
+        return left_depth == right_depth ? left.tile_x < right.tile_x : left_depth < right_depth;
+    });
+
+    std::vector<ShorelineOverlayEntry> shoreline_overlays;
+    SemanticWorldView world;
+    world.map_document = &document;
+
+    GridBounds bounds;
+    if (!document.terrain_tiles().empty()) {
+        bounds.min_x = document.terrain_tiles()[0].tile_x;
+        bounds.max_x = document.terrain_tiles()[0].tile_x;
+        bounds.min_y = document.terrain_tiles()[0].tile_y;
+        bounds.max_y = document.terrain_tiles()[0].tile_y;
+        for (const auto& t : document.terrain_tiles()) {
+            bounds.min_x = std::min(bounds.min_x, t.tile_x);
+            bounds.max_x = std::max(bounds.max_x, t.tile_x);
+            bounds.min_y = std::min(bounds.min_y, t.tile_y);
+            bounds.max_y = std::max(bounds.max_y, t.tile_y);
+        }
+    } else {
+        bounds.min_x = contracts::kMapMin;
+        bounds.max_x = contracts::kMapMax;
+        bounds.min_y = contracts::kMapMin;
+        bounds.max_y = contracts::kMapMax;
+    }
+
+    AutotileResult autotile_res = ShorelineAutotiler::evaluate_shoreline(world, bounds);
+
+    for (const auto& edit : autotile_res.edits) {
+        for (const auto piece : edit.recipe.pieces) {
+            const std::string piece_path = ShorelineCatalog::get_piece_texture_path(piece, "coast_adjusted");
+            if (const TextureAsset* tex = find_texture(piece_path)) {
+                shoreline_overlays.push_back({edit.tile.x, edit.tile.y, tex});
+            }
+        }
+    }
+
+    const TextureAsset* water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_01.png");
+    if (water_caustics == nullptr) {
+        water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_overlay_01.png");
+    }
+
+    // Canonical Layer Execution:
+    // 1. Terrain Base
+    render_map(renderer, grass_base, scenario_terrain_textures, camera, viewport_width, viewport_height);
+
+    // 2. Water Base (Shallow / Deep)
+    constexpr SDL_FColor kDeepBase = {108.0F / 255.0F, 196.0F / 255.0F, 207.0F / 255.0F, 1.0F};
+    constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};
+    for (const auto& tile : water_tiles) {
+        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,
+                         tile.shallow ? kShallowBase : kDeepBase);
+    }
+
+    // 3. Continuous Caustics Overlay
+    if (water_caustics != nullptr) {
+        for (const auto& tile : water_tiles) {
+            render_water_caustics_overlay_tile(renderer, *water_caustics, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+        }
+    }
+
+    // 4. Shoreline Edges / Corners
+    for (const auto& overlay : shoreline_overlays) {
+        if (overlay.texture != nullptr) {
+            render_custom_terrain_tile(renderer, *overlay.texture, overlay.tile_x, overlay.tile_y, camera, viewport_width, viewport_height);
         }
     }
 }
@@ -601,6 +728,11 @@ MapForgeNativeViewport::~MapForgeNativeViewport() {
     shutdown();
 }
 
+void MapForgeNativeViewport::reload_asset_catalogs() {
+    overlay_catalog_.load_directory(asset_root_ / "assets" / "overlays");
+    animated_prop_catalog_.load_directory(asset_root_ / "assets" / "props");
+}
+
 bool MapForgeNativeViewport::initialize(void* win32_hwnd, int physical_width, int physical_height, const std::string& asset_root_path) {
     if (win32_hwnd == nullptr) return false;
     shutdown();
@@ -634,12 +766,66 @@ bool MapForgeNativeViewport::initialize(void* win32_hwnd, int physical_width, in
         return false;
     }
 
+    reload_asset_catalogs();
     return true;
 }
 
-void MapForgeNativeViewport::resize(int physical_width, int physical_height) {
+bool MapForgeNativeViewport::initialize_offscreen(int physical_width, int physical_height, const std::string& asset_root_path) {
+    shutdown();
+
     physical_width_ = physical_width;
     physical_height_ = physical_height;
+    asset_root_ = asset_root_path;
+
+    if (!SDL_WasInit(SDL_INIT_VIDEO)) {
+        if (!SDL_Init(SDL_INIT_VIDEO)) {
+            return false;
+        }
+    }
+
+    offscreen_surface_ = SDL_CreateSurface(physical_width, physical_height, SDL_PIXELFORMAT_RGBA32);
+    if (offscreen_surface_ == nullptr) return false;
+
+    renderer_ = SDL_CreateSoftwareRenderer(offscreen_surface_);
+    if (renderer_ == nullptr) {
+        SDL_DestroySurface(offscreen_surface_);
+        offscreen_surface_ = nullptr;
+        return false;
+    }
+
+    reload_asset_catalogs();
+    return true;
+}
+
+bool MapForgeNativeViewport::save_frame_to_png(const std::string& filepath) {
+    if (renderer_ == nullptr) return false;
+    render_frame();
+    if (offscreen_surface_ != nullptr) {
+        return SDL_SaveBMP(offscreen_surface_, filepath.c_str());
+    } else {
+        request_frame_capture(filepath);
+        render_frame();
+        return true;
+    }
+}
+
+void MapForgeNativeViewport::resize(int physical_width, int physical_height) {
+    if (physical_width <= 0 || physical_height <= 0) return;
+    if (physical_width_ == physical_width && physical_height_ == physical_height) return;
+
+    physical_width_ = physical_width;
+    physical_height_ = physical_height;
+
+    if (window_ != nullptr) {
+        SDL_SetWindowSize(window_, physical_width, physical_height);
+        SDL_SyncWindow(window_);
+        int win_w = 0, win_h = 0;
+        SDL_GetWindowSizeInPixels(window_, &win_w, &win_h);
+        if (win_w > 0 && win_h > 0) {
+            physical_width_ = win_w;
+            physical_height_ = win_h;
+        }
+    }
 }
 
 void MapForgeNativeViewport::set_camera(const CameraState& camera) {
@@ -678,6 +864,129 @@ void MapForgeNativeViewport::clear_textures() {
         }
     }
     texture_cache_.clear();
+
+    for (auto& [key, asset] : overlay_texture_cache_) {
+        if (asset.texture != nullptr) {
+            SDL_DestroyTexture(asset.texture);
+        }
+    }
+    overlay_texture_cache_.clear();
+}
+
+const TextureAsset* MapForgeNativeViewport::find_or_create_overlay_texture(const std::string& asset_id, const OverlayDefinition& def, const std::string& overlay_type) {
+    if (renderer_ == nullptr) return nullptr;
+    const std::string key = asset_id + "_" + overlay_type;
+    if (const auto it = overlay_texture_cache_.find(key); it != overlay_texture_cache_.end()) {
+        return &it->second;
+    }
+
+    if (def.overlays.find(overlay_type) == def.overlays.end()) return nullptr;
+    const auto& layer_def = def.overlays.at(overlay_type);
+
+    std::filesystem::path base_path = asset_root_ / ("assets/buildings/" + asset_id + "_lvl1.png");
+    if (!std::filesystem::exists(base_path)) {
+        base_path = asset_root_ / ("assets/buildings/" + asset_id + ".png");
+    }
+    SDL_Surface* base_surf = SDL_LoadPNG(base_path.string().c_str());
+    if (!base_surf) return nullptr;
+
+    std::filesystem::path mask_path = asset_root_ / def.mask_path;
+    SDL_Surface* mask_surf = SDL_LoadPNG(mask_path.string().c_str());
+    if (!mask_surf) {
+        SDL_DestroySurface(base_surf);
+        return nullptr;
+    }
+
+    std::filesystem::path snow_path = asset_root_ / layer_def.texture_path;
+    SDL_Surface* snow_surf = SDL_LoadPNG(snow_path.string().c_str());
+    if (!snow_surf) {
+        SDL_DestroySurface(base_surf);
+        SDL_DestroySurface(mask_surf);
+        return nullptr;
+    }
+
+    int w = base_surf->w;
+    int h = base_surf->h;
+
+    SDL_Surface* base_rgba = SDL_ConvertSurface(base_surf, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* mask_rgba = SDL_ConvertSurface(mask_surf, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* snow_rgba = SDL_ConvertSurface(snow_surf, SDL_PIXELFORMAT_RGBA32);
+
+    SDL_DestroySurface(base_surf);
+    SDL_DestroySurface(mask_surf);
+    SDL_DestroySurface(snow_surf);
+
+    if (!base_rgba || !mask_rgba || !snow_rgba) {
+        if (base_rgba) SDL_DestroySurface(base_rgba);
+        if (mask_rgba) SDL_DestroySurface(mask_rgba);
+        if (snow_rgba) SDL_DestroySurface(snow_rgba);
+        return nullptr;
+    }
+
+    SDL_Surface* overlay_surf = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+    if (!overlay_surf) {
+        SDL_DestroySurface(base_rgba);
+        SDL_DestroySurface(mask_rgba);
+        SDL_DestroySurface(snow_rgba);
+        return nullptr;
+    }
+
+    const uint8_t* b_pixels = static_cast<const uint8_t*>(base_rgba->pixels);
+    const uint8_t* m_pixels = static_cast<const uint8_t*>(mask_rgba->pixels);
+    const uint8_t* s_pixels = static_cast<const uint8_t*>(snow_rgba->pixels);
+    uint8_t* o_pixels = static_cast<uint8_t*>(overlay_surf->pixels);
+
+    std::vector<uint8_t> active_regions = layer_def.region_ids;
+
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int b_idx = y * base_rgba->pitch + x * 4;
+            int m_idx = y * mask_rgba->pitch + x * 4;
+
+            uint8_t b_a = b_pixels[b_idx + 3];
+            uint8_t m_val = m_pixels[m_idx + 0];
+
+            if (b_a == 0) m_val = 0;
+
+            int o_idx = y * overlay_surf->pitch + x * 4;
+
+            bool is_active = false;
+            for (uint8_t r_id : active_regions) {
+                if (r_id == m_val) { is_active = true; break; }
+            }
+
+            if (is_active && m_val > 0) {
+                int sx = x % snow_rgba->w;
+                int sy = y % snow_rgba->h;
+                int s_idx = sy * snow_rgba->pitch + sx * 4;
+
+                o_pixels[o_idx + 0] = s_pixels[s_idx + 0];
+                o_pixels[o_idx + 1] = s_pixels[s_idx + 1];
+                o_pixels[o_idx + 2] = s_pixels[s_idx + 2];
+                o_pixels[o_idx + 3] = b_a; // Preserve exact base alpha
+            } else {
+                o_pixels[o_idx + 0] = 0;
+                o_pixels[o_idx + 1] = 0;
+                o_pixels[o_idx + 2] = 0;
+                o_pixels[o_idx + 3] = 0;
+            }
+        }
+    }
+
+    TextureAsset asset;
+    asset.texture = SDL_CreateTextureFromSurface(renderer_, overlay_surf);
+    asset.source_width = static_cast<float>(w);
+    asset.source_height = static_cast<float>(h);
+
+    SDL_DestroySurface(base_rgba);
+    SDL_DestroySurface(mask_rgba);
+    SDL_DestroySurface(snow_rgba);
+    SDL_DestroySurface(overlay_surf);
+
+    if (asset.texture == nullptr) return nullptr;
+
+    SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+    return &overlay_texture_cache_.emplace(key, asset).first->second;
 }
 
 void MapForgeNativeViewport::render_frame() {
@@ -688,28 +997,157 @@ void MapForgeNativeViewport::render_frame() {
     const float vw = static_cast<float>(w);
     const float vh = static_cast<float>(h);
 
-    const TextureAsset* grass = find_texture("assets/terrain/grass_isometric_01.png");
-    std::unordered_map<std::uint64_t, const TextureAsset*> scenario_textures;
-    if (current_document_.has_value()) {
-        for (const auto& t : current_document_->terrain_tiles()) {
-            if (!t.texture.empty()) {
-                if (const TextureAsset* tex = find_texture(t.texture)) {
-                    scenario_textures[tile_key(t.tile_x, t.tile_y)] = tex;
-                }
-            }
-        }
-    }
+    const auto texture_lookup = [this](const std::filesystem::path& relative_path) -> const TextureAsset* {
+        return find_texture(relative_path);
+    };
 
     // View mode: 0 = ART, 1 = LOGIC, 2 = ART_AND_LOGIC
     if (view_mode_ == 0 || view_mode_ == 2) {
-        MapRenderer::render_map(renderer_, grass, scenario_textures, camera_, vw, vh);
-
         if (current_document_.has_value()) {
+            MapRenderer::render_world_terrain_and_water(
+                renderer_,
+                *current_document_,
+                texture_lookup,
+                asset_root_,
+                camera_,
+                vw,
+                vh
+            );
+
             for (const auto& r : current_document_->roads()) {
                 if (const TextureAsset* tex = find_texture("assets/roads/straight_01.png")) {
                     MapRenderer::render_road_sprite(renderer_, *tex, r.tile_x, r.tile_y, camera_, vw, vh);
                 }
             }
+
+            // Render buildings in document
+            for (const auto& b : current_document_->buildings()) {
+                const AnimatedPropDefinition* anim_def = animated_prop_catalog_.find_prop(b.definition_id);
+                if (anim_def != nullptr) {
+                    const TextureAsset* base_tex = find_texture(anim_def->base_static_path);
+                    if (base_tex != nullptr && base_tex->texture != nullptr) {
+                        BuildingDefinition def;
+                        def.id = b.definition_id;
+                        def.footprint_width = 1;
+                        def.footprint_height = 1;
+
+                        BuildingInstance inst;
+                        inst.tile_x = b.tile_x;
+                        inst.tile_y = b.tile_y;
+
+                        BuildingSpriteGeometry geom = MapRenderer::building_sprite_geometry(def, inst, BuildingRotation::r0, base_tex->source_width, base_tex->source_height, camera_, vw, vh);
+
+                        // 1. Draw static base sprite
+                        SDL_RenderTexture(renderer_, base_tex->texture, nullptr, &geom.sprite_bounds);
+
+                        // 2. Draw animated layers
+                        for (const auto& layer : anim_def->layers) {
+                            if (layer.presentation == VisualPresentation::AtlasPhase) {
+                                throw std::runtime_error("VisualPresentation::AtlasPhase is unsupported in CH_ANIMATED_PROP_V1 Phase 2");
+                            }
+                            if (layer.presentation == VisualPresentation::TransformRotation) {
+                                const float norm_phase = prop_phase_ - std::floor(prop_phase_);
+                                const double angle = static_cast<double>(norm_phase * 360.0F);
+                                const TextureAsset* layer_tex = find_texture(layer.sprite_path);
+                                if (layer_tex != nullptr && layer_tex->texture != nullptr) {
+                                    const float scale_x = geom.sprite_bounds.w / base_tex->source_width;
+                                    const float scale_y = geom.sprite_bounds.h / base_tex->source_height;
+                                    const float mount_x_dest = layer.mount_point_x * scale_x;
+                                    const float mount_y_dest = layer.mount_point_y * scale_y;
+                                    const float pivot_x_dest = layer.pivot_x * scale_x;
+                                    const float pivot_y_dest = layer.pivot_y * scale_y;
+
+                                    SDL_FRect layer_dest;
+                                    layer_dest.w = layer_tex->source_width * scale_x;
+                                    layer_dest.h = layer_tex->source_height * scale_y;
+                                    layer_dest.x = geom.sprite_bounds.x + mount_x_dest - pivot_x_dest;
+                                    layer_dest.y = geom.sprite_bounds.y + mount_y_dest - pivot_y_dest;
+
+                                    SDL_FPoint center = { pivot_x_dest, pivot_y_dest };
+                                    SDL_RenderTextureRotated(renderer_, layer_tex->texture, nullptr, &layer_dest, angle, &center, SDL_FLIP_NONE);
+                                }
+                            }
+                        }
+
+                        // 3. Snow Overlay / Diagnostic if applicable
+                        if (render_context_.snow_coverage > 0.0F && !render_context_.diagnostic_overlay) {
+                            const OverlayDefinition* o_def = overlay_catalog_.find_overlay(b.definition_id);
+                            if (o_def != nullptr) {
+                                const TextureAsset* ov_tex = find_or_create_overlay_texture(b.definition_id, *o_def, "snow");
+                                if (ov_tex != nullptr && ov_tex->texture != nullptr) {
+                                    static SDL_BlendMode custom_blend = SDL_ComposeCustomBlendMode(
+                                        SDL_BLENDFACTOR_SRC_ALPHA,
+                                        SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+                                        SDL_BLENDOPERATION_ADD,
+                                        SDL_BLENDFACTOR_ZERO,
+                                        SDL_BLENDFACTOR_ONE,
+                                        SDL_BLENDOPERATION_ADD
+                                    );
+                                    SDL_SetTextureBlendMode(ov_tex->texture, custom_blend);
+                                    Uint8 snow_alpha = static_cast<Uint8>(std::clamp(render_context_.snow_coverage, 0.0F, 1.0F) * 255.0F);
+                                    SDL_SetTextureAlphaMod(ov_tex->texture, snow_alpha);
+                                    SDL_RenderTexture(renderer_, ov_tex->texture, nullptr, &geom.sprite_bounds);
+                                }
+                            }
+                        } else if (render_context_.diagnostic_overlay) {
+                            SDL_SetRenderDrawColor(renderer_, 255, 0, 255, 160);
+                            SDL_RenderFillRect(renderer_, &geom.sprite_bounds);
+                        }
+                        continue;
+                    }
+                }
+
+                std::filesystem::path sprite_path = "assets/buildings/" + b.definition_id + "_lvl1.png";
+                if (!std::filesystem::exists(asset_root_ / sprite_path)) {
+                    sprite_path = "assets/buildings/" + b.definition_id + ".png";
+                }
+                const TextureAsset* base_tex = find_texture(sprite_path);
+                if (base_tex != nullptr && base_tex->texture != nullptr) {
+                    BuildingDefinition def;
+                    def.id = b.definition_id;
+                    def.footprint_width = 1;
+                    def.footprint_height = 1;
+
+                    BuildingInstance inst;
+                    inst.tile_x = b.tile_x;
+                    inst.tile_y = b.tile_y;
+
+                    BuildingSpriteGeometry geom = MapRenderer::building_sprite_geometry(def, inst, BuildingRotation::r0, base_tex->source_width, base_tex->source_height, camera_, vw, vh);
+
+                    // 1. Draw base sprite
+                    SDL_RenderTexture(renderer_, base_tex->texture, nullptr, &geom.sprite_bounds);
+
+                    // 2. Absolute Early Bypass for snow_coverage <= 0.0F
+                    if (render_context_.snow_coverage > 0.0F && !render_context_.diagnostic_overlay) {
+                        const OverlayDefinition* o_def = overlay_catalog_.find_overlay(b.definition_id);
+                        if (o_def != nullptr) {
+                            const TextureAsset* ov_tex = find_or_create_overlay_texture(b.definition_id, *o_def, "snow");
+                            if (ov_tex != nullptr && ov_tex->texture != nullptr) {
+                                static SDL_BlendMode custom_blend = SDL_ComposeCustomBlendMode(
+                                    SDL_BLENDFACTOR_SRC_ALPHA,
+                                    SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+                                    SDL_BLENDOPERATION_ADD,
+                                    SDL_BLENDFACTOR_ZERO,
+                                    SDL_BLENDFACTOR_ONE,
+                                    SDL_BLENDOPERATION_ADD
+                                );
+                                SDL_SetTextureBlendMode(ov_tex->texture, custom_blend);
+                                Uint8 snow_alpha = static_cast<Uint8>(std::clamp(render_context_.snow_coverage, 0.0F, 1.0F) * 255.0F);
+                                SDL_SetTextureAlphaMod(ov_tex->texture, snow_alpha);
+                                SDL_RenderTexture(renderer_, ov_tex->texture, nullptr, &geom.sprite_bounds);
+                            }
+                        }
+                    } else if (render_context_.diagnostic_overlay) {
+                        // Diagnostic overlay mode: render extreme color tint over building bounds
+                        SDL_SetRenderDrawColor(renderer_, 255, 0, 255, 160);
+                        SDL_RenderFillRect(renderer_, &geom.sprite_bounds);
+                    }
+                }
+            }
+        } else {
+            const TextureAsset* grass = find_texture("assets/terrain/grass_isometric_01.png");
+            std::unordered_map<std::uint64_t, const TextureAsset*> scenario_textures;
+            MapRenderer::render_map(renderer_, grass, scenario_textures, camera_, vw, vh);
         }
     } else {
         // Pure LOGIC mode: dark background fill
@@ -730,6 +1168,24 @@ void MapForgeNativeViewport::render_frame() {
         );
     }
 
+    if (hover_enabled_ && !pending_capture_path_.has_value()) {
+        SDL_SetRenderDrawColor(renderer_, 255, 230, 80, 220);
+        for (int dy = -hover_brush_radius_; dy <= hover_brush_radius_; ++dy) {
+            for (int dx = -hover_brush_radius_; dx <= hover_brush_radius_; ++dx) {
+                MapRenderer::render_tile_outline(renderer_, hover_tile_x_ + dx, hover_tile_y_ + dy, camera_, vw, vh);
+            }
+        }
+    }
+
+    if (pending_capture_path_.has_value()) {
+        SDL_Surface* surface = SDL_RenderReadPixels(renderer_, nullptr);
+        if (surface != nullptr) {
+            SDL_SaveBMP(surface, pending_capture_path_->c_str());
+            SDL_DestroySurface(surface);
+        }
+        pending_capture_path_.reset();
+    }
+
     SDL_RenderPresent(renderer_);
 }
 
@@ -747,6 +1203,10 @@ void MapForgeNativeViewport::shutdown() {
     if (window_ != nullptr) {
         SDL_DestroyWindow(window_);
         window_ = nullptr;
+    }
+    if (offscreen_surface_ != nullptr) {
+        SDL_DestroySurface(offscreen_surface_);
+        offscreen_surface_ = nullptr;
     }
 }
 

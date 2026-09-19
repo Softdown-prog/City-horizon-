@@ -16,6 +16,8 @@ struct TerrainTileEntry {
     int tile_x = 0;
     int tile_y = 0;
     std::string texture;
+    // Declarative gameplay authority. Texture remains a renderer cache only.
+    std::string terrain_definition;
 };
 
 struct BuildingInstanceEntry {
@@ -45,7 +47,11 @@ public:
     [[nodiscard]] std::optional<BuildingInstanceEntry> get_building_at(int tile_x, int tile_y) const;
     [[nodiscard]] bool is_road_at(int tile_x, int tile_y) const;
 
+    void set_terrain_texture_at(int tile_x, int tile_y, const std::string& texture_path);
+    void set_terrain_definition_at(int tile_x, int tile_y, const std::string& terrain_def_id, const std::string& texture_path = "");
+
     [[nodiscard]] static std::optional<MapDocument> load_from_file(const std::string& filepath);
+    static MapDocument create_empty(const std::string& name = "Untitled City", int width = 32, int height = 32);
 
 private:
     void parse_all();

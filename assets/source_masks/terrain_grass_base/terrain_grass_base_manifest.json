@@ -1,0 +1,55 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "terrain_grass_base",
+  "base": "../../terrain/grass_isometric_01.png",
+  "semanticMask": "terrain_grass_base_semantic_mask.png",
+  "regions": {
+    "surface": 1
+  },
+  "variants": [
+    {
+      "id": "dirt_surface",
+      "region_recipes": {
+        "surface": {
+          "mode": "texture",
+          "texture": "../../materials/terrain/dirt_01.png",
+          "preserveShading": false,
+          "scale": 1.0
+        }
+      }
+    },
+    {
+      "id": "stone_surface",
+      "region_recipes": {
+        "surface": {
+          "mode": "texture",
+          "texture": "../../materials/terrain/stone_01.png",
+          "preserveShading": false,
+          "scale": 1.0
+        }
+      }
+    },
+    {
+      "id": "sand_surface",
+      "region_recipes": {
+        "surface": {
+          "mode": "texture",
+          "texture": "../../materials/terrain/sand_01.png",
+          "preserveShading": false,
+          "scale": 1.0
+        }
+      }
+    },
+    {
+      "id": "gravel_surface",
+      "region_recipes": {
+        "surface": {
+          "mode": "texture",
+          "texture": "../../materials/terrain/gravel_01.png",
+          "preserveShading": false,
+          "scale": 1.0
+        }
+      }
+    }
+  ]
+}

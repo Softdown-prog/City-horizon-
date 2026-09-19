@@ -1,0 +1,103 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "commercial_building_01",
+  "base": "../../buildings/commercial_building_01_lvl1.png",
+  "semanticMask": "commercial_building_01_semantic_mask.png",
+  "regions": {
+    "wall": 1,
+    "roof": 2,
+    "trim": 3
+  },
+  "variants": [
+    {
+      "id": "corporate_navy",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            160,
+            175,
+            195
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            45,
+            65,
+            95
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            220,
+            225,
+            230
+          ]
+        }
+      },
+      "wear": 0.05
+    },
+    {
+      "id": "bronze_glass",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            180,
+            160,
+            135
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            90,
+            75,
+            60
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            60,
+            50,
+            45
+          ]
+        }
+      },
+      "wear": 0.08
+    },
+    {
+      "id": "emerald_plaza",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            170,
+            195,
+            180
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            40,
+            85,
+            65
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            240,
+            240,
+            235
+          ]
+        }
+      },
+      "wear": 0.1
+    }
+  ]
+}

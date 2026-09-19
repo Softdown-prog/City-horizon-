@@ -21,7 +21,19 @@
 #include <optional>
 #include "src/ch_core/map_document.h"
 
+#include "src/ch_render/overlay_catalog.h"
+#include "src/ch_render/animated_prop_catalog.h"
+
 namespace ch {
+
+enum class Season { Normal, Spring, Summer, Autumn, Winter };
+
+struct RenderContext {
+    Season season = Season::Normal;
+    float snow_coverage = 0.0F;      // [0.0 .. 1.0] - Sole driver for snow
+    float wetness = 0.0F;            // Reserved
+    bool diagnostic_overlay = false; // Visual diagnostic mode for permitted regions
+};
 
 struct TextureAsset {
     SDL_Texture* texture = nullptr;
@@ -102,6 +114,12 @@ public:
                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
                            const CameraState& camera, float viewport_width, float viewport_height);
 
+    // Canonical shared world terrain, water V2, caustics, and shoreline autotile renderer.
+    static void render_world_terrain_and_water(SDL_Renderer* renderer, const MapDocument& document,
+                                               const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
+                                               const std::filesystem::path& asset_root, const CameraState& camera,
+                                               float viewport_width, float viewport_height, float render_time = 0.0F);
+
     static void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
                                   const CameraState& camera, float viewport_width, float viewport_height);
 
@@ -162,6 +180,8 @@ public:
     MapForgeNativeViewport& operator=(const MapForgeNativeViewport&) = delete;
 
     bool initialize(void* win32_hwnd, int physical_width, int physical_height, const std::string& asset_root_path);
+    bool initialize_offscreen(int physical_width, int physical_height, const std::string& asset_root_path);
+    bool save_frame_to_png(const std::string& filepath);
     void resize(int physical_width, int physical_height);
     void set_camera(const CameraState& camera);
     bool load_map_document(const MapDocument& document);
@@ -174,6 +194,28 @@ public:
     void set_channel_opacity(float opacity) { channel_opacity_ = opacity; }
     [[nodiscard]] float channel_opacity() const { return channel_opacity_; }
 
+    void request_frame_capture(const std::string& filepath) { pending_capture_path_ = filepath; }
+
+    void set_render_context(const RenderContext& context) { render_context_ = context; }
+    [[nodiscard]] const RenderContext& render_context() const { return render_context_; }
+
+    void set_prop_phase(float phase) { prop_phase_ = phase; }
+    [[nodiscard]] float prop_phase() const { return prop_phase_; }
+
+    OverlayCatalog& overlay_catalog() { return overlay_catalog_; }
+    [[nodiscard]] const OverlayCatalog& overlay_catalog() const { return overlay_catalog_; }
+
+    AnimatedPropCatalog& animated_prop_catalog() { return animated_prop_catalog_; }
+    [[nodiscard]] const AnimatedPropCatalog& animated_prop_catalog() const { return animated_prop_catalog_; }
+
+    void reload_asset_catalogs();
+    void set_hover_tile(int tile_x, int tile_y, bool enabled) {
+        hover_tile_x_ = tile_x;
+        hover_tile_y_ = tile_y;
+        hover_enabled_ = enabled;
+    }
+    void set_hover_brush_radius(int radius) { hover_brush_radius_ = std::max(0, radius); }
+
     void render_frame();
     [[nodiscard]] RenderGeometrySignature compute_geometry_signature(const BuildingCatalog& catalog) const;
     void shutdown();
@@ -183,17 +225,30 @@ public:
 private:
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
+    SDL_Surface* offscreen_surface_ = nullptr;
     CameraState camera_{};
+    RenderContext render_context_{};
+    OverlayCatalog overlay_catalog_{};
+    AnimatedPropCatalog animated_prop_catalog_{};
+    float prop_phase_ = 0.0F;
     int physical_width_ = 800;
     int physical_height_ = 600;
     std::filesystem::path asset_root_;
     std::optional<MapDocument> current_document_;
     std::unordered_map<std::string, TextureAsset> texture_cache_;
+    std::unordered_map<std::string, TextureAsset> overlay_texture_cache_;
     int view_mode_ = 0; // 0 = ART, 1 = LOGIC, 2 = ART_AND_LOGIC
     uint32_t active_channels_ = 0x1FFF; // All channels active by default
     float channel_opacity_ = 0.75F;
+    std::optional<std::string> pending_capture_path_;
+
+    bool hover_enabled_ = false;
+    int hover_tile_x_ = 0;
+    int hover_tile_y_ = 0;
+    int hover_brush_radius_ = 0;
 
     const TextureAsset* find_texture(const std::filesystem::path& relative_path);
+    const TextureAsset* find_or_create_overlay_texture(const std::string& asset_id, const OverlayDefinition& def, const std::string& overlay_type);
     void clear_textures();
 };
 

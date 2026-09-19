@@ -1,0 +1,103 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "shop_cafe_01",
+  "base": "../../buildings/cafe_01_lvl1.png",
+  "semanticMask": "shop_cafe_01_semantic_mask.png",
+  "regions": {
+    "wall": 1,
+    "fabric": 2,
+    "trim": 3
+  },
+  "variants": [
+    {
+      "id": "espresso_bistro",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            215,
+            195,
+            175
+          ]
+        },
+        "fabric": {
+          "mode": "recolor",
+          "targetRGB": [
+            130,
+            40,
+            40
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            50,
+            35,
+            30
+          ]
+        }
+      },
+      "wear": 0.1
+    },
+    {
+      "id": "coastal_blue",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            235,
+            235,
+            230
+          ]
+        },
+        "fabric": {
+          "mode": "recolor",
+          "targetRGB": [
+            45,
+            115,
+            165
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            210,
+            175,
+            120
+          ]
+        }
+      },
+      "wear": 0.05
+    },
+    {
+      "id": "vintage_mint",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            240,
+            230,
+            215
+          ]
+        },
+        "fabric": {
+          "mode": "recolor",
+          "targetRGB": [
+            75,
+            145,
+            125
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            160,
+            100,
+            60
+          ]
+        }
+      },
+      "wear": 0.12
+    }
+  ]
+}

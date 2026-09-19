@@ -1,0 +1,34 @@
+{
+  "contract": "CH_TERRAIN_BLEND_V1",
+  "defaultStyle": "organic",
+  "corePreservation": {
+    "minimumCoreAreaRatio": 0.08
+  },
+  "materials": {
+    "grass": {
+      "priority": 10,
+      "texture": "assets/terrain/grass_isometric_01.png",
+      "textureSpace": "world"
+    },
+    "dirt": {
+      "priority": 20,
+      "texture": "assets/materials/terrain/dirt_01.png",
+      "textureSpace": "world"
+    },
+    "stone": {
+      "priority": 30,
+      "texture": "assets/materials/terrain/stone_01.png",
+      "textureSpace": "world"
+    },
+    "sand": {
+      "priority": 40,
+      "texture": "assets/materials/terrain/sand_01.png",
+      "textureSpace": "world"
+    },
+    "gravel": {
+      "priority": 50,
+      "texture": "assets/materials/terrain/gravel_01.png",
+      "textureSpace": "world"
+    }
+  }
+}

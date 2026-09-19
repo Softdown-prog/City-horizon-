@@ -1,0 +1,15 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "shop_cafe_01",
+  "variantId": "aged",
+  "sha256Inputs": {
+    "base": "713642eee8a630fd2627a4b716f24282b6efb9e3b71e710b6949b4e2c095951b",
+    "colorMask": "4848ae182891e8555a6dd959f8bd5376664577900a819b5940eafc8a5477fd6d",
+    "wearMask": "934b3ba1a7cf5a495b93150cf3871a8fed172bc57d4c58e170141351c189cf24",
+    "variantsManifest": "825d84fd951798a6a3a0de260bc254b9cdb4140000978e0bddb3c313da82c015"
+  },
+  "sha256Output": "100cd03572d553920b4a77cd8dd3980e3485bfc03d43fc1ae6e50e23b12d14bc"
+}

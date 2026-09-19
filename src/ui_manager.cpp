@@ -153,7 +153,7 @@ enum class HudIcon { coins, calendar, people, energy };
 
 bool is_primary_tool_action(UiAction action) {
     return action == UiAction::open_build_panel || action == UiAction::activate_roads ||
-           action == UiAction::activate_land ||
+           action == UiAction::activate_sidewalks || action == UiAction::activate_land ||
            action == UiAction::activate_remove || action == UiAction::open_agriculture_panel ||
            action == UiAction::activate_decoration;
 }
@@ -444,7 +444,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     const float toolbar_width = std::max(100.0F, width - kMargin * 2.0F);
     const float context_width = std::clamp(toolbar_width * 0.25F, 190.0F, 330.0F);
     const float tools_width = std::max(1.0F, toolbar_width - context_width - 8.0F);
-    const float tool_width = tools_width / 6.0F;
+    const float tool_width = tools_width / 7.0F;
     add_panel({kMargin, toolbar_y, toolbar_width, kToolbarHeight});
     const float tool_y = toolbar_y + 11.0F;
     constexpr float tool_height = 52.0F;
@@ -452,13 +452,15 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                true, model.active_tool == UiTool::buildings);
     add_button({kMargin + 4.0F + tool_width * 1.0F, tool_y, tool_width - 6.0F, tool_height}, "ESTRADAS", UiAction::activate_roads,
                true, model.active_tool == UiTool::roads);
-    add_button({kMargin + 4.0F + tool_width * 2.0F, tool_y, tool_width - 6.0F, tool_height}, "TERRENO", UiAction::activate_land,
+    add_button({kMargin + 4.0F + tool_width * 2.0F, tool_y, tool_width - 6.0F, tool_height}, "PISO", UiAction::activate_sidewalks,
+               true, model.active_tool == UiTool::sidewalks);
+    add_button({kMargin + 4.0F + tool_width * 3.0F, tool_y, tool_width - 6.0F, tool_height}, "TERRENO", UiAction::activate_land,
                true, model.active_tool == UiTool::land);
-    add_button({kMargin + 4.0F + tool_width * 3.0F, tool_y, tool_width - 6.0F, tool_height}, "DEMOLIR", UiAction::activate_remove,
+    add_button({kMargin + 4.0F + tool_width * 4.0F, tool_y, tool_width - 6.0F, tool_height}, "DEMOLIR", UiAction::activate_remove,
                true, model.active_tool == UiTool::remove);
-    add_button({kMargin + 4.0F + tool_width * 4.0F, tool_y, tool_width - 6.0F, tool_height}, "AGRICULTURA", UiAction::open_agriculture_panel,
+    add_button({kMargin + 4.0F + tool_width * 5.0F, tool_y, tool_width - 6.0F, tool_height}, "AGRICULTURA", UiAction::open_agriculture_panel,
                true, model.active_tool == UiTool::agriculture);
-    add_button({kMargin + 4.0F + tool_width * 5.0F, tool_y, tool_width - 6.0F, tool_height}, "DECORACAO", UiAction::activate_decoration,
+    add_button({kMargin + 4.0F + tool_width * 6.0F, tool_y, tool_width - 6.0F, tool_height}, "DECORACAO", UiAction::activate_decoration,
                true, model.active_tool == UiTool::decoration);
 
 

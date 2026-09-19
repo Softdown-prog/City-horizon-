@@ -108,7 +108,8 @@ class MapTransactionManager:
     def _apply_change(self, change: Dict[str, Any]):
         type_ = change.get("type")
         if type_ == "terrain":
-            self.map_model.set_terrain(change["x"], change["y"], change["texture"])
+            self.map_model.set_terrain(change["x"], change["y"], change["texture"],
+                                       change.get("terrain_definition"), change.get("apply_semantics", False))
         elif type_ == "add_building":
             self.map_model.add_building(
                 change["definition_id"],

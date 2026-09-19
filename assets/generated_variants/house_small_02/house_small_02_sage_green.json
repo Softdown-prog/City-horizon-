@@ -1,0 +1,12 @@
+{
+  "contract": "CH_MASK_V1",
+  "generatorVersion": "1.0.0",
+  "algorithmVersion": "1.0.0",
+  "colorSpace": "linear_rgb_srgb",
+  "assetId": "house_small_02",
+  "variantId": "sage_green",
+  "base_sha256": "f8f110a257a5eb451d5b847b25cc3362fa52af8e41a870715c5e9fd85d4fbf1a",
+  "semantic_mask_sha256": "3d8ee62532c57060a0b79b0bbacb969b0d5d3404a1255432dff3a3f2902ea8ba",
+  "manifest_sha256": "72f1d2188e78b90d76735d6334cdc2e4b65429f8697973dc00e078b384341659",
+  "output_sha256": "faaccbb433c274c4f297caecb8a103aa5ec9f1060fea8462185b354d4dc9b941"
+}

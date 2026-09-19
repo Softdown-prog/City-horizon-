@@ -1,0 +1,103 @@
+{
+  "contract": "CH_MASK_V1",
+  "assetId": "clinic_small_01",
+  "base": "../../buildings/clinic_small_01_lvl1.png",
+  "semanticMask": "clinic_small_01_semantic_mask.png",
+  "regions": {
+    "wall": 1,
+    "roof": 2,
+    "trim": 3
+  },
+  "variants": [
+    {
+      "id": "sanitary_white",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            235,
+            240,
+            245
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            70,
+            130,
+            180
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            180,
+            190,
+            200
+          ]
+        }
+      },
+      "wear": 0.05
+    },
+    {
+      "id": "warm_brick",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            190,
+            110,
+            90
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            80,
+            90,
+            100
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            235,
+            230,
+            220
+          ]
+        }
+      },
+      "wear": 0.15
+    },
+    {
+      "id": "modern_teal",
+      "region_recipes": {
+        "wall": {
+          "mode": "recolor",
+          "targetRGB": [
+            225,
+            230,
+            230
+          ]
+        },
+        "roof": {
+          "mode": "recolor",
+          "targetRGB": [
+            35,
+            125,
+            125
+          ]
+        },
+        "trim": {
+          "mode": "recolor",
+          "targetRGB": [
+            70,
+            80,
+            90
+          ]
+        }
+      },
+      "wear": 0.08
+    }
+  ]
+}

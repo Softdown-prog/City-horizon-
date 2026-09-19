@@ -7,12 +7,31 @@ to an explicit new output path after validation.
 import sys
 import json
 import argparse
+import os
 from typing import Dict, Any
 
 from tools.map_forge.importers.map_importer import load_scenario, load_building_catalog
 from tools.map_forge.exporters.game_exporter import verify_round_trip, save_scenario
 from tools.map_forge.core.command_executor import ReadOnlyCommandExecutor
 from tools.map_forge.recipes.coastal_forest_hydroelectric import build_coastal_forest_hydroelectric
+
+
+def _default_runtime_root() -> str:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    debug_root = os.path.join(repo_root, "build", "Debug")
+    return debug_root if os.path.isdir(os.path.join(debug_root, "assets")) else os.path.join(repo_root, "build")
+
+
+def _default_scenario(root: str) -> str:
+    scenarios = os.path.join(root, "assets", "scenarios")
+    marker = os.path.join(scenarios, "active_scenario.txt")
+    if os.path.isfile(marker):
+        with open(marker, "r", encoding="utf-8") as f:
+            selected = os.path.basename(f.readline().strip())
+        candidate = os.path.join(scenarios, selected)
+        if selected.endswith(".json") and os.path.isfile(candidate):
+            return candidate
+    return os.path.join(scenarios, "initial_city.json")
 
 
 def run_cli(args: argparse.Namespace, asset_root: str, scenario_path: str):
@@ -70,12 +89,14 @@ def main_cli():
     parser.add_argument("--x", type=int, default=0, help="Tile X coordinate")
     parser.add_argument("--y", type=int, default=0, help="Tile Y coordinate")
     parser.add_argument("--id", type=str, default="", help="Building ID or Instance ID")
-    parser.add_argument("--asset-root", type=str, default=r"C:\Users\User\Documents\Codex\2026-09-05\ve\build", help="Asset root path")
-    parser.add_argument("--scenario", type=str, default=r"C:\Users\User\Documents\Codex\2026-09-05\ve\build\assets\scenarios\initial_city.json", help="Scenario JSON path")
+    default_root = _default_runtime_root()
+    parser.add_argument("--asset-root", type=str, default=default_root, help="Runtime asset root path")
+    parser.add_argument("--scenario", type=str, default=None, help="Scenario JSON path; defaults to active runtime scenario")
     parser.add_argument("--output", type=str, default="", help="required output path for generation actions")
 
     args = parser.parse_args()
-    run_cli(args, args.asset_root, args.scenario)
+    scenario_path = args.scenario or _default_scenario(args.asset_root)
+    run_cli(args, args.asset_root, scenario_path)
 
 
 if __name__ == "__main__":

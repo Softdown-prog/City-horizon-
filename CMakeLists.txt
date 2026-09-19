@@ -67,6 +67,8 @@ add_library(ch_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/map_document.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/validation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/semantic_grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/terrain_semantics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/terrain_semantics_catalog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/placement_engine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/transaction_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/shoreline_autotile.cpp
@@ -88,6 +90,8 @@ add_library(ch_render STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/semantic_renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/economy_stubs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/shoreline_catalog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/overlay_catalog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_render/animated_prop_catalog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/building_system.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/farming_system.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/land_system.cpp

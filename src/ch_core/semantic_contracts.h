@@ -12,6 +12,7 @@ inline constexpr const char* kFootprintContract = "CH_FOOTPRINT_V1";
 inline constexpr const char* kConnectorContract = "CH_CONNECTOR_V1";
 inline constexpr const char* kSemanticOverlayContract = "CH_SEMANTIC_OVERLAY_V1";
 inline constexpr const char* kSemanticStateContract = "CH_SEMANTIC_STATE_V1";
+inline constexpr const char* kTerrainSemanticsContract = "CH_TERRAIN_SEMANTICS_V1";
 
 // Three/Four-value Semantic Governance State
 enum class SemanticState : uint8_t {

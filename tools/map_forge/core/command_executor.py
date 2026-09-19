@@ -9,14 +9,17 @@ from tools.map_forge.core.validator import validate_map
 from tools.map_forge.core.projection import MAP_MIN, MAP_MAX
 from tools.map_forge.core.transaction_manager import MapTransactionManager
 from tools.map_forge.exporters.game_exporter import save_scenario
+from tools.map_forge.core.terrain_semantics import validate_definition
 
 
 class CommandExecutor:
-    def __init__(self, map_model: MapModel, asset_root: str, building_catalog: Dict[str, Dict[str, Any]], read_only: bool = False):
+    def __init__(self, map_model: MapModel, asset_root: str, building_catalog: Dict[str, Dict[str, Any]], read_only: bool = False,
+                 terrain_semantic_catalog: Optional[Dict[str, Dict[str, Any]]] = None):
         self.map_model = map_model
         self.asset_root = asset_root
         self.building_catalog = building_catalog
         self.read_only = read_only
+        self.terrain_semantic_catalog = terrain_semantic_catalog or {}
         self.transaction_manager = MapTransactionManager(map_model)
 
     def execute(self, command: Dict[str, Any]) -> Dict[str, Any]:
@@ -98,19 +101,37 @@ class CommandExecutor:
             x = command.get("x", 0)
             y = command.get("y", 0)
             texture = command.get("texture", "assets/terrain/grass_isometric_01.png")
+            paint_mode = command.get("paintMode", "visual_only")
+            definition_id = command.get("terrainDefinition")
+            if paint_mode not in {"visual_only", "visual_plus_semantics"}:
+                return {"success": False, "error": "Unknown paintMode; fail-closed."}
+            if paint_mode == "visual_plus_semantics":
+                definition = self.terrain_semantic_catalog.get(definition_id)
+                if not definition:
+                    return {"success": False, "error": "Unknown terrain definition; semantics were not inferred."}
+                try:
+                    validate_definition(definition)
+                except ValueError as exc:
+                    return {"success": False, "error": f"Invalid terrain definition: {exc}"}
+                texture = definition["visualMaterial"]
 
             prev_entry = self.map_model.get_terrain_at(x, y)
             prev_texture = prev_entry.get("texture", "assets/terrain/grass_isometric_01.png") if prev_entry else "assets/terrain/grass_isometric_01.png"
+            prev_definition = prev_entry.get("terrainDefinition") if prev_entry else None
 
-            if prev_texture == texture:
+            next_definition = definition_id if paint_mode == "visual_plus_semantics" else prev_definition
+            if prev_texture == texture and prev_definition == next_definition:
                 return {"success": True, "action": "paint_terrain", "x": x, "y": y, "texture": texture, "no_op": True}
 
-            inv = [{"type": "terrain", "x": x, "y": y, "texture": prev_texture}]
-            fwd = [{"type": "terrain", "x": x, "y": y, "texture": texture}]
+            inv = [{"type": "terrain", "x": x, "y": y, "texture": prev_texture,
+                    "terrain_definition": prev_definition, "apply_semantics": True}]
+            fwd = [{"type": "terrain", "x": x, "y": y, "texture": texture,
+                    "terrain_definition": next_definition, "apply_semantics": True}]
 
-            self.map_model.set_terrain(x, y, texture)
+            self.map_model.set_terrain(x, y, texture, definition_id, paint_mode == "visual_plus_semantics")
             self.transaction_manager.record_mutation("paint_terrain", f"Paint terrain at ({x},{y})", inv, fwd)
-            return {"success": True, "action": "paint_terrain", "x": x, "y": y, "texture": texture}
+            return {"success": True, "action": "paint_terrain", "x": x, "y": y, "texture": texture,
+                    "terrainDefinition": next_definition, "paintMode": paint_mode}
 
         elif action in ["place_building", "place_object", "add_building"]:
             def_id = command.get("definitionId") or command.get("definition_id") or command.get("id")

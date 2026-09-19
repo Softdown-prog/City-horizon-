@@ -153,25 +153,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const BuildingDefinition* police_station = catalog.find("police_station_01");
-    if (!require(police_station != nullptr, "police_station_01 definition is available") ||
-        !require(police_station->name == "Delegacia Pequena" && police_station->category == "civic" &&
-                     police_station->footprint_width == 3 && police_station->footprint_height == 3 &&
-                     police_station->rotatable && police_station->requires_road_access &&
-                     police_station->power_consumption == 5,
-                 "small police station uses the generic civic definition contract") ||
-        !require(police_station->texture_path_for(BuildingRotation::r0) ==
-                         "assets/buildings/police_station_01_rot0.png" &&
-                     police_station->texture_path_for(BuildingRotation::r90) ==
-                         "assets/buildings/police_station_01_rot1.png" &&
-                     police_station->texture_path_for(BuildingRotation::r180) ==
-                         "assets/buildings/police_station_01_rot2.png" &&
-                     police_station->texture_path_for(BuildingRotation::r270) ==
-                         "assets/buildings/police_station_01_rot3.png",
-                 "small police station selects one processed PNG for each logical rotation")) {
-        return 1;
-    }
-
     const BuildingDefinition* clinic = catalog.find("clinic_small_01");
     if (!require(clinic != nullptr, "clinic_small_01 definition is available") ||
         !require(clinic->name == "Clínica Pequena" && clinic->category == "civic" &&
