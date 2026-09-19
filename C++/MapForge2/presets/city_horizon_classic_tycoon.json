@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_15",
+  "revision": "classic_tycoon_16",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -241,8 +241,23 @@
     "qaPreviewOnly": true,
     "mutatesProductionSprite": false
   },
+  "assetBrowser": {
+    "version": "building_asset_browser_1",
+    "contractFile": "building_asset_browser_contract.json",
+    "entryPoint": "Asset Browser / Library…",
+    "manifestGlob": "*_manifest.json",
+    "recursiveScan": true,
+    "filters": ["text", "typology", "footprint", "floors", "status"],
+    "thumbnailFromExportPackage": true,
+    "reopenNode": "authoringSpec",
+    "authoringSnapshotVersion": "building_authoring_spec_1",
+    "newPackagesReopenable": true,
+    "legacyPackagesBrowseOnly": true,
+    "realizedProceduralVariantsOpenAsFixedEditableAssets": true,
+    "reexportUsesNormalValidationGate": true
+  },
   "automaticExport": {
-    "version": "automatic_export_validation_6",
+    "version": "automatic_export_validation_7",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprintEnvelope": true,
@@ -274,6 +289,10 @@
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
+    "recordsReopenableAuthoringSpec": true,
+    "authoringSpecNode": "authoringSpec",
+    "authoringSnapshotVersion": "building_authoring_spec_1",
+    "assetBrowserContract": "building_asset_browser_contract.json",
     "smallBlockQaPreviewGeneratedAfterValidation": true,
     "lodQaPreviewGeneratedAfterValidation": true,
     "transparentBuildingOnly": true,
@@ -342,5 +361,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Every accepted City Horizon building must remain readable at distant, medium and close gameplay scales before production export. building_lod_gate_1 measures silhouette size, visible alpha area and luminance separation at 35%, 60% and 100%. The LOD review is QA-only: it never creates alternate runtime sprites or changes footprint, anchor, facade geometry or road sockets. Footprint, halo, urban integration and LOD gates are all mandatory."
+  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. automatic_export_validation_7 also records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates. Packages created before the authoring snapshot existed remain visible as legacy browse-only records instead of receiving fabricated editable data."
 }
