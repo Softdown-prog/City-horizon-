@@ -10,7 +10,7 @@ namespace ch::studio {
 
 class EngineProjectionAdapter final {
 public:
-    static constexpr const char* kVersion = "engine_projection_adapter_1";
+    static constexpr const char* kVersion = "engine_projection_adapter_2";
     static constexpr const char* kCanonicalSourceFile = "src/ch_core/projection.cpp";
     static constexpr const char* kCanonicalFunction = "ch::world_to_screen_point";
 
