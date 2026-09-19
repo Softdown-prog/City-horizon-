@@ -82,6 +82,72 @@ QPolygonF faceRect(const Point3 a, const Point3 b, const float t0, const float t
             projectPoint(lerpPoint(a, b, t1, z1), view, canvas), projectPoint(lerpPoint(a, b, t0, z1), view, canvas)};
 }
 
+void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spec,
+                                   const std::array<Point3, 4>& corners,
+                                   const std::array<int, 2>& visible_edges,
+                                   const int near_index,
+                                   const BuildingView view, const QSize canvas) {
+    const float wall_h = static_cast<float>(BuildingComposer::effectiveWallHeightPx(spec));
+    const QColor ao = scaledColor(spec.wall_color, 0.42F);
+
+    // Short eave contact only: three compact bands with a fast falloff.
+    constexpr float kEaveDepthPx = 3.4F;
+    constexpr std::array<int, 3> kEaveAlpha = {30, 16, 7};
+    const float eave_band = kEaveDepthPx / static_cast<float>(kEaveAlpha.size());
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    for (const int edge : visible_edges) {
+        const Point3 a = corners[edge];
+        const Point3 b = corners[(edge + 1) % 4];
+        for (int band = 0; band < static_cast<int>(kEaveAlpha.size()); ++band) {
+            const float z1 = wall_h - static_cast<float>(band) * eave_band;
+            const float z0 = wall_h - static_cast<float>(band + 1) * eave_band;
+            painter.setBrush(scaledColor(ao, 1.0F, kEaveAlpha[band]));
+            painter.drawPolygon(faceRect(a, b, 0.015F, 0.985F, z0, z1, view, canvas));
+        }
+    }
+
+    // The two visible faces meet at the near corner. Keep AO confined to a
+    // narrow physical contact instead of painting a vertical stripe.
+    constexpr std::array<int, 3> kCornerAlpha = {20, 9, 4};
+    constexpr float kCornerSpan = 0.036F;
+    const float corner_band = kCornerSpan / static_cast<float>(kCornerAlpha.size());
+    for (int visible = 0; visible < static_cast<int>(visible_edges.size()); ++visible) {
+        const int edge = visible_edges[visible];
+        const Point3 a = corners[edge];
+        const Point3 b = corners[(edge + 1) % 4];
+        const bool contact_at_start = edge == near_index;
+        for (int band = 0; band < static_cast<int>(kCornerAlpha.size()); ++band) {
+            float t0 = 0.0F;
+            float t1 = 0.0F;
+            if (contact_at_start) {
+                t0 = static_cast<float>(band) * corner_band;
+                t1 = static_cast<float>(band + 1) * corner_band;
+            } else {
+                t0 = 1.0F - static_cast<float>(band + 1) * corner_band;
+                t1 = 1.0F - static_cast<float>(band) * corner_band;
+            }
+            painter.setBrush(scaledColor(ao, 0.94F, kCornerAlpha[band]));
+            painter.drawPolygon(faceRect(a, b, t0, t1, 1.0F, wall_h - 1.2F, view, canvas));
+        }
+    }
+    painter.restore();
+
+    // Ground contact is a single restrained line. It must ground the wall, not
+    // read as another dark base course over the structural plinth.
+    painter.save();
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(scaledColor(spec.wall_color, 0.38F, 78), 0.88,
+                        Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+    for (const int edge : visible_edges) {
+        const Point3 a = corners[edge];
+        const Point3 b = corners[(edge + 1) % 4];
+        painter.drawLine(projectPoint(lerpPoint(a, b, 0.02F, 0.72F), view, canvas),
+                         projectPoint(lerpPoint(a, b, 0.98F, 0.72F), view, canvas));
+    }
+    painter.restore();
+}
+
 void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
                 const BuildingFacadeModulePlacement& module,
                 const Point3 a, const Point3 b, const int edge,
@@ -104,6 +170,9 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const float inset = std::min(0.014F, (t1 - t0) * 0.10F);
         painter.setPen(QPen(scaledColor(spec.glass_color, 0.48F), 0.85)); painter.setBrush(scaledColor(spec.glass_color, 0.86F));
         painter.drawPolygon(faceRect(a, b, t0 + inset, t1 - inset, z0 + floor_h * 0.035F, z1 - floor_h * 0.035F, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.36F, 68), 0.72));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset, z1 - floor_h * 0.035F), view, canvas),
+                         projectPoint(lerpPoint(a, b, t1 - inset, z1 - floor_h * 0.035F), view, canvas));
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.62F, 155), 0.65));
         painter.drawLine(projectPoint(lerpPoint(a, b, center, z0 + floor_h * 0.035F), view, canvas),
                          projectPoint(lerpPoint(a, b, center, z1 - floor_h * 0.035F), view, canvas));
@@ -114,10 +183,15 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const float inset = std::min(0.014F, (t1 - t0) * 0.10F);
         painter.setPen(QPen(scaledColor(spec.door_color, 0.46F), 0.95)); painter.setBrush(spec.door_color);
         painter.drawPolygon(faceRect(a, b, t0 + inset, t1 - inset, z0 + 1.1F, z1 - floor_h * 0.035F, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.34F, 72), 0.74));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset, z1 - floor_h * 0.035F), view, canvas),
+                         projectPoint(lerpPoint(a, b, t1 - inset, z1 - floor_h * 0.035F), view, canvas));
     } else if (module.kind == BuildingFacadeModuleKind::Storefront) {
         const float z0 = base_z + floor_h * 0.10F, z1 = base_z + floor_h * 0.78F;
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F), 1.0)); painter.setBrush(scaledColor(spec.glass_color, 0.80F));
         painter.drawPolygon(faceRect(a, b, t0, t1, z0, z1, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.35F, 62), 0.70));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0, z1), view, canvas), projectPoint(lerpPoint(a, b, t1, z1), view, canvas));
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.64F), 0.8));
         painter.drawLine(projectPoint(lerpPoint(a, b, center, z0), view, canvas), projectPoint(lerpPoint(a, b, center, z1), view, canvas));
     } else if (module.kind == BuildingFacadeModuleKind::Sign) {
@@ -140,6 +214,9 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.setPen(QPen(scaledColor(spec.glass_color, 0.45F), 0.9));
         painter.setBrush(scaledColor(spec.glass_color, 0.82F));
         painter.drawPolygon(faceRect(a, b, t0 + inset, t1 - inset, z0 + 1.2F, z1 - floor_h * 0.035F, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.34F, 70), 0.72));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset, z1 - floor_h * 0.035F), view, canvas),
+                         projectPoint(lerpPoint(a, b, t1 - inset, z1 - floor_h * 0.035F), view, canvas));
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), 1.0));
         painter.drawLine(projectPoint(lerpPoint(a, b, center, z0 + 1.2F), view, canvas),
                          projectPoint(lerpPoint(a, b, center, z1 - floor_h * 0.035F), view, canvas));
@@ -300,6 +377,7 @@ QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, cons
     const std::array<int, 2> visible_edges = {(near_index + 3) % 4, near_index};
 
     QPainter painter(&image); painter.setRenderHint(QPainter::Antialiasing, true);
+    drawLocalizedAmbientOcclusion(painter, spec, corners, visible_edges, near_index, view, canvas);
     drawFloorBands(painter, spec, corners, visible_edges, view, canvas);
     if (spec.facade_editor_enabled) {
         for (const auto& module : spec.facade_modules) {
@@ -334,6 +412,18 @@ QImage BuildingFacadeRenderer::renderReviewSheet(const BuildingComposerSpec& spe
     painter.end(); return sheet;
 }
 
-QJsonObject BuildingFacadeRenderer::manifest(const BuildingComposerSpec& spec) { return BuildingComposer::facadeEditorManifest(spec); }
+QJsonObject BuildingFacadeRenderer::manifest(const BuildingComposerSpec& spec) {
+    QJsonObject manifest = BuildingComposer::facadeEditorManifest(spec);
+    manifest.insert("ambientOcclusion", QJsonObject{
+        {"version", "localized_contact_ao_1"},
+        {"eaveDepthPx", 3.4},
+        {"eaveAlphaBands", QJsonArray{30, 16, 7}},
+        {"cornerNormalizedSpan", 0.036},
+        {"cornerAlphaBands", QJsonArray{20, 9, 4}},
+        {"wallGroundContactAlpha", 78},
+        {"recessContactEnabled", true},
+    });
+    return manifest;
+}
 
 } // namespace ch::studio
