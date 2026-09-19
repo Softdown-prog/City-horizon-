@@ -1,4 +1,4 @@
-"""Post-process the Tycoon Photo Studio into a four-direction game asset package."""
+"""Post-process a Tycoon Asset Baker V1 source bake into a four-direction package."""
 
 from __future__ import annotations
 
@@ -12,6 +12,17 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 FINAL_SIZE = (256, 256)
 PALETTE_COLORS = 128
 CANDIDATE_VARIANT_ID = 3
+SHADOW_COLOR = (29, 33, 37)
+SHADOW_ALPHA_SCALE = 0.72
+SHADOW_ALPHA_MAX = 132
+SHADOW_BLUR_RADIUS = 1.4
+FALLBACK_SHADOW_THRESHOLD = 12
+FALLBACK_SHADOW_SCALE = 2.05
+FALLBACK_SHADOW_ALPHA_MAX = 118
+FALLBACK_SHADOW_BLUR_RADIUS = 2.2
+EDGE_ALPHA_THRESHOLD = 92
+EDGE_OPACITY_SCALE = 0.38
+EDGE_OPACITY_MAX = 96
 DIRECTION_ORDER = ("south", "east", "west", "north")
 
 
@@ -19,7 +30,32 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--studio-preset", required=True)
     return parser.parse_args()
+
+
+def apply_studio_preset(preset):
+    global FINAL_SIZE, PALETTE_COLORS, CANDIDATE_VARIANT_ID
+    global SHADOW_COLOR, SHADOW_ALPHA_SCALE, SHADOW_ALPHA_MAX, SHADOW_BLUR_RADIUS
+    global FALLBACK_SHADOW_THRESHOLD, FALLBACK_SHADOW_SCALE, FALLBACK_SHADOW_ALPHA_MAX, FALLBACK_SHADOW_BLUR_RADIUS
+    global EDGE_ALPHA_THRESHOLD, EDGE_OPACITY_SCALE, EDGE_OPACITY_MAX
+
+    render = preset["render"]
+    post = preset["postProcess"]
+    FINAL_SIZE = tuple(map(int, render["finalResolution"]))
+    PALETTE_COLORS = int(post["paletteColors"])
+    CANDIDATE_VARIANT_ID = int(post["candidateVariant"])
+    SHADOW_COLOR = tuple(map(int, post["shadowColor"]))
+    SHADOW_ALPHA_SCALE = float(post["shadowAlphaScale"])
+    SHADOW_ALPHA_MAX = int(post["shadowAlphaMax"])
+    SHADOW_BLUR_RADIUS = float(post["shadowBlurRadius"])
+    FALLBACK_SHADOW_THRESHOLD = int(post["fallbackShadowThreshold"])
+    FALLBACK_SHADOW_SCALE = float(post["fallbackShadowScale"])
+    FALLBACK_SHADOW_ALPHA_MAX = int(post["fallbackShadowAlphaMax"])
+    FALLBACK_SHADOW_BLUR_RADIUS = float(post["fallbackShadowBlurRadius"])
+    EDGE_ALPHA_THRESHOLD = int(post["edgeAlphaThreshold"])
+    EDGE_OPACITY_SCALE = float(post["edgeOpacityScale"])
+    EDGE_OPACITY_MAX = int(post["edgeOpacityMax"])
 
 
 def percentile_from_histogram(hist, percentile):
@@ -36,8 +72,6 @@ def percentile_from_histogram(hist, percentile):
 
 
 def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> Image.Image:
-    """Return a clean black RGBA shadow layer from the Cycles shadow catcher."""
-
     reference = shadow_reference.convert("RGBA")
     receiver_alpha = reference.getchannel("A")
     alpha_hist = receiver_alpha.histogram()
@@ -46,9 +80,11 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
     alpha_bbox = receiver_alpha.getbbox()
 
     if alpha_bbox is not None and 0.0005 < coverage < 0.45:
-        clean_alpha = receiver_alpha.point(lambda value: min(132, int(value * 0.72)))
-        clean_alpha = clean_alpha.filter(ImageFilter.GaussianBlur(radius=1.4))
-        shadow = Image.new("RGBA", reference.size, (29, 33, 37, 0))
+        clean_alpha = receiver_alpha.point(
+            lambda value: min(SHADOW_ALPHA_MAX, int(value * SHADOW_ALPHA_SCALE))
+        )
+        clean_alpha = clean_alpha.filter(ImageFilter.GaussianBlur(radius=SHADOW_BLUR_RADIUS))
+        shadow = Image.new("RGBA", reference.size, (*SHADOW_COLOR, 0))
         shadow.putalpha(clean_alpha)
         return shadow
 
@@ -79,12 +115,15 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
             if recv_data[x, y] < 16 or obj_data[x, y] > 24:
                 continue
             delta = max(0, baseline - lum_data[x, y])
-            if delta < 12:
+            if delta < FALLBACK_SHADOW_THRESHOLD:
                 continue
-            out[x, y] = min(118, int((delta - 12) * 2.05))
+            out[x, y] = min(
+                FALLBACK_SHADOW_ALPHA_MAX,
+                int((delta - FALLBACK_SHADOW_THRESHOLD) * FALLBACK_SHADOW_SCALE),
+            )
 
-    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(radius=2.2))
-    shadow = Image.new("RGBA", reference.size, (29, 33, 37, 0))
+    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(radius=FALLBACK_SHADOW_BLUR_RADIUS))
+    shadow = Image.new("RGBA", reference.size, (*SHADOW_COLOR, 0))
     shadow.putalpha(shadow_alpha)
     return shadow
 
@@ -114,15 +153,13 @@ def quantize_rgba(image: Image.Image, *, dither: bool) -> Image.Image:
 def edge_cleanup(color_only: Image.Image) -> Image.Image:
     rgba = color_only.convert("RGBA")
     alpha = rgba.getchannel("A")
-    hard_alpha = alpha.point(lambda value: 255 if value >= 92 else 0)
+    hard_alpha = alpha.point(lambda value: 255 if value >= EDGE_ALPHA_THRESHOLD else 0)
     rgba.putalpha(hard_alpha)
-
     dilated = hard_alpha.filter(ImageFilter.MaxFilter(3))
     edge = ImageChops.subtract(dilated, hard_alpha)
-    edge = edge.point(lambda value: min(96, int(value * 0.38)))
+    edge = edge.point(lambda value: min(EDGE_OPACITY_MAX, int(value * EDGE_OPACITY_SCALE)))
     outline = Image.new("RGBA", rgba.size, (48, 42, 37, 0))
     outline.putalpha(edge)
-
     result = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
     result = Image.alpha_composite(result, outline)
     return Image.alpha_composite(result, rgba)
@@ -155,7 +192,8 @@ def scaled_pivot(direction_meta, metadata):
     }
 
 
-def checker_panel(size=FINAL_SIZE):
+def checker_panel(size=None):
+    size = size or FINAL_SIZE
     panel = Image.new("RGBA", size, (231, 229, 223, 255))
     draw = ImageDraw.Draw(panel)
     step = 16
@@ -185,7 +223,7 @@ def draw_pivot(draw, pivot):
 def make_direction_review(candidates, pivots):
     board = Image.new("RGBA", (4 * 300, 380), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((20, 14), "Tycoon Asset Bake V1 - four rotations, one source, fixed camera/light", fill=(32, 32, 32, 255))
+    draw.text((20, 14), "Tycoon Asset Baker V1 - four rotations, one source, frozen studio", fill=(32, 32, 32, 255))
     for index, direction in enumerate(DIRECTION_ORDER):
         x0 = index * 300 + 22
         y0 = 62
@@ -228,9 +266,7 @@ def make_context_panel(sprite, pivot, label):
         for gx in range(-2, 3):
             sx = origin_x + (gx - gy) * 64
             sy = origin_y + (gx + gy) * 32
-            fill = (110, 139, 79, 255)
-            outline = (81, 105, 61, 255)
-            draw_diamond(draw, sx, sy, fill=fill, outline=outline)
+            draw_diamond(draw, sx, sy, fill=(110, 139, 79, 255), outline=(81, 105, 61, 255))
     panel.alpha_composite(sprite, (origin_x - pivot["x"], origin_y - pivot["y"]))
     draw.rectangle((8, 8, 146, 32), fill=(245, 242, 233, 230))
     draw.text((16, 15), label, fill=(42, 42, 42, 255))
@@ -275,18 +311,11 @@ def make_trimmed_atlas(candidates, pivots, padding=2):
         y = padding
         atlas.alpha_composite(crop, (x, y))
         pivot = pivots[direction]
-        records.append(
-            {
-                "direction": direction,
-                "x": x,
-                "y": y,
-                "w": crop.width,
-                "h": crop.height,
-                "pivotX": pivot["x"] - bounds[0],
-                "pivotY": pivot["y"] - bounds[1],
-                "sourceBounds": bounds,
-            }
-        )
+        records.append({
+            "direction": direction, "x": x, "y": y, "w": crop.width, "h": crop.height,
+            "pivotX": pivot["x"] - bounds[0], "pivotY": pivot["y"] - bounds[1],
+            "sourceBounds": bounds,
+        })
         cursor_x += crop.width + padding * 2
     return atlas, records
 
@@ -297,8 +326,12 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    preset = json.loads(Path(args.studio_preset).read_text(encoding="utf-8"))
+    apply_studio_preset(preset)
     metadata = json.loads((input_dir / "studio_metadata.json").read_text(encoding="utf-8"))
-    asset_id = metadata.get("sourceObject", "park_kiosk_1x1")
+    if metadata.get("studioPreset") != preset.get("id"):
+        raise RuntimeError("Source metadata and post-process studio preset do not match")
+    asset_id = metadata["sourceObject"]
     direction_meta = {item["id"]: item for item in metadata["directions"]}
     if tuple(metadata.get("directionOrder", [])) != DIRECTION_ORDER:
         raise RuntimeError(f"Direction order must be {DIRECTION_ORDER}, got {metadata.get('directionOrder')}")
@@ -307,7 +340,6 @@ def main():
     pivots = {}
     all_variants = {}
     view_records = []
-
     for direction in DIRECTION_ORDER:
         meta = direction_meta[direction]
         color_source = Image.open(input_dir / meta["colorSource"]).convert("RGBA")
@@ -328,32 +360,26 @@ def main():
         candidates[direction] = candidate
         pivots[direction] = pivot
         all_variants[direction] = variants
-        view_records.append(
-            {
-                "direction": direction,
-                "quarterTurns": meta["quarterTurns"],
-                "rotationDegrees": meta["rotationDegrees"],
-                "file": f"{asset_id}_{direction}.png",
-                "colorPass": f"{asset_id}_{direction}_color_pass.png",
-                "shadowPass": f"{asset_id}_{direction}_shadow_pass.png",
-                "pivot": pivot,
-                "objectAlphaBounds": alpha_bounds(color_small),
-                "spriteAlphaBounds": alpha_bounds(candidate),
-            }
-        )
+        view_records.append({
+            "direction": direction,
+            "quarterTurns": meta["quarterTurns"],
+            "rotationDegrees": meta["rotationDegrees"],
+            "file": f"{asset_id}_{direction}.png",
+            "colorPass": f"{asset_id}_{direction}_color_pass.png",
+            "shadowPass": f"{asset_id}_{direction}_shadow_pass.png",
+            "pivot": pivot,
+            "objectAlphaBounds": alpha_bounds(color_small),
+            "spriteAlphaBounds": alpha_bounds(candidate),
+        })
 
     unique_pivots = {(p["x"], p["y"]) for p in pivots.values()}
     if len(unique_pivots) != 1:
         raise RuntimeError(f"All four rotations must share one projected ground-origin pivot, got {sorted(unique_pivots)}")
 
-    fixed_sheet = make_fixed_sheet(candidates)
-    fixed_sheet.save(output_dir / f"{asset_id}_4view.png")
-
+    make_fixed_sheet(candidates).save(output_dir / f"{asset_id}_4view.png")
     atlas, atlas_records = make_trimmed_atlas(candidates, pivots)
     atlas.save(output_dir / f"{asset_id}_atlas.png")
-
-    review = make_direction_review(candidates, pivots)
-    review.save(output_dir / f"{asset_id}_review.png")
+    make_direction_review(candidates, pivots).save(output_dir / f"{asset_id}_review.png")
     style_matrix = make_style_matrix(all_variants)
     style_matrix.save(output_dir / f"{asset_id}_style_matrix.png")
     style_matrix.save(output_dir / "tycoon_photo_studio_comparison_board.png")
@@ -363,17 +389,20 @@ def main():
 
     manifest = {
         "contract": "TYCOON_ASSET_BAKE_V1",
-        "status": "visual_candidate",
+        "status": "golden_pipeline_candidate",
         "humanApprovalRequired": True,
         "assetId": asset_id,
-        "assetType": metadata.get("assetType", "static_building"),
+        "assetType": metadata.get("assetType", "static_prop"),
+        "sourceContract": metadata.get("sourceContract"),
+        "assetConfig": metadata.get("assetConfig"),
+        "studioPreset": metadata.get("studioPreset"),
         "cameraContract": metadata.get("cameraContract", "CH_CAMERA_V1"),
         "gridContract": metadata.get("gridContract", "CH_GRID_V1"),
         "projection": metadata.get("projection", "orthographic_dimetric_2_to_1"),
         "yawDegrees": metadata.get("yawDegrees", 45.0),
         "elevationDegrees": metadata.get("elevationDegrees", 30.0),
         "tile": {"width": metadata.get("tileWidth", 128), "height": metadata.get("tileHeight", 64)},
-        "footprint": metadata.get("footprint", {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]}),
+        "footprint": metadata["footprint"],
         "blenderVersion": metadata.get("blenderVersion", "unknown"),
         "renderEngine": metadata.get("renderEngine", "unknown"),
         "renderResolution": metadata.get("renderResolution", [1024, 1024]),
@@ -388,8 +417,9 @@ def main():
             "mode": "palette_reduced",
             "dither": "floyd_steinberg",
             "edgeCleanup": "none",
-            "status": "provisional_until_human_visual_approval",
+            "studioPreset": metadata.get("studioPreset"),
         },
+        "sourceSummary": metadata.get("sourceSummary", {}),
         "views": view_records,
         "atlas": {
             "file": f"{asset_id}_atlas.png",
@@ -417,18 +447,15 @@ def main():
         },
         "githubRunId": os.environ.get("GITHUB_RUN_ID", "local"),
         "githubSha": os.environ.get("GITHUB_SHA", "local"),
-        "approvalRule": "Do not promote this bake recipe to production until all four rotations are visually accepted at gameplay scale.",
+        "approvalRule": "Golden kiosk guards the approved visual recipe; new assets must use the same frozen studio unless a new studio version is explicitly approved.",
     }
     manifest_text = json.dumps(manifest, indent=2)
     (output_dir / f"{asset_id}_manifest.json").write_text(manifest_text, encoding="utf-8")
     (output_dir / "tycoon_photo_studio_manifest.json").write_text(manifest_text, encoding="utf-8")
 
-    print("Generated four-direction Tycoon asset package:")
+    print("Generated Tycoon Asset Baker V1 package:")
     for direction in DIRECTION_ORDER:
         print(" -", f"{asset_id}_{direction}.png", "pivot", pivots[direction])
-    print(" -", f"{asset_id}_4view.png")
-    print(" -", f"{asset_id}_atlas.png")
-    print(" -", f"{asset_id}_manifest.json")
 
 
 if __name__ == "__main__":

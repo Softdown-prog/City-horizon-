@@ -1,7 +1,9 @@
 {
   "id": "TYCOON_ASSET_BAKE_V1",
-  "status": "visual_candidate",
-  "purpose": "Bake one structured source asset through Blender into coherent four-direction 2D game sprites for City Horizon.",
+  "status": "golden_static_asset_approved",
+  "purpose": "Bake declarative source assets through a frozen Blender studio into coherent four-direction 2D game sprites for City Horizon.",
+  "sourceContract": "TYCOON_ASSET_SOURCE_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
   "dependsOn": {
     "camera": "CH_CAMERA_V1",
     "grid": "CH_GRID_V1",
@@ -36,22 +38,13 @@
     ],
     "source": "BuildingComposer quarterTurns + BuildingExportPipeline kViews"
   },
-  "lighting": {
-    "fixedAcrossDirections": true,
-    "key": "warm northwest area light",
-    "fill": "cool southeast area light",
-    "shadow": "Cycles shadow catcher"
-  },
   "postProcess": {
     "variantsRetainedForReview": 4,
     "candidateVariant": 3,
-    "candidate": {
-      "paletteColors": 128,
-      "dither": "floyd_steinberg",
-      "edgeCleanup": "none"
-    },
-    "candidateIsFrozenProductionStyle": false,
-    "humanApprovalRequired": true
+    "paletteColors": 128,
+    "dither": "floyd_steinberg",
+    "edgeCleanup": "none",
+    "valuesOwnedByStudioPreset": true
   },
   "pivot": {
     "source": "projected world origin (0,0,0)",
@@ -64,6 +57,13 @@
     "tileHeight": 64,
     "manifestRequired": true,
     "rotateOccupiedMaskForNonSquareAssets": true
+  },
+  "goldenRegression": {
+    "assetId": "park_kiosk_1x1",
+    "directions": ["south", "east", "west", "north"],
+    "meanAbsoluteDifferenceTolerance": 6.0,
+    "humanReviewStillRequiredForNewAssets": true,
+    "referenceFingerprint": "tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json"
   },
   "outputs": {
     "directionFiles": [
@@ -94,5 +94,5 @@
       "simple QPainter procedural shapes used as production visuals"
     ]
   },
-  "promotionRule": "Do not generalize or mass-produce until all four rotations of the golden asset are visually approved at gameplay scale."
+  "nextGate": "Bake a second visually different static asset through the unchanged CH_TYCOON_STUDIO_V1 preset and review cross-asset coherence."
 }

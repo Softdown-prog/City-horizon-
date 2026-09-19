@@ -1,12 +1,12 @@
-# City Horizon Tycoon Asset Pipeline V1
+# City Horizon Tycoon Asset Baker V1
 
-Status: **VISUAL CANDIDATE — human approval required**
+Status: **golden static asset approved; studio recipe frozen as V1**
 
-This stage converts the successful one-view Blender proof into a real game-asset bake: one deterministic source object generates four coherent rotations for the fixed City Horizon camera.
+The City Horizon production path is now a deterministic asset baker rather than a one-off POC. One declarative asset source is rendered by Blender headless through one frozen studio preset and exported as four coherent 2D game rotations.
 
-## Canonical rule
+## Canonical four-direction rule
 
-The camera does not rotate between asset directions. `CH_CAMERA_V1` and the studio lights remain fixed. The asset root rotates around world origin in the same quarter-turn convention already used by `BuildingComposer` and `BuildingExportPipeline`:
+`CH_CAMERA_V1` and world lighting never rotate. The asset root rotates around world origin:
 
 | Direction | Quarter turns | Asset Z rotation |
 | --- | ---: | ---: |
@@ -15,67 +15,76 @@ The camera does not rotate between asset directions. `CH_CAMERA_V1` and the stud
 | West | 3 | 270° |
 | North | 2 | 180° |
 
-The output order remains `south, east, west, north` because that is the current canonical order in `building_export_pipeline.cpp`.
+Output order remains `south, east, west, north`, matching the existing `BuildingExportPipeline` / `BuildingComposer` contract.
 
-## What is reused from the existing toolchain
+## Frozen studio
 
-This pipeline does **not** discard the existing MapForge2 foundation. It deliberately reuses:
+`tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json` is the visual authority for this version. It owns camera, Cycles settings, lighting, shadow receiver, source/final resolution and post-processing values. New assets must reuse this preset unless a new studio version is explicitly reviewed and approved.
 
-- `CH_CAMERA_V1` and `CH_GRID_V1`;
-- the four-view naming and direction convention from `BuildingExportPipeline`;
-- footprint concepts and 128×64 tile contract;
-- persistent pivot/anchor metadata;
-- PNG + JSON package conventions;
-- sprite-sheet/atlas export concepts;
-- Animation Core as the later expansion path for `directions × frames`;
-- Asset Browser, validation, LOD, halo and integration gates as later consumers of baked output.
-
-What changes is the final visual authority: simple QPainter/procedural shapes remain useful for debug, composition and authored metadata, but Blender baking becomes the source of production sprite pixels for this pipeline.
-
-## Pivot rule
-
-All four rotations use the projection of the same world-space origin `(0,0,0)` as their gameplay pivot. Alpha bounds are recorded for trimming and atlas packing, but they never define the pivot. CI rejects the package if the four final pivots differ.
-
-This is important because asymmetric roofs, awnings and shadows change alpha bounds between rotations while the building must stay planted on exactly the same tile origin.
-
-## Current visual recipe
-
-The current candidate keeps the successful POC setup:
+Current V1 recipe preserves the approved kiosk result:
 
 - Blender 4.2.3 LTS;
-- Cycles CPU render;
-- 1024×1024 source bake;
-- 256×256 gameplay frame;
-- fixed warm key + cool fill;
+- Cycles CPU, 24 samples + denoising;
+- orthographic `CH_CAMERA_V1`, yaw 45°, elevation 30°, ortho scale 5.6;
+- 1024×1024 source render → 256×256 final frame;
+- fixed warm NW key + cool SE fill;
 - Cycles shadow catcher;
-- palette reduction to 128 colors;
+- 128-color reduction;
 - Floyd-Steinberg dithering;
-- no hard edge-cleanup in the provisional production candidate.
+- candidate post-process variant 03.
 
-Variant 03 remains a **candidate**, not a frozen final style. All four post-process variants are kept in the review artifact so the visual recipe can still be calibrated without changing geometry or camera.
+## Generic asset source
 
-## Package produced by the proof
+Assets are no longer hardcoded into `build_scene.py`. A source JSON uses `TYCOON_ASSET_SOURCE_V1` and declares:
 
-For `park_kiosk_1x1` the pipeline emits:
+- `assetId` and `assetType`;
+- footprint / occupied cells;
+- requested studio preset;
+- materials;
+- source parts.
 
-- `park_kiosk_1x1_south.png`
-- `park_kiosk_1x1_east.png`
-- `park_kiosk_1x1_west.png`
-- `park_kiosk_1x1_north.png`
-- `park_kiosk_1x1_4view.png` — fixed-cell compatibility sheet
-- `park_kiosk_1x1_atlas.png` — trimmed deterministic atlas
-- `park_kiosk_1x1_manifest.json` — directions, rotations, pivots, bounds, footprint and atlas rects
-- `park_kiosk_1x1_review.png` — all four candidate directions with tile/pivot overlay
-- `park_kiosk_1x1_style_matrix.png` — four directions × four post-process variants
-- `park_kiosk_1x1_4dir_context.png` — gameplay-scale synthetic grid comparison
+The first source is `tools/tycoon_photo_studio/assets/park_kiosk_1x1.json`. The current declarative source supports boxes, pyramid roofs and UV spheres. The baker is intentionally structured so richer source modes can be added later without changing camera/export contracts.
 
-## Gate before the next expansion
+## Golden Asset #1
 
-Do not generalize this system to a large asset library yet. First review the four rotations together. The next stage is justified only if the same asset:
+`park_kiosk_1x1` is the approved Golden Asset #1. Its approved four-direction result is captured as a compact 16×16 RGBA perceptual fingerprint at:
 
-1. stays planted on the same tile pivot in every direction;
-2. preserves material and lighting identity across all rotations;
-3. reads correctly at gameplay scale;
-4. remains visually inside the intended classic Tycoon / Zoo Tycoon 1 family.
+`tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json`
 
-Once this golden static asset is accepted, the same root-rotation contract can be extended to animated assets by baking `4 directions × N animation frames` without independently redrawing frames.
+CI re-bakes the kiosk from the generic source config and compares all four final directions against that approved fingerprint with a small numeric tolerance. The fingerprint also records the original PNG SHA-256 values for diagnostics. This is a regression guard, not a replacement for human review of new assets.
+
+## Export package
+
+Each static asset emits:
+
+- `<asset>_south.png`
+- `<asset>_east.png`
+- `<asset>_west.png`
+- `<asset>_north.png`
+- `<asset>_4view.png`
+- `<asset>_atlas.png`
+- `<asset>_manifest.json`
+- `<asset>_review.png`
+- `<asset>_style_matrix.png`
+- `<asset>_4dir_context.png`
+
+The pivot is always the projection of world origin `(0,0,0)`, never the alpha bounds, so asymmetric assets remain planted on the same tile through rotation.
+
+## Reuse from MapForge2
+
+The baker keeps the useful foundation already built:
+
+- `CH_CAMERA_V1` and `CH_GRID_V1`;
+- four-view direction naming/order;
+- footprint and tile metadata;
+- pivot/anchor concepts;
+- PNG + JSON packaging;
+- atlas/spritesheet concepts;
+- Animation Core as the future `4 directions × N frames` extension;
+- Asset Browser and validation systems as future consumers/orchestrators.
+
+Blender is now the production pixel source. QPainter/procedural renderers remain useful for debug, composition and metadata, not as the final visual authority for this pipeline.
+
+## Next gate
+
+Do not mass-produce the library yet. The next validation is a second, visually different static asset using the same frozen studio. If it still reads as the same game, the baker has demonstrated cross-asset coherence rather than success on one kiosk only.

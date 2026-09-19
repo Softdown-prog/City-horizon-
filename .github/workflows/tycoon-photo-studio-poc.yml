@@ -1,4 +1,4 @@
-name: Tycoon Asset Bake 4-Direction POC
+name: Tycoon Asset Baker V1
 
 on:
   workflow_dispatch:
@@ -13,9 +13,13 @@ permissions:
   contents: read
 
 jobs:
-  render-poc:
+  bake-golden-kiosk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ASSET_CONFIG: tools/tycoon_photo_studio/assets/park_kiosk_1x1.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      GOLDEN_FINGERPRINT: tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json
 
     steps:
       - name: Checkout
@@ -53,26 +57,34 @@ jobs:
           fi
           chmod +x "$blender_exe"
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
-          echo "Blender executable: $blender_exe"
 
-      - name: Bake four directional source passes headlessly
+      - name: Bake golden asset from generic source config
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p out/tycoon_photo_studio/source
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup --python tools/tycoon_photo_studio/build_scene.py -- --output "$PWD/out/tycoon_photo_studio/source"
+          mkdir -p out/tycoon_asset_baker/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_scene.py -- \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tycoon_asset_baker/source"
+
           for direction in south east west north; do
-            test -f "out/tycoon_photo_studio/source/park_kiosk_1x1_${direction}_color_source.png"
-            test -f "out/tycoon_photo_studio/source/park_kiosk_1x1_${direction}_shadow_source.png"
+            test -f "out/tycoon_asset_baker/source/park_kiosk_1x1_${direction}_color_source.png"
+            test -f "out/tycoon_asset_baker/source/park_kiosk_1x1_${direction}_shadow_source.png"
           done
-          test -f out/tycoon_photo_studio/source/studio_metadata.json
+          test -f out/tycoon_asset_baker/source/studio_metadata.json
 
-      - name: Generate four-direction game asset package
+      - name: Build four-direction game asset package
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p out/tycoon_photo_studio/final
-          python tools/tycoon_photo_studio/postprocess.py --input out/tycoon_photo_studio/source --output out/tycoon_photo_studio/final
+          mkdir -p out/tycoon_asset_baker/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/tycoon_asset_baker/source \
+            --output out/tycoon_asset_baker/final \
+            --studio-preset "$STUDIO_PRESET"
+
           required=(
             park_kiosk_1x1_south.png
             park_kiosk_1x1_east.png
@@ -84,24 +96,26 @@ jobs:
             park_kiosk_1x1_style_matrix.png
             park_kiosk_1x1_4dir_context.png
             park_kiosk_1x1_manifest.json
-            tycoon_photo_studio_comparison_board.png
-            tycoon_photo_studio_in_game_context.png
-            tycoon_photo_studio_manifest.json
           )
           for file in "${required[@]}"; do
-            test -f "out/tycoon_photo_studio/final/$file"
+            test -f "out/tycoon_asset_baker/final/$file"
           done
 
-      - name: Validate four-direction contract and pivots
+      - name: Validate contracts, pivot and golden visual regression
         shell: bash
         run: |
           set -euo pipefail
-          python tools/tycoon_photo_studio/validate_package.py --manifest out/tycoon_photo_studio/final/park_kiosk_1x1_manifest.json
+          python tools/tycoon_photo_studio/validate_package.py \
+            --manifest out/tycoon_asset_baker/final/park_kiosk_1x1_manifest.json \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET" \
+            --golden-fingerprint "$GOLDEN_FINGERPRINT" \
+            --golden-mean-abs-tolerance 6.0
 
-      - name: Upload four-direction visual proof artifact
+      - name: Upload baker artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Tycoon-Asset-Bake-4Dir-POC
-          path: out/tycoon_photo_studio
+          name: Tycoon-Asset-Baker-V1-Golden-Kiosk
+          path: out/tycoon_asset_baker
           if-no-files-found: error
           retention-days: 14
