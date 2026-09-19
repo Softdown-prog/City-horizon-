@@ -83,7 +83,7 @@ jobs:
           from PIL import Image
           for variant in ('water_deep', 'water_shallow'):
               for offset in ('00', '10', '01', '11'):
-                  image = Image.open(Path('out/water/tiles') / f'${variant}_${offset}.png').convert('RGBA')
+                  image = Image.open(Path('out/water/tiles') / f'{variant}_{offset}.png').convert('RGBA')
                   assert image.size == (128, 64)
                   assert image.getpixel((0, 0))[3] == 0
                   assert image.getpixel((127, 0))[3] == 0
