@@ -1,0 +1,163 @@
+name: Tycoon Conifer Tree Family Bake
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/assets/park_tree_conifer_*.fractal.json"
+      - "tools/tycoon_photo_studio/build_classic_tree.py"
+      - "tools/tycoon_photo_studio/run_classic_tree_compat.py"
+      - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-tree-conifer-family-bake.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        asset:
+          - park_tree_conifer_tall_01
+          - park_tree_conifer_dense_01
+          - park_tree_conifer_young_01
+          - park_tree_conifer_irregular_01
+    env:
+      ASSET_ID: ${{ matrix.asset }}
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      CH_TYCOON_SHADOW_SAMPLES: "4"
+      CH_TYCOON_SHADOW_DENOISING: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Resolve and validate conifer recipe
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree_source="tools/tycoon_photo_studio/assets/${ASSET_ID}.fractal.json"
+          echo "TREE_SOURCE=$tree_source" >> "$GITHUB_ENV"
+          python - "$tree_source" "$ASSET_ID" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path, asset_id = sys.argv[1:]
+          data = json.loads(Path(path).read_text())
+          assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
+          assert data['assetId'] == asset_id
+          assert data['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
+          assert data['footprint']['widthTiles'] == 1
+          assert data['footprint']['depthTiles'] == 1
+          assert data['trunk']['smoothShading'] is True
+          assert data['fractalTree']['levels'] == 4
+          assert data['fractalTree']['branchFactor'] == 2
+          assert 5 <= data['fractalTree']['primaryBranches'] <= 7
+          assert data['leafCards']['count'] >= 700
+          assert len(data['leafCards']['materials']) >= 5
+          assert data['leafCards']['crownRadius'][2] > data['leafCards']['crownRadius'][1]
+          assert data['leafCards']['crownRadius'][2] > data['leafCards']['crownRadius'][0]
+          assert data['foliagePostProcess']['shadowBlendIntent'] == 'multiply_equivalent_alpha'
+          print('coniferRecipeGate: PASS', asset_id)
+          print('leafCards:', data['leafCards']['count'])
+          PY
+
+      - name: Download pinned Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake source renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "out/${ASSET_ID}/source"
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/run_classic_tree_compat.py -- \
+            --asset-config "$TREE_SOURCE" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/${ASSET_ID}/source"
+
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          asset_id = os.environ['ASSET_ID']
+          recipe = json.loads(Path(os.environ['TREE_SOURCE']).read_text())
+          meta = json.loads(Path(f'out/{asset_id}/source/studio_metadata.json').read_text())
+          summary = meta['sourceSummary']
+          assert summary['sourceMode'] == 'procedural_leaf_card_tree_v1', summary
+          assert summary['leafCardCount'] == recipe['leafCards']['count'], (summary, recipe['leafCards']['count'])
+          print('leafCardGeometryGate: PASS', asset_id)
+          print('branches:', summary['branchCount'], 'leafCards:', summary['leafCardCount'])
+          PY
+
+      - name: Build final PNG package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "out/${ASSET_ID}/final"
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "out/${ASSET_ID}/source" \
+            --output "out/${ASSET_ID}/final" \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply classic foliage profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_foliage_2d.py \
+            --package "out/${ASSET_ID}/final" \
+            --asset-id "$ASSET_ID" \
+            --asset-config "$TREE_SOURCE"
+
+      - name: Verify final PNG package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/${ASSET_ID}/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/${ASSET_ID}/final/${ASSET_ID}_4view.png"
+          test -f "out/${ASSET_ID}/final/${ASSET_ID}_review.png"
+          test -f "out/${ASSET_ID}/final/${ASSET_ID}_4dir_context.png"
+
+      - name: Upload conifer PNGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-${{ matrix.asset }}-PNGs
+          path: |
+            out/${{ matrix.asset }}/final
+            out/${{ matrix.asset }}/source/studio_metadata.json
+          if-no-files-found: error
+          retention-days: 14
