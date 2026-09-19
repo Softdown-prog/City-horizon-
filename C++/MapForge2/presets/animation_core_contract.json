@@ -1,13 +1,15 @@
 {
-  "id": "animation_core_1",
+  "id": "animation_core_2",
   "name": "City Horizon Animation Core",
   "status": "canonical",
-  "purpose": "Deterministic parametric timeline and frame export contract for animated City Horizon assets.",
+  "purpose": "Deterministic parametric timeline, hierarchical part animation and frame export contract for animated City Horizon assets.",
   "dataModel": {
     "asset": "AnimatedAssetSpec",
+    "node": "AnimationNodeSpec",
     "clip": "AnimationClip",
     "track": "AnimationTrack",
-    "keyframe": "AnimationKeyframe"
+    "keyframe": "AnimationKeyframe",
+    "frameNodeState": "AnimationNodeState"
   },
   "timing": {
     "frameCountRange": [2, 240],
@@ -18,7 +20,7 @@
     "fullTurnRotationEndpointsEquivalent": true
   },
   "interpolation": ["step", "linear", "smooth_step", "sine"],
-  "rootProperties": [
+  "trackProperties": [
     "offset_x_px",
     "offset_y_px",
     "rotation_degrees",
@@ -26,11 +28,25 @@
     "opacity",
     "visibility"
   ],
+  "hierarchy": {
+    "version": "animation_node_hierarchy_1",
+    "contractFile": "animation_node_hierarchy_contract.json",
+    "implicitRoot": "root",
+    "uniqueNodeIds": true,
+    "acyclic": true,
+    "parentMustExist": true,
+    "trackTargetMustExist": true,
+    "duplicateTargetPropertyTracksRejected": true,
+    "childTransformsComposeWithParent": true,
+    "drawOrderStable": true,
+    "nodeStateRecordedPerFrame": true
+  },
   "coherence": {
     "stableNormalizedAnchor": true,
     "stableFrameSize": true,
     "stableBaseRenderable": true,
     "stablePaletteProfile": true,
+    "stableNodePivots": true,
     "deterministicSampling": true,
     "frameIndependentRandomGeneration": false
   },
@@ -38,22 +54,24 @@
     "singleFrame": true,
     "contactSheet": true,
     "spritesheet": true,
-    "frameLabelsIncludeTime": true
+    "frameLabelsIncludeTime": true,
+    "hierarchicalPrimitiveQaVisuals": true
   },
   "export": {
     "version": "animation_export_1",
     "outputs": ["spritesheet_png", "preview_png", "manifest_json"],
     "spritesheetOrder": "row_major",
     "manifestRecordsFrameSamples": true,
+    "manifestRecordsNodeStates": true,
     "manifestRecordsAnchor": true,
     "manifestRecordsPaletteProfile": true,
-    "runtime": "SDL consumes baked frame cells and clip timing"
+    "runtime": "SDL consumes baked frame cells and clip timing; hierarchy remains authoring/debug metadata"
   },
   "scope": {
-    "currentRenderable": "BuildingComposerSpec",
-    "currentTrackTarget": "root",
-    "futureTargets": ["mechanical_parts", "rig_joints", "animal_parts", "effects"],
+    "currentRenderable": "BuildingComposerSpec plus hierarchical primitive QA nodes",
+    "currentTrackTargets": ["root", "authored_node_id"],
+    "nextRenderableSources": ["sprite_parts", "mechanical_parts", "rig_joints", "animal_parts", "effects"],
     "futureAnimationComposer": true
   },
-  "authoringRule": "Frames are samples of one canonical asset and one timeline. Never regenerate each frame independently. Camera, palette profile, frame size and anchor remain stable unless a future specialized contract explicitly allows otherwise."
+  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes in one acyclic hierarchy; tracks modify those nodes instead of regenerating a part per frame. Camera, palette profile, frame size, asset anchor and node pivots remain stable across the clip."
 }
