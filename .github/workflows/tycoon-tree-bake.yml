@@ -6,9 +6,8 @@ on:
     branches:
       - main
     paths:
-      - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json"
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json"
-      - "tools/tycoon_photo_studio/generate_fractal_tree_asset.py"
+      - "tools/tycoon_photo_studio/build_classic_tree.py"
       - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/postprocess.py"
@@ -24,9 +23,10 @@ jobs:
     timeout-minutes: 30
     env:
       ASSET_ID: park_tree_broadleaf_01
-      FRACTAL_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json
-      GENERATED_ASSET_CONFIG: out/tree/generated/park_tree_broadleaf_01.json
+      TREE_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      CH_TYCOON_SHADOW_SAMPLES: "4"
+      CH_TYCOON_SHADOW_DENOISING: "false"
 
     steps:
       - name: Checkout
@@ -45,23 +45,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Expand deterministic fractal tree source
+      - name: Validate classic tree source
         shell: bash
         run: |
           set -euo pipefail
-          python tools/tycoon_photo_studio/generate_fractal_tree_asset.py \
-            --input "$FRACTAL_SOURCE" \
-            --output "$GENERATED_ASSET_CONFIG"
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('out/tree/generated/park_tree_broadleaf_01.json')
-          data = json.loads(p.read_text())
-          assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
-          branch_count = sum(1 for part in data['parts'] if part['name'].startswith('CrownSkeleton_Branch_'))
-          assert branch_count == 28, branch_count
-          print('fractalTreeGate: PASS')
-          print('generatedBranches:', branch_count)
+          data = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json').read_text())
+          assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
+          assert data['fractalTree']['levels'] == 4
+          assert data['leafCards']['count'] == 620
+          assert len(data['leafCards']['materials']) >= 5
+          assert 'canopyParts' not in data
+          print('classicTreeSourceGate: PASS')
+          print('requestedLeafCards:', data['leafCards']['count'])
           PY
 
       - name: Download pinned Blender
@@ -80,16 +78,28 @@ jobs:
           chmod +x "$blender_exe"
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
 
-      - name: Bake tree source renders
+      - name: Bake dense leaf-card tree source renders
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p out/tree/source
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
-            --python tools/tycoon_photo_studio/build_scene.py -- \
-            --asset-config "$GENERATED_ASSET_CONFIG" \
+            --python tools/tycoon_photo_studio/build_classic_tree.py -- \
+            --asset-config "$TREE_SOURCE" \
             --studio-preset "$STUDIO_PRESET" \
             --output "$PWD/out/tree/source"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree/source/studio_metadata.json').read_text())
+          s = m['sourceSummary']
+          assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
+          assert s['branchCount'] == 60, s
+          assert s['leafCardCount'] == 620, s
+          print('leafCardGeometryGate: PASS')
+          print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
+          PY
 
       - name: Build final PNG package
         shell: bash
@@ -101,7 +111,7 @@ jobs:
             --output out/tree/final \
             --studio-preset "$STUDIO_PRESET"
 
-      - name: Apply classic 2D foliage profile
+      - name: Apply classic pre-rendered foliage profile
         shell: bash
         run: |
           set -euo pipefail
@@ -113,11 +123,12 @@ jobs:
           from pathlib import Path
           m = json.loads(Path('out/tree/final/park_tree_broadleaf_01_manifest.json').read_text())
           pp = m['candidatePostProcess']
-          assert pp['mode'] == 'classic_2d_foliage_v1'
-          assert pp['paletteColors'] == 24
-          assert pp['dither'] == 'none'
-          assert pp['shadowAlphaMax'] == 62
-          print('classic2DFoliageGate: PASS')
+          assert pp['mode'] == 'classic_prerendered_foliage_v2'
+          assert pp['paletteColors'] == 64
+          assert pp['dither'] == 'floyd_steinberg'
+          assert pp['expectsLeafMicrogeometry'] is True
+          assert pp['shadowAlphaMax'] == 54
+          print('classicPrerenderedFoliageGate: PASS')
           PY
 
       - name: Verify final tree package
@@ -137,6 +148,6 @@ jobs:
           name: City-Horizon-Park-Tree-PNGs
           path: |
             out/tree/final
-            out/tree/generated
+            out/tree/source/studio_metadata.json
           if-no-files-found: error
           retention-days: 14
