@@ -172,13 +172,16 @@ def alpha_bounds(image: Image.Image):
     return list(map(int, bbox))
 
 
-def variants_for(color_small: Image.Image, shadow_small: Image.Image):
+def variants_for(color_small: Image.Image, shadow_small: Image.Image, terrain_surface: bool = False):
+    # Terrain water is the ground itself: no cast shadow and no external halo.
+    if terrain_surface:
+        shadow_small = Image.new("RGBA", color_small.size, (0, 0, 0, 0))
     v1 = composite_shadow(color_small, shadow_small)
     q2_color = quantize_rgba(color_small, dither=False)
     v2 = composite_shadow(q2_color, shadow_small)
     q3_color = quantize_rgba(color_small, dither=True)
     v3 = composite_shadow(q3_color, shadow_small)
-    cleaned_color = edge_cleanup(q3_color)
+    cleaned_color = q3_color if terrain_surface else edge_cleanup(q3_color)
     v4 = composite_shadow(cleaned_color, shadow_small)
     return [v1, v2, v3, v4]
 
@@ -340,6 +343,7 @@ def main():
         print(f"[postprocess] Using dynamic finalResolution from metadata: {FINAL_SIZE[0]}×{FINAL_SIZE[1]}")
 
     asset_id = metadata["sourceObject"]
+    terrain_surface = metadata.get("assetType") == "terrain_surface"
     direction_meta = {item["id"]: item for item in metadata["directions"]}
     if tuple(metadata.get("directionOrder", [])) != DIRECTION_ORDER:
         raise RuntimeError(f"Direction order must be {DIRECTION_ORDER}, got {metadata.get('directionOrder')}")
@@ -356,7 +360,7 @@ def main():
         shadow_source = derive_shadow(color_source, shadow_reference)
         color_small = downsample(color_source)
         shadow_small = downsample(shadow_source)
-        variants = variants_for(color_small, shadow_small)
+        variants = variants_for(color_small, shadow_small, terrain_surface)
         candidate = variants[CANDIDATE_VARIANT_ID - 1]
         pivot = scaled_pivot(meta, metadata)
 
