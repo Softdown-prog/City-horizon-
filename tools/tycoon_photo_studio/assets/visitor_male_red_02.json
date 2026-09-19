@@ -1,0 +1,135 @@
+{
+  "contract": "TYCOON_CHARACTER_SOURCE_V1",
+  "assetId": "visitor_male_red_02",
+  "assetType": "visitor_npc",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "referenceRole": "generic_city_visitor_stylized_tycoon",
+  "referenceNotes": "Low-resolution Tycoon miniature pass of the canonical red visitor. Preserves the same 8-direction/8-frame bake contract while using a larger head, denser torso, thicker limbs, shorter legs, stronger color separation and restrained vertical bounce.",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1,
+    "occupiedCells": [[0, 0]]
+  },
+  "directions": [
+    {"id": "n", "rotationDegrees": 180},
+    {"id": "ne", "rotationDegrees": 135},
+    {"id": "e", "rotationDegrees": 90},
+    {"id": "se", "rotationDegrees": 45},
+    {"id": "s", "rotationDegrees": 0},
+    {"id": "sw", "rotationDegrees": 315},
+    {"id": "w", "rotationDegrees": 270},
+    {"id": "nw", "rotationDegrees": 225}
+  ],
+  "animation": {
+    "id": "walk",
+    "frameCount": 8,
+    "frameDurationMs": 120,
+    "loop": true,
+    "strideDegrees": 22,
+    "armSwingDegrees": 13,
+    "kneeBendDegrees": 21,
+    "elbowBaseDegrees": 9,
+    "elbowBendDegrees": 7,
+    "verticalBob": 0.024,
+    "torsoSwayDegrees": 1.1
+  },
+  "materials": {
+    "skin": {
+      "name": "VisitorSkinV2",
+      "rgba": [0.64, 0.39, 0.25, 1],
+      "roughness": 0.94
+    },
+    "hair": {
+      "name": "VisitorHairV2",
+      "rgba": [0.105, 0.048, 0.022, 1],
+      "roughness": 0.96
+    },
+    "shirt": {
+      "name": "TycoonRedShirtV2",
+      "rgba": [0.64, 0.055, 0.040, 1],
+      "roughness": 0.95
+    },
+    "shirtStripe": {
+      "name": "NavyShirtStripeV2",
+      "rgba": [0.025, 0.045, 0.095, 1],
+      "roughness": 0.96
+    },
+    "jeans": {
+      "name": "TycoonDenimBlueV2",
+      "rgba": [0.050, 0.17, 0.42, 1],
+      "roughness": 0.96
+    },
+    "shoe": {
+      "name": "CharcoalSneakerV2",
+      "rgba": [0.055, 0.058, 0.060, 1],
+      "roughness": 0.96
+    },
+    "sole": {
+      "name": "SneakerSoleV2",
+      "rgba": [0.55, 0.53, 0.47, 1],
+      "roughness": 0.98
+    },
+    "backpack": {
+      "name": "VisitorDaypackV2",
+      "rgba": [0.025, 0.055, 0.115, 1],
+      "roughness": 0.96
+    }
+  },
+  "proportions": {
+    "pelvisCenterZ": 0.89,
+    "pelvisDimensions": [0.44, 0.34, 0.22],
+    "torsoCenterZ": 1.20,
+    "torsoDimensions": [0.62, 0.39, 0.52],
+    "shirtStripeZ": [1.18, 1.28],
+
+    "headCenter": [0.0, -0.030, 1.60],
+    "headScale": [0.202, 0.189, 0.241],
+    "hairCenter": [0.0, 0.020, 1.725],
+    "hairScale": [0.216, 0.195, 0.135],
+    "neckCenter": [0.0, 0.0, 1.455],
+    "neckRadius": 0.086,
+    "neckDepth": 0.12,
+    "noseCenter": [0.0, -0.215, 1.605],
+    "noseScale": [0.043, 0.055, 0.047],
+    "earLCenter": [-0.194, -0.008, 1.60],
+    "earRCenter": [0.194, -0.008, 1.60],
+    "earScale": [0.034, 0.025, 0.050],
+
+    "daypackCenter": [0.0, 0.235, 1.19],
+    "daypackDimensions": [0.38, 0.18, 0.38],
+    "daypackBevel": 0.075,
+    "packTopCenter": [0.0, 0.235, 1.385],
+    "packTopDimensions": [0.29, 0.16, 0.075],
+
+    "hipX": 0.15,
+    "hipZ": 0.89,
+    "upperLegLength": 0.36,
+    "lowerLegLength": 0.36,
+    "legRadius": 0.13,
+    "shoeDimensions": [0.25, 0.37, 0.12],
+    "soleDimensions": [0.255, 0.38, 0.028],
+    "shoeForwardY": -0.078,
+
+    "shoulderX": 0.34,
+    "shoulderZ": 1.37,
+    "upperArmLength": 0.30,
+    "forearmLength": 0.27,
+    "armRadius": 0.10,
+    "handScale": [0.085, 0.078, 0.100]
+  },
+  "validation": {
+    "minimumDistinctFramesPerDirection": 6,
+    "maximumObjectHeightJitterPx": 20,
+    "maximumObjectWidthJitterPx": 26,
+    "distinctFrameRule": "At least six visibly distinct poses are required in every eight-frame loop; the stylized miniature may use a slightly stronger one-pixel-class vertical read while preserving a shared world-origin anchor."
+  },
+  "status": "visual_candidate_v2",
+  "runtime": {
+    "contract": "CH_ACTOR_RUNTIME_V1",
+    "anchorPolicy": "shared_projected_world_origin",
+    "directionOrder": ["n", "ne", "e", "se", "s", "sw", "w", "nw"],
+    "frameCount": 8,
+    "frameDurationMs": 120,
+    "assetCatalogIngest": "tools/tycoon_photo_studio/character_catalog_ingest.py"
+  }
+}
