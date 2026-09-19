@@ -55,7 +55,9 @@ jobs:
           data = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json').read_text())
           assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
           assert data['fractalTree']['levels'] == 4
-          assert data['leafCards']['count'] == 620
+          assert data['fractalTree']['primaryBranches'] == 5
+          assert data['leafCards']['count'] == 720
+          assert data['leafCards']['interiorFraction'] >= 0.35
           assert len(data['leafCards']['materials']) >= 5
           assert 'canopyParts' not in data
           print('classicTreeSourceGate: PASS')
@@ -95,8 +97,8 @@ jobs:
           m = json.loads(Path('out/tree/source/studio_metadata.json').read_text())
           s = m['sourceSummary']
           assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
-          assert s['branchCount'] == 60, s
-          assert s['leafCardCount'] == 620, s
+          assert s['branchCount'] == 75, s
+          assert s['leafCardCount'] == 720, s
           print('leafCardGeometryGate: PASS')
           print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
           PY
