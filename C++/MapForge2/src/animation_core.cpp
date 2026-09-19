@@ -36,6 +36,18 @@ float interpolateValue(const float a, const float b, const float t,
     return a + (b - a) * shaped;
 }
 
+bool loopEndpointsEquivalent(const AnimationTrack& track) {
+    if (track.keyframes.empty()) return true;
+    const float first = track.keyframes.front().value;
+    const float last = track.keyframes.back().value;
+    if (track.property == AnimationProperty::RotationDegrees) {
+        float delta = std::fmod(last - first, 360.0F);
+        if (delta < 0.0F) delta += 360.0F;
+        return std::min(delta, 360.0F - delta) <= 0.0001F;
+    }
+    return std::abs(first - last) <= 0.0001F;
+}
+
 QJsonObject keyframeJson(const AnimationKeyframe& key) {
     return QJsonObject{
         {"timeSeconds", static_cast<double>(key.time_seconds)},
@@ -96,8 +108,8 @@ bool AnimationCore::validateClip(const AnimationClip& clip, QString* reason) {
                 || std::abs(track.keyframes.back().time_seconds - clip.duration_seconds) > 0.0001F) {
                 return fail(QStringLiteral("looping tracks must include keyframes at 0 and clip duration"));
             }
-            if (std::abs(track.keyframes.front().value - track.keyframes.back().value) > 0.0001F) {
-                return fail(QStringLiteral("looping track endpoints must match for seamless closure"));
+            if (!loopEndpointsEquivalent(track)) {
+                return fail(QStringLiteral("looping track endpoints must represent the same state"));
             }
         }
     }
@@ -219,6 +231,7 @@ QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
         {"view", BuildingComposer::viewName(asset.view)},
         {"deterministic", true},
         {"stableAnchorAcrossFrames", true},
+        {"loopRotationTreatsFullTurnsAsEquivalent", true},
         {"loopClipsDoNotDuplicateEndFrame", true},
         {"baseRenderable", QStringLiteral("BuildingComposerSpec")},
         {"clips", clips},
