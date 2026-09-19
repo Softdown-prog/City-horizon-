@@ -1,0 +1,70 @@
+{
+  "id": "controlled_procedural_variation_1",
+  "name": "City Horizon Controlled Procedural Building Variation",
+  "status": "official",
+  "targetPlatform": "windows_pc",
+  "visualPreset": "city_horizon_classic_tycoon",
+  "deterministic": true,
+  "seedRange": [0, 999999],
+  "defaultSeed": 101,
+  "strengthRange": [0.0, 1.0],
+  "defaultStrength": 0.35,
+  "editableChannels": {
+    "palette": true,
+    "materials": true,
+    "roof": true,
+    "facadeModules": true
+  },
+  "allowedVariation": {
+    "palette": ["wall", "roof", "trim", "door", "accent"],
+    "materials": ["typology_approved_wall_material", "typology_approved_roof_material", "material_strength", "material_variation", "material_contrast", "material_seed"],
+    "roof": ["typology_approved_profile", "pitch", "overhang"],
+    "facadeModules": ["safe_position_jitter", "safe_width_jitter", "optional_planter_hvac_sign_presence", "legacy_window_pattern", "optional_chimney"]
+  },
+  "hardInvariants": [
+    "visual_preset",
+    "building_typology",
+    "footprint_shape",
+    "occupied_footprint_cells",
+    "footprint_envelope",
+    "setbacks",
+    "floor_count",
+    "floor_height",
+    "road_socket_enabled",
+    "road_socket_edge",
+    "road_socket_type",
+    "road_socket_position",
+    "road_socket_width",
+    "sidewalk_depth",
+    "required_ground_floor_access"
+  ],
+  "typologyPolicies": {
+    "residential": {
+      "wallMaterials": ["plaster", "brick", "timber"],
+      "roofMaterials": ["ceramic_tile", "asphalt_shingle"],
+      "roofProfiles": ["gable", "hip"]
+    },
+    "commercial": {
+      "wallMaterials": ["plaster", "brick", "concrete"],
+      "roofMaterials": ["metal_seam", "solid"],
+      "roofProfiles": ["flat", "shed"]
+    },
+    "warehouse": {
+      "wallMaterials": ["metal_panel", "concrete", "brick"],
+      "roofMaterials": ["metal_seam", "solid"],
+      "roofProfiles": ["shed", "gable", "flat"]
+    },
+    "civic": {
+      "wallMaterials": ["brick", "stone", "plaster"],
+      "roofMaterials": ["ceramic_tile", "asphalt_shingle"],
+      "roofProfiles": ["gable", "hip"]
+    }
+  },
+  "export": {
+    "manifestNode": "proceduralVariation",
+    "automaticStemIncludesVariationSeedWhenApplied": true,
+    "sameSeedReproducesSameVariant": true,
+    "variantStillPassesFootprintHaloAndUrbanValidation": true
+  },
+  "rule": "A procedural sibling may change only approved cosmetic or architectural channels. It must remain placement-compatible with the authored base building and must pass the same production validation gates as a hand-authored building."
+}
