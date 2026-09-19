@@ -202,7 +202,7 @@ bool AssetDocument::addLayer(const AssetLayer& layer_value, int index, QString* 
     if (layer_value.opacity < 0.0 || layer_value.opacity > 1.0)
         return fail(reason, QStringLiteral("layer opacity must be inside 0..1"));
 
-    if (index < 0 || index > layers_.size()) index = layers_.size();
+    if (index < 0 || index > layers_.size()) index = static_cast<int>(layers_.size());
     layers_.insert(index, layer_value);
     touch();
     if (reason) reason->clear();
@@ -238,7 +238,8 @@ bool AssetDocument::moveLayer(const QString& layer_id, int new_index, QString* r
     if (current < 0) return fail(reason, QStringLiteral("layer does not exist: %1").arg(layer_id));
     if (layers_.isEmpty()) return false;
 
-    new_index = std::clamp(new_index, 0, layers_.size() - 1);
+    const int last_index = static_cast<int>(layers_.size()) - 1;
+    new_index = std::clamp(new_index, 0, last_index);
     if (current == new_index) {
         if (reason) reason->clear();
         return true;
