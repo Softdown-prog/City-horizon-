@@ -65,6 +65,7 @@ add_library(mapforge2_asset_composer STATIC
     src/building_lod_validator.cpp
     src/building_roof_editor_renderer.cpp
     src/building_projected_shadow_renderer.cpp
+    src/building_visual_reference_gate.cpp
     src/building_facade_renderer.cpp
     src/building_urban_integration_validator.cpp
     src/building_asset_catalog.cpp
