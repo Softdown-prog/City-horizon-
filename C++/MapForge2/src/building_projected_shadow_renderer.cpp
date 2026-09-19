@@ -68,8 +68,15 @@ float cross(const QPointF& origin, const QPointF& a, const QPointF& b) {
                             - (a.y() - origin.y()) * (b.x() - origin.x()));
 }
 
+QPolygonF polygonFromPoints(const std::vector<QPointF>& points) {
+    QPolygonF polygon;
+    polygon.reserve(static_cast<int>(points.size()));
+    for (const QPointF& point : points) polygon << point;
+    return polygon;
+}
+
 QPolygonF convexHull(std::vector<QPointF> points) {
-    if (points.size() <= 2) return QPolygonF(points.data(), static_cast<int>(points.size()));
+    if (points.size() <= 2) return polygonFromPoints(points);
 
     std::sort(points.begin(), points.end(), [](const QPointF& lhs, const QPointF& rhs) {
         if (lhs.x() != rhs.x()) return lhs.x() < rhs.x();
@@ -96,10 +103,7 @@ QPolygonF convexHull(std::vector<QPointF> points) {
     }
     if (!hull.empty()) hull.pop_back();
 
-    QPolygonF polygon;
-    polygon.reserve(static_cast<int>(hull.size()));
-    for (const QPointF& point : hull) polygon << point;
-    return polygon;
+    return polygonFromPoints(hull);
 }
 
 QPolygonF sweptHull(const QPolygonF& caster, const QPointF& offset) {
@@ -184,18 +188,12 @@ void BuildingProjectedShadowRenderer::draw(QPainter& painter,
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setPen(Qt::NoPen);
 
-    // A restrained outer fringe gives the pre-rendered Tycoon softness without
-    // using a modern Gaussian blur or creating low-alpha halos around the sprite.
     painter.setBrush(shadowColor(kPenumbraAlpha));
     painter.drawPolygon(sweptHull(caster, outer_offset));
 
-    // The core uses one stable cool-charcoal tone so terrain color does not
-    // influence the lighting language of exported buildings.
     painter.setBrush(shadowColor(kCoreAlpha));
     painter.drawPolygon(sweptHull(caster, core_offset));
 
-    // Slightly denser near-field shadow anchors the mass while the localized AO
-    // remains responsible for the actual wall/ground contact line.
     painter.setBrush(shadowColor(kNearFieldAlpha));
     painter.drawPolygon(sweptHull(caster, near_offset));
     painter.restore();
