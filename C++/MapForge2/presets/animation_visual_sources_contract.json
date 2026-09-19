@@ -1,0 +1,55 @@
+{
+  "id": "animation_visual_sources_1",
+  "name": "City Horizon Animation Visual Sources",
+  "status": "canonical",
+  "purpose": "Allow each persistent animation node to render a stable authored visual source instead of regenerating independent per-frame artwork.",
+  "supportedKinds": [
+    "none",
+    "primitive_rectangle",
+    "primitive_ellipse",
+    "raster_sprite",
+    "building_render"
+  ],
+  "productionPreferredKinds": [
+    "raster_sprite",
+    "building_render"
+  ],
+  "primitivePolicy": {
+    "supportedForQaAndFallback": true,
+    "recommendedForFinalArt": false
+  },
+  "rasterSprite": {
+    "pathEncoding": "utf_8",
+    "relativePathBase": "AnimatedAssetSpec.visual_source_root",
+    "authoringResolverAlsoChecksExecutableParents": true,
+    "optionalSourceRectPx": true,
+    "transparentTrimSupported": true,
+    "preserveAspectSupported": true,
+    "smoothScalingSupported": true,
+    "sourceMustResolveBeforeProductionExport": true
+  },
+  "buildingRender": {
+    "source": "independent_BuildingComposerSpec",
+    "viewStoredPerNode": true,
+    "transparentTrimSupported": true,
+    "preserveAspectSupported": true,
+    "inheritsAnimationTimeline": false,
+    "renderedAsStableNodeVisual": true
+  },
+  "coherence": {
+    "nodeVisualSourceStableAcrossClip": true,
+    "nodePivotStableAcrossClip": true,
+    "visualSourceNotRegeneratedFromRandomPromptPerFrame": true,
+    "sameNodeSourceUsedForEveryFrame": true,
+    "hierarchicalTransformsAppliedAfterSourceResolution": true
+  },
+  "export": {
+    "version": "animation_export_3",
+    "visualSourcesValidatedBeforeBake": true,
+    "manifestRecordsVisualKind": true,
+    "manifestRecordsRasterPathWhenUsed": true,
+    "manifestRecordsBuildingRenderIdentityWhenUsed": true,
+    "runtimeReceivesBakedFrames": true
+  },
+  "authoringRule": "A node owns one stable visual source for the clip. Motion comes from timeline tracks and parent transforms; raster/building pixels are resolved from the same authored source for every sampled frame."
+}
