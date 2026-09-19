@@ -63,6 +63,8 @@ add_library(mapforge2_asset_composer STATIC
     src/animation_visual_source_compat.cpp
     src/animation_preview_renderer.cpp
     src/animation_export_pipeline.cpp
+    src/engine_projection_adapter.cpp
+    src/projection_calibration_gate.cpp
     src/carousel_part_library.cpp
     src/carousel_part_variants.cpp
     src/carousel_composer.cpp
@@ -83,7 +85,10 @@ target_include_directories(mapforge2_asset_composer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CH_ROOT}
 )
-target_link_libraries(mapforge2_asset_composer PUBLIC Qt6::Gui)
+target_link_libraries(mapforge2_asset_composer PUBLIC
+    mapforge2_canonical
+    Qt6::Gui
+)
 
 add_library(mapforge2_editor STATIC
     src/editor_document.cpp
