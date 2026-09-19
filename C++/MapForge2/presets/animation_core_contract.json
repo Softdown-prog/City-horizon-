@@ -58,7 +58,7 @@
     "hierarchicalPrimitiveQaVisuals": true
   },
   "export": {
-    "version": "animation_export_1",
+    "version": "animation_export_2",
     "outputs": ["spritesheet_png", "preview_png", "manifest_json"],
     "spritesheetOrder": "row_major",
     "manifestRecordsFrameSamples": true,
