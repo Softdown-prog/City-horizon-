@@ -85,6 +85,7 @@ add_library(mapforge2_editor STATIC
     src/production_studio_panel.cpp
     src/building_asset_browser_dialog.cpp
     src/building_composer_asset_browser_integration.cpp
+    src/building_composer_asset_browser_ui_extension.cpp
     src/building_composer_widget.cpp
     src/main_window.cpp
 )
