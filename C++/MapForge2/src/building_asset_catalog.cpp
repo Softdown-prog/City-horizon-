@@ -20,7 +20,7 @@ int enumValue(const Enum value) { return static_cast<int>(value); }
 
 template <typename Enum>
 Enum enumFrom(const QJsonObject& object, const char* key, const Enum fallback) {
-    const QJsonValue value = object.value(QLatin1String(key));
+    const QJsonValue value = object.value(QString::fromLatin1(key));
     return value.isDouble() ? static_cast<Enum>(value.toInt(enumValue(fallback))) : fallback;
 }
 
@@ -29,7 +29,7 @@ QJsonObject colorObject(const QColor& color) {
 }
 
 QColor colorFrom(const QJsonObject& object, const char* key, const QColor& fallback) {
-    const QJsonObject color = object.value(QLatin1String(key)).toObject();
+    const QJsonObject color = object.value(QString::fromLatin1(key)).toObject();
     const QString text = color.value(QStringLiteral("rgba")).toString();
     const QColor parsed(text);
     return parsed.isValid() ? parsed : fallback;
@@ -52,6 +52,7 @@ QJsonObject BuildingAssetCatalog::serializeSpec(const BuildingComposerSpec& spec
     QJsonArray modules;
     for (const auto& module : spec.facade_modules) modules.append(moduleJson(module));
 
+    const bool reopen_as_realized_asset = spec.procedural_variation_applied;
     return QJsonObject{
         {"version", QStringLiteral("building_authoring_spec_1")},
         {"visualPreset", enumValue(spec.visual_preset)},
@@ -110,14 +111,15 @@ QJsonObject BuildingAssetCatalog::serializeSpec(const BuildingComposerSpec& spec
         {"materialVariation", static_cast<double>(spec.material_variation)},
         {"materialContrast", static_cast<double>(spec.material_contrast)},
         {"materialSeed", spec.material_seed},
-        {"proceduralVariationEnabled", spec.procedural_variation_enabled},
-        {"proceduralVariationApplied", spec.procedural_variation_applied},
+        {"proceduralVariationEnabled", reopen_as_realized_asset ? false : spec.procedural_variation_enabled},
+        {"proceduralVariationApplied", false},
         {"proceduralVariationSeed", spec.procedural_variation_seed},
         {"proceduralVariationStrength", static_cast<double>(spec.procedural_variation_strength)},
         {"proceduralVaryPalette", spec.procedural_vary_palette},
         {"proceduralVaryMaterials", spec.procedural_vary_materials},
         {"proceduralVaryRoof", spec.procedural_vary_roof},
         {"proceduralVaryModules", spec.procedural_vary_modules},
+        {"snapshotRepresentsRealizedVariant", reopen_as_realized_asset},
     };
 }
 
@@ -201,7 +203,7 @@ bool BuildingAssetCatalog::deserializeSpec(const QJsonObject& object, BuildingCo
     result.material_contrast = static_cast<float>(object.value("materialContrast").toDouble(0.45));
     result.material_seed = object.value("materialSeed").toInt(17);
     result.procedural_variation_enabled = object.value("proceduralVariationEnabled").toBool(false);
-    result.procedural_variation_applied = object.value("proceduralVariationApplied").toBool(false);
+    result.procedural_variation_applied = false;
     result.procedural_variation_seed = object.value("proceduralVariationSeed").toInt(101);
     result.procedural_variation_strength = static_cast<float>(object.value("proceduralVariationStrength").toDouble(0.35));
     result.procedural_vary_palette = object.value("proceduralVaryPalette").toBool(true);
@@ -288,6 +290,7 @@ QJsonObject BuildingAssetCatalog::contractManifest() {
         {"legacyPackagesRemainBrowseable", true},
         {"legacyPackagesWithoutAuthoringSpecReopenable", false},
         {"reexportUsesNormalValidationGate", true},
+        {"realizedProceduralVariantsReopenAsFixedEditableAssets", true},
     };
 }
 
