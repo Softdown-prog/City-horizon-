@@ -1,9 +1,9 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "workflow": "tycoon-tree-bake-broadleaf-02.yml",
-    "artifact": "City-Horizon-Park-Tree-Broadleaf-02-PNGs",
-    "file": "park_tree_broadleaf_02_south.png"
+    "workflow": "tycoon-water-bake.yml",
+    "artifact": "City-Horizon-Water-3D-to-2D-PNGs",
+    "file": "water_deep_00.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -17,8 +17,14 @@
     },
     "camera": {
       "zoom": 0.92,
-      "focusTile": [0, 0],
-      "focusScreen": [0.5, 0.57]
+      "focusTile": [
+        0,
+        0
+      ],
+      "focusScreen": [
+        0.5,
+        0.57
+      ]
     },
     "stage": {
       "minTile": -6,
@@ -29,10 +35,19 @@
       "drawGrid": true
     },
     "candidate": {
-      "tile": [0, 0],
-      "footprint": [1, 1],
-      "scale": 1.0,
-      "offsetPixels": [0, 0],
+      "tile": [
+        0,
+        0
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "scale": 1,
+      "offsetPixels": [
+        0,
+        0
+      ],
       "showFootprint": true,
       "showAnchor": true,
       "footprintColor": "#f6c448",
