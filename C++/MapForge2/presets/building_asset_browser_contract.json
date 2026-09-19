@@ -1,0 +1,63 @@
+{
+  "id": "city_horizon_building_asset_browser",
+  "version": "building_asset_browser_1",
+  "targetPlatform": "windows_pc",
+  "scope": "building_composer",
+  "index": {
+    "source": "validated_export_manifests",
+    "manifestGlob": "*_manifest.json",
+    "recursive": true,
+    "thumbnailSource": "files.thumbnail",
+    "doesNotModifyProductionSprites": true
+  },
+  "filters": [
+    "text",
+    "typology",
+    "footprint_shape_and_size",
+    "floor_count",
+    "validation_status"
+  ],
+  "statusViews": [
+    "all",
+    "validated",
+    "invalid",
+    "reopenable",
+    "legacy_browse_only"
+  ],
+  "reopen": {
+    "authoringSnapshotVersion": "building_authoring_spec_1",
+    "manifestNode": "authoringSpec",
+    "requiredForEditing": true,
+    "restores": [
+      "typology",
+      "flexible_footprint",
+      "setbacks",
+      "floors",
+      "roof",
+      "materials",
+      "colors",
+      "facade_modules",
+      "sidewalk_and_road_socket",
+      "variation_controls"
+    ],
+    "realizedProceduralVariantsOpenAsFixedEditableAssets": true,
+    "preBrowserLegacyPackagesRemainBrowseable": true,
+    "preBrowserLegacyPackagesAreNotFabricatedIntoEditableSpecs": true
+  },
+  "reexport": {
+    "usesAutomaticExportPipeline": true,
+    "mustPassFootprintGate": true,
+    "mustPassHaloGate": true,
+    "mustPassUrbanIntegrationGate": true,
+    "mustPassLodGate": true,
+    "overwritesDeterministicStemOnlyWhenTheEditedDefinitionResolvesToTheSameStem": true
+  },
+  "ui": {
+    "entryPoint": "Asset Browser / Library…",
+    "embeddedInBuildingComposerWorkflow": true,
+    "showsThumbnail": true,
+    "showsManifestPath": true,
+    "showsValidationSummary": true,
+    "doubleClickReopensWhenAuthoringSnapshotExists": true
+  }
+}
