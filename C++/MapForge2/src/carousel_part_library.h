@@ -30,12 +30,21 @@ public:
                                       const QColor& primary = QColor("#c9554f"),
                                       const QColor& outline = QColor("#343638"));
 
+    // Canonical base artwork renderer retained for compatibility and library QA.
     static QImage renderPart(const QString& part_id,
                              const QSize& target_size,
                              const QColor& primary,
                              const QColor& outline,
-                             int visual_variant = 0,
                              QString* reason = nullptr);
+
+    // Directional presentation of the same persistent part. Horse variants are
+    // 0=east, 1=south, 2=west, 3=north; non-directional parts resolve to 0.
+    static QImage renderPartVariant(const QString& part_id,
+                                    const QSize& target_size,
+                                    const QColor& primary,
+                                    const QColor& outline,
+                                    int visual_variant,
+                                    QString* reason = nullptr);
 
     static QJsonObject manifest();
 };
