@@ -44,12 +44,10 @@ jobs:
           archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
           destination="$RUNNER_TEMP/blender"
           url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
-
           echo "Downloading Blender $version from $url"
           curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
           mkdir -p "$destination"
           tar -xf "$archive" -C "$destination"
-
           blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
           if [[ -z "$blender_exe" ]]; then
             echo "blender executable was not found after extraction" >&2
@@ -65,7 +63,6 @@ jobs:
           set -euo pipefail
           mkdir -p out/tycoon_photo_studio/source
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup --python tools/tycoon_photo_studio/build_scene.py -- --output "$PWD/out/tycoon_photo_studio/source"
-
           for direction in south east west north; do
             test -f "out/tycoon_photo_studio/source/park_kiosk_1x1_${direction}_color_source.png"
             test -f "out/tycoon_photo_studio/source/park_kiosk_1x1_${direction}_shadow_source.png"
@@ -78,7 +75,6 @@ jobs:
           set -euo pipefail
           mkdir -p out/tycoon_photo_studio/final
           python tools/tycoon_photo_studio/postprocess.py --input out/tycoon_photo_studio/source --output out/tycoon_photo_studio/final
-
           required=(
             park_kiosk_1x1_south.png
             park_kiosk_1x1_east.png
@@ -94,7 +90,6 @@ jobs:
             tycoon_photo_studio_in_game_context.png
             tycoon_photo_studio_manifest.json
           )
-
           for file in "${required[@]}"; do
             test -f "out/tycoon_photo_studio/final/$file"
           done
@@ -103,28 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          path = Path("out/tycoon_photo_studio/final/park_kiosk_1x1_manifest.json")
-          manifest = json.loads(path.read_text(encoding="utf-8"))
-          assert manifest["contract"] == "TYCOON_ASSET_BAKE_V1"
-          assert manifest["cameraContract"] == "CH_CAMERA_V1"
-          assert manifest["gridContract"] == "CH_GRID_V1"
-          assert manifest["directionCount"] == 4
-          assert manifest["directionOrder"] == ["south", "east", "west", "north"]
-          assert manifest["footprint"]["widthTiles"] == 1
-          assert manifest["footprint"]["depthTiles"] == 1
-          assert manifest["candidatePostProcess"]["variantId"] == 3
-          pivots = {(view["pivot"]["x"], view["pivot"]["y"]) for view in manifest["views"]}
-          assert len(pivots) == 1, pivots
-          turns = {view["direction"]: view["quarterTurns"] for view in manifest["views"]}
-          assert turns == {"south": 0, "east": 1, "west": 3, "north": 2}, turns
-          atlas_dirs = [frame["direction"] for frame in manifest["atlas"]["frames"]]
-          assert atlas_dirs == ["south", "east", "west", "north"], atlas_dirs
-          print("TYCOON_ASSET_BAKE_V1 validation passed; shared pivot:", next(iter(pivots)))
-          PY
+          python tools/tycoon_photo_studio/validate_package.py --manifest out/tycoon_photo_studio/final/park_kiosk_1x1_manifest.json
 
       - name: Upload four-direction visual proof artifact
         uses: actions/upload-artifact@v4
