@@ -1,0 +1,42 @@
+{
+  "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
+  "source": {
+    "workflow": "tycoon-tree-bake-broadleaf-02.yml",
+    "artifact": "City-Horizon-Park-Tree-Broadleaf-02-PNGs",
+    "file": "park_tree_broadleaf_02_south.png"
+  },
+  "output": {
+    "file": "mapforge_asset_capture.png",
+    "artifact": "MapForge2-Deterministic-Asset-Capture"
+  },
+  "capture": {
+    "canvas": {
+      "width": 1024,
+      "height": 768,
+      "background": "#313934"
+    },
+    "camera": {
+      "zoom": 0.92,
+      "focusTile": [0, 0],
+      "focusScreen": [0.5, 0.57]
+    },
+    "stage": {
+      "minTile": -6,
+      "maxTile": 6,
+      "groundColor": "#708963",
+      "alternateGroundColor": "#768f69",
+      "gridColor": "#3e4f3b",
+      "drawGrid": true
+    },
+    "candidate": {
+      "tile": [0, 0],
+      "footprint": [1, 1],
+      "scale": 1.0,
+      "offsetPixels": [0, 0],
+      "showFootprint": true,
+      "showAnchor": true,
+      "footprintColor": "#f6c448",
+      "anchorColor": "#ffd640"
+    }
+  }
+}
