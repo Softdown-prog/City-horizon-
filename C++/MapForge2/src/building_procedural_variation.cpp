@@ -19,13 +19,16 @@ float randomSigned(std::mt19937& rng) {
 }
 
 QColor variedColor(const QColor& source, std::mt19937& rng, const float strength) {
-    QColor color = source.toHsl();
-    const int hue = color.hslHue();
-    if (hue >= 0)
-        color.setHslHue((hue + static_cast<int>(std::round(randomSigned(rng) * 10.0F * strength)) + 360) % 360);
-    color.setHslSaturation(std::clamp(color.hslSaturation() + static_cast<int>(std::round(randomSigned(rng) * 22.0F * strength)), 0, 255));
-    color.setLightness(std::clamp(color.lightness() + static_cast<int>(std::round(randomSigned(rng) * 18.0F * strength)), 0, 255));
-    return color.toRgb();
+    const QColor hsl = source.toHsl();
+    const int source_hue = hsl.hslHue();
+    const int hue = source_hue >= 0
+        ? (source_hue + static_cast<int>(std::round(randomSigned(rng) * 10.0F * strength)) + 360) % 360
+        : 0;
+    const int saturation = std::clamp(hsl.hslSaturation() + static_cast<int>(std::round(randomSigned(rng) * 22.0F * strength)), 0, 255);
+    const int lightness = std::clamp(hsl.lightness() + static_cast<int>(std::round(randomSigned(rng) * 18.0F * strength)), 0, 255);
+    QColor result;
+    result.setHsl(hue, source_hue >= 0 ? saturation : 0, lightness, source.alpha());
+    return result.toRgb();
 }
 
 template <typename T>
