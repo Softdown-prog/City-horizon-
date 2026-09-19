@@ -26,9 +26,12 @@ private:
     void clearSelectedFacade();
     void applyBuildingTypologyPreset(int index);
     void applyDetailPreset(int index);
+    void applySpecToControls(const BuildingComposerSpec& spec);
+    void openAssetBrowser();
     void exportAsset();
 
     BuildingComposerSpec spec_;
+    QString asset_library_root_;
 
     QComboBox* typology_combo_ = nullptr;
     QComboBox* footprint_combo_ = nullptr;
