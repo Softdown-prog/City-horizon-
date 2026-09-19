@@ -9,6 +9,7 @@ on:
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json"
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json"
       - "tools/tycoon_photo_studio/generate_fractal_tree_asset.py"
+      - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/postprocess.py"
       - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
@@ -99,11 +100,36 @@ jobs:
             --input out/tree/source \
             --output out/tree/final \
             --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply classic 2D foliage profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_foliage_2d.py \
+            --package out/tree/final \
+            --asset-id "$ASSET_ID"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree/final/park_tree_broadleaf_01_manifest.json').read_text())
+          pp = m['candidatePostProcess']
+          assert pp['mode'] == 'classic_2d_foliage_v1'
+          assert pp['paletteColors'] == 24
+          assert pp['dither'] == 'none'
+          assert pp['shadowAlphaMax'] == 62
+          print('classic2DFoliageGate: PASS')
+          PY
+
+      - name: Verify final tree package
+        shell: bash
+        run: |
+          set -euo pipefail
           for direction in south east west north; do
             test -f "out/tree/final/${ASSET_ID}_${direction}.png"
           done
           test -f "out/tree/final/${ASSET_ID}_4view.png"
           test -f "out/tree/final/${ASSET_ID}_review.png"
+          test -f "out/tree/final/${ASSET_ID}_4dir_context.png"
 
       - name: Upload tree PNGs
         uses: actions/upload-artifact@v4
