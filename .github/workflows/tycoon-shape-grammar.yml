@@ -1,31 +1,24 @@
 name: Tycoon Shape Grammar Bake
 
-on:
+"on":
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - "tools/tycoon_photo_studio/generate_shape_grammar_asset.py"
-      - "tools/tycoon_photo_studio/assets/*.grammar.json"
-      - "tools/blender_bake_runner.py"
-      - "tools/tycoon_photo_studio/build_scene.py"
-      - "tools/tycoon_photo_studio/postprocess.py"
-      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
-      - "C++/MapForge2/presets/tycoon_asset_bake_contract.json"
-      - ".github/workflows/tycoon-shape-grammar.yml"
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-  bake-mixed-use:
-    name: Bake mixed_use_block_2x2
+  bake_mixed_use:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -37,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Expand shape grammar twice and prove determinism
+      - name: Expand shape grammar
         shell: bash
         run: |
           set -euo pipefail
@@ -50,20 +43,21 @@ jobs:
             --output out/generated_sources/mixed_use_block_2x2_check.json
           cmp out/generated_sources/mixed_use_block_2x2.json out/generated_sources/mixed_use_block_2x2_check.json
 
-      - name: Download pinned Blender
+      - name: Download Blender 4.2.3
         shell: bash
         run: |
           set -euo pipefail
-          version="4.2.3"
-          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          archive="$RUNNER_TEMP/blender-4.2.3-linux-x64.tar.xz"
           curl --fail --location --retry 3 \
-            "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" \
+            https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz \
             --output "$archive"
           mkdir -p "$RUNNER_TEMP/blender"
           tar -xf "$archive" -C "$RUNNER_TEMP/blender"
-          echo "BLENDER_EXE=$(find "$RUNNER_TEMP/blender" -type f -name blender | head -n 1)" >> "$GITHUB_ENV"
+          blender_exe="$(find "$RUNNER_TEMP/blender" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
 
-      - name: Run canonical asset baker
+      - name: Bake mixed use building
         shell: bash
         run: |
           set -euo pipefail
@@ -75,7 +69,8 @@ jobs:
             --output-dir out/tycoon_asset_baker/mixed_use_block_2x2 \
             --xvfb
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload PNG package
+        uses: actions/upload-artifact@v4
         with:
           name: Tycoon-Shape-Grammar-mixed_use_block_2x2
           path: out/tycoon_asset_baker/mixed_use_block_2x2
