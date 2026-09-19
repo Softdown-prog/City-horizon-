@@ -1,35 +1,23 @@
-#include "src/ch_core/map_document.h"
 #include "src/ch_core/projection.h"
 
 #include <QColor>
+#include <QFile>
 #include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPainter>
+#include <QPen>
 #include <QPolygonF>
 
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
-#include <limits>
 #include <optional>
 #include <string>
 
 namespace {
-
-constexpr int kWidth = 1024;
-constexpr int kHeight = 768;
-constexpr float kGrassOpaqueLeft = 53.0F;
-constexpr float kGrassOpaqueTop = 23.0F;
-constexpr float kGrassOpaqueWidth = 1175.0F;
-constexpr float kTileWidth = 128.0F;
-
-QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera) {
-    const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, kWidth, kHeight);
-    const auto b = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), camera, kWidth, kHeight);
-    const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, kWidth, kHeight);
-    const auto d = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), camera, kWidth, kHeight);
-    return QPolygonF{QPointF(a.x, a.y), QPointF(b.x, b.y), QPointF(c.x, c.y), QPointF(d.x, d.y)};
-}
 
 std::optional<QPointF> opaqueBottomAnchor(const QImage& source) {
     if (source.isNull()) return std::nullopt;
@@ -51,116 +39,168 @@ std::optional<QPointF> opaqueBottomAnchor(const QImage& source) {
                    static_cast<double>(maxY));
 }
 
-void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const int tileX, const int tileY,
-                        const ch::CameraState& camera, const float scale = 1.0F) {
-    const auto anchor = opaqueBottomAnchor(sprite);
-    if (!anchor) return;
-    const auto ground = ch::world_to_screen_point(static_cast<float>(tileX) + 0.5F,
-                                                  static_cast<float>(tileY) + 0.5F,
-                                                  camera, kWidth, kHeight);
-    const QSizeF targetSize(sprite.width() * scale, sprite.height() * scale);
-    const QPointF targetAnchor(anchor->x() * scale, anchor->y() * scale);
-    const QRectF target(QPointF(ground.x - targetAnchor.x(), ground.y - targetAnchor.y()), targetSize);
-    painter.drawImage(target, sprite);
+QColor colorOr(const QJsonObject& object, const char* key, const QColor& fallback) {
+    const QString value = object.value(key).toString();
+    if (value.isEmpty()) return fallback;
+    const QColor parsed(value);
+    return parsed.isValid() ? parsed : fallback;
 }
 
-void drawGrassTile(QPainter& painter, const QImage& grass, const int x, const int y,
-                   const ch::CameraState& camera) {
-    const ch::WorldPoint visualTop = ch::tile_visual_top_world(x, y, camera.rotation);
-    const auto top = ch::world_to_screen_point(visualTop.x, visualTop.y, camera, kWidth, kHeight);
-    const float scale = (kTileWidth / kGrassOpaqueWidth) * camera.zoom;
-    const QRectF destination(top.x - (kTileWidth * camera.zoom * 0.5F) - (kGrassOpaqueLeft * scale),
-                             top.y - (kGrassOpaqueTop * scale),
-                             grass.width() * scale,
-                             grass.height() * scale);
-    painter.drawImage(destination, grass);
+QPointF pairOr(const QJsonObject& object, const char* key, const QPointF& fallback) {
+    const QJsonArray values = object.value(key).toArray();
+    if (values.size() != 2) return fallback;
+    return QPointF(values.at(0).toDouble(fallback.x()), values.at(1).toDouble(fallback.y()));
+}
+
+QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
+                      const int width, const int height) {
+    const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, width, height);
+    const auto b = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), camera, width, height);
+    const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, width, height);
+    const auto d = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), camera, width, height);
+    return QPolygonF{QPointF(a.x, a.y), QPointF(b.x, b.y), QPointF(c.x, c.y), QPointF(d.x, d.y)};
+}
+
+void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const QPointF& tile,
+                        const ch::CameraState& camera, const int width, const int height,
+                        const float scale, const QPointF& offsetPixels) {
+    const auto anchor = opaqueBottomAnchor(sprite);
+    if (!anchor) return;
+    const auto ground = ch::world_to_screen_point(static_cast<float>(tile.x()) + 0.5F,
+                                                   static_cast<float>(tile.y()) + 0.5F,
+                                                   camera, width, height);
+    const QSizeF targetSize(sprite.width() * scale, sprite.height() * scale);
+    const QPointF targetAnchor(anchor->x() * scale, anchor->y() * scale);
+    const QRectF target(QPointF(ground.x - targetAnchor.x() + offsetPixels.x(),
+                                ground.y - targetAnchor.y() + offsetPixels.y()), targetSize);
+    painter.drawImage(target, sprite);
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 5) {
-        std::cerr << "usage: MapForge2MapCapture <output.png> <tree.png> <repo-root> <map.json>\n";
+    if (argc < 4) {
+        std::cerr << "usage: MapForge2MapCapture <output.png> <candidate.png> <capture_request.json>\n";
         return 2;
     }
 
     const std::filesystem::path outputPath = argv[1];
-    const std::filesystem::path treePath = argv[2];
-    const std::filesystem::path repoRoot = argv[3];
-    const std::filesystem::path mapPath = argv[4];
+    const std::filesystem::path candidatePath = argv[2];
+    const QString requestPath = QString::fromStdString(argv[3]);
 
-    const auto document = ch::MapDocument::load_from_file(mapPath.string());
-    if (!document) {
-        std::cerr << "unable to load map: " << mapPath.string() << "\n";
+    QFile requestFile(requestPath);
+    if (!requestFile.open(QIODevice::ReadOnly)) {
+        std::cerr << "unable to open capture request\n";
         return 3;
     }
-
-    const QImage grass(QString::fromStdString((repoRoot / "assets/terrain/grass_isometric_01.png").string()));
-    const QImage tree(QString::fromStdString(treePath.string()));
-    const QImage bakery(QString::fromStdString((repoRoot / "assets/buildings/bakery_01_lvl1.png").string()));
-    if (grass.isNull()) {
-        std::cerr << "unable to load canonical grass texture\n";
+    QJsonParseError parseError{};
+    const QJsonDocument requestDocument = QJsonDocument::fromJson(requestFile.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !requestDocument.isObject()) {
+        std::cerr << "invalid capture request JSON\n";
         return 4;
     }
-    if (tree.isNull()) {
-        std::cerr << "unable to load tree sprite: " << treePath.string() << "\n";
+    const QJsonObject root = requestDocument.object();
+    if (root.value("contract").toString() != "MAPFORGE_CAPTURE_REQUEST_V1") {
+        std::cerr << "unsupported capture request contract\n";
         return 5;
     }
 
-    QImage frame(kWidth, kHeight, QImage::Format_ARGB32);
-    frame.fill(QColor(65, 88, 71));
+    const QJsonObject capture = root.value("capture").toObject();
+    const QJsonObject canvas = capture.value("canvas").toObject();
+    const QJsonObject cameraSpec = capture.value("camera").toObject();
+    const QJsonObject stage = capture.value("stage").toObject();
+    const QJsonObject candidateSpec = capture.value("candidate").toObject();
+
+    const int width = std::clamp(canvas.value("width").toInt(1024), 320, 4096);
+    const int height = std::clamp(canvas.value("height").toInt(768), 240, 4096);
+    const QImage candidate(QString::fromStdString(candidatePath.string()));
+    if (candidate.isNull()) {
+        std::cerr << "unable to load candidate PNG: " << candidatePath.string() << "\n";
+        return 6;
+    }
+
+    QImage frame(width, height, QImage::Format_ARGB32);
+    frame.fill(colorOr(canvas, "background", QColor(49, 57, 52)));
 
     ch::CameraState camera{};
-    camera.zoom = 0.92F;
+    camera.zoom = static_cast<float>(cameraSpec.value("zoom").toDouble(0.92));
     camera.rotation = ch::CameraRotation::r0;
-    const auto originScreen = ch::world_to_screen_point(0.5F, 0.5F, camera, kWidth, kHeight);
-    camera.pan_x += kWidth * 0.50F - originScreen.x;
-    camera.pan_y += kHeight * 0.57F - originScreen.y;
+
+    const QPointF focusTile = pairOr(cameraSpec, "focusTile", QPointF(0.0, 0.0));
+    const QPointF focusScreen = pairOr(cameraSpec, "focusScreen", QPointF(0.5, 0.57));
+    const auto focusPoint = ch::world_to_screen_point(static_cast<float>(focusTile.x()) + 0.5F,
+                                                       static_cast<float>(focusTile.y()) + 0.5F,
+                                                       camera, width, height);
+    camera.pan_x += static_cast<float>(width * focusScreen.x() - focusPoint.x);
+    camera.pan_y += static_cast<float>(height * focusScreen.y() - focusPoint.y);
 
     QPainter painter(&frame);
     painter.setRenderHint(QPainter::Antialiasing, false);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    constexpr int minTile = -7;
-    constexpr int maxTile = 7;
+    const int minTile = std::clamp(stage.value("minTile").toInt(-6), -64, 0);
+    const int maxTile = std::clamp(stage.value("maxTile").toInt(6), 0, 64);
+    const QColor groundA = colorOr(stage, "groundColor", QColor(112, 137, 99));
+    const QColor groundB = colorOr(stage, "alternateGroundColor", QColor(118, 143, 105));
+    const QColor gridColor = colorOr(stage, "gridColor", QColor(62, 79, 59, 150));
+    const bool drawGrid = stage.value("drawGrid").toBool(true);
+
+    QPen gridPen(gridColor);
+    gridPen.setWidthF(1.0);
     for (int depth = minTile * 2; depth <= maxTile * 2; ++depth) {
         const int firstX = std::max(minTile, depth - maxTile);
         const int lastX = std::min(maxTile, depth - minTile);
         for (int x = firstX; x <= lastX; ++x) {
             const int y = depth - x;
-            drawGrassTile(painter, grass, x, y, camera);
+            painter.setPen(drawGrid ? gridPen : Qt::NoPen);
+            painter.setBrush(((x + y) & 1) == 0 ? groundA : groundB);
+            painter.drawPolygon(tilePolygon(x, y, camera, width, height));
         }
     }
 
-    QPen roadEdge(QColor(55, 59, 61, 220));
-    roadEdge.setWidthF(1.0);
-    painter.setPen(roadEdge);
-    painter.setBrush(QColor(78, 82, 84, 232));
-    for (const auto& road : document->roads()) {
-        painter.drawPolygon(tilePolygon(road.tile_x, road.tile_y, camera));
+    const QPointF candidateTile = pairOr(candidateSpec, "tile", QPointF(0.0, 0.0));
+    const QPointF footprint = pairOr(candidateSpec, "footprint", QPointF(1.0, 1.0));
+    const bool showFootprint = candidateSpec.value("showFootprint").toBool(true);
+    if (showFootprint) {
+        QPen footprintPen(colorOr(candidateSpec, "footprintColor", QColor(246, 196, 72, 210)));
+        footprintPen.setWidthF(2.0);
+        painter.setPen(footprintPen);
+        painter.setBrush(Qt::NoBrush);
+        const int fw = std::max(1, static_cast<int>(std::round(footprint.x())));
+        const int fd = std::max(1, static_cast<int>(std::round(footprint.y())));
+        for (int dx = 0; dx < fw; ++dx) {
+            for (int dy = 0; dy < fd; ++dy) {
+                painter.drawPolygon(tilePolygon(static_cast<int>(candidateTile.x()) + dx,
+                                                static_cast<int>(candidateTile.y()) + dy,
+                                                camera, width, height));
+            }
+        }
     }
 
-    // Context building first, then the candidate tree at the canonical review tile.
-    if (!bakery.isNull()) {
-        drawAnchoredSprite(painter, bakery, 3, -1, camera, 1.0F);
-    }
-    drawAnchoredSprite(painter, tree, 0, 0, camera, 1.0F);
+    const float scale = static_cast<float>(std::clamp(candidateSpec.value("scale").toDouble(1.0), 0.05, 8.0));
+    const QPointF offsetPixels = pairOr(candidateSpec, "offsetPixels", QPointF(0.0, 0.0));
+    drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
 
-    // Exact capture marker: one-pixel yellow point at the logical tree tile centre.
-    const auto treeGround = ch::world_to_screen_point(0.5F, 0.5F, camera, kWidth, kHeight);
-    painter.setPen(QColor(245, 196, 64, 210));
-    painter.drawPoint(QPointF(treeGround.x, treeGround.y));
+    if (candidateSpec.value("showAnchor").toBool(true)) {
+        const auto ground = ch::world_to_screen_point(static_cast<float>(candidateTile.x()) + 0.5F,
+                                                       static_cast<float>(candidateTile.y()) + 0.5F,
+                                                       camera, width, height);
+        painter.setPen(colorOr(candidateSpec, "anchorColor", QColor(255, 214, 64, 230)));
+        painter.drawPoint(QPointF(ground.x, ground.y));
+    }
     painter.end();
 
-    std::filesystem::create_directories(outputPath.parent_path());
+    if (!outputPath.parent_path().empty()) {
+        std::filesystem::create_directories(outputPath.parent_path());
+    }
     if (!frame.save(QString::fromStdString(outputPath.string()), "PNG")) {
         std::cerr << "failed to save capture: " << outputPath.string() << "\n";
-        return 6;
+        return 7;
     }
 
-    std::cout << "mapForgeDeterministicCapture: PASS\n";
+    std::cout << "mapForgeGenericDeterministicCapture: PASS\n";
     std::cout << "output=" << outputPath.string() << "\n";
-    std::cout << "tree=" << treePath.string() << "\n";
-    std::cout << "map=" << mapPath.string() << "\n";
+    std::cout << "candidate=" << candidatePath.string() << "\n";
+    std::cout << "request=" << requestPath.toStdString() << "\n";
     return 0;
 }
