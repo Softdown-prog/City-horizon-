@@ -21,11 +21,15 @@ permissions:
 jobs:
   bake-visitor-sequence:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       ASSET_CONFIG: tools/tycoon_photo_studio/assets/visitor_male_red_01.json
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       ASSET_ID: visitor_male_red_01
+      # Color stays at the frozen studio's 24 Cycles samples. Character shadows are
+      # downsampled/blurred later, so their dedicated catcher pass can be cheaper.
+      CH_TYCOON_SHADOW_SAMPLES: "4"
+      CH_TYCOON_SHADOW_DENOISING: "false"
 
     steps:
       - name: Checkout
@@ -68,6 +72,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "Character color quality: frozen CH_TYCOON_STUDIO_V1 (24 samples)"
+          echo "Character shadow catcher quality: ${CH_TYCOON_SHADOW_SAMPLES} samples; denoising=${CH_TYCOON_SHADOW_DENOISING}"
           mkdir -p out/tycoon_character/source
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
             --python tools/tycoon_photo_studio/build_character.py -- \
