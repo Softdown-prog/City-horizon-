@@ -3,6 +3,7 @@
 #include "building_composer.h"
 
 #include <QImage>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSize>
 
