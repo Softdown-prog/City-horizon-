@@ -90,6 +90,16 @@ bool AnimationCore::validateClip(const AnimationClip& clip, QString* reason) {
                 return fail(QStringLiteral("animation keyframes must be sorted by time"));
             previous = key.time_seconds;
         }
+
+        if (clip.loop && track.keyframes.size() > 1) {
+            if (std::abs(track.keyframes.front().time_seconds) > 0.0001F
+                || std::abs(track.keyframes.back().time_seconds - clip.duration_seconds) > 0.0001F) {
+                return fail(QStringLiteral("looping tracks must include keyframes at 0 and clip duration"));
+            }
+            if (std::abs(track.keyframes.front().value - track.keyframes.back().value) > 0.0001F) {
+                return fail(QStringLiteral("looping track endpoints must match for seamless closure"));
+            }
+        }
     }
 
     if (reason) reason->clear();
@@ -106,6 +116,9 @@ bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
     if (asset.category.trimmed().isEmpty()) return fail(QStringLiteral("asset category is empty"));
     if (asset.frame_size.width() < 32 || asset.frame_size.height() < 32)
         return fail(QStringLiteral("animation frame size is too small"));
+    if (asset.anchor_normalized.x() < 0.0 || asset.anchor_normalized.x() > 1.0
+        || asset.anchor_normalized.y() < 0.0 || asset.anchor_normalized.y() > 1.0)
+        return fail(QStringLiteral("animation anchor must remain inside normalized frame bounds"));
     if (asset.clips.empty()) return fail(QStringLiteral("animated asset has no clips"));
 
     for (const AnimationClip& clip : asset.clips) {
@@ -202,8 +215,10 @@ QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
         {"category", asset.category},
         {"paletteProfile", asset.palette_profile},
         {"frameSize", QJsonObject{{"width", asset.frame_size.width()}, {"height", asset.frame_size.height()}}},
+        {"anchorNormalized", QJsonObject{{"x", asset.anchor_normalized.x()}, {"y", asset.anchor_normalized.y()}}},
         {"view", BuildingComposer::viewName(asset.view)},
         {"deterministic", true},
+        {"stableAnchorAcrossFrames", true},
         {"loopClipsDoNotDuplicateEndFrame", true},
         {"baseRenderable", QStringLiteral("BuildingComposerSpec")},
         {"clips", clips},
