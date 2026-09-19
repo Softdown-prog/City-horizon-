@@ -1,0 +1,87 @@
+{
+  "id": "structured_directional_materials_1",
+  "name": "City Horizon Structured Directional Materials",
+  "status": "official",
+  "targetStyle": "classic_tycoon",
+  "renderer": "classic_tycoon_renderer_2",
+  "principles": {
+    "randomPointNoise": false,
+    "saltAndPepperNoise": false,
+    "surfaceCoordinatePatterns": true,
+    "directionFollowsPhysicalMaterial": true,
+    "deterministic": true,
+    "geometryMutation": false,
+    "highFrequencyNoiseAvoided": true,
+    "lodFriendly": true
+  },
+  "wallRecipes": {
+    "solid": {
+      "pattern": "none",
+      "direction": "face_ramp_only"
+    },
+    "plaster": {
+      "pattern": "broad_trowel_bands",
+      "direction": "horizontal_facade",
+      "frequency": "low",
+      "isolatedDots": false
+    },
+    "brick": {
+      "pattern": "running_bond",
+      "direction": "horizontal_courses",
+      "staggeredVerticalJoints": true,
+      "rigidMortarSpacing": true
+    },
+    "concrete": {
+      "pattern": "cast_panel_grid",
+      "direction": "facade_panel_axes",
+      "recessedJoints": true,
+      "edgeHighlight": true
+    },
+    "timber": {
+      "pattern": "horizontal_clapboards",
+      "direction": "horizontal_facade",
+      "overlapShadow": true,
+      "upperEdgeHighlight": true
+    },
+    "stone": {
+      "pattern": "coursed_blocks",
+      "direction": "horizontal_courses",
+      "blockCountAlternatesByCourse": true,
+      "randomFlecks": false
+    },
+    "metal_panel": {
+      "pattern": "standing_panels",
+      "direction": "vertical_facade",
+      "darkSeamAndLightReturn": true
+    },
+    "glass": {
+      "pattern": "curtain_wall_bays",
+      "direction": "facade_bays_and_transoms",
+      "broadDirectionalReflections": true,
+      "pointSparkleNoise": false
+    }
+  },
+  "roofRecipes": {
+    "solid": {
+      "pattern": "none",
+      "direction": "roof_face_ramp_only"
+    },
+    "ceramic_tile": {
+      "pattern": "interlocking_courses",
+      "courseDirection": "parallel_to_eave",
+      "jointDirection": "down_roof_slope",
+      "staggeredJoints": true
+    },
+    "metal_seam": {
+      "pattern": "standing_seams",
+      "direction": "ridge_to_eave",
+      "darkSeamAndLightReturn": true
+    },
+    "asphalt_shingle": {
+      "pattern": "staggered_shingle_courses",
+      "courseDirection": "parallel_to_eave",
+      "tabDirection": "down_roof_slope"
+    }
+  },
+  "authoringRule": "Material identity must come from structured construction lines, courses, panels, joints, overlaps and broad reflections. Random isolated point noise must not be used to simulate material richness. Pattern density scales with materialScale and remains readable under the Building Composer LOD gate."
+}
