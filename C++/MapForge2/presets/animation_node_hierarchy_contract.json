@@ -14,7 +14,8 @@
     "required": ["id", "parentId"],
     "transform": ["positionPx", "pivotNormalized", "rotationDegrees", "scale", "opacity", "visible"],
     "drawOrder": true,
-    "visualQaKinds": ["none", "primitive_rectangle", "primitive_ellipse"]
+    "visualSourceContract": "animation_visual_sources_1",
+    "visualSourceKinds": ["none", "primitive_rectangle", "primitive_ellipse", "raster_sprite", "building_render"]
   },
   "validation": {
     "uniqueIds": true,
@@ -26,7 +27,8 @@
     "positiveScale": true,
     "opacityRange": [0.0, 1.0],
     "trackTargetsMustExist": true,
-    "duplicateTargetPropertyTracksRejected": true
+    "duplicateTargetPropertyTracksRejected": true,
+    "productionVisualSourcesValidatedBeforeExport": true
   },
   "composition": {
     "parentTransformPropagatesToChildren": true,
@@ -34,28 +36,32 @@
     "visibilityIsCumulative": true,
     "opacityIsCumulative": true,
     "drawOrderIsDeterministic": true,
-    "assetRootTransformAppliesBeforeNodeHierarchy": true
+    "assetRootTransformAppliesBeforeNodeHierarchy": true,
+    "visualSourceResolvedBeforeHierarchicalTransform": true
   },
   "qaReference": {
     "baseStatic": true,
     "platformRotates": true,
     "horsesParentedToPlatform": true,
     "horsesUseIndependentVerticalTracks": true,
+    "structuralPartsUseBuildingRenderSources": true,
+    "movingPartStandInsUseRealRasterSprite": true,
     "frameCount": 12,
     "durationSeconds": 2.0,
     "loop": true
   },
   "export": {
     "nodeDefinitionsInManifest": true,
+    "visualSourceDefinitionsInManifest": true,
     "resolvedNodeStateRecordedPerFrame": true,
     "bakedFramesRemainPrimaryRuntimePayload": true
   },
   "futureCompatibility": {
-    "spritePartSources": true,
+    "carouselPartLibrary": true,
     "mechanicalSubassemblies": true,
     "characterRigJoints": true,
     "animalRigJoints": true,
     "counterRotationTracks": true
   },
-  "authoringRule": "A moving part is one persistent node across the entire clip. Never create a visually similar replacement node for each frame. Parent/child relationships, pivots, palette identity and draw order remain stable; only authored track properties change over time."
+  "authoringRule": "A moving part is one persistent node with one stable visual source across the entire clip. Never create a visually similar replacement node for each frame. Parent/child relationships, pivots, palette identity, visual source and draw order remain stable; only authored track properties change over time."
 }
