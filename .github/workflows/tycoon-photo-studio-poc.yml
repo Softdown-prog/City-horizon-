@@ -7,8 +7,6 @@ on:
       - main
     paths:
       - "tools/tycoon_photo_studio/**"
-      - "C++/MapForge2/presets/tycoon_asset_bake_contract.json"
-      - "C++/MapForge2/CH_TYCOON_ASSET_PIPELINE_V1.md"
       - ".github/workflows/tycoon-photo-studio-poc.yml"
 
 permissions:
