@@ -1,0 +1,165 @@
+name: Tycoon Tree Bake Broadleaf 02
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json"
+      - "tools/tycoon_photo_studio/build_classic_tree.py"
+      - "tools/tycoon_photo_studio/run_classic_tree_compat.py"
+      - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-tree-bake-broadleaf-02.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASSET_ID: park_tree_broadleaf_02
+      TREE_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      CH_TYCOON_SHADOW_SAMPLES: "4"
+      CH_TYCOON_SHADOW_DENOISING: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Validate broadleaf 02 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json').read_text())
+          assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
+          assert data['assetId'] == 'park_tree_broadleaf_02'
+          assert data['fractalTree']['levels'] == 4
+          assert data['fractalTree']['primaryBranches'] == 5
+          assert data['fractalTree']['seed'] != 1709
+          assert data['leafCards']['seed'] != 2718
+          assert data['leafCards']['count'] == 1020
+          assert data['leafCards']['interiorFraction'] >= 0.55
+          assert data['leafCards']['coreFillFraction'] >= 0.22
+          assert data['leafCards']['crownRadius'][0] >= 1.50
+          assert data['leafCards']['crownRadius'][1] >= 1.34
+          assert data['leafCards']['sizeBiasPower'] > 1.0
+          assert data['leafCards']['maxTiltDegrees'] <= 54.0
+          assert len(data['leafCards']['materials']) >= 5
+          assert data['trunk']['smoothShading'] is True
+          assert 'canopyParts' not in data
+          print('broadleaf02SourceGate: PASS')
+          print('requestedLeafCards:', data['leafCards']['count'])
+          PY
+
+      - name: Download pinned Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake broadleaf 02 source renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tree02/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/run_classic_tree_compat.py -- \
+            --asset-config "$TREE_SOURCE" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tree02/source"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree02/source/studio_metadata.json').read_text())
+          s = m['sourceSummary']
+          assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
+          assert s['branchCount'] == 75, s
+          assert s['leafCardCount'] == 1020, s
+          print('leafCardGeometryGate: PASS')
+          print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
+          PY
+
+      - name: Build final PNG package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tree02/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/tree02/source \
+            --output out/tree02/final \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply classic pre-rendered foliage profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_foliage_2d.py \
+            --package out/tree02/final \
+            --asset-id "$ASSET_ID"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree02/final/park_tree_broadleaf_02_manifest.json').read_text())
+          pp = m['candidatePostProcess']
+          assert pp['mode'] == 'classic_prerendered_foliage_v2'
+          assert pp['paletteColors'] == 64
+          assert pp['dither'] == 'floyd_steinberg'
+          assert pp['expectsLeafMicrogeometry'] is True
+          assert pp['shadowAlphaMax'] == 54
+          print('classicPrerenderedFoliageGate: PASS')
+          PY
+
+      - name: Verify final tree package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/tree02/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/tree02/final/${ASSET_ID}_4view.png"
+          test -f "out/tree02/final/${ASSET_ID}_review.png"
+          test -f "out/tree02/final/${ASSET_ID}_4dir_context.png"
+
+      - name: Upload broadleaf 02 PNGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Park-Tree-Broadleaf-02-PNGs
+          path: |
+            out/tree02/final
+            out/tree02/source/studio_metadata.json
+          if-no-files-found: error
+          retention-days: 14
