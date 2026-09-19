@@ -25,12 +25,19 @@ jobs:
         include:
           - asset_id: park_kiosk_1x1
             asset_config: tools/tycoon_photo_studio/assets/park_kiosk_1x1.json
+            grammar_config: ""
             golden: tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json
           - asset_id: neighborhood_cafe_2x1
             asset_config: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
+            grammar_config: ""
             golden: ""
           - asset_id: park_tree_broadleaf_01
             asset_config: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json
+            grammar_config: ""
+            golden: ""
+          - asset_id: mixed_use_block_2x2
+            asset_config: out/generated_sources/mixed_use_block_2x2.json
+            grammar_config: tools/tycoon_photo_studio/assets/mixed_use_block_2x2.grammar.json
             golden: ""
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +51,42 @@ jobs:
           python -m pip install --upgrade pillow
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+      - name: Expand and validate shape grammar
+        if: matrix.grammar_config != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/generated_sources
+          python tools/tycoon_photo_studio/generate_shape_grammar_asset.py \
+            --grammar "${{ matrix.grammar_config }}" \
+            --output "${{ matrix.asset_config }}"
+          python tools/tycoon_photo_studio/generate_shape_grammar_asset.py \
+            --grammar "${{ matrix.grammar_config }}" \
+            --output out/generated_sources/determinism_check.json
+          cmp "${{ matrix.asset_config }}" out/generated_sources/determinism_check.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("${{ matrix.asset_config }}")
+          asset = json.loads(p.read_text(encoding="utf-8"))
+          fp = asset["footprint"]
+          half_x = fp["widthTiles"] * 3.0 / 2.0
+          half_y = fp["depthTiles"] * 3.0 / 2.0
+          for part in asset.get("parts", []):
+              if part.get("type") != "box":
+                  continue
+              x, y, _ = part["location"]
+              dx, dy, _ = part["dimensions"]
+              if abs(x) + dx / 2 > half_x + 1e-6 or abs(y) + dy / 2 > half_y + 1e-6:
+                  raise SystemExit(f"part exceeds footprint: {part['name']}")
+          g = asset.get("generation", {})
+          if g.get("sourceContract") != "CITY_HORIZON_SHAPE_GRAMMAR_V1":
+              raise SystemExit("generated source is missing shape grammar provenance")
+          if int(g.get("partCount", 0)) != len(asset.get("parts", [])):
+              raise SystemExit("partCount provenance mismatch")
+          print(f"shape grammar gate ok: floors={asset['floors']} parts={len(asset['parts'])} seed={g['seed']}")
+          PY
       - name: Download pinned Blender
         shell: bash
         run: |
