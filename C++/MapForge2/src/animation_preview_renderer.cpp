@@ -8,8 +8,120 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace ch::studio {
+namespace {
+
+QTransform rootTransform(const AnimatedAssetSpec& asset, const AnimationFrameSample& sample) {
+    const QPointF anchor(asset.anchor_normalized.x() * asset.frame_size.width(),
+                         asset.anchor_normalized.y() * asset.frame_size.height());
+    QTransform transform;
+    transform.translate(anchor.x() + sample.root.offset_x_px,
+                        anchor.y() + sample.root.offset_y_px);
+    transform.rotate(sample.root.rotation_degrees);
+    transform.scale(sample.root.scale, sample.root.scale);
+    transform.translate(-anchor.x(), -anchor.y());
+    return transform;
+}
+
+QTransform nodeOriginTransform(const AnimatedAssetSpec& asset,
+                               const AnimationFrameSample& sample,
+                               const AnimationNodeSpec& node,
+                               const QTransform& root_transform) {
+    std::vector<const AnimationNodeSpec*> chain;
+    const AnimationNodeSpec* current = &node;
+    while (current) {
+        chain.push_back(current);
+        if (current->parent_id == QStringLiteral("root")) break;
+        current = AnimationCore::findNode(asset, current->parent_id);
+    }
+    std::reverse(chain.begin(), chain.end());
+
+    QTransform transform = root_transform;
+    for (const AnimationNodeSpec* item : chain) {
+        const AnimationNodeState* state = AnimationCore::findNodeState(sample, item->id);
+        if (!state) continue;
+        transform.translate(item->position_px.x() + state->offset_x_px,
+                            item->position_px.y() + state->offset_y_px);
+        transform.rotate(state->rotation_degrees);
+        transform.scale(state->scale, state->scale);
+    }
+    return transform;
+}
+
+bool nodeVisible(const AnimatedAssetSpec& asset,
+                 const AnimationFrameSample& sample,
+                 const AnimationNodeSpec& node) {
+    if (!sample.root.visible) return false;
+    const AnimationNodeSpec* current = &node;
+    while (current) {
+        const AnimationNodeState* state = AnimationCore::findNodeState(sample, current->id);
+        if (!state || !state->visible) return false;
+        if (current->parent_id == QStringLiteral("root")) break;
+        current = AnimationCore::findNode(asset, current->parent_id);
+    }
+    return true;
+}
+
+qreal nodeOpacity(const AnimatedAssetSpec& asset,
+                  const AnimationFrameSample& sample,
+                  const AnimationNodeSpec& node) {
+    qreal opacity = std::clamp(static_cast<qreal>(sample.root.opacity), 0.0, 1.0);
+    const AnimationNodeSpec* current = &node;
+    while (current) {
+        const AnimationNodeState* state = AnimationCore::findNodeState(sample, current->id);
+        if (!state) return 0.0;
+        opacity *= std::clamp(static_cast<qreal>(state->opacity), 0.0, 1.0);
+        if (current->parent_id == QStringLiteral("root")) break;
+        current = AnimationCore::findNode(asset, current->parent_id);
+    }
+    return std::clamp(opacity, 0.0, 1.0);
+}
+
+void drawNodeVisual(QPainter& painter,
+                    const AnimatedAssetSpec& asset,
+                    const AnimationFrameSample& sample,
+                    const AnimationNodeSpec& node,
+                    const QTransform& root_transform) {
+    if (!nodeVisible(asset, sample, node)
+        || node.visual_kind == AnimationNodeVisualKind::None) {
+        return;
+    }
+
+    const qreal width = node.visual_size_px.width();
+    const qreal height = node.visual_size_px.height();
+    const QRectF geometry(-node.pivot_normalized.x() * width,
+                          -node.pivot_normalized.y() * height,
+                          width, height);
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setOpacity(nodeOpacity(asset, sample, node));
+    painter.setWorldTransform(nodeOriginTransform(asset, sample, node, root_transform));
+    painter.setPen(QPen(node.outline_color, 1.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(node.fill_color);
+
+    if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle) {
+        painter.drawRoundedRect(geometry, 2.0, 2.0);
+    } else if (node.visual_kind == AnimationNodeVisualKind::PrimitiveEllipse) {
+        painter.drawEllipse(geometry);
+    }
+    painter.restore();
+}
+
+std::vector<const AnimationNodeSpec*> sortedNodes(const AnimatedAssetSpec& asset) {
+    std::vector<const AnimationNodeSpec*> nodes;
+    nodes.reserve(asset.nodes.size());
+    for (const AnimationNodeSpec& node : asset.nodes) nodes.push_back(&node);
+    std::stable_sort(nodes.begin(), nodes.end(), [](const AnimationNodeSpec* lhs,
+                                                    const AnimationNodeSpec* rhs) {
+        return lhs->draw_order < rhs->draw_order;
+    });
+    return nodes;
+}
+
+} // namespace
 
 QImage AnimationPreviewRenderer::renderFrame(const AnimatedAssetSpec& asset,
                                              const AnimationClip& clip,
@@ -17,28 +129,34 @@ QImage AnimationPreviewRenderer::renderFrame(const AnimatedAssetSpec& asset,
     QImage frame(asset.frame_size, QImage::Format_ARGB32_Premultiplied);
     frame.fill(Qt::transparent);
 
-    const AnimationFrameSample sample = AnimationCore::sampleFrame(clip, frame_index);
-    if (!sample.root.visible) return frame;
-
-    const QImage base = BuildingFacadeRenderer::renderView(
-        asset.base_building, asset.view, asset.frame_size);
-
-    const QPointF anchor(asset.anchor_normalized.x() * asset.frame_size.width(),
-                         asset.anchor_normalized.y() * asset.frame_size.height());
+    const AnimationFrameSample sample = AnimationCore::sampleFrame(asset, clip, frame_index);
+    const QTransform root_transform = rootTransform(asset, sample);
+    const std::vector<const AnimationNodeSpec*> nodes = sortedNodes(asset);
 
     QPainter painter(&frame);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.setOpacity(std::clamp(static_cast<qreal>(sample.root.opacity), 0.0, 1.0));
 
-    QTransform transform;
-    transform.translate(anchor.x() + sample.root.offset_x_px,
-                        anchor.y() + sample.root.offset_y_px);
-    transform.rotate(sample.root.rotation_degrees);
-    transform.scale(sample.root.scale, sample.root.scale);
-    transform.translate(-anchor.x(), -anchor.y());
-    painter.setTransform(transform);
-    painter.drawImage(QPointF(0.0, 0.0), base);
+    for (const AnimationNodeSpec* node : nodes) {
+        if (node->draw_order >= 0) break;
+        drawNodeVisual(painter, asset, sample, *node, root_transform);
+    }
+
+    if (asset.render_base_building && sample.root.visible) {
+        const QImage base = BuildingFacadeRenderer::renderView(
+            asset.base_building, asset.view, asset.frame_size);
+        painter.save();
+        painter.setOpacity(std::clamp(static_cast<qreal>(sample.root.opacity), 0.0, 1.0));
+        painter.setWorldTransform(root_transform);
+        painter.drawImage(QPointF(0.0, 0.0), base);
+        painter.restore();
+    }
+
+    for (const AnimationNodeSpec* node : nodes) {
+        if (node->draw_order < 0) continue;
+        drawNodeVisual(painter, asset, sample, *node, root_transform);
+    }
+
     painter.end();
     return frame;
 }
@@ -94,7 +212,7 @@ QImage AnimationPreviewRenderer::renderPreviewSheet(const AnimatedAssetSpec& ass
     painter.setPen(QColor("#aebbc0"));
     painter.drawText(QRect(16, 34, canvas.width() - 32, 20),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("Stable anchor · deterministic sampling · %1 s · %2")
+                     QStringLiteral("Stable anchor · hierarchical nodes · deterministic sampling · %1 s · %2")
                          .arg(clip.duration_seconds, 0, 'f', 2)
                          .arg(clip.loop ? QStringLiteral("loop") : QStringLiteral("one-shot")));
 
@@ -120,7 +238,7 @@ QImage AnimationPreviewRenderer::renderPreviewSheet(const AnimatedAssetSpec& ass
                          cell_width, cell_height);
         painter.fillRect(cell, QColor("#1b272c"));
 
-        const AnimationFrameSample sample = AnimationCore::sampleFrame(clip, frame_index);
+        const AnimationFrameSample sample = AnimationCore::sampleFrame(asset, clip, frame_index);
         painter.setPen(QColor("#dce7ea"));
         painter.drawText(QRect(cell.left() + 6, cell.top() + 3, cell.width() - 12, 18),
                          Qt::AlignLeft | Qt::AlignVCenter,
