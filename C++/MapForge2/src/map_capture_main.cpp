@@ -186,6 +186,7 @@ int main(int argc, char** argv) {
 
     const QPointF candidateTile = pairOr(candidateSpec, "tile", QPointF(0.0, 0.0));
     const QPointF footprint = pairOr(candidateSpec, "footprint", QPointF(1.0, 1.0));
+    const QJsonArray tileList = candidateSpec.value("tiles").toArray();
     const bool showFootprint = candidateSpec.value("showFootprint").toBool(true);
     if (showFootprint) {
         QPen footprintPen(colorOr(candidateSpec, "footprintColor", QColor(246, 196, 72, 210)));
@@ -205,7 +206,15 @@ int main(int argc, char** argv) {
 
     const float scale = static_cast<float>(std::clamp(candidateSpec.value("scale").toDouble(1.0), 0.05, 8.0));
     const QPointF offsetPixels = pairOr(candidateSpec, "offsetPixels", QPointF(0.0, 0.0));
-    if (candidateSpec.value("renderAsGroundTile").toBool(false)) {
+    if (!tileList.isEmpty() && candidateSpec.value("renderAsGroundTile").toBool(false)) {
+        for (const QJsonValue& entry : tileList) {
+            const QJsonArray coords = entry.toArray();
+            if (coords.size() != 2) continue;
+            drawGroundTileSprite(painter, candidate,
+                                 QPointF(coords.at(0).toDouble(), coords.at(1).toDouble()),
+                                 camera, width, height);
+        }
+    } else if (candidateSpec.value("renderAsGroundTile").toBool(false)) {
         drawGroundTileSprite(painter, candidate, candidateTile, camera, width, height);
     } else {
         drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
