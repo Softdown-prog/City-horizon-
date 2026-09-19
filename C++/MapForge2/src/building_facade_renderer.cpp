@@ -234,19 +234,23 @@ void drawAutomaticFloors(QPainter& painter, const BuildingComposerSpec& spec,
         for (int floor = 0; floor < floors; ++floor) {
             const bool ground_south = floor == 0 && logical == BuildingStreetEdge::South && spec.south_door;
             if (ground_south) {
-                drawModule(painter, spec, {BuildingFacadeModuleKind::Door, logical, floor, 0.50F, 0.22F, true},
+                const float door_position = spec.door_position == BuildingDoorPosition::Left ? 0.24F
+                    : spec.door_position == BuildingDoorPosition::Right ? 0.76F : 0.50F;
+                drawModule(painter, spec, {BuildingFacadeModuleKind::Door, logical, floor, door_position, 0.22F, true},
                            corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
                 if (spec.windows) {
-                    drawModule(painter, spec, {BuildingFacadeModuleKind::Window, logical, floor, 0.20F, 0.18F, true},
+                    const float first_window = spec.door_position == BuildingDoorPosition::Left ? 0.53F : 0.20F;
+                    const float second_window = spec.door_position == BuildingDoorPosition::Right ? 0.47F : 0.80F;
+                    drawModule(painter, spec, {BuildingFacadeModuleKind::Window, logical, floor, first_window, 0.18F, true},
                                corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
-                    drawModule(painter, spec, {BuildingFacadeModuleKind::Window, logical, floor, 0.80F, 0.18F, true},
+                    drawModule(painter, spec, {BuildingFacadeModuleKind::Window, logical, floor, second_window, 0.18F, true},
                                corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
                 }
                 if (spec.south_sign)
-                    drawModule(painter, spec, {BuildingFacadeModuleKind::Sign, logical, floor, 0.50F, 0.34F, true},
+                    drawModule(painter, spec, {BuildingFacadeModuleKind::Sign, logical, floor, door_position, 0.34F, true},
                                corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
                 if (spec.south_awning)
-                    drawModule(painter, spec, {BuildingFacadeModuleKind::Awning, logical, floor, 0.50F, 0.38F, true},
+                    drawModule(painter, spec, {BuildingFacadeModuleKind::Awning, logical, floor, door_position, 0.38F, true},
                                corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
             } else if (spec.windows) {
                 const bool strip = spec.window_pattern == BuildingWindowPattern::Strip;
