@@ -16,9 +16,7 @@ namespace {
 QString safeStem(QString value) {
     value = value.trimmed().toLower();
     for (QChar& ch : value) {
-        if (!(ch.isLetterOrNumber() || ch == QLatin1Char('_') || ch == QLatin1Char('-'))) {
-            ch = QLatin1Char('_');
-        }
+        if (!(ch.isLetterOrNumber() || ch == QLatin1Char('_') || ch == QLatin1Char('-'))) ch = QLatin1Char('_');
     }
     while (value.contains(QStringLiteral("__"))) value.replace(QStringLiteral("__"), QStringLiteral("_"));
     if (value.isEmpty()) value = QStringLiteral("animated_asset");
@@ -26,13 +24,23 @@ QString safeStem(QString value) {
 }
 
 const AnimationClip* findClip(const AnimatedAssetSpec& asset, const QString& clip_id) {
-    for (const AnimationClip& clip : asset.clips) {
-        if (clip.id == clip_id) return &clip;
-    }
+    for (const AnimationClip& clip : asset.clips) if (clip.id == clip_id) return &clip;
     return nullptr;
 }
 
 QJsonObject frameSampleJson(const AnimationFrameSample& sample) {
+    QJsonArray nodes;
+    for (const AnimationNodeState& node : sample.nodes) {
+        nodes.append(QJsonObject{
+            {"id", node.id}, {"parentId", node.parent_id},
+            {"offsetXPx", static_cast<double>(node.offset_x_px)},
+            {"offsetYPx", static_cast<double>(node.offset_y_px)},
+            {"rotationDegrees", static_cast<double>(node.rotation_degrees)},
+            {"scale", static_cast<double>(node.scale)},
+            {"opacity", static_cast<double>(node.opacity)},
+            {"visible", node.visible},
+        });
+    }
     return QJsonObject{
         {"frame", sample.frame_index},
         {"timeSeconds", static_cast<double>(sample.time_seconds)},
@@ -45,6 +53,7 @@ QJsonObject frameSampleJson(const AnimationFrameSample& sample) {
             {"opacity", static_cast<double>(sample.root.opacity)},
             {"visible", sample.root.visible},
         }},
+        {"nodes", nodes},
     };
 }
 
@@ -83,49 +92,39 @@ AnimationExportResult AnimationExportPipeline::exportClip(const AnimatedAssetSpe
     const QString preview_name = stem + QStringLiteral("_preview.png");
     const QString manifest_name = stem + QStringLiteral("_manifest.json");
 
-    const QString sheet_path = output.filePath(sheet_name);
-    const QString preview_path = output.filePath(preview_name);
-    const QString manifest_path = output.filePath(manifest_name);
-
-    if (!AnimationPreviewRenderer::renderSpriteSheet(asset, *clip, columns).save(sheet_path, "PNG")) {
-        result.reason = QStringLiteral("unable to save animation spritesheet");
-        return result;
+    if (!AnimationPreviewRenderer::renderSpriteSheet(asset, *clip, columns).save(output.filePath(sheet_name), "PNG")) {
+        result.reason = QStringLiteral("unable to save animation spritesheet"); return result;
     }
     result.files.append(sheet_name);
 
-    if (!AnimationPreviewRenderer::renderPreviewSheet(asset, *clip).save(preview_path, "PNG")) {
-        result.reason = QStringLiteral("unable to save animation preview sheet");
-        return result;
+    if (!AnimationPreviewRenderer::renderPreviewSheet(asset, *clip).save(output.filePath(preview_name), "PNG")) {
+        result.reason = QStringLiteral("unable to save animation preview sheet"); return result;
     }
     result.files.append(preview_name);
 
     QJsonArray frame_samples;
-    for (int frame_index = 0; frame_index < clip->frame_count; ++frame_index) {
-        frame_samples.append(frameSampleJson(AnimationCore::sampleFrame(*clip, frame_index)));
-    }
+    for (int frame_index = 0; frame_index < clip->frame_count; ++frame_index)
+        frame_samples.append(frameSampleJson(AnimationCore::sampleFrame(asset, *clip, frame_index)));
 
     QJsonObject manifest = AnimationCore::manifest(asset);
     manifest.insert(QStringLiteral("export"), QJsonObject{
         {"version", QString::fromLatin1(kVersion)},
         {"clipId", clip->id},
         {"spritesheet", QJsonObject{
-            {"file", sheet_name},
-            {"columns", columns},
-            {"rows", rows},
-            {"frameWidth", asset.frame_size.width()},
-            {"frameHeight", asset.frame_size.height()},
+            {"file", sheet_name}, {"columns", columns}, {"rows", rows},
+            {"frameWidth", asset.frame_size.width()}, {"frameHeight", asset.frame_size.height()},
             {"frameOrder", QStringLiteral("row_major")},
         }},
         {"previewFile", preview_name},
         {"manifestFile", manifest_name},
-        {"runtimeContract", QStringLiteral("SDL consumes ordered frame cells and clip timing; authoring transforms are already baked into PNG frames")},
+        {"hierarchicalNodeStatesRecorded", true},
+        {"runtimeContract", QStringLiteral("SDL consumes ordered baked frame cells and clip timing; hierarchy is authoring metadata and debugging context")},
     });
     manifest.insert(QStringLiteral("frameSamples"), frame_samples);
 
-    QFile manifest_file(manifest_path);
+    QFile manifest_file(output.filePath(manifest_name));
     if (!manifest_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        result.reason = QStringLiteral("unable to save animation manifest");
-        return result;
+        result.reason = QStringLiteral("unable to save animation manifest"); return result;
     }
     manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
     manifest_file.close();
