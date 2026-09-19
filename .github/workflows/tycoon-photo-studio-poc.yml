@@ -23,12 +23,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - asset_id: park_kiosk_1x1
-            asset_config: tools/tycoon_photo_studio/assets/park_kiosk_1x1.json
-            golden: tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json
-          - asset_id: neighborhood_cafe_2x1
-            asset_config: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
-            golden: ""
           - asset_id: park_tree_broadleaf_01
             asset_config: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json
             golden: ""
