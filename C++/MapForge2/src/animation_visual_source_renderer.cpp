@@ -22,10 +22,8 @@ QSize targetSize(const AnimationNodeSpec& node) {
 
 QString resolveRasterPath(const AnimatedAssetSpec& asset, const QString& authored_path) {
     if (authored_path.trimmed().isEmpty()) return {};
-
     const QFileInfo direct(authored_path);
     if (direct.isAbsolute() && direct.isFile()) return direct.canonicalFilePath();
-
     const QString rooted = QDir(asset.visual_source_root).filePath(authored_path);
     if (QFileInfo::exists(rooted)) return QFileInfo(rooted).canonicalFilePath();
 
@@ -102,7 +100,6 @@ QImage rasterSource(const AnimatedAssetSpec& asset, const AnimationNodeSpec& nod
         if (reason) *reason = QStringLiteral("raster source not found: %1").arg(node.visual_asset_path);
         return {};
     }
-
     QImageReader reader(resolved);
     reader.setAutoTransform(true);
     QImage image = reader.read().convertToFormat(QImage::Format_ARGB32_Premultiplied);
@@ -110,10 +107,8 @@ QImage rasterSource(const AnimatedAssetSpec& asset, const AnimationNodeSpec& nod
         if (reason) *reason = QStringLiteral("unable to decode raster source: %1").arg(resolved);
         return {};
     }
-
     if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty()) {
-        const QRect requested = node.visual_source_rect_px.toAlignedRect();
-        const QRect clipped = requested.intersected(image.rect());
+        const QRect clipped = node.visual_source_rect_px.toAlignedRect().intersected(image.rect());
         if (clipped.isEmpty()) {
             if (reason) *reason = QStringLiteral("raster source rect is outside image bounds");
             return {};
@@ -140,14 +135,15 @@ QImage buildingSource(const AnimationNodeSpec& node, QString* reason) {
     return fitSource(image, node);
 }
 
-QImage librarySource(const AnimationNodeSpec& node, QString* reason) {
+QImage librarySource(const AnimationNodeSpec& node, const int visual_variant, QString* reason) {
     if (!CarouselPartLibrary::contains(node.visual_library_id)) {
         if (reason) *reason = QStringLiteral("unregistered animation library part: %1")
             .arg(node.visual_library_id);
         return {};
     }
-    QImage image = CarouselPartLibrary::renderPart(
-        node.visual_library_id, targetSize(node), node.fill_color, node.outline_color, reason);
+    QImage image = CarouselPartLibrary::renderPartVariant(
+        node.visual_library_id, targetSize(node), node.fill_color,
+        node.outline_color, visual_variant, reason);
     if (image.isNull()) return {};
     if (node.visual_trim_transparent) image = cropTransparent(image);
     return fitSource(image, node);
@@ -158,11 +154,7 @@ QImage librarySource(const AnimationNodeSpec& node, QString* reason) {
 bool AnimationVisualSourceRenderer::validateSource(const AnimatedAssetSpec& asset,
                                                    const AnimationNodeSpec& node,
                                                    QString* reason) {
-    auto fail = [&](const QString& message) {
-        if (reason) *reason = message;
-        return false;
-    };
-
+    auto fail = [&](const QString& message) { if (reason) *reason = message; return false; };
     if (node.visual_kind == AnimationNodeVisualKind::None) {
         if (reason) reason->clear();
         return true;
@@ -186,8 +178,9 @@ bool AnimationVisualSourceRenderer::validateSource(const AnimatedAssetSpec& asse
         if (node.visual_library_id.trimmed().isEmpty())
             return fail(QStringLiteral("library visual source id is empty"));
         if (!CarouselPartLibrary::contains(node.visual_library_id))
-            return fail(QStringLiteral("library visual source is not registered: %1")
-                            .arg(node.visual_library_id));
+            return fail(QStringLiteral("library visual source is not registered: %1").arg(node.visual_library_id));
+        if (node.visual_variant >= CarouselPartLibrary::variantCount(node.visual_library_id))
+            return fail(QStringLiteral("default visual variant is outside library part range"));
     }
 
     if (reason) reason->clear();
@@ -196,6 +189,7 @@ bool AnimationVisualSourceRenderer::validateSource(const AnimatedAssetSpec& asse
 
 QImage AnimationVisualSourceRenderer::renderSource(const AnimatedAssetSpec& asset,
                                                    const AnimationNodeSpec& node,
+                                                   const int visual_variant,
                                                    QString* reason) {
     switch (node.visual_kind) {
         case AnimationNodeVisualKind::None:
@@ -210,7 +204,7 @@ QImage AnimationVisualSourceRenderer::renderSource(const AnimatedAssetSpec& asse
         case AnimationNodeVisualKind::BuildingRender:
             return buildingSource(node, reason);
         case AnimationNodeVisualKind::LibraryPart:
-            return librarySource(node, reason);
+            return librarySource(node, visual_variant, reason);
     }
     if (reason) *reason = QStringLiteral("unsupported animation visual source kind");
     return {};
@@ -220,21 +214,18 @@ QJsonObject AnimationVisualSourceRenderer::manifest(const AnimationNodeSpec& nod
     QJsonObject source{
         {"version", QString::fromLatin1(kVersion)},
         {"kind", AnimationCore::nodeVisualKindId(node.visual_kind)},
-        {"widthPx", node.visual_size_px.width()},
-        {"heightPx", node.visual_size_px.height()},
+        {"widthPx", node.visual_size_px.width()}, {"heightPx", node.visual_size_px.height()},
         {"trimTransparent", node.visual_trim_transparent},
         {"preserveAspect", node.visual_preserve_aspect},
         {"smoothScaling", node.visual_smooth_scaling},
+        {"defaultVariant", node.visual_variant},
     };
-
     if (node.visual_kind == AnimationNodeVisualKind::RasterSprite) {
         source.insert(QStringLiteral("assetPath"), node.visual_asset_path);
-        if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty()) {
-            source.insert(QStringLiteral("sourceRectPx"), QJsonObject{
-                {"x", node.visual_source_rect_px.x()}, {"y", node.visual_source_rect_px.y()},
-                {"width", node.visual_source_rect_px.width()}, {"height", node.visual_source_rect_px.height()},
-            });
-        }
+        if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty())
+            source.insert(QStringLiteral("sourceRectPx"), QJsonObject{{"x", node.visual_source_rect_px.x()},
+                {"y", node.visual_source_rect_px.y()}, {"width", node.visual_source_rect_px.width()},
+                {"height", node.visual_source_rect_px.height()}});
     } else if (node.visual_kind == AnimationNodeVisualKind::BuildingRender) {
         source.insert(QStringLiteral("view"), BuildingComposer::viewName(node.visual_building_view));
         source.insert(QStringLiteral("visualPreset"), BuildingComposer::visualPresetId(node.visual_building.visual_preset));
@@ -242,6 +233,7 @@ QJsonObject AnimationVisualSourceRenderer::manifest(const AnimationNodeSpec& nod
     } else if (node.visual_kind == AnimationNodeVisualKind::LibraryPart) {
         source.insert(QStringLiteral("libraryPartId"), node.visual_library_id);
         source.insert(QStringLiteral("libraryVersion"), QString::fromLatin1(CarouselPartLibrary::kVersion));
+        source.insert(QStringLiteral("variantCount"), CarouselPartLibrary::variantCount(node.visual_library_id));
         source.insert(QStringLiteral("primary"), node.fill_color.name(QColor::HexArgb));
         source.insert(QStringLiteral("outline"), node.outline_color.name(QColor::HexArgb));
     } else if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle
