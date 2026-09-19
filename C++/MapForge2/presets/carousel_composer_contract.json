@@ -1,12 +1,12 @@
 {
-  "id": "carousel_composer_1",
+  "id": "carousel_composer_2",
   "name": "City Horizon Carousel Composer",
   "status": "canonical",
-  "purpose": "Parametric authoring layer that assembles a complete animated carousel from stable City Horizon carousel library parts without requiring authors to manually create nodes, horse placement, phases or animation tracks.",
+  "purpose": "Parametric authoring layer that assembles a complete animated carousel with dynamic isometric depth ordering and directional horse presentation from stable City Horizon library parts.",
   "dependsOn": {
-    "animationCore": "animation_core_4",
-    "visualSources": "animation_visual_sources_2",
-    "partLibrary": "carousel_parts_1"
+    "animationCore": "animation_core_5",
+    "visualSources": "animation_visual_sources_3",
+    "partLibrary": "carousel_parts_2"
   },
   "spec": "CarouselComposerSpec",
   "parameters": {
@@ -17,6 +17,8 @@
     "durationSeconds": {"min": 0.50, "max": 20.0, "default": 2.4},
     "frameCount": {"min": 4, "max": 120, "default": 16},
     "clockwise": {"default": true},
+    "dynamicDepthOrdering": {"default": true},
+    "directionalHorses": {"default": true},
     "canopyEnabled": {"default": true},
     "rosettesEnabled": {"default": true},
     "finialEnabled": {"default": true},
@@ -43,14 +45,19 @@
     "horseBobPhases": "uniform_around_cycle",
     "platformRotationTrack": true,
     "horseBobTracks": true,
+    "horseCounterRotationTracks": true,
+    "horseVisualVariantTracks": true,
+    "horseDynamicDrawOrderTracks": true,
+    "directionalVariants": ["east", "south", "west", "north"],
+    "depthLayers": {"backHorse": 20, "centerPole": 60, "frontHorse": 65, "canopy": 90},
     "loopClosure": true,
     "libraryPartAssembly": true,
     "deterministic": true
   },
   "outputs": {
     "animatedAssetSpec": true,
-    "animationSpritesheet": "through_animation_export_3",
-    "animationRuntimeManifest": "through_animation_export_3",
+    "animationSpritesheet": "through_animation_export_4",
+    "animationRuntimeManifest": "through_animation_export_4",
     "animationPreview": "through_AnimationPreviewRenderer",
     "authoringManifest": "CarouselComposer.manifest"
   },
@@ -60,13 +67,15 @@
     "durationSeconds": 2.4,
     "platformRadiusPx": 72.0,
     "palette": "carousel_classic_red_cream",
+    "dynamicDepthOrdering": true,
+    "directionalHorses": true,
     "manualNodeAuthoringRequired": false,
     "manualTrackAuthoringRequired": false
   },
-  "knownBoundary": {
-    "dynamicPerFrameDepthSorting": false,
-    "directionalHorseViewSwapping": false,
-    "note": "Version 1 authors a coherent hierarchical 2.5D loop on the current Animation Core. Automatic per-frame depth sorting and directional horse sprites are separate rendering upgrades, not hidden inside the composer contract."
+  "resolvedLimitations": {
+    "dynamicPerFrameDepthSorting": true,
+    "directionalHorseViewSwapping": true,
+    "counterRotationKeepsHorseSpriteUpright": true
   },
-  "authoringRule": "Carousel authors set ride-level parameters only. The Composer owns generated node IDs, hierarchy, angular placement, loop-safe platform rotation and per-horse bob phases. The generated AnimatedAssetSpec is the sole input to preview and runtime frame export."
+  "authoringRule": "Carousel authors set ride-level parameters only. The Composer owns generated node IDs, hierarchy, angular placement, loop-safe platform rotation, per-horse bob phases, front/back depth transitions, counter-rotation and directional visual variants. The generated AnimatedAssetSpec remains the sole input to preview and runtime frame export."
 }
