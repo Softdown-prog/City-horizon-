@@ -1,0 +1,45 @@
+{
+  "id": "localized_contact_ao_1",
+  "name": "Classic Tycoon Localized Contact AO",
+  "purpose": "Keep ambient occlusion short, physical and restricted to real architectural contacts after the three-tone lighting pass.",
+  "targetPlatform": "windows_pc",
+  "rules": {
+    "primaryLighting": "classic_three_tone_ramp_1",
+    "aoIsNotASecondLightingSystem": true,
+    "noPaintedVerticalStripes": true,
+    "noBroadWallWash": true,
+    "contactOnly": true
+  },
+  "eave": {
+    "depthPx": 3.4,
+    "alphaBands": [30, 16, 7],
+    "falloff": "fast",
+    "insetFromFacadeEndsNormalized": 0.015
+  },
+  "corner": {
+    "normalizedSpan": 0.036,
+    "alphaBands": [20, 9, 4],
+    "appliesOnlyAtVisibleFaceJunction": true,
+    "fullHeightStripeForbidden": true
+  },
+  "wallGroundContact": {
+    "alpha": 78,
+    "widthPx": 0.88,
+    "heightAboveGroundPx": 0.72,
+    "purpose": "grounding_only"
+  },
+  "recesses": {
+    "enabled": true,
+    "supported": ["window", "door", "double_door", "storefront"],
+    "topContactOnly": true,
+    "alphaRange": [62, 72],
+    "forbidLargeInteriorShadowFill": true
+  },
+  "interaction": {
+    "preserveMaterialDirection": true,
+    "preserveLightMidShadowFaceIdentity": true,
+    "drawBeforeFacadeModules": true,
+    "moduleRecessAoDrawnInsideModule": true,
+    "productionSpriteOnlyUsesTransparentRgba": true
+  }
+}
