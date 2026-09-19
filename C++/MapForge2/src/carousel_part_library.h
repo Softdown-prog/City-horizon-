@@ -13,7 +13,7 @@ namespace ch::studio {
 
 class CarouselPartLibrary final {
 public:
-    static constexpr const char* kVersion = "carousel_parts_3";
+    static constexpr const char* kVersion = "carousel_parts_5";
 
     static QStringList partIds();
     static bool contains(const QString& part_id);
@@ -31,8 +31,8 @@ public:
                                       const QString& parent_id,
                                       const QPointF& position_px,
                                       int draw_order,
-                                      const QColor& primary = QColor("#c9554f"),
-                                      const QColor& outline = QColor("#343638"));
+                                      const QColor& primary = QColor("#a9433f"),
+                                      const QColor& outline = QColor("#3a332f"));
 
     static QImage renderPart(const QString& part_id,
                              const QSize& target_size,
