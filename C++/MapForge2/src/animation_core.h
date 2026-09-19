@@ -36,6 +36,7 @@ enum class AnimationNodeVisualKind {
     PrimitiveEllipse,
     RasterSprite,
     BuildingRender,
+    LibraryPart,
 };
 
 struct AnimationKeyframe {
@@ -71,8 +72,8 @@ struct AnimationNodeSpec {
     int draw_order = 0;
 
     // Visual source contract. Primitive kinds remain available as a lightweight
-    // fallback, but production animated assets should prefer RasterSprite or
-    // BuildingRender so every animated part has a stable authored visual source.
+    // fallback, but production animated assets should prefer RasterSprite,
+    // BuildingRender or LibraryPart so every animated part has a stable source.
     AnimationNodeVisualKind visual_kind = AnimationNodeVisualKind::None;
     QSizeF visual_size_px = QSizeF(24.0, 24.0);
     QColor fill_color = QColor("#d79b38");
@@ -82,6 +83,11 @@ struct AnimationNodeSpec {
     // (or absolute). A null/empty source rect means the whole image.
     QString visual_asset_path;
     QRectF visual_source_rect_px;
+
+    // LibraryPart: stable catalog ID resolved by a registered authoring library.
+    // Carousel IDs use the `carousel.*` namespace. Future libraries can add
+    // their own namespace without changing AnimationTrack or hierarchy logic.
+    QString visual_library_id;
 
     // Shared raster/render presentation policy. Transparent borders are removed
     // before fitting the source into visual_size_px so pivots remain meaningful.
@@ -145,7 +151,7 @@ struct AnimationFrameSample {
 
 class AnimationCore final {
 public:
-    static constexpr const char* kVersion = "animation_core_3";
+    static constexpr const char* kVersion = "animation_core_4";
 
     static QString propertyId(AnimationProperty property);
     static QString interpolationId(AnimationInterpolation interpolation);
