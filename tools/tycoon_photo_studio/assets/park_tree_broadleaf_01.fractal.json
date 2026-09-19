@@ -5,44 +5,53 @@
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
   "materials": {
-    "trunk": {"name": "TreeBarkWarm", "rgba": [0.20, 0.085, 0.032, 1.0], "roughness": 1.0},
+    "trunk": {"name": "TreeBarkWarm", "rgba": [0.19, 0.082, 0.030, 1.0], "roughness": 1.0},
     "branch": {"name": "TreeBranchWarm", "rgba": [0.15, 0.058, 0.020, 1.0], "roughness": 1.0},
-    "leafDark": {"name": "LeafDeepGreen", "rgba": [0.050, 0.18, 0.045, 1.0], "roughness": 1.0},
-    "leafMid": {"name": "LeafMidGreen", "rgba": [0.095, 0.30, 0.070, 1.0], "roughness": 1.0},
-    "leafLight": {"name": "LeafSunGreen", "rgba": [0.20, 0.45, 0.11, 1.0], "roughness": 1.0}
+    "leafDeep": {"name": "LeafDeep", "rgba": [0.035, 0.145, 0.032, 1.0], "roughness": 1.0},
+    "leafDark": {"name": "LeafDark", "rgba": [0.055, 0.215, 0.045, 1.0], "roughness": 1.0},
+    "leafMid": {"name": "LeafMid", "rgba": [0.105, 0.325, 0.075, 1.0], "roughness": 1.0},
+    "leafLight": {"name": "LeafLight", "rgba": [0.20, 0.46, 0.115, 1.0], "roughness": 1.0},
+    "leafSun": {"name": "LeafSun", "rgba": [0.31, 0.56, 0.16, 1.0], "roughness": 1.0}
   },
-  "baseParts": [
-    {"type":"cylinder","name":"Trunk_Base","location":[0.0,0.0,0.30],"radius":0.29,"depth":0.60,"material":"trunk","vertices":8},
-    {"type":"cylinder","name":"Trunk_Main","location":[0.0,0.0,1.22],"radius":0.20,"depth":1.84,"material":"trunk","vertices":8},
-    {"type":"cylinder","name":"Trunk_Upper","location":[0.0,0.0,2.05],"radius":0.145,"depth":0.62,"material":"branch","vertices":8}
-  ],
+  "trunk": {
+    "material": "trunk",
+    "height": 1.92,
+    "baseRadius": 0.30,
+    "topRadius": 0.145,
+    "vertices": 12,
+    "rootCount": 5,
+    "rootLength": 0.36,
+    "rootRadius": 0.105,
+    "rootSeed": 919
+  },
   "fractalTree": {
     "name": "CrownSkeleton",
     "material": "branch",
     "seed": 1709,
-    "origin": [0.0, 0.0, 1.92],
-    "levels": 3,
+    "origin": [0.0, 0.0, 1.70],
+    "levels": 4,
     "primaryBranches": 4,
     "branchFactor": 2,
-    "baseLength": 0.78,
-    "lengthDecay": 0.66,
-    "baseRadius": 0.072,
-    "radiusDecay": 0.68,
-    "initialElevationDegrees": 48.0,
+    "baseLength": 0.66,
+    "lengthDecay": 0.68,
+    "baseRadius": 0.078,
+    "radiusDecay": 0.67,
+    "initialElevationDegrees": 47.0,
     "elevationGainDegrees": 8.0,
-    "baseYawDegrees": -18.0,
-    "yawSpreadDegrees": 52.0,
-    "yawJitterDegrees": 8.0,
-    "elevationJitterDegrees": 4.0
+    "baseYawDegrees": -16.0,
+    "yawSpreadDegrees": 48.0,
+    "yawJitterDegrees": 11.0,
+    "elevationJitterDegrees": 6.0
   },
-  "canopyParts": [
-    {"type":"cylinder","name":"Canopy_BackLeft","location":[-0.46,0.34,3.10],"radius":0.66,"depth":0.34,"material":"leafDark","vertices":8,"rotationDegrees":[5,4,-8]},
-    {"type":"cylinder","name":"Canopy_BackRight","location":[0.39,0.39,3.18],"radius":0.61,"depth":0.31,"material":"leafMid","vertices":7,"rotationDegrees":[-4,-6,7]},
-    {"type":"cylinder","name":"Canopy_Left","location":[-0.72,-0.04,3.02],"radius":0.60,"depth":0.36,"material":"leafMid","vertices":8,"rotationDegrees":[2,7,-11]},
-    {"type":"cylinder","name":"Canopy_Right","location":[0.70,0.03,3.10],"radius":0.64,"depth":0.33,"material":"leafDark","vertices":7,"rotationDegrees":[-3,-8,10]},
-    {"type":"cylinder","name":"Canopy_FrontLeft","location":[-0.36,-0.46,2.96],"radius":0.65,"depth":0.35,"material":"leafDark","vertices":7,"rotationDegrees":[-6,4,-5]},
-    {"type":"cylinder","name":"Canopy_FrontRight","location":[0.42,-0.51,3.03],"radius":0.58,"depth":0.31,"material":"leafMid","vertices":8,"rotationDegrees":[6,-3,9]},
-    {"type":"cylinder","name":"Canopy_Core","location":[-0.06,-0.03,3.28],"radius":0.74,"depth":0.38,"material":"leafMid","vertices":8,"rotationDegrees":[3,-4,-3]},
-    {"type":"cylinder","name":"Canopy_Highlight","location":[0.18,-0.08,3.62],"radius":0.50,"depth":0.27,"material":"leafLight","vertices":7,"rotationDegrees":[-5,5,8]}
-  ]
+  "leafCards": {
+    "seed": 2718,
+    "count": 620,
+    "materials": ["leafDeep", "leafDark", "leafMid", "leafLight", "leafSun"],
+    "widthRange": [0.105, 0.175],
+    "heightRange": [0.17, 0.27],
+    "clusterRadius": [0.34, 0.34, 0.26],
+    "interiorFraction": 0.22,
+    "crownCenter": [0.0, 0.0, 3.00],
+    "crownRadius": [1.08, 1.00, 0.84]
+  }
 }
