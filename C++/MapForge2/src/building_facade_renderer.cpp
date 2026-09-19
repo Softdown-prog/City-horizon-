@@ -76,6 +76,20 @@ QColor scaledColor(const QColor color, const float factor, const int alpha = -1)
     return result;
 }
 
+QColor blendColor(const QColor& base, const QColor& tint, const float amount) {
+    const float t = std::clamp(amount, 0.0F, 1.0F);
+    return QColor::fromRgbF(base.redF() * (1.0F - t) + tint.redF() * t,
+                            base.greenF() * (1.0F - t) + tint.greenF() * t,
+                            base.blueF() * (1.0F - t) + tint.blueF() * t,
+                            base.alphaF());
+}
+
+QColor wallFaceTone(const BuildingComposerSpec& spec, const int edge) {
+    if (edge == 3) return blendColor(scaledColor(spec.wall_color, 1.075F), QColor("#f7e7c9"), 0.060F);
+    if (edge == 1) return blendColor(scaledColor(spec.wall_color, 0.735F), QColor("#64758a"), 0.095F);
+    return scaledColor(spec.wall_color, 0.965F);
+}
+
 QPolygonF faceRect(const Point3 a, const Point3 b, const float t0, const float t1,
                    const float z0, const float z1, const BuildingView view, const QSize canvas) {
     return {projectPoint(lerpPoint(a, b, t0, z0), view, canvas), projectPoint(lerpPoint(a, b, t1, z0), view, canvas),
@@ -89,6 +103,23 @@ void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec
                                    const BuildingView view, const QSize canvas) {
     const float wall_h = static_cast<float>(BuildingComposer::effectiveWallHeightPx(spec));
     const QColor ao = scaledColor(spec.wall_color, 0.42F);
+
+    // Remove the broader legacy contact bands from the composed body first.
+    // This tiny neutral strip is intentionally material-free: the eave contact
+    // owns this zone and will be repainted immediately below with compact AO.
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    for (const int edge : visible_edges) {
+        const Point3 a = corners[edge];
+        const Point3 b = corners[(edge + 1) % 4];
+        painter.setBrush(wallFaceTone(spec, edge));
+        painter.drawPolygon(faceRect(a, b, 0.012F, 0.988F, wall_h - 5.7F, wall_h, view, canvas));
+        painter.setPen(QPen(wallFaceTone(spec, edge), 1.30, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+        painter.drawLine(projectPoint(lerpPoint(a, b, 0.015F, 0.80F), view, canvas),
+                         projectPoint(lerpPoint(a, b, 0.985F, 0.80F), view, canvas));
+        painter.setPen(Qt::NoPen);
+    }
+    painter.restore();
 
     // Short eave contact only: three compact bands with a fast falloff.
     constexpr float kEaveDepthPx = 3.4F;
