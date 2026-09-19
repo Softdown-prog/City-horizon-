@@ -13,7 +13,7 @@ namespace ch::studio {
 
 class CarouselPartLibrary final {
 public:
-    static constexpr const char* kVersion = "carousel_parts_2";
+    static constexpr const char* kVersion = "carousel_parts_3";
 
     static QStringList partIds();
     static bool contains(const QString& part_id);
@@ -21,6 +21,10 @@ public:
     static QSizeF defaultSize(const QString& part_id);
     static QPointF defaultPivot(const QString& part_id);
     static int variantCount(const QString& part_id);
+
+    static QString assetPath(const QString& part_id, int visual_variant = 0);
+    static bool assetBacked(const QString& part_id);
+    static bool assetAvailable(const QString& part_id, int visual_variant = 0);
 
     static AnimationNodeSpec makeNode(const QString& part_id,
                                       const QString& node_id,
@@ -30,15 +34,12 @@ public:
                                       const QColor& primary = QColor("#c9554f"),
                                       const QColor& outline = QColor("#343638"));
 
-    // Canonical base artwork renderer retained for compatibility and library QA.
     static QImage renderPart(const QString& part_id,
                              const QSize& target_size,
                              const QColor& primary,
                              const QColor& outline,
                              QString* reason = nullptr);
 
-    // Directional presentation of the same persistent part. Horse variants are
-    // 0=east, 1=south, 2=west, 3=north; non-directional parts resolve to 0.
     static QImage renderPartVariant(const QString& part_id,
                                     const QSize& target_size,
                                     const QColor& primary,
