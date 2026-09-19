@@ -66,6 +66,7 @@ add_library(mapforge2_asset_composer STATIC
     src/building_roof_editor_renderer.cpp
     src/building_facade_renderer.cpp
     src/building_urban_integration_validator.cpp
+    src/building_asset_catalog.cpp
     src/building_export_pipeline.cpp
 )
 target_include_directories(mapforge2_asset_composer PUBLIC
@@ -82,6 +83,7 @@ add_library(mapforge2_editor STATIC
     src/content_pack_qt.cpp
     src/studio_panel.cpp
     src/production_studio_panel.cpp
+    src/building_asset_browser_dialog.cpp
     src/building_composer_widget.cpp
     src/main_window.cpp
 )
