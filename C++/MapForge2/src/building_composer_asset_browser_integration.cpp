@@ -1,7 +1,12 @@
 #include "building_composer_widget.h"
 #include "building_asset_browser_dialog.h"
 
+#include <QCheckBox>
+#include <QComboBox>
+#include <QLabel>
 #include <QSignalBlocker>
+#include <QSlider>
+#include <QSpinBox>
 
 #include <algorithm>
 #include <cmath>
