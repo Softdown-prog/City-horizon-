@@ -1,12 +1,12 @@
 {
-  "id": "carousel_composer_5",
+  "id": "carousel_composer_6",
   "name": "City Horizon Carousel Composer",
   "status": "canonical",
   "purpose": "Parametric carousel authoring whose motion is projected only by the City Horizon runtime camera and whose visible parts are persistent modular raster assets authored for CH_CAMERA_V1.",
   "dependsOn": {
     "animationCore": "animation_core_5",
     "visualSources": "animation_visual_sources_3",
-    "partLibrary": "carousel_parts_3",
+    "partLibrary": "carousel_parts_4",
     "cameraContract": "carousel_engine_camera_3",
     "projectionCalibration": "engine_projection_calibration_2"
   },
@@ -36,7 +36,7 @@
     "calibrationMustPassBeforeQaExport": true
   },
   "visualAssembly": {
-    "source": "carousel_parts_3",
+    "source": "carousel_parts_4",
     "proceduralCarouselArt": false,
     "persistentRasterParts": true,
     "directionalHorseAssets": 4,
