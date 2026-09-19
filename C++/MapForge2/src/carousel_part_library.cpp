@@ -2,8 +2,8 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
-#include <QImageReader>
 #include <QJsonArray>
 #include <QPainter>
 
@@ -47,6 +47,34 @@ QString resolveAsset(const QString& relative_path) {
         if (!probe.cdUp()) break;
     }
     return {};
+}
+
+QImage decodeAuthoredRaster(const QString& path, QString* reason) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (reason) *reason = QStringLiteral("unable to open carousel raster source: %1").arg(path);
+        return {};
+    }
+
+    QByteArray encoded = file.readAll();
+    encoded.replace("\r", "");
+    encoded.replace("\n", "");
+    encoded.replace(" ", "");
+    encoded.replace("\t", "");
+    const QByteArray png = QByteArray::fromBase64(encoded);
+    if (png.isEmpty()) {
+        if (reason) *reason = QStringLiteral("carousel raster source is not valid base64: %1").arg(path);
+        return {};
+    }
+
+    QImage image;
+    if (!image.loadFromData(png, "PNG")) {
+        if (reason) *reason = QStringLiteral("carousel raster source did not decode as PNG: %1").arg(path);
+        return {};
+    }
+    if (image.hasAlphaChannel()) image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    if (reason) reason->clear();
+    return image;
 }
 
 QImage tintPrimary(QImage image, const QColor& primary) {
@@ -148,18 +176,18 @@ int CarouselPartLibrary::variantCount(const QString& part_id) {
 
 QString CarouselPartLibrary::assetPath(const QString& part_id, const int visual_variant) {
     const QString root = QStringLiteral("assets/amusement/carousel/classic/");
-    if (part_id == QLatin1String(kBaseId)) return root + QStringLiteral("base.png");
-    if (part_id == QLatin1String(kPlatformId)) return root + QStringLiteral("platform.png");
-    if (part_id == QLatin1String(kCanopyId)) return root + QStringLiteral("canopy.png");
-    if (part_id == QLatin1String(kPoleId)) return root + QStringLiteral("center_pole.png");
-    if (part_id == QLatin1String(kFinialId)) return root + QStringLiteral("finial.png");
-    if (part_id == QLatin1String(kRosetteId)) return root + QStringLiteral("rosette.png");
+    if (part_id == QLatin1String(kBaseId)) return root + QStringLiteral("base.png.b64");
+    if (part_id == QLatin1String(kPlatformId)) return root + QStringLiteral("platform.png.b64");
+    if (part_id == QLatin1String(kCanopyId)) return root + QStringLiteral("canopy.png.b64");
+    if (part_id == QLatin1String(kPoleId)) return root + QStringLiteral("center_pole.png.b64");
+    if (part_id == QLatin1String(kFinialId)) return root + QStringLiteral("finial.png.b64");
+    if (part_id == QLatin1String(kRosetteId)) return root + QStringLiteral("rosette.png.b64");
     if (part_id == QLatin1String(kHorseId)) {
         switch (((visual_variant % 4) + 4) % 4) {
-            case 0: return root + QStringLiteral("horse_e.png");
-            case 1: return root + QStringLiteral("horse_s.png");
-            case 2: return root + QStringLiteral("horse_w.png");
-            case 3: return root + QStringLiteral("horse_n.png");
+            case 0: return root + QStringLiteral("horse_e.png.b64");
+            case 1: return root + QStringLiteral("horse_s.png.b64");
+            case 2: return root + QStringLiteral("horse_w.png.b64");
+            case 3: return root + QStringLiteral("horse_n.png.b64");
         }
     }
     return {};
@@ -233,13 +261,8 @@ QImage CarouselPartLibrary::renderPartVariant(const QString& part_id,
         return {};
     }
 
-    QImageReader reader(resolved);
-    reader.setAutoTransform(true);
-    QImage source = reader.read();
-    if (source.isNull()) {
-        if (reason) *reason = QStringLiteral("unable to decode carousel art asset: %1").arg(resolved);
-        return {};
-    }
+    QImage source = decodeAuthoredRaster(resolved, reason);
+    if (source.isNull()) return {};
 
     source = tintPrimary(source, primary);
     if (reason) reason->clear();
@@ -264,7 +287,7 @@ QJsonObject CarouselPartLibrary::manifest() {
             {"name", displayName(id)},
             {"defaultSizePx", QJsonObject{{"width", size.width()}, {"height", size.height()}}},
             {"defaultPivot", QJsonObject{{"x", pivot.x()}, {"y", pivot.y()}}},
-            {"source", QStringLiteral("authored_raster_asset")},
+            {"source", QStringLiteral("authored_png_base64")},
             {"proceduralFallback", false},
             {"transparentRgba", true},
             {"variants", variants},
@@ -277,7 +300,7 @@ QJsonObject CarouselPartLibrary::manifest() {
         {"style", QStringLiteral("city_horizon_classic_tycoon")},
         {"partCount", parts.size()},
         {"parts", parts},
-        {"productionReadySourceType", QStringLiteral("authored_raster_asset")},
+        {"productionReadySourceType", QStringLiteral("authored_png_base64")},
         {"proceduralCarouselArtwork", false},
     };
 }
