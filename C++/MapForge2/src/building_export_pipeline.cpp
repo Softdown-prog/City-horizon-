@@ -277,8 +277,15 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
     const QString stem = automaticStem(spec);
     if (exported_stem) *exported_stem = stem;
     if (validation) *validation = report;
+
     const QString validation_path = dir.filePath(stem + QStringLiteral("_validation.json"));
     if (!writeJson(validation_path, report.toJson(), error)) return false;
+
+    const QString lod_preview_path = dir.filePath(stem + QStringLiteral("_lod_preview.png"));
+    if (!BuildingLodValidator::renderReviewSheet(spec, QSize(960, 420)).save(lod_preview_path, "PNG")) {
+        if (error) *error = QStringLiteral("Could not write %1").arg(lod_preview_path); return false;
+    }
+
     if (!report.export_ready) {
         if (error) *error = QStringLiteral("Validation blocked production export: %1").arg(report.summary());
         return false;
@@ -300,10 +307,6 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
     const QString block_preview_path = dir.filePath(stem + QStringLiteral("_block_preview.png"));
     if (!BuildingBlockPreviewRenderer::render(spec, QSize(960, 560), 401).save(block_preview_path, "PNG")) {
         if (error) *error = QStringLiteral("Could not write %1").arg(block_preview_path); return false;
-    }
-    const QString lod_preview_path = dir.filePath(stem + QStringLiteral("_lod_preview.png"));
-    if (!BuildingLodValidator::renderReviewSheet(spec, QSize(960, 420)).save(lod_preview_path, "PNG")) {
-        if (error) *error = QStringLiteral("Could not write %1").arg(lod_preview_path); return false;
     }
     const QImage south = BuildingFacadeRenderer::renderView(spec, BuildingView::South, frame);
     const QString thumbnail_path = dir.filePath(stem + QStringLiteral("_thumb.png"));
