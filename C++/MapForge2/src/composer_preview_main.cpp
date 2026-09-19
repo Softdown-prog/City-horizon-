@@ -1,6 +1,7 @@
 #include "building_block_preview_renderer.h"
 #include "building_composer.h"
 #include "building_facade_renderer.h"
+#include "building_lod_validator.h"
 #include "building_roof_editor_renderer.h"
 
 #include <QDir>
@@ -44,6 +45,7 @@ bool writeAsset(const QString& output_dir, const QString& stem,
     manifest.insert(QStringLiteral("architecturalModules"), ch::studio::BuildingComposer::architecturalModules(spec));
     manifest.insert(QStringLiteral("facadeEditor"), ch::studio::BuildingFacadeRenderer::manifest(spec));
     manifest.insert(QStringLiteral("roofEditor"), ch::studio::BuildingRoofEditorRenderer::roofEditorManifest(spec));
+    manifest.insert(QStringLiteral("lodVisualGate"), ch::studio::BuildingLodValidator::manifest(spec));
     manifest_file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
     manifest_file.close();
 
@@ -148,6 +150,13 @@ int main(int argc, char** argv) {
         return 8;
     }
     std::cout << block_gate_path.toStdString() << "\n";
+
+    const QString lod_gate_path = QDir(output_dir).filePath(QStringLiteral("building_composer_lod_gate.png"));
+    if (!ch::studio::BuildingLodValidator::renderReviewSheet(facade_gate, QSize(960, 420)).save(lod_gate_path, "PNG")) {
+        std::cerr << "Unable to save LOD visual gate.\n";
+        return 9;
+    }
+    std::cout << lod_gate_path.toStdString() << "\n";
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
