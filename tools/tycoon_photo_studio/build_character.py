@@ -337,7 +337,12 @@ def main():
         "contract": "TYCOON_CHARACTER_BAKE_V1",
         "sourceContract": asset["contract"],
         "sourceObject": asset_id,
+        "assetStatus": asset.get("status", "production_candidate"),
         "assetType": asset.get("assetType", "visitor_npc"),
+        "runtime": asset.get("runtime", {
+            "contract": "CH_ACTOR_RUNTIME_V1",
+            "anchorPolicy": "shared_projected_world_origin",
+        }),
         "footprint": asset["footprint"],
         "assetConfig": os.path.basename(args.asset_config),
         "studioPreset": studio["id"],

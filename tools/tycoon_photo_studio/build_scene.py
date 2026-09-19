@@ -99,6 +99,76 @@ def add_uv_sphere(part, material):
     return obj
 
 
+def add_cylinder(part, material):
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=int(part.get("vertices", 24)),
+        radius=float(part["radius"]),
+        depth=float(part["depth"]),
+        location=tuple(part["location"]),
+        rotation=tuple(math.radians(float(v)) for v in part.get("rotationDegrees", [0, 0, 0])),
+    )
+    obj = bpy.context.object
+    obj.name = part["name"]
+    obj.data.materials.append(material)
+    return obj
+
+
+def add_curve(part, material):
+    curve = bpy.data.curves.new(part["name"], type="CURVE")
+    curve.dimensions = "3D"
+    curve.resolution_u = int(part.get("resolution", 12))
+    curve.bevel_depth = float(part.get("bevel", 0.025))
+    curve.bevel_resolution = int(part.get("bevelResolution", 2))
+    spline = curve.splines.new("POLY")
+    points = part.get("points", [])
+    if len(points) < 2:
+        raise RuntimeError(f"Curve {part['name']!r} requires at least two points")
+    spline.points.add(len(points) - 1)
+    for point, co in zip(spline.points, points):
+        point.co = (float(co[0]), float(co[1]), float(co[2]), 1.0)
+    obj = bpy.data.objects.new(part["name"], curve)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    return obj
+
+
+def add_text(part, material):
+    curve = bpy.data.curves.new(part["name"], type="FONT")
+    curve.body = str(part["text"])
+    curve.align_x = part.get("alignX", "CENTER")
+    curve.align_y = part.get("alignY", "CENTER")
+    curve.size = float(part.get("size", 0.35))
+    curve.extrude = float(part.get("extrude", 0.012))
+    curve.bevel_depth = float(part.get("bevel", 0.004))
+    obj = bpy.data.objects.new(part["name"], curve)
+    bpy.context.collection.objects.link(obj)
+    obj.location = tuple(part["location"])
+    obj.rotation_euler = tuple(math.radians(float(v)) for v in part.get("rotationDegrees", [0, 0, 0]))
+    obj.data.materials.append(material)
+    return obj
+
+
+def add_collection_instance(part, material):
+    library = Path(part["library"]).expanduser()
+    collection_name = str(part["collection"])
+    if not library.is_file():
+        raise RuntimeError(f"Collection library not found: {library}")
+    with bpy.data.libraries.load(str(library), link=False) as (data_from, data_to):
+        if collection_name not in data_from.collections:
+            raise RuntimeError(f"Collection {collection_name!r} not found in {library}")
+        data_to.collections = [collection_name]
+    collection = data_to.collections[0]
+    bpy.context.scene.collection.children.link(collection)
+    obj = bpy.data.objects.new(part["name"], None)
+    bpy.context.collection.objects.link(obj)
+    obj.instance_type = "COLLECTION"
+    obj.instance_collection = collection
+    obj.location = tuple(part.get("location", [0, 0, 0]))
+    obj.rotation_euler = tuple(math.radians(float(v)) for v in part.get("rotationDegrees", [0, 0, 0]))
+    obj.scale = tuple(part.get("scale", [1, 1, 1]))
+    return obj
+
+
 def build_asset(asset):
     if asset.get("contract") != "TYCOON_ASSET_SOURCE_V1":
         raise RuntimeError("Asset source must use TYCOON_ASSET_SOURCE_V1")
@@ -114,11 +184,14 @@ def build_asset(asset):
 
     authored = []
     for part in asset.get("parts", []):
-        material_key = part.get("material")
-        if material_key not in materials:
-            raise RuntimeError(f"Unknown material {material_key!r} for part {part.get('name')!r}")
-        material = materials[material_key]
         kind = part.get("type")
+        material_key = part.get("material")
+        if kind == "collection_instance":
+            material = None
+        else:
+            if material_key not in materials:
+                raise RuntimeError(f"Unknown material {material_key!r} for part {part.get('name')!r}")
+            material = materials[material_key]
         if kind == "box":
             obj = add_box(
                 part["name"], part["location"], part["dimensions"], material,
@@ -128,6 +201,14 @@ def build_asset(asset):
             obj = add_pyramid_roof(part, material)
         elif kind == "uv_sphere":
             obj = add_uv_sphere(part, material)
+        elif kind == "cylinder":
+            obj = add_cylinder(part, material)
+        elif kind == "curve":
+            obj = add_curve(part, material)
+        elif kind == "text":
+            obj = add_text(part, material)
+        elif kind == "collection_instance":
+            obj = add_collection_instance(part, material)
         else:
             raise RuntimeError(f"Unsupported declarative part type: {kind!r}")
         authored.append(obj)

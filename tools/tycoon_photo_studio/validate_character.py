@@ -55,6 +55,12 @@ def main():
     require(tuple(manifest.get("directionOrder", [])) == EXPECTED_DIRECTIONS, "8-direction order changed")
     require(manifest.get("directionCount") == 8, "Character must bake exactly 8 directions")
 
+    runtime = manifest.get("runtime", {})
+    require(runtime.get("contract") == "CH_ACTOR_RUNTIME_V1", "Character runtime contract changed")
+    require(runtime.get("anchorPolicy") == "shared_projected_world_origin", "Character anchor policy changed")
+    require(runtime.get("frameCount") == 8, "Runtime frame count must be eight")
+    require(tuple(runtime.get("directionOrder", [])) == EXPECTED_DIRECTIONS, "Runtime direction order changed")
+
     animation = manifest.get("animation", {})
     require(animation.get("id") == "walk", "Expected walk animation")
     require(animation.get("frameCount") == 8, "Walk cycle must contain exactly 8 frames")
