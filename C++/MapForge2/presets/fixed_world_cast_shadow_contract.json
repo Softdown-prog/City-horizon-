@@ -1,0 +1,43 @@
+{
+  "id": "fixed_world_cast_shadow_1",
+  "purpose": "Canonical projected building shadow for the City Horizon Classic Tycoon production renderer.",
+  "lightModel": {
+    "cameraIndependent": true,
+    "shadowWorldDirection": [1.0, 0.35],
+    "relationToThreeToneRamp": "shadow travels away from the west-biased fixed world light used by classic_three_tone_ramp_1",
+    "rotatesWithViewProjectionOnly": true
+  },
+  "geometry": {
+    "caster": "building_footprint",
+    "heightSource": "effective_wall_height_plus_0_55_roof_height",
+    "heightToLengthScale": 0.27,
+    "minimumLengthPx": 14.0,
+    "maximumLengthPx": 34.0,
+    "frameSafetyMarginPx": 4.0,
+    "clipsLengthBeforeClippingSpriteFrame": true,
+    "sweptShape": "convex_hull_of_caster_and_projected_caster"
+  },
+  "appearance": {
+    "colorFamily": "cool_charcoal",
+    "coreAlpha": 46,
+    "nearFieldAlpha": 12,
+    "penumbraAlpha": 18,
+    "penumbraExtension": 1.08,
+    "gaussianBlur": false,
+    "antiAliasedEdges": true,
+    "terrainIndependentColor": true
+  },
+  "composition": {
+    "drawBeforeBuilding": true,
+    "legacyCastShadowDisabledInProductionFacadePath": true,
+    "localizedAoOwnsWallGroundContact": true,
+    "doesNotDarkenFacadeModules": true
+  },
+  "rules": {
+    "singleProductionShadowModel": true,
+    "noCameraRelativeShadowDirection": true,
+    "noPureBlackShadow": true,
+    "noLargeSoftModernBlur": true,
+    "noShadowPaintedIntoEnvironmentPreviewTerrain": true
+  }
+}
