@@ -58,6 +58,9 @@ target_include_directories(mapforge2_studio_core PUBLIC
 )
 
 add_library(mapforge2_asset_composer STATIC
+    src/animation_core.cpp
+    src/animation_preview_renderer.cpp
+    src/animation_export_pipeline.cpp
     src/building_composer.cpp
     src/building_footprint_model.cpp
     src/building_procedural_variation.cpp
