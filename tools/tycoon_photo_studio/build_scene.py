@@ -27,10 +27,6 @@ def parse_args():
 def clear_scene():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
-    for datablocks in (bpy.data.meshes, bpy.data.curves, bpy.data.materials, bpy.data.cameras, bpy.data.lights):
-        # Orphan cleanup is intentionally left to Blender. Removing datablocks here
-        # can invalidate references while the procedural scene is still being built.
-        pass
 
 
 def make_material(name, rgba, roughness=0.72, metallic=0.0):
@@ -115,7 +111,6 @@ def add_camera():
     data = bpy.data.cameras.new("CH_CAMERA_V1")
     data.type = "ORTHO"
     data.ortho_scale = 5.6
-    data.lens = 50.0
     obj = bpy.data.objects.new("CH_CAMERA_V1", data)
     bpy.context.collection.objects.link(obj)
     obj.location = location
@@ -137,13 +132,9 @@ def build_kiosk():
     authored = []
     authored.append(add_box("Kiosk_Platform", (0.0, 0.0, 0.16), (2.85, 2.45, 0.32), stone, 0.05))
     authored.append(add_box("Kiosk_Body", (0.0, 0.0, 1.25), (2.35, 1.95, 1.85), cream, 0.055))
-
-    # Lower painted panels make the silhouette read as a constructed object rather
-    # than a single primitive block.
     authored.append(add_box("FrontLowerPanel", (0.0, -0.995, 0.73), (2.05, 0.07, 0.62), heritage_red, 0.018))
     authored.append(add_box("EastLowerPanel", (1.195, 0.0, 0.73), (0.07, 1.65, 0.62), heritage_red, 0.018))
 
-    # Front service opening and trim.
     authored.append(add_box("FrontWindow", (0.0, -1.018, 1.53), (1.42, 0.055, 0.73), glass, 0.012))
     authored.append(add_box("FrontWindowTop", (0.0, -1.055, 1.94), (1.62, 0.085, 0.11), cream_light, 0.012))
     authored.append(add_box("FrontWindowBottom", (0.0, -1.08, 1.10), (1.62, 0.20, 0.12), dark_wood, 0.015))
@@ -151,13 +142,10 @@ def build_kiosk():
     authored.append(add_box("FrontWindowRight", (0.78, -1.055, 1.53), (0.10, 0.085, 0.78), cream_light, 0.012))
     authored.append(add_box("FrontMullion", (0.0, -1.065, 1.53), (0.065, 0.075, 0.71), brass, 0.008))
 
-    # East-side window is deliberately smaller so the two visible faces do not
-    # read as mirrored clip-art.
     authored.append(add_box("EastWindow", (1.218, 0.12, 1.52), (0.055, 1.00, 0.61), glass, 0.012))
     authored.append(add_box("EastWindowTop", (1.255, 0.12, 1.86), (0.085, 1.16, 0.10), cream_light, 0.01))
     authored.append(add_box("EastWindowBottom", (1.255, 0.12, 1.18), (0.085, 1.16, 0.10), dark_wood, 0.01))
 
-    # Thin structural posts intentionally stress small-scale readability.
     for x in (-1.22, 1.22):
         authored.append(add_box(f"FrontPost_{x:+.2f}", (x, -1.16, 1.28), (0.12, 0.12, 2.22), dark_wood, 0.018))
 
@@ -165,7 +153,6 @@ def build_kiosk():
     authored.append(add_box("RoofFascia", (0.0, 0.0, 2.31), (2.78, 2.36, 0.18), heritage_red, 0.035))
     authored.append(add_pyramid_roof("KioskRoof", (0.0, 0.0, 2.72), 1.82, 0.76, red_light))
 
-    # Sign and brass accents.
     authored.append(add_box("FrontSign", (0.0, -1.24, 2.29), (1.38, 0.10, 0.32), heritage_red, 0.035))
     authored.append(add_box("FrontSignInset", (0.0, -1.30, 2.29), (0.96, 0.035, 0.11), cream_light, 0.01))
     authored.append(add_box("RoofTrimFront", (0.0, -1.22, 2.39), (2.36, 0.07, 0.06), brass, 0.012))
@@ -177,7 +164,10 @@ def build_kiosk():
 
 def configure_scene(output_dir):
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 24
+    scene.cycles.use_denoising = True
     scene.render.resolution_x = 1024
     scene.render.resolution_y = 1024
     scene.render.resolution_percentage = 100
@@ -185,12 +175,6 @@ def configure_scene(output_dir):
     scene.render.image_settings.color_mode = "RGBA"
     scene.render.film_transparent = True
 
-    if hasattr(scene, "eevee"):
-        # Kept for backwards compatibility with older Blender point releases.
-        pass
-
-    # Standard transform keeps the test intentionally restrained; the post stage
-    # owns palette reduction rather than a high-contrast filmic look.
     try:
         scene.view_settings.view_transform = "Standard"
     except Exception:
@@ -210,11 +194,8 @@ def configure_scene(output_dir):
     background.inputs["Strength"].default_value = 0.42
 
     add_camera()
-    # Warm northwest key and cool southeast fill. The exact values are recorded in
-    # metadata so later iterations can be compared rather than guessed.
     add_area_light("Key_Warm_NW", (-5.6, -6.2, 8.5), 980.0, (1.0, 0.79, 0.60), 4.1, True)
     add_area_light("Fill_Cool_SE", (5.0, 4.5, 5.2), 315.0, (0.52, 0.68, 1.0), 5.5, False)
-
     os.makedirs(output_dir, exist_ok=True)
 
 
@@ -222,23 +203,21 @@ def render_color_pass(scene, authored, ground, output_dir):
     ground.hide_render = True
     for obj in authored:
         obj.hide_render = False
+        if hasattr(obj, "visible_camera"):
+            obj.visible_camera = True
     scene.render.filepath = os.path.join(output_dir, "tycoon_photo_studio_color_source.png")
     bpy.ops.render.render(write_still=True)
 
 
 def render_shadow_reference(scene, authored, ground, output_dir):
-    # Eevee does not expose a production shadow-catcher plane identical to Cycles.
-    # For this POC we render a dedicated white-ground reference with a neutral
-    # black duplicate silhouette hidden behind the receiver. Post-processing turns
-    # luminance loss into a separate alpha-only shadow pass.
     ground.hide_render = False
     for obj in authored:
         obj.hide_render = False
+        if hasattr(obj, "visible_camera"):
+            obj.visible_camera = False
+        if hasattr(obj, "visible_shadow"):
+            obj.visible_shadow = True
 
-    # Render a white receiver with the object still visible. The post tool masks the
-    # object region using the independent color pass before extracting only ground
-    # darkening. This keeps the experiment deterministic and avoids engine-specific
-    # shadow-catcher APIs.
     scene.render.filepath = os.path.join(output_dir, "tycoon_photo_studio_shadow_reference.png")
     bpy.ops.render.render(write_still=True)
 
@@ -250,7 +229,6 @@ def main():
     configure_scene(output_dir)
 
     authored = build_kiosk()
-
     ground_material = make_material("ShadowReceiver", (0.82, 0.82, 0.82, 1.0), roughness=1.0)
     ground = add_box("ShadowReceiverPlane", (0.0, 0.0, -0.055), (7.5, 7.5, 0.10), ground_material, 0.0)
 
@@ -263,6 +241,8 @@ def main():
         "sourceObject": "park_kiosk_1x1",
         "blenderVersion": bpy.app.version_string,
         "renderEngine": scene.render.engine,
+        "renderDevice": "CPU",
+        "samples": scene.cycles.samples,
         "cameraContract": "CH_CAMERA_V1",
         "projection": "orthographic",
         "yawDegrees": 45.0,
@@ -273,9 +253,9 @@ def main():
         "lighting": {
             "key": "warm northwest area light",
             "fill": "cool southeast area light",
-            "worldStrength": 0.42,
+            "worldStrength": 0.42
         },
-        "note": "POC scene only; aesthetic approval requires review of final downsampled variants.",
+        "note": "POC scene only; aesthetic approval requires review of final downsampled variants."
     }
     with open(os.path.join(output_dir, "studio_metadata.json"), "w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
