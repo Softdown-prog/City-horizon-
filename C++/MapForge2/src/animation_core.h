@@ -5,6 +5,7 @@
 #include <QColor>
 #include <QJsonObject>
 #include <QPointF>
+#include <QRectF>
 #include <QSize>
 #include <QSizeF>
 #include <QString>
@@ -33,6 +34,8 @@ enum class AnimationNodeVisualKind {
     None,
     PrimitiveRectangle,
     PrimitiveEllipse,
+    RasterSprite,
+    BuildingRender,
 };
 
 struct AnimationKeyframe {
@@ -67,13 +70,30 @@ struct AnimationNodeSpec {
     bool visible = true;
     int draw_order = 0;
 
-    // The visual payload is intentionally simple in Animation Core 2. It gives
-    // the hierarchy a concrete deterministic QA renderer without coupling the
-    // data model to future carousel/person/animal asset formats.
+    // Visual source contract. Primitive kinds remain available as a lightweight
+    // fallback, but production animated assets should prefer RasterSprite or
+    // BuildingRender so every animated part has a stable authored visual source.
     AnimationNodeVisualKind visual_kind = AnimationNodeVisualKind::None;
     QSizeF visual_size_px = QSizeF(24.0, 24.0);
     QColor fill_color = QColor("#d79b38");
     QColor outline_color = QColor("#2d3133");
+
+    // RasterSprite: UTF-8 path relative to AnimatedAssetSpec::visual_source_root
+    // (or absolute). A null/empty source rect means the whole image.
+    QString visual_asset_path;
+    QRectF visual_source_rect_px;
+
+    // Shared raster/render presentation policy. Transparent borders are removed
+    // before fitting the source into visual_size_px so pivots remain meaningful.
+    bool visual_trim_transparent = true;
+    bool visual_preserve_aspect = true;
+    bool visual_smooth_scaling = true;
+
+    // BuildingRender: a completely independent Composer definition for this
+    // node. It is rendered once as the node's visual source, not as a new frame
+    // generated independently from the animation timeline.
+    BuildingComposerSpec visual_building;
+    BuildingView visual_building_view = BuildingView::South;
 };
 
 struct AnimatedAssetSpec {
@@ -85,6 +105,12 @@ struct AnimatedAssetSpec {
     BuildingView view = BuildingView::South;
     BuildingComposerSpec base_building;
     bool render_base_building = true;
+
+    // Root directory used to resolve relative RasterSprite paths. The visual
+    // resolver also checks the executable directory and its parent directories
+    // so authoring previews remain portable between source and build folders.
+    QString visual_source_root = QStringLiteral(".");
+
     std::vector<AnimationNodeSpec> nodes;
     std::vector<AnimationClip> clips;
 };
@@ -119,7 +145,7 @@ struct AnimationFrameSample {
 
 class AnimationCore final {
 public:
-    static constexpr const char* kVersion = "animation_core_2";
+    static constexpr const char* kVersion = "animation_core_3";
 
     static QString propertyId(AnimationProperty property);
     static QString interpolationId(AnimationInterpolation interpolation);
