@@ -28,6 +28,18 @@ struct RoofFace {
     int index = 0;
 };
 
+enum class TonalLevel {
+    Light,
+    Mid,
+    Shadow,
+};
+
+struct TonalRamp {
+    QColor light;
+    QColor mid;
+    QColor shadow;
+};
+
 constexpr std::array<BuildingView, 4> kViews = {
     BuildingView::South,
     BuildingView::East,
@@ -95,11 +107,38 @@ QColor blendColor(const QColor& base, const QColor& tint, const float amount) {
         base.alphaF());
 }
 
-QColor classicRampColor(const QColor& base, const bool lit_face) {
-    if (lit_face) {
-        return blendColor(scaledColor(base, 1.055F), QColor("#f7e7c9"), 0.055F);
+TonalRamp classicTonalRamp(const QColor& base) {
+    return {
+        blendColor(scaledColor(base, 1.075F), QColor("#f7e7c9"), 0.060F),
+        scaledColor(base, 0.965F),
+        blendColor(scaledColor(base, 0.735F), QColor("#64758a"), 0.095F),
+    };
+}
+
+QColor tonalColor(const TonalRamp& ramp, const TonalLevel level) {
+    switch (level) {
+        case TonalLevel::Light: return ramp.light;
+        case TonalLevel::Mid: return ramp.mid;
+        case TonalLevel::Shadow: return ramp.shadow;
     }
-    return blendColor(scaledColor(base, 0.765F), QColor("#64758a"), 0.085F);
+    return ramp.mid;
+}
+
+TonalLevel wallTonalLevel(const int edge) {
+    // Fixed world-light quantization: west catches the light, east is in
+    // structural shadow, while north/south remain the neutral mid tone.
+    switch (edge) {
+        case 3: return TonalLevel::Light;
+        case 1: return TonalLevel::Shadow;
+        case 0:
+        case 2:
+        default: return TonalLevel::Mid;
+    }
+}
+
+QColor classicRampColor(const QColor& base, const bool lit_face) {
+    const TonalRamp ramp = classicTonalRamp(base);
+    return lit_face ? ramp.light : ramp.shadow;
 }
 
 float averageY(const QPolygonF& polygon) {
@@ -187,7 +226,7 @@ void drawProjectedShadow(QPainter& painter, const std::array<Point3, 4>& corners
 
 void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                              const Point3& a, const Point3& b, const int edge,
-                             const float wall_h, const bool lit_face,
+                             const float wall_h, const TonalLevel face_tone,
                              const BuildingView view, const QSize canvas) {
     const QPolygonF face = wallFacePolygon(a, b, 0.0F, wall_h, view, canvas);
     QPainterPath clip;
@@ -199,14 +238,15 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
     const float variation = std::clamp(spec.material_variation, 0.0F, 1.0F);
     const float contrast = std::clamp(spec.material_contrast, 0.0F, 1.0F);
     const float edge_span = std::max(0.5F, std::hypot(b.x - a.x, b.y - a.y));
-    const QColor ramp = classicRampColor(
-        spec.wall_material == BuildingWallMaterial::Glass ? spec.glass_color : spec.wall_color,
-        lit_face);
-    const QColor dark = alphaColor(scaledColor(ramp, 0.70F - 0.10F * contrast),
+    const QColor material_base = spec.wall_material == BuildingWallMaterial::Glass
+        ? spec.glass_color : spec.wall_color;
+    const TonalRamp tonal = classicTonalRamp(material_base);
+    const QColor ramp = tonalColor(tonal, face_tone);
+    const QColor dark = alphaColor(blendColor(ramp, tonal.shadow, 0.64F + 0.16F * contrast),
                                    48 + static_cast<int>(100.0F * strength));
-    const QColor mid = alphaColor(scaledColor(ramp, 0.90F),
+    const QColor mid = alphaColor(blendColor(ramp, tonal.mid, 0.62F),
                                   24 + static_cast<int>(58.0F * strength));
-    const QColor light = alphaColor(scaledColor(ramp, 1.11F),
+    const QColor light = alphaColor(blendColor(ramp, tonal.light, 0.68F),
                                     18 + static_cast<int>(58.0F * strength));
 
     painter.save();
@@ -216,7 +256,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
     painter.drawPolygon(face);
 
     if (spec.wall_material == BuildingWallMaterial::Plaster) {
-        // Broad trowel passes: deterministic, continuous and low frequency.
         const int bands = std::max(3, static_cast<int>(wall_h / std::max(19.0F, 27.0F * scale)));
         for (int band = 0; band < bands; ++band) {
             const float z0 = wall_h * static_cast<float>(band) / static_cast<float>(bands);
@@ -224,24 +263,24 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
             const float inset = 0.025F + 0.010F * static_cast<float>((band + edge) % 2);
             painter.setPen(Qt::NoPen);
             painter.setBrush(band % 2 == 0
-                                 ? alphaColor(scaledColor(ramp, 1.035F), 8 + static_cast<int>(18.0F * strength))
-                                 : alphaColor(scaledColor(ramp, 0.965F), 7 + static_cast<int>(16.0F * strength)));
+                                 ? alphaColor(light, 7 + static_cast<int>(14.0F * strength))
+                                 : alphaColor(mid, 6 + static_cast<int>(12.0F * strength)));
             painter.drawPolygon(QPolygonF{
                 wallPoint(a, b, inset, z0 + 1.0F, view, canvas),
                 wallPoint(a, b, 1.0F - inset, z0 + 1.0F, view, canvas),
                 wallPoint(a, b, 1.0F - inset, z1 - 1.0F, view, canvas),
                 wallPoint(a, b, inset, z1 - 1.0F, view, canvas),
             });
-            painter.setPen(QPen(alphaColor(band % 2 == 0 ? light : mid, 30 + static_cast<int>(24.0F * strength)), 0.62));
+            painter.setPen(QPen(alphaColor(band % 2 == 0 ? light : mid,
+                                           24 + static_cast<int>(20.0F * strength)), 0.62));
             painter.drawLine(wallPoint(a, b, 0.05F, z1 - 1.0F, view, canvas),
                              wallPoint(a, b, 0.95F, z1 - 1.0F, view, canvas));
         }
     } else if (spec.wall_material == BuildingWallMaterial::Brick) {
-        // Rigid masonry bond: horizontal courses and staggered vertical mortar joints.
         const float course_px = std::max(7.0F, 10.5F * scale);
         const int courses = std::max(4, static_cast<int>(wall_h / course_px));
         const int columns = std::max(4, static_cast<int>(edge_span * 6.5F / scale));
-        const QColor mortar = alphaColor(blendColor(scaledColor(ramp, 0.58F), QColor("#c8bda9"), 0.18F),
+        const QColor mortar = alphaColor(blendColor(tonal.shadow, QColor("#c8bda9"), 0.18F),
                                          75 + static_cast<int>(90.0F * strength));
         painter.setPen(QPen(mortar, 0.78 + 0.28 * contrast));
         for (int row = 1; row < courses; ++row) {
@@ -267,7 +306,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
             }
         }
     } else if (spec.wall_material == BuildingWallMaterial::Concrete) {
-        // Cast panels: large bays with recessed joints and a controlled edge highlight.
         const int horizontal_panels = std::max(2, static_cast<int>(edge_span * 1.8F / scale));
         const int vertical_panels = std::max(2, static_cast<int>(wall_h / std::max(30.0F, 42.0F * scale)));
         painter.setPen(QPen(alphaColor(dark, 100 + static_cast<int>(45.0F * strength)), 0.90));
@@ -289,7 +327,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
                              wallPoint(a, b, std::min(0.99F, t + highlight_t), wall_h - 2.0F, view, canvas));
         }
     } else if (spec.wall_material == BuildingWallMaterial::Timber) {
-        // Horizontal clapboards with a dark overlap and a narrow upper catching edge.
         const float board_px = std::max(5.5F, 8.5F * scale);
         const int boards = std::max(5, static_cast<int>(wall_h / board_px));
         for (int board = 1; board < boards; ++board) {
@@ -311,7 +348,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
             }
         }
     } else if (spec.wall_material == BuildingWallMaterial::Stone) {
-        // Course stone: alternating block counts, no random flecks or point noise.
         const float course_px = std::max(10.0F, 15.0F * scale);
         const int courses = std::max(3, static_cast<int>(wall_h / course_px));
         painter.setPen(QPen(alphaColor(dark, 105 + static_cast<int>(55.0F * strength)), 0.95));
@@ -339,7 +375,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
             }
         }
     } else if (spec.wall_material == BuildingWallMaterial::MetalPanel) {
-        // Standing facade panels: dark seam plus a narrow light return on every rib.
         const int panels = std::max(3, static_cast<int>(edge_span * 5.2F / scale));
         for (int panel = 1; panel < panels; ++panel) {
             const float t = static_cast<float>(panel) / static_cast<float>(panels);
@@ -357,7 +392,6 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
                              wallPoint(a, b, 0.98F, wall_h * zf, view, canvas));
         }
     } else if (spec.wall_material == BuildingWallMaterial::Glass) {
-        // Curtain-wall bays with transoms and two broad reflection streaks following the facade plane.
         const int bays = std::max(3, static_cast<int>(edge_span * 5.0F / scale));
         const int levels = std::max(2, static_cast<int>(wall_h / std::max(28.0F, 38.0F * scale)));
         const QColor mullion = alphaColor(scaledColor(spec.trim_color, 0.46F),
@@ -373,7 +407,7 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
             painter.drawLine(wallPoint(a, b, 0.0F, z, view, canvas),
                              wallPoint(a, b, 1.0F, z, view, canvas));
         }
-        painter.setPen(QPen(alphaColor(scaledColor(spec.glass_color, 1.18F),
+        painter.setPen(QPen(alphaColor(tonal.light,
                                       55 + static_cast<int>(45.0F * strength)), 1.05));
         painter.drawLine(wallPoint(a, b, 0.08F, wall_h * 0.76F, view, canvas),
                          wallPoint(a, b, 0.44F, wall_h * 0.50F, view, canvas));
@@ -383,16 +417,16 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
 
     const float plinth_h = std::clamp(wall_h * 0.075F, 5.0F, 9.0F);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(alphaColor(scaledColor(ramp, 0.62F), 215));
+    painter.setBrush(alphaColor(blendColor(ramp, tonal.shadow, 0.58F), 215));
     painter.drawPolygon(wallFacePolygon(a, b, 0.0F, plinth_h, view, canvas));
-    painter.setPen(QPen(alphaColor(scaledColor(ramp, 0.48F), 145), 0.85));
+    painter.setPen(QPen(alphaColor(tonal.shadow, 145), 0.85));
     painter.drawLine(wallPoint(a, b, 0.0F, plinth_h, view, canvas),
                      wallPoint(a, b, 1.0F, plinth_h, view, canvas));
 
     painter.setPen(Qt::NoPen);
-    painter.setBrush(alphaColor(QColor(35, 42, 48), 42));
+    painter.setBrush(alphaColor(tonal.shadow, 38));
     painter.drawPolygon(wallFacePolygon(a, b, wall_h - 5.5F, wall_h, view, canvas));
-    painter.setPen(QPen(alphaColor(QColor(31, 37, 42), 105), 1.05));
+    painter.setPen(QPen(alphaColor(tonal.shadow, 105), 1.05));
     painter.drawLine(wallPoint(a, b, 0.0F, 0.8F, view, canvas),
                      wallPoint(a, b, 1.0F, 0.8F, view, canvas));
     painter.restore();
@@ -428,7 +462,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
     painter.setBrush(Qt::NoBrush);
 
     if (spec.roof_material == BuildingRoofMaterial::MetalSeam) {
-        // Standing seams run from ridge to eave, independent of screen axes.
         const float eave_width = std::max(10.0F, screenDistance(eave_row[0], eave_row[1]));
         const int seams = std::max(3, static_cast<int>(std::round(eave_width / std::max(11.0F, 17.0F * scale))));
         for (int seam = 1; seam < seams; ++seam) {
@@ -448,7 +481,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawLine(row[0], row[1]);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::CeramicTile) {
-        // Interlocking ceramic courses follow the roof plane; vertical joints are staggered by row.
         const float nominal_course = std::max(5.0F, 7.5F * scale);
         const int courses = std::max(2, static_cast<int>(std::round(slope_length / nominal_course)));
         for (int row_index = 1; row_index <= courses; ++row_index) {
@@ -475,7 +507,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawLine(highlight_row[0], highlight_row[1]);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::AsphaltShingle) {
-        // Shingle courses remain horizontal to the eave while short tabs step down the slope.
         const float nominal_course = std::max(6.0F, 9.0F * scale);
         const int courses = std::max(2, static_cast<int>(std::round(slope_length / nominal_course)));
         for (int row_index = 1; row_index <= courses; ++row_index) {
@@ -601,10 +632,8 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
     const std::array<int, 2> visible_edges = {(near_index + 3) % 4, near_index};
     for (const int edge : visible_edges) {
         const int next = (edge + 1) % 4;
-        const QPolygonF face = wallFacePolygon(corners[edge], corners[next], 0.0F, wall_h, view, canvas);
-        const bool lit_face = face.boundingRect().center().x() >= canvas.width() * 0.5F;
         drawClassicWallMaterial(painter, spec, corners[edge], corners[next], edge,
-                                wall_h, lit_face, view, canvas);
+                                wall_h, wallTonalLevel(edge), view, canvas);
     }
 
     const std::array<Point3, 4> eaves = {
@@ -831,8 +860,9 @@ QJsonObject BuildingRoofEditorRenderer::roofEditorManifest(const BuildingCompose
         {"ridgeEnabled", spec.roof_ridge_enabled},
         {"ridgeScale", static_cast<double>(std::clamp(spec.roof_ridge_scale, 0.5F, 1.8F))},
         {"singleParametricDefinition", true},
-        {"visualRasterPass", "classic_tycoon_renderer_2"},
+        {"visualRasterPass", "classic_tycoon_renderer_3"},
         {"materialRecipe", "structured_directional_materials_1"},
+        {"tonalLighting", "classic_three_tone_ramp_1"},
     };
 }
 
