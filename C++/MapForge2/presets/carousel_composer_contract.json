@@ -1,14 +1,14 @@
 {
-  "id": "carousel_composer_4",
+  "id": "carousel_composer_5",
   "name": "City Horizon Carousel Composer",
   "status": "canonical",
-  "purpose": "Parametric carousel authoring whose world motion is projected only by the City Horizon runtime camera implementation and whose visible parts are persistent modular raster assets.",
+  "purpose": "Parametric carousel authoring whose motion is projected only by the City Horizon runtime camera and whose visible parts are persistent modular raster assets authored for CH_CAMERA_V1.",
   "dependsOn": {
     "animationCore": "animation_core_5",
     "visualSources": "animation_visual_sources_3",
     "partLibrary": "carousel_parts_3",
-    "cameraContract": "carousel_engine_camera_2",
-    "projectionCalibration": "engine_projection_calibration_1"
+    "cameraContract": "carousel_engine_camera_3",
+    "projectionCalibration": "engine_projection_calibration_2"
   },
   "authoringParameters": {
     "horseCount": {"min": 2, "max": 24, "default": 8},
@@ -22,12 +22,17 @@
     "directionalHorses": {"default": true}
   },
   "projection": {
+    "gridContract": "CH_GRID_V1",
+    "cameraContract": "CH_CAMERA_V1",
     "authoritativeFunction": "src/ch_core/projection.cpp::ch::world_to_screen_point",
-    "composerAdapter": "engine_projection_adapter_1",
+    "composerAdapter": "engine_projection_adapter_2",
+    "projectionKind": "orthographic_dimetric_2_to_1",
+    "worldYawDegrees": 45.0,
+    "cameraElevationDegrees": 30.0,
+    "groundAxisScreenAngleDegrees": 26.56505117707799,
+    "diamondRatio": 2.0,
+    "trueIsometric35_264": false,
     "manualProjectionFormula": false,
-    "nominal45DegreeProof": false,
-    "nominal35_264DegreeProof": false,
-    "nominalTwoToOneProof": false,
     "calibrationMustPassBeforeQaExport": true
   },
   "visualAssembly": {
@@ -35,6 +40,7 @@
     "proceduralCarouselArt": false,
     "persistentRasterParts": true,
     "directionalHorseAssets": 4,
+    "assetsMustReadCorrectlyInCH_CAMERA_V1": true,
     "paletteTintingPreservesStableSourcePixels": true
   },
   "automaticAuthoring": {
@@ -46,9 +52,11 @@
     "stableNodeIds": true
   },
   "qa": {
-    "fixture": "2x2 tile + four vertical posts + ground disk",
+    "fixture": "2x2 tile + four vertical posts + projected ground disk",
     "coordinateTolerancePx": 0.0001,
+    "runtimeParityRequired": true,
+    "visualCameraProfileRequired": true,
     "failureBlocksCarouselPreview": true
   },
-  "authoringRule": "Do not infer the game camera from nominal isometric values. Author orbit positions in world units, delegate projection to ch::world_to_screen_point, and assemble persistent carousel art assets after calibration succeeds."
+  "authoringRule": "Do not infer the camera from a generic true-isometric formula. CH_CAMERA_V1 is the visual contract: classic 2:1 dimetric ground, 45-degree yaw, 30-degree orthographic elevation, 26.565-degree screen axes and no perspective."
 }
