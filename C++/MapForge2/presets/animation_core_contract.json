@@ -1,8 +1,8 @@
 {
-  "id": "animation_core_4",
+  "id": "animation_core_5",
   "name": "City Horizon Animation Core",
   "status": "canonical",
-  "purpose": "Deterministic parametric timeline, hierarchical part animation, reusable visual libraries and frame export contract for animated City Horizon assets.",
+  "purpose": "Deterministic parametric timeline, hierarchical part animation, reusable visual libraries, dynamic draw order, visual variants and frame export contract for animated City Horizon assets.",
   "dataModel": {
     "asset": "AnimatedAssetSpec",
     "node": "AnimationNodeSpec",
@@ -20,9 +20,18 @@
     "fullTurnRotationEndpointsEquivalent": true
   },
   "interpolation": ["step", "linear", "smooth_step", "sine"],
-  "trackProperties": ["offset_x_px", "offset_y_px", "rotation_degrees", "scale", "opacity", "visibility"],
+  "trackProperties": [
+    "offset_x_px",
+    "offset_y_px",
+    "rotation_degrees",
+    "scale",
+    "opacity",
+    "visibility",
+    "draw_order",
+    "visual_variant"
+  ],
   "hierarchy": {
-    "version": "animation_node_hierarchy_1",
+    "version": "animation_node_hierarchy_2",
     "contractFile": "animation_node_hierarchy_contract.json",
     "implicitRoot": "root",
     "uniqueNodeIds": true,
@@ -31,19 +40,21 @@
     "trackTargetMustExist": true,
     "duplicateTargetPropertyTracksRejected": true,
     "childTransformsComposeWithParent": true,
-    "drawOrderStable": true,
+    "drawOrderMayAnimate": true,
+    "visualVariantMayAnimate": true,
     "nodeStateRecordedPerFrame": true
   },
   "visualSources": {
-    "version": "animation_visual_sources_2",
+    "version": "animation_visual_sources_3",
     "contractFile": "animation_visual_sources_contract.json",
     "supportedKinds": ["none", "primitive_rectangle", "primitive_ellipse", "raster_sprite", "building_render", "library_part"],
     "productionPreferredKinds": ["raster_sprite", "building_render", "library_part"],
-    "registeredLibraries": ["carousel_parts_1"],
+    "registeredLibraries": ["carousel_parts_2"],
     "relativeRasterRoot": "AnimatedAssetSpec.visual_source_root",
     "transparentTrim": true,
     "preserveAspect": true,
-    "sourceValidationBeforeExport": true
+    "sourceValidationBeforeExport": true,
+    "perFrameVisualVariantResolution": true
   },
   "coherence": {
     "stableNormalizedAnchor": true,
@@ -60,29 +71,32 @@
     "contactSheet": true,
     "spritesheet": true,
     "frameLabelsIncludeTime": true,
-    "realVisualSourceQa": true,
+    "dynamicDrawOrder": true,
+    "visualVariants": true,
     "missingSourceDiagnosticMarker": true,
     "canonicalCarouselLibraryQa": true
   },
   "export": {
-    "version": "animation_export_3",
+    "version": "animation_export_4",
     "outputs": ["spritesheet_png", "preview_png", "manifest_json"],
     "spritesheetOrder": "row_major",
     "manifestRecordsFrameSamples": true,
     "manifestRecordsNodeStates": true,
+    "manifestRecordsDynamicDrawOrder": true,
+    "manifestRecordsVisualVariant": true,
     "manifestRecordsNodeVisualSources": true,
     "manifestRecordsLibraryPartIds": true,
     "manifestRecordsAnchor": true,
     "manifestRecordsPaletteProfile": true,
     "visualSourcesValidatedBeforeBake": true,
-    "runtime": "SDL consumes baked frame cells and clip timing; hierarchy and visual-source declarations remain authoring/debug metadata"
+    "runtime": "SDL consumes baked frame cells and clip timing; hierarchy, resolved draw order and visual variants remain authoring/debug metadata"
   },
   "scope": {
     "currentRenderable": "BuildingComposerSpec plus persistent hierarchical nodes with raster_sprite, building_render or registered library_part visuals",
     "currentTrackTargets": ["root", "authored_node_id"],
-    "activeLibraries": ["carousel_parts_1"],
-    "nextSystems": ["mechanical_depth_ordering", "palette_profiles", "rig_joints", "animal_parts", "effects"],
-    "futureAnimationComposer": true
+    "activeLibraries": ["carousel_parts_2"],
+    "activeMechanicalAuthoring": ["carousel_composer_2"],
+    "nextSystems": ["palette_profiles", "rig_joints", "animal_parts", "effects", "runtime_carousel_integration"]
   },
-  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes with stable visual sources in one acyclic hierarchy; tracks transform those persistent parts instead of regenerating artwork per frame. Registered library parts use stable IDs so the same authored piece is reused in every frame and every compatible asset."
+  "authoringRule": "Frames are samples of one canonical asset and one timeline. Persistent nodes keep stable identity, pivots and source IDs while authored tracks may change transforms, visibility, draw order and visual variant deterministically. Dynamic depth never creates replacement nodes or independent per-frame artwork."
 }
