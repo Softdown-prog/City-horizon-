@@ -1,0 +1,93 @@
+name: MapForge Asset Capture
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "C++/MapForge2/src/map_capture_main.cpp"
+      - "C++/MapForge2/examples/map_capture/capture_request.json"
+      - "C++/MapForge2/CMakeLists.txt"
+      - ".github/workflows/mapforge-asset-capture.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read capture request
+        shell: pwsh
+        run: |
+          $request = Get-Content "C++/MapForge2/examples/map_capture/capture_request.json" -Raw | ConvertFrom-Json
+          if ($request.contract -ne "MAPFORGE_CAPTURE_REQUEST_V1") { throw "Unsupported capture request contract" }
+          "SOURCE_WORKFLOW=$($request.source.workflow)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SOURCE_ARTIFACT=$($request.source.artifact)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SOURCE_FILE=$($request.source.file)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CAPTURE_FILE=$($request.output.file)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CAPTURE_ARTIFACT=$($request.output.artifact)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "workflow=$($request.source.workflow)"
+          Write-Host "artifact=$($request.source.artifact)"
+          Write-Host "file=$($request.source.file)"
+
+      - name: Install Qt
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download requested asset artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force -Path out/source_artifact | Out-Null
+          $runs = gh run list --workflow "$env:SOURCE_WORKFLOW" --branch main --status success --limit 1 --json databaseId | ConvertFrom-Json
+          if ($null -eq $runs -or $runs.Count -lt 1) { throw "No successful run found for $env:SOURCE_WORKFLOW" }
+          $runId = $runs[0].databaseId
+          Write-Host "Using source run $runId"
+          gh run download $runId --name "$env:SOURCE_ARTIFACT" --dir out/source_artifact
+          $candidate = Get-ChildItem out/source_artifact -Recurse -File | Where-Object { $_.Name -eq $env:SOURCE_FILE } | Select-Object -First 1
+          if ($null -eq $candidate) { throw "Requested asset file not found: $env:SOURCE_FILE" }
+          "CANDIDATE_PNG=$($candidate.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure capture worker
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/mapforge-capture -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build capture worker
+        shell: pwsh
+        run: cmake --build build/mapforge-capture --config Release --target MapForge2MapCapture --parallel
+
+      - name: Render deterministic capture
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out/mapforge_capture | Out-Null
+          $output = Join-Path "out/mapforge_capture" $env:CAPTURE_FILE
+          & "build/mapforge-capture/Release/MapForge2MapCapture.exe" `
+            "$output" `
+            "$env:CANDIDATE_PNG" `
+            "C++/MapForge2/examples/map_capture/capture_request.json"
+          if ($LASTEXITCODE -ne 0) { throw "MapForge2MapCapture failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "$output")) { throw "Capture PNG missing: $output" }
+
+      - name: Upload deterministic capture
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CAPTURE_ARTIFACT }}
+          path: out/mapforge_capture/${{ env.CAPTURE_FILE }}
+          if-no-files-found: error
+          retention-days: 14
