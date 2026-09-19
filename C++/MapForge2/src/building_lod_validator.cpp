@@ -4,6 +4,7 @@
 
 #include <QFont>
 #include <QPainter>
+#include <QStringList>
 
 #include <algorithm>
 #include <array>
