@@ -16,7 +16,7 @@ struct AnimationExportResult {
 
 class AnimationExportPipeline final {
 public:
-    static constexpr const char* kVersion = "animation_export_1";
+    static constexpr const char* kVersion = "animation_export_2";
 
     static AnimationExportResult exportClip(const AnimatedAssetSpec& asset,
                                             const QString& clip_id,
