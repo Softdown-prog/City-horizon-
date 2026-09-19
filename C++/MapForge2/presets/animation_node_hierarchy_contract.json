@@ -1,8 +1,8 @@
 {
-  "id": "animation_node_hierarchy_1",
+  "id": "animation_node_hierarchy_2",
   "name": "City Horizon Animation Node Hierarchy",
   "status": "canonical",
-  "purpose": "Persistent part/node hierarchy for coherent multi-part animation such as carousels, ferris wheels, characters and animals.",
+  "purpose": "Persistent part/node hierarchy for coherent multi-part animation with deterministic per-frame draw ordering and visual presentation state.",
   "root": {
     "id": "root",
     "implicit": true,
@@ -13,9 +13,10 @@
     "type": "AnimationNodeSpec",
     "required": ["id", "parentId"],
     "transform": ["positionPx", "pivotNormalized", "rotationDegrees", "scale", "opacity", "visible"],
-    "drawOrder": true,
-    "visualSourceContract": "animation_visual_sources_1",
-    "visualSourceKinds": ["none", "primitive_rectangle", "primitive_ellipse", "raster_sprite", "building_render"]
+    "drawOrder": "authored_default_plus_optional_track",
+    "visualVariant": "authored_default_plus_optional_track",
+    "visualSourceContract": "animation_visual_sources_3",
+    "visualSourceKinds": ["none", "primitive_rectangle", "primitive_ellipse", "raster_sprite", "building_render", "library_part"]
   },
   "validation": {
     "uniqueIds": true,
@@ -26,8 +27,11 @@
     "pivotRange": [0.0, 1.0],
     "positiveScale": true,
     "opacityRange": [0.0, 1.0],
+    "visualVariantNonNegative": true,
     "trackTargetsMustExist": true,
     "duplicateTargetPropertyTracksRejected": true,
+    "nodeOnlyDrawOrderRejectedOnRoot": true,
+    "nodeOnlyVisualVariantRejectedOnRoot": true,
     "productionVisualSourcesValidatedBeforeExport": true
   },
   "composition": {
@@ -35,25 +39,29 @@
     "childKeepsIndependentTrackState": true,
     "visibilityIsCumulative": true,
     "opacityIsCumulative": true,
-    "drawOrderIsDeterministic": true,
+    "drawOrderIsDeterministicPerFrame": true,
+    "drawOrderMayChangeAcrossFrames": true,
+    "visualVariantMayChangeAcrossFrames": true,
     "assetRootTransformAppliesBeforeNodeHierarchy": true,
     "visualSourceResolvedBeforeHierarchicalTransform": true
   },
   "qaReference": {
-    "baseStatic": true,
     "platformRotates": true,
     "horsesParentedToPlatform": true,
     "horsesUseIndependentVerticalTracks": true,
-    "structuralPartsUseBuildingRenderSources": true,
-    "movingPartStandInsUseRealRasterSprite": true,
-    "frameCount": 12,
-    "durationSeconds": 2.0,
+    "horsesUseCounterRotation": true,
+    "horsesChangeDirectionalVariant": true,
+    "horsesMoveBehindAndInFrontOfCenterPole": true,
+    "frameCount": 16,
+    "durationSeconds": 2.4,
     "loop": true
   },
   "export": {
     "nodeDefinitionsInManifest": true,
     "visualSourceDefinitionsInManifest": true,
     "resolvedNodeStateRecordedPerFrame": true,
+    "resolvedDrawOrderRecordedPerFrame": true,
+    "resolvedVisualVariantRecordedPerFrame": true,
     "bakedFramesRemainPrimaryRuntimePayload": true
   },
   "futureCompatibility": {
@@ -61,7 +69,8 @@
     "mechanicalSubassemblies": true,
     "characterRigJoints": true,
     "animalRigJoints": true,
-    "counterRotationTracks": true
+    "counterRotationTracks": true,
+    "dynamicOcclusionLayers": true
   },
-  "authoringRule": "A moving part is one persistent node with one stable visual source across the entire clip. Never create a visually similar replacement node for each frame. Parent/child relationships, pivots, palette identity, visual source and draw order remain stable; only authored track properties change over time."
+  "authoringRule": "A moving part is one persistent node with one stable source identity across the clip. Parent/child relationships and pivots remain stable; authored tracks may change transforms, visibility, draw order and visual variant to represent motion and occlusion without creating replacement artwork per frame."
 }
