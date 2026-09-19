@@ -1,6 +1,7 @@
 #include "animation_visual_source_renderer.h"
 
 #include "building_facade_renderer.h"
+#include "carousel_part_library.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -9,7 +10,6 @@
 #include <QPainter>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 
 namespace ch::studio {
@@ -29,8 +29,6 @@ QString resolveRasterPath(const AnimatedAssetSpec& asset, const QString& authore
     const QString rooted = QDir(asset.visual_source_root).filePath(authored_path);
     if (QFileInfo::exists(rooted)) return QFileInfo(rooted).canonicalFilePath();
 
-    // Authoring executables are commonly launched from build/Debug or build/Release.
-    // Search a bounded set of parents without hard-coding a machine-specific path.
     QDir probe(QCoreApplication::applicationDirPath());
     for (int depth = 0; depth < 7; ++depth) {
         const QString candidate = probe.filePath(authored_path);
@@ -42,7 +40,6 @@ QString resolveRasterPath(const AnimatedAssetSpec& asset, const QString& authore
 
 QImage cropTransparent(const QImage& source) {
     if (source.isNull()) return {};
-
     int left = source.width();
     int top = source.height();
     int right = -1;
@@ -57,7 +54,6 @@ QImage cropTransparent(const QImage& source) {
             bottom = std::max(bottom, y);
         }
     }
-
     if (right < left || bottom < top) return source;
     return source.copy(QRect(left, top, right - left + 1, bottom - top + 1));
 }
@@ -91,11 +87,10 @@ QImage primitiveSource(const AnimationNodeSpec& node) {
     painter.setBrush(node.fill_color);
     const QRectF bounds(0.6, 0.6, std::max(0.0, size.width() - 1.2),
                         std::max(0.0, size.height() - 1.2));
-    if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle) {
+    if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle)
         painter.drawRoundedRect(bounds, 2.0, 2.0);
-    } else {
+    else
         painter.drawEllipse(bounds);
-    }
     painter.end();
     return image;
 }
@@ -145,6 +140,19 @@ QImage buildingSource(const AnimationNodeSpec& node, QString* reason) {
     return fitSource(image, node);
 }
 
+QImage librarySource(const AnimationNodeSpec& node, QString* reason) {
+    if (!CarouselPartLibrary::contains(node.visual_library_id)) {
+        if (reason) *reason = QStringLiteral("unregistered animation library part: %1")
+            .arg(node.visual_library_id);
+        return {};
+    }
+    QImage image = CarouselPartLibrary::renderPart(
+        node.visual_library_id, targetSize(node), node.fill_color, node.outline_color, reason);
+    if (image.isNull()) return {};
+    if (node.visual_trim_transparent) image = cropTransparent(image);
+    return fitSource(image, node);
+}
+
 } // namespace
 
 bool AnimationVisualSourceRenderer::validateSource(const AnimatedAssetSpec& asset,
@@ -170,9 +178,16 @@ bool AnimationVisualSourceRenderer::validateSource(const AnimatedAssetSpec& asse
         if (!node.visual_source_rect_px.isNull()
             && (node.visual_source_rect_px.x() < 0.0 || node.visual_source_rect_px.y() < 0.0
                 || node.visual_source_rect_px.width() <= 0.0
-                || node.visual_source_rect_px.height() <= 0.0)) {
+                || node.visual_source_rect_px.height() <= 0.0))
             return fail(QStringLiteral("raster source rect must be positive and non-negative"));
-        }
+    }
+
+    if (node.visual_kind == AnimationNodeVisualKind::LibraryPart) {
+        if (node.visual_library_id.trimmed().isEmpty())
+            return fail(QStringLiteral("library visual source id is empty"));
+        if (!CarouselPartLibrary::contains(node.visual_library_id))
+            return fail(QStringLiteral("library visual source is not registered: %1")
+                            .arg(node.visual_library_id));
     }
 
     if (reason) reason->clear();
@@ -194,6 +209,8 @@ QImage AnimationVisualSourceRenderer::renderSource(const AnimatedAssetSpec& asse
             return rasterSource(asset, node, reason);
         case AnimationNodeVisualKind::BuildingRender:
             return buildingSource(node, reason);
+        case AnimationNodeVisualKind::LibraryPart:
+            return librarySource(node, reason);
     }
     if (reason) *reason = QStringLiteral("unsupported animation visual source kind");
     return {};
@@ -214,16 +231,19 @@ QJsonObject AnimationVisualSourceRenderer::manifest(const AnimationNodeSpec& nod
         source.insert(QStringLiteral("assetPath"), node.visual_asset_path);
         if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty()) {
             source.insert(QStringLiteral("sourceRectPx"), QJsonObject{
-                {"x", node.visual_source_rect_px.x()},
-                {"y", node.visual_source_rect_px.y()},
-                {"width", node.visual_source_rect_px.width()},
-                {"height", node.visual_source_rect_px.height()},
+                {"x", node.visual_source_rect_px.x()}, {"y", node.visual_source_rect_px.y()},
+                {"width", node.visual_source_rect_px.width()}, {"height", node.visual_source_rect_px.height()},
             });
         }
     } else if (node.visual_kind == AnimationNodeVisualKind::BuildingRender) {
         source.insert(QStringLiteral("view"), BuildingComposer::viewName(node.visual_building_view));
         source.insert(QStringLiteral("visualPreset"), BuildingComposer::visualPresetId(node.visual_building.visual_preset));
         source.insert(QStringLiteral("typology"), BuildingComposer::typologyId(node.visual_building.building_typology));
+    } else if (node.visual_kind == AnimationNodeVisualKind::LibraryPart) {
+        source.insert(QStringLiteral("libraryPartId"), node.visual_library_id);
+        source.insert(QStringLiteral("libraryVersion"), QString::fromLatin1(CarouselPartLibrary::kVersion));
+        source.insert(QStringLiteral("primary"), node.fill_color.name(QColor::HexArgb));
+        source.insert(QStringLiteral("outline"), node.outline_color.name(QColor::HexArgb));
     } else if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle
                || node.visual_kind == AnimationNodeVisualKind::PrimitiveEllipse) {
         source.insert(QStringLiteral("fill"), node.fill_color.name(QColor::HexArgb));
