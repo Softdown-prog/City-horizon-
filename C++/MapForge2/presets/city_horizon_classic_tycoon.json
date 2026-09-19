@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_19",
+  "revision": "classic_tycoon_20",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -242,6 +242,25 @@
     "qaPreviewOnly": true,
     "mutatesProductionSprite": false
   },
+  "visualReferenceGate": {
+    "version": "classic_visual_reference_gate_1",
+    "contractFile": "classic_visual_reference_gate_contract.json",
+    "referenceBuildingId": "classic_tycoon_reference_house_1",
+    "deterministic": true,
+    "neighborhoodSeed": 401,
+    "generatedBy": "MapForge2ComposerPreview",
+    "artifacts": [
+      "building_composer_visual_reference_hero.png",
+      "building_composer_visual_reference_materials.png",
+      "building_composer_visual_reference_shadow.png",
+      "building_composer_visual_reference_lod.png",
+      "building_composer_visual_reference_block.png",
+      "building_composer_visual_reference_report.json"
+    ],
+    "automatedScope": ["building_lod_gate_1"],
+    "manualVisualReviewRequired": true,
+    "regenerateAfterIntentionalRendererRevision": true
+  },
   "assetBrowser": {
     "version": "building_asset_browser_1",
     "contractFile": "building_asset_browser_contract.json",
@@ -393,5 +412,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. The production wall raster uses classic_three_tone_ramp_1 over structured_directional_materials_1. The global cast shadow uses fixed_world_cast_shadow_1: one camera-independent world direction, height-derived bounded reach, cool-charcoal core and compact anti-aliased penumbra, composited before the building. The legacy camera-relative shadow is disabled in the production facade path. Ambient occlusion uses localized_contact_ao_1 only at real contacts. automatic_export_validation_7 records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates."
+  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. The production wall raster uses classic_three_tone_ramp_1 over structured_directional_materials_1. The global cast shadow uses fixed_world_cast_shadow_1 and ambient occlusion uses localized_contact_ao_1 only at real contacts. classic_visual_reference_gate_1 freezes one deterministic reference building and regenerates hero, material, shadow, LOD and small-block QA artifacts after intentional renderer revisions; automated LOD validation is recorded separately from the required manual visual review. automatic_export_validation_7 records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates."
 }
