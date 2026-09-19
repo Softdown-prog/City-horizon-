@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 
 #include <algorithm>
+#include <cmath>
 
 namespace ch::studio {
 namespace {
