@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json"
+      - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json"
+      - "tools/tycoon_photo_studio/generate_fractal_tree_asset.py"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/postprocess.py"
       - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
@@ -21,7 +23,8 @@ jobs:
     timeout-minutes: 30
     env:
       ASSET_ID: park_tree_broadleaf_01
-      ASSET_CONFIG: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json
+      FRACTAL_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json
+      GENERATED_ASSET_CONFIG: out/tree/generated/park_tree_broadleaf_01.json
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
 
     steps:
@@ -40,6 +43,25 @@ jobs:
           python -m pip install --upgrade pillow
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Expand deterministic fractal tree source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/generate_fractal_tree_asset.py \
+            --input "$FRACTAL_SOURCE" \
+            --output "$GENERATED_ASSET_CONFIG"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/tree/generated/park_tree_broadleaf_01.json')
+          data = json.loads(p.read_text())
+          assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+          branch_count = sum(1 for part in data['parts'] if part['name'].startswith('CrownSkeleton_Branch_'))
+          assert branch_count == 28, branch_count
+          print('fractalTreeGate: PASS')
+          print('generatedBranches:', branch_count)
+          PY
 
       - name: Download pinned Blender
         shell: bash
@@ -64,7 +86,7 @@ jobs:
           mkdir -p out/tree/source
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
             --python tools/tycoon_photo_studio/build_scene.py -- \
-            --asset-config "$ASSET_CONFIG" \
+            --asset-config "$GENERATED_ASSET_CONFIG" \
             --studio-preset "$STUDIO_PRESET" \
             --output "$PWD/out/tree/source"
 
@@ -87,6 +109,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Park-Tree-PNGs
-          path: out/tree/final
+          path: |
+            out/tree/final
+            out/tree/generated
           if-no-files-found: error
           retention-days: 14
