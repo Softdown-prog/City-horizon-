@@ -153,6 +153,8 @@ def build_leaf_mesh(asset, materials, terminals, authored):
 
     width_range = tuple(float(v) for v in spec.get("widthRange", [0.11, 0.18]))
     height_range = tuple(float(v) for v in spec.get("heightRange", [0.18, 0.28]))
+    size_bias_power = max(0.25, float(spec.get("sizeBiasPower", 1.0)))
+    max_tilt = max(5.0, min(80.0, float(spec.get("maxTiltDegrees", 60.0))))
     cluster = tuple(float(v) for v in spec.get("clusterRadius", [0.34, 0.34, 0.26]))
     interior_fraction = float(spec.get("interiorFraction", 0.20))
     terminal_pull = float(spec.get("terminalPullToCenter", 0.18))
@@ -192,8 +194,10 @@ def build_leaf_mesh(asset, materials, terminals, authored):
             center = crown_center + random_ellipsoid_offset(crown_radius)
         center = clamp_to_crown(center)
 
-        width = rng.uniform(*width_range)
-        height = rng.uniform(*height_range)
+        size_t = rng.random() ** size_bias_power
+        width = width_range[0] + (width_range[1] - width_range[0]) * size_t
+        height_t = min(1.0, max(0.0, size_t * 0.72 + rng.random() * 0.28))
+        height = height_range[0] + (height_range[1] - height_range[0]) * height_t
         local = (
             Vector((-0.48 * width, 0.0, 0.0)),
             Vector((-0.20 * width, 0.0, 0.38 * height)),
@@ -203,8 +207,8 @@ def build_leaf_mesh(asset, materials, terminals, authored):
             Vector((0.0, 0.0, -0.52 * height)),
         )
         rotation = Euler((
-            math.radians(rng.uniform(-70.0, 70.0)),
-            math.radians(rng.uniform(-70.0, 70.0)),
+            math.radians(rng.uniform(-max_tilt, max_tilt)),
+            math.radians(rng.uniform(-max_tilt * 0.72, max_tilt * 0.72)),
             math.radians(rng.uniform(0.0, 360.0)),
         ), "XYZ").to_matrix()
         start = len(vertices)
@@ -233,15 +237,34 @@ def build_tree(asset):
 
     trunk = asset.get("trunk", {})
     trunk_height = float(trunk.get("height", 1.90))
-    authored.append(add_tapered_segment(
-        "ClassicTrunk",
-        (0.0, 0.0, 0.03),
-        (0.0, 0.0, trunk_height),
-        float(trunk.get("baseRadius", 0.29)),
-        float(trunk.get("topRadius", 0.14)),
-        materials[str(trunk.get("material", "trunk"))],
-        vertices=int(trunk.get("vertices", 12)),
-    ))
+    base_radius = float(trunk.get("baseRadius", 0.29))
+    top_radius = float(trunk.get("topRadius", 0.14))
+    trunk_vertices = int(trunk.get("vertices", 12))
+    lean = tuple(float(v) for v in trunk.get("lean", [0.0, 0.0]))
+    kink = tuple(float(v) for v in trunk.get("midKink", [0.0, 0.0]))
+    trunk_material = materials[str(trunk.get("material", "trunk"))]
+
+    p0 = Vector((0.0, 0.0, 0.03))
+    p1 = Vector((lean[0] * 0.24, lean[1] * 0.24, trunk_height * 0.37))
+    p2 = Vector((lean[0] * 0.66 + kink[0], lean[1] * 0.66 + kink[1], trunk_height * 0.70))
+    p3 = Vector((lean[0], lean[1], trunk_height))
+    trunk_points = (p0, p1, p2, p3)
+    trunk_radii = (
+        base_radius,
+        base_radius * 0.76,
+        max(top_radius * 1.48, base_radius * 0.43),
+        top_radius,
+    )
+    for index in range(3):
+        authored.append(add_tapered_segment(
+            f"ClassicTrunk_{index + 1:02d}",
+            trunk_points[index],
+            trunk_points[index + 1],
+            trunk_radii[index],
+            trunk_radii[index + 1],
+            trunk_material,
+            vertices=trunk_vertices,
+        ))
 
     root_count = int(trunk.get("rootCount", 5))
     root_length = float(trunk.get("rootLength", 0.34))
@@ -255,7 +278,7 @@ def build_tree(asset):
             end,
             float(trunk.get("rootRadius", 0.105)),
             0.018,
-            materials[str(trunk.get("material", "trunk"))],
+            trunk_material,
             vertices=8,
         ))
 
