@@ -137,6 +137,7 @@ bool CarouselComposer::validate(const CarouselComposerSpec& spec, QString* reaso
 
     if (spec.asset_id.trimmed().isEmpty()) return fail(QStringLiteral("carousel asset id is empty"));
     if (spec.clip_id.trimmed().isEmpty()) return fail(QStringLiteral("carousel clip id is empty"));
+    if (spec.clip_name.trimmed().isEmpty()) return fail(QStringLiteral("carousel clip name is empty"));
     if (spec.frame_size.width() < 240 || spec.frame_size.height() < 240)
         return fail(QStringLiteral("carousel frame size must be at least 240x240"));
     if (spec.anchor_normalized.x() < 0.0 || spec.anchor_normalized.x() > 1.0
@@ -186,11 +187,13 @@ AnimatedAssetSpec CarouselComposer::compose(const CarouselComposerSpec& spec, QS
     const qreal base_y = platform_y + deck_size.height() * 0.58;
     const qreal canopy_y = platform_y - std::max<qreal>(102.0, spec.platform_radius_px * 1.34);
     const qreal pole_y = (platform_y + canopy_y) * 0.50;
+    const qreal max_visual_width = std::max<qreal>(64.0, spec.frame_size.width() - 16.0);
 
     AnimationNodeSpec base = CarouselPartLibrary::makeNode(
         QString::fromLatin1(kBasePart), QStringLiteral("base"), QStringLiteral("root"),
         QPointF(center_x, base_y), 0, colors.base, colors.outline);
-    base.visual_size_px = QSizeF(deck_size.width() + 26.0, deck_size.height() + 12.0);
+    const qreal base_width = std::min(deck_size.width() + 26.0, max_visual_width);
+    base.visual_size_px = QSizeF(base_width, std::min(deck_size.height() + 12.0, base_width * 0.34));
     asset.nodes.push_back(base);
 
     AnimationNodeSpec platform = CarouselPartLibrary::makeNode(
@@ -220,8 +223,8 @@ AnimatedAssetSpec CarouselComposer::compose(const CarouselComposerSpec& spec, QS
         AnimationNodeSpec canopy = CarouselPartLibrary::makeNode(
             QString::fromLatin1(kCanopyPart), QStringLiteral("canopy"), QStringLiteral("root"),
             QPointF(center_x, canopy_y), 70, colors.canopy, colors.outline);
-        canopy.visual_size_px = QSizeF(deck_size.width() + 30.0,
-                                       (deck_size.width() + 30.0) * 0.47);
+        const qreal canopy_width = std::min(deck_size.width() + 30.0, max_visual_width);
+        canopy.visual_size_px = QSizeF(canopy_width, canopy_width * 0.47);
         asset.nodes.push_back(canopy);
 
         if (spec.rosettes_enabled && spec.rosette_count > 0) {
