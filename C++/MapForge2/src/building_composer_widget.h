@@ -16,6 +16,7 @@ namespace ch::studio {
 class BuildingComposerWidget final : public QWidget {
 public:
     explicit BuildingComposerWidget(QWidget* parent = nullptr);
+    void openAssetBrowser();
 
 private:
     void refreshSpecFromControls();
@@ -27,7 +28,6 @@ private:
     void applyBuildingTypologyPreset(int index);
     void applyDetailPreset(int index);
     void applySpecToControls(const BuildingComposerSpec& spec);
-    void openAssetBrowser();
     void exportAsset();
 
     BuildingComposerSpec spec_;
