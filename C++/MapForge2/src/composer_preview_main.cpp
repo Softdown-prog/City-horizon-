@@ -1,3 +1,4 @@
+#include "building_block_preview_renderer.h"
 #include "building_composer.h"
 #include "building_facade_renderer.h"
 #include "building_roof_editor_renderer.h"
@@ -140,6 +141,13 @@ int main(int argc, char** argv) {
         {Kind::Window, Edge::East, 2, 0.70F, 0.18F, true}
     };
     if (!writeAsset(output_dir, "building_composer_facade_floor_gate", facade_gate)) return 7;
+
+    const QString block_gate_path = QDir(output_dir).filePath(QStringLiteral("building_composer_small_block_gate.png"));
+    if (!ch::studio::BuildingBlockPreviewRenderer::render(facade_gate, QSize(960, 560), 401).save(block_gate_path, "PNG")) {
+        std::cerr << "Unable to save small block preview gate.\n";
+        return 8;
+    }
+    std::cout << block_gate_path.toStdString() << "\n";
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
