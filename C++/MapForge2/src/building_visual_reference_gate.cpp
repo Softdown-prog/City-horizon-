@@ -235,10 +235,14 @@ QImage BuildingVisualReferenceGate::renderBlockBoard(const QSize canvas) {
 
 QJsonObject BuildingVisualReferenceGate::manifest() {
     const BuildingComposerSpec spec = referenceSpec();
+    const BuildingLodValidation lod_validation = BuildingLodValidator::validate(spec);
     return QJsonObject{
         {"version", "classic_visual_reference_gate_1"},
         {"referenceBuildingId", "classic_tycoon_reference_house_1"},
         {"deterministic", true},
+        {"automatedGatePass", lod_validation.valid},
+        {"automatedGateScope", QJsonArray{"building_lod_gate_1"}},
+        {"manualVisualReviewRequired", true},
         {"neighborhoodSeed", kNeighborhoodSeed},
         {"geometry", QJsonObject{
             {"footprintWidthTiles", spec.footprint_width_tiles},
