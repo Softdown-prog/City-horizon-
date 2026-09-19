@@ -1,0 +1,55 @@
+{
+  "id": "classic_three_tone_ramp_1",
+  "name": "City Horizon Classic Three-Tone Lighting Ramp",
+  "status": "official",
+  "target": "Building Composer production raster path",
+  "purpose": "Replace continuous wall-lighting gradients with discrete Classic Tycoon LIGHT / MID / SHADOW ramps while preserving local material structure and AO.",
+  "levels": {
+    "light": {
+      "baseScale": 1.075,
+      "warmTint": "#f7e7c9",
+      "warmTintMix": 0.06
+    },
+    "mid": {
+      "baseScale": 0.965,
+      "tintMix": 0.0
+    },
+    "shadow": {
+      "baseScale": 0.735,
+      "coolTint": "#64758a",
+      "coolTintMix": 0.095
+    }
+  },
+  "wallWorldAssignment": {
+    "west": "light",
+    "north": "mid",
+    "south": "mid",
+    "east": "shadow",
+    "cameraIndependent": true,
+    "rotatesWithBuildingDefinition": true
+  },
+  "rules": {
+    "continuousGradientAsPrimaryWallLighting": false,
+    "screenPositionChoosesWallLighting": false,
+    "materialDetailsMayUseRampDerivedLocalHighlights": true,
+    "materialDetailsMayUseRampDerivedLocalShadows": true,
+    "ambientOcclusionRemainsLocalized": true,
+    "randomSaltAndPepperLighting": false,
+    "randomScratchNoise": false,
+    "directionalStructuredAccentsAllowed": true,
+    "productionWallFillMustResolveToOneOfThreeLevels": true
+  },
+  "renderer": {
+    "version": "classic_tycoon_renderer_3",
+    "materialRecipe": "structured_directional_materials_1",
+    "manifestField": "roofEditor.tonalLighting"
+  },
+  "visualIntent": [
+    "clear face separation at gameplay zoom",
+    "warm readable light face",
+    "stable neutral mid face",
+    "cooler stronger shadow face",
+    "no modern smooth wall-lighting wash",
+    "preserve classic illustrated Tycoon readability"
+  ]
+}
