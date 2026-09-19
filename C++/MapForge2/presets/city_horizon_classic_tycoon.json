@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_12",
+  "revision": "classic_tycoon_13",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -83,6 +83,22 @@
     "previewShowsOccupiedCells": true,
     "invalidMaskBlocksProductionExport": true,
     "runtimePlacementUsesOccupiedCells": true
+  },
+  "proceduralVariation": {
+    "version": "controlled_procedural_variation_1",
+    "contractFile": "procedural_variation_contract.json",
+    "enabledByDefault": false,
+    "defaultSeed": 101,
+    "defaultStrength": 0.35,
+    "deterministic": true,
+    "channels": ["palette", "materials", "roof", "facade_modules"],
+    "preservesFootprint": true,
+    "preservesFloorCount": true,
+    "preservesRoadSocket": true,
+    "preservesRequiredGroundAccess": true,
+    "typologyConstrained": true,
+    "sameSeedReproducesSameVariant": true,
+    "variantMustPassNormalExportValidation": true
   },
   "floorSystem": {
     "version": "floor_system_1",
@@ -185,13 +201,14 @@
     "sidewalkTouchesFootprint": true
   },
   "automaticExport": {
-    "version": "automatic_export_validation_3",
+    "version": "automatic_export_validation_4",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprintEnvelope": true,
     "automaticFrameIncludesFloorHeight": true,
     "automaticStemIncludesTypologyId": true,
     "automaticStemIncludesFootprintShape": true,
+    "automaticStemIncludesVariationSeedWhenApplied": true,
     "frameIncrementPx": 32,
     "minimumFrame": [320, 280],
     "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "thumbnail", "manifest_json", "validation_json"],
@@ -207,6 +224,7 @@
         "extreme_low_alpha_white_or_black_halo",
         "urban_integration_validation_2"
       ],
+      "proceduralVariantsUseSameGate": true,
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
@@ -276,5 +294,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Buildings may use rectangle, L, courtyard or annex logical footprints. Placement and collision use the exported occupied-cell mask, not the bounding envelope, and that mask rotates with the building. Road sockets must overlap an occupied cell on the selected edge; setbacks are recorded as lot reservations. Typology, floor, facade, roof, material, halo and urban-integration contracts remain fully editable and validated before production export."
+  "authoringRule": "Buildings may use rectangle, L, courtyard or annex logical footprints and may generate deterministic controlled siblings from a seed. Procedural variation may change only approved palette, material, roof and facade-module channels; footprint cells, setbacks, floors, sidewalk and road socket remain invariant. Every procedural sibling must pass the same footprint, halo and urban-integration gates as a manually authored building before production export."
 }
