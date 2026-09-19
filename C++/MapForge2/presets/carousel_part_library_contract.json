@@ -1,84 +1,60 @@
 {
-  "id": "carousel_parts_1",
+  "id": "carousel_parts_2",
   "name": "City Horizon Classic Carousel Part Library",
   "status": "canonical",
-  "purpose": "Reusable deterministic visual parts for coherent multi-frame carousel animation in the City Horizon Classic Tycoon style.",
+  "purpose": "Reusable deterministic visual parts for coherent multi-frame carousel animation in the City Horizon Classic Tycoon style, including directional horse presentations.",
   "visualSourceKind": "library_part",
   "namespace": "carousel.*",
   "style": "city_horizon_classic_tycoon",
   "projection": "screen_space_sprite_parts_for_fixed_isometric_authoring",
   "parts": [
-    {
-      "id": "carousel.base.classic.v1",
-      "role": "static_base",
-      "defaultSizePx": [250, 78],
-      "defaultPivot": [0.50, 0.50]
-    },
-    {
-      "id": "carousel.platform.classic.v1",
-      "role": "rotating_platform",
-      "defaultSizePx": [224, 72],
-      "defaultPivot": [0.50, 0.50]
-    },
-    {
-      "id": "carousel.canopy.classic.v1",
-      "role": "static_canopy",
-      "defaultSizePx": [250, 118],
-      "defaultPivot": [0.50, 0.86]
-    },
-    {
-      "id": "carousel.center_pole.classic.v1",
-      "role": "static_center_pole",
-      "defaultSizePx": [24, 170],
-      "defaultPivot": [0.50, 0.50]
-    },
+    {"id": "carousel.base.classic.v1", "role": "static_base", "defaultSizePx": [250, 78], "defaultPivot": [0.50, 0.50], "variantCount": 1},
+    {"id": "carousel.platform.classic.v1", "role": "rotating_platform", "defaultSizePx": [224, 72], "defaultPivot": [0.50, 0.50], "variantCount": 1},
+    {"id": "carousel.canopy.classic.v1", "role": "static_canopy", "defaultSizePx": [250, 118], "defaultPivot": [0.50, 0.86], "variantCount": 1},
+    {"id": "carousel.center_pole.classic.v1", "role": "static_center_pole", "defaultSizePx": [24, 170], "defaultPivot": [0.50, 0.50], "variantCount": 1},
     {
       "id": "carousel.horse.classic.v1",
       "role": "rider_mount",
       "defaultSizePx": [62, 70],
-      "defaultPivot": [0.50, 0.78]
+      "defaultPivot": [0.50, 0.78],
+      "variantCount": 4,
+      "variants": {"0": "east", "1": "south", "2": "west", "3": "north"}
     },
-    {
-      "id": "carousel.ornament.finial.v1",
-      "role": "canopy_finial",
-      "defaultSizePx": [34, 46],
-      "defaultPivot": [0.50, 0.90]
-    },
-    {
-      "id": "carousel.ornament.rosette.v1",
-      "role": "decorative_rosette",
-      "defaultSizePx": [30, 30],
-      "defaultPivot": [0.50, 0.50]
-    }
+    {"id": "carousel.ornament.finial.v1", "role": "canopy_finial", "defaultSizePx": [34, 46], "defaultPivot": [0.50, 0.90], "variantCount": 1},
+    {"id": "carousel.ornament.rosette.v1", "role": "decorative_rosette", "defaultSizePx": [30, 30], "defaultPivot": [0.50, 0.50], "variantCount": 1}
   ],
   "rendering": {
     "deterministic": true,
     "transparentRgba": true,
     "antialiased": true,
     "stableGeometryPerPartId": true,
+    "directionalVariantsSharePersistentPartId": true,
     "nodePrimaryColorMayVary": true,
     "nodeOutlineColorMayVary": true,
     "frameIndependentRandomGeneration": false,
     "primitiveQaFallback": false
   },
   "animationIntegration": {
-    "animationCore": "animation_core_4",
-    "visualSources": "animation_visual_sources_2",
-    "hierarchy": "animation_node_hierarchy_1",
+    "animationCore": "animation_core_5",
+    "visualSources": "animation_visual_sources_3",
+    "hierarchy": "animation_node_hierarchy_2",
     "platformOwnsHorseChildren": true,
     "horsesMayUseIndependentVerticalTracks": true,
+    "horsesSupportDirectionalVariantTrack": true,
+    "horsesSupportCounterRotationTrack": true,
     "canopyMayOwnStaticOrnaments": true,
     "stablePartIdsRecordedInManifest": true,
     "bakedFramesRemainRuntimePayload": true
   },
   "qaReference": {
-    "assetId": "carousel_classic_reference",
-    "frameCount": 12,
-    "durationSeconds": 2.0,
+    "assetId": "carousel_composer_reference",
+    "frameCount": 16,
+    "durationSeconds": 2.4,
     "loop": true,
     "usesOnlyCarouselLibraryParts": true,
+    "directionalHorseVariants": true,
     "borrowedPedestrianRaster": false,
     "borrowedBuildingRender": false
   },
-  "authoringRule": "Carousel frames must reuse the same persistent library parts across the entire clip. A color variant may change the authored node palette, but geometry, pivot identity and library part ID remain stable unless the asset author explicitly selects another registered part variant."
+  "authoringRule": "Carousel frames reuse the same persistent library parts across the entire clip. Directional horse views are presentation variants of carousel.horse.classic.v1, not replacement nodes, so ID, pivot, palette identity and hierarchy remain stable while visualVariant changes deterministically."
 }
