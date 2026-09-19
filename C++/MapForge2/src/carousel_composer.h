@@ -31,6 +31,9 @@ struct CarouselComposerSpec {
     int frame_count = 16;
     bool clockwise = true;
 
+    bool dynamic_depth_ordering = true;
+    bool directional_horses = true;
+
     bool canopy_enabled = true;
     bool rosettes_enabled = true;
     bool finial_enabled = true;
@@ -53,7 +56,7 @@ struct CarouselPalette {
 
 class CarouselComposer final {
 public:
-    static constexpr const char* kVersion = "carousel_composer_1";
+    static constexpr const char* kVersion = "carousel_composer_2";
 
     static QString paletteId(CarouselPaletteProfile palette);
     static CarouselPalette palette(CarouselPaletteProfile profile);
