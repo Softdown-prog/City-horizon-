@@ -156,7 +156,7 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     bsdf.inputs["Base Color"].default_value = tuple(rgba)
     bsdf.inputs["Roughness"].default_value = roughness
-    bsdf.inputs["Metallic"].default_value = metallic
+    bsdf.inputs["Metallic"].default_value = 0.0
     return mat
 
 
@@ -172,7 +172,7 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     output.location = (760, 0)
     bsdf = tree.nodes.new("ShaderNodeBsdfPrincipled")
     bsdf.location = (500, 0)
-    bsdf.inputs["Roughness"].default_value = max(0.12, min(0.24, roughness))
+    bsdf.inputs["Roughness"].default_value = 0.38
     bsdf.inputs["Metallic"].default_value = metallic
     if "IOR" in bsdf.inputs:
         bsdf.inputs["IOR"].default_value = 1.333
@@ -195,9 +195,9 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     gradient = tree.nodes.new("ShaderNodeValToRGB")
     gradient.location = (-100, 260)
     gradient.color_ramp.elements[0].position = 0.18
-    gradient.color_ramp.elements[0].color = (0.051, 0.263, 0.341, 1.0)
+    gradient.color_ramp.elements[0].color = (0.039, 0.227, 0.290, 1.0)
     gradient.color_ramp.elements[1].position = 0.82
-    gradient.color_ramp.elements[1].color = (0.122, 0.455, 0.520, 1.0)
+    gradient.color_ramp.elements[1].color = (0.043, 0.188, 0.251, 1.0)
 
     voronoi = tree.nodes.new("ShaderNodeTexVoronoi")
     voronoi.location = (-500, -120)
@@ -220,15 +220,15 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     caustics = tree.nodes.new("ShaderNodeValToRGB")
     caustics.location = (-120, -100)
     caustics.color_ramp.elements[0].position = 0.12
-    caustics.color_ramp.elements[0].color = (0.220, 0.698, 0.722, 1.0)
+    caustics.color_ramp.elements[0].color = (0.114, 0.604, 0.659, 1.0)
     caustics.color_ramp.elements[1].position = 0.42
-    caustics.color_ramp.elements[1].color = (0.051, 0.263, 0.341, 1.0)
+    caustics.color_ramp.elements[1].color = (0.039, 0.227, 0.290, 1.0)
     caustics.color_ramp.interpolation = "EASE"
 
     screen = tree.nodes.new("ShaderNodeMixRGB")
     screen.location = (180, 180)
     screen.blend_type = "SCREEN"
-    screen.inputs["Fac"].default_value = 0.26
+    screen.inputs["Fac"].default_value = 0.22
     bump = tree.nodes.new("ShaderNodeBump")
     bump.location = (260, -160)
     bump.inputs["Strength"].default_value = 0.01
@@ -244,7 +244,6 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     tree.links.new(caustics.outputs["Color"], screen.inputs["Color2"])
     tree.links.new(screen.outputs["Color"], bsdf.inputs["Base Color"])
     tree.links.new(caustics.outputs["Color"], bump.inputs["Height"])
-    tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
     return mat
 
