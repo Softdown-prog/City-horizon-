@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_13",
+  "revision": "classic_tycoon_14",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -200,8 +200,30 @@
     "footprintMaskOverlay": "uses_flexible_footprint_1",
     "sidewalkTouchesFootprint": true
   },
+  "smallBlockPreview": {
+    "version": "small_block_preview_1",
+    "contractFile": "small_block_preview_contract.json",
+    "previewOnly": true,
+    "exportedIntoBuildingSprite": false,
+    "focusBuildingCount": 1,
+    "deterministicNeighbourCount": 5,
+    "defaultNeighborhoodSeed": 401,
+    "includesRoads": true,
+    "includesSidewalks": true,
+    "includesTrees": true,
+    "includesIntersection": true,
+    "focusLotHighlighted": true,
+    "reviewPurpose": [
+      "gameplay_scale_readability",
+      "visual_repetition",
+      "silhouette_against_neighbours",
+      "street_grounding",
+      "density_and_prop_scale"
+    ],
+    "automaticExportQaFile": "*_block_preview.png"
+  },
   "automaticExport": {
-    "version": "automatic_export_validation_4",
+    "version": "automatic_export_validation_5",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprintEnvelope": true,
@@ -211,7 +233,7 @@
     "automaticStemIncludesVariationSeedWhenApplied": true,
     "frameIncrementPx": 32,
     "minimumFrame": [320, 280],
-    "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "thumbnail", "manifest_json", "validation_json"],
+    "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "small_block_qa_preview", "thumbnail", "manifest_json", "validation_json"],
     "validationGate": {
       "blocksInvalidProductionExport": true,
       "checks": [
@@ -228,8 +250,9 @@
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
+    "smallBlockQaPreviewGeneratedAfterValidation": true,
     "transparentBuildingOnly": true,
-    "environmentContextExported": false
+    "environmentContextExportedIntoProductionSprite": false
   },
   "lighting": {
     "wallShadowFaceFactor": 0.84,
@@ -294,5 +317,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Buildings may use rectangle, L, courtyard or annex logical footprints and may generate deterministic controlled siblings from a seed. Procedural variation may change only approved palette, material, roof and facade-module channels; footprint cells, setbacks, floors, sidewalk and road socket remain invariant. Every procedural sibling must pass the same footprint, halo and urban-integration gates as a manually authored building before production export."
+  "authoringRule": "Buildings may use flexible footprints and deterministic controlled siblings. Every accepted building is now reviewed both in isolated four-view form and through small_block_preview_1: one focus lot plus five deterministic neighbours, roads, sidewalks, trees and an intersection using CH_GRID_V1. The block image is QA-only and never contaminates transparent production sprites. Footprint, halo and urban-integration gates remain mandatory before production export."
 }
