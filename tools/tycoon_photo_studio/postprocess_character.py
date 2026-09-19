@@ -262,11 +262,15 @@ def main():
 
     manifest = {
         "contract": "TYCOON_CHARACTER_SEQUENCE_V1",
-        "status": "golden_sequence_candidate",
+        "status": metadata.get("assetStatus", "production_candidate"),
         "humanApprovalRequired": True,
         "assetId": asset_id,
         "assetType": metadata.get("assetType", "visitor_npc"),
         "sourceContract": metadata.get("sourceContract"),
+        "runtime": metadata.get("runtime", {
+            "contract": "CH_ACTOR_RUNTIME_V1",
+            "anchorPolicy": "shared_projected_world_origin",
+        }),
         "assetConfig": metadata.get("assetConfig"),
         "studioPreset": metadata.get("studioPreset"),
         "cameraContract": metadata.get("cameraContract", "CH_CAMERA_V1"),

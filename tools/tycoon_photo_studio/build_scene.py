@@ -643,6 +643,28 @@ def render_color_pass(scene, authored, ground, path):
     bpy.ops.render.render(write_still=True)
 
 
+def _shadow_render_overrides():
+    """Return optional CI-only shadow quality overrides without changing the frozen studio."""
+    samples_raw = os.environ.get("CH_TYCOON_SHADOW_SAMPLES", "").strip()
+    denoising_raw = os.environ.get("CH_TYCOON_SHADOW_DENOISING", "").strip().lower()
+
+    samples = None
+    if samples_raw:
+        samples = int(samples_raw)
+        if samples < 1:
+            raise RuntimeError("CH_TYCOON_SHADOW_SAMPLES must be >= 1")
+
+    denoising = None
+    if denoising_raw:
+        if denoising_raw not in {"0", "1", "false", "true", "no", "yes"}:
+            raise RuntimeError(
+                "CH_TYCOON_SHADOW_DENOISING must be one of 0/1/false/true/no/yes"
+            )
+        denoising = denoising_raw in {"1", "true", "yes"}
+
+    return samples, denoising
+
+
 def render_shadow_pass(scene, authored, ground, path):
     ground.hide_render = False
     if hasattr(ground, "is_shadow_catcher"):
@@ -653,8 +675,22 @@ def render_shadow_pass(scene, authored, ground, path):
             obj.visible_camera = False
         if hasattr(obj, "visible_shadow"):
             obj.visible_shadow = True
-    scene.render.filepath = path
-    bpy.ops.render.render(write_still=True)
+
+    original_samples = scene.cycles.samples
+    original_denoising = scene.cycles.use_denoising
+    shadow_samples, shadow_denoising = _shadow_render_overrides()
+    if shadow_samples is not None:
+        scene.cycles.samples = shadow_samples
+    if shadow_denoising is not None:
+        scene.cycles.use_denoising = shadow_denoising
+
+    try:
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+    finally:
+        # The next color pass must always return to the frozen studio quality.
+        scene.cycles.samples = original_samples
+        scene.cycles.use_denoising = original_denoising
 
 
 # ---------------------------------------------------------------------------

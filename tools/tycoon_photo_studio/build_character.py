@@ -127,19 +127,19 @@ def build_character(asset):
         p["torsoDimensions"], materials["shirt"], 0.085,
     )
 
-    # Thin dark bands reference the supplied red/navy visitor without copying a raster frame.
     torso_depth = float(p["torsoDimensions"][1])
     torso_width = float(p["torsoDimensions"][0])
-    for index, z in enumerate((1.38, 1.48)):
+    stripe_z = p.get("shirtStripeZ", [1.38, 1.48])
+    for index, z in enumerate(stripe_z):
         add_box_child(
             authored, pose_root, f"ShirtStripe{index}",
-            (0.0, -torso_depth * 0.505, z),
+            (0.0, -torso_depth * 0.505, float(z)),
             (torso_width * 0.93, 0.018, 0.035), materials["shirtStripe"], 0.005,
         )
 
     add_cylinder_child(
-        authored, pose_root, "Neck", (0.0, 0.0, 1.66),
-        0.075, 0.14, materials["skin"], 12,
+        authored, pose_root, "Neck", p.get("neckCenter", [0.0, 0.0, 1.66]),
+        float(p.get("neckRadius", 0.075)), float(p.get("neckDepth", 0.14)), materials["skin"], 12,
     )
     add_sphere_child(
         authored, pose_root, "Head", p["headCenter"], p["headScale"], materials["skin"], 24, 14,
@@ -147,28 +147,27 @@ def build_character(asset):
     add_sphere_child(
         authored, pose_root, "Hair", p["hairCenter"], p["hairScale"], materials["hair"], 20, 10,
     )
-    # Nose and ears create directional readability at gameplay scale.
     add_sphere_child(
-        authored, pose_root, "Nose", (0.0, -0.166, 1.815),
-        (0.035, 0.048, 0.040), materials["skin"], 12, 8,
+        authored, pose_root, "Nose", p.get("noseCenter", [0.0, -0.166, 1.815]),
+        p.get("noseScale", [0.035, 0.048, 0.040]), materials["skin"], 12, 8,
     )
     add_sphere_child(
-        authored, pose_root, "EarL", (-0.151, -0.005, 1.81),
-        (0.028, 0.020, 0.042), materials["skin"], 10, 6,
+        authored, pose_root, "EarL", p.get("earLCenter", [-0.151, -0.005, 1.81]),
+        p.get("earScale", [0.028, 0.020, 0.042]), materials["skin"], 10, 6,
     )
     add_sphere_child(
-        authored, pose_root, "EarR", (0.151, -0.005, 1.81),
-        (0.028, 0.020, 0.042), materials["skin"], 10, 6,
+        authored, pose_root, "EarR", p.get("earRCenter", [0.151, -0.005, 1.81]),
+        p.get("earScale", [0.028, 0.020, 0.042]), materials["skin"], 10, 6,
     )
 
-    # Small daypack gives back/front views a clear, stable difference.
     add_box_child(
-        authored, pose_root, "Daypack", (0.0, 0.205, 1.36),
-        (0.34, 0.16, 0.43), materials["backpack"], 0.075,
+        authored, pose_root, "Daypack", p.get("daypackCenter", [0.0, 0.205, 1.36]),
+        p.get("daypackDimensions", [0.34, 0.16, 0.43]), materials["backpack"],
+        float(p.get("daypackBevel", 0.075)),
     )
     add_box_child(
-        authored, pose_root, "PackTop", (0.0, 0.205, 1.57),
-        (0.26, 0.14, 0.08), materials["backpack"], 0.035,
+        authored, pose_root, "PackTop", p.get("packTopCenter", [0.0, 0.205, 1.57]),
+        p.get("packTopDimensions", [0.26, 0.14, 0.08]), materials["backpack"], 0.035,
     )
 
     rig = {
@@ -181,6 +180,9 @@ def build_character(asset):
     leg_radius = float(p["legRadius"])
     hip_x = float(p["hipX"])
     hip_z = float(p["hipZ"])
+    shoe_dimensions = p.get("shoeDimensions", [0.22, 0.34, 0.11])
+    sole_dimensions = p.get("soleDimensions", [0.225, 0.35, 0.025])
+    shoe_y = float(p.get("shoeForwardY", -0.070))
 
     for side, x in (("L", -hip_x), ("R", hip_x)):
         hip = add_empty(f"Hip{side}", pose_root, (x, 0.0, hip_z))
@@ -195,13 +197,13 @@ def build_character(asset):
         )
         add_box_child(
             authored, knee, f"Shoe{side}",
-            (0.0, -0.070, -lower_leg - 0.010),
-            (0.22, 0.34, 0.11), materials["shoe"], 0.035,
+            (0.0, shoe_y, -lower_leg - 0.010),
+            shoe_dimensions, materials["shoe"], 0.035,
         )
         add_box_child(
             authored, knee, f"Sole{side}",
-            (0.0, -0.070, -lower_leg - 0.066),
-            (0.225, 0.35, 0.025), materials["sole"], 0.010,
+            (0.0, shoe_y, -lower_leg - 0.066),
+            sole_dimensions, materials["sole"], 0.010,
         )
         rig[f"hip{side}"] = hip
         rig[f"knee{side}"] = knee
@@ -211,6 +213,7 @@ def build_character(asset):
     arm_radius = float(p["armRadius"])
     shoulder_x = float(p["shoulderX"])
     shoulder_z = float(p["shoulderZ"])
+    hand_scale = p.get("handScale", [0.073, 0.066, 0.090])
 
     for side, x in (("L", -shoulder_x), ("R", shoulder_x)):
         shoulder = add_empty(f"Shoulder{side}", pose_root, (x, 0.0, shoulder_z))
@@ -225,7 +228,7 @@ def build_character(asset):
         )
         add_sphere_child(
             authored, elbow, f"Hand{side}", (0.0, 0.0, -forearm - 0.035),
-            (0.073, 0.066, 0.090), materials["skin"], 12, 8,
+            hand_scale, materials["skin"], 12, 8,
         )
         rig[f"shoulder{side}"] = shoulder
         rig[f"elbow{side}"] = elbow
@@ -337,7 +340,12 @@ def main():
         "contract": "TYCOON_CHARACTER_BAKE_V1",
         "sourceContract": asset["contract"],
         "sourceObject": asset_id,
+        "assetStatus": asset.get("status", "production_candidate"),
         "assetType": asset.get("assetType", "visitor_npc"),
+        "runtime": asset.get("runtime", {
+            "contract": "CH_ACTOR_RUNTIME_V1",
+            "anchorPolicy": "shared_projected_world_origin",
+        }),
         "footprint": asset["footprint"],
         "assetConfig": os.path.basename(args.asset_config),
         "studioPreset": studio["id"],

@@ -1,0 +1,57 @@
+{
+  "contract": "TYCOON_FRACTAL_TREE_SOURCE_V1",
+  "assetId": "park_tree_broadleaf_01",
+  "assetType": "static_decor",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
+  "materials": {
+    "trunk": {"name": "TreeBarkWarm", "rgba": [0.19, 0.082, 0.030, 1.0], "roughness": 1.0},
+    "branch": {"name": "TreeBranchWarm", "rgba": [0.15, 0.058, 0.020, 1.0], "roughness": 1.0},
+    "leafDeep": {"name": "LeafDeep", "rgba": [0.035, 0.145, 0.032, 1.0], "roughness": 1.0},
+    "leafDark": {"name": "LeafDark", "rgba": [0.055, 0.215, 0.045, 1.0], "roughness": 1.0},
+    "leafMid": {"name": "LeafMid", "rgba": [0.105, 0.325, 0.075, 1.0], "roughness": 1.0},
+    "leafLight": {"name": "LeafLight", "rgba": [0.20, 0.46, 0.115, 1.0], "roughness": 1.0},
+    "leafSun": {"name": "LeafSun", "rgba": [0.31, 0.56, 0.16, 1.0], "roughness": 1.0}
+  },
+  "trunk": {
+    "material": "trunk",
+    "height": 1.92,
+    "baseRadius": 0.30,
+    "topRadius": 0.145,
+    "vertices": 12,
+    "rootCount": 5,
+    "rootLength": 0.36,
+    "rootRadius": 0.105,
+    "rootSeed": 919
+  },
+  "fractalTree": {
+    "name": "CrownSkeleton",
+    "material": "branch",
+    "seed": 1709,
+    "origin": [0.0, 0.0, 1.70],
+    "levels": 4,
+    "primaryBranches": 4,
+    "branchFactor": 2,
+    "baseLength": 0.66,
+    "lengthDecay": 0.68,
+    "baseRadius": 0.078,
+    "radiusDecay": 0.67,
+    "initialElevationDegrees": 47.0,
+    "elevationGainDegrees": 8.0,
+    "baseYawDegrees": -16.0,
+    "yawSpreadDegrees": 48.0,
+    "yawJitterDegrees": 11.0,
+    "elevationJitterDegrees": 6.0
+  },
+  "leafCards": {
+    "seed": 2718,
+    "count": 620,
+    "materials": ["leafDeep", "leafDark", "leafMid", "leafLight", "leafSun"],
+    "widthRange": [0.105, 0.175],
+    "heightRange": [0.17, 0.27],
+    "clusterRadius": [0.34, 0.34, 0.26],
+    "interiorFraction": 0.22,
+    "crownCenter": [0.0, 0.0, 3.00],
+    "crownRadius": [1.08, 1.00, 0.84]
+  }
+}

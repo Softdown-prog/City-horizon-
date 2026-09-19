@@ -3,237 +3,76 @@ name: Tycoon Asset Baker V1
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
+      - "tools/blender_bake_runner.py"
       - "tools/tycoon_photo_studio/**"
+      - "tools/asset_catalog_ingest.py"
+      - "C++/MapForge2/presets/tycoon_asset_bake_contract.json"
       - ".github/workflows/tycoon-photo-studio-poc.yml"
 
 permissions:
   contents: read
 
 jobs:
-  bake-golden-kiosk:
+  bake:
+    name: Bake ${{ matrix.asset_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      ASSET_CONFIG: tools/tycoon_photo_studio/assets/park_kiosk_1x1.json
-      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
-      GOLDEN_FINGERPRINT: tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset_id: park_kiosk_1x1
+            asset_config: tools/tycoon_photo_studio/assets/park_kiosk_1x1.json
+            golden: tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json
+          - asset_id: neighborhood_cafe_2x1
+            asset_config: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
+            golden: ""
+          - asset_id: park_tree_broadleaf_01
+            asset_config: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json
+            golden: ""
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install post-processing and headless rendering dependencies
+      - name: Install dependencies
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade pillow
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
-
-      - name: Download pinned Blender portable build
+      - name: Download pinned Blender
         shell: bash
         run: |
           set -euo pipefail
           version="4.2.3"
           archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
-          destination="$RUNNER_TEMP/blender"
-          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
-          echo "Downloading Blender $version from $url"
-          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
-          mkdir -p "$destination"
-          tar -xf "$archive" -C "$destination"
-          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
-          if [[ -z "$blender_exe" ]]; then
-            echo "blender executable was not found after extraction" >&2
-            exit 1
-          fi
-          chmod +x "$blender_exe"
-          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
-
-      - name: Bake golden asset from generic source config
+          curl --fail --location --retry 3 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xf "$archive" -C "$RUNNER_TEMP/blender"
+          echo "BLENDER_EXE=$(find "$RUNNER_TEMP/blender" -type f -name blender | head -n 1)" >> "$GITHUB_ENV"
+      - name: Run canonical asset baker
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p out/tycoon_asset_baker/source
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
-            --python tools/tycoon_photo_studio/build_scene.py -- \
-            --asset-config "$ASSET_CONFIG" \
-            --studio-preset "$STUDIO_PRESET" \
-            --output "$PWD/out/tycoon_asset_baker/source"
-
-          for direction in south east west north; do
-            test -f "out/tycoon_asset_baker/source/park_kiosk_1x1_${direction}_color_source.png"
-            test -f "out/tycoon_asset_baker/source/park_kiosk_1x1_${direction}_shadow_source.png"
-          done
-          test -f out/tycoon_asset_baker/source/studio_metadata.json
-
-      - name: Build four-direction game asset package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p out/tycoon_asset_baker/final
-          python tools/tycoon_photo_studio/postprocess.py \
-            --input out/tycoon_asset_baker/source \
-            --output out/tycoon_asset_baker/final \
-            --studio-preset "$STUDIO_PRESET"
-
-          required=(
-            park_kiosk_1x1_south.png
-            park_kiosk_1x1_east.png
-            park_kiosk_1x1_west.png
-            park_kiosk_1x1_north.png
-            park_kiosk_1x1_4view.png
-            park_kiosk_1x1_atlas.png
-            park_kiosk_1x1_review.png
-            park_kiosk_1x1_style_matrix.png
-            park_kiosk_1x1_4dir_context.png
-            park_kiosk_1x1_manifest.json
+          args=(
+            --contract C++/MapForge2/presets/tycoon_asset_bake_contract.json
+            --asset-config "${{ matrix.asset_config }}"
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+            --blender "$BLENDER_EXE"
+            --output-dir "out/tycoon_asset_baker/${{ matrix.asset_id }}"
+            --xvfb
           )
-          for file in "${required[@]}"; do
-            test -f "out/tycoon_asset_baker/final/$file"
-          done
-
-      - name: Validate contracts, pivot and golden visual regression
-        shell: bash
-        run: |
-          set -euo pipefail
-          python tools/tycoon_photo_studio/validate_package.py \
-            --manifest out/tycoon_asset_baker/final/park_kiosk_1x1_manifest.json \
-            --asset-config "$ASSET_CONFIG" \
-            --studio-preset "$STUDIO_PRESET" \
-            --golden-fingerprint "$GOLDEN_FINGERPRINT" \
-            --golden-mean-abs-tolerance 6.0
-
-      - name: Upload baker artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Tycoon-Asset-Baker-V1-Golden-Kiosk
-          path: out/tycoon_asset_baker
-          if-no-files-found: error
-          retention-days: 14
-
-  bake-cafeteria-consistency:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      ASSET_CONFIG: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
-      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
-      ASSET_ID: neighborhood_cafe_2x1
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install post-processing and headless rendering dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pillow
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
-
-      - name: Download pinned Blender portable build
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="4.2.3"
-          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
-          destination="$RUNNER_TEMP/blender"
-          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
-          echo "Downloading Blender $version from $url"
-          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
-          mkdir -p "$destination"
-          tar -xf "$archive" -C "$destination"
-          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
-          if [[ -z "$blender_exe" ]]; then
-            echo "blender executable was not found after extraction" >&2
-            exit 1
+          if [[ -n "${{ matrix.golden }}" ]]; then
+            args+=(--golden-fingerprint "${{ matrix.golden }}" --golden-mean-abs-tolerance 6.0)
           fi
-          chmod +x "$blender_exe"
-          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
-
-      - name: Bake cafeteria through frozen studio
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p out/tycoon_cafeteria/source
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
-            --python tools/tycoon_photo_studio/build_scene.py -- \
-            --asset-config "$ASSET_CONFIG" \
-            --studio-preset "$STUDIO_PRESET" \
-            --output "$PWD/out/tycoon_cafeteria/source"
-
-          for direction in south east west north; do
-            test -f "out/tycoon_cafeteria/source/${ASSET_ID}_${direction}_color_source.png"
-            test -f "out/tycoon_cafeteria/source/${ASSET_ID}_${direction}_shadow_source.png"
-          done
-          test -f out/tycoon_cafeteria/source/studio_metadata.json
-
-      - name: Build cafeteria four-direction package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p out/tycoon_cafeteria/final
-          python tools/tycoon_photo_studio/postprocess.py \
-            --input out/tycoon_cafeteria/source \
-            --output out/tycoon_cafeteria/final \
-            --studio-preset "$STUDIO_PRESET"
-
-          required=(
-            ${ASSET_ID}_south.png
-            ${ASSET_ID}_east.png
-            ${ASSET_ID}_west.png
-            ${ASSET_ID}_north.png
-            ${ASSET_ID}_4view.png
-            ${ASSET_ID}_atlas.png
-            ${ASSET_ID}_review.png
-            ${ASSET_ID}_style_matrix.png
-            ${ASSET_ID}_4dir_context.png
-            ${ASSET_ID}_manifest.json
-          )
-          for file in "${required[@]}"; do
-            test -f "out/tycoon_cafeteria/final/$file"
-          done
-
-      - name: Validate cafeteria contracts and four-view coherence
-        shell: bash
-        run: |
-          set -euo pipefail
-          python tools/tycoon_photo_studio/validate_package.py \
-            --manifest "out/tycoon_cafeteria/final/${ASSET_ID}_manifest.json" \
-            --asset-config "$ASSET_CONFIG" \
-            --studio-preset "$STUDIO_PRESET"
-
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          manifest = json.loads(Path('out/tycoon_cafeteria/final/neighborhood_cafe_2x1_manifest.json').read_text())
-          footprint = manifest['footprint']
-          assert footprint['widthTiles'] == 2
-          assert footprint['depthTiles'] == 1
-          assert footprint['occupiedCells'] == [[0, 0], [1, 0]]
-          assert manifest['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
-          print('cafeteriaConsistencyGate: PASS')
-          print('footprint:', footprint)
-          PY
-
-      - name: Upload cafeteria consistency artifact
-        uses: actions/upload-artifact@v4
+          LIBGL_ALWAYS_SOFTWARE=1 python tools/blender_bake_runner.py "${args[@]}"
+      - uses: actions/upload-artifact@v4
         with:
-          name: Tycoon-Asset-Baker-V1-Cafeteria-Consistency
-          path: out/tycoon_cafeteria
+          name: Tycoon-Asset-Baker-${{ matrix.asset_id }}
+          path: out/tycoon_asset_baker/${{ matrix.asset_id }}
           if-no-files-found: error
           retention-days: 14

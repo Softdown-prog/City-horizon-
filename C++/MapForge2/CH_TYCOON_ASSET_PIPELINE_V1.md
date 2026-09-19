@@ -1,90 +1,39 @@
 # City Horizon Tycoon Asset Baker V1
 
-Status: **golden static asset approved; studio recipe frozen as V1**
+Status: **production pipeline active; frozen studio V1**
 
-The City Horizon production path is now a deterministic asset baker rather than a one-off POC. One declarative asset source is rendered by Blender headless through one frozen studio preset and exported as four coherent 2D game rotations.
+City Horizon renders final game art offline in Blender and ships only 2D RGBA PNG packages to the SDL3 runtime. The fixed visual authority is `CH_CAMERA_V1`: orthographic, yaw 45°, elevation 30°, 2:1 dimetric tiles.
 
-## Canonical four-direction rule
+## Canonical invocation
 
-`CH_CAMERA_V1` and world lighting never rotate. The asset root rotates around world origin:
+```bash
+python tools/blender_bake_runner.py \
+  --contract C++/MapForge2/presets/tycoon_asset_bake_contract.json \
+  --asset-config tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json \
+  --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json \
+  --blender /path/to/blender \
+  --output-dir out/neighborhood_cafe_2x1
+```
 
-| Direction | Quarter turns | Asset Z rotation |
-| --- | ---: | ---: |
-| South | 0 | 0° |
-| East | 1 | 90° |
-| West | 3 | 270° |
-| North | 2 | 180° |
+The runner is the only orchestration entry point. It forwards the declarative source and frozen preset to Blender, runs post-process and validation, creates a road/sidewalk/terrain placement board for all four rotations, and writes `bake_run_report.json`.
 
-Output order remains `south, east, west, north`, matching the existing `BuildingExportPipeline` / `BuildingComposer` contract.
+Use the optional promotion bridge only after visual approval:
 
-## Frozen studio
+```bash
+  --promote-asset-dir assets/buildings \
+  --promote-pack-out assets/definitions/buildings/neighborhood_cafe_2x1_pack.json
+```
 
-`tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json` is the visual authority for this version. It owns camera, Cycles settings, lighting, shadow receiver, source/final resolution and post-processing values. New assets must reuse this preset unless a new studio version is explicitly reviewed and approved.
+Promotion uses `asset_catalog_ingest.py`; it copies the exact validated PNG package and writes a `CH_CONTENT_PACK_V1` record. It never invents anchors: the shared pivot is the projection of world origin.
 
-Current V1 recipe preserves the approved kiosk result:
+## Proven static assets
 
-- Blender 4.2.3 LTS;
-- Cycles CPU, 24 samples + denoising;
-- orthographic `CH_CAMERA_V1`, yaw 45°, elevation 30°, ortho scale 5.6;
-- 1024×1024 source render → 256×256 final frame;
-- fixed warm NW key + cool SE fill;
-- Cycles shadow catcher;
-- 128-color reduction;
-- Floyd-Steinberg dithering;
-- candidate post-process variant 03.
+Both `park_kiosk_1x1` and `neighborhood_cafe_2x1` are baked in CI through the unchanged studio. This proves cross-asset coherence; the old “second asset” next-gate is complete.
 
-## Generic asset source
+## Source vocabulary
 
-Assets are no longer hardcoded into `build_scene.py`. A source JSON uses `TYCOON_ASSET_SOURCE_V1` and declares:
+`TYCOON_ASSET_SOURCE_V1` supports boxes, pyramid roofs, UV spheres, cylinders, bevelled curves, Blender text and reusable `collection_instance` parts from a checked-in Blender library. This is enough for modular façades, signs, rails, vegetation, attractions and port details without changing camera, lighting or export rules.
 
-- `assetId` and `assetType`;
-- footprint / occupied cells;
-- requested studio preset;
-- materials;
-- source parts.
+## Character sequence standard
 
-The first source is `tools/tycoon_photo_studio/assets/park_kiosk_1x1.json`. The current declarative source supports boxes, pyramid roofs and UV spheres. The baker is intentionally structured so richer source modes can be added later without changing camera/export contracts.
-
-## Golden Asset #1
-
-`park_kiosk_1x1` is the approved Golden Asset #1. Its approved four-direction result is captured as a compact 16×16 RGBA perceptual fingerprint at:
-
-`tools/tycoon_photo_studio/golden/park_kiosk_1x1_golden.json`
-
-CI re-bakes the kiosk from the generic source config and compares all four final directions against that approved fingerprint with a small numeric tolerance. The fingerprint also records the original PNG SHA-256 values for diagnostics. This is a regression guard, not a replacement for human review of new assets.
-
-## Export package
-
-Each static asset emits:
-
-- `<asset>_south.png`
-- `<asset>_east.png`
-- `<asset>_west.png`
-- `<asset>_north.png`
-- `<asset>_4view.png`
-- `<asset>_atlas.png`
-- `<asset>_manifest.json`
-- `<asset>_review.png`
-- `<asset>_style_matrix.png`
-- `<asset>_4dir_context.png`
-
-The pivot is always the projection of world origin `(0,0,0)`, never the alpha bounds, so asymmetric assets remain planted on the same tile through rotation.
-
-## Reuse from MapForge2
-
-The baker keeps the useful foundation already built:
-
-- `CH_CAMERA_V1` and `CH_GRID_V1`;
-- four-view direction naming/order;
-- footprint and tile metadata;
-- pivot/anchor concepts;
-- PNG + JSON packaging;
-- atlas/spritesheet concepts;
-- Animation Core as the future `4 directions × N frames` extension;
-- Asset Browser and validation systems as future consumers/orchestrators.
-
-Blender is now the production pixel source. QPainter/procedural renderers remain useful for debug, composition and metadata, not as the final visual authority for this pipeline.
-
-## Next gate
-
-Do not mass-produce the library yet. The next validation is a second, visually different static asset using the same frozen studio. If it still reads as the same game, the baker has demonstrated cross-asset coherence rather than success on one kiosk only.
+Visitor sprites use one canonical 3D source and action: eight directions × eight frames, one projected-origin pivot and `TYCOON_CHARACTER_SEQUENCE_V1`. The sequence is promoted through `character_catalog_ingest.py` into a `CH_ACTOR_CONTENT_PACK_V1`. Human gameplay-scale approval remains mandatory before shipping any candidate.

@@ -36,7 +36,7 @@ from pathlib import Path
 # Constants
 # ---------------------------------------------------------------------------
 
-PIPELINE_STAGES = ("blender_bake", "postprocess", "validate")
+PIPELINE_STAGES = ("blender_bake", "postprocess", "validate", "runtime_placement_gate", "promote")
 REQUIRED_CONTRACT_FIELDS = (
     "id",
     "renderer",
@@ -48,7 +48,7 @@ REQUIRED_CONTRACT_FIELDS = (
     "outputs",
 )
 DIRECTION_ORDER = ("south", "east", "west", "north")
-RUNNER_VERSION = "1.0.0"
+RUNNER_VERSION = "1.1.0"
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +66,18 @@ def parse_args() -> argparse.Namespace:
         required=True,
         metavar="PATH",
         help="Path to the bake contract JSON (e.g. tycoon_asset_bake_contract.json)",
+    )
+    parser.add_argument(
+        "--asset-config",
+        required=True,
+        metavar="PATH",
+        help="Declarative TYCOON_ASSET_SOURCE_V1 JSON to bake.",
+    )
+    parser.add_argument(
+        "--studio-preset",
+        required=True,
+        metavar="PATH",
+        help="Frozen CH_TYCOON_STUDIO_V1 JSON used by every pipeline stage.",
     )
     parser.add_argument(
         "--scene",
@@ -105,6 +117,35 @@ def parse_args() -> argparse.Namespace:
             "Path to validate_package.py (default: tools/tycoon_photo_studio/validate_package.py "
             "relative to this script's parent directory)"
         ),
+    )
+    parser.add_argument(
+        "--golden-fingerprint",
+        default=None,
+        metavar="PATH",
+        help="Optional TYCOON_GOLDEN_FINGERPRINT_V1 used by the validation stage.",
+    )
+    parser.add_argument(
+        "--golden-mean-abs-tolerance",
+        type=float,
+        default=6.0,
+        help="Mean absolute-difference tolerance for --golden-fingerprint (default: 6.0).",
+    )
+    parser.add_argument(
+        "--promote-asset-dir",
+        default=None,
+        metavar="DIR",
+        help="Optional canonical asset directory, e.g. assets/buildings.",
+    )
+    parser.add_argument(
+        "--promote-pack-out",
+        default=None,
+        metavar="PATH",
+        help="Optional CH_CONTENT_PACK_V1 destination.",
+    )
+    parser.add_argument(
+        "--promote-force",
+        action="store_true",
+        help="Allow promotion to replace an existing asset package.",
     )
     parser.add_argument(
         "--dry-run",
@@ -219,6 +260,8 @@ def resolve_blender(blender_arg: str | None) -> str:
 def run_blender_bake(
     blender_exe: str,
     scene_script: Path,
+    asset_config: Path,
+    studio_preset: Path,
     output_source_dir: Path,
     xvfb: bool,
     extra_args: list[str],
@@ -238,6 +281,10 @@ def run_blender_bake(
         "--",
         "--output",
         str(output_source_dir),
+        "--asset-config",
+        str(asset_config),
+        "--studio-preset",
+        str(studio_preset),
     ]
     if extra_args:
         cmd += extra_args
@@ -291,6 +338,7 @@ def run_postprocess(
     postprocess_script: Path,
     source_dir: Path,
     final_dir: Path,
+    studio_preset: Path,
 ) -> dict:
     """Apply the canonical post-process pipeline to the Blender source renders."""
     final_dir.mkdir(parents=True, exist_ok=True)
@@ -302,6 +350,8 @@ def run_postprocess(
         str(source_dir),
         "--output",
         str(final_dir),
+        "--studio-preset",
+        str(studio_preset),
     ]
 
     print(f"\n[postprocess] Running: {' '.join(cmd)}")
@@ -317,7 +367,14 @@ def run_postprocess(
     }
 
 
-def run_validate(validate_script: Path, final_dir: Path) -> dict:
+def run_validate(
+    validate_script: Path,
+    final_dir: Path,
+    asset_config: Path,
+    studio_preset: Path,
+    golden_fingerprint: Path | None,
+    golden_tolerance: float,
+) -> dict:
     """Validate the completed package against the TYCOON_ASSET_BAKE_V1 contract."""
     # Find the manifest produced by postprocess
     manifests = list(final_dir.glob("*_manifest.json"))
@@ -339,7 +396,16 @@ def run_validate(validate_script: Path, final_dir: Path) -> dict:
         str(validate_script),
         "--manifest",
         str(manifest_path),
+        "--asset-config",
+        str(asset_config),
+        "--studio-preset",
+        str(studio_preset),
     ]
+    if golden_fingerprint:
+        cmd += [
+            "--golden-fingerprint", str(golden_fingerprint),
+            "--golden-mean-abs-tolerance", str(golden_tolerance),
+        ]
 
     print(f"\n[validate] Running: {' '.join(cmd)}")
     t0 = time.monotonic()
@@ -353,6 +419,39 @@ def run_validate(validate_script: Path, final_dir: Path) -> dict:
         "elapsed_s": round(elapsed, 2),
         "manifest": str(manifest_path),
     }
+
+
+def run_runtime_gate(gate_script: Path, final_dir: Path) -> dict:
+    """Render a deterministic road/sidewalk/terrain placement board from the final package."""
+    manifests = sorted(final_dir.glob("*_manifest.json"))
+    if len(manifests) != 1:
+        return {"stage": "runtime_placement_gate", "status": "failed",
+                "error": f"Expected exactly one asset manifest in {final_dir}, found {len(manifests)}"}
+    cmd = [sys.executable, str(gate_script), "--manifest", str(manifests[0]), "--output", str(final_dir)]
+    print(f"\n[runtime_placement_gate] Running: {' '.join(cmd)}")
+    t0 = time.monotonic()
+    result = subprocess.run(cmd, capture_output=False, text=True)
+    return {"stage": "runtime_placement_gate",
+            "status": "passed" if result.returncode == 0 else "failed",
+            "returncode": result.returncode, "elapsed_s": round(time.monotonic() - t0, 2)}
+
+
+def run_promotion(ingest_script: Path, final_dir: Path, asset_dir: Path, pack_out: Path, force: bool) -> dict:
+    """Promote an already validated bake through the canonical content-pack ingest."""
+    manifests = sorted(final_dir.glob("*_manifest.json"))
+    if len(manifests) != 1:
+        return {"stage": "promote", "status": "failed",
+                "error": f"Expected exactly one asset manifest in {final_dir}, found {len(manifests)}"}
+    cmd = [sys.executable, str(ingest_script), "--manifest", str(manifests[0]),
+           "--asset-dir", str(asset_dir), "--pack-out", str(pack_out)]
+    if force:
+        cmd.append("--force")
+    print(f"\n[promote] Running: {' '.join(cmd)}")
+    t0 = time.monotonic()
+    result = subprocess.run(cmd, capture_output=False, text=True)
+    return {"stage": "promote", "status": "passed" if result.returncode == 0 else "failed",
+            "returncode": result.returncode, "elapsed_s": round(time.monotonic()-t0, 2),
+            "asset_dir": str(asset_dir), "pack_out": str(pack_out)}
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +499,8 @@ def main() -> int:
         validate_script = _tools_dir(
             args.validate, "tycoon_photo_studio/validate_package.py"
         )
+        ingest_script = _tools_dir(None, "asset_catalog_ingest.py")
+        runtime_gate_script = _tools_dir(None, "tycoon_photo_studio/runtime_placement_gate.py")
     except FileNotFoundError as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
@@ -410,6 +511,19 @@ def main() -> int:
         contract = load_contract(contract_path)
     except (FileNotFoundError, ValueError) as exc:
         print(f"[ERROR] Contract validation failed: {exc}", file=sys.stderr)
+        return 1
+
+    asset_config = Path(args.asset_config).resolve()
+    studio_preset = Path(args.studio_preset).resolve()
+    golden_fingerprint = Path(args.golden_fingerprint).resolve() if args.golden_fingerprint else None
+    if not asset_config.is_file() or not studio_preset.is_file():
+        print("[ERROR] Asset config or studio preset does not exist.", file=sys.stderr)
+        return 1
+    if golden_fingerprint and not golden_fingerprint.is_file():
+        print(f"[ERROR] Golden fingerprint not found: {golden_fingerprint}", file=sys.stderr)
+        return 1
+    if bool(args.promote_asset_dir) != bool(args.promote_pack_out):
+        print("[ERROR] --promote-asset-dir and --promote-pack-out must be provided together.", file=sys.stderr)
         return 1
 
     renderer = contract["renderer"]
@@ -424,6 +538,8 @@ def main() -> int:
     if args.dry_run:
         print("\n[runner] --dry-run: all inputs validated — Blender NOT invoked.")
         print(f"         Scene    : {scene_script}")
+        print(f"         Asset    : {asset_config}")
+        print(f"         Studio   : {studio_preset}")
         print(f"         Post     : {postprocess_script}")
         print(f"         Validate : {validate_script}")
         print(f"         Output   : {output_dir}")
@@ -446,6 +562,8 @@ def main() -> int:
     bake_result = run_blender_bake(
         blender_exe=blender_exe,
         scene_script=scene_script,
+        asset_config=asset_config,
+        studio_preset=studio_preset,
         output_source_dir=source_dir,
         xvfb=args.xvfb,
         extra_args=args.blender_extra_args,
@@ -460,7 +578,7 @@ def main() -> int:
         return 1
 
     # ── Stage 2: Post-process ──────────────────────────────────────────────
-    pp_result = run_postprocess(postprocess_script, source_dir, final_dir)
+    pp_result = run_postprocess(postprocess_script, source_dir, final_dir, studio_preset)
     stage_results.append(pp_result)
     if pp_result["status"] != "passed":
         print(
@@ -472,7 +590,10 @@ def main() -> int:
 
     # ── Stage 3: Validate ─────────────────────────────────────────────────
     if not args.skip_validate:
-        val_result = run_validate(validate_script, final_dir)
+        val_result = run_validate(
+            validate_script, final_dir, asset_config, studio_preset,
+            golden_fingerprint, args.golden_mean_abs_tolerance
+        )
         stage_results.append(val_result)
         if val_result["status"] != "passed":
             print(
@@ -484,6 +605,27 @@ def main() -> int:
     else:
         stage_results.append({"stage": "validate", "status": "skipped"})
         print("\n[validate] Skipped (--skip-validate).")
+
+    # ── Stage 4: gameplay-scale placement review ──────────────────────────
+    if not args.skip_validate:
+        gate_result = run_runtime_gate(runtime_gate_script, final_dir)
+        stage_results.append(gate_result)
+        if gate_result["status"] != "passed":
+            print("\n[ERROR] Runtime placement gate failed.", file=sys.stderr)
+            write_report(output_dir, contract, stage_results)
+            return 1
+
+    # ── Optional canonical promotion ───────────────────────────────────────
+    if args.promote_asset_dir:
+        promotion_result = run_promotion(
+            ingest_script, final_dir, Path(args.promote_asset_dir).resolve(),
+            Path(args.promote_pack_out).resolve(), args.promote_force
+        )
+        stage_results.append(promotion_result)
+        if promotion_result["status"] != "passed":
+            print("\n[ERROR] Promotion failed.", file=sys.stderr)
+            write_report(output_dir, contract, stage_results)
+            return 1
 
     # ── Write report ──────────────────────────────────────────────────────
     report_path = write_report(output_dir, contract, stage_results)
