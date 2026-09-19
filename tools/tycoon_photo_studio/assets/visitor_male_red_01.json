@@ -1,0 +1,71 @@
+{
+  "contract": "TYCOON_CHARACTER_SOURCE_V1",
+  "assetId": "visitor_male_red_01",
+  "assetType": "visitor_npc",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "referenceRole": "generic_city_visitor",
+  "referenceNotes": "Single adult visitor derived from the supplied classic-Tycoon visual reference: red short-sleeve top, blue jeans, brown hair, dark daypack and neutral sneakers. One canonical 3D source drives every direction and walk frame.",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1,
+    "occupiedCells": [[0, 0]]
+  },
+  "directions": [
+    {"id": "n", "rotationDegrees": 180.0},
+    {"id": "ne", "rotationDegrees": 135.0},
+    {"id": "e", "rotationDegrees": 90.0},
+    {"id": "se", "rotationDegrees": 45.0},
+    {"id": "s", "rotationDegrees": 0.0},
+    {"id": "sw", "rotationDegrees": 315.0},
+    {"id": "w", "rotationDegrees": 270.0},
+    {"id": "nw", "rotationDegrees": 225.0}
+  ],
+  "animation": {
+    "id": "walk",
+    "frameCount": 8,
+    "frameDurationMs": 120,
+    "loop": true,
+    "strideDegrees": 23.0,
+    "armSwingDegrees": 18.0,
+    "kneeBendDegrees": 24.0,
+    "elbowBaseDegrees": 8.0,
+    "elbowBendDegrees": 9.0,
+    "verticalBob": 0.024,
+    "torsoSwayDegrees": 1.3
+  },
+  "materials": {
+    "skin": {"name": "VisitorSkin", "rgba": [0.59, 0.37, 0.25, 1.0], "roughness": 0.78},
+    "hair": {"name": "VisitorHair", "rgba": [0.12, 0.065, 0.035, 1.0], "roughness": 0.86},
+    "shirt": {"name": "BrickRedShirt", "rgba": [0.50, 0.075, 0.065, 1.0], "roughness": 0.82},
+    "shirtStripe": {"name": "NavyShirtStripe", "rgba": [0.045, 0.070, 0.105, 1.0], "roughness": 0.84},
+    "jeans": {"name": "DenimBlue", "rgba": [0.075, 0.19, 0.34, 1.0], "roughness": 0.88},
+    "shoe": {"name": "CharcoalSneaker", "rgba": [0.075, 0.080, 0.085, 1.0], "roughness": 0.83},
+    "sole": {"name": "SneakerSole", "rgba": [0.48, 0.47, 0.43, 1.0], "roughness": 0.90},
+    "backpack": {"name": "VisitorDaypack", "rgba": [0.045, 0.075, 0.12, 1.0], "roughness": 0.87}
+  },
+  "proportions": {
+    "pelvisCenterZ": 0.99,
+    "pelvisDimensions": [0.38, 0.30, 0.20],
+    "torsoCenterZ": 1.34,
+    "torsoDimensions": [0.56, 0.34, 0.62],
+    "headCenter": [0.0, -0.025, 1.81],
+    "headScale": [0.155, 0.145, 0.185],
+    "hairCenter": [0.0, 0.018, 1.91],
+    "hairScale": [0.166, 0.150, 0.105],
+    "hipX": 0.135,
+    "hipZ": 0.99,
+    "upperLegLength": 0.42,
+    "lowerLegLength": 0.44,
+    "legRadius": 0.105,
+    "shoulderX": 0.32,
+    "shoulderZ": 1.54,
+    "upperArmLength": 0.35,
+    "forearmLength": 0.32,
+    "armRadius": 0.080
+  },
+  "validation": {
+    "minimumDistinctFramesPerDirection": 6,
+    "maximumObjectHeightJitterPx": 18,
+    "maximumObjectWidthJitterPx": 24
+  }
+}

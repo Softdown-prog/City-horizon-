@@ -1,0 +1,120 @@
+name: Tycoon Character Sequence V1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/assets/visitor_male_red_01.json"
+      - "tools/tycoon_photo_studio/build_character.py"
+      - "tools/tycoon_photo_studio/postprocess_character.py"
+      - "tools/tycoon_photo_studio/validate_character.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-character-sequence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-visitor-sequence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ASSET_CONFIG: tools/tycoon_photo_studio/assets/visitor_male_red_01.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      ASSET_ID: visitor_male_red_01
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-processing and headless rendering dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Download pinned Blender portable build
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          echo "Downloading Blender $version from $url"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          if [[ -z "$blender_exe" ]]; then
+            echo "blender executable was not found after extraction" >&2
+            exit 1
+          fi
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake one canonical visitor through 8 directions and 8 walk frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_character/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_character.py -- \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tycoon_character/source"
+
+          test -f out/tycoon_character/source/character_studio_metadata.json
+          count="$(find out/tycoon_character/source -maxdepth 1 -name "${ASSET_ID}_*_f*_color_source.png" | wc -l)"
+          test "$count" -eq 64
+          count="$(find out/tycoon_character/source -maxdepth 1 -name "${ASSET_ID}_*_f*_shadow_source.png" | wc -l)"
+          test "$count" -eq 64
+
+      - name: Build character sequence package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_character/final
+          python tools/tycoon_photo_studio/postprocess_character.py \
+            --input out/tycoon_character/source \
+            --output out/tycoon_character/final \
+            --studio-preset "$STUDIO_PRESET"
+
+          required=(
+            ${ASSET_ID}_walk_8dir_8frame.png
+            ${ASSET_ID}_walk_atlas.png
+            ${ASSET_ID}_sequence_review.png
+            ${ASSET_ID}_8dir_context.png
+            ${ASSET_ID}_manifest.json
+          )
+          for file in "${required[@]}"; do
+            test -f "out/tycoon_character/final/$file"
+          done
+
+      - name: Validate sequence coherence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/validate_character.py \
+            --manifest "out/tycoon_character/final/${ASSET_ID}_manifest.json" \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Upload visitor sequence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tycoon-Character-Sequence-V1-Visitor-Male-Red
+          path: out/tycoon_character
+          if-no-files-found: error
+          retention-days: 14
