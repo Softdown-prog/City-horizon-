@@ -8,6 +8,7 @@ on:
     paths:
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.fractal.json"
       - "tools/tycoon_photo_studio/build_classic_tree.py"
+      - "tools/tycoon_photo_studio/run_classic_tree_compat.py"
       - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/postprocess.py"
@@ -86,7 +87,7 @@ jobs:
           set -euo pipefail
           mkdir -p out/tree/source
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
-            --python tools/tycoon_photo_studio/build_classic_tree.py -- \
+            --python tools/tycoon_photo_studio/run_classic_tree_compat.py -- \
             --asset-config "$TREE_SOURCE" \
             --studio-preset "$STUDIO_PRESET" \
             --output "$PWD/out/tree/source"
