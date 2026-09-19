@@ -1,9 +1,11 @@
 #include "building_facade_renderer.h"
 
+#include "building_projected_shadow_renderer.h"
 #include "building_roof_editor_renderer.h"
 #include "src/ch_core/contracts.h"
 
 #include <QFont>
+#include <QJsonArray>
 #include <QPainter>
 #include <QPolygonF>
 
@@ -121,7 +123,6 @@ void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec
     }
     painter.restore();
 
-    // Short eave contact only: three compact bands with a fast falloff.
     constexpr float kEaveDepthPx = 3.4F;
     constexpr std::array<int, 3> kEaveAlpha = {30, 16, 7};
     const float eave_band = kEaveDepthPx / static_cast<float>(kEaveAlpha.size());
@@ -138,8 +139,6 @@ void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec
         }
     }
 
-    // The two visible faces meet at the near corner. Keep AO confined to a
-    // narrow physical contact instead of painting a vertical stripe.
     constexpr std::array<int, 3> kCornerAlpha = {20, 9, 4};
     constexpr float kCornerSpan = 0.036F;
     const float corner_band = kCornerSpan / static_cast<float>(kCornerAlpha.size());
@@ -164,8 +163,6 @@ void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec
     }
     painter.restore();
 
-    // Ground contact is a single restrained line. It must ground the wall, not
-    // read as another dark base course over the structural plinth.
     painter.save();
     painter.setBrush(Qt::NoBrush);
     painter.setPen(QPen(scaledColor(spec.wall_color, 0.38F, 78), 0.88,
@@ -386,6 +383,11 @@ QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, cons
     BuildingComposerSpec render_spec = spec;
     render_spec.wall_height_px = BuildingComposer::effectiveWallHeightPx(spec);
 
+    // The production facade path owns the global cast shadow. Disable the
+    // legacy shadow in the roof/body renderer so only one shadow model is ever
+    // composited into exported sprites.
+    render_spec.cast_shadow = false;
+
     // Facade modules are always authored after the body/roof pass. This keeps
     // the Classic Tycoon material ramp free to repaint the wall surface without
     // covering doors, windows, signs or awnings, including single-storey legacy presets.
@@ -394,7 +396,15 @@ QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, cons
     render_spec.south_awning = false;
     render_spec.south_sign = false;
 
-    QImage image = BuildingRoofEditorRenderer::renderView(render_spec, view, canvas);
+    const QImage building = BuildingRoofEditorRenderer::renderView(render_spec, view, canvas);
+    QImage image(canvas, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    {
+        QPainter composition(&image);
+        composition.setRenderHint(QPainter::Antialiasing, true);
+        BuildingProjectedShadowRenderer::draw(composition, spec, view, canvas);
+        composition.drawImage(QPoint(0, 0), building);
+    }
 
     const float half_w = static_cast<float>(std::max(1, spec.footprint_width_tiles)) * 0.5F;
     const float half_d = static_cast<float>(std::max(1, spec.footprint_depth_tiles)) * 0.5F;
@@ -454,6 +464,7 @@ QJsonObject BuildingFacadeRenderer::manifest(const BuildingComposerSpec& spec) {
         {"wallGroundContactAlpha", 78},
         {"recessContactEnabled", true},
     });
+    manifest.insert("castShadow", BuildingProjectedShadowRenderer::manifest());
     return manifest;
 }
 
