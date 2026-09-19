@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace ch::studio {
 namespace {
 
@@ -37,11 +39,12 @@ protected:
     }
 };
 
+} // namespace
+
 void installAssetBrowserUiExtension() {
     if (qApp) qApp->installEventFilter(new AssetBrowserUiExtension(qApp));
 }
 
-} // namespace
 } // namespace ch::studio
 
 Q_COREAPP_STARTUP_FUNCTION(ch::studio::installAssetBrowserUiExtension)
