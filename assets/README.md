@@ -1,44 +1,37 @@
-# City Horizon assets
+# Assets — City Horizon
 
-`assets/` is the canonical source asset directory. The build copies this directory to
-`build/assets/` after a successful build; do not author or update game assets only in
-the build output.
+## Fonte oficial dos assets visuais
 
-Building progressions use the existing `*_lvl1.png` through `*_lvl5.png` files when a
-definition supports five visual phases. Keep all phases together when replacing or
-adding a building family.
+A fonte oficial para novos assets visuais do City Horizon é o pipeline Blender / Tycoon Photo Studio do projeto.
 
-Before accepting a new building export, run:
+Arquivos e diretórios principais:
 
-```powershell
-python tools/clean_building_export_guides.py --validate
-```
+- `tools/blender_bake_runner.py`
+- `tools/tycoon_photo_studio/`
+- `C++/MapForge2/presets/tycoon_asset_bake_contract.json`
 
-The command enforces [`buildings/export_contract.json`](buildings/export_contract.json):
-RGBA output only, no high-saturation near-transparent matte residue, and no long thin
-debug guide touching the bottom of a sprite. A violation exits with a nonzero status.
-Use `--write` only to sanitize a known bad local export, then validate again.
+O PNG usado pelo runtime é um produto derivado. A fonte autoritativa deve ser o arquivo de configuração, gramática procedural ou cena/import 3D correspondente, junto do preset de estúdio e do contrato de bake.
 
-For a declared single-tile source render (never for arbitrary buildings or
-foliage), the same tool also supports stricter, opt-in geometry checks. For
-example, the prepared-soil tile has a fixed lower content boundary and must
-not retain labels or layout rulers below it:
+O padrão visual atual usa câmera isométrica/dimétrica fixa 2:1, yaw de 45°, elevação de 30° e tile de referência 128×64. Novos prédios, assets de farm, decoração, vegetação, pedra, água, props, ruas, calçadas e demais elementos do mapa devem ser recriados e promovidos por esse pipeline, em vez de reutilizar os pacotes visuais antigos.
 
-```powershell
-python tools/clean_building_export_guides.py --file assets/farming/prepared_soil/prepared_soil_01.png --max-content-y 916 --validate
-```
+## Estado temporário do runtime
 
-`--keep-largest-component` and `--clip-largest-component-bounds` are likewise
-single-tile-only checks; use them only when a contract explicitly guarantees
-that detached visual components are invalid.
+Por decisão de produção, o único asset visual legado de terreno mantido por enquanto é a grama canônica:
 
-Ground tiles use a separate zero-tolerance geometric contract. It compares
-the canvas and the renderer-critical alpha bounds against the current
-canonical grass, prepared-soil and coast tile families:
+- `assets/terrain/grass_isometric_01.png`
+- `assets/terrain/grass_isometric_01.json`
 
-```powershell
-python tools/validate_ground_tiles.py --all --debug
-```
+O contrato técnico de tile de chão também permanece em `assets/terrain/ground_tile_contract.json`.
 
-Any one-pixel drift is reported as `[GROUND TILE REJECTED]` with the exact
-canvas, bounds or content-row reason, and causes a nonzero exit status.
+Água/costa, pedra, caminhos, decoração, farming, construções, props, veículos, parques, ruas, calçadas, variantes geradas e demais bibliotecas visuais antigas foram removidos. Quando alguma dessas categorias voltar ao jogo, ela deverá nascer novamente no pipeline Blender e passar pelo bake/validation gate atual.
+
+## Regra para novos assets
+
+1. Criar ou editar a fonte no pipeline Blender / Tycoon Photo Studio.
+2. Gerar o bake headless com a câmera e o estúdio oficiais.
+3. Validar footprint, pivot, transparência, escala e rotações exigidas pelo contrato.
+4. Testar o resultado no Map Forge / runtime sobre a grade real.
+5. Promover somente o PNG aprovado para uso do jogo.
+6. Não reintroduzir sprites, variantes experimentais ou bibliotecas antigas fora desse fluxo.
+
+Áudio, UI e dados de jogo como missões e cenários não fazem parte desta limpeza de assets visuais e permanecem versionados normalmente.

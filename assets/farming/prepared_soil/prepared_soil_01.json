@@ -1,7 +1,0 @@
-{
-  "id": "prepared_soil_01",
-  "displayName": "Terra Preparada",
-  "texturePath": "assets/farming/prepared_soil/prepared_soil_01.png",
-  "gridFootprint": { "width": 1, "height": 1 },
-  "state": "prepared"
-}
