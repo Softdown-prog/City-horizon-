@@ -32,7 +32,9 @@
       "groundColor": "#708963",
       "alternateGroundColor": "#768f69",
       "gridColor": "#3e4f3b",
-      "drawGrid": true
+      "drawGrid": false,
+      "drawGrassTexture": true,
+      "grassSpeckleColor": "#5f7f50"
     },
     "candidate": {
       "tile": [
@@ -48,8 +50,9 @@
         0,
         0
       ],
-      "showFootprint": true,
-      "showAnchor": true,
+      "showFootprint": false,
+      "showAnchor": false,
+      "renderAsGroundTile": true,
       "footprintColor": "#f6c448",
       "anchorColor": "#ffd640"
     }
