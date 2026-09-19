@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QPolygonF>
 
@@ -59,6 +60,17 @@ QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
     const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, width, height);
     const auto d = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), camera, width, height);
     return QPolygonF{QPointF(a.x, a.y), QPointF(b.x, b.y), QPointF(c.x, c.y), QPointF(d.x, d.y)};
+}
+
+void drawGroundTileSprite(QPainter& painter, const QImage& sprite, const QPointF& tile,
+                           const ch::CameraState& camera, const int width, const int height) {
+    const QPolygonF polygon = tilePolygon(static_cast<int>(tile.x()), static_cast<int>(tile.y()), camera, width, height);
+    painter.save();
+    QPainterPath clip;
+    clip.addPolygon(polygon);
+    painter.setClipPath(clip);
+    painter.drawImage(polygon.boundingRect(), sprite);
+    painter.restore();
 }
 
 void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const QPointF& tile,
@@ -154,7 +166,21 @@ int main(int argc, char** argv) {
             const int y = depth - x;
             painter.setPen(drawGrid ? gridPen : Qt::NoPen);
             painter.setBrush(((x + y) & 1) == 0 ? groundA : groundB);
-            painter.drawPolygon(tilePolygon(x, y, camera, width, height));
+            const QPolygonF groundTile = tilePolygon(x, y, camera, width, height);
+            painter.drawPolygon(groundTile);
+            if (stage.value("drawGrassTexture").toBool(true)) {
+                const QColor speckle = colorOr(stage, "grassSpeckleColor", QColor(92, 122, 78, 95));
+                painter.setPen(QPen(speckle, 1.0));
+                const QRectF bounds = groundTile.boundingRect();
+                const unsigned seed = static_cast<unsigned>((x * 92837111) ^ (y * 689287499));
+                for (int i = 0; i < 6; ++i) {
+                    const unsigned value = seed + static_cast<unsigned>(i * 2654435761u);
+                    const double fx = 0.18 + 0.64 * ((value & 0xffffu) / 65535.0);
+                    const double fy = 0.18 + 0.64 * (((value >> 16) & 0xffffu) / 65535.0);
+                    painter.drawPoint(QPointF(bounds.left() + bounds.width() * fx,
+                                              bounds.top() + bounds.height() * fy));
+                }
+            }
         }
     }
 
@@ -179,7 +205,11 @@ int main(int argc, char** argv) {
 
     const float scale = static_cast<float>(std::clamp(candidateSpec.value("scale").toDouble(1.0), 0.05, 8.0));
     const QPointF offsetPixels = pairOr(candidateSpec, "offsetPixels", QPointF(0.0, 0.0));
-    drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
+    if (candidateSpec.value("renderAsGroundTile").toBool(false)) {
+        drawGroundTileSprite(painter, candidate, candidateTile, camera, width, height);
+    } else {
+        drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
+    }
 
     if (candidateSpec.value("showAnchor").toBool(true)) {
         const auto ground = ch::world_to_screen_point(static_cast<float>(candidateTile.x()) + 0.5F,
