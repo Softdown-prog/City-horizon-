@@ -63,15 +63,22 @@ jobs:
           assert data['leafCards']['count'] == 1020
           assert data['leafCards']['interiorFraction'] >= 0.55
           assert data['leafCards']['coreFillFraction'] >= 0.22
-          assert data['leafCards']['crownRadius'][0] >= 1.50
-          assert data['leafCards']['crownRadius'][1] >= 1.34
+          assert data['leafCards']['crownRadius'][0] >= 2.25
+          assert data['leafCards']['crownRadius'][1] >= 2.00
+          assert 2.20 <= data['trunk']['height'] <= 2.30
           assert data['leafCards']['sizeBiasPower'] > 1.0
           assert data['leafCards']['maxTiltDegrees'] <= 54.0
           assert len(data['leafCards']['materials']) >= 5
           assert data['trunk']['smoothShading'] is True
+          profile = data['foliagePostProcess']
+          assert profile['shadowAlphaMax'] == 133
+          assert abs(profile['shadowStrength'] - 0.52) < 1e-6
+          assert profile['shadowRadiusPx'] >= 80.0
+          assert profile['contrastMultiplier'] >= 1.12
           assert 'canopyParts' not in data
           print('broadleaf02SourceGate: PASS')
           print('requestedLeafCards:', data['leafCards']['count'])
+          print('gameplayScaleFactor: 1.5x recipe geometry')
           PY
 
       - name: Download pinned Blender
@@ -123,13 +130,14 @@ jobs:
             --output out/tree02/final \
             --studio-preset "$STUDIO_PRESET"
 
-      - name: Apply classic pre-rendered foliage profile
+      - name: Apply calibrated classic foliage profile
         shell: bash
         run: |
           set -euo pipefail
           python tools/tycoon_photo_studio/stylize_foliage_2d.py \
             --package out/tree02/final \
-            --asset-id "$ASSET_ID"
+            --asset-id "$ASSET_ID" \
+            --asset-config "$TREE_SOURCE"
           python - <<'PY'
           import json
           from pathlib import Path
@@ -139,8 +147,12 @@ jobs:
           assert pp['paletteColors'] == 64
           assert pp['dither'] == 'floyd_steinberg'
           assert pp['expectsLeafMicrogeometry'] is True
-          assert pp['shadowAlphaMax'] == 54
-          print('classicPrerenderedFoliageGate: PASS')
+          assert pp['shadowAlphaMax'] == 133
+          assert abs(pp['shadowStrength'] - 0.52) < 1e-6
+          assert pp['shadowRadiusPx'] == 81.0
+          assert pp['contrastMultiplier'] == 1.14
+          assert pp['shadowBlendIntent'] == 'multiply_equivalent_alpha'
+          print('calibratedClassicFoliageGate: PASS')
           PY
 
       - name: Verify final tree package
