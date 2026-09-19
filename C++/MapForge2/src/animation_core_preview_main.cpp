@@ -26,6 +26,8 @@ ch::studio::CarouselComposerSpec makeCarouselComposerGate() {
     spec.duration_seconds = 2.4F;
     spec.frame_count = 16;
     spec.clockwise = true;
+    spec.dynamic_depth_ordering = true;
+    spec.directional_horses = true;
     spec.canopy_enabled = true;
     spec.rosettes_enabled = true;
     spec.finial_enabled = true;
@@ -83,6 +85,6 @@ int main(int argc, char** argv) {
 
     if (!writeComposerAuthoringManifest(composer_spec, output_dir)) return 4;
 
-    std::cout << "Carousel Composer preview package generated from one parametric spec.\n";
+    std::cout << "Carousel Composer preview package generated with dynamic depth and directional horses.\n";
     return 0;
 }
