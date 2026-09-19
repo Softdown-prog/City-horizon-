@@ -13,13 +13,14 @@ namespace ch::studio {
 
 class CarouselPartLibrary final {
 public:
-    static constexpr const char* kVersion = "carousel_parts_1";
+    static constexpr const char* kVersion = "carousel_parts_2";
 
     static QStringList partIds();
     static bool contains(const QString& part_id);
     static QString displayName(const QString& part_id);
     static QSizeF defaultSize(const QString& part_id);
     static QPointF defaultPivot(const QString& part_id);
+    static int variantCount(const QString& part_id);
 
     static AnimationNodeSpec makeNode(const QString& part_id,
                                       const QString& node_id,
@@ -33,6 +34,7 @@ public:
                              const QSize& target_size,
                              const QColor& primary,
                              const QColor& outline,
+                             int visual_variant = 0,
                              QString* reason = nullptr);
 
     static QJsonObject manifest();
