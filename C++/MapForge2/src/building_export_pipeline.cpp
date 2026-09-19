@@ -3,6 +3,7 @@
 #include "building_block_preview_renderer.h"
 #include "building_facade_renderer.h"
 #include "building_footprint_model.h"
+#include "building_lod_validator.h"
 #include "building_procedural_variation.h"
 #include "building_roof_editor_renderer.h"
 #include "building_urban_integration_validator.h"
@@ -111,15 +112,18 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec));
     manifest.insert(QStringLiteral("proceduralVariation"), BuildingProceduralVariation::manifest(spec));
     manifest.insert(QStringLiteral("smallBlockPreview"), BuildingBlockPreviewRenderer::manifest(401));
+    manifest.insert(QStringLiteral("lodVisualGate"), BuildingLodValidator::manifest(spec));
     manifest.insert(QStringLiteral("urbanIntegrationValidation"),
                     BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_5")},
+        {"version", QStringLiteral("automatic_export_validation_6")},
         {"packageValidated", validation.export_ready},
         {"flexibleFootprintValidated", validation.footprint_valid},
         {"urbanIntegrationValidated", validation.urban_integration_valid},
+        {"lodVisualValidated", validation.lod_visual_valid},
         {"proceduralVariationRecorded", true},
         {"smallBlockQaPreviewGenerated", true},
+        {"lodQaPreviewGenerated", true},
         {"transparentRgba", true},
         {"environmentContextExportedIntoSprite", false},
         {"validationFile", QStringLiteral("*_validation.json")},
@@ -141,22 +145,24 @@ bool writeJson(const QString& path, const QJsonObject& object, QString* error) {
 
 QString BuildingExportValidation::summary() const {
     if (export_ready)
-        return QStringLiteral("PASS — flexible footprint, frame, anchor, halo and urban integration validation passed");
-    return QStringLiteral("FAIL — footprint=%1 halo=%2 urban=%3 clipped=%4 contamination=%5 suspiciousHalo=%6 anchor=%7")
+        return QStringLiteral("PASS — footprint, halo, urban integration and LOD gameplay-scale validation passed");
+    return QStringLiteral("FAIL — footprint=%1 halo=%2 urban=%3 lod=%4 clipped=%5 contamination=%6 suspiciousHalo=%7 anchor=%8")
         .arg(footprint_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(halo_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(urban_integration_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
+        .arg(lod_visual_valid ? QStringLiteral("ok") : QStringLiteral("invalid"))
         .arg(clipped_edge_pixels).arg(transparent_rgb_contamination).arg(suspicious_halo_pixels)
         .arg(anchor_contact ? QStringLiteral("ok") : QStringLiteral("missing"));
 }
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_5")},
+        {"version", QStringLiteral("automatic_export_validation_6")},
         {"exportReady", export_ready},
         {"footprintValid", footprint_valid},
         {"haloValid", halo_valid},
         {"urbanIntegrationValid", urban_integration_valid},
+        {"lodVisualValid", lod_visual_valid},
         {"anchorContact", anchor_contact},
         {"clippedEdgePixels", clipped_edge_pixels},
         {"transparentRgbContamination", transparent_rgb_contamination},
@@ -226,6 +232,7 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
     }
 
     const BuildingUrbanIntegrationValidation urban = BuildingUrbanIntegrationValidator::validate(spec);
+    const BuildingLodValidation lod = BuildingLodValidator::validate(spec);
 
     report.clipped_edge_pixels = total_clipped;
     report.transparent_rgb_contamination = total_contamination;
@@ -235,7 +242,8 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
     report.footprint_valid = declared_footprint && frame_fits && total_clipped == 0 && all_anchor_contacts;
     report.halo_valid = total_contamination == 0 && total_suspicious <= 12;
     report.urban_integration_valid = urban.valid;
-    report.export_ready = report.footprint_valid && report.halo_valid && report.urban_integration_valid;
+    report.lod_visual_valid = lod.valid;
+    report.export_ready = report.footprint_valid && report.halo_valid && report.urban_integration_valid && report.lod_visual_valid;
     report.details = QJsonObject{
         {"gridContract", QString::fromLatin1(ch::contracts::kGridContract)},
         {"tileWidth", ch::contracts::kTileWidth},
@@ -245,6 +253,7 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
         {"footprintValidationReason", footprint_reason},
         {"proceduralVariation", BuildingProceduralVariation::manifest(spec)},
         {"smallBlockPreview", BuildingBlockPreviewRenderer::manifest(401)},
+        {"lodVisualGate", lod.toJson()},
         {"floorCount", std::clamp(spec.floor_count, 1, 8)},
         {"recommendedFrame", QJsonObject{{"width", minimum_frame.width()}, {"height", minimum_frame.height()}}},
         {"frameFitsRecommendedMinimum", frame_fits},
@@ -292,6 +301,10 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
     if (!BuildingBlockPreviewRenderer::render(spec, QSize(960, 560), 401).save(block_preview_path, "PNG")) {
         if (error) *error = QStringLiteral("Could not write %1").arg(block_preview_path); return false;
     }
+    const QString lod_preview_path = dir.filePath(stem + QStringLiteral("_lod_preview.png"));
+    if (!BuildingLodValidator::renderReviewSheet(spec, QSize(960, 420)).save(lod_preview_path, "PNG")) {
+        if (error) *error = QStringLiteral("Could not write %1").arg(lod_preview_path); return false;
+    }
     const QImage south = BuildingFacadeRenderer::renderView(spec, BuildingView::South, frame);
     const QString thumbnail_path = dir.filePath(stem + QStringLiteral("_thumb.png"));
     if (!south.scaled(QSize(192, 168), Qt::KeepAspectRatio, Qt::SmoothTransformation).save(thumbnail_path, "PNG")) {
@@ -303,6 +316,7 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
         {"west", stem + QStringLiteral("_west.png")}, {"north", stem + QStringLiteral("_north.png")},
         {"spriteSheet", stem + QStringLiteral("_4view.png")}, {"reviewSheet", stem + QStringLiteral("_review.png")},
         {"blockPreview", stem + QStringLiteral("_block_preview.png")},
+        {"lodPreview", stem + QStringLiteral("_lod_preview.png")},
         {"thumbnail", stem + QStringLiteral("_thumb.png")}, {"validation", stem + QStringLiteral("_validation.json")},
     });
     return writeJson(dir.filePath(stem + QStringLiteral("_manifest.json")), manifest, error);
