@@ -60,12 +60,12 @@ jobs:
           assert data['leafCards']['count'] == 900
           assert data['leafCards']['interiorFraction'] >= 0.50
           assert data['leafCards']['coreFillFraction'] >= 0.18
-          assert data['leafCards']['crownRadius'][0] >= 1.30
-          assert data['leafCards']['crownRadius'][1] >= 1.15
+          assert data['leafCards']['crownRadius'][0] >= 1.40
+          assert data['leafCards']['crownRadius'][1] >= 1.25
           assert data['leafCards']['sizeBiasPower'] > 1.0
           assert data['leafCards']['maxTiltDegrees'] <= 54.0
           assert len(data['leafCards']['materials']) >= 5
-          assert 1.47 <= data['trunk']['height'] <= 1.53
+          assert 1.23 <= data['trunk']['height'] <= 1.29
           assert data['trunk']['smoothShading'] is True
           assert len(data['trunk']['lean']) == 2
           assert len(data['trunk']['midKink']) == 2
