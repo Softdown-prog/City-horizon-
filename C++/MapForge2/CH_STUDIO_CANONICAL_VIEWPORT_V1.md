@@ -8,12 +8,20 @@ Make City Horizon Studio display real City Horizon world art through the canonic
 
 This milestone is intentionally an inspection gate before lossless native authoring. It proves ownership, embedding, camera/DPR handling and renderer reuse first. Production scenario mutation and Save remain disabled.
 
+## Camera contract
+
+Projection geometry is no longer implicit in this viewport document. The canonical visual camera is defined separately by `CH_CAMERA_CONTRACT_V1` / `CH_CAMERA_V1`.
+
+That contract fixes the City Horizon classic-tycoon camera to orthographic 2:1 dimetric geometry: 45-degree world yaw, 30-degree camera elevation, 26.565-degree ground screen axes, 128×64 logical tiles at zoom 1 and no perspective.
+
+The viewport itself remains PILOT because embedding/DPR/scene-parity behavior still needs final human approval. This does not authorize the viewport, Building Composer or Animation Composer to substitute a different projection.
+
 ## Ownership contract
 
 - **Qt6 owns:** the main window, native child viewport HWND, menus, docks, keyboard/mouse input, focus, resize notifications and the application event loop.
 - **SDL3 owns:** the rendering context attached to the existing Qt-owned HWND.
 - **ch_render owns:** terrain, road and building presentation rules used by the Studio viewport.
-- **ch_core owns:** canonical projection, map parsing, grid contracts and coordinate transforms.
+- **ch_core owns:** `CH_GRID_V1`, `CH_CAMERA_V1`, canonical projection, map parsing and coordinate transforms.
 - SDL does not run a competing editor input loop.
 - The Qt-owned HWND must outlive the SDL wrapper.
 
@@ -43,15 +51,17 @@ Canonical scenario mode is **inspection-only in this pilot**. Inspect, pan, zoom
 
 The Windows artifact carries the repository `assets` directory next to `MapForge2.exe`. The canonical adapter resolves textures relative to the executable directory, so IDE working-directory differences do not decide visual output.
 
+Any raster art representing a 3D world object must be authored for `CH_CAMERA_V1`; matching a tile footprint numerically is not sufficient if the object itself visually uses another camera.
+
 ## Negative coordinates
 
 Editor scenario bounds preserve real negative and positive coordinates. Camera centering uses actual loaded content bounds rather than assuming a 0..63-only document.
 
 ## Frozen systems
 
-This pilot does **not** rewrite `MapRenderer`, projection rules, asset metadata, terrain semantics, masks, overlays or animation contracts. It adds a Studio-side adapter that consumes existing game-side code.
+This pilot does **not** rewrite `MapRenderer`, terrain semantics, masks, overlays or animation contracts. It consumes game-side code. Camera projection geometry is frozen separately in `CH_CAMERA_V1`.
 
-## Gates before freezing V1
+## Gates before freezing viewport V1
 
 1. Windows CI compiles the Qt6 + SDL3 + ch_render Studio target.
 2. Packaged artifact launches with Qt and SDL3 dependencies plus canonical assets.
@@ -59,7 +69,8 @@ This pilot does **not** rewrite `MapRenderer`, projection rules, asset metadata,
 4. Pan, zoom, hover and Center remain aligned at 100%, 125% and 150% Windows display scaling.
 5. No black viewport after resize/minimize/restore.
 6. Qt remains the only input/event-loop authority.
-7. A later parity capture must compare the same scenario/camera against runtime output before this contract is marked FROZEN.
+7. A parity capture compares the same scenario/camera against runtime output before this viewport contract is marked FROZEN.
+8. The parity capture must use `CH_CAMERA_V1`; no generic true-isometric substitute is accepted.
 
 ## Next milestone
 
