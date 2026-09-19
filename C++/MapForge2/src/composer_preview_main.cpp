@@ -3,6 +3,7 @@
 #include "building_facade_renderer.h"
 #include "building_lod_validator.h"
 #include "building_roof_editor_renderer.h"
+#include "building_visual_reference_gate.h"
 
 #include <QDir>
 #include <QFile>
@@ -50,6 +51,44 @@ bool writeAsset(const QString& output_dir, const QString& stem,
     manifest_file.close();
 
     std::cout << review_path.toStdString() << "\n" << sheet_path.toStdString() << "\n" << manifest_path.toStdString() << "\n";
+    return true;
+}
+
+bool writeVisualReferenceGate(const QString& output_dir) {
+    using Gate = ch::studio::BuildingVisualReferenceGate;
+    struct ImageArtifact {
+        QString file_name;
+        QImage image;
+    };
+
+    const ImageArtifact artifacts[] = {
+        {QStringLiteral("building_composer_visual_reference_hero.png"), Gate::renderHeroReview()},
+        {QStringLiteral("building_composer_visual_reference_materials.png"), Gate::renderMaterialBoard()},
+        {QStringLiteral("building_composer_visual_reference_shadow.png"), Gate::renderShadowBoard()},
+        {QStringLiteral("building_composer_visual_reference_lod.png"), Gate::renderLodBoard()},
+        {QStringLiteral("building_composer_visual_reference_block.png"), Gate::renderBlockBoard()},
+    };
+
+    for (const ImageArtifact& artifact : artifacts) {
+        const QString path = QDir(output_dir).filePath(artifact.file_name);
+        if (!artifact.image.save(path, "PNG")) {
+            std::cerr << "Unable to save full visual reference artifact: "
+                      << artifact.file_name.toStdString() << "\n";
+            return false;
+        }
+        std::cout << path.toStdString() << "\n";
+    }
+
+    const QString report_path = QDir(output_dir).filePath(
+        QStringLiteral("building_composer_visual_reference_report.json"));
+    QFile report_file(report_path);
+    if (!report_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        std::cerr << "Unable to save full visual reference report.\n";
+        return false;
+    }
+    report_file.write(QJsonDocument(Gate::manifest()).toJson(QJsonDocument::Indented));
+    report_file.close();
+    std::cout << report_path.toStdString() << "\n";
     return true;
 }
 
@@ -157,6 +196,8 @@ int main(int argc, char** argv) {
         return 9;
     }
     std::cout << lod_gate_path.toStdString() << "\n";
+
+    if (!writeVisualReferenceGate(output_dir)) return 10;
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
