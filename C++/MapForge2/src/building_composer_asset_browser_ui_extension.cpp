@@ -47,4 +47,8 @@ void installAssetBrowserUiExtension() {
 
 } // namespace ch::studio
 
-Q_COREAPP_STARTUP_FUNCTION(ch::studio::installAssetBrowserUiExtension)
+static void installCityHorizonAssetBrowserUiExtension() {
+    ch::studio::installAssetBrowserUiExtension();
+}
+
+Q_COREAPP_STARTUP_FUNCTION(installCityHorizonAssetBrowserUiExtension)
