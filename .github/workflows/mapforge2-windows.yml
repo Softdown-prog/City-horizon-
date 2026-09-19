@@ -23,6 +23,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade aqtinstall
+          python -m pip install pillow
           python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
           "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -52,6 +53,7 @@ jobs:
           Copy-Item "C++/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md" dist/MapForge2/CH_STUDIO_CANONICAL_VIEWPORT_V1.md
           Copy-Item "C++/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md" dist/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md
           Copy-Item "C++/MapForge2/CH_BUILDING_COMPOSER_V0.md" dist/MapForge2/CH_BUILDING_COMPOSER_V0.md
+          Copy-Item "C++/MapForge2/CH_CLASSIC_TYCOON_STYLE_V1.md" dist/MapForge2/CH_CLASSIC_TYCOON_STYLE_V1.md
           New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
           Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
           Copy-Item "C++/MapForge2/examples/studio_project/city_horizon_production_profile.json" dist/MapForge2/examples/city_horizon_production_profile.json
@@ -82,6 +84,16 @@ jobs:
           if ($null -eq $preview) { throw "Carousel Composer preview image was not generated." }
           if ($null -eq $manifest) { throw "Carousel Composer runtime manifest was not generated." }
           if ($null -eq $authoring) { throw "Carousel Composer authoring manifest was not generated." }
+
+      - name: Carousel gameplay-scale visual production gate
+        shell: pwsh
+        run: |
+          python tools/carousel_production_gate.py --directory dist/MapForge2/animation_tests --bakery assets/buildings/bakery_01_lvl1.png
+          if (-not (Test-Path dist/MapForge2/animation_tests/carousel_lod_gate.png)) { throw "Carousel LOD gate was not generated." }
+          if (-not (Test-Path dist/MapForge2/animation_tests/carousel_frame_coherence_gate.png)) { throw "Carousel frame coherence gate was not generated." }
+          if (-not (Test-Path dist/MapForge2/animation_tests/carousel_game_context_gate.png)) { throw "Carousel game context gate was not generated." }
+          if (-not (Test-Path dist/MapForge2/animation_tests/carousel_production_gate.json)) { throw "Carousel production report was not generated." }
+          if (-not (Test-Path dist/MapForge2/assets/amusement/carousel/classic/carousel_classic_01.png)) { throw "Carousel runtime fixture was not promoted into the distributable asset tree." }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
