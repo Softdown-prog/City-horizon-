@@ -1,6 +1,7 @@
 #include "projection_calibration_gate.h"
 
 #include "engine_projection_adapter.h"
+#include "src/ch_core/contracts.h"
 #include "src/ch_core/projection.h"
 
 #include <QDir>
@@ -21,6 +22,7 @@ namespace ch::studio {
 namespace {
 
 constexpr float kTolerancePx = 0.0001F;
+constexpr float kProfileTolerance = 0.0001F;
 constexpr float kPi = 3.14159265358979323846F;
 
 struct Sample {
@@ -34,6 +36,10 @@ float pointError(const QPointF& a, const QPointF& b) {
     return std::sqrt(dx * dx + dy * dy);
 }
 
+bool nearlyEqual(const double a, const double b, const double tolerance = kProfileTolerance) {
+    return std::abs(a - b) <= tolerance;
+}
+
 QPointF runtimeProjection(const Sample& sample,
                           const ch::CameraState& camera,
                           const QSizeF& viewport) {
@@ -42,6 +48,58 @@ QPointF runtimeProjection(const Sample& sample,
         static_cast<float>(viewport.width()),
         static_cast<float>(viewport.height()));
     return QPointF(p.x, p.y);
+}
+
+QJsonObject validateCameraProfile(bool* pass_out) {
+    ch::CameraState camera;
+    camera.rotation = ch::CameraRotation::r0;
+    camera.zoom = 1.0F;
+    camera.pan_x = 0.0F;
+    camera.pan_y = 0.0F;
+
+    const QSizeF viewport(0.0, 0.0);
+    const QPointF origin = EngineProjectionAdapter::worldToScreen(0.0F, 0.0F, camera, viewport);
+    const QPointF world_x = EngineProjectionAdapter::worldToScreen(1.0F, 0.0F, camera, viewport);
+    const QPointF world_y = EngineProjectionAdapter::worldToScreen(0.0F, 1.0F, camera, viewport);
+
+    const QPointF dx = world_x - origin;
+    const QPointF dy = world_y - origin;
+    const double axis_angle_deg = std::atan2(std::abs(dx.y()), std::abs(dx.x())) * 180.0 / kPi;
+    const double diamond_width = std::abs(dx.x()) + std::abs(dy.x());
+    const double diamond_height = std::abs(dx.y()) + std::abs(dy.y());
+    const double ratio = diamond_height > 0.0 ? diamond_width / diamond_height : 0.0;
+
+    const bool basis_pass =
+        nearlyEqual(dx.x(), ch::contracts::kTileWidth * 0.5)
+        && nearlyEqual(dx.y(), ch::contracts::kTileHeight * 0.5)
+        && nearlyEqual(dy.x(), -ch::contracts::kTileWidth * 0.5)
+        && nearlyEqual(dy.y(), ch::contracts::kTileHeight * 0.5);
+    const bool ratio_pass = nearlyEqual(ratio, ch::contracts::kDiamondRatio);
+    const bool angle_pass = nearlyEqual(axis_angle_deg, ch::contracts::kGroundAxisScreenAngleDeg);
+    const bool camera_metadata_pass =
+        nearlyEqual(ch::contracts::kCameraWorldYawDeg, 45.0)
+        && nearlyEqual(ch::contracts::kCameraElevationDeg, 30.0)
+        && !ch::contracts::kCameraPerspective;
+
+    const bool pass = basis_pass && ratio_pass && angle_pass && camera_metadata_pass;
+    if (pass_out) *pass_out = pass;
+
+    return QJsonObject{
+        {"cameraContract", QString::fromLatin1(ch::contracts::kCameraContract)},
+        {"projectionKind", QStringLiteral("orthographic_dimetric_2_to_1")},
+        {"visualTarget", QStringLiteral("classic_tycoon_zoo_tycoon_1_read")},
+        {"worldYawDeg", ch::contracts::kCameraWorldYawDeg},
+        {"cameraElevationDeg", ch::contracts::kCameraElevationDeg},
+        {"groundAxisScreenAngleDeg", axis_angle_deg},
+        {"diamondRatio", ratio},
+        {"basisWorldX", QJsonObject{{"x", dx.x()}, {"y", dx.y()}}},
+        {"basisWorldY", QJsonObject{{"x", dy.x()}, {"y", dy.y()}}},
+        {"basisPass", basis_pass},
+        {"ratioPass", ratio_pass},
+        {"axisAnglePass", angle_pass},
+        {"cameraMetadataPass", camera_metadata_pass},
+        {"pass", pass},
+    };
 }
 
 QImage renderCalibrationPreview() {
@@ -59,7 +117,7 @@ QImage renderCalibrationPreview() {
     camera.pan_y = 20.0F;
 
     const QSizeF viewport(image_size);
-    auto p = [&](float x, float y) {
+    auto p = [&](const float x, const float y) {
         return EngineProjectionAdapter::worldToScreen(x, y, camera, viewport);
     };
 
@@ -99,20 +157,21 @@ QImage renderCalibrationPreview() {
     title.setBold(true);
     painter.setFont(title);
     painter.drawText(QRectF(20, 18, image.width() - 40, 28),
-                     QStringLiteral("ENGINE PROJECTION CALIBRATION"));
+                     QStringLiteral("CH_CAMERA_V1 · CLASSIC TYCOON CAMERA CALIBRATION"));
 
     QFont body = painter.font();
     body.setPointSize(10);
     body.setBold(false);
     painter.setFont(body);
     painter.setPen(QColor("#9fb6bd"));
-    painter.drawText(QRectF(20, 50, image.width() - 40, 44),
-                     QStringLiteral("2x2 world tile · four vertical posts · projected ground disk\n"
-                                    "Composer delegates to src/ch_core/projection.cpp::world_to_screen_point()"));
+    painter.drawText(QRectF(20, 50, image.width() - 40, 58),
+                     QStringLiteral("Orthographic 2:1 dimetric ground · yaw 45° · elevation 30°\n"
+                                    "screen ground axis 26.565° · four vertical posts · projected disk\n"
+                                    "Composer delegates to src/ch_core/projection.cpp"));
 
     painter.setPen(QColor("#82d6a0"));
     painter.drawText(QRectF(20, image.height() - 42, image.width() - 40, 24),
-                     QStringLiteral("CALIBRATION PASS: runtime and composer share one projection source"));
+                     QStringLiteral("PASS requires runtime parity AND CH_CAMERA_V1 visual geometry"));
     painter.end();
     return image;
 }
@@ -144,7 +203,7 @@ ProjectionCalibrationResult ProjectionCalibrationGate::run() {
     QJsonArray rotation_reports;
     float max_error = 0.0F;
     int compared = 0;
-    bool pass = true;
+    bool parity_pass = true;
 
     for (const ch::CameraRotation rotation : rotations) {
         ch::CameraState camera;
@@ -162,7 +221,7 @@ ProjectionCalibrationResult ProjectionCalibrationGate::run() {
             rotation_max = std::max(rotation_max, error);
             max_error = std::max(max_error, error);
             ++compared;
-            if (error > kTolerancePx) pass = false;
+            if (error > kTolerancePx) parity_pass = false;
         }
 
         rotation_reports.append(QJsonObject{
@@ -173,21 +232,27 @@ ProjectionCalibrationResult ProjectionCalibrationGate::run() {
         });
     }
 
+    bool profile_pass = false;
+    const QJsonObject camera_profile = validateCameraProfile(&profile_pass);
+    const bool pass = parity_pass && profile_pass;
+
     result.pass = pass;
     result.max_error_px = max_error;
     result.compared_points = compared;
     result.reason = pass
-        ? QStringLiteral("Composer projection is pixel-identical to runtime projection samples.")
-        : QStringLiteral("Composer/runtime projection mismatch exceeded calibration tolerance.");
+        ? QStringLiteral("Runtime/Composer projection parity and CH_CAMERA_V1 classic-tycoon geometry both passed.")
+        : QStringLiteral("Camera calibration failed runtime parity or CH_CAMERA_V1 visual-geometry validation.");
     result.preview = renderCalibrationPreview();
     result.report = QJsonObject{
         {"version", QString::fromLatin1(kVersion)},
         {"pass", pass},
+        {"runtimeParityPass", parity_pass},
+        {"visualCameraProfilePass", profile_pass},
         {"tolerancePx", kTolerancePx},
         {"maxErrorPx", max_error},
         {"comparedPoints", compared},
         {"sourceOfTruth", QStringLiteral("src/ch_core/projection.cpp::ch::world_to_screen_point")},
-        {"nominalAngleChecksAreAuthoritative", false},
+        {"cameraProfile", camera_profile},
         {"fixture", QJsonObject{
             {"worldTileWidth", 2.0},
             {"worldTileHeight", 2.0},
