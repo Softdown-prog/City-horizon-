@@ -103,6 +103,9 @@ void drawNodeVisual(QPainter& painter,
         return;
     }
 
+    const AnimationNodeState* state = AnimationCore::findNodeState(sample, node.id);
+    const int visual_variant = state ? state->visual_variant : node.visual_variant;
+
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, node.visual_smooth_scaling);
@@ -110,10 +113,9 @@ void drawNodeVisual(QPainter& painter,
     painter.setWorldTransform(nodeOriginTransform(asset, sample, node, root_transform));
 
     QString source_reason;
-    const QImage source = AnimationVisualSourceRenderer::renderSource(asset, node, &source_reason);
+    const QImage source = AnimationVisualSourceRenderer::renderSource(
+        asset, node, visual_variant, &source_reason);
     if (source.isNull()) {
-        // Direct preview calls remain diagnostic. Production export validates
-        // sources before frame generation and therefore never bakes this marker.
         drawMissingSource(painter, node);
         painter.restore();
         return;
@@ -125,15 +127,25 @@ void drawNodeVisual(QPainter& painter,
     painter.restore();
 }
 
-std::vector<const AnimationNodeSpec*> sortedNodes(const AnimatedAssetSpec& asset) {
+std::vector<const AnimationNodeSpec*> sortedNodes(const AnimatedAssetSpec& asset,
+                                                  const AnimationFrameSample& sample) {
     std::vector<const AnimationNodeSpec*> nodes;
     nodes.reserve(asset.nodes.size());
     for (const AnimationNodeSpec& node : asset.nodes) nodes.push_back(&node);
-    std::stable_sort(nodes.begin(), nodes.end(), [](const AnimationNodeSpec* lhs,
-                                                    const AnimationNodeSpec* rhs) {
-        return lhs->draw_order < rhs->draw_order;
+    std::stable_sort(nodes.begin(), nodes.end(), [&](const AnimationNodeSpec* lhs,
+                                                     const AnimationNodeSpec* rhs) {
+        const AnimationNodeState* lhs_state = AnimationCore::findNodeState(sample, lhs->id);
+        const AnimationNodeState* rhs_state = AnimationCore::findNodeState(sample, rhs->id);
+        const int lhs_order = lhs_state ? lhs_state->draw_order : lhs->draw_order;
+        const int rhs_order = rhs_state ? rhs_state->draw_order : rhs->draw_order;
+        return lhs_order < rhs_order;
     });
     return nodes;
+}
+
+int resolvedDrawOrder(const AnimationFrameSample& sample, const AnimationNodeSpec& node) {
+    const AnimationNodeState* state = AnimationCore::findNodeState(sample, node.id);
+    return state ? state->draw_order : node.draw_order;
 }
 
 } // namespace
@@ -146,14 +158,14 @@ QImage AnimationPreviewRenderer::renderFrame(const AnimatedAssetSpec& asset,
 
     const AnimationFrameSample sample = AnimationCore::sampleFrame(asset, clip, frame_index);
     const QTransform root_transform = rootTransform(asset, sample);
-    const std::vector<const AnimationNodeSpec*> nodes = sortedNodes(asset);
+    const std::vector<const AnimationNodeSpec*> nodes = sortedNodes(asset, sample);
 
     QPainter painter(&frame);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
     for (const AnimationNodeSpec* node : nodes) {
-        if (node->draw_order >= 0) break;
+        if (resolvedDrawOrder(sample, *node) >= 0) break;
         drawNodeVisual(painter, asset, sample, *node, root_transform);
     }
 
@@ -168,7 +180,7 @@ QImage AnimationPreviewRenderer::renderFrame(const AnimatedAssetSpec& asset,
     }
 
     for (const AnimationNodeSpec* node : nodes) {
-        if (node->draw_order < 0) continue;
+        if (resolvedDrawOrder(sample, *node) < 0) continue;
         drawNodeVisual(painter, asset, sample, *node, root_transform);
     }
 
@@ -227,7 +239,7 @@ QImage AnimationPreviewRenderer::renderPreviewSheet(const AnimatedAssetSpec& ass
     painter.setPen(QColor("#aebbc0"));
     painter.drawText(QRect(16, 34, canvas.width() - 32, 20),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("Stable anchor · hierarchical nodes · real visual sources · deterministic sampling · %1 s · %2")
+                     QStringLiteral("Stable anchor · dynamic depth · visual variants · deterministic sampling · %1 s · %2")
                          .arg(clip.duration_seconds, 0, 'f', 2)
                          .arg(clip.loop ? QStringLiteral("loop") : QStringLiteral("one-shot")));
 
