@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Gui)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 include(FetchContent)
 set(SDL_TESTS OFF CACHE BOOL "Disable SDL tests for the Studio build" FORCE)
@@ -57,6 +57,17 @@ target_include_directories(mapforge2_studio_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+add_library(mapforge2_asset_document STATIC
+    src/asset_document.cpp
+    src/asset_history.cpp
+)
+target_include_directories(mapforge2_asset_document PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_link_libraries(mapforge2_asset_document PUBLIC
+    Qt6::Core
+)
+
 add_library(mapforge2_asset_composer STATIC
     src/animation_core.cpp
     src/animation_visual_source_renderer.cpp
@@ -86,6 +97,7 @@ target_include_directories(mapforge2_asset_composer PUBLIC
     ${CH_ROOT}
 )
 target_link_libraries(mapforge2_asset_composer PUBLIC
+    mapforge2_asset_document
     mapforge2_canonical
     Qt6::Gui
 )
@@ -132,24 +144,33 @@ add_executable(MapForge2AnimationPreview
 )
 target_link_libraries(MapForge2AnimationPreview PRIVATE mapforge2_asset_composer Qt6::Gui)
 
+add_executable(MapForge2AssetDocumentGate
+    src/asset_document_gate_main.cpp
+)
+target_link_libraries(MapForge2AssetDocumentGate PRIVATE mapforge2_asset_document Qt6::Core)
+
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_render PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_studio_core PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(mapforge2_asset_document PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_asset_composer PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_editor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2 PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(mapforge2_canonical PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_render PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_studio_core PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(mapforge2_asset_document PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_asset_composer PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_editor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2 PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 add_custom_command(TARGET MapForge2 POST_BUILD

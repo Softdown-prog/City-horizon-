@@ -1,0 +1,44 @@
+{
+  "id": "CH_ASSET_DOCUMENT_V1",
+  "name": "City Horizon Universal Asset Authoring Document",
+  "status": "foundation",
+  "fileExtension": ".chasset",
+  "purpose": "Deterministic authoring state shared by raster, vector, 2.5D, animation and AI-operated asset workflows.",
+  "cameraContractDefault": "CH_CAMERA_V1",
+  "stylePresetDefault": "CH_CLASSIC_TYCOON_STYLE_V1",
+  "aiPolicy": {
+    "directFinalPixelGenerationAsPrimaryOperation": false,
+    "editsDocumentState": true,
+    "rendererOwnsFinalOutput": true,
+    "allAiEditsMustBeUndoable": true
+  },
+  "layerTypes": [
+    "group",
+    "raster",
+    "vector",
+    "mask",
+    "adjustment",
+    "reference",
+    "object_2_5d"
+  ],
+  "determinism": {
+    "orderedLayers": true,
+    "persistentLayerIds": true,
+    "explicitTransforms": true,
+    "explicitPivots": true,
+    "explicitExternalSourcePaths": true,
+    "futureRandomOperationsMustPersistSeed": true
+  },
+  "history": {
+    "transactionalUndoRedo": true,
+    "aiRequestCanBeGroupedAsSingleTransaction": true
+  },
+  "validation": {
+    "persistentIdFormat": "^[a-z0-9][a-z0-9._-]*$",
+    "hierarchyCyclesRejected": true,
+    "missingParentsRejected": true,
+    "opacityRange": [0.0, 1.0],
+    "normalizedPivotRange": [0.0, 1.0],
+    "normalizedAnchorRange": [0.0, 1.0]
+  }
+}

@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Map Forge 2
         shell: pwsh
-        run: cmake --build build/mapforge2 --config Release --target MapForge2 MapForge2ComposerPreview MapForge2AnimationPreview --parallel
+        run: cmake --build build/mapforge2 --config Release --target MapForge2 MapForge2ComposerPreview MapForge2AnimationPreview MapForge2AssetDocumentGate --parallel
 
       - name: Deploy Studio runtime
         shell: pwsh
@@ -54,9 +54,20 @@ jobs:
           Copy-Item "C++/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md" dist/MapForge2/CH_STUDIO_PRODUCTION_WORKBENCH_V1.md
           Copy-Item "C++/MapForge2/CH_BUILDING_COMPOSER_V0.md" dist/MapForge2/CH_BUILDING_COMPOSER_V0.md
           Copy-Item "C++/MapForge2/CH_CLASSIC_TYCOON_STYLE_V1.md" dist/MapForge2/CH_CLASSIC_TYCOON_STYLE_V1.md
+          Copy-Item "C++/MapForge2/CH_ASSET_EDITOR_FOUNDATION_V1.md" dist/MapForge2/CH_ASSET_EDITOR_FOUNDATION_V1.md
           New-Item -ItemType Directory -Force -Path dist/MapForge2/examples | Out-Null
           Copy-Item "C++/MapForge2/examples/content_packs/circus_validation_pack.json" dist/MapForge2/examples/circus_validation_pack.json
           Copy-Item "C++/MapForge2/examples/studio_project/city_horizon_production_profile.json" dist/MapForge2/examples/city_horizon_production_profile.json
+
+      - name: Validate deterministic AssetDocument foundation
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/MapForge2/asset_document_tests | Out-Null
+          build/mapforge2/Release/MapForge2AssetDocumentGate.exe dist/MapForge2/asset_document_tests
+          if (-not (Test-Path dist/MapForge2/asset_document_tests/foundation_sample.chasset)) { throw "Deterministic .chasset round-trip fixture was not generated." }
+          if (-not (Test-Path dist/MapForge2/asset_document_tests/asset_document_gate.json)) { throw "AssetDocument foundation gate report was not generated." }
+          $report = Get-Content dist/MapForge2/asset_document_tests/asset_document_gate.json -Raw | ConvertFrom-Json
+          if (-not $report.pass) { throw "AssetDocument deterministic persistence/history gate failed." }
 
       - name: Generate Building Composer visual gate
         shell: pwsh
