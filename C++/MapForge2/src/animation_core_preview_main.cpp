@@ -1,4 +1,5 @@
 #include "animation_export_pipeline.h"
+#include "carousel_part_library.h"
 
 #include <QDir>
 #include <QGuiApplication>
@@ -6,79 +7,6 @@
 #include <iostream>
 
 namespace {
-
-ch::studio::BuildingComposerSpec partBuilding(const QColor& wall,
-                                              const QColor& roof,
-                                              const ch::studio::BuildingRoofStyle roof_style,
-                                              const int footprint_width,
-                                              const int footprint_depth) {
-    using namespace ch::studio;
-    BuildingComposerSpec spec = BuildingComposer::presetSpec();
-    spec.footprint_width_tiles = footprint_width;
-    spec.footprint_depth_tiles = footprint_depth;
-    spec.floor_count = 1;
-    spec.floor_height_px = 36;
-    spec.wall_height_px = 36;
-    spec.wall_color = wall;
-    spec.roof_color = roof;
-    spec.trim_color = QColor("#f2eadf");
-    spec.wall_material = BuildingWallMaterial::Solid;
-    spec.roof_material = BuildingRoofMaterial::Solid;
-    spec.roof_style = roof_style;
-    spec.roof_height_px = roof_style == BuildingRoofStyle::Flat ? 8 : 24;
-    spec.roof_pitch_degrees = 32.0F;
-    spec.roof_overhang = 0.08F;
-    spec.windows = false;
-    spec.south_door = false;
-    spec.south_awning = false;
-    spec.south_sign = false;
-    spec.roof_chimney = false;
-    spec.cast_shadow = false;
-    return spec;
-}
-
-ch::studio::AnimationNodeSpec buildingNode(const QString& id,
-                                           const QString& parent,
-                                           const QPointF position,
-                                           const QSizeF size,
-                                           const ch::studio::BuildingComposerSpec& building,
-                                           const int draw_order) {
-    using namespace ch::studio;
-    AnimationNodeSpec node;
-    node.id = id;
-    node.parent_id = parent;
-    node.position_px = position;
-    node.pivot_normalized = QPointF(0.50, 0.62);
-    node.visual_kind = AnimationNodeVisualKind::BuildingRender;
-    node.visual_size_px = size;
-    node.visual_building = building;
-    node.visual_building_view = BuildingView::South;
-    node.visual_trim_transparent = true;
-    node.visual_preserve_aspect = true;
-    node.draw_order = draw_order;
-    return node;
-}
-
-ch::studio::AnimationNodeSpec rasterNode(const QString& id,
-                                         const QString& parent,
-                                         const QPointF position,
-                                         const QSizeF size,
-                                         const int draw_order) {
-    using namespace ch::studio;
-    AnimationNodeSpec node;
-    node.id = id;
-    node.parent_id = parent;
-    node.position_px = position;
-    node.pivot_normalized = QPointF(0.50, 0.88);
-    node.visual_kind = AnimationNodeVisualKind::RasterSprite;
-    node.visual_size_px = size;
-    node.visual_asset_path = QStringLiteral("assets/pedestrians/canonical_walk/se/frame_00.png");
-    node.visual_trim_transparent = true;
-    node.visual_preserve_aspect = true;
-    node.visual_smooth_scaling = true;
-    node.draw_order = draw_order;
-    return node;
-}
 
 ch::studio::AnimationTrack rotationTrack(const QString& target) {
     using namespace ch::studio;
@@ -106,48 +34,70 @@ ch::studio::AnimationTrack bobTrack(const QString& target, const float phase) {
     return track;
 }
 
-ch::studio::AnimatedAssetSpec makeAnimationCoreGate() {
+ch::studio::AnimatedAssetSpec makeCarouselLibraryGate() {
     using namespace ch::studio;
 
     AnimatedAssetSpec asset;
-    asset.asset_id = QStringLiteral("animation_visual_sources_reference");
-    asset.category = QStringLiteral("mechanical_qa_reference");
-    asset.palette_profile = QStringLiteral("city_horizon_classic_tycoon");
+    asset.asset_id = QStringLiteral("carousel_classic_reference");
+    asset.category = QStringLiteral("amusement_ride");
+    asset.palette_profile = QStringLiteral("amusement_park_classic");
     asset.frame_size = QSize(420, 420);
     asset.anchor_normalized = QPointF(0.50, 0.90);
     asset.view = BuildingView::South;
     asset.render_base_building = false;
-    asset.visual_source_root = QStringLiteral(".");
 
-    const BuildingComposerSpec base = partBuilding(
-        QColor("#745348"), QColor("#5c4038"), BuildingRoofStyle::Flat, 2, 2);
-    const BuildingComposerSpec platform = partBuilding(
-        QColor("#d39b43"), QColor("#b87532"), BuildingRoofStyle::Flat, 2, 2);
-    const BuildingComposerSpec canopy = partBuilding(
-        QColor("#efe3cf"), QColor("#a94e3f"), BuildingRoofStyle::Hip, 2, 2);
-    const BuildingComposerSpec pole = partBuilding(
-        QColor("#eee7da"), QColor("#d0c5b6"), BuildingRoofStyle::Flat, 1, 1);
-
+    const QColor outline("#343638");
     asset.nodes = {
-        buildingNode(QStringLiteral("base"), QStringLiteral("root"), QPointF(210.0, 326.0),
-                     QSizeF(220.0, 84.0), base, 0),
-        buildingNode(QStringLiteral("platform"), QStringLiteral("root"), QPointF(210.0, 286.0),
-                     QSizeF(198.0, 74.0), platform, 10),
-        rasterNode(QStringLiteral("horse_a"), QStringLiteral("platform"), QPointF(-68.0, -8.0),
-                   QSizeF(30.0, 52.0), 20),
-        rasterNode(QStringLiteral("horse_b"), QStringLiteral("platform"), QPointF(0.0, 18.0),
-                   QSizeF(30.0, 52.0), 21),
-        rasterNode(QStringLiteral("horse_c"), QStringLiteral("platform"), QPointF(68.0, -8.0),
-                   QSizeF(30.0, 52.0), 22),
-        buildingNode(QStringLiteral("center_pole"), QStringLiteral("root"), QPointF(210.0, 238.0),
-                     QSizeF(34.0, 150.0), pole, 30),
-        buildingNode(QStringLiteral("canopy"), QStringLiteral("root"), QPointF(210.0, 174.0),
-                     QSizeF(220.0, 116.0), canopy, 40),
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.base.classic.v1"), QStringLiteral("base"),
+            QStringLiteral("root"), QPointF(210.0, 328.0), 0,
+            QColor("#785548"), outline),
+
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.platform.classic.v1"), QStringLiteral("platform"),
+            QStringLiteral("root"), QPointF(210.0, 286.0), 10,
+            QColor("#d29a42"), outline),
+
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.horse.classic.v1"), QStringLiteral("horse_a"),
+            QStringLiteral("platform"), QPointF(-72.0, -8.0), 20,
+            QColor("#b8524d"), outline),
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.horse.classic.v1"), QStringLiteral("horse_b"),
+            QStringLiteral("platform"), QPointF(0.0, 20.0), 21,
+            QColor("#547a9b"), outline),
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.horse.classic.v1"), QStringLiteral("horse_c"),
+            QStringLiteral("platform"), QPointF(72.0, -8.0), 22,
+            QColor("#71905a"), outline),
+
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.center_pole.classic.v1"), QStringLiteral("center_pole"),
+            QStringLiteral("root"), QPointF(210.0, 240.0), 30,
+            QColor("#e9dfcf"), outline),
+
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.canopy.classic.v1"), QStringLiteral("canopy"),
+            QStringLiteral("root"), QPointF(210.0, 185.0), 40,
+            QColor("#b94f49"), outline),
+
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.ornament.rosette.v1"), QStringLiteral("rosette_left"),
+            QStringLiteral("canopy"), QPointF(-70.0, 32.0), 41,
+            QColor("#dba848"), outline),
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.ornament.rosette.v1"), QStringLiteral("rosette_right"),
+            QStringLiteral("canopy"), QPointF(70.0, 32.0), 42,
+            QColor("#dba848"), outline),
+        CarouselPartLibrary::makeNode(
+            QStringLiteral("carousel.ornament.finial.v1"), QStringLiteral("finial"),
+            QStringLiteral("canopy"), QPointF(0.0, -80.0), 43,
+            QColor("#d6a044"), outline),
     };
 
     AnimationClip clip;
     clip.id = QStringLiteral("carousel_parts_loop");
-    clip.name = QStringLiteral("Real visual-source carousel parts loop");
+    clip.name = QStringLiteral("City Horizon classic carousel library loop");
     clip.duration_seconds = 2.0F;
     clip.frame_count = 12;
     clip.loop = true;
@@ -170,13 +120,13 @@ int main(int argc, char** argv) {
         ? QString::fromLocal8Bit(argv[1])
         : QStringLiteral("animation_core_preview");
 
-    const ch::studio::AnimatedAssetSpec asset = makeAnimationCoreGate();
+    const ch::studio::AnimatedAssetSpec asset = makeCarouselLibraryGate();
     const ch::studio::AnimationExportResult result =
         ch::studio::AnimationExportPipeline::exportClip(
             asset, QStringLiteral("carousel_parts_loop"), output_dir);
 
     if (!result.success) {
-        std::cerr << "Animation visual-source preview export failed: "
+        std::cerr << "Carousel library preview export failed: "
                   << result.reason.toStdString() << "\n";
         return 2;
     }
@@ -184,6 +134,6 @@ int main(int argc, char** argv) {
     QDir directory(output_dir);
     for (const QString& file : result.files)
         std::cout << directory.filePath(file).toStdString() << "\n";
-    std::cout << "Animation visual-source preview package generated.\n";
+    std::cout << "Carousel library preview package generated.\n";
     return 0;
 }
