@@ -1,0 +1,59 @@
+{
+  "id": "animation_core_1",
+  "name": "City Horizon Animation Core",
+  "status": "canonical",
+  "purpose": "Deterministic parametric timeline and frame export contract for animated City Horizon assets.",
+  "dataModel": {
+    "asset": "AnimatedAssetSpec",
+    "clip": "AnimationClip",
+    "track": "AnimationTrack",
+    "keyframe": "AnimationKeyframe"
+  },
+  "timing": {
+    "frameCountRange": [2, 240],
+    "timeUnit": "seconds",
+    "loopClipsOmitDuplicatedEndFrame": true,
+    "loopTracksRequireStartAndDurationKeys": true,
+    "loopEndpointsMustMatch": true,
+    "fullTurnRotationEndpointsEquivalent": true
+  },
+  "interpolation": ["step", "linear", "smooth_step", "sine"],
+  "rootProperties": [
+    "offset_x_px",
+    "offset_y_px",
+    "rotation_degrees",
+    "scale",
+    "opacity",
+    "visibility"
+  ],
+  "coherence": {
+    "stableNormalizedAnchor": true,
+    "stableFrameSize": true,
+    "stableBaseRenderable": true,
+    "stablePaletteProfile": true,
+    "deterministicSampling": true,
+    "frameIndependentRandomGeneration": false
+  },
+  "preview": {
+    "singleFrame": true,
+    "contactSheet": true,
+    "spritesheet": true,
+    "frameLabelsIncludeTime": true
+  },
+  "export": {
+    "version": "animation_export_1",
+    "outputs": ["spritesheet_png", "preview_png", "manifest_json"],
+    "spritesheetOrder": "row_major",
+    "manifestRecordsFrameSamples": true,
+    "manifestRecordsAnchor": true,
+    "manifestRecordsPaletteProfile": true,
+    "runtime": "SDL consumes baked frame cells and clip timing"
+  },
+  "scope": {
+    "currentRenderable": "BuildingComposerSpec",
+    "currentTrackTarget": "root",
+    "futureTargets": ["mechanical_parts", "rig_joints", "animal_parts", "effects"],
+    "futureAnimationComposer": true
+  },
+  "authoringRule": "Frames are samples of one canonical asset and one timeline. Never regenerate each frame independently. Camera, palette profile, frame size and anchor remain stable unless a future specialized contract explicitly allows otherwise."
+}
