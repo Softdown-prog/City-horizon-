@@ -1,5 +1,7 @@
 #include "engine_projection_adapter.h"
 
+#include "src/ch_core/contracts.h"
+
 namespace ch::studio {
 
 QPointF EngineProjectionAdapter::worldToScreen(const float world_x,
@@ -34,6 +36,14 @@ QJsonObject EngineProjectionAdapter::manifest(const ch::CameraState& camera) {
         {"version", QString::fromLatin1(kVersion)},
         {"canonicalSourceFile", QString::fromLatin1(kCanonicalSourceFile)},
         {"canonicalFunction", QString::fromLatin1(kCanonicalFunction)},
+        {"gridContract", QString::fromLatin1(ch::contracts::kGridContract)},
+        {"cameraContract", QString::fromLatin1(ch::contracts::kCameraContract)},
+        {"projectionKind", QStringLiteral("orthographic_dimetric_2_to_1")},
+        {"cameraWorldYawDeg", ch::contracts::kCameraWorldYawDeg},
+        {"cameraElevationDeg", ch::contracts::kCameraElevationDeg},
+        {"groundAxisScreenAngleDeg", ch::contracts::kGroundAxisScreenAngleDeg},
+        {"diamondRatio", ch::contracts::kDiamondRatio},
+        {"perspective", ch::contracts::kCameraPerspective},
         {"formulaDuplicatedInComposer", false},
         {"cameraRotationQuarterTurns", static_cast<int>(camera.rotation)},
         {"cameraZoom", camera.zoom},
