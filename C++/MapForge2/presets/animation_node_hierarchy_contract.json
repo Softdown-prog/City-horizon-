@@ -1,0 +1,61 @@
+{
+  "id": "animation_node_hierarchy_1",
+  "name": "City Horizon Animation Node Hierarchy",
+  "status": "canonical",
+  "purpose": "Persistent part/node hierarchy for coherent multi-part animation such as carousels, ferris wheels, characters and animals.",
+  "root": {
+    "id": "root",
+    "implicit": true,
+    "reserved": true,
+    "ownsAssetAnchor": true
+  },
+  "node": {
+    "type": "AnimationNodeSpec",
+    "required": ["id", "parentId"],
+    "transform": ["positionPx", "pivotNormalized", "rotationDegrees", "scale", "opacity", "visible"],
+    "drawOrder": true,
+    "visualQaKinds": ["none", "primitive_rectangle", "primitive_ellipse"]
+  },
+  "validation": {
+    "uniqueIds": true,
+    "rootIdCannotBeReused": true,
+    "parentMustExist": true,
+    "selfParentRejected": true,
+    "cyclesRejected": true,
+    "pivotRange": [0.0, 1.0],
+    "positiveScale": true,
+    "opacityRange": [0.0, 1.0],
+    "trackTargetsMustExist": true,
+    "duplicateTargetPropertyTracksRejected": true
+  },
+  "composition": {
+    "parentTransformPropagatesToChildren": true,
+    "childKeepsIndependentTrackState": true,
+    "visibilityIsCumulative": true,
+    "opacityIsCumulative": true,
+    "drawOrderIsDeterministic": true,
+    "assetRootTransformAppliesBeforeNodeHierarchy": true
+  },
+  "qaReference": {
+    "baseStatic": true,
+    "platformRotates": true,
+    "horsesParentedToPlatform": true,
+    "horsesUseIndependentVerticalTracks": true,
+    "frameCount": 12,
+    "durationSeconds": 2.0,
+    "loop": true
+  },
+  "export": {
+    "nodeDefinitionsInManifest": true,
+    "resolvedNodeStateRecordedPerFrame": true,
+    "bakedFramesRemainPrimaryRuntimePayload": true
+  },
+  "futureCompatibility": {
+    "spritePartSources": true,
+    "mechanicalSubassemblies": true,
+    "characterRigJoints": true,
+    "animalRigJoints": true,
+    "counterRotationTracks": true
+  },
+  "authoringRule": "A moving part is one persistent node across the entire clip. Never create a visually similar replacement node for each frame. Parent/child relationships, pivots, palette identity and draw order remain stable; only authored track properties change over time."
+}
