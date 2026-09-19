@@ -119,3 +119,121 @@ jobs:
           path: out/tycoon_asset_baker
           if-no-files-found: error
           retention-days: 14
+
+  bake-cafeteria-consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASSET_CONFIG: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      ASSET_ID: neighborhood_cafe_2x1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-processing and headless rendering dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Download pinned Blender portable build
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          echo "Downloading Blender $version from $url"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          if [[ -z "$blender_exe" ]]; then
+            echo "blender executable was not found after extraction" >&2
+            exit 1
+          fi
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake cafeteria through frozen studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_cafeteria/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_scene.py -- \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tycoon_cafeteria/source"
+
+          for direction in south east west north; do
+            test -f "out/tycoon_cafeteria/source/${ASSET_ID}_${direction}_color_source.png"
+            test -f "out/tycoon_cafeteria/source/${ASSET_ID}_${direction}_shadow_source.png"
+          done
+          test -f out/tycoon_cafeteria/source/studio_metadata.json
+
+      - name: Build cafeteria four-direction package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_cafeteria/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/tycoon_cafeteria/source \
+            --output out/tycoon_cafeteria/final \
+            --studio-preset "$STUDIO_PRESET"
+
+          required=(
+            ${ASSET_ID}_south.png
+            ${ASSET_ID}_east.png
+            ${ASSET_ID}_west.png
+            ${ASSET_ID}_north.png
+            ${ASSET_ID}_4view.png
+            ${ASSET_ID}_atlas.png
+            ${ASSET_ID}_review.png
+            ${ASSET_ID}_style_matrix.png
+            ${ASSET_ID}_4dir_context.png
+            ${ASSET_ID}_manifest.json
+          )
+          for file in "${required[@]}"; do
+            test -f "out/tycoon_cafeteria/final/$file"
+          done
+
+      - name: Validate cafeteria contracts and four-view coherence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/validate_package.py \
+            --manifest "out/tycoon_cafeteria/final/${ASSET_ID}_manifest.json" \
+            --asset-config "$ASSET_CONFIG" \
+            --studio-preset "$STUDIO_PRESET"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('out/tycoon_cafeteria/final/neighborhood_cafe_2x1_manifest.json').read_text())
+          footprint = manifest['footprint']
+          assert footprint['widthTiles'] == 2
+          assert footprint['depthTiles'] == 1
+          assert footprint['occupiedCells'] == [[0, 0], [1, 0]]
+          assert manifest['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
+          print('cafeteriaConsistencyGate: PASS')
+          print('footprint:', footprint)
+          PY
+
+      - name: Upload cafeteria consistency artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tycoon-Asset-Baker-V1-Cafeteria-Consistency
+          path: out/tycoon_cafeteria
+          if-no-files-found: error
+          retention-days: 14
