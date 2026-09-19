@@ -1,0 +1,40 @@
+{
+  "id": "carousel_engine_camera_1",
+  "name": "City Horizon Carousel Engine Camera Contract",
+  "status": "canonical",
+  "purpose": "Lock Carousel Composer motion to the same world-to-screen basis used by the City Horizon engine instead of an arbitrary screen-space ellipse or parent rotation.",
+  "engineGridContract": "CH_GRID_V1",
+  "projection": {
+    "tileWidth": 128,
+    "tileHeight": 64,
+    "diamondRatio": 2.0,
+    "horizontalWorldRotationDegrees": 45.0,
+    "isometricInclinationDegrees": 35.264,
+    "groundPlaneBasis": {
+      "screenX": "(worldX - worldY) * tileWidth/2",
+      "screenY": "(worldX + worldY) * tileHeight/2"
+    }
+  },
+  "carouselOrbit": {
+    "authoredInWorldPlane": true,
+    "screenSpaceParentRotationForbidden": true,
+    "horseOffsetXGeneratedFromWorldOrbit": true,
+    "horseOffsetYGeneratedFromWorldOrbit": true,
+    "verticalBobAddedAfterGroundProjection": true,
+    "canonicalDepthScale": 0.5,
+    "depthScaleAuthorOverrideForbidden": true
+  },
+  "directionAndDepth": {
+    "horseDirectionDerivedFromProjectedWorldTangent": true,
+    "depthOrderingDerivedFromProjectedWorldPosition": true,
+    "directionalVariants": ["east", "south", "west", "north"]
+  },
+  "coherence": {
+    "sameCameraAsEngineGrid": true,
+    "sameTwoToOneDiamond": true,
+    "noMockupCameraInference": true,
+    "deterministicAcrossFrames": true,
+    "loopClosureRequired": true
+  },
+  "authoringRule": "Carousel motion is authored in the logical world plane and projected through CH_GRID_V1. Never rotate the horse hierarchy as a flat screen-space group to simulate an isometric orbit."
+}
