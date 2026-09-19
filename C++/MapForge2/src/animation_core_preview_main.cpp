@@ -107,7 +107,8 @@ int main(int argc, char** argv) {
         return 5;
 
     std::cout
-        << "Carousel Composer package generated after pixel-identical runtime "
-           "projection calibration and with authored modular carousel assets.\n";
+        << "Carousel Composer package generated after CH_CAMERA_V1 validation: "
+           "orthographic 2:1 dimetric, 45-degree yaw, 30-degree elevation, "
+           "26.565-degree ground axes, runtime parity, and authored modular assets.\n";
     return 0;
 }
