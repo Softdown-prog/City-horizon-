@@ -42,6 +42,26 @@ QRect alphaBounds(const QImage& image, const int threshold = 16) {
         : QRect();
 }
 
+QSize measurementFrame(const BuildingComposerSpec& spec) {
+    const int span_tiles = std::clamp(spec.footprint_width_tiles, 1, 8) +
+                           std::clamp(spec.footprint_depth_tiles, 1, 8);
+    const int width = std::max(420, span_tiles * 64 + 192);
+    const int height = std::max(420,
+        BuildingComposer::effectiveWallHeightPx(spec) +
+        std::max(10, spec.roof_height_px) * 2 + span_tiles * 20 + 150);
+    return QSize(width, height);
+}
+
+QImage scaledBuilding(const BuildingComposerSpec& spec, const LodProfile& profile) {
+    const QImage source = BuildingFacadeRenderer::renderView(spec, BuildingView::South, measurementFrame(spec));
+    const QRect bounds = alphaBounds(source, 2);
+    if (bounds.isNull()) return QImage();
+    const QImage cropped = source.copy(bounds.adjusted(-2, -2, 2, 2).intersected(source.rect()));
+    const QSize target(std::max(1, static_cast<int>(cropped.width() * profile.scale)),
+                       std::max(1, static_cast<int>(cropped.height() * profile.scale)));
+    return cropped.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+}
+
 BuildingLodLevelValidation evaluate(const QImage& image, const LodProfile& profile) {
     BuildingLodLevelValidation level;
     level.id = QString::fromLatin1(profile.id);
@@ -79,14 +99,6 @@ BuildingLodLevelValidation evaluate(const QImage& image, const LodProfile& profi
     return level;
 }
 
-QImage scaledBuilding(const BuildingComposerSpec& spec, const LodProfile& profile) {
-    const QSize source_size(420, 420);
-    const QImage source = BuildingFacadeRenderer::renderView(spec, BuildingView::South, source_size);
-    const QSize target(std::max(1, static_cast<int>(source.width() * profile.scale)),
-                       std::max(1, static_cast<int>(source.height() * profile.scale)));
-    return source.scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-}
-
 void drawLevelCard(QPainter& painter, const QRect& rect, const BuildingComposerSpec& spec,
                    const LodProfile& profile, const BuildingLodLevelValidation& validation) {
     painter.save();
@@ -108,9 +120,12 @@ void drawLevelCard(QPainter& painter, const QRect& rect, const BuildingComposerS
 
     const QImage building = scaledBuilding(spec, profile);
     const QRect target(rect.left() + 10, rect.top() + 40, rect.width() - 20, rect.height() - 108);
-    painter.drawImage(QRect(target.center().x() - building.width() / 2,
-                            target.center().y() - building.height() / 2,
-                            building.width(), building.height()), building);
+    if (!building.isNull()) {
+        const QSize display_size = building.size().scaled(target.size(), Qt::KeepAspectRatio);
+        const QImage display = building.scaled(display_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        painter.drawImage(QPoint(target.center().x() - display.width() / 2,
+                                 target.center().y() - display.height() / 2), display);
+    }
 
     QFont info(QStringLiteral("Arial"));
     info.setPointSize(8);
@@ -214,6 +229,8 @@ QJsonObject BuildingLodValidator::manifest(const BuildingComposerSpec& spec) {
         {"version", QStringLiteral("building_lod_gate_1")},
         {"blockingProductionExport", true},
         {"sourceView", QStringLiteral("south")},
+        {"measurementFrameDynamic", true},
+        {"alphaCroppedBeforeScaling", true},
         {"levels", levels},
         {"validation", validate(spec).toJson()},
         {"purpose", QStringLiteral("ensure building silhouette and material/facade contrast remain readable at gameplay zoom scales")},
