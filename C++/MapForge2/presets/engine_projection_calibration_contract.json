@@ -1,0 +1,30 @@
+{
+  "id": "engine_projection_calibration_1",
+  "name": "City Horizon Runtime Projection Calibration Gate",
+  "status": "canonical",
+  "purpose": "Prove that MapForge/Carousel Composer samples the exact runtime world-to-screen implementation instead of validating nominal isometric angles.",
+  "sourceOfTruth": {
+    "file": "src/ch_core/projection.cpp",
+    "function": "ch::world_to_screen_point",
+    "adapter": "engine_projection_adapter_1",
+    "formulaDuplicationForbidden": true
+  },
+  "fixture": {
+    "worldTile": {"width": 2.0, "height": 2.0},
+    "verticalPosts": 4,
+    "groundDiskRadiusWorld": 0.67,
+    "diskSamples": 32,
+    "cameraRotationsQuarterTurns": [0, 1, 2, 3],
+    "nonDefaultZoom": 1.37,
+    "nonDefaultPan": [23.25, -17.75]
+  },
+  "acceptance": {
+    "coordinateTolerancePx": 0.0001,
+    "failureBlocksCarouselPreview": true
+  },
+  "outputs": [
+    "carousel_engine_projection_calibration.png",
+    "carousel_engine_projection_calibration.json"
+  ],
+  "rule": "Nominal values such as 45 degrees, 35.264 degrees and 2:1 may describe the projection but never count as proof of camera equivalence."
+}
