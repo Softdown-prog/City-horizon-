@@ -1,11 +1,20 @@
 {
-  "id": "carousel_parts_3",
+  "id": "carousel_parts_4",
   "name": "City Horizon Authored Carousel Part Library",
   "status": "canonical",
-  "purpose": "Use persistent modular art files for carousel production rendering instead of procedural QPainter carousel drawings.",
+  "purpose": "Use persistent modular art files for carousel production rendering instead of procedural QPainter carousel drawings, with every 3D-reading source authored for CH_CAMERA_V1.",
   "sourceType": "authored_png_base64",
   "assetRoot": "assets/amusement/carousel/classic",
   "proceduralProductionFallback": false,
+  "cameraContract": "CH_CAMERA_V1",
+  "cameraProfile": {
+    "projectionKind": "orthographic_dimetric_2_to_1",
+    "worldYawDegrees": 45.0,
+    "cameraElevationDegrees": 30.0,
+    "groundAxisScreenAngleDegrees": 26.56505117707799,
+    "diamondRatio": 2.0,
+    "perspective": false
+  },
   "parts": {
     "carousel.base.classic.v1": ["base.png.b64"],
     "carousel.platform.classic.v1": ["platform.png.b64"],
@@ -20,7 +29,9 @@
     "stablePivot": true,
     "stablePartId": true,
     "directionalHorseVariants": 4,
-    "assetAvailabilityRequiredAtRender": true
+    "assetAvailabilityRequiredAtRender": true,
+    "visualCameraMustMatchCH_CAMERA_V1": true,
+    "trueIsometric35_264AssetsRejected": true
   },
-  "rule": "Production carousel frames resolve persistent modular raster assets. Procedural carousel geometry is not a production source."
+  "rule": "Production carousel frames resolve persistent modular raster assets. Procedural carousel geometry is not a production source, and raster pieces that visually use a different camera are not production-valid even if their anchors fit the runtime grid."
 }
