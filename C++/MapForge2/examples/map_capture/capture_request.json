@@ -1,9 +1,9 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "workflow": "tycoon-water-bake.yml",
-    "artifact": "City-Horizon-Water-3D-to-2D-PNGs",
-    "file": "water_deep_00.png"
+    "workflow": "tycoon-house-bake.yml",
+    "artifact": "City-Horizon-Residential-House-PNGs",
+    "file": "residential_house_2x2_01_south.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -17,14 +17,8 @@
     },
     "camera": {
       "zoom": 0.92,
-      "focusTile": [
-        0.5,
-        0.5
-      ],
-      "focusScreen": [
-        0.5,
-        0.57
-      ]
+      "focusTile": [0.5, 0.5],
+      "focusScreen": [0.5, 0.58]
     },
     "stage": {
       "minTile": -6,
@@ -32,28 +26,18 @@
       "groundColor": "#708963",
       "alternateGroundColor": "#768f69",
       "gridColor": "#3e4f3b",
-      "drawGrid": false,
+      "drawGrid": true,
       "drawGrassTexture": true,
       "grassSpeckleColor": "#5f7f50"
     },
     "candidate": {
-      "tile": [
-        0,
-        0
-      ],
-      "footprint": [
-        2,
-        2
-      ],
-      "scale": 1,
-      "offsetPixels": [
-        0,
-        0
-      ],
-      "showFootprint": false,
+      "tile": [0, 0],
+      "footprint": [2, 2],
+      "scale": 1.0,
+      "offsetPixels": [0, 0],
+      "showFootprint": true,
       "showAnchor": false,
-      "renderAsGroundTile": true,
-      "tiles": [[0, 0], [1, 0], [0, 1], [1, 1]],
+      "renderAsGroundTile": false,
       "footprintColor": "#f6c448",
       "anchorColor": "#ffd640"
     }
