@@ -133,6 +133,9 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
     Falls back silently to flat Principled BSDF when the library is unavailable
     (e.g. during unit tests outside Blender) or when recipe=None/'solid'.
     """
+    if recipe == "water_classic":
+        return make_water_classic_material(name, rgba, roughness, metallic, seed, strength)
+
     if recipe and recipe != "solid" and _MAT_LIB_AVAILABLE:
         try:
             return _mat_lib.make(
@@ -154,6 +157,86 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
     bsdf.inputs["Base Color"].default_value = tuple(rgba)
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
+    return mat
+
+
+
+def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0, strength=1.0):
+    """Zoo Tycoon-era pre-rendered water: NW/SE gradient plus subtle Voronoi caustics."""
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    tree = mat.node_tree
+    tree.nodes.clear()
+
+    output = tree.nodes.new("ShaderNodeOutputMaterial")
+    output.location = (760, 0)
+    bsdf = tree.nodes.new("ShaderNodeBsdfPrincipled")
+    bsdf.location = (500, 0)
+    bsdf.inputs["Roughness"].default_value = max(0.12, min(0.24, roughness))
+    bsdf.inputs["Metallic"].default_value = metallic
+    if "IOR" in bsdf.inputs:
+        bsdf.inputs["IOR"].default_value = 1.333
+    if "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.48
+
+    tex = tree.nodes.new("ShaderNodeTexCoord")
+    tex.location = (-900, 80)
+    mapping = tree.nodes.new("ShaderNodeMapping")
+    mapping.location = (-720, 80)
+    # Keep the coordinate period tied to the 3 Blender-unit tile.
+    mapping.inputs["Scale"].default_value = (1.0 / BLENDER_UNITS_PER_TILE,
+                                              1.0 / BLENDER_UNITS_PER_TILE, 1.0)
+    separate = tree.nodes.new("ShaderNodeSeparateXYZ")
+    separate.location = (-520, 240)
+    add_xy = tree.nodes.new("ShaderNodeMath")
+    add_xy.operation = "ADD"
+    add_xy.location = (-320, 240)
+    add_xy.inputs[1].default_value = -0.35
+    gradient = tree.nodes.new("ShaderNodeValToRGB")
+    gradient.location = (-100, 260)
+    gradient.color_ramp.elements[0].position = 0.18
+    gradient.color_ramp.elements[0].color = (0.043, 0.157, 0.20, 1.0)
+    gradient.color_ramp.elements[1].position = 0.82
+    gradient.color_ramp.elements[1].color = (0.137, 0.545, 0.592, 1.0)
+
+    voronoi = tree.nodes.new("ShaderNodeTexVoronoi")
+    voronoi.location = (-500, -120)
+    voronoi.voronoi_dimensions = "4D"
+    voronoi.feature = "DISTANCE_TO_EDGE"
+    voronoi.inputs["Scale"].default_value = 7.0
+    voronoi.inputs["Randomness"].default_value = 0.72
+    if "W" in voronoi.inputs:
+        voronoi.inputs["W"].default_value = 0.0
+
+    caustics = tree.nodes.new("ShaderNodeValToRGB")
+    caustics.location = (-120, -100)
+    caustics.color_ramp.elements[0].position = 0.05
+    caustics.color_ramp.elements[0].color = (1.0, 1.0, 1.0, 1.0)
+    caustics.color_ramp.elements[1].position = 0.20
+    caustics.color_ramp.elements[1].color = (0.0, 0.0, 0.0, 1.0)
+    caustics.color_ramp.interpolation = "CONSTANT"
+
+    screen = tree.nodes.new("ShaderNodeMixRGB")
+    screen.location = (180, 180)
+    screen.blend_type = "SCREEN"
+    screen.inputs["Fac"].default_value = 0.34
+    bump = tree.nodes.new("ShaderNodeBump")
+    bump.location = (260, -160)
+    bump.inputs["Strength"].default_value = 0.07
+    bump.inputs["Distance"].default_value = 0.10
+
+    tree.links.new(tex.outputs["Object"], mapping.inputs["Vector"])
+    tree.links.new(mapping.outputs["Vector"], separate.inputs["Vector"])
+    tree.links.new(separate.outputs["X"], add_xy.inputs[0])
+    tree.links.new(separate.outputs["Y"], add_xy.inputs[1])
+    tree.links.new(add_xy.outputs[0], gradient.inputs["Fac"])
+    tree.links.new(gradient.outputs["Color"], screen.inputs["Color1"])
+    tree.links.new(voronoi.outputs["Distance"], caustics.inputs["Fac"])
+    tree.links.new(caustics.outputs["Color"], screen.inputs["Color2"])
+    tree.links.new(screen.outputs["Color"], bsdf.inputs["Base Color"])
+    tree.links.new(caustics.outputs["Color"], bump.inputs["Height"])
+    tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
     return mat
 
 
@@ -229,9 +312,9 @@ def add_water_surface(part, material):
     for polygon in obj.data.polygons:
         polygon.use_smooth = True
 
-    # The studio material stays physically simple, but water needs a tight
-    # highlight so the displaced plane has classic pre-rendered readability.
-    if material.use_nodes:
+    # The classic water node graph carries the readable highlights and caustics;
+    # the mesh itself remains a zero-thickness ground surface.
+    if material.use_nodes and not material.name.startswith("Water"):
         bsdf = material.node_tree.nodes.get("Principled BSDF")
         if bsdf is not None:
             if "Roughness" in bsdf.inputs:
