@@ -21,7 +21,7 @@ ch::studio::CarouselComposerSpec makeCarouselComposerGate() {
     spec.anchor_normalized = QPointF(0.50, 0.90);
     spec.horse_count = 8;
     spec.platform_radius_px = 72.0F;
-    spec.isometric_depth_scale = 0.46F;
+    spec.isometric_depth_scale = 0.50F;
     spec.horse_bob_amplitude_px = 9.0F;
     spec.duration_seconds = 2.4F;
     spec.frame_count = 16;
@@ -85,6 +85,6 @@ int main(int argc, char** argv) {
 
     if (!writeComposerAuthoringManifest(composer_spec, output_dir)) return 4;
 
-    std::cout << "Carousel Composer preview package generated with dynamic depth and directional horses.\n";
+    std::cout << "Carousel Composer preview package generated with CH_GRID_V1 camera projection, dynamic depth and directional horses.\n";
     return 0;
 }
