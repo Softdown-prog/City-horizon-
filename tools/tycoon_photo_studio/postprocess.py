@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 FINAL_SIZE = (256, 256)
 PALETTE_COLORS = 128
@@ -34,20 +34,34 @@ def percentile_from_histogram(hist, percentile):
 
 
 def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> Image.Image:
-    """Extract only ground darkening from the shadow reference.
+    """Return a clean black RGBA shadow layer.
 
-    The object itself is masked using the independent transparent color pass, so
-    the resulting image is a black RGBA shadow layer rather than a second object
-    silhouette. This is deliberately simple and deterministic for the POC.
+    Preferred path: Cycles shadow catcher already produces transparent pixels
+    outside the projected shadow. A luminance-based fallback remains for older
+    artifacts so this script is still diagnosable if Blender changes behavior.
     """
 
     reference = shadow_reference.convert("RGBA")
-    object_alpha = color_source.convert("RGBA").getchannel("A")
     receiver_alpha = reference.getchannel("A")
-    luminance = ImageOps.grayscale(reference.convert("RGB"))
+    alpha_hist = receiver_alpha.histogram()
+    nonzero = sum(alpha_hist[1:])
+    coverage = nonzero / float(reference.width * reference.height)
+    alpha_bbox = receiver_alpha.getbbox()
 
-    # Estimate the lit receiver level from the upper tail of the visible ground.
-    # Transparent background does not influence the estimate.
+    # A real shadow-catcher result should occupy only a bounded part of the frame.
+    # Clamp its strength to a classic soft projected shadow instead of preserving
+    # arbitrary Blender alpha values verbatim.
+    if alpha_bbox is not None and 0.0005 < coverage < 0.45:
+        clean_alpha = receiver_alpha.point(lambda value: min(132, int(value * 0.72)))
+        clean_alpha = clean_alpha.filter(ImageFilter.GaussianBlur(radius=1.4))
+        shadow = Image.new("RGBA", reference.size, (29, 33, 37, 0))
+        shadow.putalpha(clean_alpha)
+        return shadow
+
+    # Fallback for a normal receiver render: estimate the lit plane level and keep
+    # only local darkening not occupied by the independently rendered object.
+    object_alpha = color_source.convert("RGBA").getchannel("A")
+    luminance = ImageOps.grayscale(reference.convert("RGB"))
     masked_values = []
     lum_data = luminance.load()
     recv_data = receiver_alpha.load()
@@ -73,11 +87,14 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
             if recv_data[x, y] < 16 or obj_data[x, y] > 24:
                 continue
             delta = max(0, baseline - lum_data[x, y])
-            alpha = min(118, int(delta * 2.15))
-            out[x, y] = alpha
+            # Ignore broad lighting gradients so a receiver plane never becomes a
+            # visible rectangle around the sprite.
+            if delta < 12:
+                continue
+            out[x, y] = min(118, int((delta - 12) * 2.05))
 
-    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(radius=2.4))
-    shadow = Image.new("RGBA", reference.size, (28, 31, 34, 0))
+    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(radius=2.2))
+    shadow = Image.new("RGBA", reference.size, (29, 33, 37, 0))
     shadow.putalpha(shadow_alpha)
     return shadow
 
@@ -89,14 +106,12 @@ def downsample(image: Image.Image) -> Image.Image:
 def composite_shadow(color: Image.Image, shadow: Image.Image) -> Image.Image:
     out = Image.new("RGBA", color.size, (0, 0, 0, 0))
     out = Image.alpha_composite(out, shadow)
-    out = Image.alpha_composite(out, color)
-    return out
+    return Image.alpha_composite(out, color)
 
 
 def quantize_rgba(image: Image.Image, *, dither: bool) -> Image.Image:
     rgba = image.convert("RGBA")
     alpha = rgba.getchannel("A")
-
     matte = Image.new("RGB", rgba.size, (214, 211, 202))
     matte.paste(rgba.convert("RGB"), mask=alpha)
     mode = Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE
@@ -114,24 +129,22 @@ def edge_cleanup(color_only: Image.Image) -> Image.Image:
 
     dilated = hard_alpha.filter(ImageFilter.MaxFilter(3))
     edge = ImageChops.subtract(dilated, hard_alpha)
-    edge = edge.point(lambda value: min(112, int(value * 0.44)))
-
+    edge = edge.point(lambda value: min(96, int(value * 0.38)))
     outline = Image.new("RGBA", rgba.size, (48, 42, 37, 0))
     outline.putalpha(edge)
+
     result = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
     result = Image.alpha_composite(result, outline)
-    result = Image.alpha_composite(result, rgba)
-    return result
+    return Image.alpha_composite(result, rgba)
 
 
 def alpha_bounds_and_pivot(color: Image.Image):
     alpha = color.getchannel("A")
     bbox = alpha.getbbox() or (0, 0, color.width, color.height)
-    pivot = {
+    return list(map(int, bbox)), {
         "x": int(round((bbox[0] + bbox[2]) * 0.5)),
         "y": int(bbox[3]),
     }
-    return list(map(int, bbox)), pivot
 
 
 def draw_diamond(draw, center_x, center_y, width=128, height=64, fill=(108, 137, 78, 255), outline=(80, 104, 60, 255)):
@@ -161,7 +174,7 @@ def make_context(sprite: Image.Image) -> Image.Image:
     enlarged = sprite.resize((320, 320), Image.Resampling.NEAREST)
     canvas.alpha_composite(enlarged, (224, 76))
     draw.rectangle((16, 16, 752, 56), fill=(245, 242, 233, 236))
-    draw.text((28, 28), "Synthetic CH_CAMERA_V1 scale context — not a runtime screenshot", fill=(42, 42, 42, 255))
+    draw.text((28, 28), "Synthetic CH_CAMERA_V1 scale context - not a runtime screenshot", fill=(42, 42, 42, 255))
     return canvas
 
 
@@ -185,7 +198,7 @@ def make_board(variants):
     ]
     board = Image.new("RGBA", (4 * 300, 360), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((20, 14), "Tycoon Photo Studio POC — same render, four post-process variants", fill=(32, 32, 32, 255))
+    draw.text((20, 14), "Tycoon Photo Studio POC - same render, four post-process variants", fill=(32, 32, 32, 255))
 
     for index, (label, sprite) in enumerate(zip(labels, variants)):
         x0 = index * 300 + 22
@@ -215,13 +228,10 @@ def main():
     shadow_small.save(output_dir / "tycoon_photo_studio_shadow_pass.png")
 
     v1 = composite_shadow(color_small, shadow_small)
-
     q2_color = quantize_rgba(color_small, dither=False)
     v2 = composite_shadow(q2_color, shadow_small)
-
     q3_color = quantize_rgba(color_small, dither=True)
     v3 = composite_shadow(q3_color, shadow_small)
-
     cleaned_color = edge_cleanup(q3_color)
     v4 = composite_shadow(cleaned_color, shadow_small)
 
@@ -229,11 +239,8 @@ def main():
     for index, image in enumerate(variants, start=1):
         image.save(output_dir / f"tycoon_photo_studio_variant_{index:02d}.png")
 
-    board = make_board(variants)
-    board.save(output_dir / "tycoon_photo_studio_comparison_board.png")
-
-    context = make_context(v4)
-    context.save(output_dir / "tycoon_photo_studio_in_game_context.png")
+    make_board(variants).save(output_dir / "tycoon_photo_studio_comparison_board.png")
+    make_context(v4).save(output_dir / "tycoon_photo_studio_in_game_context.png")
 
     bbox, pivot = alpha_bounds_and_pivot(color_small)
     manifest = {
@@ -258,11 +265,11 @@ def main():
             {"id": 3, "mode": "palette_reduced", "dither": "floyd_steinberg", "edgeCleanup": "none"},
             {"id": 4, "mode": "palette_reduced", "dither": "floyd_steinberg", "edgeCleanup": "binary_alpha_plus_subtle_1px_selout"},
         ],
-        "shadowPass": "derived from dedicated white-receiver render and object-alpha mask",
+        "shadowPass": metadata.get("shadowMode", "dedicated receiver render"),
         "contextPreview": "synthetic 2:1 tile context; not a City Horizon runtime screenshot",
         "githubRunId": os.environ.get("GITHUB_RUN_ID", "local"),
         "githubSha": os.environ.get("GITHUB_SHA", "local"),
-        "approvalRule": "Do not promote this pipeline until the downsampled sprite is visually accepted in the classic Tycoon/Zoo Tycoon 1 family.",
+        "approvalRule": "Do not promote this pipeline until the downsampled sprite is visually accepted in the classic Tycoon/Zoo Tycoon 1 family."
     }
     (output_dir / "tycoon_photo_studio_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 

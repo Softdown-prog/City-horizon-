@@ -1,9 +1,8 @@
 """Tycoon Photo Studio POC scene.
 
-This script intentionally does one thing: build a small park kiosk in a fixed
-CH_CAMERA_V1-like photo studio and bake an object color pass plus a shadow
-reference pass. It is not a general asset editor and it does not attempt to
-encode a magic "Zoo Tycoon shader".
+Build one small park kiosk in a fixed CH_CAMERA_V1-like studio and bake an
+object color pass plus a Cycles shadow-catcher pass. This is intentionally a
+single visual proof, not a general asset editor.
 """
 
 import argparse
@@ -158,7 +157,6 @@ def build_kiosk():
     authored.append(add_box("RoofTrimFront", (0.0, -1.22, 2.39), (2.36, 0.07, 0.06), brass, 0.012))
     authored.append(add_box("RoofTrimEast", (1.40, 0.0, 2.39), (0.07, 1.95, 0.06), brass, 0.012))
     authored.append(add_uv_sphere("RoofFinial", (0.0, 0.0, 3.15), 0.11, brass))
-
     return authored
 
 
@@ -201,6 +199,8 @@ def configure_scene(output_dir):
 
 def render_color_pass(scene, authored, ground, output_dir):
     ground.hide_render = True
+    if hasattr(ground, "is_shadow_catcher"):
+        ground.is_shadow_catcher = False
     for obj in authored:
         obj.hide_render = False
         if hasattr(obj, "visible_camera"):
@@ -211,6 +211,8 @@ def render_color_pass(scene, authored, ground, output_dir):
 
 def render_shadow_reference(scene, authored, ground, output_dir):
     ground.hide_render = False
+    if hasattr(ground, "is_shadow_catcher"):
+        ground.is_shadow_catcher = True
     for obj in authored:
         obj.hide_render = False
         if hasattr(obj, "visible_camera"):
@@ -255,6 +257,7 @@ def main():
             "fill": "cool southeast area light",
             "worldStrength": 0.42
         },
+        "shadowMode": "Cycles shadow catcher with object hidden from camera",
         "note": "POC scene only; aesthetic approval requires review of final downsampled variants."
     }
     with open(os.path.join(output_dir, "studio_metadata.json"), "w", encoding="utf-8") as handle:
