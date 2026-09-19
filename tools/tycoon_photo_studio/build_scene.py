@@ -156,7 +156,7 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     bsdf.inputs["Base Color"].default_value = tuple(rgba)
     bsdf.inputs["Roughness"].default_value = roughness
-    bsdf.inputs["Metallic"].default_value = 0.0
+    bsdf.inputs["Metallic"].default_value = metallic
     return mat
 
 
@@ -173,7 +173,7 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     bsdf = tree.nodes.new("ShaderNodeBsdfPrincipled")
     bsdf.location = (500, 0)
     bsdf.inputs["Roughness"].default_value = 0.38
-    bsdf.inputs["Metallic"].default_value = metallic
+    bsdf.inputs["Metallic"].default_value = 0.0
     if "IOR" in bsdf.inputs:
         bsdf.inputs["IOR"].default_value = 1.333
     if "Specular IOR Level" in bsdf.inputs:
