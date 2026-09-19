@@ -1,8 +1,8 @@
 {
-  "id": "animation_core_3",
+  "id": "animation_core_4",
   "name": "City Horizon Animation Core",
   "status": "canonical",
-  "purpose": "Deterministic parametric timeline, hierarchical part animation, real node visual sources and frame export contract for animated City Horizon assets.",
+  "purpose": "Deterministic parametric timeline, hierarchical part animation, reusable visual libraries and frame export contract for animated City Horizon assets.",
   "dataModel": {
     "asset": "AnimatedAssetSpec",
     "node": "AnimationNodeSpec",
@@ -20,14 +20,7 @@
     "fullTurnRotationEndpointsEquivalent": true
   },
   "interpolation": ["step", "linear", "smooth_step", "sine"],
-  "trackProperties": [
-    "offset_x_px",
-    "offset_y_px",
-    "rotation_degrees",
-    "scale",
-    "opacity",
-    "visibility"
-  ],
+  "trackProperties": ["offset_x_px", "offset_y_px", "rotation_degrees", "scale", "opacity", "visibility"],
   "hierarchy": {
     "version": "animation_node_hierarchy_1",
     "contractFile": "animation_node_hierarchy_contract.json",
@@ -42,16 +35,11 @@
     "nodeStateRecordedPerFrame": true
   },
   "visualSources": {
-    "version": "animation_visual_sources_1",
+    "version": "animation_visual_sources_2",
     "contractFile": "animation_visual_sources_contract.json",
-    "supportedKinds": [
-      "none",
-      "primitive_rectangle",
-      "primitive_ellipse",
-      "raster_sprite",
-      "building_render"
-    ],
-    "productionPreferredKinds": ["raster_sprite", "building_render"],
+    "supportedKinds": ["none", "primitive_rectangle", "primitive_ellipse", "raster_sprite", "building_render", "library_part"],
+    "productionPreferredKinds": ["raster_sprite", "building_render", "library_part"],
+    "registeredLibraries": ["carousel_parts_1"],
     "relativeRasterRoot": "AnimatedAssetSpec.visual_source_root",
     "transparentTrim": true,
     "preserveAspect": true,
@@ -73,7 +61,8 @@
     "spritesheet": true,
     "frameLabelsIncludeTime": true,
     "realVisualSourceQa": true,
-    "missingSourceDiagnosticMarker": true
+    "missingSourceDiagnosticMarker": true,
+    "canonicalCarouselLibraryQa": true
   },
   "export": {
     "version": "animation_export_3",
@@ -82,16 +71,18 @@
     "manifestRecordsFrameSamples": true,
     "manifestRecordsNodeStates": true,
     "manifestRecordsNodeVisualSources": true,
+    "manifestRecordsLibraryPartIds": true,
     "manifestRecordsAnchor": true,
     "manifestRecordsPaletteProfile": true,
     "visualSourcesValidatedBeforeBake": true,
     "runtime": "SDL consumes baked frame cells and clip timing; hierarchy and visual-source declarations remain authoring/debug metadata"
   },
   "scope": {
-    "currentRenderable": "BuildingComposerSpec plus persistent hierarchical nodes with raster_sprite or building_render visuals",
+    "currentRenderable": "BuildingComposerSpec plus persistent hierarchical nodes with raster_sprite, building_render or registered library_part visuals",
     "currentTrackTargets": ["root", "authored_node_id"],
-    "nextSystems": ["carousel_part_library", "mechanical_depth_ordering", "palette_profiles", "rig_joints", "animal_parts", "effects"],
+    "activeLibraries": ["carousel_parts_1"],
+    "nextSystems": ["mechanical_depth_ordering", "palette_profiles", "rig_joints", "animal_parts", "effects"],
     "futureAnimationComposer": true
   },
-  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes with stable visual sources in one acyclic hierarchy; tracks transform those persistent parts instead of regenerating artwork per frame. Camera, palette profile, frame size, asset anchor, node pivots and node visual sources remain stable across the clip."
+  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes with stable visual sources in one acyclic hierarchy; tracks transform those persistent parts instead of regenerating artwork per frame. Registered library parts use stable IDs so the same authored piece is reused in every frame and every compatible asset."
 }
