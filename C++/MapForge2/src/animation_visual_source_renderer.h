@@ -10,7 +10,7 @@ namespace ch::studio {
 
 class AnimationVisualSourceRenderer final {
 public:
-    static constexpr const char* kVersion = "animation_visual_sources_2";
+    static constexpr const char* kVersion = "animation_visual_sources_3";
 
     static bool validateSource(const AnimatedAssetSpec& asset,
                                const AnimationNodeSpec& node,
@@ -18,6 +18,7 @@ public:
 
     static QImage renderSource(const AnimatedAssetSpec& asset,
                                const AnimationNodeSpec& node,
+                               int visual_variant = 0,
                                QString* reason = nullptr);
 
     static QJsonObject manifest(const AnimationNodeSpec& node);
