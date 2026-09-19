@@ -29,6 +29,9 @@ jobs:
           - asset_id: neighborhood_cafe_2x1
             asset_config: tools/tycoon_photo_studio/assets/neighborhood_cafe_2x1.json
             golden: ""
+          - asset_id: park_tree_broadleaf_01
+            asset_config: tools/tycoon_photo_studio/assets/park_tree_broadleaf_01.json
+            golden: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
