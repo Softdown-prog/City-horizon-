@@ -1,0 +1,129 @@
+name: Tycoon Residential House Bake
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/assets/residential_house_2x2_01.json"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/validate_package.py"
+      - "tools/blender_bake_runner.py"
+      - "tools/asset_catalog_ingest.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - "C++/MapForge2/presets/tycoon_asset_bake_contract.json"
+      - ".github/workflows/tycoon-house-bake.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-house:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ASSET_ID: residential_house_2x2_01
+      ASSET_SOURCE: tools/tycoon_photo_studio/assets/residential_house_2x2_01.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      BAKE_CONTRACT: C++/MapForge2/presets/tycoon_asset_bake_contract.json
+      OUTPUT_DIR: out/bake/residential_house_2x2_01
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Validate residential house source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = json.loads(Path('tools/tycoon_photo_studio/assets/residential_house_2x2_01.json').read_text(encoding='utf-8'))
+          assert source['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+          assert source['assetId'] == 'residential_house_2x2_01'
+          assert source['assetType'] == 'building'
+          assert source['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
+          assert source['footprint']['widthTiles'] == 2
+          assert source['footprint']['depthTiles'] == 2
+          assert sorted(map(tuple, source['footprint']['occupiedCells'])) == [(0, 0), (0, 1), (1, 0), (1, 1)]
+          assert source['floors'] == 1
+          names = {part['name'] for part in source['parts']}
+          required = {'Foundation', 'MainWalls', 'HipRoof', 'Chimney', 'DoorLeafSouth'}
+          assert required.issubset(names), required - names
+          print('residentialHouseSourceGate: PASS')
+          print('parts:', len(source['parts']))
+          PY
+
+      - name: Download pinned Blender 4.2.3 LTS
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake canonical four-direction PNG package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/blender_bake_runner.py \
+            --contract "$BAKE_CONTRACT" \
+            --asset-config "$ASSET_SOURCE" \
+            --studio-preset "$STUDIO_PRESET" \
+            --blender "$BLENDER_EXE" \
+            --output-dir "$OUTPUT_DIR" \
+            --xvfb
+
+      - name: Verify four directions and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "$OUTPUT_DIR/${ASSET_ID}_${direction}.png"
+          done
+          test -f "$OUTPUT_DIR/${ASSET_ID}_4view.png"
+          test -f "$OUTPUT_DIR/${ASSET_ID}_atlas.png"
+          test -f "$OUTPUT_DIR/${ASSET_ID}_manifest.json"
+          test -f "$OUTPUT_DIR/${ASSET_ID}_review.png"
+          test -f "$OUTPUT_DIR/${ASSET_ID}_4dir_context.png"
+          test -f "$OUTPUT_DIR/bake_run_report.json"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('out/bake/residential_house_2x2_01/bake_run_report.json').read_text(encoding='utf-8'))
+          print('bakeReport:', json.dumps(report, indent=2)[:4000])
+          PY
+
+      - name: Upload residential house PNG package
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Residential-House-2x2-01
+          path: out/bake/residential_house_2x2_01
+          if-no-files-found: error
+          retention-days: 14
