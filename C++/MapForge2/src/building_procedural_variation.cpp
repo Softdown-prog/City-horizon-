@@ -162,16 +162,17 @@ BuildingComposerSpec BuildingProceduralVariation::generate(const BuildingCompose
     if (base.procedural_vary_modules) {
         for (auto& module : result.facade_modules) {
             if (!module.enabled) continue;
-            const bool access = module.floor_index == 0 && module.edge == base.road_socket_edge && isAccessModule(module.kind);
-            if (!access) {
-                module.position = std::clamp(module.position + randomSigned(rng) * 0.045F * strength,
-                                             module.width * 0.5F,
-                                             1.0F - module.width * 0.5F);
-            }
-            const float width_delta = isAccessModule(module.kind) ? 0.025F : 0.055F;
-            module.width = std::clamp(module.width + randomSigned(rng) * width_delta * strength, 0.06F, 0.90F);
+            const bool required_access = module.floor_index == 0 &&
+                                         module.edge == base.road_socket_edge &&
+                                         isAccessModule(module.kind);
+            if (required_access) continue;
+
+            module.width = std::clamp(module.width + randomSigned(rng) * 0.055F * strength, 0.06F, 0.90F);
+            module.position = std::clamp(module.position + randomSigned(rng) * 0.045F * strength,
+                                         module.width * 0.5F,
+                                         1.0F - module.width * 0.5F);
             if (isDecorativeOptionalModule(module.kind) && randomUnit(rng) < 0.14F * strength)
-                module.enabled = !module.enabled;
+                module.enabled = false;
         }
 
         if (!base.facade_editor_enabled) {
