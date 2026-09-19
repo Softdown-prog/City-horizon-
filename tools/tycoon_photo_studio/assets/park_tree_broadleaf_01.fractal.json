@@ -3,34 +3,117 @@
   "assetId": "park_tree_broadleaf_01",
   "assetType": "static_decor",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
-  "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1,
+    "occupiedCells": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
   "materials": {
-    "trunk": {"name": "TreeBarkWarm", "rgba": [0.18, 0.072, 0.026, 1.0], "roughness": 1.0},
-    "branch": {"name": "TreeBranchWarm", "rgba": [0.135, 0.050, 0.017, 1.0], "roughness": 1.0},
-    "leafDeep": {"name": "LeafDeep", "rgba": [0.030, 0.125, 0.028, 1.0], "roughness": 1.0},
-    "leafDark": {"name": "LeafDark", "rgba": [0.050, 0.195, 0.040, 1.0], "roughness": 1.0},
-    "leafMid": {"name": "LeafMid", "rgba": [0.095, 0.305, 0.070, 1.0], "roughness": 1.0},
-    "leafLight": {"name": "LeafLight", "rgba": [0.19, 0.43, 0.105, 1.0], "roughness": 1.0},
-    "leafSun": {"name": "LeafSun", "rgba": [0.285, 0.52, 0.145, 1.0], "roughness": 1.0}
+    "trunk": {
+      "name": "TreeBarkWarm",
+      "rgba": [
+        0.18,
+        0.072,
+        0.026,
+        1
+      ],
+      "roughness": 1
+    },
+    "branch": {
+      "name": "TreeBranchWarm",
+      "rgba": [
+        0.135,
+        0.05,
+        0.017,
+        1
+      ],
+      "roughness": 1
+    },
+    "leafDeep": {
+      "name": "LeafDeep",
+      "rgba": [
+        0.03,
+        0.125,
+        0.028,
+        1
+      ],
+      "roughness": 1
+    },
+    "leafDark": {
+      "name": "LeafDark",
+      "rgba": [
+        0.05,
+        0.195,
+        0.04,
+        1
+      ],
+      "roughness": 1
+    },
+    "leafMid": {
+      "name": "LeafMid",
+      "rgba": [
+        0.095,
+        0.305,
+        0.07,
+        1
+      ],
+      "roughness": 1
+    },
+    "leafLight": {
+      "name": "LeafLight",
+      "rgba": [
+        0.19,
+        0.43,
+        0.105,
+        1
+      ],
+      "roughness": 1
+    },
+    "leafSun": {
+      "name": "LeafSun",
+      "rgba": [
+        0.285,
+        0.52,
+        0.145,
+        1
+      ],
+      "roughness": 1
+    }
   },
   "trunk": {
     "material": "trunk",
-    "height": 1.74,
+    "height": 1.5,
     "baseRadius": 0.235,
     "topRadius": 0.092,
     "vertices": 12,
-    "lean": [0.055, -0.032],
-    "midKink": [-0.028, 0.022],
+    "lean": [
+      0.055,
+      -0.032
+    ],
+    "midKink": [
+      -0.028,
+      0.022
+    ],
     "rootCount": 6,
     "rootLength": 0.25,
     "rootRadius": 0.066,
-    "rootSeed": 919
+    "rootSeed": 919,
+    "smoothShading": true
   },
   "fractalTree": {
     "name": "CrownSkeleton",
     "material": "branch",
     "seed": 1709,
-    "origin": [0.035, -0.018, 1.51],
+    "origin": [
+      0.035,
+      -0.018,
+      1.3
+    ],
     "levels": 4,
     "primaryBranches": 5,
     "branchFactor": 2,
@@ -38,26 +121,57 @@
     "lengthDecay": 0.68,
     "baseRadius": 0.058,
     "radiusDecay": 0.65,
-    "initialElevationDegrees": 47.0,
-    "elevationGainDegrees": 7.0,
-    "baseYawDegrees": -11.0,
-    "yawSpreadDegrees": 46.0,
-    "yawJitterDegrees": 15.0,
-    "elevationJitterDegrees": 8.0
+    "initialElevationDegrees": 47,
+    "elevationGainDegrees": 7,
+    "baseYawDegrees": -11,
+    "yawSpreadDegrees": 46,
+    "yawJitterDegrees": 15,
+    "elevationJitterDegrees": 8
   },
   "leafCards": {
     "seed": 2718,
-    "count": 760,
-    "materials": ["leafDeep", "leafDark", "leafMid", "leafLight", "leafSun"],
-    "widthRange": [0.075, 0.135],
-    "heightRange": [0.13, 0.215],
+    "count": 900,
+    "materials": [
+      "leafDeep",
+      "leafDark",
+      "leafMid",
+      "leafLight",
+      "leafSun"
+    ],
+    "widthRange": [
+      0.075,
+      0.135
+    ],
+    "heightRange": [
+      0.13,
+      0.215
+    ],
     "sizeBiasPower": 1.65,
-    "maxTiltDegrees": 54.0,
-    "clusterRadius": [0.29, 0.27, 0.20],
-    "interiorFraction": 0.40,
-    "terminalPullToCenter": 0.24,
-    "maxNormalizedCenterRadius": 0.93,
-    "crownCenter": [0.04, -0.03, 2.72],
-    "crownRadius": [1.10, 0.98, 0.68]
+    "maxTiltDegrees": 54,
+    "clusterRadius": [
+      0.27,
+      0.25,
+      0.18
+    ],
+    "interiorFraction": 0.52,
+    "terminalPullToCenter": 0.34,
+    "maxNormalizedCenterRadius": 0.91,
+    "crownCenter": [
+      0.04,
+      -0.03,
+      2.51
+    ],
+    "crownRadius": [
+      1.34,
+      1.2,
+      0.69
+    ],
+    "coreFillFraction": 0.2,
+    "coreRadius": [
+      0.62,
+      0.56,
+      0.42
+    ],
+    "topIsolationLimit": 0.86
   }
 }

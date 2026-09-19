@@ -57,11 +57,16 @@ jobs:
           assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
           assert data['fractalTree']['levels'] == 4
           assert data['fractalTree']['primaryBranches'] == 5
-          assert data['leafCards']['count'] == 760
-          assert data['leafCards']['interiorFraction'] >= 0.40
+          assert data['leafCards']['count'] == 900
+          assert data['leafCards']['interiorFraction'] >= 0.50
+          assert data['leafCards']['coreFillFraction'] >= 0.18
+          assert data['leafCards']['crownRadius'][0] >= 1.30
+          assert data['leafCards']['crownRadius'][1] >= 1.15
           assert data['leafCards']['sizeBiasPower'] > 1.0
           assert data['leafCards']['maxTiltDegrees'] <= 54.0
           assert len(data['leafCards']['materials']) >= 5
+          assert 1.47 <= data['trunk']['height'] <= 1.53
+          assert data['trunk']['smoothShading'] is True
           assert len(data['trunk']['lean']) == 2
           assert len(data['trunk']['midKink']) == 2
           assert 'canopyParts' not in data
@@ -103,7 +108,7 @@ jobs:
           s = m['sourceSummary']
           assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
           assert s['branchCount'] == 75, s
-          assert s['leafCardCount'] == 760, s
+          assert s['leafCardCount'] == 900, s
           print('leafCardGeometryGate: PASS')
           print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
           PY

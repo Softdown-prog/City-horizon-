@@ -161,6 +161,11 @@ def build_leaf_mesh(asset, materials, terminals, authored):
     crown_center = Vector(tuple(float(v) for v in spec.get("crownCenter", [0.0, 0.0, 3.0])))
     crown_radius = tuple(float(v) for v in spec.get("crownRadius", [1.10, 1.02, 0.86]))
     max_center_radius = float(spec.get("maxNormalizedCenterRadius", 0.97))
+    core_fill_fraction = max(0.0, min(0.75, float(spec.get("coreFillFraction", 0.0))))
+    core_radius = tuple(float(v) for v in spec.get("coreRadius", [
+        crown_radius[0] * 0.52, crown_radius[1] * 0.52, crown_radius[2] * 0.58
+    ]))
+    top_isolation_limit = max(0.55, min(1.0, float(spec.get("topIsolationLimit", 1.0))))
 
     vertices = []
     faces = []
@@ -185,14 +190,22 @@ def build_leaf_mesh(asset, materials, terminals, authored):
         scale = max_center_radius / max(normalized, 1e-6)
         return crown_center + Vector((delta.x * scale, delta.y * scale, delta.z * scale))
 
+    core_count = int(round(count * core_fill_fraction))
     for index in range(count):
-        if terminals and rng.random() >= interior_fraction:
+        if index < core_count:
+            # Dedicated inner mass closes camera-dependent holes without flattening
+            # the irregular outer silhouette produced by terminal clusters.
+            center = crown_center + random_ellipsoid_offset(core_radius)
+        elif terminals and rng.random() >= interior_fraction:
             terminal = Vector(terminals[rng.randrange(len(terminals))])
             terminal = terminal.lerp(crown_center, terminal_pull)
             center = terminal + random_ellipsoid_offset(cluster)
         else:
             center = crown_center + random_ellipsoid_offset(crown_radius)
         center = clamp_to_crown(center)
+        max_top = crown_center.z + crown_radius[2] * top_isolation_limit
+        if center.z > max_top:
+            center.z = max_top - rng.random() * crown_radius[2] * 0.08
 
         size_t = rng.random() ** size_bias_power
         width = width_range[0] + (width_range[1] - width_range[0]) * size_t
@@ -243,6 +256,14 @@ def build_tree(asset):
     lean = tuple(float(v) for v in trunk.get("lean", [0.0, 0.0]))
     kink = tuple(float(v) for v in trunk.get("midKink", [0.0, 0.0]))
     trunk_material = materials[str(trunk.get("material", "trunk"))]
+    smooth_trunk = bool(trunk.get("smoothShading", True))
+
+    def smooth_mesh(obj):
+        if not smooth_trunk or obj.type != "MESH":
+            return obj
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = True
+        return obj
 
     p0 = Vector((0.0, 0.0, 0.03))
     p1 = Vector((lean[0] * 0.24, lean[1] * 0.24, trunk_height * 0.37))
@@ -256,7 +277,7 @@ def build_tree(asset):
         top_radius,
     )
     for index in range(3):
-        authored.append(add_tapered_segment(
+        authored.append(smooth_mesh(add_tapered_segment(
             f"ClassicTrunk_{index + 1:02d}",
             trunk_points[index],
             trunk_points[index + 1],
@@ -264,7 +285,7 @@ def build_tree(asset):
             trunk_radii[index + 1],
             trunk_material,
             vertices=trunk_vertices,
-        ))
+        )))
 
     root_count = int(trunk.get("rootCount", 5))
     root_length = float(trunk.get("rootLength", 0.34))
@@ -272,7 +293,7 @@ def build_tree(asset):
     for index in range(root_count):
         yaw = 2.0 * math.pi * index / max(1, root_count) + root_rng.uniform(-0.18, 0.18)
         end = (math.cos(yaw) * root_length, math.sin(yaw) * root_length, 0.035)
-        authored.append(add_tapered_segment(
+        authored.append(smooth_mesh(add_tapered_segment(
             f"ClassicRoot_{index:02d}",
             (0.0, 0.0, 0.11),
             end,
@@ -280,7 +301,7 @@ def build_tree(asset):
             0.018,
             trunk_material,
             vertices=8,
-        ))
+        )))
 
     terminals, branch_count = generate_branch_geometry(asset, materials, authored)
     leaf_count = build_leaf_mesh(asset, materials, terminals, authored)
