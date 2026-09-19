@@ -1,5 +1,5 @@
 {
-  "id": "automatic_export_validation_6",
+  "id": "automatic_export_validation_7",
   "name": "Building Composer Automatic Export + Validation",
   "targetPlatform": "windows_pc",
   "gridContract": "CH_GRID_V1",
@@ -106,11 +106,16 @@
       "proceduralVariationNode": "proceduralVariation",
       "smallBlockPreviewNode": "smallBlockPreview",
       "lodVisualGateNode": "lodVisualGate",
+      "authoringSpecNode": "authoringSpec",
+      "assetBrowserNode": "assetBrowser",
+      "authoringSnapshotVersion": "building_authoring_spec_1",
+      "assetBrowserContract": "building_asset_browser_contract.json",
       "recordsOccupiedCellMask": true,
       "recordsSetbacks": true,
       "recordsVariationSeed": true,
       "recordsQaPreviewContract": true,
-      "recordsLodMetrics": true
+      "recordsLodMetrics": true,
+      "recordsReopenableAuthoringSnapshot": true
     },
     "qaPreview": {
       "smallBlockContract": "small_block_preview_contract.json",
@@ -118,6 +123,13 @@
       "lodContract": "building_lod_contract.json",
       "lodFileSuffix": "_lod_preview.png",
       "includedInProductionSprite": false
+    },
+    "assetBrowser": {
+      "contract": "building_asset_browser_contract.json",
+      "newPackagesReopenable": true,
+      "legacyPackagesWithoutAuthoringSpecBrowseOnly": true,
+      "realizedProceduralVariantsReopenAsFixedEditableAssets": true,
+      "reexportUsesNormalValidationGate": true
     },
     "png": {
       "rgba": true,
@@ -127,5 +139,5 @@
       "lodPreviewIncludedInProductionSprite": false
     }
   },
-  "rule": "A production building package is accepted only after flexible footprint, frame, anchor, halo, urban-integration and gameplay-scale LOD gates pass. Every accepted package receives small-block and distant/medium/close LOD QA previews; neither QA image is baked into the transparent production sprites."
+  "rule": "A production building package is accepted only after flexible footprint, frame, anchor, halo, urban-integration and gameplay-scale LOD gates pass. Every accepted package also records building_authoring_spec_1 so the Building Composer Asset Browser can reopen the authored definition for editing and validated re-export. Legacy packages without that snapshot remain browse-only rather than receiving fabricated authoring data."
 }
