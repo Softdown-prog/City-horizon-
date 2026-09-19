@@ -6,7 +6,6 @@ on:
     branches:
       - main
     paths:
-      - "tools/tycoon_photo_studio/assets/visitor_male_red_01.json"
       - "tools/tycoon_photo_studio/assets/visitor_male_red_02.json"
       - "tools/tycoon_photo_studio/build_character.py"
       - "tools/tycoon_photo_studio/postprocess_character.py"
