@@ -1,0 +1,79 @@
+name: MapForge Tree Capture
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "C++/MapForge2/src/map_capture_main.cpp"
+      - "C++/MapForge2/examples/map_capture/tree_capture_map.json"
+      - "C++/MapForge2/CMakeLists.txt"
+      - ".github/workflows/mapforge-tree-capture.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Qt 6.8.3
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download latest successful tree PNG artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path out/tree_artifact | Out-Null
+          $runs = gh run list --workflow tycoon-tree-bake.yml --branch main --status success --limit 1 --json databaseId | ConvertFrom-Json
+          if ($null -eq $runs -or $runs.Count -lt 1) { throw "No successful Tycoon Tree Bake run was found." }
+          $runId = $runs[0].databaseId
+          Write-Host "Using tree bake run $runId"
+          gh run download $runId --name City-Horizon-Park-Tree-PNGs --dir out/tree_artifact
+          $tree = Get-ChildItem out/tree_artifact -Recurse -Filter "park_tree_broadleaf_01_south.png" | Select-Object -First 1
+          if ($null -eq $tree) { throw "park_tree_broadleaf_01_south.png was not found in the tree artifact." }
+          "TREE_PNG=$($tree.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure MapForge capture target
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/mapforge-capture -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build capture worker
+        shell: pwsh
+        run: cmake --build build/mapforge-capture --config Release --target MapForge2MapCapture --parallel
+
+      - name: Render deterministic map capture
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out/mapforge_capture | Out-Null
+          $exe = "build/mapforge-capture/Release/MapForge2MapCapture.exe"
+          & $exe `
+            "out/mapforge_capture/mapforge_tree_capture.png" `
+            "$env:TREE_PNG" `
+            "$pwd" `
+            "C++/MapForge2/examples/map_capture/tree_capture_map.json"
+          if ($LASTEXITCODE -ne 0) { throw "MapForge2MapCapture failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "out/mapforge_capture/mapforge_tree_capture.png")) { throw "Capture PNG was not generated." }
+
+      - name: Upload deterministic capture
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge2-Tree-Deterministic-Capture
+          path: out/mapforge_capture/mapforge_tree_capture.png
+          if-no-files-found: error
+          retention-days: 14
