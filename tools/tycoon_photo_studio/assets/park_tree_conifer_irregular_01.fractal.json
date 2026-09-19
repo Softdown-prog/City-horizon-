@@ -1,0 +1,20 @@
+{
+  "contract": "TYCOON_FRACTAL_TREE_SOURCE_V1",
+  "assetId": "park_tree_conifer_irregular_01",
+  "assetType": "static_decor",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
+  "materials": {
+    "trunk": {"name": "ConiferBarkWarm", "rgba": [0.115, 0.062, 0.033, 1], "roughness": 1},
+    "branch": {"name": "ConiferBranchWarm", "rgba": [0.075, 0.038, 0.022, 1], "roughness": 1},
+    "leafDeep": {"name": "NeedleDeep", "rgba": [0.010, 0.055, 0.038, 1], "roughness": 1},
+    "leafDark": {"name": "NeedleDark", "rgba": [0.018, 0.100, 0.058, 1], "roughness": 1},
+    "leafMid": {"name": "NeedleMid", "rgba": [0.036, 0.170, 0.082, 1], "roughness": 1},
+    "leafLight": {"name": "NeedleLight", "rgba": [0.095, 0.285, 0.115, 1], "roughness": 1},
+    "leafSun": {"name": "NeedleSun", "rgba": [0.180, 0.390, 0.145, 1], "roughness": 1}
+  },
+  "trunk": {"material": "trunk", "height": 2.85, "baseRadius": 0.30, "topRadius": 0.105, "vertices": 12, "lean": [0.075, -0.045], "midKink": [-0.038, 0.052], "rootCount": 6, "rootLength": 0.36, "rootRadius": 0.084, "rootSeed": 7401, "smoothShading": true},
+  "fractalTree": {"name": "ConiferSkeleton", "material": "branch", "seed": 7411, "origin": [0.045, -0.028, 1.66], "levels": 4, "primaryBranches": 6, "branchFactor": 2, "baseLength": 1.05, "lengthDecay": 0.67, "baseRadius": 0.067, "radiusDecay": 0.62, "initialElevationDegrees": 25, "elevationGainDegrees": 8, "baseYawDegrees": -19, "yawSpreadDegrees": 45, "yawJitterDegrees": 20, "elevationJitterDegrees": 10},
+  "leafCards": {"seed": 7421, "count": 1040, "materials": ["leafDeep", "leafDark", "leafMid", "leafLight", "leafSun"], "widthRange": [0.076, 0.148], "heightRange": [0.145, 0.255], "sizeBiasPower": 1.82, "maxTiltDegrees": 50, "clusterRadius": [0.34, 0.30, 0.34], "interiorFraction": 0.54, "terminalPullToCenter": 0.34, "maxNormalizedCenterRadius": 0.93, "crownCenter": [0.055, -0.035, 3.64], "crownRadius": [1.28, 1.05, 1.52], "coreFillFraction": 0.20, "coreRadius": [0.58, 0.50, 0.78], "topIsolationLimit": 0.90},
+  "foliagePostProcess": {"shadowAlphaMax": 132, "shadowStrength": 0.53, "shadowRadiusPx": 76.0, "saturationMultiplier": 1.05, "contrastMultiplier": 1.16, "shadowBlendIntent": "multiply_equivalent_alpha"}
+}
