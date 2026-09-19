@@ -1,5 +1,6 @@
 #include "building_export_pipeline.h"
 
+#include "building_block_preview_renderer.h"
 #include "building_facade_renderer.h"
 #include "building_footprint_model.h"
 #include "building_procedural_variation.h"
@@ -109,16 +110,18 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("facadeEditor"), BuildingFacadeRenderer::manifest(spec));
     manifest.insert(QStringLiteral("roofEditor"), BuildingRoofEditorRenderer::roofEditorManifest(spec));
     manifest.insert(QStringLiteral("proceduralVariation"), BuildingProceduralVariation::manifest(spec));
+    manifest.insert(QStringLiteral("smallBlockPreview"), BuildingBlockPreviewRenderer::manifest(401));
     manifest.insert(QStringLiteral("urbanIntegrationValidation"),
                     BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_4")},
+        {"version", QStringLiteral("automatic_export_validation_5")},
         {"packageValidated", validation.export_ready},
         {"flexibleFootprintValidated", validation.footprint_valid},
         {"urbanIntegrationValidated", validation.urban_integration_valid},
         {"proceduralVariationRecorded", true},
+        {"smallBlockQaPreviewGenerated", true},
         {"transparentRgba", true},
-        {"environmentContextExported", false},
+        {"environmentContextExportedIntoSprite", false},
         {"validationFile", QStringLiteral("*_validation.json")},
     });
     return manifest;
@@ -149,7 +152,7 @@ QString BuildingExportValidation::summary() const {
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_4")},
+        {"version", QStringLiteral("automatic_export_validation_5")},
         {"exportReady", export_ready},
         {"footprintValid", footprint_valid},
         {"haloValid", halo_valid},
@@ -241,6 +244,7 @@ BuildingExportValidation BuildingExportPipeline::validate(const BuildingComposer
         {"flexibleFootprint", BuildingFootprintModel::manifest(spec)},
         {"footprintValidationReason", footprint_reason},
         {"proceduralVariation", BuildingProceduralVariation::manifest(spec)},
+        {"smallBlockPreview", BuildingBlockPreviewRenderer::manifest(401)},
         {"floorCount", std::clamp(spec.floor_count, 1, 8)},
         {"recommendedFrame", QJsonObject{{"width", minimum_frame.width()}, {"height", minimum_frame.height()}}},
         {"frameFitsRecommendedMinimum", frame_fits},
@@ -284,6 +288,10 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
     if (!BuildingFacadeRenderer::renderReviewSheet(spec, QSize(frame.width(), frame.height() - 20)).save(review_path, "PNG")) {
         if (error) *error = QStringLiteral("Could not write %1").arg(review_path); return false;
     }
+    const QString block_preview_path = dir.filePath(stem + QStringLiteral("_block_preview.png"));
+    if (!BuildingBlockPreviewRenderer::render(spec, QSize(960, 560), 401).save(block_preview_path, "PNG")) {
+        if (error) *error = QStringLiteral("Could not write %1").arg(block_preview_path); return false;
+    }
     const QImage south = BuildingFacadeRenderer::renderView(spec, BuildingView::South, frame);
     const QString thumbnail_path = dir.filePath(stem + QStringLiteral("_thumb.png"));
     if (!south.scaled(QSize(192, 168), Qt::KeepAspectRatio, Qt::SmoothTransformation).save(thumbnail_path, "PNG")) {
@@ -294,6 +302,7 @@ bool BuildingExportPipeline::exportPackage(const BuildingComposerSpec& spec, con
         {"south", stem + QStringLiteral("_south.png")}, {"east", stem + QStringLiteral("_east.png")},
         {"west", stem + QStringLiteral("_west.png")}, {"north", stem + QStringLiteral("_north.png")},
         {"spriteSheet", stem + QStringLiteral("_4view.png")}, {"reviewSheet", stem + QStringLiteral("_review.png")},
+        {"blockPreview", stem + QStringLiteral("_block_preview.png")},
         {"thumbnail", stem + QStringLiteral("_thumb.png")}, {"validation", stem + QStringLiteral("_validation.json")},
     });
     return writeJson(dir.filePath(stem + QStringLiteral("_manifest.json")), manifest, error);
