@@ -273,14 +273,16 @@ void drawAutomaticFloors(QPainter& painter, const BuildingComposerSpec& spec,
 QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, const BuildingView view, const QSize canvas) {
     BuildingComposerSpec render_spec = spec;
     render_spec.wall_height_px = BuildingComposer::effectiveWallHeightPx(spec);
-    const bool layered_facade = spec.facade_editor_enabled || spec.floor_count > 1;
-    if (layered_facade) {
-        render_spec.windows = false; render_spec.south_door = false;
-        render_spec.south_awning = false; render_spec.south_sign = false;
-    }
+
+    // Facade modules are always authored after the body/roof pass. This keeps
+    // the Classic Tycoon material ramp free to repaint the wall surface without
+    // covering doors, windows, signs or awnings, including single-storey legacy presets.
+    render_spec.windows = false;
+    render_spec.south_door = false;
+    render_spec.south_awning = false;
+    render_spec.south_sign = false;
 
     QImage image = BuildingRoofEditorRenderer::renderView(render_spec, view, canvas);
-    if (!layered_facade) return image;
 
     const float half_w = static_cast<float>(std::max(1, spec.footprint_width_tiles)) * 0.5F;
     const float half_d = static_cast<float>(std::max(1, spec.footprint_depth_tiles)) * 0.5F;
