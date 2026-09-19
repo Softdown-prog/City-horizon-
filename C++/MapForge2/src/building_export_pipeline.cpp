@@ -1,5 +1,6 @@
 #include "building_export_pipeline.h"
 
+#include "building_asset_catalog.h"
 #include "building_block_preview_renderer.h"
 #include "building_facade_renderer.h"
 #include "building_footprint_model.h"
@@ -113,10 +114,12 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
     manifest.insert(QStringLiteral("proceduralVariation"), BuildingProceduralVariation::manifest(spec));
     manifest.insert(QStringLiteral("smallBlockPreview"), BuildingBlockPreviewRenderer::manifest(401));
     manifest.insert(QStringLiteral("lodVisualGate"), BuildingLodValidator::manifest(spec));
+    manifest.insert(QStringLiteral("authoringSpec"), BuildingAssetCatalog::serializeSpec(spec));
+    manifest.insert(QStringLiteral("assetBrowser"), BuildingAssetCatalog::contractManifest());
     manifest.insert(QStringLiteral("urbanIntegrationValidation"),
                     BuildingUrbanIntegrationValidator::validate(spec).toJson());
     manifest.insert(QStringLiteral("exportPipeline"), QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_6")},
+        {"version", QStringLiteral("automatic_export_validation_7")},
         {"packageValidated", validation.export_ready},
         {"flexibleFootprintValidated", validation.footprint_valid},
         {"urbanIntegrationValidated", validation.urban_integration_valid},
@@ -124,6 +127,8 @@ QJsonObject buildManifest(const BuildingComposerSpec& spec, const QSize frame,
         {"proceduralVariationRecorded", true},
         {"smallBlockQaPreviewGenerated", true},
         {"lodQaPreviewGenerated", true},
+        {"authoringSpecRecorded", true},
+        {"reopenableInAssetBrowser", true},
         {"transparentRgba", true},
         {"environmentContextExportedIntoSprite", false},
         {"validationFile", QStringLiteral("*_validation.json")},
@@ -157,7 +162,7 @@ QString BuildingExportValidation::summary() const {
 
 QJsonObject BuildingExportValidation::toJson() const {
     return QJsonObject{
-        {"version", QStringLiteral("automatic_export_validation_6")},
+        {"version", QStringLiteral("automatic_export_validation_7")},
         {"exportReady", export_ready},
         {"footprintValid", footprint_valid},
         {"haloValid", halo_valid},
