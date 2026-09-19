@@ -1,0 +1,424 @@
+{
+  "contract": "TYCOON_ASSET_SOURCE_V1",
+  "_comment": "City Horizon residential house 2x2. Authored once in world space; TYCOON_ASSET_BAKE_V1 rotates AssetRoot for SOUTH/EAST/WEST/NORTH while CH_TYCOON_STUDIO_V1 keeps camera and world lights fixed.",
+  "assetId": "residential_house_2x2_01",
+  "assetType": "building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2,
+    "occupiedCells": [[0, 0], [1, 0], [0, 1], [1, 1]]
+  },
+  "floors": 1,
+  "materials": {
+    "foundation": {
+      "name": "HouseFoundationStone",
+      "rgba": [0.39, 0.40, 0.38, 1.0],
+      "recipe": "stone",
+      "roughness": 0.92,
+      "seed": 19,
+      "strength": 0.26
+    },
+    "wall": {
+      "name": "HouseWarmPlaster",
+      "rgba": [0.78, 0.67, 0.52, 1.0],
+      "recipe": "plaster",
+      "roughness": 0.86,
+      "seed": 41,
+      "strength": 0.24
+    },
+    "roof": {
+      "name": "HouseMutedClayRoof",
+      "rgba": [0.44, 0.20, 0.13, 1.0],
+      "recipe": "stone",
+      "roughness": 0.84,
+      "seed": 73,
+      "strength": 0.32
+    },
+    "trim": {
+      "name": "HouseWarmTrim",
+      "rgba": [0.82, 0.79, 0.68, 1.0],
+      "recipe": "plaster",
+      "roughness": 0.80,
+      "seed": 13,
+      "strength": 0.14
+    },
+    "door": {
+      "name": "HouseDoorTimber",
+      "rgba": [0.30, 0.17, 0.095, 1.0],
+      "recipe": "timber",
+      "roughness": 0.72,
+      "seed": 29,
+      "strength": 0.34
+    },
+    "glass": {
+      "name": "HouseWindowGlass",
+      "rgba": [0.30, 0.47, 0.53, 1.0],
+      "recipe": "glass",
+      "roughness": 0.30,
+      "seed": 7,
+      "strength": 0.18
+    },
+    "chimney": {
+      "name": "HouseChimneyBrick",
+      "rgba": [0.36, 0.23, 0.17, 1.0],
+      "recipe": "brick",
+      "roughness": 0.90,
+      "seed": 61,
+      "strength": 0.28
+    }
+  },
+  "parts": [
+    {
+      "type": "box",
+      "name": "Foundation",
+      "location": [0.0, 0.0, 0.16],
+      "dimensions": [4.72, 4.12, 0.32],
+      "material": "foundation",
+      "bevel": 0.045
+    },
+    {
+      "type": "box",
+      "name": "MainWalls",
+      "location": [0.0, 0.0, 1.72],
+      "dimensions": [4.48, 3.88, 2.90],
+      "material": "wall",
+      "bevel": 0.055
+    },
+    {
+      "type": "box",
+      "name": "EaveShadowBandSouth",
+      "location": [0.0, -1.955, 3.08],
+      "dimensions": [4.50, 0.08, 0.18],
+      "material": "foundation",
+      "bevel": 0.015
+    },
+    {
+      "type": "box",
+      "name": "EaveShadowBandNorth",
+      "location": [0.0, 1.955, 3.08],
+      "dimensions": [4.50, 0.08, 0.18],
+      "material": "foundation",
+      "bevel": 0.015
+    },
+    {
+      "type": "box",
+      "name": "EaveShadowBandEast",
+      "location": [2.255, 0.0, 3.08],
+      "dimensions": [0.08, 3.90, 0.18],
+      "material": "foundation",
+      "bevel": 0.015
+    },
+    {
+      "type": "box",
+      "name": "EaveShadowBandWest",
+      "location": [-2.255, 0.0, 3.08],
+      "dimensions": [0.08, 3.90, 0.18],
+      "material": "foundation",
+      "bevel": 0.015
+    },
+    {
+      "type": "pyramid_roof",
+      "name": "HipRoof",
+      "location": [0.0, 0.0, 3.65],
+      "radius": 3.55,
+      "depth": 1.28,
+      "material": "roof",
+      "rotationDegrees": 45.0,
+      "bevel": 0.035
+    },
+    {
+      "type": "box",
+      "name": "Chimney",
+      "location": [1.05, 0.48, 4.03],
+      "dimensions": [0.50, 0.46, 1.28],
+      "material": "chimney",
+      "bevel": 0.025
+    },
+    {
+      "type": "box",
+      "name": "DoorLeafSouth",
+      "location": [0.0, -1.982, 1.25],
+      "dimensions": [0.92, 0.12, 2.18],
+      "material": "door",
+      "bevel": 0.025
+    },
+    {
+      "type": "box",
+      "name": "DoorFrameLeft",
+      "location": [-0.54, -2.035, 1.28],
+      "dimensions": [0.13, 0.12, 2.34],
+      "material": "trim",
+      "bevel": 0.018
+    },
+    {
+      "type": "box",
+      "name": "DoorFrameRight",
+      "location": [0.54, -2.035, 1.28],
+      "dimensions": [0.13, 0.12, 2.34],
+      "material": "trim",
+      "bevel": 0.018
+    },
+    {
+      "type": "box",
+      "name": "DoorFrameTop",
+      "location": [0.0, -2.035, 2.43],
+      "dimensions": [1.20, 0.12, 0.14],
+      "material": "trim",
+      "bevel": 0.018
+    },
+    {
+      "type": "box",
+      "name": "DoorThreshold",
+      "location": [0.0, -2.08, 0.30],
+      "dimensions": [1.26, 0.34, 0.16],
+      "material": "foundation",
+      "bevel": 0.025
+    },
+
+    {
+      "type": "box",
+      "name": "SouthWindowLeftGlass",
+      "location": [-1.42, -1.985, 1.64],
+      "dimensions": [0.90, 0.10, 0.96],
+      "material": "glass",
+      "bevel": 0.010
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowLeftFrameTop",
+      "location": [-1.42, -2.035, 2.17],
+      "dimensions": [1.12, 0.12, 0.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowLeftFrameBottom",
+      "location": [-1.42, -2.035, 1.11],
+      "dimensions": [1.18, 0.16, 0.14],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowLeftFrameL",
+      "location": [-1.93, -2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowLeftFrameR",
+      "location": [-0.91, -2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowLeftMullion",
+      "location": [-1.42, -2.045, 1.64],
+      "dimensions": [0.07, 0.13, 0.96],
+      "material": "trim",
+      "bevel": 0.008
+    },
+
+    {
+      "type": "box",
+      "name": "SouthWindowRightGlass",
+      "location": [1.42, -1.985, 1.64],
+      "dimensions": [0.90, 0.10, 0.96],
+      "material": "glass",
+      "bevel": 0.010
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowRightFrameTop",
+      "location": [1.42, -2.035, 2.17],
+      "dimensions": [1.12, 0.12, 0.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowRightFrameBottom",
+      "location": [1.42, -2.035, 1.11],
+      "dimensions": [1.18, 0.16, 0.14],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowRightFrameL",
+      "location": [0.91, -2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowRightFrameR",
+      "location": [1.93, -2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "SouthWindowRightMullion",
+      "location": [1.42, -2.045, 1.64],
+      "dimensions": [0.07, 0.13, 0.96],
+      "material": "trim",
+      "bevel": 0.008
+    },
+
+    {
+      "type": "box",
+      "name": "EastWindowGlass",
+      "location": [2.285, 0.34, 1.65],
+      "dimensions": [0.10, 1.18, 0.98],
+      "material": "glass",
+      "bevel": 0.010
+    },
+    {
+      "type": "box",
+      "name": "EastWindowFrameTop",
+      "location": [2.335, 0.34, 2.19],
+      "dimensions": [0.12, 1.38, 0.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "EastWindowFrameBottom",
+      "location": [2.335, 0.34, 1.10],
+      "dimensions": [0.16, 1.44, 0.14],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "EastWindowFrameFront",
+      "location": [2.335, -0.29, 1.65],
+      "dimensions": [0.12, 0.12, 1.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "EastWindowFrameBack",
+      "location": [2.335, 0.97, 1.65],
+      "dimensions": [0.12, 0.12, 1.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "EastWindowMullion",
+      "location": [2.345, 0.34, 1.65],
+      "dimensions": [0.13, 0.07, 0.98],
+      "material": "trim",
+      "bevel": 0.008
+    },
+
+    {
+      "type": "box",
+      "name": "WestWindowGlass",
+      "location": [-2.285, 0.34, 1.65],
+      "dimensions": [0.10, 1.18, 0.98],
+      "material": "glass",
+      "bevel": 0.010
+    },
+    {
+      "type": "box",
+      "name": "WestWindowFrameTop",
+      "location": [-2.335, 0.34, 2.19],
+      "dimensions": [0.12, 1.38, 0.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "WestWindowFrameBottom",
+      "location": [-2.335, 0.34, 1.10],
+      "dimensions": [0.16, 1.44, 0.14],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "WestWindowFrameFront",
+      "location": [-2.335, -0.29, 1.65],
+      "dimensions": [0.12, 0.12, 1.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "WestWindowFrameBack",
+      "location": [-2.335, 0.97, 1.65],
+      "dimensions": [0.12, 0.12, 1.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "WestWindowMullion",
+      "location": [-2.345, 0.34, 1.65],
+      "dimensions": [0.13, 0.07, 0.98],
+      "material": "trim",
+      "bevel": 0.008
+    },
+
+    {
+      "type": "box",
+      "name": "NorthWindowGlass",
+      "location": [0.35, 1.985, 1.64],
+      "dimensions": [1.22, 0.10, 0.96],
+      "material": "glass",
+      "bevel": 0.010
+    },
+    {
+      "type": "box",
+      "name": "NorthWindowFrameTop",
+      "location": [0.35, 2.035, 2.17],
+      "dimensions": [1.44, 0.12, 0.12],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "NorthWindowFrameBottom",
+      "location": [0.35, 2.035, 1.11],
+      "dimensions": [1.50, 0.16, 0.14],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "NorthWindowFrameL",
+      "location": [-0.31, 2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "NorthWindowFrameR",
+      "location": [1.01, 2.035, 1.64],
+      "dimensions": [0.12, 0.12, 1.10],
+      "material": "trim",
+      "bevel": 0.012
+    },
+    {
+      "type": "box",
+      "name": "NorthWindowMullion",
+      "location": [0.35, 2.045, 1.64],
+      "dimensions": [0.07, 0.13, 0.96],
+      "material": "trim",
+      "bevel": 0.008
+    }
+  ]
+}
