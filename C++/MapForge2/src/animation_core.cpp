@@ -116,6 +116,8 @@ QString AnimationCore::nodeVisualKindId(const AnimationNodeVisualKind kind) {
         case AnimationNodeVisualKind::None: return QStringLiteral("none");
         case AnimationNodeVisualKind::PrimitiveRectangle: return QStringLiteral("primitive_rectangle");
         case AnimationNodeVisualKind::PrimitiveEllipse: return QStringLiteral("primitive_ellipse");
+        case AnimationNodeVisualKind::RasterSprite: return QStringLiteral("raster_sprite");
+        case AnimationNodeVisualKind::BuildingRender: return QStringLiteral("building_render");
     }
     return QStringLiteral("none");
 }
@@ -195,6 +197,16 @@ bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
         if (node.visual_kind != AnimationNodeVisualKind::None
             && (node.visual_size_px.width() <= 0.0 || node.visual_size_px.height() <= 0.0)) {
             return fail(QStringLiteral("animation node '%1' visual size must be positive").arg(node.id));
+        }
+        if (node.visual_kind == AnimationNodeVisualKind::RasterSprite
+            && node.visual_asset_path.trimmed().isEmpty()) {
+            return fail(QStringLiteral("animation node '%1' raster source path is empty").arg(node.id));
+        }
+        if (!node.visual_source_rect_px.isNull()
+            && (node.visual_source_rect_px.x() < 0.0 || node.visual_source_rect_px.y() < 0.0
+                || node.visual_source_rect_px.width() <= 0.0
+                || node.visual_source_rect_px.height() <= 0.0)) {
+            return fail(QStringLiteral("animation node '%1' source rect is invalid").arg(node.id));
         }
 
         for (std::size_t other = index + 1; other < asset.nodes.size(); ++other) {
@@ -355,6 +367,36 @@ QJsonObject AnimationCore::clipManifest(const AnimationClip& clip) {
 }
 
 QJsonObject AnimationCore::nodeManifest(const AnimationNodeSpec& node) {
+    QJsonObject visual{
+        {"version", QStringLiteral("animation_visual_sources_1")},
+        {"kind", nodeVisualKindId(node.visual_kind)},
+        {"widthPx", node.visual_size_px.width()},
+        {"heightPx", node.visual_size_px.height()},
+        {"trimTransparent", node.visual_trim_transparent},
+        {"preserveAspect", node.visual_preserve_aspect},
+        {"smoothScaling", node.visual_smooth_scaling},
+    };
+    if (node.visual_kind == AnimationNodeVisualKind::RasterSprite) {
+        visual.insert(QStringLiteral("assetPath"), node.visual_asset_path);
+        if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty()) {
+            visual.insert(QStringLiteral("sourceRectPx"), QJsonObject{
+                {"x", node.visual_source_rect_px.x()},
+                {"y", node.visual_source_rect_px.y()},
+                {"width", node.visual_source_rect_px.width()},
+                {"height", node.visual_source_rect_px.height()},
+            });
+        }
+    } else if (node.visual_kind == AnimationNodeVisualKind::BuildingRender) {
+        visual.insert(QStringLiteral("view"), BuildingComposer::viewName(node.visual_building_view));
+        visual.insert(QStringLiteral("visualPreset"), BuildingComposer::visualPresetId(node.visual_building.visual_preset));
+        visual.insert(QStringLiteral("typology"), BuildingComposer::typologyId(node.visual_building.building_typology));
+    } else if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle
+               || node.visual_kind == AnimationNodeVisualKind::PrimitiveEllipse) {
+        visual.insert(QStringLiteral("fill"), node.fill_color.name(QColor::HexArgb));
+        visual.insert(QStringLiteral("outline"), node.outline_color.name(QColor::HexArgb));
+        visual.insert(QStringLiteral("qaFallbackOnly"), true);
+    }
+
     return QJsonObject{
         {"id", node.id},
         {"parentId", node.parent_id},
@@ -365,13 +407,7 @@ QJsonObject AnimationCore::nodeManifest(const AnimationNodeSpec& node) {
         {"opacity", static_cast<double>(node.opacity)},
         {"visible", node.visible},
         {"drawOrder", node.draw_order},
-        {"visual", QJsonObject{
-            {"kind", nodeVisualKindId(node.visual_kind)},
-            {"widthPx", node.visual_size_px.width()},
-            {"heightPx", node.visual_size_px.height()},
-            {"fill", node.fill_color.name(QColor::HexArgb)},
-            {"outline", node.outline_color.name(QColor::HexArgb)},
-        }},
+        {"visual", visual},
     };
 }
 
@@ -399,6 +435,8 @@ QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
         {"renderBaseBuilding", asset.render_base_building},
         {"baseRenderable", QStringLiteral("BuildingComposerSpec")},
         {"nodeHierarchyVersion", QStringLiteral("animation_node_hierarchy_1")},
+        {"visualSourceVersion", QStringLiteral("animation_visual_sources_1")},
+        {"visualSourceRoot", asset.visual_source_root},
         {"nodes", nodes},
         {"clips", clips},
         {"valid", valid},
