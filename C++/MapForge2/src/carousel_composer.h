@@ -25,7 +25,12 @@ struct CarouselComposerSpec {
 
     int horse_count = 8;
     float platform_radius_px = 72.0F;
-    float isometric_depth_scale = 0.46F;
+
+    // Locked to the City Horizon canonical 2:1 projection (CH_GRID_V1).
+    // Kept in the authoring spec for manifest/backward compatibility; callers
+    // must use 0.50 so the carousel cannot silently drift to another camera.
+    float isometric_depth_scale = 0.50F;
+
     float horse_bob_amplitude_px = 9.0F;
     float duration_seconds = 2.4F;
     int frame_count = 16;
@@ -56,7 +61,7 @@ struct CarouselPalette {
 
 class CarouselComposer final {
 public:
-    static constexpr const char* kVersion = "carousel_composer_2";
+    static constexpr const char* kVersion = "carousel_composer_3";
 
     static QString paletteId(CarouselPaletteProfile palette);
     static CarouselPalette palette(CarouselPaletteProfile profile);
