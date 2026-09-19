@@ -1,99 +1,54 @@
 {
-  "id": "carousel_composer_3",
+  "id": "carousel_composer_4",
   "name": "City Horizon Carousel Composer",
   "status": "canonical",
-  "purpose": "Parametric authoring layer that assembles a complete animated carousel using the City Horizon canonical engine camera, dynamic isometric depth ordering and directional horse presentation.",
+  "purpose": "Parametric carousel authoring whose world motion is projected only by the City Horizon runtime camera implementation and whose visible parts are persistent modular raster assets.",
   "dependsOn": {
     "animationCore": "animation_core_5",
     "visualSources": "animation_visual_sources_3",
-    "partLibrary": "carousel_parts_2",
-    "cameraContract": "carousel_engine_camera_1"
+    "partLibrary": "carousel_parts_3",
+    "cameraContract": "carousel_engine_camera_2",
+    "projectionCalibration": "engine_projection_calibration_1"
   },
-  "spec": "CarouselComposerSpec",
-  "parameters": {
+  "authoringParameters": {
     "horseCount": {"min": 2, "max": 24, "default": 8},
-    "platformRadiusPx": {"min": 32.0, "max": 110.0, "default": 72.0},
-    "isometricDepthScale": {"locked": 0.50, "source": "CH_GRID_V1 tileHeight/tileWidth"},
+    "platformRadiusWorldTiles": {"min": 0.30, "max": 1.60, "default": 0.80},
     "horseBobAmplitudePx": {"min": 0.0, "max": 24.0, "default": 9.0},
     "durationSeconds": {"min": 0.50, "max": 20.0, "default": 2.4},
     "frameCount": {"min": 4, "max": 120, "default": 16},
-    "clockwise": {"default": true},
+    "cameraRotation": {"source": "ch::CameraState"},
+    "cameraZoom": {"default": 1.0},
     "dynamicDepthOrdering": {"default": true},
-    "directionalHorses": {"default": true},
-    "canopyEnabled": {"default": true},
-    "rosettesEnabled": {"default": true},
-    "finialEnabled": {"default": true},
-    "rosetteCount": {"min": 0, "max": 16, "default": 6}
+    "directionalHorses": {"default": true}
   },
-  "camera": {
-    "contractFile": "carousel_engine_camera_contract.json",
-    "engineGridContract": "CH_GRID_V1",
-    "tileWidth": 128,
-    "tileHeight": 64,
-    "diamondRatio": 2.0,
-    "horizontalWorldRotationDegrees": 45.0,
-    "isometricInclinationDegrees": 35.264,
-    "screenSpaceParentRotation": false,
-    "worldOrbitProjectedPerFrame": true
+  "projection": {
+    "authoritativeFunction": "src/ch_core/projection.cpp::ch::world_to_screen_point",
+    "composerAdapter": "engine_projection_adapter_1",
+    "manualProjectionFormula": false,
+    "nominal45DegreeProof": false,
+    "nominal35_264DegreeProof": false,
+    "nominalTwoToOneProof": false,
+    "calibrationMustPassBeforeQaExport": true
   },
-  "paletteProfiles": [
-    "carousel_classic_red_cream",
-    "carousel_blue_gold",
-    "carousel_green_ivory"
-  ],
-  "generatedHierarchy": {
-    "base": "root",
-    "platform": "root",
-    "horses": "platform",
-    "centerPole": "root",
-    "canopy": "root",
-    "rosettes": "canopy",
-    "finial": "canopy"
+  "visualAssembly": {
+    "source": "carousel_parts_3",
+    "proceduralCarouselArt": false,
+    "persistentRasterParts": true,
+    "directionalHorseAssets": 4,
+    "paletteTintingPreservesStableSourcePixels": true
   },
   "automaticAuthoring": {
-    "horseIdsStable": true,
-    "horseAngularDistribution": "uniform_world_plane",
-    "horseOrbitProjection": "CH_GRID_V1",
-    "horseOffsetXTracks": true,
-    "horseOffsetYTracks": true,
-    "horseBobAddedToProjectedY": true,
-    "platformScreenRotationTrack": false,
-    "horseCounterRotationTracks": false,
-    "horseVisualVariantTracks": true,
-    "horseDynamicDrawOrderTracks": true,
-    "directionalVariants": ["east", "south", "west", "north"],
-    "directionDerivedFromProjectedWorldTangent": true,
-    "depthDerivedFromProjectedWorldPosition": true,
-    "depthLayers": {"backHorse": 20, "centerPole": 60, "frontHorse": 65, "canopy": 90},
+    "worldPlaneOrbit": true,
+    "runtimeProjectedOffsetTracks": true,
+    "runtimeDepthKey": true,
+    "directionFromRuntimeProjectedTangent": true,
     "loopClosure": true,
-    "libraryPartAssembly": true,
-    "deterministic": true
+    "stableNodeIds": true
   },
-  "outputs": {
-    "animatedAssetSpec": true,
-    "animationSpritesheet": "through_animation_export_4",
-    "animationRuntimeManifest": "through_animation_export_4",
-    "animationPreview": "through_AnimationPreviewRenderer",
-    "authoringManifest": "CarouselComposer.manifest"
+  "qa": {
+    "fixture": "2x2 tile + four vertical posts + ground disk",
+    "coordinateTolerancePx": 0.0001,
+    "failureBlocksCarouselPreview": true
   },
-  "qaReference": {
-    "horseCount": 8,
-    "frameCount": 16,
-    "durationSeconds": 2.4,
-    "platformRadiusPx": 72.0,
-    "isometricDepthScale": 0.50,
-    "palette": "carousel_classic_red_cream",
-    "dynamicDepthOrdering": true,
-    "directionalHorses": true,
-    "manualNodeAuthoringRequired": false,
-    "manualTrackAuthoringRequired": false,
-    "usesCanonicalEngineCamera": true
-  },
-  "resolvedLimitations": {
-    "dynamicPerFrameDepthSorting": true,
-    "directionalHorseViewSwapping": true,
-    "flatScreenSpaceOrbitRemoved": true,
-    "arbitraryDepthScaleRemoved": true
-  },
-  "authoringRule": "Carousel authors set ride-level parameters only. The Composer owns generated node IDs, hierarchy and world-plane orbit sampling. Horse X/Y positions are projected through CH_GRID_V1 rather than rotating a flat screen-space group. Direction and depth are derived from the same projected world orbit."
+  "authoringRule": "Do not infer the game camera from nominal isometric values. Author orbit positions in world units, delegate projection to ch::world_to_screen_point, and assemble persistent carousel art assets after calibration succeeds."
 }
