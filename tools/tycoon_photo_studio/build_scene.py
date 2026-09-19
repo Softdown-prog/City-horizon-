@@ -33,6 +33,21 @@ import bpy
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
+# GAP 4: import the procedural material library.
+# It is imported lazily-safely: if bpy is not available this module
+# is only used inside Blender anyway, so the import is always valid here.
+try:
+    import sys as _sys
+    import os as _os
+    _here = _os.path.dirname(__file__)
+    if _here not in _sys.path:
+        _sys.path.insert(0, _here)
+    import tycoon_material_library as _mat_lib
+    _MAT_LIB_AVAILABLE = True
+except Exception:
+    _mat_lib = None
+    _MAT_LIB_AVAILABLE = False
+
 DIRECTIONS = (
     {"id": "south", "quarterTurns": 0, "rotationDegrees": 0.0},
     {"id": "east", "quarterTurns": 1, "rotationDegrees": 90.0},
@@ -108,7 +123,31 @@ def clear_scene():
     bpy.ops.object.delete(use_global=False)
 
 
-def make_material(name, rgba, roughness=0.72, metallic=0.0):
+def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0, strength=1.0):
+    """Create a Blender material, optionally using a procedural recipe.
+
+    If ``recipe`` is given and tycoon_material_library is available, the material
+    is built using the full procedural node graph for that recipe (brick, plaster,
+    concrete, timber, stone, metal_panel, glass).
+
+    Falls back silently to flat Principled BSDF when the library is unavailable
+    (e.g. during unit tests outside Blender) or when recipe=None/'solid'.
+    """
+    if recipe and recipe != "solid" and _MAT_LIB_AVAILABLE:
+        try:
+            return _mat_lib.make(
+                recipe_name=recipe,
+                mat_name=name,
+                rgba=tuple(rgba),
+                roughness=roughness,
+                metallic=metallic,
+                seed=seed,
+                strength=strength,
+            )
+        except Exception as exc:
+            print(f"[WARN][material] Recipe '{recipe}' failed ({exc}); falling back to flat BSDF.")
+
+    # ── Flat Principled BSDF fallback ────────────────────────────────────
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
@@ -325,6 +364,9 @@ def build_asset(asset, asset_config_path=""):
             spec["rgba"],
             float(spec.get("roughness", 0.72)),
             float(spec.get("metallic", 0.0)),
+            recipe=spec.get("recipe"),          # GAP 4: None → solid fallback
+            seed=int(spec.get("seed", 0)),
+            strength=float(spec.get("strength", 1.0)),
         )
 
     authored = []
