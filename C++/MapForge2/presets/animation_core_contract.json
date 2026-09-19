@@ -1,8 +1,8 @@
 {
-  "id": "animation_core_2",
+  "id": "animation_core_3",
   "name": "City Horizon Animation Core",
   "status": "canonical",
-  "purpose": "Deterministic parametric timeline, hierarchical part animation and frame export contract for animated City Horizon assets.",
+  "purpose": "Deterministic parametric timeline, hierarchical part animation, real node visual sources and frame export contract for animated City Horizon assets.",
   "dataModel": {
     "asset": "AnimatedAssetSpec",
     "node": "AnimationNodeSpec",
@@ -41,12 +41,29 @@
     "drawOrderStable": true,
     "nodeStateRecordedPerFrame": true
   },
+  "visualSources": {
+    "version": "animation_visual_sources_1",
+    "contractFile": "animation_visual_sources_contract.json",
+    "supportedKinds": [
+      "none",
+      "primitive_rectangle",
+      "primitive_ellipse",
+      "raster_sprite",
+      "building_render"
+    ],
+    "productionPreferredKinds": ["raster_sprite", "building_render"],
+    "relativeRasterRoot": "AnimatedAssetSpec.visual_source_root",
+    "transparentTrim": true,
+    "preserveAspect": true,
+    "sourceValidationBeforeExport": true
+  },
   "coherence": {
     "stableNormalizedAnchor": true,
     "stableFrameSize": true,
     "stableBaseRenderable": true,
     "stablePaletteProfile": true,
     "stableNodePivots": true,
+    "stableNodeVisualSources": true,
     "deterministicSampling": true,
     "frameIndependentRandomGeneration": false
   },
@@ -55,23 +72,26 @@
     "contactSheet": true,
     "spritesheet": true,
     "frameLabelsIncludeTime": true,
-    "hierarchicalPrimitiveQaVisuals": true
+    "realVisualSourceQa": true,
+    "missingSourceDiagnosticMarker": true
   },
   "export": {
-    "version": "animation_export_2",
+    "version": "animation_export_3",
     "outputs": ["spritesheet_png", "preview_png", "manifest_json"],
     "spritesheetOrder": "row_major",
     "manifestRecordsFrameSamples": true,
     "manifestRecordsNodeStates": true,
+    "manifestRecordsNodeVisualSources": true,
     "manifestRecordsAnchor": true,
     "manifestRecordsPaletteProfile": true,
-    "runtime": "SDL consumes baked frame cells and clip timing; hierarchy remains authoring/debug metadata"
+    "visualSourcesValidatedBeforeBake": true,
+    "runtime": "SDL consumes baked frame cells and clip timing; hierarchy and visual-source declarations remain authoring/debug metadata"
   },
   "scope": {
-    "currentRenderable": "BuildingComposerSpec plus hierarchical primitive QA nodes",
+    "currentRenderable": "BuildingComposerSpec plus persistent hierarchical nodes with raster_sprite or building_render visuals",
     "currentTrackTargets": ["root", "authored_node_id"],
-    "nextRenderableSources": ["sprite_parts", "mechanical_parts", "rig_joints", "animal_parts", "effects"],
+    "nextSystems": ["carousel_part_library", "mechanical_depth_ordering", "palette_profiles", "rig_joints", "animal_parts", "effects"],
     "futureAnimationComposer": true
   },
-  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes in one acyclic hierarchy; tracks modify those nodes instead of regenerating a part per frame. Camera, palette profile, frame size, asset anchor and node pivots remain stable across the clip."
+  "authoringRule": "Frames are samples of one canonical asset and one timeline. Parts are persistent named nodes with stable visual sources in one acyclic hierarchy; tracks transform those persistent parts instead of regenerating artwork per frame. Camera, palette profile, frame size, asset anchor, node pivots and node visual sources remain stable across the clip."
 }
