@@ -155,15 +155,16 @@ def build_leaf_mesh(asset, materials, terminals, authored):
     height_range = tuple(float(v) for v in spec.get("heightRange", [0.18, 0.28]))
     cluster = tuple(float(v) for v in spec.get("clusterRadius", [0.34, 0.34, 0.26]))
     interior_fraction = float(spec.get("interiorFraction", 0.20))
+    terminal_pull = float(spec.get("terminalPullToCenter", 0.18))
     crown_center = Vector(tuple(float(v) for v in spec.get("crownCenter", [0.0, 0.0, 3.0])))
     crown_radius = tuple(float(v) for v in spec.get("crownRadius", [1.10, 1.02, 0.86]))
+    max_center_radius = float(spec.get("maxNormalizedCenterRadius", 0.97))
 
     vertices = []
     faces = []
     material_indices = []
 
     def random_ellipsoid_offset(radius):
-        # Rejection sampling gives a soft, organic fill instead of shell-only placement.
         while True:
             x = rng.uniform(-1.0, 1.0)
             y = rng.uniform(-1.0, 1.0)
@@ -171,15 +172,28 @@ def build_leaf_mesh(asset, materials, terminals, authored):
             if x * x + y * y + z * z <= 1.0:
                 return Vector((x * radius[0], y * radius[1], z * radius[2]))
 
+    def clamp_to_crown(point):
+        delta = point - crown_center
+        nx = delta.x / max(crown_radius[0], 1e-6)
+        ny = delta.y / max(crown_radius[1], 1e-6)
+        nz = delta.z / max(crown_radius[2], 1e-6)
+        normalized = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if normalized <= max_center_radius:
+            return point
+        scale = max_center_radius / max(normalized, 1e-6)
+        return crown_center + Vector((delta.x * scale, delta.y * scale, delta.z * scale))
+
     for index in range(count):
         if terminals and rng.random() >= interior_fraction:
-            center = Vector(terminals[rng.randrange(len(terminals))]) + random_ellipsoid_offset(cluster)
+            terminal = Vector(terminals[rng.randrange(len(terminals))])
+            terminal = terminal.lerp(crown_center, terminal_pull)
+            center = terminal + random_ellipsoid_offset(cluster)
         else:
             center = crown_center + random_ellipsoid_offset(crown_radius)
+        center = clamp_to_crown(center)
 
         width = rng.uniform(*width_range)
         height = rng.uniform(*height_range)
-        # Six-point leaf silhouette. The card is true micro-geometry, not a large smooth primitive.
         local = (
             Vector((-0.48 * width, 0.0, 0.0)),
             Vector((-0.20 * width, 0.0, 0.38 * height)),
