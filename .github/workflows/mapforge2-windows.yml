@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Map Forge 2
         shell: pwsh
-        run: cmake --build build/mapforge2 --config Release --target MapForge2 MapForge2ComposerPreview --parallel
+        run: cmake --build build/mapforge2 --config Release --target MapForge2 MapForge2ComposerPreview MapForge2AnimationPreview --parallel
 
       - name: Deploy Studio runtime
         shell: pwsh
@@ -65,6 +65,23 @@ jobs:
           if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_review.png)) { throw "Building Composer review image was not generated." }
           if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_4view.png)) { throw "Building Composer sprite sheet was not generated." }
           if (-not (Test-Path dist/MapForge2/visual_tests/building_composer_pilot_manifest.json)) { throw "Building Composer manifest was not generated." }
+
+      - name: Generate Carousel Composer animation gate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/MapForge2/animation_tests | Out-Null
+          $env:QT_QPA_PLATFORM="offscreen"
+          build/mapforge2/Release/MapForge2AnimationPreview.exe dist/MapForge2/animation_tests
+
+          $sheet = Get-ChildItem dist/MapForge2/animation_tests -Filter "*_spritesheet.png" | Select-Object -First 1
+          $preview = Get-ChildItem dist/MapForge2/animation_tests -Filter "*_preview.png" | Select-Object -First 1
+          $manifest = Get-ChildItem dist/MapForge2/animation_tests -Filter "*_manifest.json" | Select-Object -First 1
+          $authoring = Get-ChildItem dist/MapForge2/animation_tests -Filter "*_authoring.json" | Select-Object -First 1
+
+          if ($null -eq $sheet) { throw "Carousel Composer spritesheet was not generated." }
+          if ($null -eq $preview) { throw "Carousel Composer preview image was not generated." }
+          if ($null -eq $manifest) { throw "Carousel Composer runtime manifest was not generated." }
+          if ($null -eq $authoring) { throw "Carousel Composer authoring manifest was not generated." }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
