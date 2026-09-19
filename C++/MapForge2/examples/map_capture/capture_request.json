@@ -18,8 +18,8 @@
     "camera": {
       "zoom": 0.92,
       "focusTile": [
-        0,
-        0
+        0.5,
+        0.5
       ],
       "focusScreen": [
         0.5,
@@ -42,8 +42,8 @@
         0
       ],
       "footprint": [
-        1,
-        1
+        2,
+        2
       ],
       "scale": 1,
       "offsetPixels": [
@@ -53,6 +53,7 @@
       "showFootprint": false,
       "showAnchor": false,
       "renderAsGroundTile": true,
+      "tiles": [[0, 0], [1, 0], [0, 1], [1, 1]],
       "footprintColor": "#f6c448",
       "anchorColor": "#ffd640"
     }
