@@ -1,12 +1,14 @@
 {
-  "id": "carousel_parts_4",
-  "name": "City Horizon Authored Carousel Part Library",
-  "status": "canonical",
-  "purpose": "Use persistent modular art files for carousel production rendering instead of procedural QPainter carousel drawings, with every 3D-reading source authored for CH_CAMERA_V1.",
+  "id": "carousel_parts_5",
+  "name": "City Horizon Classic Tycoon Carousel Art Library",
+  "status": "production_candidate",
+  "purpose": "Use persistent modular artwork with classic tycoon readability and material discipline, authored for CH_CAMERA_V1 and reviewed at gameplay scale.",
+  "styleGuide": "CH_CLASSIC_TYCOON_STYLE_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "artGeneration": "classic_tycoon_carousel_art_2",
   "sourceType": "authored_png_base64",
   "assetRoot": "assets/amusement/carousel/classic",
   "proceduralProductionFallback": false,
-  "cameraContract": "CH_CAMERA_V1",
   "cameraProfile": {
     "projectionKind": "orthographic_dimetric_2_to_1",
     "worldYawDegrees": 45.0,
@@ -24,6 +26,14 @@
     "carousel.ornament.finial.v1": ["finial.png.b64"],
     "carousel.ornament.rosette.v1": ["rosette.png.b64"]
   },
+  "materialIntent": {
+    "base": "painted wood + brass trim + localized contact shadow",
+    "platform": "painted wood top + decorative fascia + three-tone depth",
+    "canopy": "cloth panels + ribs + dark underside + scalloped hem",
+    "centerPole": "painted metal + restrained brass detail",
+    "horse": "painted carousel figure + saddle + harness + readable four-direction anatomy",
+    "ornament": "muted brass / enamel accents"
+  },
   "requirements": {
     "decodesToTransparentRgbaPng": true,
     "stablePivot": true,
@@ -31,7 +41,10 @@
     "directionalHorseVariants": 4,
     "assetAvailabilityRequiredAtRender": true,
     "visualCameraMustMatchCH_CAMERA_V1": true,
-    "trueIsometric35_264AssetsRejected": true
+    "trueIsometric35_264AssetsRejected": true,
+    "gameScaleReviewRequired": true,
+    "frameCoherenceGateRequired": true,
+    "mapContextGateRequired": true
   },
-  "rule": "Production carousel frames resolve persistent modular raster assets. Procedural carousel geometry is not a production source, and raster pieces that visually use a different camera are not production-valid even if their anchors fit the runtime grid."
+  "rule": "A production carousel frame must use persistent modular artwork authored for CH_CAMERA_V1. Build success alone does not approve visual quality."
 }
