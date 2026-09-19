@@ -7,6 +7,7 @@ on:
       - "tools/tycoon_photo_studio/assets/residential_house_2x2_01.json"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/stylize_building_2d.py"
       - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
       - ".github/workflows/tycoon-house-bake.yml"
 permissions:
@@ -74,6 +75,26 @@ jobs:
             --input out/house/source \
             --output out/house/final \
             --studio-preset "$STUDIO_PRESET"
+      - name: Apply classic pre-rendered building profile
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_building_2d.py \
+            --package out/house/final \
+            --asset-id "$ASSET_ID"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('out/house/final/residential_house_2x2_01_manifest.json').read_text(encoding='utf-8'))
+          pp = manifest['candidatePostProcess']
+          assert pp['mode'] == 'classic_prerendered_building_v1'
+          assert pp['paletteColors'] == 48
+          assert pp['dither'] == 'floyd_steinberg'
+          assert pp['posterizeBitsPerChannel'] == 4
+          assert pp['roofStructuralRows'] is True
+          assert pp['stylizedDiagonalGlassReflection'] is True
+          assert pp['internalTechnicalEdges'] is True
+          print('classicPrerenderedBuildingGate: PASS')
+          PY
       - name: Verify four directions
         run: |
           set -euo pipefail
