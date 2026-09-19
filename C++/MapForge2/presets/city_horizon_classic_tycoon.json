@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_14",
+  "revision": "classic_tycoon_15",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -222,8 +222,27 @@
     ],
     "automaticExportQaFile": "*_block_preview.png"
   },
+  "lodVisualGate": {
+    "version": "building_lod_gate_1",
+    "contractFile": "building_lod_contract.json",
+    "blocksProductionExport": true,
+    "sourceView": "south",
+    "scales": {
+      "distant": 0.35,
+      "medium": 0.60,
+      "close": 1.00
+    },
+    "metrics": [
+      "alpha_silhouette_bounds",
+      "visible_alpha_pixel_area",
+      "opaque_luminance_range"
+    ],
+    "automaticExportQaFile": "*_lod_preview.png",
+    "qaPreviewOnly": true,
+    "mutatesProductionSprite": false
+  },
   "automaticExport": {
-    "version": "automatic_export_validation_5",
+    "version": "automatic_export_validation_6",
     "enabled": true,
     "deterministicNaming": true,
     "automaticFrameByFootprintEnvelope": true,
@@ -233,7 +252,11 @@
     "automaticStemIncludesVariationSeedWhenApplied": true,
     "frameIncrementPx": 32,
     "minimumFrame": [320, 280],
-    "package": ["south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png", "four_view_sheet", "review_sheet", "small_block_qa_preview", "thumbnail", "manifest_json", "validation_json"],
+    "package": [
+      "south_rgba_png", "east_rgba_png", "west_rgba_png", "north_rgba_png",
+      "four_view_sheet", "review_sheet", "small_block_qa_preview", "lod_qa_preview",
+      "thumbnail", "manifest_json", "validation_json"
+    ],
     "validationGate": {
       "blocksInvalidProductionExport": true,
       "checks": [
@@ -244,13 +267,15 @@
         "sprite_edge_clipping",
         "transparent_rgb_contamination",
         "extreme_low_alpha_white_or_black_halo",
-        "urban_integration_validation_2"
+        "urban_integration_validation_2",
+        "building_lod_gate_1"
       ],
       "proceduralVariantsUseSameGate": true,
       "haloSuspicionTolerancePixels": 12,
       "validationReportWrittenOnFailure": true
     },
     "smallBlockQaPreviewGeneratedAfterValidation": true,
+    "lodQaPreviewGeneratedAfterValidation": true,
     "transparentBuildingOnly": true,
     "environmentContextExportedIntoProductionSprite": false
   },
@@ -317,5 +342,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Buildings may use flexible footprints and deterministic controlled siblings. Every accepted building is now reviewed both in isolated four-view form and through small_block_preview_1: one focus lot plus five deterministic neighbours, roads, sidewalks, trees and an intersection using CH_GRID_V1. The block image is QA-only and never contaminates transparent production sprites. Footprint, halo and urban-integration gates remain mandatory before production export."
+  "authoringRule": "Every accepted City Horizon building must remain readable at distant, medium and close gameplay scales before production export. building_lod_gate_1 measures silhouette size, visible alpha area and luminance separation at 35%, 60% and 100%. The LOD review is QA-only: it never creates alternate runtime sprites or changes footprint, anchor, facade geometry or road sockets. Footprint, halo, urban integration and LOD gates are all mandatory."
 }
