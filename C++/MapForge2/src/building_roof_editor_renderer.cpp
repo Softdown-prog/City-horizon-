@@ -123,8 +123,8 @@ void drawProjectedShadow(QPainter& painter, const std::array<Point3, 4>& corners
     for (const Point3& corner : corners) footprint << projectPoint(corner, view, canvas);
 
     const float height = wall_h + roof_h * 0.55F;
-    const float length = std::clamp(height * 0.30F, 17.0F, 72.0F);
-    const QPointF offset(-length * 0.78F, length * 0.42F);
+    const float length = std::clamp(height * 0.30F, 17.0F, 30.0F);
+    const QPointF offset(-length * 0.78F, -length * 0.18F);
     QPolygonF projected;
     for (const QPointF& point : footprint) projected << point + offset;
 
@@ -156,6 +156,7 @@ void drawClassicWallMaterial(QPainter& painter, const BuildingComposerSpec& spec
                              const Point3& a, const Point3& b, const int edge,
                              const float wall_h, const bool lit_face,
                              const BuildingView view, const QSize canvas) {
+    (void)edge;
     const QPolygonF face = wallFacePolygon(a, b, 0.0F, wall_h, view, canvas);
     QPainterPath clip;
     clip.addPolygon(face);
@@ -680,6 +681,7 @@ QJsonObject BuildingRoofEditorRenderer::roofEditorManifest(const BuildingCompose
         {"ridgeEnabled", spec.roof_ridge_enabled},
         {"ridgeScale", static_cast<double>(std::clamp(spec.roof_ridge_scale, 0.5F, 1.8F))},
         {"singleParametricDefinition", true},
+        {"visualRasterPass", "classic_tycoon_renderer_1"},
     };
 }
 
