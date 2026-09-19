@@ -1,19 +1,28 @@
 {
-  "id": "carousel_engine_camera_2",
+  "id": "carousel_engine_camera_3",
   "name": "City Horizon Carousel Runtime Camera Contract",
   "status": "canonical",
-  "purpose": "Make the runtime projection implementation the only source of truth for carousel world-to-screen placement.",
+  "purpose": "Bind carousel authoring to the City Horizon classic-tycoon camera contract and to the same runtime world-to-screen implementation used by the game.",
   "sourceOfTruth": {
+    "gridContract": "CH_GRID_V1",
+    "cameraContract": "CH_CAMERA_V1",
     "file": "src/ch_core/projection.cpp",
     "function": "ch::world_to_screen_point",
     "cameraStateType": "ch::CameraState",
-    "adapter": "engine_projection_adapter_1"
+    "adapter": "engine_projection_adapter_2"
   },
-  "descriptiveMetadataNotAuthority": {
-    "gridContract": "CH_GRID_V1",
-    "nominalTwoToOneDiamond": true,
-    "nominalAnglesMayBeDocumented": true,
-    "nominalAnglesMayBeUsedAsProof": false
+  "visualCamera": {
+    "projectionKind": "orthographic_dimetric_2_to_1",
+    "visualReference": "classic late-1990s/early-2000s tycoon read, including Zoo Tycoon 1",
+    "worldYawDegrees": 45.0,
+    "cameraElevationDegrees": 30.0,
+    "groundAxisScreenAngleDegrees": 26.56505117707799,
+    "tileWidthPx": 128,
+    "tileHeightPx": 64,
+    "diamondRatio": 2.0,
+    "perspective": false,
+    "verticalWorldFeaturesStayScreenVertical": true,
+    "trueIsometric35_264": false
   },
   "carouselOrbit": {
     "authoredInWorldPlane": true,
@@ -22,6 +31,6 @@
     "screenOffsetsProducedByRuntimeProjection": true,
     "verticalBobAppliedAfterGroundProjection": true
   },
-  "calibrationGate": "engine_projection_calibration_1",
-  "authoringRule": "If runtime projection and Composer projection differ at any calibration sample, carousel export QA fails. Do not reimplement the runtime projection in MapForge."
+  "calibrationGate": "engine_projection_calibration_2",
+  "authoringRule": "Runtime parity alone is not sufficient. Export QA must also prove CH_CAMERA_V1 geometry: 2:1 dimetric ground, 26.565-degree screen axes, 45-degree yaw, 30-degree orthographic elevation and no perspective."
 }
