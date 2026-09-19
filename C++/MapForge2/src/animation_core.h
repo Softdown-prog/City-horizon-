@@ -3,6 +3,7 @@
 #include "building_composer.h"
 
 #include <QJsonObject>
+#include <QPointF>
 #include <QSize>
 #include <QString>
 
@@ -52,6 +53,7 @@ struct AnimatedAssetSpec {
     QString category = QStringLiteral("building");
     QString palette_profile = QStringLiteral("city_horizon_classic_tycoon");
     QSize frame_size = QSize(420, 420);
+    QPointF anchor_normalized = QPointF(0.50, 0.90);
     BuildingView view = BuildingView::South;
     BuildingComposerSpec base_building;
     std::vector<AnimationClip> clips;
