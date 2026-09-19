@@ -1,4 +1,4 @@
-"""Post-process Tycoon Photo Studio POC renders into four comparable variants."""
+"""Post-process the Tycoon Photo Studio into a four-direction game asset package."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 FINAL_SIZE = (256, 256)
 PALETTE_COLORS = 128
+CANDIDATE_VARIANT_ID = 3
+DIRECTION_ORDER = ("south", "east", "west", "north")
 
 
 def parse_args():
@@ -34,12 +36,7 @@ def percentile_from_histogram(hist, percentile):
 
 
 def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> Image.Image:
-    """Return a clean black RGBA shadow layer.
-
-    Preferred path: Cycles shadow catcher already produces transparent pixels
-    outside the projected shadow. A luminance-based fallback remains for older
-    artifacts so this script is still diagnosable if Blender changes behavior.
-    """
+    """Return a clean black RGBA shadow layer from the Cycles shadow catcher."""
 
     reference = shadow_reference.convert("RGBA")
     receiver_alpha = reference.getchannel("A")
@@ -48,9 +45,6 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
     coverage = nonzero / float(reference.width * reference.height)
     alpha_bbox = receiver_alpha.getbbox()
 
-    # A real shadow-catcher result should occupy only a bounded part of the frame.
-    # Clamp its strength to a classic soft projected shadow instead of preserving
-    # arbitrary Blender alpha values verbatim.
     if alpha_bbox is not None and 0.0005 < coverage < 0.45:
         clean_alpha = receiver_alpha.point(lambda value: min(132, int(value * 0.72)))
         clean_alpha = clean_alpha.filter(ImageFilter.GaussianBlur(radius=1.4))
@@ -58,8 +52,6 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
         shadow.putalpha(clean_alpha)
         return shadow
 
-    # Fallback for a normal receiver render: estimate the lit plane level and keep
-    # only local darkening not occupied by the independently rendered object.
     object_alpha = color_source.convert("RGBA").getchannel("A")
     luminance = ImageOps.grayscale(reference.convert("RGB"))
     masked_values = []
@@ -87,8 +79,6 @@ def derive_shadow(color_source: Image.Image, shadow_reference: Image.Image) -> I
             if recv_data[x, y] < 16 or obj_data[x, y] > 24:
                 continue
             delta = max(0, baseline - lum_data[x, y])
-            # Ignore broad lighting gradients so a receiver plane never becomes a
-            # visible rectangle around the sprite.
             if delta < 12:
                 continue
             out[x, y] = min(118, int((delta - 12) * 2.05))
@@ -138,47 +128,34 @@ def edge_cleanup(color_only: Image.Image) -> Image.Image:
     return Image.alpha_composite(result, rgba)
 
 
-def alpha_bounds_and_pivot(color: Image.Image):
-    alpha = color.getchannel("A")
-    bbox = alpha.getbbox() or (0, 0, color.width, color.height)
-    return list(map(int, bbox)), {
-        "x": int(round((bbox[0] + bbox[2]) * 0.5)),
-        "y": int(bbox[3]),
+def alpha_bounds(image: Image.Image):
+    bbox = image.convert("RGBA").getchannel("A").getbbox()
+    if bbox is None:
+        return [0, 0, image.width, image.height]
+    return list(map(int, bbox))
+
+
+def variants_for(color_small: Image.Image, shadow_small: Image.Image):
+    v1 = composite_shadow(color_small, shadow_small)
+    q2_color = quantize_rgba(color_small, dither=False)
+    v2 = composite_shadow(q2_color, shadow_small)
+    q3_color = quantize_rgba(color_small, dither=True)
+    v3 = composite_shadow(q3_color, shadow_small)
+    cleaned_color = edge_cleanup(q3_color)
+    v4 = composite_shadow(cleaned_color, shadow_small)
+    return [v1, v2, v3, v4]
+
+
+def scaled_pivot(direction_meta, metadata):
+    source = direction_meta["groundOriginSourcePx"]
+    render_width, render_height = metadata["renderResolution"]
+    return {
+        "x": int(round(source["x"] * FINAL_SIZE[0] / render_width)),
+        "y": int(round(source["y"] * FINAL_SIZE[1] / render_height)),
     }
 
 
-def draw_diamond(draw, center_x, center_y, width=128, height=64, fill=(108, 137, 78, 255), outline=(80, 104, 60, 255)):
-    points = [
-        (center_x, center_y - height // 2),
-        (center_x + width // 2, center_y),
-        (center_x, center_y + height // 2),
-        (center_x - width // 2, center_y),
-    ]
-    draw.polygon(points, fill=fill, outline=outline)
-
-
-def make_context(sprite: Image.Image) -> Image.Image:
-    canvas = Image.new("RGBA", (768, 512), (185, 198, 171, 255))
-    draw = ImageDraw.Draw(canvas)
-    origin_x, origin_y = 384, 250
-
-    for gy in range(-3, 4):
-        for gx in range(-4, 5):
-            sx = origin_x + (gx - gy) * 64
-            sy = origin_y + (gx + gy) * 32
-            is_path = gx == 1 or gy == 1
-            fill = (139, 132, 119, 255) if is_path else (110, 139, 79, 255)
-            outline = (101, 94, 84, 255) if is_path else (81, 105, 61, 255)
-            draw_diamond(draw, sx, sy, fill=fill, outline=outline)
-
-    enlarged = sprite.resize((320, 320), Image.Resampling.NEAREST)
-    canvas.alpha_composite(enlarged, (224, 76))
-    draw.rectangle((16, 16, 752, 56), fill=(245, 242, 233, 236))
-    draw.text((28, 28), "Synthetic CH_CAMERA_V1 scale context - not a runtime screenshot", fill=(42, 42, 42, 255))
-    return canvas
-
-
-def checker_panel(size=(256, 256)):
+def checker_panel(size=FINAL_SIZE):
     panel = Image.new("RGBA", size, (231, 229, 223, 255))
     draw = ImageDraw.Draw(panel)
     step = 16
@@ -189,25 +166,129 @@ def checker_panel(size=(256, 256)):
     return panel
 
 
-def make_board(variants):
-    labels = [
-        "01 Full Color Smooth",
-        "02 Palette Reduced",
-        "03 Palette + Dither",
-        "04 Dither + Edge Cleanup",
+def draw_diamond(draw, center_x, center_y, width=128, height=64, fill=(108, 137, 78, 115), outline=(79, 104, 60, 210)):
+    points = [
+        (center_x, center_y - height // 2),
+        (center_x + width // 2, center_y),
+        (center_x, center_y + height // 2),
+        (center_x - width // 2, center_y),
     ]
-    board = Image.new("RGBA", (4 * 300, 360), (247, 245, 239, 255))
-    draw = ImageDraw.Draw(board)
-    draw.text((20, 14), "Tycoon Photo Studio POC - same render, four post-process variants", fill=(32, 32, 32, 255))
+    draw.polygon(points, fill=fill, outline=outline)
 
-    for index, (label, sprite) in enumerate(zip(labels, variants)):
+
+def draw_pivot(draw, pivot):
+    x, y = pivot["x"], pivot["y"]
+    draw.line((x - 5, y, x + 5, y), fill=(230, 72, 58, 255), width=1)
+    draw.line((x, y - 5, x, y + 5), fill=(230, 72, 58, 255), width=1)
+
+
+def make_direction_review(candidates, pivots):
+    board = Image.new("RGBA", (4 * 300, 380), (247, 245, 239, 255))
+    draw = ImageDraw.Draw(board)
+    draw.text((20, 14), "Tycoon Asset Bake V1 - four rotations, one source, fixed camera/light", fill=(32, 32, 32, 255))
+    for index, direction in enumerate(DIRECTION_ORDER):
         x0 = index * 300 + 22
         y0 = 62
         panel = checker_panel()
-        panel.alpha_composite(sprite)
+        pdraw = ImageDraw.Draw(panel)
+        pivot = pivots[direction]
+        draw_diamond(pdraw, pivot["x"], pivot["y"])
+        panel.alpha_composite(candidates[direction])
+        draw_pivot(pdraw, pivot)
         board.alpha_composite(panel, (x0, y0))
-        draw.text((x0, 326), label, fill=(40, 40, 40, 255))
+        draw.text((x0, 326), direction.upper(), fill=(40, 40, 40, 255))
+        draw.text((x0, 344), f"pivot {pivot['x']},{pivot['y']}", fill=(72, 72, 72, 255))
     return board
+
+
+def make_style_matrix(all_variants):
+    labels = ("01 Full Color", "02 Palette", "03 Palette+Dither", "04 +Edge Cleanup")
+    cell = 276
+    left = 110
+    top = 62
+    board = Image.new("RGBA", (left + 4 * cell, top + 4 * cell + 36), (247, 245, 239, 255))
+    draw = ImageDraw.Draw(board)
+    draw.text((18, 14), "Four-direction style matrix - same Blender source bake", fill=(32, 32, 32, 255))
+    for column, label in enumerate(labels):
+        draw.text((left + column * cell + 8, 40), label, fill=(55, 55, 55, 255))
+    for row, direction in enumerate(DIRECTION_ORDER):
+        draw.text((18, top + row * cell + 118), direction.upper(), fill=(45, 45, 45, 255))
+        for column, sprite in enumerate(all_variants[direction]):
+            panel = checker_panel()
+            panel.alpha_composite(sprite)
+            board.alpha_composite(panel, (left + column * cell, top + row * cell))
+    return board
+
+
+def make_context_panel(sprite, pivot, label):
+    panel = Image.new("RGBA", (420, 320), (185, 198, 171, 255))
+    draw = ImageDraw.Draw(panel)
+    origin_x, origin_y = 210, 196
+    for gy in range(-2, 3):
+        for gx in range(-2, 3):
+            sx = origin_x + (gx - gy) * 64
+            sy = origin_y + (gx + gy) * 32
+            fill = (110, 139, 79, 255)
+            outline = (81, 105, 61, 255)
+            draw_diamond(draw, sx, sy, fill=fill, outline=outline)
+    panel.alpha_composite(sprite, (origin_x - pivot["x"], origin_y - pivot["y"]))
+    draw.rectangle((8, 8, 146, 32), fill=(245, 242, 233, 230))
+    draw.text((16, 15), label, fill=(42, 42, 42, 255))
+    return panel
+
+
+def make_context_board(candidates, pivots):
+    board = Image.new("RGBA", (840, 680), (185, 198, 171, 255))
+    draw = ImageDraw.Draw(board)
+    draw.rectangle((0, 0, 840, 40), fill=(245, 242, 233, 245))
+    draw.text((16, 14), "Synthetic CH_CAMERA_V1 gameplay-scale context - not a runtime screenshot", fill=(42, 42, 42, 255))
+    positions = ((0, 40), (420, 40), (0, 360), (420, 360))
+    for direction, pos in zip(DIRECTION_ORDER, positions):
+        board.alpha_composite(make_context_panel(candidates[direction], pivots[direction], direction.upper()), pos)
+    return board
+
+
+def make_fixed_sheet(candidates):
+    sheet = Image.new("RGBA", (FINAL_SIZE[0] * 4, FINAL_SIZE[1]), (0, 0, 0, 0))
+    for index, direction in enumerate(DIRECTION_ORDER):
+        sheet.alpha_composite(candidates[direction], (index * FINAL_SIZE[0], 0))
+    return sheet
+
+
+def make_trimmed_atlas(candidates, pivots, padding=2):
+    records = []
+    crops = []
+    total_width = 0
+    max_height = 0
+    for direction in DIRECTION_ORDER:
+        sprite = candidates[direction]
+        left, top, right, bottom = alpha_bounds(sprite)
+        crop = sprite.crop((left, top, right, bottom))
+        crops.append((direction, crop, [left, top, right, bottom]))
+        total_width += crop.width + padding * 2
+        max_height = max(max_height, crop.height + padding * 2)
+
+    atlas = Image.new("RGBA", (total_width, max_height), (0, 0, 0, 0))
+    cursor_x = 0
+    for direction, crop, bounds in crops:
+        x = cursor_x + padding
+        y = padding
+        atlas.alpha_composite(crop, (x, y))
+        pivot = pivots[direction]
+        records.append(
+            {
+                "direction": direction,
+                "x": x,
+                "y": y,
+                "w": crop.width,
+                "h": crop.height,
+                "pivotX": pivot["x"] - bounds[0],
+                "pivotY": pivot["y"] - bounds[1],
+                "sourceBounds": bounds,
+            }
+        )
+        cursor_x += crop.width + padding * 2
+    return atlas, records
 
 
 def main():
@@ -216,66 +297,138 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    color_source = Image.open(input_dir / "tycoon_photo_studio_color_source.png").convert("RGBA")
-    shadow_reference = Image.open(input_dir / "tycoon_photo_studio_shadow_reference.png").convert("RGBA")
     metadata = json.loads((input_dir / "studio_metadata.json").read_text(encoding="utf-8"))
+    asset_id = metadata.get("sourceObject", "park_kiosk_1x1")
+    direction_meta = {item["id"]: item for item in metadata["directions"]}
+    if tuple(metadata.get("directionOrder", [])) != DIRECTION_ORDER:
+        raise RuntimeError(f"Direction order must be {DIRECTION_ORDER}, got {metadata.get('directionOrder')}")
 
-    shadow_source = derive_shadow(color_source, shadow_reference)
-    color_small = downsample(color_source)
-    shadow_small = downsample(shadow_source)
+    candidates = {}
+    pivots = {}
+    all_variants = {}
+    view_records = []
 
-    color_small.save(output_dir / "tycoon_photo_studio_color_pass.png")
-    shadow_small.save(output_dir / "tycoon_photo_studio_shadow_pass.png")
+    for direction in DIRECTION_ORDER:
+        meta = direction_meta[direction]
+        color_source = Image.open(input_dir / meta["colorSource"]).convert("RGBA")
+        shadow_reference = Image.open(input_dir / meta["shadowSource"]).convert("RGBA")
+        shadow_source = derive_shadow(color_source, shadow_reference)
+        color_small = downsample(color_source)
+        shadow_small = downsample(shadow_source)
+        variants = variants_for(color_small, shadow_small)
+        candidate = variants[CANDIDATE_VARIANT_ID - 1]
+        pivot = scaled_pivot(meta, metadata)
 
-    v1 = composite_shadow(color_small, shadow_small)
-    q2_color = quantize_rgba(color_small, dither=False)
-    v2 = composite_shadow(q2_color, shadow_small)
-    q3_color = quantize_rgba(color_small, dither=True)
-    v3 = composite_shadow(q3_color, shadow_small)
-    cleaned_color = edge_cleanup(q3_color)
-    v4 = composite_shadow(cleaned_color, shadow_small)
+        color_small.save(output_dir / f"{asset_id}_{direction}_color_pass.png")
+        shadow_small.save(output_dir / f"{asset_id}_{direction}_shadow_pass.png")
+        for index, image in enumerate(variants, start=1):
+            image.save(output_dir / f"{asset_id}_{direction}_variant_{index:02d}.png")
+        candidate.save(output_dir / f"{asset_id}_{direction}.png")
 
-    variants = [v1, v2, v3, v4]
-    for index, image in enumerate(variants, start=1):
-        image.save(output_dir / f"tycoon_photo_studio_variant_{index:02d}.png")
+        candidates[direction] = candidate
+        pivots[direction] = pivot
+        all_variants[direction] = variants
+        view_records.append(
+            {
+                "direction": direction,
+                "quarterTurns": meta["quarterTurns"],
+                "rotationDegrees": meta["rotationDegrees"],
+                "file": f"{asset_id}_{direction}.png",
+                "colorPass": f"{asset_id}_{direction}_color_pass.png",
+                "shadowPass": f"{asset_id}_{direction}_shadow_pass.png",
+                "pivot": pivot,
+                "objectAlphaBounds": alpha_bounds(color_small),
+                "spriteAlphaBounds": alpha_bounds(candidate),
+            }
+        )
 
-    make_board(variants).save(output_dir / "tycoon_photo_studio_comparison_board.png")
-    make_context(v4).save(output_dir / "tycoon_photo_studio_in_game_context.png")
+    unique_pivots = {(p["x"], p["y"]) for p in pivots.values()}
+    if len(unique_pivots) != 1:
+        raise RuntimeError(f"All four rotations must share one projected ground-origin pivot, got {sorted(unique_pivots)}")
 
-    bbox, pivot = alpha_bounds_and_pivot(color_small)
+    fixed_sheet = make_fixed_sheet(candidates)
+    fixed_sheet.save(output_dir / f"{asset_id}_4view.png")
+
+    atlas, atlas_records = make_trimmed_atlas(candidates, pivots)
+    atlas.save(output_dir / f"{asset_id}_atlas.png")
+
+    review = make_direction_review(candidates, pivots)
+    review.save(output_dir / f"{asset_id}_review.png")
+    style_matrix = make_style_matrix(all_variants)
+    style_matrix.save(output_dir / f"{asset_id}_style_matrix.png")
+    style_matrix.save(output_dir / "tycoon_photo_studio_comparison_board.png")
+    context = make_context_board(candidates, pivots)
+    context.save(output_dir / f"{asset_id}_4dir_context.png")
+    context.save(output_dir / "tycoon_photo_studio_in_game_context.png")
+
     manifest = {
-        "contract": "TYCOON_PHOTO_STUDIO_POC_V1",
-        "status": "visual_experiment_only",
+        "contract": "TYCOON_ASSET_BAKE_V1",
+        "status": "visual_candidate",
         "humanApprovalRequired": True,
+        "assetId": asset_id,
+        "assetType": metadata.get("assetType", "static_building"),
         "cameraContract": metadata.get("cameraContract", "CH_CAMERA_V1"),
-        "projection": metadata.get("projection", "orthographic"),
+        "gridContract": metadata.get("gridContract", "CH_GRID_V1"),
+        "projection": metadata.get("projection", "orthographic_dimetric_2_to_1"),
         "yawDegrees": metadata.get("yawDegrees", 45.0),
         "elevationDegrees": metadata.get("elevationDegrees", 30.0),
+        "tile": {"width": metadata.get("tileWidth", 128), "height": metadata.get("tileHeight", 64)},
+        "footprint": metadata.get("footprint", {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]}),
         "blenderVersion": metadata.get("blenderVersion", "unknown"),
         "renderEngine": metadata.get("renderEngine", "unknown"),
-        "sourceObject": metadata.get("sourceObject", "park_kiosk_1x1"),
         "renderResolution": metadata.get("renderResolution", [1024, 1024]),
-        "finalResolution": list(FINAL_SIZE),
+        "finalFrameResolution": list(FINAL_SIZE),
+        "directionCount": 4,
+        "directionOrder": list(DIRECTION_ORDER),
+        "rotationPolicy": metadata.get("rotationPolicy", {}),
+        "pivotPolicy": "projected world origin (0,0,0), fixed across all directions",
         "paletteColorCount": PALETTE_COLORS,
-        "autoCropBoundsAtFinalResolution": bbox,
-        "pivotAtFinalResolution": pivot,
-        "variants": [
-            {"id": 1, "mode": "full_color_smooth", "dither": "none", "edgeCleanup": "none"},
-            {"id": 2, "mode": "palette_reduced", "dither": "none", "edgeCleanup": "none"},
-            {"id": 3, "mode": "palette_reduced", "dither": "floyd_steinberg", "edgeCleanup": "none"},
-            {"id": 4, "mode": "palette_reduced", "dither": "floyd_steinberg", "edgeCleanup": "binary_alpha_plus_subtle_1px_selout"},
-        ],
-        "shadowPass": metadata.get("shadowMode", "dedicated receiver render"),
-        "contextPreview": "synthetic 2:1 tile context; not a City Horizon runtime screenshot",
+        "candidatePostProcess": {
+            "variantId": CANDIDATE_VARIANT_ID,
+            "mode": "palette_reduced",
+            "dither": "floyd_steinberg",
+            "edgeCleanup": "none",
+            "status": "provisional_until_human_visual_approval",
+        },
+        "views": view_records,
+        "atlas": {
+            "file": f"{asset_id}_atlas.png",
+            "packing": "deterministic_single_row_trimmed_v1",
+            "paddingPx": 2,
+            "frames": atlas_records,
+        },
+        "files": {
+            "south": f"{asset_id}_south.png",
+            "east": f"{asset_id}_east.png",
+            "west": f"{asset_id}_west.png",
+            "north": f"{asset_id}_north.png",
+            "spriteSheet": f"{asset_id}_4view.png",
+            "atlas": f"{asset_id}_atlas.png",
+            "reviewSheet": f"{asset_id}_review.png",
+            "styleMatrix": f"{asset_id}_style_matrix.png",
+            "context4Dir": f"{asset_id}_4dir_context.png",
+        },
+        "reuse": {
+            "directionOrderSource": "C++/MapForge2/src/building_export_pipeline.cpp::kViews",
+            "directionQuarterTurnsSource": "C++/MapForge2/src/building_composer.cpp::quarterTurns",
+            "fileNamingCompatibleWithBuildingExportPipeline": True,
+            "cameraContractReused": True,
+            "futureAnimationExpansion": "same source root; bake directions x animation frames",
+        },
         "githubRunId": os.environ.get("GITHUB_RUN_ID", "local"),
         "githubSha": os.environ.get("GITHUB_SHA", "local"),
-        "approvalRule": "Do not promote this pipeline until the downsampled sprite is visually accepted in the classic Tycoon/Zoo Tycoon 1 family."
+        "approvalRule": "Do not promote this bake recipe to production until all four rotations are visually accepted at gameplay scale.",
     }
-    (output_dir / "tycoon_photo_studio_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    manifest_text = json.dumps(manifest, indent=2)
+    (output_dir / f"{asset_id}_manifest.json").write_text(manifest_text, encoding="utf-8")
+    (output_dir / "tycoon_photo_studio_manifest.json").write_text(manifest_text, encoding="utf-8")
 
-    print("Generated Tycoon Photo Studio POC outputs:")
-    for path in sorted(output_dir.glob("tycoon_photo_studio_*")):
-        print(" -", path.name)
+    print("Generated four-direction Tycoon asset package:")
+    for direction in DIRECTION_ORDER:
+        print(" -", f"{asset_id}_{direction}.png", "pivot", pivots[direction])
+    print(" -", f"{asset_id}_4view.png")
+    print(" -", f"{asset_id}_atlas.png")
+    print(" -", f"{asset_id}_manifest.json")
 
 
 if __name__ == "__main__":

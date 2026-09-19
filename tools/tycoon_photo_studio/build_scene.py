@@ -1,8 +1,9 @@
-"""Tycoon Photo Studio POC scene.
+"""Tycoon Photo Studio 4-direction bake proof.
 
-Build one small park kiosk in a fixed CH_CAMERA_V1-like studio and bake an
-object color pass plus a Cycles shadow-catcher pass. This is intentionally a
-single visual proof, not a general asset editor.
+Build one park kiosk in the fixed CH_CAMERA_V1 photo studio. The camera and
+lights never rotate. The authored asset root rotates in quarter turns matching
+BuildingExportPipeline: South=0, East=1, West=3, North=2. Each direction bakes
+an RGBA color pass plus a Cycles shadow-catcher pass.
 """
 
 import argparse
@@ -12,7 +13,17 @@ import os
 import sys
 
 import bpy
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
+
+
+ASSET_ID = "park_kiosk_1x1"
+DIRECTIONS = (
+    {"id": "south", "quarterTurns": 0, "rotationDegrees": 0.0},
+    {"id": "east", "quarterTurns": 1, "rotationDegrees": 90.0},
+    {"id": "west", "quarterTurns": 3, "rotationDegrees": 270.0},
+    {"id": "north", "quarterTurns": 2, "rotationDegrees": 180.0},
+)
 
 
 def parse_args():
@@ -197,7 +208,33 @@ def configure_scene(output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
 
-def render_color_pass(scene, authored, ground, output_dir):
+def create_asset_root(authored):
+    root = bpy.data.objects.new("AssetRoot", None)
+    bpy.context.collection.objects.link(root)
+    root.location = (0.0, 0.0, 0.0)
+    root.rotation_mode = "XYZ"
+    for obj in authored:
+        obj.parent = root
+    return root
+
+
+def set_direction(root, direction):
+    root.rotation_euler[2] = math.radians(direction["rotationDegrees"])
+    bpy.context.view_layer.update()
+
+
+def ground_origin_source_px(scene):
+    coord = world_to_camera_view(scene, scene.camera, Vector((0.0, 0.0, 0.0)))
+    scale = scene.render.resolution_percentage / 100.0
+    width = scene.render.resolution_x * scale
+    height = scene.render.resolution_y * scale
+    return {
+        "x": round(coord.x * width, 4),
+        "y": round((1.0 - coord.y) * height, 4),
+    }
+
+
+def render_color_pass(scene, authored, ground, path):
     ground.hide_render = True
     if hasattr(ground, "is_shadow_catcher"):
         ground.is_shadow_catcher = False
@@ -205,11 +242,11 @@ def render_color_pass(scene, authored, ground, output_dir):
         obj.hide_render = False
         if hasattr(obj, "visible_camera"):
             obj.visible_camera = True
-    scene.render.filepath = os.path.join(output_dir, "tycoon_photo_studio_color_source.png")
+    scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
 
 
-def render_shadow_reference(scene, authored, ground, output_dir):
+def render_shadow_pass(scene, authored, ground, path):
     ground.hide_render = False
     if hasattr(ground, "is_shadow_catcher"):
         ground.is_shadow_catcher = True
@@ -219,8 +256,7 @@ def render_shadow_reference(scene, authored, ground, output_dir):
             obj.visible_camera = False
         if hasattr(obj, "visible_shadow"):
             obj.visible_shadow = True
-
-    scene.render.filepath = os.path.join(output_dir, "tycoon_photo_studio_shadow_reference.png")
+    scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
 
 
@@ -231,39 +267,72 @@ def main():
     configure_scene(output_dir)
 
     authored = build_kiosk()
+    root = create_asset_root(authored)
     ground_material = make_material("ShadowReceiver", (0.82, 0.82, 0.82, 1.0), roughness=1.0)
     ground = add_box("ShadowReceiverPlane", (0.0, 0.0, -0.055), (7.5, 7.5, 0.10), ground_material, 0.0)
-
     scene = bpy.context.scene
-    render_color_pass(scene, authored, ground, output_dir)
-    render_shadow_reference(scene, authored, ground, output_dir)
+
+    direction_metadata = []
+    for direction in DIRECTIONS:
+        set_direction(root, direction)
+        direction_id = direction["id"]
+        color_name = f"{ASSET_ID}_{direction_id}_color_source.png"
+        shadow_name = f"{ASSET_ID}_{direction_id}_shadow_source.png"
+        render_color_pass(scene, authored, ground, os.path.join(output_dir, color_name))
+        render_shadow_pass(scene, authored, ground, os.path.join(output_dir, shadow_name))
+        direction_metadata.append(
+            {
+                **direction,
+                "colorSource": color_name,
+                "shadowSource": shadow_name,
+                "groundOriginSourcePx": ground_origin_source_px(scene),
+            }
+        )
+
+    root.rotation_euler[2] = 0.0
+    bpy.context.view_layer.update()
 
     metadata = {
-        "poc": "TYCOON_PHOTO_STUDIO_POC_V1",
-        "sourceObject": "park_kiosk_1x1",
+        "contract": "TYCOON_ASSET_BAKE_V1",
+        "sourceObject": ASSET_ID,
+        "assetType": "static_building",
+        "footprint": {"widthTiles": 1, "depthTiles": 1, "occupiedCells": [[0, 0]]},
         "blenderVersion": bpy.app.version_string,
         "renderEngine": scene.render.engine,
         "renderDevice": "CPU",
         "samples": scene.cycles.samples,
         "cameraContract": "CH_CAMERA_V1",
-        "projection": "orthographic",
+        "gridContract": "CH_GRID_V1",
+        "projection": "orthographic_dimetric_2_to_1",
         "yawDegrees": 45.0,
         "elevationDegrees": 30.0,
-        "groundRead": "2:1 dimetric target",
+        "tileWidth": 128,
+        "tileHeight": 64,
         "renderResolution": [scene.render.resolution_x, scene.render.resolution_y],
         "orthoScale": scene.camera.data.ortho_scale,
+        "directionOrder": [direction["id"] for direction in DIRECTIONS],
+        "directions": direction_metadata,
+        "rotationPolicy": {
+            "cameraRotates": False,
+            "assetRootRotates": True,
+            "lightsRotate": False,
+            "quarterTurnsMatchBuildingComposer": True,
+        },
         "lighting": {
             "key": "warm northwest area light",
             "fill": "cool southeast area light",
-            "worldStrength": 0.42
+            "worldStrength": 0.42,
+            "fixedAcrossDirections": True,
         },
         "shadowMode": "Cycles shadow catcher with object hidden from camera",
-        "note": "POC scene only; aesthetic approval requires review of final downsampled variants."
+        "note": "Four-direction visual candidate. Aesthetic approval remains human-gated.",
     }
     with open(os.path.join(output_dir, "studio_metadata.json"), "w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
 
-    print("Tycoon Photo Studio POC source passes generated in", output_dir)
+    print("Tycoon Photo Studio 4-direction source passes generated in", output_dir)
+    for direction in DIRECTIONS:
+        print(" -", direction["id"], direction["rotationDegrees"], "degrees")
 
 
 if __name__ == "__main__":

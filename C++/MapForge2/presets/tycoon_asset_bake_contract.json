@@ -1,0 +1,98 @@
+{
+  "id": "TYCOON_ASSET_BAKE_V1",
+  "status": "visual_candidate",
+  "purpose": "Bake one structured source asset through Blender into coherent four-direction 2D game sprites for City Horizon.",
+  "dependsOn": {
+    "camera": "CH_CAMERA_V1",
+    "grid": "CH_GRID_V1",
+    "classicStyle": "CH_CLASSIC_TYCOON_STYLE_V1",
+    "existingBuildingExport": "automatic_export_validation_7"
+  },
+  "renderer": {
+    "backend": "Blender",
+    "version": "4.2.3 LTS",
+    "engine": "Cycles",
+    "device": "CPU",
+    "headless": true,
+    "sourceResolution": [1024, 1024],
+    "finalFrameResolution": [256, 256]
+  },
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric_2_to_1",
+    "yawDegrees": 45.0,
+    "elevationDegrees": 30.0,
+    "cameraRotatesPerDirection": false
+  },
+  "rotationPolicy": {
+    "assetRootRotates": true,
+    "lightsRemainWorldFixed": true,
+    "directionOrder": ["south", "east", "west", "north"],
+    "directions": [
+      {"id": "south", "quarterTurns": 0, "rotationDegrees": 0},
+      {"id": "east", "quarterTurns": 1, "rotationDegrees": 90},
+      {"id": "west", "quarterTurns": 3, "rotationDegrees": 270},
+      {"id": "north", "quarterTurns": 2, "rotationDegrees": 180}
+    ],
+    "source": "BuildingComposer quarterTurns + BuildingExportPipeline kViews"
+  },
+  "lighting": {
+    "fixedAcrossDirections": true,
+    "key": "warm northwest area light",
+    "fill": "cool southeast area light",
+    "shadow": "Cycles shadow catcher"
+  },
+  "postProcess": {
+    "variantsRetainedForReview": 4,
+    "candidateVariant": 3,
+    "candidate": {
+      "paletteColors": 128,
+      "dither": "floyd_steinberg",
+      "edgeCleanup": "none"
+    },
+    "candidateIsFrozenProductionStyle": false,
+    "humanApprovalRequired": true
+  },
+  "pivot": {
+    "source": "projected world origin (0,0,0)",
+    "mustBeIdenticalAcrossDirections": true,
+    "alphaBoundsDoNotDefinePivot": true
+  },
+  "footprint": {
+    "gridContract": "CH_GRID_V1",
+    "tileWidth": 128,
+    "tileHeight": 64,
+    "manifestRequired": true,
+    "rotateOccupiedMaskForNonSquareAssets": true
+  },
+  "outputs": {
+    "directionFiles": [
+      "<asset>_south.png",
+      "<asset>_east.png",
+      "<asset>_west.png",
+      "<asset>_north.png"
+    ],
+    "fixedFourViewSheet": "<asset>_4view.png",
+    "trimmedAtlas": "<asset>_atlas.png",
+    "manifest": "<asset>_manifest.json",
+    "review": "<asset>_review.png",
+    "styleMatrix": "<asset>_style_matrix.png",
+    "context": "<asset>_4dir_context.png"
+  },
+  "reuse": {
+    "keep": [
+      "CH_CAMERA_V1",
+      "CH_GRID_V1",
+      "BuildingExportPipeline direction naming/order",
+      "Building Composer footprint concepts",
+      "pivot/anchor metadata",
+      "PNG + JSON export conventions",
+      "Animation Core for future directions x frames",
+      "Asset Browser/manifests/validation gates"
+    ],
+    "replaceAsFinalArtAuthority": [
+      "simple QPainter procedural shapes used as production visuals"
+    ]
+  },
+  "promotionRule": "Do not generalize or mass-produce until all four rotations of the golden asset are visually approved at gameplay scale."
+}
