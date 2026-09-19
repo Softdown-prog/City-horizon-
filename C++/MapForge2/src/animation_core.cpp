@@ -21,17 +21,12 @@ float interpolateValue(const float a, const float b, const float t,
     const float clamped = std::clamp(t, 0.0F, 1.0F);
     float shaped = clamped;
     switch (interpolation) {
-        case AnimationInterpolation::Step:
-            shaped = 0.0F;
-            break;
-        case AnimationInterpolation::Linear:
-            break;
+        case AnimationInterpolation::Step: shaped = 0.0F; break;
+        case AnimationInterpolation::Linear: break;
         case AnimationInterpolation::SmoothStep:
-            shaped = clamped * clamped * (3.0F - 2.0F * clamped);
-            break;
+            shaped = clamped * clamped * (3.0F - 2.0F * clamped); break;
         case AnimationInterpolation::Sine:
-            shaped = 0.5F - 0.5F * std::cos(clamped * 3.14159265358979323846F);
-            break;
+            shaped = 0.5F - 0.5F * std::cos(clamped * 3.14159265358979323846F); break;
     }
     return a + (b - a) * shaped;
 }
@@ -49,10 +44,8 @@ bool loopEndpointsEquivalent(const AnimationTrack& track) {
 }
 
 QJsonObject keyframeJson(const AnimationKeyframe& key) {
-    return QJsonObject{
-        {"timeSeconds", static_cast<double>(key.time_seconds)},
-        {"value", static_cast<double>(key.value)},
-    };
+    return QJsonObject{{"timeSeconds", static_cast<double>(key.time_seconds)},
+                       {"value", static_cast<double>(key.value)}};
 }
 
 bool isNormalizedPoint(const QPointF& point) {
@@ -72,6 +65,9 @@ void applyProperty(AnimationRootState& state, const AnimationProperty property, 
         case AnimationProperty::Scale: state.scale = std::max(0.01F, value); break;
         case AnimationProperty::Opacity: state.opacity = std::clamp(value, 0.0F, 1.0F); break;
         case AnimationProperty::Visibility: state.visible = value >= 0.5F; break;
+        case AnimationProperty::DrawOrder:
+        case AnimationProperty::VisualVariant:
+            break;
     }
 }
 
@@ -84,6 +80,8 @@ void applyProperty(AnimationNodeState& state, const AnimationNodeSpec& node,
         case AnimationProperty::Scale: state.scale = std::max(0.01F, node.scale * value); break;
         case AnimationProperty::Opacity: state.opacity = std::clamp(node.opacity * value, 0.0F, 1.0F); break;
         case AnimationProperty::Visibility: state.visible = node.visible && value >= 0.5F; break;
+        case AnimationProperty::DrawOrder: state.draw_order = static_cast<int>(std::lround(value)); break;
+        case AnimationProperty::VisualVariant: state.visual_variant = std::max(0, static_cast<int>(std::lround(value))); break;
     }
 }
 
@@ -97,6 +95,8 @@ QString AnimationCore::propertyId(const AnimationProperty property) {
         case AnimationProperty::Scale: return QStringLiteral("scale");
         case AnimationProperty::Opacity: return QStringLiteral("opacity");
         case AnimationProperty::Visibility: return QStringLiteral("visibility");
+        case AnimationProperty::DrawOrder: return QStringLiteral("draw_order");
+        case AnimationProperty::VisualVariant: return QStringLiteral("visual_variant");
     }
     return QStringLiteral("offset_x_px");
 }
@@ -124,11 +124,7 @@ QString AnimationCore::nodeVisualKindId(const AnimationNodeVisualKind kind) {
 }
 
 bool AnimationCore::validateClip(const AnimationClip& clip, QString* reason) {
-    auto fail = [&](const QString& message) {
-        if (reason) *reason = message;
-        return false;
-    };
-
+    auto fail = [&](const QString& message) { if (reason) *reason = message; return false; };
     if (clip.id.trimmed().isEmpty()) return fail(QStringLiteral("clip id is empty"));
     if (!(clip.duration_seconds > 0.0F)) return fail(QStringLiteral("clip duration must be greater than zero"));
     if (clip.frame_count < 2 || clip.frame_count > 240)
@@ -138,15 +134,11 @@ bool AnimationCore::validateClip(const AnimationClip& clip, QString* reason) {
         const AnimationTrack& track = clip.tracks[track_index];
         if (track.target_id.trimmed().isEmpty()) return fail(QStringLiteral("animation track target is empty"));
         if (track.keyframes.empty()) return fail(QStringLiteral("animation track has no keyframes"));
-
         for (std::size_t other = track_index + 1; other < clip.tracks.size(); ++other) {
-            if (track.target_id == clip.tracks[other].target_id
-                && track.property == clip.tracks[other].property) {
+            if (track.target_id == clip.tracks[other].target_id && track.property == clip.tracks[other].property)
                 return fail(QStringLiteral("duplicate track property '%1' for target '%2'")
                                 .arg(propertyId(track.property), track.target_id));
-            }
         }
-
         float previous = -1.0F;
         for (const AnimationKeyframe& key : track.keyframes) {
             if (key.time_seconds < 0.0F || key.time_seconds > clip.duration_seconds)
@@ -155,27 +147,20 @@ bool AnimationCore::validateClip(const AnimationClip& clip, QString* reason) {
                 return fail(QStringLiteral("animation keyframes must be sorted by time"));
             previous = key.time_seconds;
         }
-
         if (clip.loop && track.keyframes.size() > 1) {
             if (std::abs(track.keyframes.front().time_seconds) > 0.0001F
-                || std::abs(track.keyframes.back().time_seconds - clip.duration_seconds) > 0.0001F) {
+                || std::abs(track.keyframes.back().time_seconds - clip.duration_seconds) > 0.0001F)
                 return fail(QStringLiteral("looping tracks must include keyframes at 0 and clip duration"));
-            }
             if (!loopEndpointsEquivalent(track))
                 return fail(QStringLiteral("looping track endpoints must represent the same state"));
         }
     }
-
     if (reason) reason->clear();
     return true;
 }
 
 bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
-    auto fail = [&](const QString& message) {
-        if (reason) *reason = message;
-        return false;
-    };
-
+    auto fail = [&](const QString& message) { if (reason) *reason = message; return false; };
     if (asset.asset_id.trimmed().isEmpty()) return fail(QStringLiteral("asset id is empty"));
     if (asset.category.trimmed().isEmpty()) return fail(QStringLiteral("asset category is empty"));
     if (asset.frame_size.width() < 32 || asset.frame_size.height() < 32)
@@ -194,28 +179,24 @@ bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
         if (!(node.scale > 0.0F)) return fail(QStringLiteral("animation node '%1' scale must be positive").arg(node.id));
         if (node.opacity < 0.0F || node.opacity > 1.0F)
             return fail(QStringLiteral("animation node '%1' opacity must be inside 0..1").arg(node.id));
+        if (node.visual_variant < 0)
+            return fail(QStringLiteral("animation node '%1' visual variant cannot be negative").arg(node.id));
         if (node.visual_kind != AnimationNodeVisualKind::None
             && (node.visual_size_px.width() <= 0.0 || node.visual_size_px.height() <= 0.0))
             return fail(QStringLiteral("animation node '%1' visual size must be positive").arg(node.id));
-        if (node.visual_kind == AnimationNodeVisualKind::RasterSprite
-            && node.visual_asset_path.trimmed().isEmpty())
+        if (node.visual_kind == AnimationNodeVisualKind::RasterSprite && node.visual_asset_path.trimmed().isEmpty())
             return fail(QStringLiteral("animation node '%1' raster source path is empty").arg(node.id));
-        if (node.visual_kind == AnimationNodeVisualKind::LibraryPart
-            && node.visual_library_id.trimmed().isEmpty())
+        if (node.visual_kind == AnimationNodeVisualKind::LibraryPart && node.visual_library_id.trimmed().isEmpty())
             return fail(QStringLiteral("animation node '%1' library part id is empty").arg(node.id));
         if (!node.visual_source_rect_px.isNull()
             && (node.visual_source_rect_px.x() < 0.0 || node.visual_source_rect_px.y() < 0.0
-                || node.visual_source_rect_px.width() <= 0.0
-                || node.visual_source_rect_px.height() <= 0.0))
+                || node.visual_source_rect_px.width() <= 0.0 || node.visual_source_rect_px.height() <= 0.0))
             return fail(QStringLiteral("animation node '%1' source rect is invalid").arg(node.id));
-
-        for (std::size_t other = index + 1; other < asset.nodes.size(); ++other) {
+        for (std::size_t other = index + 1; other < asset.nodes.size(); ++other)
             if (node.id == asset.nodes[other].id)
                 return fail(QStringLiteral("duplicate animation node id: %1").arg(node.id));
-        }
         if (node.parent_id != QStringLiteral("root") && !hasNodeId(asset, node.parent_id))
-            return fail(QStringLiteral("animation node '%1' references missing parent '%2'")
-                            .arg(node.id, node.parent_id));
+            return fail(QStringLiteral("animation node '%1' references missing parent '%2'").arg(node.id, node.parent_id));
     }
 
     for (const AnimationNodeSpec& node : asset.nodes) {
@@ -225,9 +206,7 @@ bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
             const AnimationNodeSpec* parent_node = findNode(asset, parent);
             if (!parent_node) return fail(QStringLiteral("animation hierarchy contains a missing parent"));
             parent = parent_node->parent_id;
-            ++hops;
-            if (hops > asset.nodes.size())
-                return fail(QStringLiteral("animation node hierarchy contains a cycle"));
+            if (++hops > asset.nodes.size()) return fail(QStringLiteral("animation node hierarchy contains a cycle"));
         }
     }
 
@@ -239,6 +218,10 @@ bool AnimationCore::validate(const AnimatedAssetSpec& asset, QString* reason) {
         for (const AnimationTrack& track : clip.tracks) {
             if (track.target_id != QStringLiteral("root") && !hasNodeId(asset, track.target_id))
                 return fail(QStringLiteral("clip '%1' targets unknown node '%2'").arg(clip.id, track.target_id));
+            if (track.target_id == QStringLiteral("root")
+                && (track.property == AnimationProperty::DrawOrder || track.property == AnimationProperty::VisualVariant))
+                return fail(QStringLiteral("clip '%1' cannot apply node-only property '%2' to root")
+                                .arg(clip.id, propertyId(track.property)));
         }
     }
 
@@ -250,18 +233,15 @@ float AnimationCore::sampleTrack(const AnimationTrack& track, const float time_s
                                  const float duration_seconds, const bool loop) {
     if (track.keyframes.empty()) return 0.0F;
     if (track.keyframes.size() == 1) return track.keyframes.front().value;
-
     const float t = normalizedLoopTime(time_seconds, duration_seconds, loop);
     if (t <= track.keyframes.front().time_seconds) return track.keyframes.front().value;
     if (t >= track.keyframes.back().time_seconds) return track.keyframes.back().value;
-
     for (std::size_t i = 1; i < track.keyframes.size(); ++i) {
         const AnimationKeyframe& next = track.keyframes[i];
         if (t > next.time_seconds) continue;
         const AnimationKeyframe& previous = track.keyframes[i - 1];
         const float span = std::max(0.0001F, next.time_seconds - previous.time_seconds);
-        const float local_t = (t - previous.time_seconds) / span;
-        return interpolateValue(previous.value, next.value, local_t, track.interpolation);
+        return interpolateValue(previous.value, next.value, (t - previous.time_seconds) / span, track.interpolation);
     }
     return track.keyframes.back().value;
 }
@@ -292,6 +272,8 @@ AnimationFrameSample AnimationCore::sampleFrame(const AnimatedAssetSpec& asset,
         state.scale = node.scale;
         state.opacity = node.opacity;
         state.visible = node.visible;
+        state.draw_order = node.draw_order;
+        state.visual_variant = node.visual_variant;
         sample.nodes.push_back(state);
     }
 
@@ -301,22 +283,19 @@ AnimationFrameSample AnimationCore::sampleFrame(const AnimatedAssetSpec& asset,
             applyProperty(sample.root, track.property, value);
             continue;
         }
-        AnimationNodeState* state = nullptr;
         const AnimationNodeSpec* node = findNode(asset, track.target_id);
         if (!node) continue;
         for (AnimationNodeState& candidate : sample.nodes) {
             if (candidate.id == track.target_id) {
-                state = &candidate;
+                applyProperty(candidate, *node, track.property, value);
                 break;
             }
         }
-        if (state) applyProperty(*state, *node, track.property, value);
     }
     return sample;
 }
 
-const AnimationNodeSpec* AnimationCore::findNode(const AnimatedAssetSpec& asset,
-                                                 const QString& node_id) {
+const AnimationNodeSpec* AnimationCore::findNode(const AnimatedAssetSpec& asset, const QString& node_id) {
     for (const AnimationNodeSpec& node : asset.nodes) if (node.id == node_id) return &node;
     return nullptr;
 }
@@ -332,38 +311,30 @@ QJsonObject AnimationCore::clipManifest(const AnimationClip& clip) {
     for (const AnimationTrack& track : clip.tracks) {
         QJsonArray keys;
         for (const AnimationKeyframe& key : track.keyframes) keys.append(keyframeJson(key));
-        tracks.append(QJsonObject{
-            {"targetId", track.target_id},
-            {"property", propertyId(track.property)},
-            {"interpolation", interpolationId(track.interpolation)},
-            {"keyframes", keys},
-        });
+        tracks.append(QJsonObject{{"targetId", track.target_id},
+                                  {"property", propertyId(track.property)},
+                                  {"interpolation", interpolationId(track.interpolation)},
+                                  {"keyframes", keys}});
     }
-    return QJsonObject{
-        {"id", clip.id}, {"name", clip.name},
-        {"durationSeconds", static_cast<double>(clip.duration_seconds)},
-        {"frameCount", clip.frame_count}, {"loop", clip.loop}, {"tracks", tracks},
-    };
+    return QJsonObject{{"id", clip.id}, {"name", clip.name},
+                       {"durationSeconds", static_cast<double>(clip.duration_seconds)},
+                       {"frameCount", clip.frame_count}, {"loop", clip.loop}, {"tracks", tracks}};
 }
 
 QJsonObject AnimationCore::nodeManifest(const AnimationNodeSpec& node) {
-    QJsonObject visual{
-        {"version", QStringLiteral("animation_visual_sources_2")},
-        {"kind", nodeVisualKindId(node.visual_kind)},
-        {"widthPx", node.visual_size_px.width()},
-        {"heightPx", node.visual_size_px.height()},
-        {"trimTransparent", node.visual_trim_transparent},
-        {"preserveAspect", node.visual_preserve_aspect},
-        {"smoothScaling", node.visual_smooth_scaling},
-    };
+    QJsonObject visual{{"version", QStringLiteral("animation_visual_sources_3")},
+                       {"kind", nodeVisualKindId(node.visual_kind)},
+                       {"widthPx", node.visual_size_px.width()}, {"heightPx", node.visual_size_px.height()},
+                       {"trimTransparent", node.visual_trim_transparent},
+                       {"preserveAspect", node.visual_preserve_aspect},
+                       {"smoothScaling", node.visual_smooth_scaling},
+                       {"defaultVariant", node.visual_variant}};
     if (node.visual_kind == AnimationNodeVisualKind::RasterSprite) {
         visual.insert(QStringLiteral("assetPath"), node.visual_asset_path);
-        if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty()) {
-            visual.insert(QStringLiteral("sourceRectPx"), QJsonObject{
-                {"x", node.visual_source_rect_px.x()}, {"y", node.visual_source_rect_px.y()},
-                {"width", node.visual_source_rect_px.width()}, {"height", node.visual_source_rect_px.height()},
-            });
-        }
+        if (!node.visual_source_rect_px.isNull() && !node.visual_source_rect_px.isEmpty())
+            visual.insert(QStringLiteral("sourceRectPx"), QJsonObject{{"x", node.visual_source_rect_px.x()},
+                {"y", node.visual_source_rect_px.y()}, {"width", node.visual_source_rect_px.width()},
+                {"height", node.visual_source_rect_px.height()}});
     } else if (node.visual_kind == AnimationNodeVisualKind::BuildingRender) {
         visual.insert(QStringLiteral("view"), BuildingComposer::viewName(node.visual_building_view));
         visual.insert(QStringLiteral("visualPreset"), BuildingComposer::visualPresetId(node.visual_building.visual_preset));
@@ -379,14 +350,12 @@ QJsonObject AnimationCore::nodeManifest(const AnimationNodeSpec& node) {
         visual.insert(QStringLiteral("qaFallbackOnly"), true);
     }
 
-    return QJsonObject{
-        {"id", node.id}, {"parentId", node.parent_id},
+    return QJsonObject{{"id", node.id}, {"parentId", node.parent_id},
         {"positionPx", QJsonObject{{"x", node.position_px.x()}, {"y", node.position_px.y()}}},
         {"pivotNormalized", QJsonObject{{"x", node.pivot_normalized.x()}, {"y", node.pivot_normalized.y()}}},
-        {"rotationDegrees", static_cast<double>(node.rotation_degrees)},
-        {"scale", static_cast<double>(node.scale)}, {"opacity", static_cast<double>(node.opacity)},
-        {"visible", node.visible}, {"drawOrder", node.draw_order}, {"visual", visual},
-    };
+        {"rotationDegrees", static_cast<double>(node.rotation_degrees)}, {"scale", static_cast<double>(node.scale)},
+        {"opacity", static_cast<double>(node.opacity)}, {"visible", node.visible},
+        {"drawOrder", node.draw_order}, {"visualVariant", node.visual_variant}, {"visual", visual}};
 }
 
 QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
@@ -394,11 +363,9 @@ QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
     for (const AnimationClip& clip : asset.clips) clips.append(clipManifest(clip));
     QJsonArray nodes;
     for (const AnimationNodeSpec& node : asset.nodes) nodes.append(nodeManifest(node));
-
     QString reason;
     const bool valid = validate(asset, &reason);
-    return QJsonObject{
-        {"version", QString::fromLatin1(kVersion)}, {"assetId", asset.asset_id},
+    return QJsonObject{{"version", QString::fromLatin1(kVersion)}, {"assetId", asset.asset_id},
         {"category", asset.category}, {"paletteProfile", asset.palette_profile},
         {"frameSize", QJsonObject{{"width", asset.frame_size.width()}, {"height", asset.frame_size.height()}}},
         {"anchorNormalized", QJsonObject{{"x", asset.anchor_normalized.x()}, {"y", asset.anchor_normalized.y()}}},
@@ -407,10 +374,9 @@ QJsonObject AnimationCore::manifest(const AnimatedAssetSpec& asset) {
         {"loopClipsDoNotDuplicateEndFrame", true}, {"renderBaseBuilding", asset.render_base_building},
         {"baseRenderable", QStringLiteral("BuildingComposerSpec")},
         {"nodeHierarchyVersion", QStringLiteral("animation_node_hierarchy_1")},
-        {"visualSourceVersion", QStringLiteral("animation_visual_sources_2")},
+        {"visualSourceVersion", QStringLiteral("animation_visual_sources_3")},
         {"visualSourceRoot", asset.visual_source_root}, {"nodes", nodes}, {"clips", clips},
-        {"valid", valid}, {"validationReason", reason},
-    };
+        {"valid", valid}, {"validationReason", reason}};
 }
 
 } // namespace ch::studio
