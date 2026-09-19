@@ -1,5 +1,5 @@
 {
-  "id": "animation_visual_sources_1",
+  "id": "animation_visual_sources_2",
   "name": "City Horizon Animation Visual Sources",
   "status": "canonical",
   "purpose": "Allow each persistent animation node to render a stable authored visual source instead of regenerating independent per-frame artwork.",
@@ -8,11 +8,13 @@
     "primitive_rectangle",
     "primitive_ellipse",
     "raster_sprite",
-    "building_render"
+    "building_render",
+    "library_part"
   ],
   "productionPreferredKinds": [
     "raster_sprite",
-    "building_render"
+    "building_render",
+    "library_part"
   ],
   "primitivePolicy": {
     "supportedForQaAndFallback": true,
@@ -36,6 +38,17 @@
     "inheritsAnimationTimeline": false,
     "renderedAsStableNodeVisual": true
   },
+  "libraryPart": {
+    "stableIdRequired": true,
+    "registeredNamespaceRequired": true,
+    "firstRegisteredLibrary": "carousel_parts_1",
+    "firstNamespace": "carousel.*",
+    "deterministicRenderer": true,
+    "transparentRgba": true,
+    "perNodePrimaryColorSupported": true,
+    "perNodeOutlineColorSupported": true,
+    "sourceMustResolveBeforeProductionExport": true
+  },
   "coherence": {
     "nodeVisualSourceStableAcrossClip": true,
     "nodePivotStableAcrossClip": true,
@@ -49,7 +62,8 @@
     "manifestRecordsVisualKind": true,
     "manifestRecordsRasterPathWhenUsed": true,
     "manifestRecordsBuildingRenderIdentityWhenUsed": true,
+    "manifestRecordsLibraryPartIdWhenUsed": true,
     "runtimeReceivesBakedFrames": true
   },
-  "authoringRule": "A node owns one stable visual source for the clip. Motion comes from timeline tracks and parent transforms; raster/building pixels are resolved from the same authored source for every sampled frame."
+  "authoringRule": "A node owns one stable visual source for the clip. Motion comes from timeline tracks and parent transforms; raster, building or registered library pixels are resolved from the same authored source for every sampled frame."
 }
