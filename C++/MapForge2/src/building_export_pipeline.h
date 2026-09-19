@@ -13,6 +13,7 @@ struct BuildingExportValidation {
     bool footprint_valid = false;
     bool halo_valid = false;
     bool urban_integration_valid = false;
+    bool lod_visual_valid = false;
     bool export_ready = false;
     bool anchor_contact = false;
     int clipped_edge_pixels = 0;
@@ -28,20 +29,15 @@ struct BuildingExportValidation {
 
 class BuildingExportPipeline final {
 public:
-    // Chooses a frame large enough for the declared footprint, wall/roof height
-    // and authored roof overhang, rounded to stable 32 px increments.
     static QSize recommendedFrame(const BuildingComposerSpec& spec);
-
-    // Deterministic production stem. Re-exporting the same authored definition
-    // replaces the same package instead of generating arbitrary duplicate names.
     static QString automaticStem(const BuildingComposerSpec& spec);
 
     static BuildingExportValidation validate(
         const BuildingComposerSpec& spec,
         QSize frame = QSize());
 
-    // Writes the complete production package only when footprint/frame/anchor,
-    // halo and urban-integration authoring validation all pass.
+    // Writes production sprites only after footprint/frame/anchor, halo,
+    // urban-integration and gameplay-scale LOD readability gates all pass.
     static bool exportPackage(
         const BuildingComposerSpec& spec,
         const QString& output_directory,
