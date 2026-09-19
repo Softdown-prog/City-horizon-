@@ -18,7 +18,12 @@ public:
 
     static QImage renderSource(const AnimatedAssetSpec& asset,
                                const AnimationNodeSpec& node,
-                               int visual_variant = 0,
+                               int visual_variant,
+                               QString* reason = nullptr);
+
+    // Compatibility overload: resolves the node's authored default variant.
+    static QImage renderSource(const AnimatedAssetSpec& asset,
+                               const AnimationNodeSpec& node,
                                QString* reason = nullptr);
 
     static QJsonObject manifest(const AnimationNodeSpec& node);
