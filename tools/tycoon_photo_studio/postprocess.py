@@ -331,10 +331,19 @@ def main():
     metadata = json.loads((input_dir / "studio_metadata.json").read_text(encoding="utf-8"))
     if metadata.get("studioPreset") != preset.get("id"):
         raise RuntimeError("Source metadata and post-process studio preset do not match")
+
+    # GAP 2: use the dynamic finalResolution recorded by build_scene.py if present.
+    # It may differ from the studio preset when the asset footprint is larger than 1×1.
+    if "finalResolution" in metadata:
+        global FINAL_SIZE
+        FINAL_SIZE = tuple(map(int, metadata["finalResolution"]))
+        print(f"[postprocess] Using dynamic finalResolution from metadata: {FINAL_SIZE[0]}×{FINAL_SIZE[1]}")
+
     asset_id = metadata["sourceObject"]
     direction_meta = {item["id"]: item for item in metadata["directions"]}
     if tuple(metadata.get("directionOrder", [])) != DIRECTION_ORDER:
         raise RuntimeError(f"Direction order must be {DIRECTION_ORDER}, got {metadata.get('directionOrder')}")
+
 
     candidates = {}
     pivots = {}
