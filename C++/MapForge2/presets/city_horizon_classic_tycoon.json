@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_18",
+  "revision": "classic_tycoon_19",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -316,10 +316,24 @@
     "wallLightWarmTint": "#f7e7c9",
     "wallShadowCoolTint": "#64758a",
     "roofShadowFaceFactor": 0.86,
-    "roofLitFaceFactor": 1.06,
-    "castShadowEnabled": true,
-    "contactShadowAlpha": 58,
-    "castShadowAlpha": 46
+    "roofLitFaceFactor": 1.06
+  },
+  "castShadow": {
+    "version": "fixed_world_cast_shadow_1",
+    "contractFile": "fixed_world_cast_shadow_contract.json",
+    "enabled": true,
+    "worldDirection": [1.0, 0.35],
+    "heightLengthScale": 0.27,
+    "minimumLengthPx": 14.0,
+    "maximumLengthPx": 34.0,
+    "coreAlpha": 46,
+    "nearFieldAlpha": 12,
+    "penumbraAlpha": 18,
+    "penumbraExtension": 1.08,
+    "frameSafetyMarginPx": 4.0,
+    "cameraIndependent": true,
+    "gaussianBlur": false,
+    "legacyProductionShadowDisabled": true
   },
   "ambientOcclusion": {
     "version": "localized_contact_ao_1",
@@ -379,5 +393,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. The production wall raster uses classic_three_tone_ramp_1 over structured_directional_materials_1. Ambient occlusion uses localized_contact_ao_1 only at real contacts: short eave falloff, narrow visible-corner contact, restrained wall-ground grounding and compact recess contact for openings. Broad AO washes and painted vertical corner stripes are not permitted. automatic_export_validation_7 also records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates."
+  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. The production wall raster uses classic_three_tone_ramp_1 over structured_directional_materials_1. The global cast shadow uses fixed_world_cast_shadow_1: one camera-independent world direction, height-derived bounded reach, cool-charcoal core and compact anti-aliased penumbra, composited before the building. The legacy camera-relative shadow is disabled in the production facade path. Ambient occlusion uses localized_contact_ao_1 only at real contacts. automatic_export_validation_7 records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates."
 }
