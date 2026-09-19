@@ -1,0 +1,40 @@
+{
+  "id": "city_horizon_small_block_preview",
+  "version": "small_block_preview_1",
+  "targetPlatform": "windows_pc",
+  "gridContract": "CH_GRID_V1",
+  "purpose": "Review authored buildings at gameplay scale inside a deterministic mini-block before accepting them into the production asset library.",
+  "previewOnly": true,
+  "exportedIntoBuildingSprite": false,
+  "composition": {
+    "focusBuildings": 1,
+    "deterministicNeighbours": 5,
+    "roads": true,
+    "sidewalks": true,
+    "trees": true,
+    "intersection": true,
+    "focusLotHighlight": true
+  },
+  "neighbours": {
+    "source": "controlled_procedural_variation_1",
+    "defaultNeighborhoodSeed": 401,
+    "sameSeedReproducesSameBlock": true,
+    "preservePlacementCompatibility": true
+  },
+  "reviewChecks": [
+    "gameplay_scale_readability",
+    "silhouette_against_neighbours",
+    "visual_repetition",
+    "palette_repetition",
+    "roof_repetition",
+    "street_and_sidewalk_grounding",
+    "building_density",
+    "tree_and_prop_scale",
+    "focus_building_remains_identifiable"
+  ],
+  "automaticExport": {
+    "qaFileSuffix": "_block_preview.png",
+    "recordsManifestNode": "smallBlockPreview",
+    "neverReplacesTransparentProductionSprites": true
+  }
+}
