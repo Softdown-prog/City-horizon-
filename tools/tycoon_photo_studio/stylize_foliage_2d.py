@@ -1,8 +1,9 @@
-"""Apply a classic 2D Tycoon foliage treatment to an already baked static asset package.
+"""Apply a classic pre-rendered Tycoon foliage treatment to an already baked tree package.
 
-This stage is intentionally asset-class specific. It keeps the canonical camera, pivot,
-Blender source bake and generic package format intact, while reducing modern 3D cues:
-soft gradients, excessive palette depth, long dark shadows and antialiased silhouette haze.
+V2 assumes the Blender source contains dense leaf micro-geometry.  Instead of crushing
+that information into large flat bands, it preserves small leaf-to-leaf contrast,
+uses a restrained indexed palette with Floyd-Steinberg diffusion, and keeps the ground
+shadow compact so the final sprite reads as pre-rendered 2D rather than modern 3D.
 """
 
 from __future__ import annotations
@@ -17,9 +18,9 @@ from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 import postprocess as package_tools
 
 DIRECTIONS = ("south", "east", "west", "north")
-PALETTE_COLORS = 24
-SHADOW_ALPHA_MAX = 62
-SHADOW_RADIUS_PX = 82.0
+PALETTE_COLORS = 64
+SHADOW_ALPHA_MAX = 54
+SHADOW_RADIUS_PX = 72.0
 
 
 def parse_args():
@@ -29,30 +30,30 @@ def parse_args():
     return parser.parse_args()
 
 
-def flatten_color(image: Image.Image) -> Image.Image:
+def stylize_color(image: Image.Image) -> Image.Image:
     rgba = image.convert("RGBA")
     alpha = rgba.getchannel("A")
 
-    # Remove translucent fringe before color reduction. The final outline is rebuilt below.
-    hard_alpha = alpha.point(lambda value: 255 if value >= 72 else 0)
+    # Preserve leaf-sized gaps and hard silhouette while removing translucent render haze.
+    hard_alpha = alpha.point(lambda value: 255 if value >= 64 else 0)
     rgb = rgba.convert("RGB")
-    rgb = ImageEnhance.Color(rgb).enhance(1.18)
-    rgb = ImageEnhance.Contrast(rgb).enhance(1.12)
-    rgb = ImageOps.posterize(rgb, 4)
+    rgb = ImageEnhance.Color(rgb).enhance(1.12)
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.08)
+    rgb = ImageOps.posterize(rgb, 5)
     rgb = rgb.quantize(
         colors=PALETTE_COLORS,
         method=Image.Quantize.MEDIANCUT,
-        dither=Image.Dither.NONE,
+        dither=Image.Dither.FLOYDSTEINBERG,
     ).convert("RGB")
 
     out = rgb.convert("RGBA")
     out.putalpha(hard_alpha)
 
-    # One-pixel restrained outline gives the miniature a painted sprite silhouette.
+    # A very restrained edge only closes LANCZOS fringe; it must not become a cartoon outline.
     dilated = hard_alpha.filter(ImageFilter.MaxFilter(3))
     edge = ImageChops.subtract(dilated, hard_alpha)
-    edge = edge.point(lambda value: 72 if value else 0)
-    outline = Image.new("RGBA", out.size, (39, 45, 32, 0))
+    edge = edge.point(lambda value: 46 if value else 0)
+    outline = Image.new("RGBA", out.size, (34, 40, 29, 0))
     outline.putalpha(edge)
     base = Image.new("RGBA", out.size, (0, 0, 0, 0))
     base = Image.alpha_composite(base, outline)
@@ -69,23 +70,21 @@ def simplify_shadow(image: Image.Image, pivot: dict[str, int]) -> Image.Image:
     out_alpha = Image.new("L", rgba.size, 0)
     out = out_alpha.load()
 
-    # Fade aggressively with distance from the contact pivot so the shadow reads as a
-    # compact gameplay cue instead of a physically rendered studio shadow.
     for y in range(height):
         for x in range(width):
             value = inp[x, y]
             if value == 0:
                 continue
             dx = x - px
-            dy = (y - py) * 1.25
+            dy = (y - py) * 1.30
             distance = math.sqrt(dx * dx + dy * dy)
             falloff = max(0.0, 1.0 - distance / SHADOW_RADIUS_PX)
-            value = min(SHADOW_ALPHA_MAX, int(value * 0.42 * falloff))
-            if value >= 5:
+            value = min(SHADOW_ALPHA_MAX, int(value * 0.34 * falloff))
+            if value >= 4:
                 out[x, y] = value
 
-    out_alpha = out_alpha.filter(ImageFilter.GaussianBlur(radius=0.75))
-    shadow = Image.new("RGBA", rgba.size, (42, 45, 39, 0))
+    out_alpha = out_alpha.filter(ImageFilter.GaussianBlur(radius=0.65))
+    shadow = Image.new("RGBA", rgba.size, (43, 46, 39, 0))
     shadow.putalpha(out_alpha)
     return shadow
 
@@ -102,7 +101,7 @@ def main():
     for direction in DIRECTIONS:
         color_path = package / f"{asset_id}_{direction}_color_pass.png"
         shadow_path = package / f"{asset_id}_{direction}_shadow_pass.png"
-        color = flatten_color(Image.open(color_path))
+        color = stylize_color(Image.open(color_path))
         shadow = simplify_shadow(Image.open(shadow_path), pivots[direction])
         sprite = package_tools.composite_shadow(color, shadow)
 
@@ -121,29 +120,30 @@ def main():
 
     manifest["paletteColorCount"] = PALETTE_COLORS
     manifest["candidatePostProcess"] = {
-        "mode": "classic_2d_foliage_v1",
+        "mode": "classic_prerendered_foliage_v2",
         "paletteColors": PALETTE_COLORS,
-        "dither": "none",
-        "posterizeBitsPerChannel": 4,
-        "saturationMultiplier": 1.18,
-        "contrastMultiplier": 1.12,
-        "hardAlphaThreshold": 72,
-        "outlineAlpha": 72,
+        "dither": "floyd_steinberg",
+        "posterizeBitsPerChannel": 5,
+        "saturationMultiplier": 1.12,
+        "contrastMultiplier": 1.08,
+        "hardAlphaThreshold": 64,
+        "outlineAlpha": 46,
         "shadowAlphaMax": SHADOW_ALPHA_MAX,
         "shadowRadiusPx": SHADOW_RADIUS_PX,
         "preservesCameraAndPivot": True,
+        "expectsLeafMicrogeometry": True
     }
     manifest["atlas"]["frames"] = atlas_records
     manifest["humanApprovalRequired"] = True
     manifest["approvalRule"] = (
-        "Classic 2D foliage profile reduces Blender render cues; approve only after "
-        "gameplay-scale visual review."
+        "Classic pre-rendered foliage V2 preserves leaf microdetail and palette diffusion; "
+        "approve only after gameplay-scale visual review."
     )
     text = json.dumps(manifest, indent=2)
     manifest_path.write_text(text, encoding="utf-8")
     (package / "tycoon_photo_studio_manifest.json").write_text(text, encoding="utf-8")
 
-    print("classic2DFoliageProfile: PASS")
+    print("classicPrerenderedFoliageV2: PASS")
     print("paletteColors:", PALETTE_COLORS)
     print("shadowAlphaMax:", SHADOW_ALPHA_MAX)
 
