@@ -1,6 +1,7 @@
 #include "animation_export_pipeline.h"
 
 #include "animation_preview_renderer.h"
+#include "animation_visual_source_renderer.h"
 
 #include <QDir>
 #include <QFile>
@@ -71,6 +72,15 @@ AnimationExportResult AnimationExportPipeline::exportClip(const AnimatedAssetSpe
         return result;
     }
 
+    for (const AnimationNodeSpec& node : asset.nodes) {
+        QString source_reason;
+        if (!AnimationVisualSourceRenderer::validateSource(asset, node, &source_reason)) {
+            result.reason = QStringLiteral("invalid visual source for node '%1': %2")
+                                .arg(node.id, source_reason);
+            return result;
+        }
+    }
+
     const AnimationClip* clip = findClip(asset, clip_id);
     if (!clip) {
         result.reason = QStringLiteral("animation clip '%1' was not found").arg(clip_id);
@@ -118,7 +128,9 @@ AnimationExportResult AnimationExportPipeline::exportClip(const AnimatedAssetSpe
         {"previewFile", preview_name},
         {"manifestFile", manifest_name},
         {"hierarchicalNodeStatesRecorded", true},
-        {"runtimeContract", QStringLiteral("SDL consumes ordered baked frame cells and clip timing; hierarchy is authoring metadata and debugging context")},
+        {"visualSourcesValidatedBeforeBake", true},
+        {"visualSourceVersion", QString::fromLatin1(AnimationVisualSourceRenderer::kVersion)},
+        {"runtimeContract", QStringLiteral("SDL consumes ordered baked frame cells and clip timing; hierarchy and visual-source declarations remain authoring/debug metadata")},
     });
     manifest.insert(QStringLiteral("frameSamples"), frame_samples);
 
