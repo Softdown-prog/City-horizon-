@@ -1,0 +1,52 @@
+{
+  "id": "building_lod_gate_1",
+  "name": "City Horizon Building LOD / Gameplay Scale Gate",
+  "targetPlatform": "windows_pc",
+  "purpose": "Ensure authored buildings remain legible at the gameplay zoom ranges used by the desktop city builder before production export.",
+  "sourceView": "south",
+  "previewOnly": true,
+  "mutatesProductionSprite": false,
+  "blockingProductionExport": true,
+  "levels": [
+    {
+      "id": "distant",
+      "scale": 0.35,
+      "minimumVisibleWidthPx": 24,
+      "minimumVisibleHeightPx": 24,
+      "minimumVisibleAlphaPixels": 220,
+      "minimumLuminanceRange": 18,
+      "intent": "silhouette and broad material separation must remain readable"
+    },
+    {
+      "id": "medium",
+      "scale": 0.60,
+      "minimumVisibleWidthPx": 40,
+      "minimumVisibleHeightPx": 40,
+      "minimumVisibleAlphaPixels": 650,
+      "minimumLuminanceRange": 22,
+      "intent": "roof, wall mass and primary facade modules must remain visually distinct"
+    },
+    {
+      "id": "close",
+      "scale": 1.00,
+      "minimumVisibleWidthPx": 64,
+      "minimumVisibleHeightPx": 64,
+      "minimumVisibleAlphaPixels": 1500,
+      "minimumLuminanceRange": 26,
+      "intent": "full authored material and facade detail must remain readable"
+    }
+  ],
+  "metrics": [
+    "alpha_silhouette_bounds",
+    "visible_alpha_pixel_area",
+    "opaque_luminance_range"
+  ],
+  "export": {
+    "qaImage": "<stem>_lod_preview.png",
+    "manifestNode": "lodVisualGate",
+    "validationNode": "details.lodVisualGate",
+    "pngIsQaOnly": true,
+    "qaImageNotUsedByRuntime": true
+  },
+  "rule": "A production building package is blocked when any distant, medium or close gameplay-scale profile fails its silhouette, visible-area or contrast threshold. The LOD gate evaluates readability only and never creates alternate gameplay sprites or changes footprint, anchor, facade geometry or road sockets."
+}
