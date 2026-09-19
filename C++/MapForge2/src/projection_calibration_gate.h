@@ -17,7 +17,7 @@ struct ProjectionCalibrationResult {
 
 class ProjectionCalibrationGate final {
 public:
-    static constexpr const char* kVersion = "engine_projection_calibration_1";
+    static constexpr const char* kVersion = "engine_projection_calibration_2";
 
     static ProjectionCalibrationResult run();
     static bool save(const ProjectionCalibrationResult& result,
