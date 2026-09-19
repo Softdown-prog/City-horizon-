@@ -1,0 +1,100 @@
+name: Tycoon Water Surface Bake
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/tycoon_photo_studio/assets/water_surface_deep_01.json"
+      - "tools/tycoon_photo_studio/assets/water_surface_shallow_01.json"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/export_water_tiles.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-water-bake.yml"
+permissions:
+  contents: read
+jobs:
+  bake-water:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bake dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+      - name: Validate water source contracts
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name, material in (('water_surface_deep_01.json', 'waterDeep'), ('water_surface_shallow_01.json', 'waterShallow')):
+              data = json.loads((Path('tools/tycoon_photo_studio/assets') / name).read_text())
+              assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+              assert data['assetType'] == 'terrain_surface'
+              assert data['footprint']['widthTiles'] == data['footprint']['depthTiles'] == 1
+              part = data['parts'][0]
+              assert part['type'] == 'water_surface'
+              assert part['size'] == [3.0, 3.0]
+              assert 0.0 < part['waveAmplitude'] <= 0.02
+              assert part['material'] == material
+          print('waterSourceGate: PASS')
+          PY
+      - name: Download pinned Blender
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          curl --fail --location --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+      - name: Bake canonical 3D water surfaces
+        run: |
+          set -euo pipefail
+          for kind in deep shallow; do
+            mkdir -p "out/water/${kind}/source"
+            LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+              --python tools/tycoon_photo_studio/build_scene.py -- \
+              --asset-config "tools/tycoon_photo_studio/assets/water_surface_${kind}_01.json" \
+              --studio-preset "$STUDIO_PRESET" \
+              --output "$PWD/out/water/${kind}/source"
+          done
+      - name: Export 2D terrain tiles from Blender bakes
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/export_water_tiles.py \
+            --deep-source out/water/deep/source \
+            --shallow-source out/water/shallow/source \
+            --output out/water/tiles
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          for variant in ('water_deep', 'water_shallow'):
+              for offset in ('00', '10', '01', '11'):
+                  image = Image.open(Path('out/water/tiles') / f'${variant}_${offset}.png').convert('RGBA')
+                  assert image.size == (128, 64)
+                  assert image.getpixel((0, 0))[3] == 0
+                  assert image.getpixel((127, 0))[3] == 0
+          print('waterTileGeometryGate: PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Water-3D-to-2D-PNGs
+          path: |
+            out/water/tiles
+            out/water/deep/source/studio_metadata.json
+            out/water/shallow/source/studio_metadata.json
+          if-no-files-found: error
+          retention-days: 14

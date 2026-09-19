@@ -191,6 +191,61 @@ def add_pyramid_roof(part, material):
     return obj
 
 
+def add_water_surface(part, material):
+    """Create a zero-thickness, gently displaced water plane.
+
+    Terrain water must remain a flat world surface: this is a subdivided plane,
+    never a box, so no visible side wall or raised block can reach the 2D bake.
+    The very small deterministic displacement exists only to catch the frozen
+    studio light and produce pre-rendered micro-variation.
+    """
+    size_x, size_y = (float(v) for v in part.get("size", [BLENDER_UNITS_PER_TILE, BLENDER_UNITS_PER_TILE]))
+    subdivisions = max(4, int(part.get("subdivisions", 36)))
+    amplitude = max(0.0, float(part.get("waveAmplitude", 0.018)))
+    frequency = max(0.01, float(part.get("waveFrequency", 3.2)))
+    detail = max(0.0, float(part.get("waveDetail", 0.35)))
+    phase = float(part.get("wavePhase", 0.0))
+    location = tuple(float(v) for v in part.get("location", [0.0, 0.0, 0.0]))
+
+    bpy.ops.mesh.primitive_grid_add(
+        x_subdivisions=subdivisions,
+        y_subdivisions=subdivisions,
+        size=1.0,
+        location=location,
+    )
+    obj = bpy.context.object
+    obj.name = part["name"]
+    obj.scale = (size_x, size_y, 1.0)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+    for vertex in obj.data.vertices:
+        x, y = vertex.co.x, vertex.co.y
+        primary = math.sin((x * 1.08 + y * 0.46) * frequency + phase)
+        crossing = math.sin((x * 0.34 - y * 1.18) * frequency * 1.27 - phase * 0.71)
+        fine = math.sin((x + y) * frequency * 3.1 + phase * 1.91)
+        vertex.co.z = amplitude * (primary * 0.66 + crossing * 0.28 + fine * detail * 0.12)
+
+    obj.data.materials.append(material)
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = True
+
+    # The studio material stays physically simple, but water needs a tight
+    # highlight so the displaced plane has classic pre-rendered readability.
+    if material.use_nodes:
+        bsdf = material.node_tree.nodes.get("Principled BSDF")
+        if bsdf is not None:
+            if "Roughness" in bsdf.inputs:
+                bsdf.inputs["Roughness"].default_value = min(
+                    float(part.get("roughness", 0.28)), 0.36
+                )
+            if "Metallic" in bsdf.inputs:
+                bsdf.inputs["Metallic"].default_value = 0.02
+            if "Specular IOR Level" in bsdf.inputs:
+                bsdf.inputs["Specular IOR Level"].default_value = 0.48
+    return obj
+
+
+
 def add_uv_sphere(part, material):
     bpy.ops.mesh.primitive_uv_sphere_add(
         segments=int(part.get("segments", 24)),
@@ -374,7 +429,7 @@ def build_asset(asset, asset_config_path=""):
         kind = part.get("type")
 
         # ── Declarative geometry ──────────────────────────────────────
-        if kind in ("box", "pyramid_roof", "uv_sphere"):
+        if kind in ("box", "pyramid_roof", "uv_sphere", "water_surface"):
             material_key = part.get("material")
             if material_key not in materials:
                 raise RuntimeError(
@@ -390,6 +445,8 @@ def build_asset(asset, asset_config_path=""):
                 obj = add_pyramid_roof(part, material)
             elif kind == "uv_sphere":
                 obj = add_uv_sphere(part, material)
+            elif kind == "water_surface":
+                obj = add_water_surface(part, material)
             authored.append(obj)
 
         # ── GAP 1: External mesh import ───────────────────────────────
@@ -408,7 +465,7 @@ def build_asset(asset, asset_config_path=""):
         else:
             raise RuntimeError(
                 f"Unsupported part type: '{kind}'. "
-                f"Supported: box, pyramid_roof, uv_sphere, blend_import, fbx_import, glb_import"
+                f"Supported: box, pyramid_roof, uv_sphere, water_surface, blend_import, fbx_import, glb_import"
             )
 
     if not authored:
