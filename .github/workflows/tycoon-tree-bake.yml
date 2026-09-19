@@ -57,9 +57,13 @@ jobs:
           assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
           assert data['fractalTree']['levels'] == 4
           assert data['fractalTree']['primaryBranches'] == 5
-          assert data['leafCards']['count'] == 720
-          assert data['leafCards']['interiorFraction'] >= 0.35
+          assert data['leafCards']['count'] == 760
+          assert data['leafCards']['interiorFraction'] >= 0.40
+          assert data['leafCards']['sizeBiasPower'] > 1.0
+          assert data['leafCards']['maxTiltDegrees'] <= 54.0
           assert len(data['leafCards']['materials']) >= 5
+          assert len(data['trunk']['lean']) == 2
+          assert len(data['trunk']['midKink']) == 2
           assert 'canopyParts' not in data
           print('classicTreeSourceGate: PASS')
           print('requestedLeafCards:', data['leafCards']['count'])
@@ -99,7 +103,7 @@ jobs:
           s = m['sourceSummary']
           assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
           assert s['branchCount'] == 75, s
-          assert s['leafCardCount'] == 720, s
+          assert s['leafCardCount'] == 760, s
           print('leafCardGeometryGate: PASS')
           print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
           PY
