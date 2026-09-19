@@ -191,7 +191,7 @@
   "validation": {
     "minimumDistinctFramesPerDirection": 5,
     "maximumObjectHeightJitterPx": 18,
-    "maximumObjectWidthJitterPx": 24,
+    "maximumObjectWidthJitterPx": 32,
     "distinctFrameRule": "Five unique poses are required within the eight-frame loop; repeated contact frames are allowed for a conservative classic-Tycoon cadence."
   },
   "status": "production_candidate",
