@@ -1,6 +1,7 @@
 #include "carousel_composer.h"
 
 #include "carousel_part_library.h"
+#include "src/ch_core/contracts.h"
 
 #include <QJsonArray>
 
@@ -18,65 +19,93 @@ constexpr const char* kPolePart = "carousel.center_pole.classic.v1";
 constexpr const char* kHorsePart = "carousel.horse.classic.v1";
 constexpr const char* kFinialPart = "carousel.ornament.finial.v1";
 constexpr const char* kRosettePart = "carousel.ornament.rosette.v1";
+constexpr float kCanonicalDepthScale =
+    static_cast<float>(ch::contracts::kTileHeight) / static_cast<float>(ch::contracts::kTileWidth);
 
 float rotationSign(const CarouselComposerSpec& spec) {
     return spec.clockwise ? 1.0F : -1.0F;
 }
 
-AnimationTrack rotationTrack(const CarouselComposerSpec& spec) {
-    AnimationTrack track;
-    track.target_id = QStringLiteral("platform");
-    track.property = AnimationProperty::RotationDegrees;
-    track.interpolation = AnimationInterpolation::Linear;
-    track.keyframes = {{0.0F, 0.0F}, {spec.duration_seconds, rotationSign(spec) * 360.0F}};
-    return track;
+QPointF projectCanonicalWorldVector(const float world_x,
+                                    const float world_y,
+                                    const float horizontal_radius_px) {
+    const float half_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
+    const float half_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
+    const float normalize = horizontal_radius_px / (std::sqrt(2.0F) * half_w);
+    return QPointF(
+        (world_x - world_y) * half_w * normalize,
+        (world_x + world_y) * half_h * normalize);
 }
 
-AnimationTrack counterRotationTrack(const QString& target, const CarouselComposerSpec& spec) {
-    AnimationTrack track;
-    track.target_id = target;
-    track.property = AnimationProperty::RotationDegrees;
-    track.interpolation = AnimationInterpolation::Linear;
-    track.keyframes = {{0.0F, 0.0F}, {spec.duration_seconds, -rotationSign(spec) * 360.0F}};
-    return track;
+QPointF projectedOrbitOffset(const float angle_radians,
+                             const CarouselComposerSpec& spec) {
+    return projectCanonicalWorldVector(
+        std::cos(angle_radians), std::sin(angle_radians), spec.platform_radius_px);
 }
 
-AnimationTrack bobTrack(const QString& target,
-                        const CarouselComposerSpec& spec,
-                        const float phase_radians) {
+QPointF projectedTangent(const float angle_radians,
+                         const CarouselComposerSpec& spec) {
+    const float sign = rotationSign(spec);
+    return projectCanonicalWorldVector(
+        -std::sin(angle_radians) * sign,
+        std::cos(angle_radians) * sign,
+        spec.platform_radius_px);
+}
+
+float bobValue(const float orbit_phase,
+               const float normalized_time,
+               const CarouselComposerSpec& spec) {
+    return std::sin(orbit_phase + normalized_time * 2.0F * kPi)
+        * spec.horse_bob_amplitude_px;
+}
+
+AnimationTrack projectedOrbitTrack(const QString& target,
+                                   const AnimationProperty property,
+                                   const CarouselComposerSpec& spec,
+                                   const float phase_radians) {
     AnimationTrack track;
     track.target_id = target;
-    track.property = AnimationProperty::OffsetY;
+    track.property = property;
     track.interpolation = AnimationInterpolation::Linear;
 
-    constexpr int kSegments = 16;
-    const float first_value = std::sin(phase_radians) * spec.horse_bob_amplitude_px;
-    track.keyframes.reserve(kSegments + 1);
-    for (int i = 0; i <= kSegments; ++i) {
-        const float normalized = static_cast<float>(i) / static_cast<float>(kSegments);
-        const float value = i == kSegments
-            ? first_value
-            : std::sin(phase_radians + normalized * 2.0F * kPi)
-                * spec.horse_bob_amplitude_px;
+    const int segments = std::max(32, spec.frame_count * 2);
+    const QPointF first = projectedOrbitOffset(phase_radians, spec);
+    const float first_value = property == AnimationProperty::OffsetX
+        ? static_cast<float>(first.x())
+        : static_cast<float>(first.y()) + bobValue(phase_radians, 0.0F, spec);
+
+    track.keyframes.reserve(segments + 1);
+    for (int i = 0; i <= segments; ++i) {
+        const float normalized = static_cast<float>(i) / static_cast<float>(segments);
+        const float angle = phase_radians
+            + rotationSign(spec) * normalized * 2.0F * kPi;
+        const QPointF projected = projectedOrbitOffset(angle, spec);
+        float value = property == AnimationProperty::OffsetX
+            ? static_cast<float>(projected.x())
+            : static_cast<float>(projected.y()) + bobValue(phase_radians, normalized, spec);
+        if (i == segments) value = first_value;
         track.keyframes.push_back({spec.duration_seconds * normalized, value});
     }
     return track;
 }
 
-int directionalVariant(const float angle_radians, const bool clockwise) {
-    // Horses face tangentially to the ride. Variants are defined by the part
-    // library as 0=east, 1=south, 2=west, 3=north.
-    const float tangent = angle_radians + (clockwise ? kPi * 0.5F : -kPi * 0.5F);
-    const float x = std::cos(tangent);
-    const float y = std::sin(tangent);
+int directionalVariant(const float angle_radians,
+                       const CarouselComposerSpec& spec) {
+    // Variant selection is based on the projected tangent under CH_GRID_V1,
+    // not on an arbitrary screen-space rotation. 0=east, 1=south,
+    // 2=west, 3=north.
+    const QPointF tangent = projectedTangent(angle_radians, spec);
+    const float x = static_cast<float>(tangent.x());
+    const float y = static_cast<float>(tangent.y());
     if (std::abs(x) >= std::abs(y)) return x >= 0.0F ? 0 : 2;
     return y >= 0.0F ? 1 : 3;
 }
 
-int depthOrder(const float orbit_angle_radians) {
-    // Positive screen-space Y is the near half of the isometric ellipse.
-    // Back horses render behind the center pole; front horses render in front.
-    return std::sin(orbit_angle_radians) >= 0.0F ? 65 : 20;
+int depthOrder(const float orbit_angle_radians,
+               const CarouselComposerSpec& spec) {
+    // Under the canonical projection, positive screen Y is the near half of
+    // the ground-plane orbit. Back horses render behind the center pole.
+    return projectedOrbitOffset(orbit_angle_radians, spec).y() >= 0.0 ? 65 : 20;
 }
 
 AnimationTrack discreteOrbitTrack(const QString& target,
@@ -89,10 +118,9 @@ AnimationTrack discreteOrbitTrack(const QString& target,
     track.interpolation = AnimationInterpolation::Step;
 
     const int segments = std::max(32, spec.frame_count * 2);
-    const float first_angle = phase_radians;
     const float first_value = property == AnimationProperty::DrawOrder
-        ? static_cast<float>(depthOrder(first_angle))
-        : static_cast<float>(directionalVariant(first_angle, spec.clockwise));
+        ? static_cast<float>(depthOrder(phase_radians, spec))
+        : static_cast<float>(directionalVariant(phase_radians, spec));
 
     track.keyframes.reserve(segments + 1);
     for (int i = 0; i <= segments; ++i) {
@@ -100,8 +128,8 @@ AnimationTrack discreteOrbitTrack(const QString& target,
         const float angle = phase_radians
             + rotationSign(spec) * normalized * 2.0F * kPi;
         float value = property == AnimationProperty::DrawOrder
-            ? static_cast<float>(depthOrder(angle))
-            : static_cast<float>(directionalVariant(angle, spec.clockwise));
+            ? static_cast<float>(depthOrder(angle, spec))
+            : static_cast<float>(directionalVariant(angle, spec));
         if (i == segments) value = first_value;
         track.keyframes.push_back({spec.duration_seconds * normalized, value});
     }
@@ -120,7 +148,7 @@ QColor horseColor(const CarouselPalette& colors, const int index) {
 QSizeF platformSize(const CarouselComposerSpec& spec) {
     const qreal width = std::clamp(static_cast<qreal>(spec.platform_radius_px * 2.0F + 80.0F),
                                    150.0, static_cast<qreal>(spec.frame_size.width() - 24));
-    return QSizeF(width, width * 0.31);
+    return QSizeF(width, width * kCanonicalDepthScale * 0.62);
 }
 
 QJsonObject paletteManifest(const CarouselPalette& colors) {
@@ -201,8 +229,8 @@ bool CarouselComposer::validate(const CarouselComposerSpec& spec, QString* reaso
         return fail(QStringLiteral("carousel platform radius must be between 32 and 110 pixels"));
     if (spec.platform_radius_px > static_cast<float>(spec.frame_size.width()) * 0.30F)
         return fail(QStringLiteral("carousel platform radius is too large for the selected frame width"));
-    if (spec.isometric_depth_scale < 0.25F || spec.isometric_depth_scale > 0.70F)
-        return fail(QStringLiteral("carousel isometric depth scale must be between 0.25 and 0.70"));
+    if (std::abs(spec.isometric_depth_scale - kCanonicalDepthScale) > 0.0001F)
+        return fail(QStringLiteral("carousel depth scale is locked to CH_GRID_V1 (0.50)"));
     if (spec.horse_bob_amplitude_px < 0.0F || spec.horse_bob_amplitude_px > 24.0F)
         return fail(QStringLiteral("carousel horse bob amplitude must be between 0 and 24 pixels"));
     if (spec.duration_seconds < 0.50F || spec.duration_seconds > 20.0F)
@@ -255,14 +283,12 @@ AnimatedAssetSpec CarouselComposer::compose(const CarouselComposerSpec& spec, QS
 
     for (int i = 0; i < spec.horse_count; ++i) {
         const float phase = (2.0F * kPi * static_cast<float>(i)) / static_cast<float>(spec.horse_count);
-        const qreal x = std::cos(phase) * spec.platform_radius_px;
-        const qreal y = std::sin(phase) * spec.platform_radius_px * spec.isometric_depth_scale;
         const QString node_id = QStringLiteral("horse_%1").arg(i + 1, 2, 10, QLatin1Char('0'));
         AnimationNodeSpec horse = CarouselPartLibrary::makeNode(
             QString::fromLatin1(kHorsePart), node_id, QStringLiteral("platform"),
-            QPointF(x, y - 10.0), 20 + i, horseColor(colors, i), colors.outline);
+            QPointF(0.0, -10.0), 20 + i, horseColor(colors, i), colors.outline);
         horse.visual_variant = spec.directional_horses
-            ? directionalVariant(phase, spec.clockwise) : 0;
+            ? directionalVariant(phase, spec) : 0;
         asset.nodes.push_back(horse);
     }
 
@@ -309,15 +335,17 @@ AnimatedAssetSpec CarouselComposer::compose(const CarouselComposerSpec& spec, QS
     clip.duration_seconds = spec.duration_seconds;
     clip.frame_count = spec.frame_count;
     clip.loop = true;
-    clip.tracks.push_back(rotationTrack(spec));
 
     for (int i = 0; i < spec.horse_count; ++i) {
         const float phase = (2.0F * kPi * static_cast<float>(i)) / static_cast<float>(spec.horse_count);
         const QString node_id = QStringLiteral("horse_%1").arg(i + 1, 2, 10, QLatin1Char('0'));
-        clip.tracks.push_back(bobTrack(node_id, spec, phase));
+
+        clip.tracks.push_back(projectedOrbitTrack(
+            node_id, AnimationProperty::OffsetX, spec, phase));
+        clip.tracks.push_back(projectedOrbitTrack(
+            node_id, AnimationProperty::OffsetY, spec, phase));
 
         if (spec.directional_horses) {
-            clip.tracks.push_back(counterRotationTrack(node_id, spec));
             clip.tracks.push_back(discreteOrbitTrack(
                 node_id, AnimationProperty::VisualVariant, spec, phase));
         }
@@ -370,12 +398,23 @@ QJsonObject CarouselComposer::manifest(const CarouselComposerSpec& spec) {
         {"finialEnabled", spec.finial_enabled},
         {"rosetteCount", spec.rosette_count},
         {"palette", paletteManifest(colors)},
+        {"cameraContract", QJsonObject{
+            {"gridContract", QString::fromLatin1(ch::contracts::kGridContract)},
+            {"tileWidth", ch::contracts::kTileWidth},
+            {"tileHeight", ch::contracts::kTileHeight},
+            {"diamondRatio", ch::contracts::kDiamondRatio},
+            {"worldRotationDegrees", ch::contracts::kHorizontalWorldRotationDeg},
+            {"inclinationDegrees", ch::contracts::kIsometricInclinationDeg},
+            {"screenSpaceParentRotation", false},
+            {"worldOrbitProjectedToScreen", true},
+        }},
         {"deterministicHierarchyGeneration", true},
         {"automaticHorsePhaseDistribution", true},
         {"automaticHorseTrackGeneration", true},
+        {"automaticProjectedOrbitTracks", true},
         {"automaticDepthTracks", spec.dynamic_depth_ordering},
         {"automaticDirectionalVariantTracks", spec.directional_horses},
-        {"automaticCounterRotationTracks", spec.directional_horses},
+        {"automaticCounterRotationTracks", false},
         {"automaticLibraryPartAssembly", true},
     };
 }
