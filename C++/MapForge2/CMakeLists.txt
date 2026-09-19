@@ -149,6 +149,12 @@ add_executable(MapForge2AssetDocumentGate
 )
 target_link_libraries(MapForge2AssetDocumentGate PRIVATE mapforge2_asset_document Qt6::Core)
 
+add_executable(MapForge2MapCapture
+    src/map_capture_main.cpp
+)
+target_include_directories(MapForge2MapCapture PRIVATE ${CH_ROOT})
+target_link_libraries(MapForge2MapCapture PRIVATE mapforge2_canonical Qt6::Gui)
+
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_render PRIVATE /W4 /permissive- /utf-8)
@@ -160,6 +166,7 @@ if(MSVC)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2MapCapture PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(mapforge2_canonical PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_render PRIVATE -Wall -Wextra -Wpedantic)
@@ -171,6 +178,7 @@ else()
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2MapCapture PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 add_custom_command(TARGET MapForge2 POST_BUILD
