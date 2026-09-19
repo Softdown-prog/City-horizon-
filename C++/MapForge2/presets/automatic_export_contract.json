@@ -1,5 +1,5 @@
 {
-  "id": "automatic_export_validation_4",
+  "id": "automatic_export_validation_5",
   "name": "Building Composer Automatic Export + Validation",
   "targetPlatform": "windows_pc",
   "gridContract": "CH_GRID_V1",
@@ -87,6 +87,7 @@
       "<stem>_north.png",
       "<stem>_4view.png",
       "<stem>_review.png",
+      "<stem>_block_preview.png",
       "<stem>_thumb.png",
       "<stem>_manifest.json",
       "<stem>_validation.json"
@@ -94,16 +95,28 @@
     "manifest": {
       "footprintNode": "geometry.flexibleFootprint",
       "proceduralVariationNode": "proceduralVariation",
+      "smallBlockPreviewNode": "smallBlockPreview",
       "recordsOccupiedCellMask": true,
       "recordsSetbacks": true,
-      "recordsVariationSeed": true
+      "recordsVariationSeed": true,
+      "recordsQaPreviewContract": true
+    },
+    "qaPreview": {
+      "contract": "small_block_preview_contract.json",
+      "fileSuffix": "_block_preview.png",
+      "focusBuildingCount": 1,
+      "deterministicNeighbourCount": 5,
+      "includesRoads": true,
+      "includesSidewalks": true,
+      "includesTrees": true,
+      "includedInProductionSprite": false
     },
     "png": {
       "rgba": true,
       "transparentBackground": true,
-      "environmentPreviewIncluded": false,
+      "environmentPreviewIncludedInProductionSprite": false,
       "footprintMaskOverlayIncluded": false
     }
   },
-  "rule": "A production building package is accepted only after the flexible footprint, frame, anchor, halo and urban-integration gates pass. Procedural siblings use the same gate, preserve placement compatibility with the authored base, and record the deterministic variation seed in the manifest and export stem."
+  "rule": "A production building package is accepted only after the flexible footprint, frame, anchor, halo and urban-integration gates pass. Procedural siblings use the same gate and preserve placement compatibility. Every accepted package also receives a deterministic small-block QA preview with roads, sidewalks, trees and five neighbours; that review image is never baked into the transparent production sprites."
 }
