@@ -1,0 +1,99 @@
+{
+  "contract": "TYCOON_FRACTAL_TREE_SOURCE_V1",
+  "assetId": "park_tree_broadleaf_02",
+  "assetType": "static_decor",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1,
+    "occupiedCells": [[0, 0]]
+  },
+  "materials": {
+    "trunk": {
+      "name": "TreeBarkWarm",
+      "rgba": [0.145, 0.073, 0.035, 1],
+      "roughness": 1
+    },
+    "branch": {
+      "name": "TreeBranchWarm",
+      "rgba": [0.095, 0.041, 0.019, 1],
+      "roughness": 1
+    },
+    "leafDeep": {
+      "name": "LeafDeep",
+      "rgba": [0.022, 0.095, 0.025, 1],
+      "roughness": 1
+    },
+    "leafDark": {
+      "name": "LeafDark",
+      "rgba": [0.038, 0.165, 0.038, 1],
+      "roughness": 1
+    },
+    "leafMid": {
+      "name": "LeafMid",
+      "rgba": [0.078, 0.275, 0.061, 1],
+      "roughness": 1
+    },
+    "leafLight": {
+      "name": "LeafLight",
+      "rgba": [0.165, 0.405, 0.095, 1],
+      "roughness": 1
+    },
+    "leafSun": {
+      "name": "LeafSun",
+      "rgba": [0.315, 0.555, 0.155, 1],
+      "roughness": 1
+    }
+  },
+  "trunk": {
+    "material": "trunk",
+    "height": 1.5,
+    "baseRadius": 0.235,
+    "topRadius": 0.092,
+    "vertices": 12,
+    "lean": [0.042, -0.041],
+    "midKink": [-0.019, 0.031],
+    "rootCount": 6,
+    "rootLength": 0.25,
+    "rootRadius": 0.066,
+    "rootSeed": 1337,
+    "smoothShading": true
+  },
+  "fractalTree": {
+    "name": "CrownSkeleton",
+    "material": "branch",
+    "seed": 2803,
+    "origin": [0.03, -0.02, 1.3],
+    "levels": 4,
+    "primaryBranches": 5,
+    "branchFactor": 2,
+    "baseLength": 0.68,
+    "lengthDecay": 0.69,
+    "baseRadius": 0.058,
+    "radiusDecay": 0.65,
+    "initialElevationDegrees": 45,
+    "elevationGainDegrees": 7,
+    "baseYawDegrees": -17,
+    "yawSpreadDegrees": 49,
+    "yawJitterDegrees": 17,
+    "elevationJitterDegrees": 9
+  },
+  "leafCards": {
+    "seed": 4421,
+    "count": 1020,
+    "materials": ["leafDeep", "leafDark", "leafMid", "leafLight", "leafSun"],
+    "widthRange": [0.073, 0.133],
+    "heightRange": [0.128, 0.212],
+    "sizeBiasPower": 1.68,
+    "maxTiltDegrees": 54,
+    "clusterRadius": [0.29, 0.27, 0.18],
+    "interiorFraction": 0.56,
+    "terminalPullToCenter": 0.36,
+    "maxNormalizedCenterRadius": 0.92,
+    "crownCenter": [0.03, -0.025, 2.5],
+    "crownRadius": [1.52, 1.36, 0.72],
+    "coreFillFraction": 0.23,
+    "coreRadius": [0.69, 0.63, 0.44],
+    "topIsolationLimit": 0.86
+  }
+}
