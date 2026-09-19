@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "tools/tycoon_photo_studio/assets/visitor_male_red_01.json"
+      - "tools/tycoon_photo_studio/assets/visitor_male_red_02.json"
       - "tools/tycoon_photo_studio/build_character.py"
       - "tools/tycoon_photo_studio/postprocess_character.py"
       - "tools/tycoon_photo_studio/validate_character.py"
@@ -23,11 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ASSET_CONFIG: tools/tycoon_photo_studio/assets/visitor_male_red_01.json
+      ASSET_CONFIG: tools/tycoon_photo_studio/assets/visitor_male_red_02.json
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
-      ASSET_ID: visitor_male_red_01
-      # Color stays at the frozen studio's 24 Cycles samples. Character shadows are
-      # downsampled/blurred later, so their dedicated catcher pass can be cheaper.
+      ASSET_ID: visitor_male_red_02
       CH_TYCOON_SHADOW_SAMPLES: "4"
       CH_TYCOON_SHADOW_DENOISING: "false"
 
@@ -68,7 +67,7 @@ jobs:
           chmod +x "$blender_exe"
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
 
-      - name: Bake one canonical visitor through 8 directions and 8 walk frames
+      - name: Bake stylized visitor through 8 directions and 8 walk frames
         shell: bash
         run: |
           set -euo pipefail
@@ -117,10 +116,10 @@ jobs:
             --asset-config "$ASSET_CONFIG" \
             --studio-preset "$STUDIO_PRESET"
 
-      - name: Upload visitor sequence artifact
+      - name: Upload visitor V2 sequence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Tycoon-Character-Sequence-V1-Visitor-Male-Red
+          name: Tycoon-Character-Sequence-V2-Visitor-Male-Red
           path: out/tycoon_character
           if-no-files-found: error
           retention-days: 14
