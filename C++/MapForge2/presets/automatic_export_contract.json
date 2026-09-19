@@ -1,5 +1,5 @@
 {
-  "id": "automatic_export_validation_3",
+  "id": "automatic_export_validation_4",
   "name": "Building Composer Automatic Export + Validation",
   "targetPlatform": "windows_pc",
   "gridContract": "CH_GRID_V1",
@@ -38,6 +38,13 @@
       "extreme_low_alpha_white_or_black_fringe",
       "urban_integration_validation_2"
     ],
+    "proceduralVariation": {
+      "contract": "procedural_variation_contract.json",
+      "usesSameValidationGateAsAuthoredBase": true,
+      "recordsSeedAndStrength": true,
+      "recordsAllowedChannels": true,
+      "mustPreservePlacementCompatibility": true
+    },
     "flexibleFootprint": {
       "contract": "flexible_footprint_contract.json",
       "blocksExport": true,
@@ -71,7 +78,8 @@
     }
   },
   "package": {
-    "deterministicStem": "building_<typology>_<footprint_shape>_<width>x<depth>_<floors>f_<roof_profile>_seed<material_seed>",
+    "deterministicStemBase": "building_<typology>_<footprint_shape>_<width>x<depth>_<floors>f_<roof_profile>_seed<material_seed>",
+    "proceduralVariantSuffix": "_v<variation_seed>",
     "outputs": [
       "<stem>_south.png",
       "<stem>_east.png",
@@ -85,8 +93,10 @@
     ],
     "manifest": {
       "footprintNode": "geometry.flexibleFootprint",
+      "proceduralVariationNode": "proceduralVariation",
       "recordsOccupiedCellMask": true,
-      "recordsSetbacks": true
+      "recordsSetbacks": true,
+      "recordsVariationSeed": true
     },
     "png": {
       "rgba": true,
@@ -95,5 +105,5 @@
       "footprintMaskOverlayIncluded": false
     }
   },
-  "rule": "A production building package is accepted only after the flexible footprint mask, frame, anchor, halo and urban-integration gates pass. Runtime collision uses occupied cells from geometry.flexibleFootprint rather than assuming the entire bounding envelope is occupied."
+  "rule": "A production building package is accepted only after the flexible footprint, frame, anchor, halo and urban-integration gates pass. Procedural siblings use the same gate, preserve placement compatibility with the authored base, and record the deterministic variation seed in the manifest and export stem."
 }
