@@ -1,5 +1,6 @@
 #include "animation_preview_renderer.h"
 
+#include "animation_visual_source_renderer.h"
 #include "building_facade_renderer.h"
 
 #include <QFont>
@@ -79,6 +80,19 @@ qreal nodeOpacity(const AnimatedAssetSpec& asset,
     return std::clamp(opacity, 0.0, 1.0);
 }
 
+void drawMissingSource(QPainter& painter, const AnimationNodeSpec& node) {
+    const qreal width = std::max(6.0, node.visual_size_px.width());
+    const qreal height = std::max(6.0, node.visual_size_px.height());
+    const QRectF bounds(-node.pivot_normalized.x() * width,
+                        -node.pivot_normalized.y() * height,
+                        width, height);
+    painter.setPen(QPen(QColor("#ff4f9a"), 1.4));
+    painter.setBrush(QColor(80, 20, 52, 100));
+    painter.drawRect(bounds);
+    painter.drawLine(bounds.topLeft(), bounds.bottomRight());
+    painter.drawLine(bounds.topRight(), bounds.bottomLeft());
+}
+
 void drawNodeVisual(QPainter& painter,
                     const AnimatedAssetSpec& asset,
                     const AnimationFrameSample& sample,
@@ -89,24 +103,25 @@ void drawNodeVisual(QPainter& painter,
         return;
     }
 
-    const qreal width = node.visual_size_px.width();
-    const qreal height = node.visual_size_px.height();
-    const QRectF geometry(-node.pivot_normalized.x() * width,
-                          -node.pivot_normalized.y() * height,
-                          width, height);
-
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, node.visual_smooth_scaling);
     painter.setOpacity(nodeOpacity(asset, sample, node));
     painter.setWorldTransform(nodeOriginTransform(asset, sample, node, root_transform));
-    painter.setPen(QPen(node.outline_color, 1.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.setBrush(node.fill_color);
 
-    if (node.visual_kind == AnimationNodeVisualKind::PrimitiveRectangle) {
-        painter.drawRoundedRect(geometry, 2.0, 2.0);
-    } else if (node.visual_kind == AnimationNodeVisualKind::PrimitiveEllipse) {
-        painter.drawEllipse(geometry);
+    QString source_reason;
+    const QImage source = AnimationVisualSourceRenderer::renderSource(asset, node, &source_reason);
+    if (source.isNull()) {
+        // Direct preview calls remain diagnostic. Production export validates
+        // sources before frame generation and therefore never bakes this marker.
+        drawMissingSource(painter, node);
+        painter.restore();
+        return;
     }
+
+    const QPointF top_left(-node.pivot_normalized.x() * source.width(),
+                           -node.pivot_normalized.y() * source.height());
+    painter.drawImage(top_left, source);
     painter.restore();
 }
 
@@ -212,7 +227,7 @@ QImage AnimationPreviewRenderer::renderPreviewSheet(const AnimatedAssetSpec& ass
     painter.setPen(QColor("#aebbc0"));
     painter.drawText(QRect(16, 34, canvas.width() - 32, 20),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("Stable anchor · hierarchical nodes · deterministic sampling · %1 s · %2")
+                     QStringLiteral("Stable anchor · hierarchical nodes · real visual sources · deterministic sampling · %1 s · %2")
                          .arg(clip.duration_seconds, 0, 'f', 2)
                          .arg(clip.loop ? QStringLiteral("loop") : QStringLiteral("one-shot")));
 
