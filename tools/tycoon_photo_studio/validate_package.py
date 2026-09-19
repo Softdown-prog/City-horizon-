@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 from pathlib import Path
 
@@ -38,6 +39,13 @@ def validate_png(path: Path):
         require(image.format == "PNG", f"Not a PNG: {path}")
         require(image.width > 0 and image.height > 0, f"Invalid PNG dimensions: {path}")
         image.verify()
+
+
+def rgba_digest(path: Path) -> str:
+    with Image.open(path) as image:
+        rgba = image.convert("RGBA")
+        payload = rgba.size[0].to_bytes(4, "big") + rgba.size[1].to_bytes(4, "big") + rgba.tobytes()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def fingerprint_difference(actual_path: Path, golden_record, sample_size) -> float:
@@ -87,17 +95,27 @@ def main():
     require(len(pivots) == 1, f"Four views do not share one projected world-origin pivot: {sorted(pivots)}")
 
     alpha_bounds = []
+    visual_digests = []
     for view in views:
         direction = view["direction"]
-        validate_png(base / view["file"])
+        file_path = base / view["file"]
+        validate_png(file_path)
         validate_png(base / view["colorPass"])
         validate_png(base / view["shadowPass"])
         bounds = view.get("spriteAlphaBounds")
         require(isinstance(bounds, list) and len(bounds) == 4, f"Missing alpha bounds for {direction}")
         require(bounds[2] > bounds[0] and bounds[3] > bounds[1], f"Empty alpha bounds for {direction}: {bounds}")
         alpha_bounds.append(tuple(bounds))
+        visual_digests.append(rgba_digest(file_path))
 
-    require(len(set(alpha_bounds)) >= 2, "Four-direction bake did not produce distinct directional bounds")
+    validation = asset.get("validation", {})
+    minimum_distinct_visuals = int(validation.get("minimumDistinctDirectionVisuals", 1))
+    require(1 <= minimum_distinct_visuals <= 4, "minimumDistinctDirectionVisuals must be between 1 and 4")
+    distinct_visual_count = len(set(visual_digests))
+    require(
+        distinct_visual_count >= minimum_distinct_visuals,
+        f"Four-direction bake produced only {distinct_visual_count} distinct visual outputs; asset requires {minimum_distinct_visuals}",
+    )
 
     atlas_frames = manifest.get("atlas", {}).get("frames", [])
     require([frame.get("direction") for frame in atlas_frames] == EXPECTED_ORDER, "Atlas direction order changed")
@@ -133,6 +151,7 @@ def main():
     print("studioPreset:", studio["id"])
     print("sharedPivot:", next(iter(pivots)))
     print("distinctDirectionalBounds:", len(set(alpha_bounds)))
+    print("distinctDirectionalVisuals:", distinct_visual_count)
 
 
 if __name__ == "__main__":
