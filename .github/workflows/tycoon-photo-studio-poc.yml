@@ -1,0 +1,102 @@
+name: Tycoon Photo Studio POC
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/**"
+      - ".github/workflows/tycoon-photo-studio-poc.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  render-poc:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-processing dependency
+        shell: pwsh
+        run: python -m pip install --upgrade pillow
+
+      - name: Download pinned Blender portable build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "4.2.3"
+          $archive = "$env:RUNNER_TEMP/blender-$version-windows-x64.zip"
+          $destination = "$env:RUNNER_TEMP/blender"
+          $url = "https://download.blender.org/release/Blender4.2/blender-$version-windows-x64.zip"
+
+          Write-Host "Downloading Blender $version from $url"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $destination -Force
+
+          $blender = Get-ChildItem $destination -Filter blender.exe -Recurse | Select-Object -First 1
+          if ($null -eq $blender) { throw "blender.exe was not found after extraction." }
+
+          "BLENDER_EXE=$($blender.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Blender executable: $($blender.FullName)"
+
+      - name: Bake kiosk source passes headlessly
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path out/tycoon_photo_studio/source | Out-Null
+          & $env:BLENDER_EXE --background --factory-startup --python tools/tycoon_photo_studio/build_scene.py -- --output "$PWD/out/tycoon_photo_studio/source"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          if (-not (Test-Path out/tycoon_photo_studio/source/tycoon_photo_studio_color_source.png)) { throw "Color source pass was not generated." }
+          if (-not (Test-Path out/tycoon_photo_studio/source/tycoon_photo_studio_shadow_reference.png)) { throw "Shadow reference pass was not generated." }
+          if (-not (Test-Path out/tycoon_photo_studio/source/studio_metadata.json)) { throw "Studio metadata was not generated." }
+
+      - name: Generate four post-process variants
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path out/tycoon_photo_studio/final | Out-Null
+          python tools/tycoon_photo_studio/postprocess.py --input out/tycoon_photo_studio/source --output out/tycoon_photo_studio/final
+
+          $required = @(
+            "tycoon_photo_studio_variant_01.png",
+            "tycoon_photo_studio_variant_02.png",
+            "tycoon_photo_studio_variant_03.png",
+            "tycoon_photo_studio_variant_04.png",
+            "tycoon_photo_studio_color_pass.png",
+            "tycoon_photo_studio_shadow_pass.png",
+            "tycoon_photo_studio_comparison_board.png",
+            "tycoon_photo_studio_in_game_context.png",
+            "tycoon_photo_studio_manifest.json"
+          )
+
+          foreach ($file in $required) {
+            $path = Join-Path "out/tycoon_photo_studio/final" $file
+            if (-not (Test-Path $path)) { throw "Required POC output missing: $file" }
+          }
+
+      - name: Preserve raw source passes beside review outputs
+        shell: pwsh
+        run: |
+          Copy-Item out/tycoon_photo_studio/source/tycoon_photo_studio_color_source.png out/tycoon_photo_studio/final/tycoon_photo_studio_color_source_1024.png
+          Copy-Item out/tycoon_photo_studio/source/tycoon_photo_studio_shadow_reference.png out/tycoon_photo_studio/final/tycoon_photo_studio_shadow_reference_1024.png
+          Copy-Item out/tycoon_photo_studio/source/studio_metadata.json out/tycoon_photo_studio/final/studio_metadata.json
+
+      - name: Upload visual proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tycoon-Photo-Studio-POC
+          path: out/tycoon_photo_studio/final
+          if-no-files-found: error
+          retention-days: 14
