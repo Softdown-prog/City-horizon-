@@ -207,6 +207,15 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     voronoi.inputs["Randomness"].default_value = 0.72
     if "W" in voronoi.inputs:
         voronoi.inputs["W"].default_value = 0.0
+        voronoi.inputs["W"].keyframe_insert(data_path="default_value", frame=0)
+        voronoi.inputs["W"].default_value = 1.0
+        voronoi.inputs["W"].keyframe_insert(data_path="default_value", frame=8)
+        if mat.animation_data and mat.animation_data.action:
+            for curve in mat.animation_data.action.fcurves:
+                for key in curve.keyframe_points:
+                    key.interpolation = "LINEAR"
+        mat["waterAnimationFrames"] = 8
+        mat["waterAnimationLoop"] = True
 
     caustics = tree.nodes.new("ShaderNodeValToRGB")
     caustics.location = (-120, -100)
