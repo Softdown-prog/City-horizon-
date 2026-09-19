@@ -1,7 +1,7 @@
 {
   "id": "city_horizon_classic_tycoon",
   "name": "City Horizon Classic Tycoon",
-  "revision": "classic_tycoon_16",
+  "revision": "classic_tycoon_17",
   "status": "official",
   "purpose": "Canonical visual baseline for all newly authored City Horizon buildings.",
   "targetPlatform": "windows_pc",
@@ -12,7 +12,8 @@
     "inclinationDegrees": 35.264
   },
   "materials": {
-    "recipeVersion": "rich_materials_1",
+    "recipeVersion": "structured_directional_materials_1",
+    "contractFile": "structured_directional_materials_contract.json",
     "wallDefault": "plaster",
     "roofDefault": "ceramic_tile",
     "supportedWallRecipes": ["plaster", "brick", "concrete", "timber", "stone", "metal_panel", "glass", "solid"],
@@ -299,10 +300,21 @@
     "environmentContextExportedIntoProductionSprite": false
   },
   "lighting": {
-    "wallShadowFaceFactor": 0.84,
-    "wallLitFaceFactor": 1.0,
-    "wallGradientTopFactor": 1.045,
-    "wallGradientBottomFactor": 0.94,
+    "version": "classic_three_tone_ramp_1",
+    "contractFile": "classic_three_tone_ramp_contract.json",
+    "continuousWallGradient": false,
+    "cameraIndependent": true,
+    "wallLightScale": 1.075,
+    "wallMidScale": 0.965,
+    "wallShadowScale": 0.735,
+    "wallWorldAssignment": {
+      "west": "light",
+      "north": "mid",
+      "south": "mid",
+      "east": "shadow"
+    },
+    "wallLightWarmTint": "#f7e7c9",
+    "wallShadowCoolTint": "#64758a",
     "roofShadowFaceFactor": 0.86,
     "roofLitFaceFactor": 1.06,
     "castShadowEnabled": true,
@@ -361,5 +373,5 @@
     "jambSurround": true,
     "twoLevelThreshold": true
   },
-  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. automatic_export_validation_7 also records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates. Packages created before the authoring snapshot existed remain visible as legacy browse-only records instead of receiving fabricated editable data."
+  "authoringRule": "Every accepted City Horizon building remains subject to the footprint, halo, urban-integration and LOD production gates. The production wall raster uses classic_three_tone_ramp_1 over structured_directional_materials_1: LIGHT, MID and SHADOW are fixed world-light levels and continuous wall gradients are not permitted as the primary wall-lighting model. automatic_export_validation_7 also records building_authoring_spec_1 so validated packages can be indexed by building_asset_browser_1, reopened in the Building Composer, edited and re-exported through the same gates."
 }
