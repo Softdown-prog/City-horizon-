@@ -1,0 +1,64 @@
+{
+  "contract": "CH_TYCOON_MINIATURE_V1",
+  "kind": "art_direction_contract",
+  "status": "visual_pilot_until_human_approved",
+  "technicalBase": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "purpose": "Make new buildings read first as charming tycoon game pieces, never as architectural visualization.",
+  "references": {
+    "allowedUse": "Classic and casual tycoon games may guide readability, miniature composition, color blocking and charm. Do not copy a specific building design.",
+    "keywords": [
+      "tycoon miniature",
+      "casual city-builder readability",
+      "diorama charm",
+      "simple colorful building",
+      "game-first silhouette"
+    ]
+  },
+  "shapeLanguage": {
+    "silhouetteBeforeDetail": true,
+    "bodyProportion": "compact_and_slightly_squat",
+    "roofPresence": "high",
+    "roofOverhang": "clearly_readable",
+    "windows": "slightly_oversized_for_gameplay_read",
+    "doors": "clear_focal_point",
+    "secondaryMasses": "one_or_two_large_readable_accents_only",
+    "microGeometry": "avoid_unless_it_changes_gameplay_scale_read"
+  },
+  "colorLanguage": {
+    "dominantColorBlocks": "large_clean_separated_regions",
+    "saturation": "friendly_moderate_to_bright",
+    "materialNoise": "low",
+    "surfaceVariation": "broad_and_subtle",
+    "contrast": "enough_to_separate_roof_wall_trim_glass",
+    "avoid": [
+      "architectural_render_neutrals_everywhere",
+      "photoreal_microtexture",
+      "dirty_grunge",
+      "large_posterized_light_patches",
+      "heavy_retro_dither"
+    ]
+  },
+  "lightingLanguage": {
+    "keepFrozenStudio": true,
+    "softContactShadow": true,
+    "broadReadableFaces": true,
+    "avoidDramaticArchitecturalVisualization": true
+  },
+  "approvalQuestions": [
+    "At normal gameplay scale, does this read immediately as a game asset?",
+    "Would the silhouette still be recognizable if material detail were removed?",
+    "Are roof, wall, trim, glass and entrance separable at a glance?",
+    "Does it feel charming/miniature rather than architecturally serious?",
+    "Are all four rotations clearly the same authored building?"
+  ],
+  "rejectionSignals": [
+    "looks_like_archviz",
+    "looks_like_real_estate_render",
+    "too_many_small_realistic_details",
+    "roof_does_not_dominate_enough",
+    "colors_are_too_sober",
+    "postprocess_is_creating_the_style_instead_of_the_geometry_and_color_design"
+  ]
+}

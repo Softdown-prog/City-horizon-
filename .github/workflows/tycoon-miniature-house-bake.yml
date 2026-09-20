@@ -1,0 +1,171 @@
+name: Tycoon Miniature House Pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/tycoon_photo_studio/assets/tycoon_house_pilot_2x2_01.house.json"
+      - "tools/tycoon_photo_studio/generate_tycoon_miniature_house.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/stylize_building_2d.py"
+      - "tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-miniature-house-bake.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-tycoon-miniature-house:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASSET_ID: tycoon_house_pilot_2x2_01
+      HOUSE_PLAN: tools/tycoon_photo_studio/assets/tycoon_house_pilot_2x2_01.house.json
+      ART_CONTRACT: tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Validate game-first tycoon plan
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path('tools/tycoon_photo_studio/assets/tycoon_house_pilot_2x2_01.house.json').read_text(encoding='utf-8'))
+          art = json.loads(Path('tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json').read_text(encoding='utf-8'))
+          assert plan['contract'] == 'CITY_HORIZON_TYCOON_HOUSE_V1'
+          assert plan['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert plan['artDirectionContract'] == 'CH_TYCOON_MINIATURE_V1'
+          assert art['contract'] == 'CH_TYCOON_MINIATURE_V1'
+          assert art['technicalBase'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert plan['footprint'] == {'widthTiles': 2, 'depthTiles': 2}
+          assert plan['designIntent']['detailLevel'] == 'low_medium'
+          assert 'architectural_visualization' in plan['designIntent']['doNotTarget']
+          assert plan['roof']['overhangIntent'] == 'large_readable'
+          assert plan['frontBay']['enabled'] is True
+          assert plan['facade']['shutters'] is True
+          pp = plan['buildingPostProcess']
+          assert pp['profile'] == 'tycoon_miniature_clean_v1'
+          assert pp['paletteDither'] is False
+          assert pp['posterizeBitsPerChannel'] == 8
+          assert pp['roofStructuralRows'] is False
+          assert pp['saturationMultiplier'] > 1.0
+          print('tycoonMiniaturePlanGate: PASS')
+          PY
+
+      - name: Expand plan to canonical source
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_house/generated
+          python tools/tycoon_photo_studio/generate_tycoon_miniature_house.py \
+            --plan "$HOUSE_PLAN" \
+            --output out/tycoon_house/generated/${ASSET_ID}.source.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/tycoon_house/generated/tycoon_house_pilot_2x2_01.source.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+          assert data['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert data['artDirectionContract'] == 'CH_TYCOON_MINIATURE_V1'
+          assert data['assetType'] == 'building'
+          assert data['floors'] == 1
+          assert data['generation']['sourceContract'] == 'CITY_HORIZON_TYCOON_HOUSE_V1'
+          assert data['generation']['proceduralStage'] == 'game_first_plan_to_canonical_source_v1'
+          assert data['generation']['partCount'] >= 40
+          names = {part['name'] for part in data['parts']}
+          for required in ('MainRoof', 'FrontBayBody', 'FrontBayRoof', 'FrontDoor', 'FrontShrubLeft', 'FrontShrubRight'):
+              assert required in names
+          print('tycoonMiniatureCanonicalSourceGate: PASS', data['generation']['partCount'])
+          PY
+
+      - name: Download pinned Blender
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          curl --fail --location --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake four canonical directions
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_house/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_scene.py -- \
+            --asset-config "$PWD/out/tycoon_house/generated/${ASSET_ID}.source.json" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tycoon_house/source"
+
+      - name: Build final PNG package
+        run: |
+          set -euo pipefail
+          mkdir -p out/tycoon_house/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/tycoon_house/source \
+            --output out/tycoon_house/final \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply clean tycoon miniature treatment
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_building_2d.py \
+            --package out/tycoon_house/final \
+            --asset-id "$ASSET_ID" \
+            --asset-config "$HOUSE_PLAN"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tycoon_house/final/tycoon_house_pilot_2x2_01_manifest.json').read_text(encoding='utf-8'))
+          pp = m['candidatePostProcess']
+          assert pp['profile'] == 'tycoon_miniature_clean_v1'
+          assert pp['paletteColors'] == 128
+          assert pp['dither'] == 'none'
+          assert pp['posterizeBitsPerChannel'] == 8
+          assert pp['roofStructuralRows'] is False
+          assert pp['preservesCameraPivotAndFootprint'] is True
+          print('tycoonMiniatureStylizerGate: PASS')
+          PY
+
+      - name: Verify final package
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/tycoon_house/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/tycoon_house/final/${ASSET_ID}_4view.png"
+          test -f "out/tycoon_house/final/${ASSET_ID}_review.png"
+          test -f "out/tycoon_house/final/${ASSET_ID}_4dir_context.png"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Tycoon-Miniature-House-Pilot-PNGs
+          path: |
+            out/tycoon_house/final
+            out/tycoon_house/generated/tycoon_house_pilot_2x2_01.source.json
+            out/tycoon_house/source/studio_metadata.json
+            tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json
+          if-no-files-found: error
+          retention-days: 14
