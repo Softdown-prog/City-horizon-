@@ -1,5 +1,6 @@
 #include "asset_project_editor_window.h"
 #include "asset_grid_preview_widget.h"
+#include "tile_surface_preview_widget.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -76,7 +77,6 @@ void AssetProjectEditorWindow::buildUi() {
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(splitter);
 
-    // Left: persistent layer/object structure.
     auto* left = new QWidget(splitter);
     auto* left_layout = new QVBoxLayout(left);
     auto* layer_title = new QLabel(QStringLiteral("Asset layers"), left);
@@ -101,7 +101,6 @@ void AssetProjectEditorWindow::buildUi() {
     connect(remove_layer, &QPushButton::clicked, this, [this]() { removeSelectedLayer(); });
     connect(layer_list_, &QListWidget::currentRowChanged, this, [this](int) { refreshPreview(); });
 
-    // Center: immediate visual proof on the canonical gameplay grid.
     auto* center = new QWidget(splitter);
     auto* center_layout = new QVBoxLayout(center);
     auto* preview_title = new QLabel(QStringLiteral("Canonical gameplay preview"), center);
@@ -132,7 +131,6 @@ void AssetProjectEditorWindow::buildUi() {
     center_layout->addWidget(grid_preview_, 1);
     center_layout->addWidget(preview_info_label_);
 
-    // Right: APE-like property pages.
     auto* right = new QWidget(splitter);
     auto* right_layout = new QVBoxLayout(right);
     auto* tabs = new QTabWidget(right);
@@ -174,9 +172,7 @@ void AssetProjectEditorWindow::buildUi() {
     income_spin_ = new QSpinBox(gameplay_tab);
     footprint_width_spin_ = new QSpinBox(gameplay_tab);
     footprint_depth_spin_ = new QSpinBox(gameplay_tab);
-    for (QSpinBox* spin : {cost_spin_, upkeep_spin_, income_spin_}) {
-        spin->setRange(-1000000, 1000000);
-    }
+    for (QSpinBox* spin : {cost_spin_, upkeep_spin_, income_spin_}) spin->setRange(-1000000, 1000000);
     footprint_width_spin_->setRange(1, 64);
     footprint_depth_spin_->setRange(1, 64);
     requires_path_check_ = new QCheckBox(QStringLiteral("Object requires a path connection"), gameplay_tab);
@@ -216,6 +212,38 @@ void AssetProjectEditorWindow::buildUi() {
     visuals_form->addRow(refresh_preview);
     tabs->addTab(visuals_tab, QStringLiteral("4 Directions"));
     connect(refresh_preview, &QPushButton::clicked, this, [this]() { refreshPreview(); });
+
+    auto* surface_tab = new QWidget(tabs);
+    auto* surface_layout = new QVBoxLayout(surface_tab);
+    auto* surface_form = new QFormLayout();
+    surface_tile_path_edit_ = makePathRow(surface_tab, surface_form, QStringLiteral("Surface tile PNG"), [this]() {
+        const QString path = chooseImageFile(QStringLiteral("Choose 2D surface/tile image"));
+        if (!path.isEmpty()) applySurfaceTilePath(path);
+    });
+    surface_repeat_x_spin_ = new QSpinBox(surface_tab);
+    surface_repeat_y_spin_ = new QSpinBox(surface_tab);
+    surface_mask_spin_ = new QSpinBox(surface_tab);
+    surface_show_grid_check_ = new QCheckBox(QStringLiteral("Show 128×64 grid"), surface_tab);
+    surface_repeat_x_spin_->setRange(1, 12);
+    surface_repeat_y_spin_->setRange(1, 12);
+    surface_mask_spin_->setRange(0, 15);
+    surface_repeat_x_spin_->setValue(5);
+    surface_repeat_y_spin_->setValue(5);
+    surface_mask_spin_->setValue(15);
+    surface_show_grid_check_->setChecked(true);
+    surface_form->addRow(QStringLiteral("Repeat X"), surface_repeat_x_spin_);
+    surface_form->addRow(QStringLiteral("Repeat Y"), surface_repeat_y_spin_);
+    surface_form->addRow(QStringLiteral("Autotile mask (0-15)"), surface_mask_spin_);
+    surface_form->addRow(surface_show_grid_check_);
+    surface_layout->addLayout(surface_form);
+    surface_preview_ = new TileSurfacePreviewWidget(surface_tab);
+    surface_layout->addWidget(surface_preview_, 1);
+    tabs->addTab(surface_tab, QStringLiteral("Tile / Surface"));
+
+    connect(surface_repeat_x_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { refreshSurfacePreview(); });
+    connect(surface_repeat_y_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { refreshSurfacePreview(); });
+    connect(surface_mask_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { refreshSurfacePreview(); });
+    connect(surface_show_grid_check_, &QCheckBox::toggled, this, [this](bool) { refreshSurfacePreview(); });
 
     auto* metadata_tab = new QWidget(tabs);
     auto* metadata_layout = new QVBoxLayout(metadata_tab);
@@ -259,11 +287,8 @@ void AssetProjectEditorWindow::buildMenus() {
     connect(save_as_action, &QAction::triggered, this, [this]() { saveAsset(true); });
     connect(validate_action, &QAction::triggered, this, [this]() {
         QString reason;
-        if (document_.validate(&reason)) {
-            QMessageBox::information(this, QStringLiteral("Validation"), QStringLiteral("CH_ASSET_DOCUMENT_V1: PASS"));
-        } else {
-            QMessageBox::warning(this, QStringLiteral("Validation failed"), reason);
-        }
+        if (document_.validate(&reason)) QMessageBox::information(this, QStringLiteral("Validation"), QStringLiteral("CH_ASSET_DOCUMENT_V1: PASS"));
+        else QMessageBox::warning(this, QStringLiteral("Validation failed"), reason);
     });
     connect(undo_action, &QAction::triggered, this, [this]() { undo(); });
     connect(redo_action, &QAction::triggered, this, [this]() { redo(); });
@@ -271,15 +296,12 @@ void AssetProjectEditorWindow::buildMenus() {
 
 void AssetProjectEditorWindow::newAsset() {
     bool ok = false;
-    const QString id = QInputDialog::getText(this, QStringLiteral("New asset"),
-                                             QStringLiteral("Persistent asset ID:"), QLineEdit::Normal,
+    const QString id = QInputDialog::getText(this, QStringLiteral("New asset"), QStringLiteral("Persistent asset ID:"), QLineEdit::Normal,
                                              QStringLiteral("park.scenery.new_asset"), &ok).trimmed();
     if (!ok || id.isEmpty()) return;
-    const QString display = QInputDialog::getText(this, QStringLiteral("New asset"),
-                                                  QStringLiteral("Display name:"), QLineEdit::Normal,
+    const QString display = QInputDialog::getText(this, QStringLiteral("New asset"), QStringLiteral("Display name:"), QLineEdit::Normal,
                                                   QStringLiteral("New Park Asset"), &ok).trimmed();
     if (!ok || display.isEmpty()) return;
-
     document_.newDocument(id, display, QSize(512, 512));
     document_.setCategory(QStringLiteral("scenery"));
     document_.setStylePreset(QStringLiteral(kDefaultStyle));
@@ -316,9 +338,7 @@ bool AssetProjectEditorWindow::saveAsset(bool save_as) {
                                             QStringLiteral("City Horizon Asset (*.chasset)"));
         if (path.isEmpty()) return false;
     }
-    if (!path.endsWith(QStringLiteral(".chasset"), Qt::CaseInsensitive)) {
-        path += QStringLiteral(".chasset");
-    }
+    if (!path.endsWith(QStringLiteral(".chasset"), Qt::CaseInsensitive)) path += QStringLiteral(".chasset");
     QString reason;
     if (!document_.save(path, &reason)) {
         QMessageBox::critical(this, QStringLiteral("Save failed"), reason);
@@ -354,65 +374,61 @@ void AssetProjectEditorWindow::refreshUiFromDocument() {
     east_path_edit_->setText(directionPath(QStringLiteral("east")));
     west_path_edit_->setText(directionPath(QStringLiteral("west")));
     north_path_edit_->setText(directionPath(QStringLiteral("north")));
+
+    const QJsonObject surface = metadata.value(QStringLiteral("surface")).toObject();
+    surface_tile_path_edit_->setText(surface.value(QStringLiteral("tilePath")).toString());
+    surface_repeat_x_spin_->setValue(surface.value(QStringLiteral("repeatX")).toInt(5));
+    surface_repeat_y_spin_->setValue(surface.value(QStringLiteral("repeatY")).toInt(5));
+    surface_mask_spin_->setValue(surface.value(QStringLiteral("autotileMask")).toInt(15));
+    surface_show_grid_check_->setChecked(surface.value(QStringLiteral("showGrid")).toBool(true));
     refreshing_ = false;
 
     refreshLayerList();
     refreshRawMetadata();
     refreshPreview();
+    refreshSurfacePreview();
     updateWindowTitle();
 }
 
 void AssetProjectEditorWindow::refreshLayerList() {
     layer_list_->clear();
-    for (const AssetLayer& layer : document_.layers()) {
-        layer_list_->addItem(QStringLiteral("%1  [%2]").arg(layer.name, assetLayerTypeId(layer.type)));
-    }
+    for (const AssetLayer& layer : document_.layers()) layer_list_->addItem(QStringLiteral("%1  [%2]").arg(layer.name, assetLayerTypeId(layer.type)));
 }
 
 void AssetProjectEditorWindow::refreshPreview() {
-    if (grid_preview_ == nullptr) return;
-
-    const QJsonObject gameplay = document_.metadata().value(QStringLiteral("gameplay")).toObject();
-    const QSize footprint(
-        std::max(1, gameplay.value(QStringLiteral("footprintWidthTiles")).toInt(1)),
-        std::max(1, gameplay.value(QStringLiteral("footprintDepthTiles")).toInt(1)));
-    grid_preview_->setFootprint(footprint);
+    grid_preview_->setFootprint(QSize(footprint_width_spin_->value(), footprint_depth_spin_->value()));
     grid_preview_->setAnchorNormalized(document_.anchorNormalized());
     grid_preview_->setDirectionLabel(preview_direction_.toUpper());
 
     QString candidate = directionPath(preview_direction_);
-    QString source_description = QStringLiteral("%1 direction sprite").arg(preview_direction_.toUpper());
-
     if (candidate.isEmpty()) {
         const int row = layer_list_->currentRow();
-        if (row >= 0 && row < document_.layers().size()) {
-            candidate = document_.layers().at(row).source_path;
-            source_description = QStringLiteral("selected layer fallback");
-        }
+        if (row >= 0 && row < document_.layers().size()) candidate = document_.layers().at(row).source_path;
     }
 
     const QString resolved = resolvedPath(candidate);
     QPixmap pixmap;
     if (!resolved.isEmpty()) pixmap.load(resolved);
-
     if (pixmap.isNull()) {
         grid_preview_->clearSprite();
-        preview_info_label_->setText(QStringLiteral("%1 — no PNG assigned. Footprint %2×%3, anchor (%4, %5).")
-                                         .arg(preview_direction_.toUpper())
-                                         .arg(footprint.width())
-                                         .arg(footprint.height())
-                                         .arg(document_.anchorNormalized().x(), 0, 'f', 2)
-                                         .arg(document_.anchorNormalized().y(), 0, 'f', 2));
+        preview_info_label_->setText(QStringLiteral("No %1 sprite assigned yet.").arg(preview_direction_.toUpper()));
         return;
     }
-
     grid_preview_->setSprite(pixmap);
-    preview_info_label_->setText(QStringLiteral("%1 — %2 × %3 px — %4 — %5")
-                                     .arg(preview_direction_.toUpper())
-                                     .arg(pixmap.width())
-                                     .arg(pixmap.height())
-                                     .arg(source_description)
-                                     .arg(candidate));
+    preview_info_label_->setText(QStringLiteral("%1 × %2 px — %3").arg(pixmap.width()).arg(pixmap.height()).arg(candidate));
+}
+
+void AssetProjectEditorWindow::refreshSurfacePreview() {
+    if (!surface_preview_) return;
+    surface_preview_->setRepeatCount(surface_repeat_x_spin_->value(), surface_repeat_y_spin_->value());
+    surface_preview_->setShowGrid(surface_show_grid_check_->isChecked());
+    surface_preview_->setAutotileMask(surface_mask_spin_->value());
+
+    QPixmap pixmap;
+    const QString path = resolvedPath(surfaceTilePath());
+    if (!path.isEmpty()) pixmap.load(path);
+    if (pixmap.isNull()) surface_preview_->clearTile();
+    else surface_preview_->setTile(pixmap);
 }
 
 void AssetProjectEditorWindow::refreshRawMetadata() {
@@ -427,11 +443,8 @@ void AssetProjectEditorWindow::applyGeneralFields() {
     document_.setCanvasSize(QSize(canvas_width_spin_->value(), canvas_height_spin_->value()));
     document_.setCameraContract(camera_contract_edit_->text().trimmed());
     document_.setStylePreset(style_preset_edit_->text().trimmed());
-    if (!transaction.commit()) {
-        setStatus(QStringLiteral("No general property changes to commit."));
-    } else {
-        setStatus(QStringLiteral("General properties updated."));
-    }
+    if (!transaction.commit()) setStatus(QStringLiteral("No general property changes to commit."));
+    else setStatus(QStringLiteral("General properties updated."));
     refreshUiFromDocument();
 }
 
@@ -449,7 +462,8 @@ void AssetProjectEditorWindow::applyGameplayFields() {
     metadata.insert(QStringLiteral("gameplay"), gameplay);
     document_.setMetadata(metadata);
     transaction.commit();
-    refreshUiFromDocument();
+    refreshRawMetadata();
+    refreshPreview();
     setStatus(QStringLiteral("Gameplay properties updated."));
 }
 
@@ -463,7 +477,23 @@ void AssetProjectEditorWindow::applyDirectionPath(const QString& direction, cons
     transaction.commit();
     preview_direction_ = direction;
     refreshUiFromDocument();
-    setStatus(QStringLiteral("%1 sprite assigned and selected for preview.").arg(direction.toUpper()));
+    setStatus(QStringLiteral("%1 sprite assigned.").arg(direction.toUpper()));
+}
+
+void AssetProjectEditorWindow::applySurfaceTilePath(const QString& path) {
+    AssetEditTransaction transaction(document_, history_, QStringLiteral("Assign surface tile"));
+    QJsonObject metadata = document_.metadata();
+    QJsonObject surface = metadata.value(QStringLiteral("surface")).toObject();
+    surface.insert(QStringLiteral("tilePath"), storedPathForFile(path));
+    surface.insert(QStringLiteral("repeatX"), surface_repeat_x_spin_->value());
+    surface.insert(QStringLiteral("repeatY"), surface_repeat_y_spin_->value());
+    surface.insert(QStringLiteral("autotileMask"), surface_mask_spin_->value());
+    surface.insert(QStringLiteral("showGrid"), surface_show_grid_check_->isChecked());
+    metadata.insert(QStringLiteral("surface"), surface);
+    document_.setMetadata(metadata);
+    transaction.commit();
+    refreshUiFromDocument();
+    setStatus(QStringLiteral("Surface tile assigned and continuity preview updated."));
 }
 
 void AssetProjectEditorWindow::applyRawMetadata() {
@@ -483,13 +513,11 @@ void AssetProjectEditorWindow::applyRawMetadata() {
 void AssetProjectEditorWindow::addRasterLayer(bool reference_layer) {
     const QString path = chooseImageFile(reference_layer ? QStringLiteral("Choose reference image") : QStringLiteral("Choose raster image"));
     if (path.isEmpty()) return;
-
     AssetLayer layer;
     layer.id = nextLayerId(document_, reference_layer ? QStringLiteral("reference") : QStringLiteral("raster"));
     layer.name = QFileInfo(path).completeBaseName();
     layer.type = reference_layer ? AssetLayerType::Reference : AssetLayerType::Raster;
     layer.source_path = storedPathForFile(path);
-
     QString reason;
     AssetEditTransaction transaction(document_, history_, reference_layer ? QStringLiteral("Add reference layer") : QStringLiteral("Add raster layer"));
     if (!document_.addLayer(layer, -1, &reason)) {
@@ -524,9 +552,7 @@ void AssetProjectEditorWindow::undo() {
     if (history_.undo(document_, &label)) {
         refreshUiFromDocument();
         setStatus(QStringLiteral("Undo: %1").arg(label));
-    } else {
-        setStatus(QStringLiteral("Nothing to undo."));
-    }
+    } else setStatus(QStringLiteral("Nothing to undo."));
 }
 
 void AssetProjectEditorWindow::redo() {
@@ -534,9 +560,7 @@ void AssetProjectEditorWindow::redo() {
     if (history_.redo(document_, &label)) {
         refreshUiFromDocument();
         setStatus(QStringLiteral("Redo: %1").arg(label));
-    } else {
-        setStatus(QStringLiteral("Nothing to redo."));
-    }
+    } else setStatus(QStringLiteral("Nothing to redo."));
 }
 
 QString AssetProjectEditorWindow::chooseImageFile(const QString& title) const {
@@ -563,12 +587,16 @@ QString AssetProjectEditorWindow::directionPath(const QString& direction) const 
     return document_.metadata().value(QStringLiteral("directions")).toObject().value(direction).toString();
 }
 
+QString AssetProjectEditorWindow::surfaceTilePath() const {
+    return document_.metadata().value(QStringLiteral("surface")).toObject().value(QStringLiteral("tilePath")).toString();
+}
+
 void AssetProjectEditorWindow::setPreviewDirection(const QString& direction) {
-    preview_direction_ = direction.toLower();
-    south_preview_button_->setChecked(preview_direction_ == QStringLiteral("south"));
-    east_preview_button_->setChecked(preview_direction_ == QStringLiteral("east"));
-    west_preview_button_->setChecked(preview_direction_ == QStringLiteral("west"));
-    north_preview_button_->setChecked(preview_direction_ == QStringLiteral("north"));
+    preview_direction_ = direction;
+    south_preview_button_->setChecked(direction == QStringLiteral("south"));
+    east_preview_button_->setChecked(direction == QStringLiteral("east"));
+    west_preview_button_->setChecked(direction == QStringLiteral("west"));
+    north_preview_button_->setChecked(direction == QStringLiteral("north"));
     refreshPreview();
 }
 
