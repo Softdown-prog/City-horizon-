@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Expand CITY_HORIZON_PARK_KIOSK_V1 into TYCOON_ASSET_SOURCE_V1.
 
-This generator intentionally starts from a non-residential silhouette: a short
-park-service body, oversized floating canopy and one sign fin. It must not
-reconstruct retired house geometry.
+The kiosk identity is authored as real geometry so the frozen AssetRoot rotation
+produces consistent SOUTH/EAST/WEST/NORTH views. No 2D generative repaint is
+required for category identity.
 """
 
 from __future__ import annotations
@@ -24,6 +24,18 @@ def box(name, location, dimensions, material, bevel=0.025):
     }
 
 
+def sphere(name, location, radius, material, segments=20, rings=10):
+    return {
+        "type": "uv_sphere",
+        "name": name,
+        "location": [round(float(v), 4) for v in location],
+        "radius": round(float(radius), 4),
+        "segments": int(segments),
+        "rings": int(rings),
+        "material": material,
+    }
+
+
 def expand(recipe: dict) -> dict:
     if recipe.get("contract") != "CITY_HORIZON_PARK_KIOSK_V1":
         raise ValueError("Expected CITY_HORIZON_PARK_KIOSK_V1")
@@ -34,7 +46,9 @@ def expand(recipe: dict) -> dict:
 
     m = recipe["mass"]
     op = recipe["openings"]
-    sign = recipe["sign"]
+    awning = recipe["awning"]
+    roof_identity = recipe["roofIdentity"]
+    menu = recipe["menuBoard"]
     mats = recipe["materials"]
 
     bw = float(m["bodyWidth"])
@@ -55,9 +69,8 @@ def expand(recipe: dict) -> dict:
     parts.append(box("Kiosk_Base", [0, 0, base_h / 2], [bw + 0.12, bd + 0.12, base_h], "base", 0.05))
     parts.append(box("Kiosk_Body", [0, 0, base_h + bh / 2], [bw, bd, bh], "body", 0.07))
 
-    # Oversized floating canopy: the primary silhouette, intentionally unlike a house roof.
+    # Flat graphic canopy, intentionally non-residential.
     parts.append(box("Kiosk_Canopy", [0, 0, cz], [cw, cd, ct], "canopy", 0.08))
-    # Bold coral fascia on the gameplay-facing edges to reinforce toy/tycoon readability.
     fascia_h = 0.16
     parts.append(box("Kiosk_Fascia_South", [0, -cd / 2 + 0.035, cz - 0.01], [cw - 0.10, 0.07, fascia_h], "accent", 0.025))
     parts.append(box("Kiosk_Fascia_East", [cw / 2 - 0.035, 0, cz - 0.01], [0.07, cd - 0.10, fascia_h], "accent", 0.025))
@@ -69,39 +82,78 @@ def expand(recipe: dict) -> dict:
     eh = float(op["eastWindowHeight"])
     inset = 0.035
 
-    # Large service windows are graphic openings rather than realistic facade detail.
+    # Deep, dark serving openings: read as food-service windows rather than glass office windows.
     parts.append(box("Kiosk_South_Window", [0, -bd / 2 - inset, sill + sh / 2], [sw, 0.06, sh], "glass", 0.018))
-    parts.append(box("Kiosk_East_Window", [bw / 2 + inset, -0.02, sill + eh / 2], [0.06, ew, eh], "glass", 0.018))
+    parts.append(box("Kiosk_East_Window", [bw / 2 + inset, -0.08, sill + eh / 2], [0.06, ew, eh], "glass", 0.018))
 
     counter_d = float(op["counterDepth"])
     counter_t = float(op["counterThickness"])
     counter_z = sill - 0.03
-    parts.append(box("Kiosk_South_Counter", [0, -bd / 2 - counter_d / 2, counter_z], [sw + 0.22, counter_d, counter_t], "counter", 0.035))
-    parts.append(box("Kiosk_East_Counter", [bw / 2 + counter_d / 2, -0.02, counter_z], [counter_d, ew + 0.18, counter_t], "counter", 0.035))
+    parts.append(box("Kiosk_South_Counter", [0, -bd / 2 - counter_d / 2, counter_z], [sw + 0.24, counter_d, counter_t], "counter", 0.035))
+    parts.append(box("Kiosk_East_Counter", [bw / 2 + counter_d / 2, -0.08, counter_z], [counter_d, ew + 0.16, counter_t], "counter", 0.035))
 
-    # Thick dark frames keep the openings readable after downsampling.
-    frame = 0.075
-    z_mid = sill + sh / 2
-    parts.append(box("South_Frame_Top", [0, -bd / 2 - inset - 0.012, sill + sh + frame / 2], [sw + 0.16, 0.07, frame], "dark", 0.016))
-    parts.append(box("South_Frame_Left", [-sw / 2 - frame / 2, -bd / 2 - inset - 0.012, z_mid], [frame, 0.07, sh + 0.10], "dark", 0.016))
-    parts.append(box("South_Frame_Right", [sw / 2 + frame / 2, -bd / 2 - inset - 0.012, z_mid], [frame, 0.07, sh + 0.10], "dark", 0.016))
+    # Red/cream striped awning in front of the main service window.
+    if bool(awning.get("enabled", True)):
+        stripe_count = max(3, int(awning.get("stripeCount", 7)))
+        awning_depth = float(awning.get("depth", 0.42))
+        drop = float(awning.get("drop", 0.16))
+        stripe_w = (sw + 0.52) / stripe_count
+        start_x = -(sw + 0.52) / 2 + stripe_w / 2
+        y = -bd / 2 - awning_depth / 2 - 0.02
+        z = cz - ct / 2 - drop / 2 + 0.02
+        for i in range(stripe_count):
+            material = "accent" if i % 2 == 0 else "canopy"
+            parts.append(box(f"Awning_Stripe_{i}", [start_x + i * stripe_w, y, z], [stripe_w * 0.94, awning_depth, drop], material, 0.045))
 
-    # One oversized asymmetric sign fin is the secondary silhouette and category cue.
-    swid = float(sign["width"])
-    sdep = float(sign["depth"])
-    shei = float(sign["height"])
-    sx = float(sign["offsetX"])
-    sy = float(sign["offsetY"])
-    sign_z = cz + ct / 2 + shei / 2 - 0.03
-    parts.append(box("Kiosk_Sign_Fin", [sx, sy, sign_z], [swid, sdep, shei], "accent", 0.07))
-    parts.append(box("Kiosk_Sign_Inset", [sx, sy - sdep / 2 - 0.018, sign_z], [swid * 0.62, 0.04, shei * 0.44], "canopy", 0.025))
+    # Menu board on the east face: strong dark rectangle with warm frame.
+    menu_w = float(menu["width"])
+    menu_h = float(menu["height"])
+    menu_y = float(menu.get("offsetY", 0.34))
+    menu_x = bw / 2 + 0.045
+    menu_z = base_h + 0.72
+    parts.append(box("Menu_Frame", [menu_x, menu_y, menu_z], [0.075, menu_w + 0.12, menu_h + 0.12], "counter", 0.028))
+    parts.append(box("Menu_Board", [menu_x + 0.006, menu_y, menu_z], [0.085, menu_w, menu_h], "dark", 0.02))
+    # Three chunky menu lines visible at gameplay scale.
+    for i, scale in enumerate((0.72, 0.60, 0.48)):
+        parts.append(box(f"Menu_Line_{i}", [menu_x + 0.055, menu_y - 0.08 + i * 0.16, menu_z + 0.14 - i * 0.16], [0.035, menu_w * scale, 0.045], "canopy", 0.012))
 
-    # A simple rear service door prevents the back view from reading as an empty cube.
+    # Condiment bottles as tiny iconic blocks on the counter.
+    condiment_y = -bd / 2 - counter_d - 0.035
+    parts.append(box("Ketchup_Bottle", [-0.28, condiment_y, counter_z + 0.17], [0.11, 0.11, 0.27], "accent", 0.045))
+    parts.append(box("Mustard_Bottle", [-0.10, condiment_y, counter_z + 0.17], [0.11, 0.11, 0.27], "mustard", 0.045))
+
+    # Oversized roof hot-dog identity. Rounded bars are built from beveled boxes plus
+    # small spherical end-caps so the icon remains original, simple and rotation-safe.
+    hot_len = float(roof_identity["length"])
+    bun_w = float(roof_identity["bunWidth"])
+    sausage_w = float(roof_identity["sausageWidth"])
+    hot_h = float(roof_identity["height"])
+    hot_z = float(roof_identity["z"])
+    support_h = float(roof_identity.get("supportHeight", 0.20))
+
+    # Two discreet supports make the roof prop feel physically attached.
+    for x in (-hot_len * 0.28, hot_len * 0.28):
+        parts.append(box("HotDog_Support_L" if x < 0 else "HotDog_Support_R", [x, 0.03, hot_z - hot_h / 2 - support_h / 2], [0.10, 0.10, support_h], "dark", 0.025))
+
+    # Bun halves, sausage and rounded end caps.
+    parts.append(box("HotDog_Bun_Back", [0, 0.11, hot_z], [hot_len, bun_w, hot_h], "bun", hot_h * 0.42))
+    parts.append(box("HotDog_Sausage", [0, -0.01, hot_z + 0.01], [hot_len * 0.88, sausage_w, hot_h * 0.74], "sausage", hot_h * 0.34))
+    parts.append(box("HotDog_Bun_Front", [0, -0.17, hot_z - 0.015], [hot_len, bun_w * 0.78, hot_h * 0.72], "bun", hot_h * 0.34))
+    cap_r = hot_h * 0.25
+    for x in (-hot_len * 0.44, hot_len * 0.44):
+        parts.append(sphere(f"HotDog_SausageCap_{'L' if x < 0 else 'R'}", [x, -0.01, hot_z + 0.01], cap_r, "sausage"))
+
+    # Mustard squiggle: five bright beads across the sausage. It reads as a graphic
+    # line after downsampling without requiring textures or image-space painting.
+    mustard_points = [(-0.48, -0.045), (-0.24, 0.015), (0.0, -0.035), (0.24, 0.018), (0.48, -0.04)]
+    for i, (x, yoff) in enumerate(mustard_points):
+        parts.append(sphere(f"HotDog_Mustard_{i}", [x * hot_len * 0.78, -0.13 + yoff, hot_z + hot_h * 0.23], 0.055, "mustard", 16, 8))
+
+    # Rear service door keeps the back view authored rather than blank.
     door_h = 1.02
     door_w = 0.58
     parts.append(box("Kiosk_Rear_Service_Door", [-0.34, bd / 2 + inset, base_h + door_h / 2], [door_w, 0.06, door_h], "dark", 0.02))
 
-    material_defs = {key: value for key, value in mats.items()}
     return {
         "contract": "TYCOON_ASSET_SOURCE_V1",
         "assetId": recipe["assetId"],
@@ -113,14 +165,16 @@ def expand(recipe: dict) -> dict:
             "depthTiles": 1,
             "occupiedCells": [[0, 0]],
         },
-        "materials": material_defs,
+        "materials": {key: value for key, value in mats.items()},
         "parts": parts,
         "buildingPostProcess": recipe.get("buildingPostProcess", {}),
         "generation": {
             "sourceContract": recipe["contract"],
-            "designGrammar": "floating_canopy_plus_sign_fin_v1",
+            "designGrammar": "hotdog_kiosk_geometry_identity_v2",
             "partCount": len(parts),
             "retiredHouseGeometryReused": False,
+            "identityAuthoredIn3D": True,
+            "rotationConsistency": "AssetRoot_four_direction_bake",
         },
     }
 
