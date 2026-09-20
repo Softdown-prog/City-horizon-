@@ -16,8 +16,11 @@ class QListWidget;
 class QPlainTextEdit;
 class QSpinBox;
 class QTabWidget;
+class QPushButton;
 
 namespace ch::studio {
+
+class AssetGridPreviewWidget;
 
 class AssetProjectEditorWindow final : public QMainWindow {
 public:
@@ -45,12 +48,14 @@ private:
     QString storedPathForFile(const QString& absolute_path) const;
     QString resolvedPath(const QString& stored_path) const;
     QString directionPath(const QString& direction) const;
+    void setPreviewDirection(const QString& direction);
     void setStatus(const QString& text);
     void updateWindowTitle();
 
     AssetDocument document_;
     AssetHistory history_;
     QString current_path_;
+    QString preview_direction_ = QStringLiteral("south");
     bool refreshing_ = false;
 
     QLineEdit* asset_id_edit_ = nullptr;
@@ -75,8 +80,12 @@ private:
     QLineEdit* north_path_edit_ = nullptr;
 
     QListWidget* layer_list_ = nullptr;
-    QLabel* preview_label_ = nullptr;
+    AssetGridPreviewWidget* grid_preview_ = nullptr;
     QLabel* preview_info_label_ = nullptr;
+    QPushButton* south_preview_button_ = nullptr;
+    QPushButton* east_preview_button_ = nullptr;
+    QPushButton* west_preview_button_ = nullptr;
+    QPushButton* north_preview_button_ = nullptr;
     QPlainTextEdit* metadata_edit_ = nullptr;
     QLabel* status_label_ = nullptr;
 };
