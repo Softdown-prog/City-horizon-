@@ -4,51 +4,34 @@ This file is the fast onboarding document for AI agents and human contributors. 
 
 ## 1. What City Horizon is
 
-City Horizon is now a **small-scope 2D isometric park-management / tycoon project**, pivoted away from the previous full modern city-builder scope.
+City Horizon is a **modern 2D isometric city-builder**.
 
-The runtime remains SDL3/C++, and the existing engine, MapForge, placement systems, grid, camera, connected paths/roads, economy foundations, audio and asset pipeline should be reused wherever they fit.
+The runtime remains SDL3/C++. The existing engine, MapForge, placement systems, grid, camera, connected roads/paths, economy foundations, audio and asset pipeline should be reused wherever they fit.
 
 The project is developed by a solo programmer. Preserve continuity: prefer documenting durable decisions in the repository instead of relying on chat/session memory.
 
 ### Scope rule
 
-Do **not** silently re-expand the project back into a full city-builder or RollerCoaster-Tycoon-scale simulation.
+Do not silently pivot City Horizon into a different genre. The project remains a city builder unless the user explicitly decides otherwise.
 
-The first playable target is intentionally small:
-- one compact park map;
-- connected pedestrian paths;
-- a limited set of reusable trees and props;
-- benches, lighting, toilets and basic service objects;
-- a cafeteria / kiosk and a few small attractions;
-- simple money / upkeep / income loops;
-- simple park quality metrics such as cleanliness, beauty, services and fun;
-- land expansion only after the core loop works;
-- visitors may start as simplified agents/markers before full character animation.
-
-Large systems such as full urban zoning, traffic simulation, vehicle networks, dozens of building categories, airports, ports, skyscraper progression and city-scale infrastructure are **out of scope** unless explicitly re-approved later.
+The city-builder scope may still be developed incrementally. Prefer proving one system at a time instead of expanding broad infrastructure ahead of visible gameplay need.
 
 ## 2. Current art direction
 
-The authoritative production visual contract is now `CH_STYLIZED_3D_PRERENDER_V1`.
-
-City Horizon intentionally uses **stylized 3D assets rendered offline and shipped as 2D RGBA PNG sprites**. Visible 3D rendering characteristics are allowed and desirable when they support a coherent stylized miniature/toy-like look.
+The authoritative technical style contract is `CH_STYLIZED_PRERENDER_V1`. The current game-first art-direction contract is `CH_TYCOON_MINIATURE_V1`, but it remains a direction contract rather than an approved house design.
 
 Target:
-- stylized 3D prerendered sprites used in a 2D runtime;
+- stylized pre-rendered 2D sprites;
 - strong gameplay readability;
 - clean, coherent material separation;
-- rounded/simple forms where appropriate;
-- saturated but controlled colors;
-- soft directional lighting;
-- readable contact shadows and localized AO;
-- large details that survive gameplay-scale reduction;
-- one coherent visual universe across park buildings, vegetation, paths, attractions and props;
-- miniature / diorama-like presentation is acceptable and may be embraced intentionally;
-- modern Blender rendering characteristics are allowed and expected.
+- controlled detail and soft contact/shadow structure;
+- one coherent visual universe across buildings, vegetation, roads, props and characters;
+- a miniature / diorama-like presentation may be used when it supports the approved gameplay look;
+- modern tooling is allowed and expected.
 
-Do **not** try to hide the Blender origin of a good asset through aggressive posterization, forced dithering, palette reduction, fake pixel-art treatment or other destructive retro emulation.
+Blender remains an offline production tool. Its scale, camera, lighting and material settings should stay deliberately restrained so the final result reads as a coherent 2D game asset rather than a standalone 3D showcase render.
 
-Classic Zoo Tycoon / RollerCoaster Tycoon references remain useful for readability, composition, path logic and information density only. They are not the production-rendering target.
+Do not interpret classic Tycoon references as an instruction to reproduce year-2000 hardware limitations. Zoo Tycoon / RollerCoaster Tycoon are useful references for readability, miniature composition, path logic and information density.
 
 ### Visual proof rule
 
@@ -64,7 +47,7 @@ Use:
 - 45° yaw;
 - 30° elevation;
 - 128×64 reference tile;
-- fixed world lighting from `CH_TYCOON_STUDIO_V1` unless explicitly superseded;
+- fixed world lighting from `CH_TYCOON_STUDIO_V1`;
 - four canonical asset directions: SOUTH, EAST, WEST, NORTH.
 
 Do not create top-down 90° art for this project. Do not silently change camera angle, tile ratio or light direction to make one asset look better.
@@ -81,7 +64,8 @@ Design intent / procedural plan
   -> TYCOON_ASSET_SOURCE_V1
   -> build_scene.py in Blender headless
   -> TYCOON_ASSET_BAKE_V1
-  -> light corrective postprocess only when needed
+  -> postprocess.py
+  -> category stylizer
   -> four PNG directions + review/context boards
   -> gameplay-scale human review
   -> runtime promotion
@@ -89,63 +73,38 @@ Design intent / procedural plan
 
 The design should be explicit before Blender when practical. A compact plan/recipe is preferred over hundreds of hand-authored primitive entries because it is easier to audit, vary and reproduce.
 
-The Blender render should already be visually close to the final sprite. Post-processing is not expected to erase the 3D look.
-
 ### House-design reset
 
 There is currently **no approved residential-house recipe, generator or geometry reference**.
 
 The previous suburban-house and miniature-house pilots were retired because, although technically competent, they converged on the same unwanted house design language. They must not be recreated, copied, parameter-tweaked, or used as a silhouette/geometry starting point for future buildings.
 
-For a future house, start from a genuinely new silhouette and grammar before materials or post-processing. It may reuse only the generic technical infrastructure: camera/grid contracts, frozen studio, generic material system, Blender bake, four-direction export and review tooling.
+For a future house, start from a genuinely new silhouette and grammar before materials or post-processing. It may reuse only the generic technical infrastructure: camera/grid contracts, frozen studio, generic material system, Blender bake, four-direction export and review tooling. `CH_TYCOON_MINIATURE_V1` may guide game readability and miniature character, but it does not authorize reuse of any retired house geometry.
 
 Vegetation uses its own procedural tree contracts but ends in the same frozen studio/bake review flow.
 
-For the park pivot, prefer **reusable modular assets** over large catalog breadth. One good tree, bench, lamp, kiosk or attraction may appear many times and is more valuable than many one-off building types.
-
 ## 5. Blender's role
 
-Blender is the primary deterministic authoring/rendering environment for suitable production assets.
+Blender is a deterministic renderer/baker and geometry/material execution environment. It is not the place where undocumented art direction should live.
 
-Keep design intent in recipes/contracts where practical. Blender receives canonical source, uses the frozen studio, rotates the asset root for four directions and exports source/final passes. The game still consumes 2D PNGs.
+Keep design intent in recipes/contracts where possible. Blender receives canonical source, uses the frozen studio, rotates the asset root for four directions and exports source passes. The final game still uses 2D PNGs.
 
 Pinned production Blender version in Actions is currently 4.2.3 LTS.
 
-Blender is expected to preserve a **stylized 3D rendered appearance** under the new visual contract. It is not a defect if a sprite visibly reads as a clean modern 3D prerender.
+Keep Blender output intentionally controlled at the approved game scale. Do not increase scene scale, camera drama, PBR intensity or detail density merely because Blender can render them. The current lower-scale restrained Blender setup should be preserved when it produces the approved in-game 2D look.
 
-Use Blender for:
-- consistent proportions and geometry;
-- canonical camera;
-- four-direction rendering;
-- stylized materials;
-- soft lighting;
-- readable AO/contact shadows;
-- deterministic export.
-
-New procedural material or asset-generation approaches must still be validated with a real rendered artifact before being promoted as production direction.
+Blender is not assumed to solve every visual problem automatically. New procedural material or asset-generation approaches must be validated with a real rendered artifact before being promoted as production direction.
 
 ## 6. Material rules
 
 The material library lives in `tools/tycoon_photo_studio/tycoon_material_library.py` and supports procedural recipes such as plaster, brick, concrete, timber, stone, metal panel and glass.
 
-Under `CH_STYLIZED_3D_PRERENDER_V1`, material response should communicate matter without chasing photorealism.
-
-Prefer:
-- broad readable color/value groups;
-- restrained gloss;
-- simplified specular response;
-- smooth stylized gradients;
-- clean bevel highlights;
-- localized AO/contact darkening;
-- simple signage/accent colors.
-
-Avoid:
-- photoreal architectural-visualization look;
-- noisy high-frequency texture that disappears at final size;
-- physically accurate PBR showcase rendering as an end goal;
-- raw low-poly geometry with no art treatment;
-- flat vector surfaces with no depth read;
-- destructive retro filters used only to hide 3D rendering.
+Use material response to communicate matter at gameplay scale. Avoid:
+- plastic CG look;
+- high-frequency texture noise that disappears at final size;
+- photoreal microdetail;
+- flat vector surfaces with no material read;
+- treating technical correctness as sufficient visual approval.
 
 ## 7. Visual approval rule
 
@@ -159,15 +118,13 @@ Always inspect:
 
 Do not claim an art target was achieved before inspecting the artifact.
 
-Under the new style, do not reject an otherwise coherent asset merely because it visibly originated from Blender/3D. Judge whether it belongs to the same stylized visual universe.
-
 ## 8. Runtime / MapForge
 
 MapForge2 is the project-side environment for map/editor testing and deterministic captures. Use neutral or controlled captures when judging new assets; legacy assets visible in a scene are functional context only and must not become visual references.
 
-Park buildings and props should align to the grid and pedestrian paths without unexplained grass gaps. Footprint, pivot and anchor correctness are part of the asset contract.
+Buildings should align to the grid and sidewalks without unexplained grass gaps. Footprint, pivot and anchor correctness are part of the asset contract.
 
-Connected pedestrian paths are a primary gameplay system. Existing road/path topology code should be reused where practical, while keeping pedestrian-path semantics independent from vehicle-road semantics.
+Connected roads and pedestrian paths remain primary gameplay systems. Reuse shared topology where practical while preserving their different semantics.
 
 ## 9. Engineering workflow
 
@@ -179,35 +136,22 @@ When changing a GitHub file, read the current version first. Avoid concurrent wr
 
 ### Vertical-slice priority
 
-Before adding broad new systems, prove the park loop with a minimal vertical slice using mostly existing technology:
-
-```text
-compact map
-  -> place connected paths
-  -> place a few reusable park objects / services
-  -> place one or two small attractions
-  -> spend money / receive income
-  -> observe simple park metrics
-  -> expand only after the loop is playable
-```
+Before adding broad new systems, prove city-builder systems in small playable slices using mostly existing technology.
 
 Do not build large infrastructure ahead of visible gameplay need.
 
 ## 10. Source hierarchy
 
 For visual work, trust in this order:
-1. `C++/MapForge2/CH_STYLIZED_3D_PRERENDER_V1.md`;
-2. current contracts under `tools/tycoon_photo_studio/contracts/` that do not conflict with it;
-3. approved procedural recipes/source configs;
-4. frozen studio/camera configuration;
-5. generated bake artifacts;
-6. runtime integration.
-
-`CH_CLASSIC_TYCOON_STYLE_V1` is historical/reference guidance only when it conflicts with `CH_STYLIZED_3D_PRERENDER_V1`.
+1. current contracts under `tools/tycoon_photo_studio/contracts/`;
+2. approved procedural recipes/source configs;
+3. frozen studio/camera configuration;
+4. generated bake artifacts;
+5. runtime integration.
 
 Do not infer art direction from old asset folders. Retired house experiments are explicitly excluded as visual or geometric references.
 
-For game scope, this `AGENTS.md` pivot is authoritative over older city-builder descriptions unless a newer explicit contract supersedes it.
+For game scope, this `AGENTS.md` is authoritative over older pivot notes unless a newer explicit contract supersedes it.
 
 ## 11. Where to learn more
 
@@ -216,6 +160,5 @@ For game scope, this `AGENTS.md` pivot is authoritative over older city-builder 
 - asset pipeline: `docs/ASSET_PIPELINE.md`
 - Tycoon Photo Studio: `tools/tycoon_photo_studio/README.md`
 - MapForge documentation: `docs/map_forge/`
-- authoritative production art direction: `C++/MapForge2/CH_STYLIZED_3D_PRERENDER_V1.md`
 
 If a new system introduces a durable contract or workflow, update the relevant README/docs in the same change. The repository should carry enough context that a new agent can continue the project without the user re-explaining the fundamentals.
