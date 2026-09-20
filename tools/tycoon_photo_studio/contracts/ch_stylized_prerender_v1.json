@@ -27,7 +27,12 @@
   },
   "vegetationGuidance": {
     "canopy": "preserve irregular organic silhouette, readable foliage mass and controlled internal variation",
-    "trunk": "retain broad stylized tonal bands but avoid obvious radial polygon facets or triangular face-reading",
+    "canopyTreatmentStatus": "frozen_for_park_tree_broadleaf_02",
+    "trunk": "use a dedicated wood pass with 3-5 restrained organic bark tone masses; avoid obvious radial polygon facets, triangular face-reading, diagonal plates and camouflage-like geometry patterns",
+    "woodAndFoliageMustUseSeparateFinishingPaths": true,
+    "woodSourceLightingMayGuideButMustNotDominateFinalTonePattern": true,
+    "foliageIndexedDitherMayRemainEnabled": true,
+    "woodIndexedDitherRequired": false,
     "shadow": "support grounding without competing with the asset",
     "rotationConsistency": "four directions must read as the same authored asset"
   },
@@ -35,12 +40,13 @@
     {
       "assetId": "park_tree_broadleaf_02",
       "role": "vegetation_reference",
-      "note": "Reference for stylization level, gameplay legibility, organic canopy and restrained pre-rendered depth; not a mandate to copy its exact appearance across categories."
+      "note": "Reference for stylization level, gameplay legibility and organic canopy. Its approved crown is frozen; trunk and branch finishing may evolve independently until the wood pass no longer exposes geometric lighting plates."
     }
   ],
   "approval": {
     "humanVisualGateRequired": true,
     "mapContextReviewRequired": true,
-    "rule": "An asset is approved only when it reads coherently in gameplay context and no longer depends on modern 3D rendering cues for visual quality."
+    "rule": "An asset is approved only when it reads coherently in gameplay context and no longer depends on modern 3D rendering cues for visual quality.",
+    "vegetationRule": "Do not alter an already approved canopy to solve a trunk problem. Wood and foliage must be reviewed as distinct visual regions."
   }
 }
