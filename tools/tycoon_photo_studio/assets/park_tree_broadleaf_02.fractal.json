@@ -109,5 +109,12 @@
     "posterizeBitsPerChannel": 4,
     "outlineAlpha": 30,
     "shadowBlendIntent": "multiply_equivalent_alpha"
+  },
+  "woodPostProcess": {
+    "woodToneCount": 4,
+    "woodOrganicStrength": 0.24,
+    "woodVerticalScale": 24.0,
+    "woodHorizontalScale": 39.0,
+    "intent": "Preserve the approved crown unchanged while replacing large polygon-lighting plates on visible trunk and branches with restrained, vertical organic bark tone masses."
   }
 }
