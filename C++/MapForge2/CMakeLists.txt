@@ -134,6 +134,19 @@ add_executable(MapForge2 WIN32
 )
 target_link_libraries(MapForge2 PRIVATE mapforge2_editor Qt6::Widgets)
 
+add_executable(CityHorizonAssetEditor WIN32
+    src/asset_project_editor_main.cpp
+    src/asset_project_editor_window.cpp
+)
+target_include_directories(CityHorizonAssetEditor PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_link_libraries(CityHorizonAssetEditor PRIVATE
+    mapforge2_asset_document
+    Qt6::Widgets
+    Qt6::Gui
+)
+
 add_executable(MapForge2ComposerPreview
     src/composer_preview_main.cpp
 )
@@ -163,6 +176,7 @@ if(MSVC)
     target_compile_options(mapforge2_asset_composer PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_editor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2 PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(CityHorizonAssetEditor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
@@ -175,6 +189,7 @@ else()
     target_compile_options(mapforge2_asset_composer PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_editor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2 PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(CityHorizonAssetEditor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
@@ -194,4 +209,4 @@ if(TARGET SDL3::SDL3-shared)
     )
 endif()
 
-install(TARGETS MapForge2 RUNTIME DESTINATION .)
+install(TARGETS MapForge2 CityHorizonAssetEditor RUNTIME DESTINATION .)
