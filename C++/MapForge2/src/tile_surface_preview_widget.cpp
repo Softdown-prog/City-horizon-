@@ -24,8 +24,18 @@ void TileSurfacePreviewWidget::setTile(const QPixmap& tile) {
     update();
 }
 
+void TileSurfacePreviewWidget::setAutotileTiles(const QHash<int, QPixmap>& tiles) {
+    autotile_tiles_ = tiles;
+    update();
+}
+
 void TileSurfacePreviewWidget::clearTile() {
     tile_ = QPixmap();
+    update();
+}
+
+void TileSurfacePreviewWidget::clearAutotileTiles() {
+    autotile_tiles_.clear();
     update();
 }
 
@@ -43,6 +53,13 @@ void TileSurfacePreviewWidget::setShowGrid(const bool show_grid) {
 void TileSurfacePreviewWidget::setAutotileMask(const int mask) {
     autotile_mask_ = std::clamp(mask, 0, 15);
     update();
+}
+
+const QPixmap* TileSurfacePreviewWidget::tileForMask(const int mask) const {
+    const auto it = autotile_tiles_.constFind(mask);
+    if (it != autotile_tiles_.cend() && !it.value().isNull()) return &it.value();
+    if (!tile_.isNull()) return &tile_;
+    return nullptr;
 }
 
 QPointF TileSurfacePreviewWidget::projectTile(const qreal tile_x, const qreal tile_y) const {
@@ -63,6 +80,8 @@ void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
     painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
     painter.fillRect(rect(), QColor(31, 31, 31));
 
+    const QPixmap* selected = tileForMask(autotile_mask_);
+
     for (int y = 0; y < repeat_y_; ++y) {
         for (int x = 0; x < repeat_x_; ++x) {
             const QPointF north = projectTile(x, y);
@@ -70,8 +89,8 @@ void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
             const QPointF west = projectTile(x, y + 1);
             const QPointF top_left(north.x() - kTileWidth * 0.5, north.y());
 
-            if (!tile_.isNull()) {
-                painter.drawPixmap(QRectF(top_left, QSizeF(kTileWidth, kTileHeight)), tile_, tile_.rect());
+            if (selected != nullptr) {
+                painter.drawPixmap(QRectF(top_left, QSizeF(kTileWidth, kTileHeight)), *selected, selected->rect());
             }
 
             if (show_grid_) {
@@ -91,10 +110,10 @@ void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
                          .arg(repeat_y_)
                          .arg(autotile_mask_, 2, 10, QLatin1Char('0')));
 
-    if (tile_.isNull()) {
+    if (selected == nullptr) {
         painter.setPen(QColor(185, 185, 185));
         painter.drawText(rect().adjusted(20, 40, -20, -20), Qt::AlignCenter,
-                         QStringLiteral("No surface tile assigned\n\nLoad a 2D tile image to inspect repetition, edges and continuity."));
+                         QStringLiteral("No tile assigned for this mask\n\nLoad a base tile or one of the 16 autotile PNGs."));
     }
 }
 
