@@ -1,0 +1,78 @@
+{
+  "contract": "CITY_HORIZON_PARK_KIOSK_V1",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "assetId": "park_snack_kiosk_1x1",
+  "assetType": "park_service_building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "designIntent": {
+    "summary": "Original compact park snack kiosk designed as a cheerful tycoon game piece, not as a house or architectural visualization.",
+    "silhouette": "wide floating canopy over a short body with one tall sign fin",
+    "readOrder": ["canopy", "sign", "service_windows", "counter"],
+    "detailLevel": "low",
+    "rules": [
+      "no pitched residential roof",
+      "no porch or house facade grammar",
+      "large clean color blocks",
+      "slightly oversized service openings",
+      "one strong asymmetric accent",
+      "readable at normal gameplay zoom"
+    ]
+  },
+  "footprint": {"widthTiles": 1, "depthTiles": 1},
+  "mass": {
+    "bodyWidth": 2.12,
+    "bodyDepth": 1.82,
+    "bodyHeight": 1.48,
+    "baseHeight": 0.16,
+    "canopyWidth": 2.82,
+    "canopyDepth": 2.48,
+    "canopyThickness": 0.18,
+    "canopyZ": 1.68
+  },
+  "openings": {
+    "southWindowWidth": 1.26,
+    "southWindowHeight": 0.72,
+    "eastWindowWidth": 1.02,
+    "eastWindowHeight": 0.68,
+    "sillZ": 0.78,
+    "counterDepth": 0.24,
+    "counterThickness": 0.12
+  },
+  "sign": {
+    "width": 0.58,
+    "depth": 0.36,
+    "height": 0.82,
+    "offsetX": 0.64,
+    "offsetY": 0.30
+  },
+  "materials": {
+    "body": {"name":"KioskTurquoiseBody","rgba":[0.18,0.55,0.56,1.0],"recipe":"plaster","roughness":0.88,"seed":11,"strength":0.08},
+    "canopy": {"name":"KioskWarmCreamCanopy","rgba":[0.91,0.77,0.53,1.0],"recipe":"solid","roughness":0.82,"seed":13,"strength":0.04},
+    "accent": {"name":"KioskCoralAccent","rgba":[0.82,0.28,0.20,1.0],"recipe":"solid","roughness":0.80,"seed":17,"strength":0.04},
+    "glass": {"name":"KioskBlueGlass","rgba":[0.16,0.42,0.52,1.0],"recipe":"glass","roughness":0.34,"seed":19,"strength":0.08},
+    "counter": {"name":"KioskCounterWood","rgba":[0.46,0.25,0.10,1.0],"recipe":"timber","roughness":0.78,"seed":23,"strength":0.12},
+    "base": {"name":"KioskStoneBase","rgba":[0.48,0.47,0.40,1.0],"recipe":"stone","roughness":0.92,"seed":29,"strength":0.10},
+    "dark": {"name":"KioskDarkTrim","rgba":[0.10,0.14,0.15,1.0],"recipe":"metal_panel","roughness":0.68,"metallic":0.08,"seed":31,"strength":0.04}
+  },
+  "buildingPostProcess": {
+    "profile": "park_kiosk_game_first_v1",
+    "intent": "preserve_simple_game_first_color_blocks",
+    "paletteColors": 112,
+    "paletteDither": false,
+    "posterizeBitsPerChannel": 7,
+    "contrastMultiplier": 1.03,
+    "saturationMultiplier": 1.05,
+    "outlineAlpha": 62,
+    "internalEdgeAlpha": 18,
+    "internalEdgeThreshold": 98,
+    "roofStructuralRows": false,
+    "roofRowSpacingPx": 7,
+    "roofRowDarken": 0.92,
+    "glassReflectionStrength": 0.38,
+    "surfacePolicy": {
+      "preferLargeColorBlocks": true,
+      "avoidArchitecturalMaterialDrama": true,
+      "canopyIsGraphicSilhouette": true
+    }
+  }
+}
