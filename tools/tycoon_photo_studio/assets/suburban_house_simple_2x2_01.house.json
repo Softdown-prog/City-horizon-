@@ -1,0 +1,79 @@
+{
+  "contract": "CITY_HORIZON_SUBURBAN_HOUSE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "assetId": "suburban_house_simple_2x2_01",
+  "assetType": "building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "seed": 92026,
+  "designIntent": {
+    "category": "suburban_residential",
+    "summary": "Simple one-storey suburban house with a compact porch, hip roof, chimney and restrained architectural detail.",
+    "detailLevel": "medium_low",
+    "gameplayRead": "Recognizable residential house at normal city-builder zoom without relying on microscopic texture.",
+    "doNotTarget": [
+      "photorealism",
+      "modern real-time 3D look",
+      "literal 2000-era hardware limitations",
+      "excess ornamental detail"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2
+  },
+  "mass": {
+    "width": 4.55,
+    "depth": 3.95,
+    "foundationHeight": 0.30,
+    "wallHeight": 2.72
+  },
+  "roof": {
+    "kind": "hip",
+    "radius": 3.42,
+    "depth": 1.24,
+    "baseZ": 3.02,
+    "chimney": true,
+    "chimneyOffset": [1.05, 0.52]
+  },
+  "facade": {
+    "front": "south",
+    "doorOffsetX": 0.42,
+    "doorWidth": 0.88,
+    "doorHeight": 2.06,
+    "frontWindows": [
+      {"x": -1.32, "width": 1.02, "height": 0.98, "sillZ": 1.08},
+      {"x": 1.52, "width": 0.78, "height": 0.90, "sillZ": 1.12}
+    ],
+    "sideWindowWidth": 1.05,
+    "sideWindowHeight": 0.92,
+    "sideWindowSillZ": 1.10
+  },
+  "details": {
+    "porch": true,
+    "porchWidth": 1.68,
+    "porchDepth": 0.58,
+    "porchPosts": 2,
+    "frontSteps": 2,
+    "eaveShadowBand": true,
+    "windowMullions": true,
+    "sideWindows": true,
+    "rearWindows": true,
+    "foundationVents": 2
+  },
+  "materials": {
+    "foundation": {"name": "SuburbanFoundationStone", "rgba": [0.39, 0.40, 0.37, 1.0], "recipe": "stone", "roughness": 0.93, "seed": 19, "strength": 0.22},
+    "wall": {"name": "SuburbanWarmPlaster", "rgba": [0.74, 0.66, 0.53, 1.0], "recipe": "plaster", "roughness": 0.88, "seed": 41, "strength": 0.20},
+    "roof": {"name": "SuburbanMutedClayRoof", "rgba": [0.39, 0.19, 0.13, 1.0], "recipe": "stone", "roughness": 0.86, "seed": 73, "strength": 0.28},
+    "trim": {"name": "SuburbanCreamTrim", "rgba": [0.82, 0.79, 0.69, 1.0], "recipe": "plaster", "roughness": 0.82, "seed": 13, "strength": 0.12},
+    "door": {"name": "SuburbanDoorTimber", "rgba": [0.28, 0.16, 0.09, 1.0], "recipe": "timber", "roughness": 0.76, "seed": 29, "strength": 0.28},
+    "glass": {"name": "SuburbanWindowGlass", "rgba": [0.29, 0.45, 0.50, 1.0], "recipe": "glass", "roughness": 0.34, "seed": 7, "strength": 0.14},
+    "chimney": {"name": "SuburbanChimneyBrick", "rgba": [0.35, 0.23, 0.17, 1.0], "recipe": "brick", "roughness": 0.91, "seed": 61, "strength": 0.24},
+    "metal": {"name": "SuburbanDarkMetal", "rgba": [0.15, 0.16, 0.15, 1.0], "recipe": "metal_panel", "roughness": 0.64, "metallic": 0.10, "seed": 5, "strength": 0.10}
+  },
+  "buildingPostProcess": {
+    "intent": "stylized_prerender_not_historical_emulation",
+    "preserveMaterialRead": true,
+    "preserveArchitecturalSilhouette": true,
+    "gameplayScaleApprovalRequired": true
+  }
+}

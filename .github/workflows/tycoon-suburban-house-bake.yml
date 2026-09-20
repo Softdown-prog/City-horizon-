@@ -1,0 +1,149 @@
+name: Tycoon Suburban House Bake
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/tycoon_photo_studio/assets/suburban_house_simple_2x2_01.house.json"
+      - "tools/tycoon_photo_studio/generate_suburban_house_asset.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/stylize_building_2d.py"
+      - "tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-suburban-house-bake.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-suburban-house:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASSET_ID: suburban_house_simple_2x2_01
+      HOUSE_PLAN: tools/tycoon_photo_studio/assets/suburban_house_simple_2x2_01.house.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Validate procedural house plan
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('tools/tycoon_photo_studio/assets/suburban_house_simple_2x2_01.house.json').read_text(encoding='utf-8'))
+          assert data['contract'] == 'CITY_HORIZON_SUBURBAN_HOUSE_V1'
+          assert data['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert data['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
+          assert data['footprint'] == {'widthTiles': 2, 'depthTiles': 2}
+          assert data['designIntent']['detailLevel'] == 'medium_low'
+          assert data['details']['porch'] is True
+          assert data['roof']['kind'] == 'hip'
+          print('suburbanHousePlanGate: PASS')
+          PY
+
+      - name: Expand plan to canonical asset source
+        run: |
+          set -euo pipefail
+          mkdir -p out/suburban_house/generated
+          python tools/tycoon_photo_studio/generate_suburban_house_asset.py \
+            --plan "$HOUSE_PLAN" \
+            --output out/suburban_house/generated/${ASSET_ID}.source.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/suburban_house/generated/suburban_house_simple_2x2_01.source.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+          assert data['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert data['assetType'] == 'building'
+          assert data['floors'] == 1
+          assert data['generation']['sourceContract'] == 'CITY_HORIZON_SUBURBAN_HOUSE_V1'
+          assert data['generation']['proceduralStage'] == 'pre_blender_plan_to_canonical_source_v1'
+          assert data['generation']['partCount'] >= 35
+          print('canonicalHouseSourceGate: PASS', data['generation']['partCount'])
+          PY
+
+      - name: Download pinned Blender
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          curl --fail --location --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake four canonical directions
+        run: |
+          set -euo pipefail
+          mkdir -p out/suburban_house/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_scene.py -- \
+            --asset-config "$PWD/out/suburban_house/generated/${ASSET_ID}.source.json" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/suburban_house/source"
+
+      - name: Build final PNG package
+        run: |
+          set -euo pipefail
+          mkdir -p out/suburban_house/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/suburban_house/source \
+            --output out/suburban_house/final \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply City Horizon stylized pre-render treatment
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_building_2d.py \
+            --package out/suburban_house/final \
+            --asset-id "$ASSET_ID"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/suburban_house/final/suburban_house_simple_2x2_01_manifest.json').read_text(encoding='utf-8'))
+          pp = m['candidatePostProcess']
+          assert pp['preservesCameraPivotAndFootprint'] is True
+          assert pp['glassIsolation'] == 'connected_window_components'
+          print('stylizedPrerenderBuildingGate: PASS')
+          PY
+
+      - name: Verify final package
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/suburban_house/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/suburban_house/final/${ASSET_ID}_4view.png"
+          test -f "out/suburban_house/final/${ASSET_ID}_review.png"
+          test -f "out/suburban_house/final/${ASSET_ID}_4dir_context.png"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Suburban-House-Simple-2x2-01-PNGs
+          path: |
+            out/suburban_house/final
+            out/suburban_house/generated/suburban_house_simple_2x2_01.source.json
+            out/suburban_house/source/studio_metadata.json
+          if-no-files-found: error
+          retention-days: 14

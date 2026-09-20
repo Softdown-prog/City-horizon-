@@ -1,56 +1,121 @@
-# Tycoon Photo Studio — Proof of Concept
+# Tycoon Photo Studio — production asset pipeline
 
-Status: VISUAL EXPERIMENT ONLY
+This folder is the visual production pipeline for City Horizon. It is no longer treated as a one-off proof of concept.
 
-This folder exists to answer one question before more editor/tooling work is funded:
+## Current objective
 
-> Can a deterministic Blender headless bake plus controlled post-processing produce a City Horizon sprite that belongs visually to the classic Zoo Tycoon 1 / RollerCoaster Tycoon family?
+Generate deterministic, stylized pre-rendered 2D assets that share one camera, scale, lighting setup and material language.
 
-## Deliberate scope
+The current art-direction contract is `CH_STYLIZED_PRERENDER_V1`. Classic Tycoon games remain useful visual references for readability and miniature composition, but the pipeline is not required to emulate early-2000s hardware limitations.
 
-The POC uses one small park kiosk only. It does not add editor UI, AI authoring, Layers tooling, carousel work or a general renderer framework.
+## Frozen studio
 
-The fixed studio contract is:
-
-- `CH_CAMERA_V1` visual target;
+`CH_TYCOON_STUDIO_V1` provides:
 - orthographic camera;
-- 45 degree yaw;
-- 30 degree elevation;
-- warm northwest key light;
-- cool southeast fill light;
-- supersampled 1024x1024 source render;
-- 256x256 review output;
-- separate object color source and ground-shadow reference;
-- deterministic post-processing.
+- 45° yaw;
+- 30° elevation;
+- fixed world lighting;
+- four canonical asset rotations;
+- supersampled source renders;
+- deterministic final PNG packaging.
 
-## Four review variants
+The camera/lights stay fixed. The asset root rotates.
 
-1. Full-color smooth downsample.
-2. 128-color palette reduction without dithering.
-3. 128-color palette reduction with Floyd-Steinberg dithering.
-4. Variant 3 plus hard alpha cleanup and a restrained one-pixel sel-out experiment.
+## Main stages
 
-The point is not to claim that any of these is historically identical to Zoo Tycoon 1. The point is to isolate which treatment produces the strongest small-sprite miniature read for City Horizon.
+### 1. Plan / recipe
 
-## Outputs
+Prefer a compact, human-readable procedural recipe when a family can be expressed parametrically.
 
-The GitHub Actions workflow `Tycoon Photo Studio POC` publishes the artifact `Tycoon-Photo-Studio-POC` containing:
+Example residential plan:
+`assets/suburban_house_simple_2x2_01.house.json`
 
-- `tycoon_photo_studio_variant_01.png`
-- `tycoon_photo_studio_variant_02.png`
-- `tycoon_photo_studio_variant_03.png`
-- `tycoon_photo_studio_variant_04.png`
-- `tycoon_photo_studio_color_pass.png`
-- `tycoon_photo_studio_shadow_pass.png`
-- `tycoon_photo_studio_comparison_board.png`
-- `tycoon_photo_studio_in_game_context.png`
-- `tycoon_photo_studio_manifest.json`
-- raw 1024px source/reference passes
+This plan describes intent, footprint, massing, roof, facade rules, detail budget and material recipes before Blender is involved.
 
-The context image is explicitly synthetic and is **not** a runtime screenshot.
+### 2. Pre-Blender expansion
 
-## Stop rule
+Procedural plans are expanded into the canonical `TYCOON_ASSET_SOURCE_V1` format.
 
-A green workflow means only that the deterministic bake pipeline executed successfully. It does **not** mean the art is approved.
+Residential example:
+`generate_suburban_house_asset.py`
 
-Do not expand this into a general production tool until the downsampled result is manually accepted as belonging to the intended classic Tycoon visual family. If the result fails visually, adjust geometry, lighting, materials and post-processing here first.
+Generic/more complex architecture can use grammar tooling such as:
+`generate_shape_grammar_asset.py`
+
+The expander should be deterministic for a given recipe/seed.
+
+### 3. Blender bake
+
+`build_scene.py` consumes canonical asset source and executes geometry/material instructions inside Blender headless.
+
+Blender's role is to render and bake consistently. Avoid hiding critical design decisions only inside Blender code or a `.blend` scene if they can live in a recipe/contract instead.
+
+### 4. Post-process
+
+`postprocess.py` creates runtime-scale passes, pivots, atlases and review assets.
+
+Category stylizers then apply controlled presentation rules:
+- `stylize_building_2d.py`
+- `stylize_foliage_2d.py`
+
+Stylization supports material/readability goals. It is not a mandate to make assets artificially old.
+
+### 5. Review
+
+Expected building outputs normally include:
+- `<asset>_south.png`
+- `<asset>_east.png`
+- `<asset>_west.png`
+- `<asset>_north.png`
+- `<asset>_4view.png`
+- `<asset>_review.png`
+- `<asset>_4dir_context.png`
+- atlas + manifest
+
+A successful workflow is not visual approval. Inspect the artifact at gameplay scale.
+
+## Important files
+
+- `build_scene.py` — canonical Blender baker.
+- `tycoon_material_library.py` — procedural material recipes.
+- `postprocess.py` — packaging/downsample/atlas/review stage.
+- `generate_suburban_house_asset.py` — simple suburban-house procedural expander.
+- `generate_shape_grammar_asset.py` — generic architecture grammar expander.
+- `build_classic_tree.py` — dense procedural tree generator.
+- `stylize_building_2d.py` — building presentation layer.
+- `stylize_foliage_2d.py` — foliage presentation layer.
+- `contracts/ch_stylized_prerender_v1.json` — current visual contract.
+- `studio_presets/ch_tycoon_studio_v1.json` — frozen studio.
+
+## Procedural building policy
+
+For a new building family:
+
+```text
+recipe/plan
+  -> deterministic expander
+  -> TYCOON_ASSET_SOURCE_V1
+  -> Blender bake
+  -> post-process/stylize
+  -> 4-direction artifact
+  -> human approval
+```
+
+Do not hand-author giant primitive JSON files by default when the design can be expressed as a smaller plan + reusable generator. Direct canonical JSON is still valid for special one-off assets, imports or low-level tests.
+
+## Material policy
+
+The procedural material library currently supports recipes including plaster, brick, concrete, timber, stone, metal panel and glass.
+
+At final sprite size prioritize:
+- material separation;
+- silhouette;
+- controlled structural detail;
+- readable windows/doors/roof;
+- soft contact information.
+
+Avoid high-frequency noise, plastic CG response and detail that only works in close-up.
+
+## Production stop rule
+
+Do not scale a family until one exemplar has been visually accepted. If the exemplar fails, fix the recipe, geometry, materials, lighting or category stylizer first; then generate variants.
