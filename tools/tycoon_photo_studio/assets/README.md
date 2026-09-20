@@ -16,23 +16,15 @@ For a new procedural building, prefer this order:
 
 A successful workflow is not visual approval.
 
-## Current game-first building pilot
+## Current building status
 
-The active visual pilot for new small buildings is:
+There is currently **no approved house recipe, house-specific generator, or house geometry reference** in this directory.
 
-- recipe: `tycoon_house_pilot_2x2_01.house.json`;
-- recipe contract: `CITY_HORIZON_TYCOON_HOUSE_V1`;
-- art direction: `CH_TYCOON_MINIATURE_V1`;
-- expander: `../generate_tycoon_miniature_house.py`;
-- workflow: `.github/workflows/tycoon-miniature-house-bake.yml`.
+The previous suburban-house and miniature-house pilots were retired because they kept converging on the same unwanted design language. They are not historical templates to revive later and must not be reconstructed from memory, old artifacts, commit history, screenshots, or parameter variations unless the user explicitly asks to recover one.
 
-`CH_TYCOON_MINIATURE_V1` is layered on the technical bake/style base `CH_STYLIZED_PRERENDER_V1`. Its purpose is to make geometry and color design look like a **game miniature from the start**: compact body, strong roof silhouette, slightly oversized openings, large clean color blocks, low material noise and restrained landscaping.
+The generic art-direction contract `CH_TYCOON_MINIATURE_V1` remains valid as guidance for game-first readability: strong silhouette, miniature charm, clean color blocking, readable openings, low material noise and restrained detail. It is **not** an approved building design.
 
-This pilot is intentionally independent from the older suburban-house grammar. Do not derive the new shape language from the older house simply because it exists.
-
-## Older residential recipes
-
-`suburban_house_simple_2x2_01.house.json` and `residential_house_2x2_01.json` may remain for pipeline/history/testing, but they are **not the target visual reference** for the new game-first miniature direction unless the user explicitly re-approves them.
+For the next house/building experiment, create a genuinely new silhouette/grammar before materials and post-processing. Reuse the generic technical pipeline — camera, grid, studio, material system, Blender bake, four-direction export and review tooling — but not the retired house geometry or composition.
 
 ## Reference policy
 

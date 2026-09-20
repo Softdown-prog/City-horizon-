@@ -29,7 +29,7 @@ Large systems such as full urban zoning, traffic simulation, vehicle networks, d
 
 ## 2. Current art direction
 
-The authoritative style contract is `CH_STYLIZED_PRERENDER_V1`.
+The authoritative technical style contract is `CH_STYLIZED_PRERENDER_V1`. The current game-first art-direction contract is `CH_TYCOON_MINIATURE_V1`, but it remains a direction contract rather than an approved house design.
 
 Target:
 - stylized pre-rendered 2D sprites;
@@ -82,10 +82,13 @@ Design intent / procedural plan
 
 The design should be explicit before Blender when practical. A compact plan/recipe is preferred over hundreds of hand-authored primitive entries because it is easier to audit, vary and reproduce.
 
-First residential example:
-- `tools/tycoon_photo_studio/assets/suburban_house_simple_2x2_01.house.json`
-- `tools/tycoon_photo_studio/generate_suburban_house_asset.py`
-- `.github/workflows/tycoon-suburban-house-bake.yml`
+### House-design reset
+
+There is currently **no approved residential-house recipe, generator or geometry reference**.
+
+The previous suburban-house and miniature-house pilots were retired because, although technically competent, they converged on the same unwanted house design language. They must not be recreated, copied, parameter-tweaked, or used as a silhouette/geometry starting point for future buildings.
+
+For a future house, start from a genuinely new silhouette and grammar before materials or post-processing. It may reuse only the generic technical infrastructure: camera/grid contracts, frozen studio, generic material system, Blender bake, four-direction export and review tooling. `CH_TYCOON_MINIATURE_V1` may guide game readability and miniature character, but it does not authorize reuse of any retired house geometry.
 
 Vegetation uses its own procedural tree contracts but ends in the same frozen studio/bake review flow.
 
@@ -165,7 +168,7 @@ For visual work, trust in this order:
 4. generated bake artifacts;
 5. runtime integration.
 
-Do not infer art direction from old asset folders.
+Do not infer art direction from old asset folders. Retired house experiments are explicitly excluded as visual or geometric references.
 
 For game scope, this `AGENTS.md` pivot is authoritative over older city-builder descriptions unless a newer explicit contract supersedes it.
 
