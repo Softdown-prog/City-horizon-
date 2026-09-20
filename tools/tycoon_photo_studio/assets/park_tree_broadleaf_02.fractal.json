@@ -1,5 +1,6 @@
 {
   "contract": "TYCOON_FRACTAL_TREE_SOURCE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "assetId": "park_tree_broadleaf_02",
   "assetType": "static_decor",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
@@ -50,7 +51,7 @@
     "height": 2.25,
     "baseRadius": 0.3525,
     "topRadius": 0.138,
-    "vertices": 12,
+    "vertices": 18,
     "lean": [0.063, -0.0615],
     "midKink": [-0.0285, 0.0465],
     "rootCount": 6,
