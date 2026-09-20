@@ -53,6 +53,9 @@ jobs:
           assert data['footprint'] == {'widthTiles': 1, 'depthTiles': 1}
           assert data['mass']['canopyWidth'] > data['mass']['bodyWidth']
           assert data['mass']['canopyDepth'] > data['mass']['bodyDepth']
+          assert data['awning']['enabled'] is True
+          assert data['awning']['stripeCount'] >= 5
+          assert data['roofIdentity']['kind'] == 'hotdog'
           assert data['buildingPostProcess']['profile'] == 'park_kiosk_game_first_v1'
           assert data['buildingPostProcess']['roofStructuralRows'] is False
           print('parkKioskPlanGate: PASS')
@@ -74,9 +77,14 @@ jobs:
           assert data['styleContract'] == 'CH_TYCOON_MINIATURE_V1'
           assert data['assetType'] == 'static_building'
           assert data['generation']['sourceContract'] == 'CITY_HORIZON_PARK_KIOSK_V1'
-          assert data['generation']['designGrammar'] == 'floating_canopy_plus_sign_fin_v1'
+          assert data['generation']['designGrammar'] == 'hotdog_kiosk_geometry_identity_v2'
+          assert data['generation']['identityAuthoredIn3D'] is True
           assert data['generation']['retiredHouseGeometryReused'] is False
-          assert data['generation']['partCount'] >= 15
+          assert data['generation']['partCount'] >= 30
+          names = {part['name'] for part in data['parts']}
+          assert 'HotDog_Sausage' in names
+          assert any(name.startswith('Awning_Stripe_') for name in names)
+          assert 'Menu_Board' in names
           print('canonicalKioskSourceGate: PASS', data['generation']['partCount'])
           PY
 
