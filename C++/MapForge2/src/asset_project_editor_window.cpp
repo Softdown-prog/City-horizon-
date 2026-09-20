@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonDocument>
@@ -216,8 +217,8 @@ void AssetProjectEditorWindow::buildUi() {
     auto* surface_tab = new QWidget(tabs);
     auto* surface_layout = new QVBoxLayout(surface_tab);
     auto* surface_form = new QFormLayout();
-    surface_tile_path_edit_ = makePathRow(surface_tab, surface_form, QStringLiteral("Surface tile PNG"), [this]() {
-        const QString path = chooseImageFile(QStringLiteral("Choose 2D surface/tile image"));
+    surface_tile_path_edit_ = makePathRow(surface_tab, surface_form, QStringLiteral("Fallback/base tile PNG"), [this]() {
+        const QString path = chooseImageFile(QStringLiteral("Choose base 2D surface/tile image"));
         if (!path.isEmpty()) applySurfaceTilePath(path);
     });
     surface_repeat_x_spin_ = new QSpinBox(surface_tab);
@@ -235,6 +236,13 @@ void AssetProjectEditorWindow::buildUi() {
     surface_form->addRow(QStringLiteral("Repeat Y"), surface_repeat_y_spin_);
     surface_form->addRow(QStringLiteral("Autotile mask (0-15)"), surface_mask_spin_);
     surface_form->addRow(surface_show_grid_check_);
+
+    surface_autotile_path_label_ = new QLabel(surface_tab);
+    surface_autotile_path_label_->setWordWrap(true);
+    surface_assign_mask_button_ = new QPushButton(QStringLiteral("Assign PNG to selected mask"), surface_tab);
+    surface_form->addRow(QStringLiteral("Selected mask PNG"), surface_autotile_path_label_);
+    surface_form->addRow(surface_assign_mask_button_);
+
     surface_layout->addLayout(surface_form);
     surface_preview_ = new TileSurfacePreviewWidget(surface_tab);
     surface_layout->addWidget(surface_preview_, 1);
@@ -244,6 +252,11 @@ void AssetProjectEditorWindow::buildUi() {
     connect(surface_repeat_y_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { refreshSurfacePreview(); });
     connect(surface_mask_spin_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { refreshSurfacePreview(); });
     connect(surface_show_grid_check_, &QCheckBox::toggled, this, [this](bool) { refreshSurfacePreview(); });
+    connect(surface_assign_mask_button_, &QPushButton::clicked, this, [this]() {
+        const int mask = surface_mask_spin_->value();
+        const QString path = chooseImageFile(QStringLiteral("Choose autotile PNG for mask %1").arg(mask, 2, 10, QLatin1Char('0')));
+        if (!path.isEmpty()) applySurfaceAutotilePath(mask, path);
+    });
 
     auto* metadata_tab = new QWidget(tabs);
     auto* metadata_layout = new QVBoxLayout(metadata_tab);
@@ -420,15 +433,34 @@ void AssetProjectEditorWindow::refreshPreview() {
 
 void AssetProjectEditorWindow::refreshSurfacePreview() {
     if (!surface_preview_) return;
+
     surface_preview_->setRepeatCount(surface_repeat_x_spin_->value(), surface_repeat_y_spin_->value());
     surface_preview_->setShowGrid(surface_show_grid_check_->isChecked());
     surface_preview_->setAutotileMask(surface_mask_spin_->value());
 
-    QPixmap pixmap;
-    const QString path = resolvedPath(surfaceTilePath());
-    if (!path.isEmpty()) pixmap.load(path);
-    if (pixmap.isNull()) surface_preview_->clearTile();
-    else surface_preview_->setTile(pixmap);
+    QPixmap base;
+    const QString base_path = resolvedPath(surfaceTilePath());
+    if (!base_path.isEmpty()) base.load(base_path);
+    if (base.isNull()) surface_preview_->clearTile();
+    else surface_preview_->setTile(base);
+
+    QHash<int, QPixmap> autotiles;
+    for (int mask = 0; mask < 16; ++mask) {
+        const QString stored = surfaceAutotilePath(mask);
+        const QString resolved = resolvedPath(stored);
+        if (resolved.isEmpty()) continue;
+        QPixmap tile;
+        if (tile.load(resolved) && !tile.isNull()) autotiles.insert(mask, tile);
+    }
+    surface_preview_->setAutotileTiles(autotiles);
+
+    const int selected_mask = surface_mask_spin_->value();
+    const QString selected_path = surfaceAutotilePath(selected_mask);
+    if (surface_autotile_path_label_) {
+        surface_autotile_path_label_->setText(selected_path.isEmpty()
+            ? QStringLiteral("(no PNG assigned — using fallback/base tile if available)")
+            : selected_path);
+    }
 }
 
 void AssetProjectEditorWindow::refreshRawMetadata() {
@@ -493,7 +525,26 @@ void AssetProjectEditorWindow::applySurfaceTilePath(const QString& path) {
     document_.setMetadata(metadata);
     transaction.commit();
     refreshUiFromDocument();
-    setStatus(QStringLiteral("Surface tile assigned and continuity preview updated."));
+    setStatus(QStringLiteral("Surface base tile assigned and continuity preview updated."));
+}
+
+void AssetProjectEditorWindow::applySurfaceAutotilePath(const int mask, const QString& path) {
+    AssetEditTransaction transaction(document_, history_, QStringLiteral("Assign autotile mask %1").arg(mask, 2, 10, QLatin1Char('0')));
+    QJsonObject metadata = document_.metadata();
+    QJsonObject surface = metadata.value(QStringLiteral("surface")).toObject();
+    QJsonObject autotiles = surface.value(QStringLiteral("autotiles")).toObject();
+    autotiles.insert(QString::number(mask), storedPathForFile(path));
+    surface.insert(QStringLiteral("autotiles"), autotiles);
+    surface.insert(QStringLiteral("autotileMask"), mask);
+    surface.insert(QStringLiteral("repeatX"), surface_repeat_x_spin_->value());
+    surface.insert(QStringLiteral("repeatY"), surface_repeat_y_spin_->value());
+    surface.insert(QStringLiteral("showGrid"), surface_show_grid_check_->isChecked());
+    metadata.insert(QStringLiteral("surface"), surface);
+    document_.setMetadata(metadata);
+    transaction.commit();
+    surface_mask_spin_->setValue(mask);
+    refreshUiFromDocument();
+    setStatus(QStringLiteral("Autotile mask %1 PNG assigned.").arg(mask, 2, 10, QLatin1Char('0')));
 }
 
 void AssetProjectEditorWindow::applyRawMetadata() {
@@ -589,6 +640,11 @@ QString AssetProjectEditorWindow::directionPath(const QString& direction) const 
 
 QString AssetProjectEditorWindow::surfaceTilePath() const {
     return document_.metadata().value(QStringLiteral("surface")).toObject().value(QStringLiteral("tilePath")).toString();
+}
+
+QString AssetProjectEditorWindow::surfaceAutotilePath(const int mask) const {
+    const QJsonObject surface = document_.metadata().value(QStringLiteral("surface")).toObject();
+    return surface.value(QStringLiteral("autotiles")).toObject().value(QString::number(mask)).toString();
 }
 
 void AssetProjectEditorWindow::setPreviewDirection(const QString& direction) {
