@@ -30,10 +30,18 @@ def diamond() -> Image.Image:
     ImageDraw.Draw(alpha).polygon(((NW//2, 0), (NW, NH//2), (NW//2, NH), (0, NH//2)), fill=255)
     return alpha
 
-def dirt_surface(mask: int) -> Image.Image:
+def display_diamond() -> Image.Image:
+    """Hard shared edges: filtered alpha leaves hairline grass seams."""
+    alpha = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(alpha).polygon(((W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)), fill=255)
+    return alpha
+
+def dirt_surface() -> Image.Image:
     # Coarse, low-contrast grains survive the 4x downsample as old tycoon
     # terrain, rather than as salt-and-pepper noise.
-    seed = int.from_bytes(hashlib.sha256(f"CH_DIRT_PATH_V1:{mask}".encode()).digest()[:8], "big")
+    # All sixteen masks share one material domain.  Mask-specific random
+    # textures make adjacent tiles look like separately stamped squares.
+    seed = int.from_bytes(hashlib.sha256(b"CH_DIRT_PATH_V1:shared-surface").digest()[:8], "big")
     import random
     rng = random.Random(seed)
     base = Image.new("RGB", (NW, NH), (129, 91, 51))
@@ -47,7 +55,7 @@ def dirt_surface(mask: int) -> Image.Image:
 
 def render(mask: int) -> Image.Image:
     alpha = diamond()
-    image = dirt_surface(mask)
+    image = dirt_surface()
     # Subtle compacted wear tells the topology apart, but does not make a
     # corridor: every tile remains a walkable dirt surface.
     wear = Image.new("RGBA", (NW, NH), (0, 0, 0, 0))
@@ -60,7 +68,11 @@ def render(mask: int) -> Image.Image:
     wear = wear.filter(ImageFilter.GaussianBlur(SS * 2.4))
     image = Image.alpha_composite(image, wear)
     image.putalpha(alpha)
-    return image.resize((W, H), Image.Resampling.LANCZOS)
+    result = image.resize((W, H), Image.Resampling.LANCZOS)
+    # Keep the shared edge hard. Filtered alpha would blend grass into the
+    # join and reveal a hairline where two diamonds meet.
+    result.putalpha(display_diamond())
+    return result
 
 def preview(tiles: dict[int, Image.Image], path: Path) -> None:
     canvas = Image.new("RGBA", (768, 384), (87, 126, 62, 255))

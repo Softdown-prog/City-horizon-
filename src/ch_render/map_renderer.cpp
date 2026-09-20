@@ -369,16 +369,18 @@ void MapRenderer::render_world_terrain_and_water(
     // 1. Terrain Base
     render_map(renderer, grass_base, scenario_terrain_textures, camera, viewport_width, viewport_height);
 
-    // 1.5 Ground paths.  Their connection mask comes from neighbouring
-    // ground terrain in the map document, so there is no road, vehicle or
-    // building-access side effect.
+    // 1.5 Ground paths. Their connection mask comes from neighbouring
+    // ground terrain, never RoadManager. First paint an opaque soil underlay:
+    // it owns every shared raster edge, so adjacent sprites cannot reveal a
+    // grass/alpha hairline at any camera zoom.
+    constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
+    for (const auto& tile : dirt_path_tiles) {
+        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height, kDirtUnderlay);
+    }
     for (const auto& tile : dirt_path_tiles) {
         const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
         if (const TextureAsset* sprite = find_texture(dirt_path_sprite(visual_connections))) {
             render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
-        } else {
-            render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,
-                             SDL_FColor{0.48F, 0.35F, 0.21F, 1.0F});
         }
     }
 
