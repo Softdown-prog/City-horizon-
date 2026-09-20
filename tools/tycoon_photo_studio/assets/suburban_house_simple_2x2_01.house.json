@@ -72,8 +72,27 @@
   },
   "buildingPostProcess": {
     "intent": "stylized_prerender_not_historical_emulation",
+    "profile": "restrained_material_read_v1",
     "preserveMaterialRead": true,
     "preserveArchitecturalSilhouette": true,
-    "gameplayScaleApprovalRequired": true
+    "gameplayScaleApprovalRequired": true,
+    "paletteColors": 96,
+    "paletteDither": false,
+    "posterizeBitsPerChannel": 6,
+    "contrastMultiplier": 1.02,
+    "saturationMultiplier": 1.01,
+    "outlineAlpha": 68,
+    "internalEdgeAlpha": 24,
+    "internalEdgeThreshold": 92,
+    "roofStructuralRows": true,
+    "roofRowSpacingPx": 7,
+    "roofRowDarken": 0.90,
+    "glassReflectionStrength": 0.45,
+    "surfacePolicy": {
+      "wall": "preserve broad Blender lighting; avoid stepped face banding",
+      "roof": "preserve clay hue across lit and shaded faces; add only restrained structural rows",
+      "glass": "allow stylized reflection only inside window-sized components",
+      "trimDoorStone": "retain source material response with global palette restraint only"
+    }
   }
 }
