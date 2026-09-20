@@ -1,0 +1,46 @@
+{
+  "id": "CH_STYLIZED_PRERENDER_V1",
+  "status": "active",
+  "description": "Contrato visual do City Horizon para assets 2D pre-renderizados estilizados produzidos por pipeline 3D moderno.",
+  "intent": {
+    "target": "visual proprio do City Horizon, legivel em escala de gameplay e claramente 2D no runtime",
+    "notTarget": "emulacao literal de limitacoes graficas de jogos dos anos 2000",
+    "references": "tycoons classicos podem orientar leitura, escala, silhueta e clareza, mas nao funcionam como limite tecnico"
+  },
+  "render": {
+    "output": "PNG RGBA pre-renderizado 2D",
+    "cameraContract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric_2_to_1",
+    "yawDegrees": 45,
+    "elevationDegrees": 30,
+    "tileReferencePx": [128, 64]
+  },
+  "artDirection": {
+    "silhouettePriority": true,
+    "gameplayScaleLegibilityRequired": true,
+    "photorealismRequired": false,
+    "modern3DRenderLookAllowed": false,
+    "microtextureOnlyWhenReadable": true,
+    "controlledLighting": true,
+    "subtleContactShadow": true,
+    "postProcessPurpose": "stylization_and_readability_not_artificial_age_emulation"
+  },
+  "vegetationGuidance": {
+    "canopy": "preserve irregular organic silhouette, readable foliage mass and controlled internal variation",
+    "trunk": "retain broad stylized tonal bands but avoid obvious radial polygon facets or triangular face-reading",
+    "shadow": "support grounding without competing with the asset",
+    "rotationConsistency": "four directions must read as the same authored asset"
+  },
+  "referenceAssets": [
+    {
+      "assetId": "park_tree_broadleaf_02",
+      "role": "vegetation_reference",
+      "note": "Reference for stylization level, gameplay legibility, organic canopy and restrained pre-rendered depth; not a mandate to copy its exact appearance across categories."
+    }
+  ],
+  "approval": {
+    "humanVisualGateRequired": true,
+    "mapContextReviewRequired": true,
+    "rule": "An asset is approved only when it reads coherently in gameplay context and no longer depends on modern 3D rendering cues for visual quality."
+  }
+}
