@@ -1,4 +1,5 @@
 #include "asset_project_editor_window.h"
+#include "asset_grid_preview_widget.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -100,19 +101,35 @@ void AssetProjectEditorWindow::buildUi() {
     connect(remove_layer, &QPushButton::clicked, this, [this]() { removeSelectedLayer(); });
     connect(layer_list_, &QListWidget::currentRowChanged, this, [this](int) { refreshPreview(); });
 
-    // Center: immediate visual proof at gameplay-oriented scale.
+    // Center: immediate visual proof on the canonical gameplay grid.
     auto* center = new QWidget(splitter);
     auto* center_layout = new QVBoxLayout(center);
-    auto* preview_title = new QLabel(QStringLiteral("Canonical asset preview"), center);
+    auto* preview_title = new QLabel(QStringLiteral("Canonical gameplay preview"), center);
     preview_title->setFont(title_font);
-    preview_label_ = new QLabel(center);
-    preview_label_->setAlignment(Qt::AlignCenter);
-    preview_label_->setMinimumSize(480, 480);
-    preview_label_->setStyleSheet(QStringLiteral("QLabel { background:#242424; border:1px solid #555; color:#bbb; }"));
+
+    auto* direction_bar = new QHBoxLayout();
+    south_preview_button_ = new QPushButton(QStringLiteral("SOUTH"), center);
+    east_preview_button_ = new QPushButton(QStringLiteral("EAST"), center);
+    west_preview_button_ = new QPushButton(QStringLiteral("WEST"), center);
+    north_preview_button_ = new QPushButton(QStringLiteral("NORTH"), center);
+    for (QPushButton* button : {south_preview_button_, east_preview_button_, west_preview_button_, north_preview_button_}) {
+        button->setCheckable(true);
+        direction_bar->addWidget(button);
+    }
+    south_preview_button_->setChecked(true);
+
+    connect(south_preview_button_, &QPushButton::clicked, this, [this]() { setPreviewDirection(QStringLiteral("south")); });
+    connect(east_preview_button_, &QPushButton::clicked, this, [this]() { setPreviewDirection(QStringLiteral("east")); });
+    connect(west_preview_button_, &QPushButton::clicked, this, [this]() { setPreviewDirection(QStringLiteral("west")); });
+    connect(north_preview_button_, &QPushButton::clicked, this, [this]() { setPreviewDirection(QStringLiteral("north")); });
+
+    grid_preview_ = new AssetGridPreviewWidget(center);
     preview_info_label_ = new QLabel(center);
     preview_info_label_->setWordWrap(true);
+
     center_layout->addWidget(preview_title);
-    center_layout->addWidget(preview_label_, 1);
+    center_layout->addLayout(direction_bar);
+    center_layout->addWidget(grid_preview_, 1);
     center_layout->addWidget(preview_info_label_);
 
     // Right: APE-like property pages.
@@ -268,6 +285,7 @@ void AssetProjectEditorWindow::newAsset() {
     document_.setStylePreset(QStringLiteral(kDefaultStyle));
     history_.clear();
     current_path_.clear();
+    preview_direction_ = QStringLiteral("south");
     refreshUiFromDocument();
     setStatus(QStringLiteral("New asset created. Save it as .chasset when ready."));
 }
@@ -285,6 +303,7 @@ void AssetProjectEditorWindow::openAsset() {
     document_ = loaded;
     history_.clear();
     current_path_ = path;
+    preview_direction_ = QStringLiteral("south");
     refreshUiFromDocument();
     setStatus(QStringLiteral("Opened %1").arg(QFileInfo(path).fileName()));
 }
@@ -351,31 +370,49 @@ void AssetProjectEditorWindow::refreshLayerList() {
 }
 
 void AssetProjectEditorWindow::refreshPreview() {
-    QString candidate;
-    const int row = layer_list_->currentRow();
-    if (row >= 0 && row < document_.layers().size()) {
-        candidate = document_.layers().at(row).source_path;
-    }
+    if (grid_preview_ == nullptr) return;
+
+    const QJsonObject gameplay = document_.metadata().value(QStringLiteral("gameplay")).toObject();
+    const QSize footprint(
+        std::max(1, gameplay.value(QStringLiteral("footprintWidthTiles")).toInt(1)),
+        std::max(1, gameplay.value(QStringLiteral("footprintDepthTiles")).toInt(1)));
+    grid_preview_->setFootprint(footprint);
+    grid_preview_->setAnchorNormalized(document_.anchorNormalized());
+    grid_preview_->setDirectionLabel(preview_direction_.toUpper());
+
+    QString candidate = directionPath(preview_direction_);
+    QString source_description = QStringLiteral("%1 direction sprite").arg(preview_direction_.toUpper());
+
     if (candidate.isEmpty()) {
-        for (const QString& dir : {QStringLiteral("south"), QStringLiteral("east"), QStringLiteral("west"), QStringLiteral("north")}) {
-            candidate = directionPath(dir);
-            if (!candidate.isEmpty()) break;
+        const int row = layer_list_->currentRow();
+        if (row >= 0 && row < document_.layers().size()) {
+            candidate = document_.layers().at(row).source_path;
+            source_description = QStringLiteral("selected layer fallback");
         }
     }
 
     const QString resolved = resolvedPath(candidate);
     QPixmap pixmap;
     if (!resolved.isEmpty()) pixmap.load(resolved);
+
     if (pixmap.isNull()) {
-        preview_label_->setPixmap(QPixmap());
-        preview_label_->setText(QStringLiteral("No preview image yet\n\nAssign a SOUTH/EAST/WEST/NORTH PNG\nor add a raster/reference layer."));
-        preview_info_label_->setText(QStringLiteral("The editor stores deterministic asset data even before final art exists."));
+        grid_preview_->clearSprite();
+        preview_info_label_->setText(QStringLiteral("%1 — no PNG assigned. Footprint %2×%3, anchor (%4, %5).")
+                                         .arg(preview_direction_.toUpper())
+                                         .arg(footprint.width())
+                                         .arg(footprint.height())
+                                         .arg(document_.anchorNormalized().x(), 0, 'f', 2)
+                                         .arg(document_.anchorNormalized().y(), 0, 'f', 2));
         return;
     }
 
-    preview_label_->setText(QString());
-    preview_label_->setPixmap(pixmap.scaled(preview_label_->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    preview_info_label_->setText(QStringLiteral("%1 × %2 px — %3").arg(pixmap.width()).arg(pixmap.height()).arg(candidate));
+    grid_preview_->setSprite(pixmap);
+    preview_info_label_->setText(QStringLiteral("%1 — %2 × %3 px — %4 — %5")
+                                     .arg(preview_direction_.toUpper())
+                                     .arg(pixmap.width())
+                                     .arg(pixmap.height())
+                                     .arg(source_description)
+                                     .arg(candidate));
 }
 
 void AssetProjectEditorWindow::refreshRawMetadata() {
@@ -412,7 +449,7 @@ void AssetProjectEditorWindow::applyGameplayFields() {
     metadata.insert(QStringLiteral("gameplay"), gameplay);
     document_.setMetadata(metadata);
     transaction.commit();
-    refreshRawMetadata();
+    refreshUiFromDocument();
     setStatus(QStringLiteral("Gameplay properties updated."));
 }
 
@@ -424,8 +461,9 @@ void AssetProjectEditorWindow::applyDirectionPath(const QString& direction, cons
     metadata.insert(QStringLiteral("directions"), directions);
     document_.setMetadata(metadata);
     transaction.commit();
+    preview_direction_ = direction;
     refreshUiFromDocument();
-    setStatus(QStringLiteral("%1 sprite assigned.").arg(direction.toUpper()));
+    setStatus(QStringLiteral("%1 sprite assigned and selected for preview.").arg(direction.toUpper()));
 }
 
 void AssetProjectEditorWindow::applyRawMetadata() {
@@ -523,6 +561,15 @@ QString AssetProjectEditorWindow::resolvedPath(const QString& stored_path) const
 
 QString AssetProjectEditorWindow::directionPath(const QString& direction) const {
     return document_.metadata().value(QStringLiteral("directions")).toObject().value(direction).toString();
+}
+
+void AssetProjectEditorWindow::setPreviewDirection(const QString& direction) {
+    preview_direction_ = direction.toLower();
+    south_preview_button_->setChecked(preview_direction_ == QStringLiteral("south"));
+    east_preview_button_->setChecked(preview_direction_ == QStringLiteral("east"));
+    west_preview_button_->setChecked(preview_direction_ == QStringLiteral("west"));
+    north_preview_button_->setChecked(preview_direction_ == QStringLiteral("north"));
+    refreshPreview();
 }
 
 void AssetProjectEditorWindow::setStatus(const QString& text) {
