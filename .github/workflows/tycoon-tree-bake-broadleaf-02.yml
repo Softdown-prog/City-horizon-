@@ -71,14 +71,19 @@ jobs:
           assert len(data['leafCards']['materials']) >= 5
           assert data['trunk']['smoothShading'] is True
           profile = data['foliagePostProcess']
-          assert profile['shadowAlphaMax'] == 133
-          assert abs(profile['shadowStrength'] - 0.52) < 1e-6
-          assert profile['shadowRadiusPx'] >= 80.0
-          assert profile['contrastMultiplier'] >= 1.12
+          assert profile['shadowAlphaMax'] == 118
+          assert abs(profile['shadowStrength'] - 0.46) < 1e-6
+          assert profile['shadowRadiusPx'] == 78.0
+          assert abs(profile['contrastMultiplier'] - 0.96) < 1e-6
+          assert abs(profile['luminanceCompression'] - 0.74) < 1e-6
+          assert abs(profile['midtoneLift'] - 5.0) < 1e-6
+          assert profile['paletteColors'] == 48
+          assert profile['posterizeBitsPerChannel'] == 5
+          assert profile['outlineAlpha'] == 38
           assert 'canopyParts' not in data
           print('broadleaf02SourceGate: PASS')
           print('requestedLeafCards:', data['leafCards']['count'])
-          print('gameplayScaleFactor: 1.5x recipe geometry')
+          print('classic2DPilot: luminance compressed, reduced contrast, shorter palette')
           PY
 
       - name: Download pinned Blender
@@ -130,7 +135,7 @@ jobs:
             --output out/tree02/final \
             --studio-preset "$STUDIO_PRESET"
 
-      - name: Apply calibrated classic foliage profile
+      - name: Apply flattened classic foliage profile
         shell: bash
         run: |
           set -euo pipefail
@@ -144,15 +149,19 @@ jobs:
           m = json.loads(Path('out/tree02/final/park_tree_broadleaf_02_manifest.json').read_text())
           pp = m['candidatePostProcess']
           assert pp['mode'] == 'classic_prerendered_foliage_v2'
-          assert pp['paletteColors'] == 64
+          assert pp['paletteColors'] == 48
           assert pp['dither'] == 'floyd_steinberg'
           assert pp['expectsLeafMicrogeometry'] is True
-          assert pp['shadowAlphaMax'] == 133
-          assert abs(pp['shadowStrength'] - 0.52) < 1e-6
-          assert pp['shadowRadiusPx'] == 81.0
-          assert pp['contrastMultiplier'] == 1.14
+          assert pp['shadowAlphaMax'] == 118
+          assert abs(pp['shadowStrength'] - 0.46) < 1e-6
+          assert pp['shadowRadiusPx'] == 78.0
+          assert abs(pp['contrastMultiplier'] - 0.96) < 1e-6
+          assert abs(pp['luminanceCompression'] - 0.74) < 1e-6
+          assert abs(pp['midtoneLift'] - 5.0) < 1e-6
+          assert pp['posterizeBitsPerChannel'] == 5
+          assert pp['outlineAlpha'] == 38
           assert pp['shadowBlendIntent'] == 'multiply_equivalent_alpha'
-          print('calibratedClassicFoliageGate: PASS')
+          print('flattenedClassicFoliageGate: PASS')
           PY
 
       - name: Verify final tree package
