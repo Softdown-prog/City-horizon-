@@ -7,7 +7,8 @@
   "dependsOn": {
     "camera": "CH_CAMERA_V1",
     "grid": "CH_GRID_V1",
-    "classicStyle": "CH_CLASSIC_TYCOON_STYLE_V1",
+    "visualStyle": "CH_STYLIZED_PRERENDER_V1",
+    "legacyClassicReference": "CH_CLASSIC_TYCOON_STYLE_V1",
     "existingBuildingExport": "automatic_export_validation_7"
   },
   "renderer": {
@@ -38,13 +39,30 @@
     ],
     "source": "BuildingComposer quarterTurns + BuildingExportPipeline kViews"
   },
+  "visualPolicy": {
+    "contract": "CH_STYLIZED_PRERENDER_V1",
+    "productionDefault": "stylized_prerendered_tycoon",
+    "strictRetroEmulation": false,
+    "classicTycoonInfluence": true,
+    "priority": "scalable_consistent_pre_rendered_assets",
+    "retroProfilesAreOptional": true,
+    "manualPixelCleanupIsNotNormalProductionWorkflow": true
+  },
   "postProcess": {
     "variantsRetainedForReview": 4,
-    "candidateVariant": 3,
-    "paletteColors": 128,
-    "dither": "floyd_steinberg",
-    "edgeCleanup": "none",
+    "candidateVariant": 1,
+    "defaultProductionTreatment": "full_color_or_light_stylization",
+    "paletteReductionRequired": false,
+    "ditherRequired": false,
+    "paletteColorsForOptionalReviewVariant": 128,
+    "edgeCleanup": "subtle_if_needed",
+    "assetSpecificRetroProfileAllowed": true,
     "valuesOwnedByStudioPreset": true
+  },
+  "selectiveMaterialEffects": {
+    "authoritativeSource": ["material_id", "object_id", "mask_pass", "aov", "authored_metadata"],
+    "colorHeuristic": "fallback_debug_only",
+    "mustNotLeakAcrossMaterials": true
   },
   "pivot": {
     "source": "projected world origin (0,0,0)",
@@ -91,8 +109,9 @@
       "Asset Browser/manifests/validation gates"
     ],
     "replaceAsFinalArtAuthority": [
-      "simple QPainter procedural shapes used as production visuals"
+      "simple QPainter procedural shapes used as production visuals",
+      "strict retro post-process as mandatory global production authority"
     ]
   },
-  "nextGate": "Bake a second visually different static asset through the unchanged CH_TYCOON_STUDIO_V1 preset and review cross-asset coherence."
+  "nextGate": "Bake visually different static assets through the unchanged camera/light studio and verify cross-asset coherence at gameplay scale without requiring strict early-2000s pixel-era emulation."
 }
