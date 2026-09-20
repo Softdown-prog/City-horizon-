@@ -1,0 +1,17 @@
+{
+  "contract": "CH_TERRAIN_TILE_ROSTER_V1",
+  "provenance": "reference-classification-only",
+  "productionRule": "Recreate each approved material through the City Horizon authoring pipeline; do not ship extracted reference pixels.",
+  "tileCanvas": { "width": 128, "height": 64, "projection": "isometric_2_to_1" },
+  "materials": [
+    { "id": "water_blue", "surface": "water", "role": "cool shallow water", "variants": ["01", "02"] },
+    { "id": "water_teal", "surface": "water", "role": "teal water", "variants": ["01", "02"] },
+    { "id": "water_pale", "surface": "water", "role": "pale reflective water", "variants": ["01", "02"] },
+    { "id": "ground_mud", "surface": "soil", "role": "dark mud / wet earth", "variants": ["01", "02"] },
+    { "id": "ground_pale_sand", "surface": "soil", "role": "pale sand or dry gravel", "variants": ["01", "02"] },
+    { "id": "ground_dark_grass", "surface": "grass", "role": "dark grass / moss", "variants": ["01", "02"] },
+    { "id": "water_green_shallow", "surface": "water", "role": "green shallow water", "variants": ["01", "02"] },
+    { "id": "water_slate", "surface": "water", "role": "slate-blue deep water", "variants": ["01", "02"] },
+    { "id": "water_turquoise", "surface": "water", "role": "bright turquoise water", "variants": ["01", "02"] }
+  ]
+}
