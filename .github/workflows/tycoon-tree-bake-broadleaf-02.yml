@@ -62,6 +62,8 @@ jobs:
           assert contract['id'] == data['styleContract']
           assert data['assetId'] == 'park_tree_broadleaf_02'
           assert any(ref['assetId'] == data['assetId'] for ref in contract['referenceAssets'])
+          assert contract['vegetationGuidance']['canopyTreatmentStatus'] == 'frozen_for_park_tree_broadleaf_02'
+          assert contract['vegetationGuidance']['woodAndFoliageMustUseSeparateFinishingPaths'] is True
           assert data['fractalTree']['levels'] == 4
           assert data['fractalTree']['primaryBranches'] == 5
           assert data['leafCards']['count'] == 1020
@@ -83,10 +85,15 @@ jobs:
           assert profile['paletteColors'] == 32
           assert profile['posterizeBitsPerChannel'] == 4
           assert profile['outlineAlpha'] == 30
+          wood = data['woodPostProcess']
+          assert wood['woodToneCount'] == 4
+          assert abs(wood['woodOrganicStrength'] - 0.24) < 1e-6
+          assert wood['woodVerticalScale'] == 24.0
+          assert wood['woodHorizontalScale'] == 39.0
           print('broadleaf02SourceGate: PASS')
           print('styleContract:', data['styleContract'])
-          print('trunkVertices:', data['trunk']['vertices'])
-          print('requestedLeafCards:', data['leafCards']['count'])
+          print('canopy: FROZEN')
+          print('woodToneCount:', wood['woodToneCount'])
           PY
 
       - name: Download pinned Blender
@@ -138,7 +145,7 @@ jobs:
             --output out/tree02/final \
             --studio-preset "$STUDIO_PRESET"
 
-      - name: Apply stronger classic 2D foliage profile
+      - name: Apply split foliage and organic wood profile
         shell: bash
         run: |
           set -euo pipefail
@@ -151,10 +158,11 @@ jobs:
           from pathlib import Path
           m = json.loads(Path('out/tree02/final/park_tree_broadleaf_02_manifest.json').read_text())
           pp = m['candidatePostProcess']
-          assert pp['mode'] == 'classic_prerendered_foliage_v2'
+          assert pp['mode'] == 'stylized_prerender_foliage_wood_split_v1'
           assert pp['paletteColors'] == 32
-          assert pp['dither'] == 'floyd_steinberg'
+          assert pp['dither'] == 'floyd_steinberg_foliage_only'
           assert pp['expectsLeafMicrogeometry'] is True
+          assert pp['foliageTreatmentFrozen'] is True
           assert pp['shadowAlphaMax'] == 102
           assert abs(pp['shadowStrength'] - 0.40) < 1e-6
           assert pp['shadowRadiusPx'] == 76.0
@@ -165,7 +173,13 @@ jobs:
           assert pp['posterizeBitsPerChannel'] == 4
           assert pp['outlineAlpha'] == 30
           assert pp['shadowBlendIntent'] == 'multiply_equivalent_alpha'
-          print('strongClassic2DFoliageGate: PASS')
+          wood = pp['woodTreatment']
+          assert wood['mode'] == 'organic_bark_tone_masses_v1'
+          assert wood['toneCount'] == 4
+          assert abs(wood['organicStrength'] - 0.24) < 1e-6
+          assert wood['floydSteinberg'] is False
+          assert abs(wood['sourceLuminanceInfluence'] - 0.16) < 1e-6
+          print('foliageWoodSplitGate: PASS')
           PY
 
       - name: Verify final tree package
