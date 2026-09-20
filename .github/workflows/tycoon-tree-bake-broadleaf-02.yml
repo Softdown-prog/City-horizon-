@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json"
+      - "tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json"
       - "tools/tycoon_photo_studio/build_classic_tree.py"
       - "tools/tycoon_photo_studio/run_classic_tree_compat.py"
       - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
@@ -25,6 +26,7 @@ jobs:
     env:
       ASSET_ID: park_tree_broadleaf_02
       TREE_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json
+      STYLE_CONTRACT: tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       CH_TYCOON_SHADOW_SAMPLES: "4"
       CH_TYCOON_SHADOW_DENOISING: "false"
@@ -46,7 +48,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Validate broadleaf 02 source
+      - name: Validate broadleaf 02 source and style contract
         shell: bash
         run: |
           set -euo pipefail
@@ -54,8 +56,12 @@ jobs:
           import json
           from pathlib import Path
           data = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json').read_text())
+          contract = json.loads(Path('tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json').read_text())
           assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
+          assert data['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert contract['id'] == data['styleContract']
           assert data['assetId'] == 'park_tree_broadleaf_02'
+          assert any(ref['assetId'] == data['assetId'] for ref in contract['referenceAssets'])
           assert data['fractalTree']['levels'] == 4
           assert data['fractalTree']['primaryBranches'] == 5
           assert data['leafCards']['count'] == 1020
@@ -64,6 +70,7 @@ jobs:
           assert data['leafCards']['crownRadius'][0] >= 2.25
           assert data['leafCards']['crownRadius'][1] >= 2.00
           assert 2.20 <= data['trunk']['height'] <= 2.30
+          assert data['trunk']['vertices'] == 18
           assert data['trunk']['smoothShading'] is True
           profile = data['foliagePostProcess']
           assert profile['shadowAlphaMax'] == 102
@@ -77,8 +84,9 @@ jobs:
           assert profile['posterizeBitsPerChannel'] == 4
           assert profile['outlineAlpha'] == 30
           print('broadleaf02SourceGate: PASS')
+          print('styleContract:', data['styleContract'])
+          print('trunkVertices:', data['trunk']['vertices'])
           print('requestedLeafCards:', data['leafCards']['count'])
-          print('classic2DPass: stronger luminance compression, lower contrast, 32-color palette')
           PY
 
       - name: Download pinned Blender
