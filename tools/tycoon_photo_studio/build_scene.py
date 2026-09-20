@@ -199,17 +199,19 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
     gradient.color_ramp.elements[1].position = 0.82
     gradient.color_ramp.elements[1].color = (0.043, 0.188, 0.251, 1.0)
 
-    voronoi = tree.nodes.new("ShaderNodeTexVoronoi")
-    voronoi.location = (-500, -120)
-    voronoi.voronoi_dimensions = "4D"
-    voronoi.feature = "DISTANCE_TO_EDGE"
-    voronoi.inputs["Scale"].default_value = 2.2
-    voronoi.inputs["Randomness"].default_value = 0.72
-    if "W" in voronoi.inputs:
-        voronoi.inputs["W"].default_value = 0.0
-        voronoi.inputs["W"].keyframe_insert(data_path="default_value", frame=0)
-        voronoi.inputs["W"].default_value = 1.0
-        voronoi.inputs["W"].keyframe_insert(data_path="default_value", frame=8)
+    # Broad, soft colour fields: this is water pigment variation, not surface relief.
+    noise = tree.nodes.new("ShaderNodeTexNoise")
+    noise.location = (-500, -120)
+    noise.noise_dimensions = "4D"
+    noise.inputs["Scale"].default_value = 1.35
+    noise.inputs["Detail"].default_value = 2.0
+    noise.inputs["Roughness"].default_value = 0.52
+    noise.inputs["Distortion"].default_value = 0.22
+    if "W" in noise.inputs:
+        noise.inputs["W"].default_value = 0.0
+        noise.inputs["W"].keyframe_insert(data_path="default_value", frame=0)
+        noise.inputs["W"].default_value = 1.0
+        noise.inputs["W"].keyframe_insert(data_path="default_value", frame=8)
         if mat.animation_data and mat.animation_data.action:
             for curve in mat.animation_data.action.fcurves:
                 for key in curve.keyframe_points:
@@ -217,33 +219,28 @@ def make_water_classic_material(name, rgba, roughness=0.16, metallic=0.0, seed=0
         mat["waterAnimationFrames"] = 8
         mat["waterAnimationLoop"] = True
 
-    caustics = tree.nodes.new("ShaderNodeValToRGB")
-    caustics.location = (-120, -100)
-    caustics.color_ramp.elements[0].position = 0.12
-    caustics.color_ramp.elements[0].color = (0.114, 0.604, 0.659, 1.0)
-    caustics.color_ramp.elements[1].position = 0.42
-    caustics.color_ramp.elements[1].color = (0.039, 0.227, 0.290, 1.0)
-    caustics.color_ramp.interpolation = "EASE"
+    water_texture = tree.nodes.new("ShaderNodeValToRGB")
+    water_texture.location = (-120, -100)
+    water_texture.color_ramp.elements[0].position = 0.28
+    water_texture.color_ramp.elements[0].color = (0.105, 0.420, 0.470, 1.0)
+    water_texture.color_ramp.elements[1].position = 0.72
+    water_texture.color_ramp.elements[1].color = (0.360, 0.800, 0.790, 1.0)
+    water_texture.color_ramp.interpolation = "EASE"
 
-    screen = tree.nodes.new("ShaderNodeMixRGB")
-    screen.location = (180, 180)
-    screen.blend_type = "SCREEN"
-    screen.inputs["Fac"].default_value = 0.22
-    bump = tree.nodes.new("ShaderNodeBump")
-    bump.location = (260, -160)
-    bump.inputs["Strength"].default_value = 0.01
-    bump.inputs["Distance"].default_value = 0.025
+    color_mix = tree.nodes.new("ShaderNodeMixRGB")
+    color_mix.location = (180, 180)
+    color_mix.blend_type = "MIX"
+    color_mix.inputs["Fac"].default_value = 0.78
 
     tree.links.new(tex.outputs["Object"], mapping.inputs["Vector"])
     tree.links.new(mapping.outputs["Vector"], separate.inputs["Vector"])
     tree.links.new(separate.outputs["X"], add_xy.inputs[0])
     tree.links.new(separate.outputs["Y"], add_xy.inputs[1])
     tree.links.new(add_xy.outputs[0], gradient.inputs["Fac"])
-    tree.links.new(gradient.outputs["Color"], screen.inputs["Color1"])
-    tree.links.new(voronoi.outputs["Distance"], caustics.inputs["Fac"])
-    tree.links.new(caustics.outputs["Color"], screen.inputs["Color2"])
-    tree.links.new(screen.outputs["Color"], bsdf.inputs["Base Color"])
-    tree.links.new(caustics.outputs["Color"], bump.inputs["Height"])
+    tree.links.new(gradient.outputs["Color"], color_mix.inputs["Color1"])
+    tree.links.new(noise.outputs["Fac"], water_texture.inputs["Fac"])
+    tree.links.new(water_texture.outputs["Color"], color_mix.inputs["Color2"])
+    tree.links.new(color_mix.outputs["Color"], bsdf.inputs["Base Color"])
     tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
     return mat
 
