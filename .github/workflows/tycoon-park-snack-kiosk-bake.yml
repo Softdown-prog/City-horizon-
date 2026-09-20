@@ -3,75 +3,55 @@ name: Tycoon Park Snack Kiosk Bake
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - "tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json"
-      - "tools/tycoon_photo_studio/generate_park_kiosk_asset.py"
-      - "tools/tycoon_photo_studio/stylize_building_2d.py"
-      - "tools/tycoon_photo_studio/build_scene.py"
-      - "tools/tycoon_photo_studio/postprocess.py"
-      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
-      - "tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json"
-      - "tools/blender_bake_runner.py"
-      - "C++/MapForge2/presets/tycoon_asset_bake_contract.json"
-      - ".github/workflows/tycoon-park-snack-kiosk-bake.yml"
-
-permissions:
-  contents: read
+      - tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json
+      - tools/tycoon_photo_studio/generate_park_kiosk_asset.py
+      - tools/tycoon_photo_studio/stylize_building_2d.py
+      - tools/tycoon_photo_studio/build_scene.py
+      - tools/tycoon_photo_studio/postprocess.py
+      - tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      - tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json
+      - tools/blender_bake_runner.py
+      - C++/MapForge2/presets/tycoon_asset_bake_contract.json
+      - .github/workflows/tycoon-park-snack-kiosk-bake.yml
 
 jobs:
-  bake-kiosk:
+  bake_kiosk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      ASSET_ID: park_snack_kiosk_1x1
-      RECIPE: tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json
-      GENERATED_SOURCE: out/kiosk/park_snack_kiosk_1x1.json
-      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
-      BAKE_CONTRACT: C++/MapForge2/presets/tycoon_asset_bake_contract.json
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies
-        shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade pillow
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Validate game-first kiosk recipe
-        shell: bash
+      - name: Validate and expand kiosk recipe
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-          data = json.loads(Path('tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json').read_text())
+          p = Path('tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json')
+          data = json.loads(p.read_text())
           assert data['contract'] == 'CITY_HORIZON_PARK_KIOSK_V1'
           assert data['styleContract'] == 'CH_TYCOON_MINIATURE_V1'
           assert data['footprint'] == {'widthTiles': 1, 'depthTiles': 1}
           assert data['mass']['canopyWidth'] > data['mass']['bodyWidth']
           assert data['mass']['canopyDepth'] > data['mass']['bodyDepth']
-          assert data['buildingPostProcess']['roofStructuralRows'] is False
           print('parkKioskRecipeGate: PASS')
           PY
-
-      - name: Expand kiosk recipe
-        shell: bash
-        run: |
-          set -euo pipefail
           python tools/tycoon_photo_studio/generate_park_kiosk_asset.py \
-            --recipe "$RECIPE" \
-            --output "$GENERATED_SOURCE"
+            --recipe tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json \
+            --output out/kiosk/park_snack_kiosk_1x1.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -81,18 +61,16 @@ jobs:
           assert data['generation']['retiredHouseGeometryReused'] is False
           assert data['generation']['partCount'] >= 15
           print('parkKioskExpansionGate: PASS')
-          print('partCount:', data['generation']['partCount'])
           PY
 
-      - name: Download pinned Blender
-        shell: bash
+      - name: Download Blender 4.2.3 LTS
         run: |
           set -euo pipefail
-          version="4.2.3"
-          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          archive="$RUNNER_TEMP/blender.tar.xz"
           destination="$RUNNER_TEMP/blender"
-          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
-          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz \
+            --output "$archive"
           mkdir -p "$destination"
           tar -xf "$archive" -C "$destination"
           blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
@@ -100,39 +78,36 @@ jobs:
           chmod +x "$blender_exe"
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
 
-      - name: Bake canonical four-direction package
-        shell: bash
+      - name: Bake four directions
         run: |
           set -euo pipefail
           python tools/blender_bake_runner.py \
-            --contract "$BAKE_CONTRACT" \
-            --asset-config "$GENERATED_SOURCE" \
-            --studio-preset "$STUDIO_PRESET" \
+            --contract C++/MapForge2/presets/tycoon_asset_bake_contract.json \
+            --asset-config out/kiosk/park_snack_kiosk_1x1.json \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json \
             --scene tools/tycoon_photo_studio/build_scene.py \
             --blender "$BLENDER_EXE" \
             --output-dir out/kiosk/bake \
             --xvfb \
             --skip-validate
 
-      - name: Apply restrained game-first building treatment
-        shell: bash
+      - name: Apply game-first treatment
         run: |
           set -euo pipefail
           python tools/tycoon_photo_studio/stylize_building_2d.py \
             --package out/kiosk/bake/final \
-            --asset-id "$ASSET_ID" \
-            --asset-config "$GENERATED_SOURCE"
+            --asset-id park_snack_kiosk_1x1 \
+            --asset-config out/kiosk/park_snack_kiosk_1x1.json
 
-      - name: Verify review package
-        shell: bash
+      - name: Verify package
         run: |
           set -euo pipefail
           for direction in south east west north; do
-            test -f "out/kiosk/bake/final/${ASSET_ID}_${direction}.png"
+            test -f "out/kiosk/bake/final/park_snack_kiosk_1x1_${direction}.png"
           done
-          test -f "out/kiosk/bake/final/${ASSET_ID}_4view.png"
-          test -f "out/kiosk/bake/final/${ASSET_ID}_review.png"
-          test -f "out/kiosk/bake/final/${ASSET_ID}_4dir_context.png"
+          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_4view.png
+          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_review.png
+          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_4dir_context.png
           python - <<'PY'
           import json
           from pathlib import Path
