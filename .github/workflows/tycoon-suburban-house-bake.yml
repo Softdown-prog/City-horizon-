@@ -54,6 +54,18 @@ jobs:
           assert data['designIntent']['detailLevel'] == 'medium_low'
           assert data['details']['porch'] is True
           assert data['roof']['kind'] == 'hip'
+          pp = data['buildingPostProcess']
+          assert pp['profile'] == 'restrained_material_read_v1'
+          assert pp['paletteColors'] == 96
+          assert pp['paletteDither'] is False
+          assert pp['posterizeBitsPerChannel'] == 6
+          assert abs(pp['contrastMultiplier'] - 1.02) < 1e-6
+          assert abs(pp['saturationMultiplier'] - 1.01) < 1e-6
+          assert pp['outlineAlpha'] == 68
+          assert pp['internalEdgeAlpha'] == 24
+          assert pp['roofRowSpacingPx'] == 7
+          assert abs(pp['roofRowDarken'] - 0.90) < 1e-6
+          assert abs(pp['glassReflectionStrength'] - 0.45) < 1e-6
           print('suburbanHousePlanGate: PASS')
           PY
 
@@ -117,15 +129,31 @@ jobs:
           set -euo pipefail
           python tools/tycoon_photo_studio/stylize_building_2d.py \
             --package out/suburban_house/final \
-            --asset-id "$ASSET_ID"
+            --asset-id "$ASSET_ID" \
+            --asset-config "$HOUSE_PLAN"
           python - <<'PY'
           import json
           from pathlib import Path
           m = json.loads(Path('out/suburban_house/final/suburban_house_simple_2x2_01_manifest.json').read_text(encoding='utf-8'))
           pp = m['candidatePostProcess']
+          assert pp['mode'] == 'ch_stylized_prerender_building_v2'
+          assert pp['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert pp['profile'] == 'restrained_material_read_v1'
           assert pp['preservesCameraPivotAndFootprint'] is True
+          assert pp['paletteColors'] == 96
+          assert pp['dither'] == 'none'
+          assert pp['posterizeBitsPerChannel'] == 6
+          assert abs(pp['contrastMultiplier'] - 1.02) < 1e-6
+          assert abs(pp['saturationMultiplier'] - 1.01) < 1e-6
+          assert pp['outlineAlpha'] == 68
+          assert pp['internalEdgeAlpha'] == 24
+          assert pp['roofRowSpacingPx'] == 7
+          assert abs(pp['roofRowDarken'] - 0.90) < 1e-6
+          assert abs(pp['glassReflectionStrength'] - 0.45) < 1e-6
           assert pp['glassIsolation'] == 'connected_window_components'
-          print('stylizedPrerenderBuildingGate: PASS')
+          assert pp['surfaceIdentityMode'] == 'deterministic_image_space_roof_and_glass_classification_v1'
+          assert pp['trueMaterialIdMasks'] is False
+          print('restrainedStylizedPrerenderBuildingGate: PASS')
           PY
 
       - name: Verify final package
