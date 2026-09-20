@@ -1,0 +1,107 @@
+{
+  "id": "CH_STYLIZED_PRERENDER_V1",
+  "name": "City Horizon Stylized Pre-Rendered Visual Contract",
+  "status": "official",
+  "purpose": "Define the production visual baseline for City Horizon assets: modern Blender pre-rendered 3D used to produce final 2D RGBA sprites, with restrained classic tycoon influence but without mandatory emulation of early-2000s rendering limitations.",
+  "productionPhilosophy": {
+    "runtimeArtForm": "2d_rgba_sprites",
+    "authoringSource": "blender_3d_or_declarative_3d",
+    "visualTarget": "stylized_prerendered_tycoon",
+    "strict2000EraEmulation": false,
+    "classicTycoonInfluence": true,
+    "priorityOrder": [
+      "camera_and_grid_consistency",
+      "silhouette_and_gameplay_readability",
+      "material_identity",
+      "lighting_consistency",
+      "production_scalability",
+      "optional_retro_surface_treatment"
+    ]
+  },
+  "mandatory": {
+    "cameraContract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric_2_to_1",
+    "fixedWorldLighting": true,
+    "consistentPivot": true,
+    "validatedFootprint": true,
+    "transparentRGBA": true,
+    "materialSeparation": true,
+    "localizedContactAO": true,
+    "noHalo": true,
+    "gameplayScaleReview": true
+  },
+  "preferredVisualLanguage": {
+    "geometry": "clean_readable_pre_rendered_forms",
+    "materials": "procedural_or_authored_with_visible_structure",
+    "roughness": "generally_moderate_to_high",
+    "specular": "restrained_except_materials_that_require_it",
+    "lighting": "simple_directional_and_readable_not_photorealistic",
+    "shadows": "soft_but_controlled",
+    "ambientOcclusion": "local_contacts_only",
+    "microdetail": "enough_to_break_smooth_cg_surfaces_without_noise",
+    "edgeTreatment": "natural_geometry_first_optional_subtle_cleanup",
+    "color": "controlled_cohesive_palette_without_forced_indexed_palette"
+  },
+  "optionalRetroTreatment": {
+    "enabledByDefault": false,
+    "allowedPerAssetOrArtFamily": true,
+    "features": [
+      "light_palette_quantization",
+      "light_dithering",
+      "limited_tonal_banding",
+      "subtle_technical_outline",
+      "stylized_glass_reflections"
+    ],
+    "rule": "Retro treatment may reinforce readability or art direction, but must not become a mandatory global emulation layer or require bespoke manual cleanup for every asset."
+  },
+  "notProductionDefaults": [
+    "mandatory_48_color_palette",
+    "mandatory_floyd_steinberg_on_every_asset",
+    "mandatory_heavy_posterization",
+    "mandatory_one_pixel_outline_on_every_edge",
+    "forced_three_tone_face_ramps_for_every_material",
+    "color_heuristics_as_authoritative_material_masks",
+    "manual_asset_specific_pixel_cleanup_as_normal_workflow"
+  ],
+  "selectiveEffects": {
+    "rule": "Effects that apply to one material family only must use explicit material identity, object identity, mask pass, AOV, or other authored metadata whenever available.",
+    "colorHeuristicPolicy": "fallback_debug_only",
+    "examples": {
+      "glassReflection": "glass_mask_or_material_id",
+      "roofTreatment": "roof_mask_or_material_id",
+      "wallTreatment": "wall_mask_or_material_id"
+    }
+  },
+  "productionScalability": {
+    "target": "high_probability_first_pass_usable_asset",
+    "avoidPerAssetExceptions": true,
+    "preferReusableMaterialRecipes": true,
+    "preferReusableValidationGates": true,
+    "humanReviewRole": "art_direction_and_final_quality_not_routine_bug_detection"
+  },
+  "validation": {
+    "blockingTechnicalChecks": [
+      "camera_contract",
+      "pivot_consistency",
+      "footprint_validity",
+      "frame_fit",
+      "sprite_edge_clipping",
+      "transparent_rgb_contamination",
+      "halo",
+      "material_specific_effect_leakage_when_explicit_masks_exist"
+    ],
+    "visualChecks": [
+      "silhouette_readability",
+      "material_readability",
+      "lighting_coherence",
+      "street_and_terrain_grounding",
+      "cross_asset_consistency"
+    ],
+    "strictRetroSimilarityIsBlocking": false
+  },
+  "legacyReferences": {
+    "CH_CLASSIC_TYCOON_STYLE_V1": "inspiration_and_optional_reference_profile",
+    "classic_visual_reference_gate_1": "legacy_reference_and_comparison_not_global_production_authority",
+    "classic_three_tone_ramp_1": "optional_specialized_profile"
+  }
+}
