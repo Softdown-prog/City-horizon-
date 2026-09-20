@@ -138,6 +138,7 @@ add_executable(CityHorizonAssetEditor WIN32
     src/asset_project_editor_main.cpp
     src/asset_project_editor_window.cpp
     src/asset_grid_preview_widget.cpp
+    src/tile_surface_preview_widget.cpp
 )
 target_include_directories(CityHorizonAssetEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
