@@ -1,5 +1,6 @@
 {
   "id": "CH_TYCOON_STUDIO_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
   "camera": {
     "contract": "CH_CAMERA_V1",
     "projection": "orthographic_dimetric_2_to_1",
@@ -55,8 +56,13 @@
     "roughness": 1.0
   },
   "postProcess": {
+    "productionMode": "stylized_prerendered_default",
+    "candidateVariant": 1,
     "paletteColors": 128,
-    "candidateVariant": 3,
+    "paletteReductionRequired": false,
+    "ditherRequired": false,
+    "strictRetroEmulation": false,
+    "optionalRetroProfilesAllowed": true,
     "shadowColor": [29, 33, 37],
     "shadowAlphaScale": 0.72,
     "shadowAlphaMax": 132,
@@ -68,5 +74,13 @@
     "edgeAlphaThreshold": 92,
     "edgeOpacityScale": 0.38,
     "edgeOpacityMax": 96
+  },
+  "styleIntent": {
+    "target": "modern_pre_rendered_3d_with_classic_tycoon_influence",
+    "runtimeRemains2D": true,
+    "preferMaterialStructureOverPixelSimulation": true,
+    "preferSubtleStylizationOverHeavyRetroFilters": true,
+    "manualPerAssetPixelCleanup": "exception_only",
+    "selectiveEffectsRequireExplicitMaterialIdentityWhenAvailable": true
   }
 }
