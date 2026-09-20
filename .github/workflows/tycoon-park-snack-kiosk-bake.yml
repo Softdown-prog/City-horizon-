@@ -5,27 +5,33 @@ on:
   push:
     branches: [main]
     paths:
-      - tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json
-      - tools/tycoon_photo_studio/generate_park_kiosk_asset.py
-      - tools/tycoon_photo_studio/stylize_building_2d.py
-      - tools/tycoon_photo_studio/build_scene.py
-      - tools/tycoon_photo_studio/postprocess.py
-      - tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
-      - tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json
-      - tools/blender_bake_runner.py
-      - C++/MapForge2/presets/tycoon_asset_bake_contract.json
-      - .github/workflows/tycoon-park-snack-kiosk-bake.yml
+      - "tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json"
+      - "tools/tycoon_photo_studio/generate_park_kiosk_asset.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/stylize_building_2d.py"
+      - "tools/tycoon_photo_studio/contracts/ch_tycoon_miniature_v1.json"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-park-snack-kiosk-bake.yml"
+
+permissions:
+  contents: read
 
 jobs:
-  bake_kiosk:
+  bake-park-kiosk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ASSET_ID: park_snack_kiosk_1x1
+      KIOSK_PLAN: tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -34,43 +40,53 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Validate and expand kiosk recipe
+      - name: Validate procedural kiosk plan
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json')
-          data = json.loads(p.read_text())
+          data = json.loads(Path('tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json').read_text(encoding='utf-8'))
           assert data['contract'] == 'CITY_HORIZON_PARK_KIOSK_V1'
           assert data['styleContract'] == 'CH_TYCOON_MINIATURE_V1'
+          assert data['studioPreset'] == 'CH_TYCOON_STUDIO_V1'
           assert data['footprint'] == {'widthTiles': 1, 'depthTiles': 1}
           assert data['mass']['canopyWidth'] > data['mass']['bodyWidth']
           assert data['mass']['canopyDepth'] > data['mass']['bodyDepth']
-          print('parkKioskRecipeGate: PASS')
+          assert data['buildingPostProcess']['profile'] == 'park_kiosk_game_first_v1'
+          assert data['buildingPostProcess']['roofStructuralRows'] is False
+          print('parkKioskPlanGate: PASS')
           PY
+
+      - name: Expand plan to canonical asset source
+        run: |
+          set -euo pipefail
+          mkdir -p out/park_kiosk/generated
           python tools/tycoon_photo_studio/generate_park_kiosk_asset.py \
-            --recipe tools/tycoon_photo_studio/assets/park_snack_kiosk_1x1.kiosk.json \
-            --output out/kiosk/park_snack_kiosk_1x1.json
+            --recipe "$KIOSK_PLAN" \
+            --output out/park_kiosk/generated/${ASSET_ID}.source.json
           python - <<'PY'
           import json
           from pathlib import Path
-          data = json.loads(Path('out/kiosk/park_snack_kiosk_1x1.json').read_text())
+          p = Path('out/park_kiosk/generated/park_snack_kiosk_1x1.source.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
           assert data['contract'] == 'TYCOON_ASSET_SOURCE_V1'
+          assert data['styleContract'] == 'CH_TYCOON_MINIATURE_V1'
+          assert data['assetType'] == 'static_building'
+          assert data['generation']['sourceContract'] == 'CITY_HORIZON_PARK_KIOSK_V1'
           assert data['generation']['designGrammar'] == 'floating_canopy_plus_sign_fin_v1'
           assert data['generation']['retiredHouseGeometryReused'] is False
           assert data['generation']['partCount'] >= 15
-          print('parkKioskExpansionGate: PASS')
+          print('canonicalKioskSourceGate: PASS', data['generation']['partCount'])
           PY
 
-      - name: Download Blender 4.2.3 LTS
+      - name: Download pinned Blender
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/blender.tar.xz"
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
           destination="$RUNNER_TEMP/blender"
-          curl --fail --location --retry 3 --retry-delay 2 \
-            https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz \
-            --output "$archive"
+          curl --fail --location --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
           mkdir -p "$destination"
           tar -xf "$archive" -C "$destination"
           blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
@@ -78,55 +94,62 @@ jobs:
           chmod +x "$blender_exe"
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
 
-      - name: Bake four directions
+      - name: Bake four canonical directions
         run: |
           set -euo pipefail
-          python tools/blender_bake_runner.py \
-            --contract C++/MapForge2/presets/tycoon_asset_bake_contract.json \
-            --asset-config out/kiosk/park_snack_kiosk_1x1.json \
-            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json \
-            --scene tools/tycoon_photo_studio/build_scene.py \
-            --blender "$BLENDER_EXE" \
-            --output-dir out/kiosk/bake \
-            --xvfb \
-            --skip-validate
+          mkdir -p out/park_kiosk/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_scene.py -- \
+            --asset-config "$PWD/out/park_kiosk/generated/${ASSET_ID}.source.json" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/park_kiosk/source"
 
-      - name: Apply game-first treatment
+      - name: Build final PNG package
+        run: |
+          set -euo pipefail
+          mkdir -p out/park_kiosk/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/park_kiosk/source \
+            --output out/park_kiosk/final \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply game-first building treatment
         run: |
           set -euo pipefail
           python tools/tycoon_photo_studio/stylize_building_2d.py \
-            --package out/kiosk/bake/final \
-            --asset-id park_snack_kiosk_1x1 \
-            --asset-config out/kiosk/park_snack_kiosk_1x1.json
-
-      - name: Verify package
-        run: |
-          set -euo pipefail
-          for direction in south east west north; do
-            test -f "out/kiosk/bake/final/park_snack_kiosk_1x1_${direction}.png"
-          done
-          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_4view.png
-          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_review.png
-          test -f out/kiosk/bake/final/park_snack_kiosk_1x1_4dir_context.png
+            --package out/park_kiosk/final \
+            --asset-id "$ASSET_ID" \
+            --asset-config "$KIOSK_PLAN"
           python - <<'PY'
           import json
           from pathlib import Path
-          m = json.loads(Path('out/kiosk/bake/final/park_snack_kiosk_1x1_manifest.json').read_text())
+          m = json.loads(Path('out/park_kiosk/final/park_snack_kiosk_1x1_manifest.json').read_text(encoding='utf-8'))
           pp = m['candidatePostProcess']
+          assert pp['mode'] == 'ch_stylized_prerender_building_v2'
           assert pp['profile'] == 'park_kiosk_game_first_v1'
+          assert pp['preservesCameraPivotAndFootprint'] is True
           assert pp['dither'] == 'none'
           assert pp['roofStructuralRows'] is False
           assert m['humanApprovalRequired'] is True
-          print('parkKioskReviewGate: PASS')
+          print('gameFirstKioskGate: PASS')
           PY
 
-      - name: Upload kiosk PNGs
-        uses: actions/upload-artifact@v4
+      - name: Verify final package
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/park_kiosk/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/park_kiosk/final/${ASSET_ID}_4view.png"
+          test -f "out/park_kiosk/final/${ASSET_ID}_review.png"
+          test -f "out/park_kiosk/final/${ASSET_ID}_4dir_context.png"
+
+      - uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Park-Snack-Kiosk-PNGs
           path: |
-            out/kiosk/bake/final
-            out/kiosk/bake/source/studio_metadata.json
-            out/kiosk/park_snack_kiosk_1x1.json
+            out/park_kiosk/final
+            out/park_kiosk/generated/park_snack_kiosk_1x1.source.json
+            out/park_kiosk/source/studio_metadata.json
           if-no-files-found: error
           retention-days: 14
