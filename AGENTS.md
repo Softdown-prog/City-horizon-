@@ -4,9 +4,28 @@ This file is the fast onboarding document for AI agents and human contributors. 
 
 ## 1. What City Horizon is
 
-City Horizon is a modern 2D isometric city-builder. The game runtime is SDL3/C++, but visual assets are primarily pre-rendered PNGs created by a deterministic procedural + Blender pipeline.
+City Horizon is now a **small-scope 2D isometric park-management / tycoon project**, pivoted away from the previous full modern city-builder scope.
+
+The runtime remains SDL3/C++, and the existing engine, MapForge, placement systems, grid, camera, connected paths/roads, economy foundations, audio and asset pipeline should be reused wherever they fit.
 
 The project is developed by a solo programmer. Preserve continuity: prefer documenting durable decisions in the repository instead of relying on chat/session memory.
+
+### Scope rule
+
+Do **not** silently re-expand the project back into a full city-builder or RollerCoaster-Tycoon-scale simulation.
+
+The first playable target is intentionally small:
+- one compact park map;
+- connected pedestrian paths;
+- a limited set of reusable trees and props;
+- benches, lighting, toilets and basic service objects;
+- a cafeteria / kiosk and a few small attractions;
+- simple money / upkeep / income loops;
+- simple park quality metrics such as cleanliness, beauty, services and fun;
+- land expansion only after the core loop works;
+- visitors may start as simplified agents/markers before full character animation.
+
+Large systems such as full urban zoning, traffic simulation, vehicle networks, dozens of building categories, airports, ports, skyscraper progression and city-scale infrastructure are **out of scope** unless explicitly re-approved later.
 
 ## 2. Current art direction
 
@@ -17,10 +36,17 @@ Target:
 - strong gameplay readability;
 - clean, coherent material separation;
 - controlled detail and soft contact/shadow structure;
-- one coherent visual universe across buildings, vegetation, roads, props and characters;
+- one coherent visual universe across park buildings, vegetation, paths, attractions and props;
+- a miniature / diorama-like presentation is acceptable and may be embraced intentionally;
 - modern tooling is allowed and expected.
 
-Do not interpret classic Tycoon references as an instruction to reproduce year-2000 hardware limitations. Zoo Tycoon / RollerCoaster Tycoon are useful references for readability, miniature composition and information density only.
+Do not interpret classic Tycoon references as an instruction to reproduce year-2000 hardware limitations. Zoo Tycoon / RollerCoaster Tycoon are useful references for readability, miniature composition, path logic and information density only.
+
+### Visual proof rule
+
+For visual tasks, code completion is not evidence of success. A visual approach is only considered successful after its generated PNG/artifact has been inspected at gameplay scale.
+
+Do not keep escalating a failed visual technique with endless new procedural revisions. If repeated generated outputs do not approach the requested target, stop and report the limitation instead of presenting another speculative pipeline change as a likely solution.
 
 ## 3. Camera and grid are non-negotiable
 
@@ -63,6 +89,8 @@ First residential example:
 
 Vegetation uses its own procedural tree contracts but ends in the same frozen studio/bake review flow.
 
+For the park pivot, prefer **reusable modular assets** over large catalog breadth. One good tree, bench, lamp, kiosk or attraction may appear many times and is more valuable than many one-off building types.
+
 ## 5. Blender's role
 
 Blender is a deterministic renderer/baker and geometry/material execution environment. It is not the place where undocumented art direction should live.
@@ -70,6 +98,8 @@ Blender is a deterministic renderer/baker and geometry/material execution enviro
 Keep design intent in recipes/contracts where possible. Blender receives canonical source, uses the frozen studio, rotates the asset root for four directions and exports source passes. The final game still uses 2D PNGs.
 
 Pinned production Blender version in Actions is currently 4.2.3 LTS.
+
+Blender is not assumed to solve every visual problem automatically. New procedural material or asset-generation approaches must be validated with a real rendered artifact before being promoted as production direction.
 
 ## 6. Material rules
 
@@ -79,7 +109,8 @@ Use material response to communicate matter at gameplay scale. Avoid:
 - plastic CG look;
 - high-frequency texture noise that disappears at final size;
 - photoreal microdetail;
-- flat vector surfaces with no material read.
+- flat vector surfaces with no material read;
+- treating technical correctness as sufficient visual approval.
 
 ## 7. Visual approval rule
 
@@ -97,7 +128,9 @@ Do not claim an art target was achieved before inspecting the artifact.
 
 MapForge2 is the project-side environment for map/editor testing and deterministic captures. Use neutral or controlled captures when judging new assets; legacy assets visible in a scene are functional context only and must not become visual references.
 
-Buildings should align to the grid and sidewalks without unexplained grass gaps. Footprint, pivot and anchor correctness are part of the asset contract.
+Park buildings and props should align to the grid and pedestrian paths without unexplained grass gaps. Footprint, pivot and anchor correctness are part of the asset contract.
+
+Connected pedestrian paths are a primary gameplay system. Existing road/path topology code should be reused where practical, while keeping pedestrian-path semantics independent from vehicle-road semantics.
 
 ## 9. Engineering workflow
 
@@ -106,6 +139,22 @@ Prefer edits to canonical files. Do not create duplicate EXEs, backup copies or 
 The solo-development workflow intentionally avoids a full rebuild/ctest cycle after every tiny edit. Use focused validation while iterating. Full compile/test is appropriate for milestones, architecture changes or when there is a concrete reason to validate the whole system.
 
 When changing a GitHub file, read the current version first. Avoid concurrent writes to the same path.
+
+### Vertical-slice priority
+
+Before adding broad new systems, prove the park loop with a minimal vertical slice using mostly existing technology:
+
+```text
+compact map
+  -> place connected paths
+  -> place a few reusable park objects / services
+  -> place one or two small attractions
+  -> spend money / receive income
+  -> observe simple park metrics
+  -> expand only after the loop is playable
+```
+
+Do not build large infrastructure ahead of visible gameplay need.
 
 ## 10. Source hierarchy
 
@@ -117,6 +166,8 @@ For visual work, trust in this order:
 5. runtime integration.
 
 Do not infer art direction from old asset folders.
+
+For game scope, this `AGENTS.md` pivot is authoritative over older city-builder descriptions unless a newer explicit contract supersedes it.
 
 ## 11. Where to learn more
 
