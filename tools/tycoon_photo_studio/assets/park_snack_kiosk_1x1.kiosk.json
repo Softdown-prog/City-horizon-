@@ -5,17 +5,17 @@
   "assetType": "park_service_building",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "designIntent": {
-    "summary": "Original compact park snack kiosk designed as a cheerful tycoon game piece, not as a house or architectural visualization.",
-    "silhouette": "wide floating canopy over a short body with one tall sign fin",
-    "readOrder": ["canopy", "sign", "service_windows", "counter"],
-    "detailLevel": "low",
+    "summary": "Original compact hot-dog park kiosk designed as a cheerful tycoon game piece, with category identity authored in geometry so all four rotations stay consistent.",
+    "silhouette": "short kiosk body, striped service awning and oversized roof hot-dog sign",
+    "readOrder": ["roof_hotdog", "striped_awning", "service_window", "menu_board", "counter"],
+    "detailLevel": "low_medium",
     "rules": [
+      "category identity must come from authored geometry, not generated 2D repainting",
       "no pitched residential roof",
-      "no porch or house facade grammar",
       "large clean color blocks",
-      "slightly oversized service openings",
-      "one strong asymmetric accent",
-      "readable at normal gameplay zoom"
+      "slightly oversized food-service cues",
+      "one iconic roof prop readable at gameplay zoom",
+      "all decorative parts rotate with AssetRoot"
     ]
   },
   "footprint": {"widthTiles": 1, "depthTiles": 1},
@@ -30,29 +30,45 @@
     "canopyZ": 1.68
   },
   "openings": {
-    "southWindowWidth": 1.26,
-    "southWindowHeight": 0.72,
-    "eastWindowWidth": 1.02,
-    "eastWindowHeight": 0.68,
-    "sillZ": 0.78,
+    "southWindowWidth": 1.34,
+    "southWindowHeight": 0.74,
+    "eastWindowWidth": 0.94,
+    "eastWindowHeight": 0.66,
+    "sillZ": 0.77,
     "counterDepth": 0.24,
     "counterThickness": 0.12
   },
-  "sign": {
-    "width": 0.58,
-    "depth": 0.36,
-    "height": 0.82,
-    "offsetX": 0.64,
-    "offsetY": 0.30
+  "awning": {
+    "enabled": true,
+    "depth": 0.42,
+    "drop": 0.16,
+    "stripeCount": 7
+  },
+  "roofIdentity": {
+    "kind": "hotdog",
+    "length": 1.48,
+    "bunWidth": 0.34,
+    "sausageWidth": 0.23,
+    "height": 0.34,
+    "z": 2.13,
+    "supportHeight": 0.20
+  },
+  "menuBoard": {
+    "width": 0.54,
+    "height": 0.72,
+    "offsetY": 0.34
   },
   "materials": {
-    "body": {"name":"KioskTurquoiseBody","rgba":[0.18,0.55,0.56,1.0],"recipe":"plaster","roughness":0.88,"seed":11,"strength":0.08},
-    "canopy": {"name":"KioskWarmCreamCanopy","rgba":[0.91,0.77,0.53,1.0],"recipe":"solid","roughness":0.82,"seed":13,"strength":0.04},
-    "accent": {"name":"KioskCoralAccent","rgba":[0.82,0.28,0.20,1.0],"recipe":"solid","roughness":0.80,"seed":17,"strength":0.04},
-    "glass": {"name":"KioskBlueGlass","rgba":[0.16,0.42,0.52,1.0],"recipe":"glass","roughness":0.34,"seed":19,"strength":0.08},
-    "counter": {"name":"KioskCounterWood","rgba":[0.46,0.25,0.10,1.0],"recipe":"timber","roughness":0.78,"seed":23,"strength":0.12},
-    "base": {"name":"KioskStoneBase","rgba":[0.48,0.47,0.40,1.0],"recipe":"stone","roughness":0.92,"seed":29,"strength":0.10},
-    "dark": {"name":"KioskDarkTrim","rgba":[0.10,0.14,0.15,1.0],"recipe":"metal_panel","roughness":0.68,"metallic":0.08,"seed":31,"strength":0.04}
+    "body": {"name":"KioskMustardBody","rgba":[0.88,0.58,0.12,1.0],"recipe":"solid","roughness":0.86,"seed":11,"strength":0.04},
+    "canopy": {"name":"KioskWarmCream","rgba":[0.94,0.84,0.64,1.0],"recipe":"solid","roughness":0.84,"seed":13,"strength":0.03},
+    "accent": {"name":"KioskKetchupRed","rgba":[0.80,0.16,0.10,1.0],"recipe":"solid","roughness":0.80,"seed":17,"strength":0.03},
+    "glass": {"name":"KioskDarkServingOpening","rgba":[0.08,0.11,0.13,1.0],"recipe":"solid","roughness":0.72,"seed":19,"strength":0.02},
+    "counter": {"name":"KioskCounterWood","rgba":[0.55,0.30,0.10,1.0],"recipe":"timber","roughness":0.78,"seed":23,"strength":0.08},
+    "base": {"name":"KioskStoneBase","rgba":[0.54,0.52,0.46,1.0],"recipe":"solid","roughness":0.92,"seed":29,"strength":0.03},
+    "dark": {"name":"KioskMenuDark","rgba":[0.08,0.10,0.12,1.0],"recipe":"solid","roughness":0.74,"seed":31,"strength":0.02},
+    "bun": {"name":"HotDogBun","rgba":[0.95,0.58,0.16,1.0],"recipe":"solid","roughness":0.74,"seed":37,"strength":0.03},
+    "sausage": {"name":"HotDogSausage","rgba":[0.62,0.10,0.06,1.0],"recipe":"solid","roughness":0.72,"seed":41,"strength":0.03},
+    "mustard": {"name":"HotDogMustard","rgba":[0.98,0.76,0.05,1.0],"recipe":"solid","roughness":0.68,"seed":43,"strength":0.02}
   },
   "buildingPostProcess": {
     "profile": "park_kiosk_game_first_v1",
@@ -61,18 +77,19 @@
     "paletteDither": false,
     "posterizeBitsPerChannel": 7,
     "contrastMultiplier": 1.03,
-    "saturationMultiplier": 1.05,
+    "saturationMultiplier": 1.06,
     "outlineAlpha": 62,
     "internalEdgeAlpha": 18,
     "internalEdgeThreshold": 98,
     "roofStructuralRows": false,
     "roofRowSpacingPx": 7,
     "roofRowDarken": 0.92,
-    "glassReflectionStrength": 0.38,
+    "glassReflectionStrength": 0.0,
     "surfacePolicy": {
       "preferLargeColorBlocks": true,
       "avoidArchitecturalMaterialDrama": true,
-      "canopyIsGraphicSilhouette": true
+      "canopyIsGraphicSilhouette": true,
+      "identityComesFromGeometry": true
     }
   }
 }
