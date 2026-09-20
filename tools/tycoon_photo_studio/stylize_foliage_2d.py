@@ -27,6 +27,10 @@ DEFAULT_SHADOW_STRENGTH = 0.34
 DEFAULT_SHADOW_RADIUS_PX = 72.0
 DEFAULT_SATURATION_MULTIPLIER = 1.12
 DEFAULT_CONTRAST_MULTIPLIER = 1.08
+DEFAULT_LUMINANCE_COMPRESSION = 1.0
+DEFAULT_MIDTONE_LIFT = 0.0
+DEFAULT_POSTERIZE_BITS = 5
+DEFAULT_OUTLINE_ALPHA = 46
 
 
 def parse_args():
@@ -44,23 +48,48 @@ def load_profile(asset_config: str | None) -> dict:
         "shadowRadiusPx": DEFAULT_SHADOW_RADIUS_PX,
         "saturationMultiplier": DEFAULT_SATURATION_MULTIPLIER,
         "contrastMultiplier": DEFAULT_CONTRAST_MULTIPLIER,
+        "luminanceCompression": DEFAULT_LUMINANCE_COMPRESSION,
+        "midtoneLift": DEFAULT_MIDTONE_LIFT,
+        "paletteColors": PALETTE_COLORS,
+        "posterizeBitsPerChannel": DEFAULT_POSTERIZE_BITS,
+        "outlineAlpha": DEFAULT_OUTLINE_ALPHA,
         "shadowBlendIntent": "alpha_darkening",
     }
-    if not asset_config:
-        return profile
-
-    asset = json.loads(Path(asset_config).read_text(encoding="utf-8"))
-    overrides = asset.get("foliagePostProcess", {})
-    for key in profile:
-        if key in overrides:
-            profile[key] = overrides[key]
+    if asset_config:
+        asset = json.loads(Path(asset_config).read_text(encoding="utf-8"))
+        overrides = asset.get("foliagePostProcess", {})
+        for key in profile:
+            if key in overrides:
+                profile[key] = overrides[key]
 
     profile["shadowAlphaMax"] = max(0, min(255, int(profile["shadowAlphaMax"])))
     profile["shadowStrength"] = max(0.0, min(1.0, float(profile["shadowStrength"])))
     profile["shadowRadiusPx"] = max(8.0, float(profile["shadowRadiusPx"]))
     profile["saturationMultiplier"] = max(0.1, float(profile["saturationMultiplier"]))
     profile["contrastMultiplier"] = max(0.1, float(profile["contrastMultiplier"]))
+    profile["luminanceCompression"] = max(0.35, min(1.0, float(profile["luminanceCompression"])))
+    profile["midtoneLift"] = max(-32.0, min(32.0, float(profile["midtoneLift"])))
+    profile["paletteColors"] = max(16, min(128, int(profile["paletteColors"])))
+    profile["posterizeBitsPerChannel"] = max(3, min(8, int(profile["posterizeBitsPerChannel"])))
+    profile["outlineAlpha"] = max(0, min(96, int(profile["outlineAlpha"])))
     return profile
+
+
+def flatten_luminance(rgb: Image.Image, profile: dict) -> Image.Image:
+    """Compress directional 3D lighting while preserving chroma and leaf microstructure."""
+    compression = float(profile["luminanceCompression"])
+    lift = float(profile["midtoneLift"])
+    if abs(compression - 1.0) < 1e-6 and abs(lift) < 1e-6:
+        return rgb
+
+    ycbcr = rgb.convert("YCbCr")
+    y, cb, cr = ycbcr.split()
+    lut = []
+    for value in range(256):
+        compressed = 128.0 + (value - 128.0) * compression + lift
+        lut.append(max(0, min(255, int(round(compressed)))))
+    y = y.point(lut)
+    return Image.merge("YCbCr", (y, cb, cr)).convert("RGB")
 
 
 def stylize_color(image: Image.Image, profile: dict) -> Image.Image:
@@ -70,11 +99,12 @@ def stylize_color(image: Image.Image, profile: dict) -> Image.Image:
     # Preserve leaf-sized gaps and hard silhouette while removing translucent render haze.
     hard_alpha = alpha.point(lambda value: 255 if value >= 64 else 0)
     rgb = rgba.convert("RGB")
+    rgb = flatten_luminance(rgb, profile)
     rgb = ImageEnhance.Color(rgb).enhance(float(profile["saturationMultiplier"]))
     rgb = ImageEnhance.Contrast(rgb).enhance(float(profile["contrastMultiplier"]))
-    rgb = ImageOps.posterize(rgb, 5)
+    rgb = ImageOps.posterize(rgb, int(profile["posterizeBitsPerChannel"]))
     rgb = rgb.quantize(
-        colors=PALETTE_COLORS,
+        colors=int(profile["paletteColors"]),
         method=Image.Quantize.MEDIANCUT,
         dither=Image.Dither.FLOYDSTEINBERG,
     ).convert("RGB")
@@ -82,10 +112,11 @@ def stylize_color(image: Image.Image, profile: dict) -> Image.Image:
     out = rgb.convert("RGBA")
     out.putalpha(hard_alpha)
 
-    # A very restrained edge only closes LANCZOS fringe; it must not become a cartoon outline.
+    # A restrained edge only closes LANCZOS fringe; it must not become a cartoon outline.
     dilated = hard_alpha.filter(ImageFilter.MaxFilter(3))
     edge = ImageChops.subtract(dilated, hard_alpha)
-    edge = edge.point(lambda value: 46 if value else 0)
+    outline_alpha = int(profile["outlineAlpha"])
+    edge = edge.point(lambda value: outline_alpha if value else 0)
     outline = Image.new("RGBA", out.size, (34, 40, 29, 0))
     outline.putalpha(edge)
     base = Image.new("RGBA", out.size, (0, 0, 0, 0))
@@ -159,16 +190,18 @@ def main():
     context.save(package / f"{asset_id}_4dir_context.png")
     context.save(package / "tycoon_photo_studio_in_game_context.png")
 
-    manifest["paletteColorCount"] = PALETTE_COLORS
+    manifest["paletteColorCount"] = int(profile["paletteColors"])
     manifest["candidatePostProcess"] = {
         "mode": "classic_prerendered_foliage_v2",
-        "paletteColors": PALETTE_COLORS,
+        "paletteColors": int(profile["paletteColors"]),
         "dither": "floyd_steinberg",
-        "posterizeBitsPerChannel": 5,
+        "posterizeBitsPerChannel": int(profile["posterizeBitsPerChannel"]),
         "saturationMultiplier": float(profile["saturationMultiplier"]),
         "contrastMultiplier": float(profile["contrastMultiplier"]),
+        "luminanceCompression": float(profile["luminanceCompression"]),
+        "midtoneLift": float(profile["midtoneLift"]),
         "hardAlphaThreshold": 64,
-        "outlineAlpha": 46,
+        "outlineAlpha": int(profile["outlineAlpha"]),
         "shadowAlphaMax": int(profile["shadowAlphaMax"]),
         "shadowStrength": float(profile["shadowStrength"]),
         "shadowRadiusPx": float(profile["shadowRadiusPx"]),
@@ -179,15 +212,17 @@ def main():
     manifest["atlas"]["frames"] = atlas_records
     manifest["humanApprovalRequired"] = True
     manifest["approvalRule"] = (
-        "Classic pre-rendered foliage V2 preserves leaf microdetail and palette diffusion; "
-        "approve only after gameplay-scale visual review."
+        "Classic pre-rendered foliage V2 preserves leaf microdetail while allowing per-asset "
+        "luminance compression to suppress modern 3D lighting; approve only after gameplay-scale visual review."
     )
     text = json.dumps(manifest, indent=2)
     manifest_path.write_text(text, encoding="utf-8")
     (package / "tycoon_photo_studio_manifest.json").write_text(text, encoding="utf-8")
 
     print("classicPrerenderedFoliageV2: PASS")
-    print("paletteColors:", PALETTE_COLORS)
+    print("paletteColors:", profile["paletteColors"])
+    print("luminanceCompression:", profile["luminanceCompression"])
+    print("midtoneLift:", profile["midtoneLift"])
     print("shadowAlphaMax:", profile["shadowAlphaMax"])
     print("shadowStrength:", profile["shadowStrength"])
     print("shadowRadiusPx:", profile["shadowRadiusPx"])
