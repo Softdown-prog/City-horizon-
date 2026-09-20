@@ -137,6 +137,7 @@ target_link_libraries(MapForge2 PRIVATE mapforge2_editor Qt6::Widgets)
 add_executable(CityHorizonAssetEditor WIN32
     src/asset_project_editor_main.cpp
     src/asset_project_editor_window.cpp
+    src/asset_grid_preview_widget.cpp
 )
 target_include_directories(CityHorizonAssetEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
