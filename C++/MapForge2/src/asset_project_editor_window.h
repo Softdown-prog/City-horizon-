@@ -42,6 +42,7 @@ private:
     void applyGameplayFields();
     void applyDirectionPath(const QString& direction, const QString& path);
     void applySurfaceTilePath(const QString& path);
+    void applySurfaceAutotilePath(int mask, const QString& path);
     void applyRawMetadata();
     void addRasterLayer(bool reference_layer);
     void removeSelectedLayer();
@@ -52,6 +53,7 @@ private:
     QString resolvedPath(const QString& stored_path) const;
     QString directionPath(const QString& direction) const;
     QString surfaceTilePath() const;
+    QString surfaceAutotilePath(int mask) const;
     void setPreviewDirection(const QString& direction);
     void setStatus(const QString& text);
     void updateWindowTitle();
@@ -88,6 +90,8 @@ private:
     QSpinBox* surface_repeat_y_spin_ = nullptr;
     QSpinBox* surface_mask_spin_ = nullptr;
     QCheckBox* surface_show_grid_check_ = nullptr;
+    QLabel* surface_autotile_path_label_ = nullptr;
+    QPushButton* surface_assign_mask_button_ = nullptr;
     TileSurfacePreviewWidget* surface_preview_ = nullptr;
 
     QListWidget* layer_list_ = nullptr;
