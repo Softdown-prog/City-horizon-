@@ -97,11 +97,16 @@
     "topIsolationLimit": 0.86
   },
   "foliagePostProcess": {
-    "shadowAlphaMax": 133,
-    "shadowStrength": 0.52,
-    "shadowRadiusPx": 81.0,
-    "saturationMultiplier": 1.10,
-    "contrastMultiplier": 1.14,
+    "shadowAlphaMax": 118,
+    "shadowStrength": 0.46,
+    "shadowRadiusPx": 78.0,
+    "saturationMultiplier": 1.06,
+    "contrastMultiplier": 0.96,
+    "luminanceCompression": 0.74,
+    "midtoneLift": 5.0,
+    "paletteColors": 48,
+    "posterizeBitsPerChannel": 5,
+    "outlineAlpha": 38,
     "shadowBlendIntent": "multiply_equivalent_alpha"
   }
 }
