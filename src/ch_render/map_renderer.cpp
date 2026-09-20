@@ -1,8 +1,10 @@
 #include "src/ch_render/map_renderer.h"
 #include "src/ch_render/semantic_renderer.h"
 #include "src/ch_core/shoreline_autotile.h"
+#include "src/ch_core/ground_surface.h"
 #include "src/ch_render/shoreline_catalog.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -23,6 +25,12 @@ struct ShorelineOverlayEntry {
     const TextureAsset* texture = nullptr;
 };
 
+struct GroundSurfaceTileEntry {
+    int tile_x = 0;
+    int tile_y = 0;
+    TileConnectionMask connections = 0;
+};
+
 constexpr float kTileWidth = static_cast<float>(contracts::kTileWidth);
 constexpr float kGrassOpaqueLeft = 53.0F;
 constexpr float kGrassOpaqueTop = 23.0F;
@@ -40,6 +48,16 @@ constexpr TileCoordinate road_access_offset(const GridDirection direction) {
         case GridDirection::west: return {-1, 0};
     }
     return {};
+}
+
+std::string dirt_path_sprite(const TileConnectionMask mask) {
+    static constexpr std::array<const char*, 16> kSprites = {
+        "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
+        "dirt_path_04_end_s.png", "dirt_path_05_straight_ns.png", "dirt_path_06_curve_es.png", "dirt_path_07_tee_no_w.png",
+        "dirt_path_08_end_w.png", "dirt_path_09_curve_nw.png", "dirt_path_10_straight_ew.png", "dirt_path_11_tee_no_s.png",
+        "dirt_path_12_curve_sw.png", "dirt_path_13_tee_no_e.png", "dirt_path_14_tee_no_n.png", "dirt_path_15_cross.png",
+    };
+    return "assets/terrain/paths/dirt_01/" + std::string(kSprites.at(static_cast<std::size_t>(mask)));
 }
 
 SDL_FColor road_placeholder_color(const RoadVisualType type) {
@@ -277,6 +295,7 @@ void MapRenderer::render_world_terrain_and_water(
 
     std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
     std::vector<WaterSurfaceTileEntry> water_tiles;
+    std::vector<GroundSurfaceTileEntry> dirt_path_tiles;
 
     for (const auto& tile : document.terrain_tiles()) {
         const std::uint64_t key = tile_key(tile.tile_x, tile.tile_y);
@@ -293,6 +312,11 @@ void MapRenderer::render_world_terrain_and_water(
 
         if (is_water) {
             water_tiles.push_back({tile.tile_x, tile.tile_y, shallow});
+        }
+
+        if (is_connectable_ground_surface(tile)) {
+            dirt_path_tiles.push_back({tile.tile_x, tile.tile_y,
+                ground_surface_connection_mask(document, tile.tile_x, tile.tile_y, tile.terrain_definition)});
         }
     }
 
@@ -344,6 +368,19 @@ void MapRenderer::render_world_terrain_and_water(
     // Canonical Layer Execution:
     // 1. Terrain Base
     render_map(renderer, grass_base, scenario_terrain_textures, camera, viewport_width, viewport_height);
+
+    // 1.5 Ground paths.  Their connection mask comes from neighbouring
+    // ground terrain in the map document, so there is no road, vehicle or
+    // building-access side effect.
+    for (const auto& tile : dirt_path_tiles) {
+        const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
+        if (const TextureAsset* sprite = find_texture(dirt_path_sprite(visual_connections))) {
+            render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+        } else {
+            render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,
+                             SDL_FColor{0.48F, 0.35F, 0.21F, 1.0F});
+        }
+    }
 
     // 2. Water Base (Shallow / Deep)
     constexpr SDL_FColor kDeepBase = {108.0F / 255.0F, 196.0F / 255.0F, 207.0F / 255.0F, 1.0F};

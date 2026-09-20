@@ -1,0 +1,16 @@
+{
+  "contract": "CH_GROUND_PATH_AUTOTILE_V1",
+  "id": "dirt_path_01",
+  "displayName": "Caminho de terra",
+  "canvas": { "width": 128, "height": 64, "projection": "isometric_2_to_1" },
+  "connectionBits": { "north": 1, "east": 2, "south": 4, "west": 8 },
+  "basePath": "assets/terrain/paths/dirt_01",
+  "files": [
+    "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
+    "dirt_path_04_end_s.png", "dirt_path_05_straight_ns.png", "dirt_path_06_curve_es.png", "dirt_path_07_tee_no_w.png",
+    "dirt_path_08_end_w.png", "dirt_path_09_curve_nw.png", "dirt_path_10_straight_ew.png", "dirt_path_11_tee_no_s.png",
+    "dirt_path_12_curve_sw.png", "dirt_path_13_tee_no_e.png", "dirt_path_14_tee_no_n.png", "dirt_path_15_cross.png"
+  ],
+  "semantics": { "pedestrianWalkable": true, "vehicleDriveable": false, "buildable": false, "farmable": false },
+  "notes": "Uses SidewalkManager topology only; it never creates road access, vehicle lanes, or road occupancy."
+}

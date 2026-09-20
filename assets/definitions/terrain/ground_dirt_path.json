@@ -1,0 +1,12 @@
+{
+  "contract": "CH_TERRAIN_SEMANTICS_V1",
+  "id": "ground_dirt_path",
+  "visualMaterial": "assets/terrain/paths/dirt_01",
+  "semantic": {
+    "surface": "soil",
+    "pedestrianWalkable": true,
+    "vehicleDriveable": false,
+    "buildable": false,
+    "farmable": false
+  }
+}
