@@ -1,8 +1,9 @@
 {
   "id": "classic_visual_reference_gate_1",
   "name": "City Horizon Classic Tycoon Visual Reference Gate",
-  "status": "official",
-  "purpose": "Provide one deterministic reference building and one reproducible QA package that evaluates the complete Classic Tycoon raster stack after visual calibration.",
+  "status": "official_reference_profile",
+  "productionAuthority": false,
+  "purpose": "Provide one deterministic classic-tycoon reference building and reproducible QA package for comparison, calibration and optional retro profiles. This contract is no longer the global production visual authority; CH_STYLIZED_PRERENDER_V1 defines the default production baseline.",
   "referenceBuildingId": "classic_tycoon_reference_house_1",
   "referenceSpec": {
     "footprint": [2, 2],
@@ -14,7 +15,7 @@
     "materialSeed": 17,
     "neighborhoodSeed": 401
   },
-  "requiredVisualContracts": [
+  "requiredVisualContractsForThisReferenceProfile": [
     "structured_directional_materials_1",
     "classic_three_tone_ramp_1",
     "localized_contact_ao_1",
@@ -44,9 +45,11 @@
     ]
   },
   "lightingAndAoGate": {
+    "appliesToThisClassicReferenceProfileOnly": true,
     "threeToneWorldLightingRequired": true,
     "requiredLevels": ["light", "mid", "shadow"],
     "continuousWallGradientForbidden": true,
+    "globalProductionRule": false,
     "aoContract": "localized_contact_ao_1",
     "passRules": [
       "face separation is clear without appearing vector-flat",
@@ -84,8 +87,7 @@
   },
   "manualFinalChecklist": [
     "silhouette reads before microdetail",
-    "materials are physically directional",
-    "LIGHT MID SHADOW contrast is clear but not cartoon-flat",
+    "materials remain readable at gameplay scale",
     "ambient occlusion is localized to real contacts",
     "cast shadow grounds the building without becoming a black blob",
     "all three LODs remain legible",
@@ -93,8 +95,10 @@
     "no halo clipping or accidental terrain is baked into transparent production sprites"
   ],
   "policy": {
+    "defaultProductionVisualContract": "CH_STYLIZED_PRERENDER_V1",
+    "strictRetroSimilarityIsOptional": true,
     "referenceSpecIsFrozenUntilIntentionalVisualRevision": true,
-    "newRendererRevisionMustRegenerateAllArtifacts": true,
+    "newRendererRevisionMustRegenerateAllArtifactsWhenThisProfileIsUsed": true,
     "visualBaselineChangeRequiresPresetRevision": true,
     "qaArtifactsDoNotReplaceProductionExportValidation": true,
     "noProprietaryTycoonAssetsAreCopied": true
