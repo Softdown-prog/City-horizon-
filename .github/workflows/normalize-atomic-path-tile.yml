@@ -1,0 +1,41 @@
+name: Normalize atomic path tile
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_path:
+        description: Source image path in the repository
+        required: false
+        default: Tiles_test/file_000000006488820ea37cdc5012a4e189.png
+      output_name:
+        description: Output PNG filename
+        required: false
+        default: dirt_path_atomic_128x64.png
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Normalize tile
+        run: |
+          mkdir -p Tiles_test/generated
+          python tools/normalize_atomic_path_tile.py "${{ inputs.input_path }}" "Tiles_test/generated/${{ inputs.output_name }}"
+
+      - name: Upload normalized tile
+        uses: actions/upload-artifact@v4
+        with:
+          name: normalized-atomic-path-tile
+          path: Tiles_test/generated/${{ inputs.output_name }}
+          if-no-files-found: error
