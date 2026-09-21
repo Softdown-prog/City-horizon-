@@ -2,10 +2,10 @@
 """Agent-first CLI for CH Blender.
 
 Stable machine-facing interface:
-  doctor        validate the pinned Blender executable and repository contracts
-  run-job       execute one CH_BLENDER_AGENT_JOB_V1 JSON job
+  doctor         validate the pinned Blender executable and repository contracts
+  run-job        execute one CH_BLENDER_AGENT_JOB_V1 JSON job
   print-contract print the machine-readable worker contract
-  cache-key     print the canonical shared GitHub cache key
+  cache-key      print the canonical shared GitHub cache key
 
 Human-oriented interactive UI is intentionally out of scope.
 """
@@ -60,8 +60,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_run_job(args: argparse.Namespace) -> int:
-    job_path = (REPO_ROOT / args.job).resolve() if not Path(args.job).is_absolute() else Path(args.job).resolve()
-    report_path = (REPO_ROOT / args.report).resolve() if args.report and not Path(args.report).is_absolute() else (Path(args.report).resolve() if args.report else None)
+    job_path = (
+        (REPO_ROOT / args.job).resolve()
+        if not Path(args.job).is_absolute()
+        else Path(args.job).resolve()
+    )
+    report_path = (
+        (REPO_ROOT / args.report).resolve()
+        if args.report and not Path(args.report).is_absolute()
+        else (Path(args.report).resolve() if args.report else None)
+    )
     try:
         blender = resolve_blender(args.blender)
         payload = run_job(job_path, blender)
@@ -77,8 +85,31 @@ def cmd_contract(_: argparse.Namespace) -> int:
     payload = {
         "contract": JOB_CONTRACT,
         "reportContract": REPORT_CONTRACT,
+        "qualityContracts": {
+            "preflight": "CH_SCENE_PREFLIGHT_V1",
+            "proxy": "CH_PROXY_RENDER_V1",
+            "approval": "CH_PROXY_APPROVAL_V1",
+            "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
+        },
         "operations": {
+            "guarded_blender_script": {
+                "preferredForNewAssets": True,
+                "required": ["contract", "jobId", "operation", "script", "qualityStage"],
+                "qualityStages": ["preflight", "proxy", "final"],
+                "finalRequires": [
+                    "approval.proxyReviewed=true",
+                    "approval.approvedProxySha256=<64 hex chars>",
+                ],
+                "optional": [
+                    "args",
+                    "expectedOutputs",
+                    "outputDir",
+                    "qualityProfile",
+                    "approval",
+                ],
+            },
             "canonical_bake": {
+                "legacyForNewAgentAssets": True,
                 "required": ["contract", "jobId", "operation", "assetConfig"],
                 "optional": ["studioPreset", "outputDir", "postprocess"],
                 "defaults": {
@@ -88,14 +119,25 @@ def cmd_contract(_: argparse.Namespace) -> int:
                 },
             },
             "blender_script": {
+                "legacyUnguarded": True,
                 "required": ["contract", "jobId", "operation", "script"],
                 "optional": ["args", "expectedOutputs", "outputDir"],
-                "defaults": {"args": [], "expectedOutputs": [], "outputDir": "out/ch_blender_agent/<jobId>"},
+                "defaults": {
+                    "args": [],
+                    "expectedOutputs": [],
+                    "outputDir": "out/ch_blender_agent/<jobId>",
+                },
             },
         },
         "exitCodes": EXIT,
-        "binaryResolutionOrder": ["--blender", "CH_BLENDER_EXE", "BLENDER_EXE", "PATH:blender"],
+        "binaryResolutionOrder": [
+            "--blender",
+            "CH_BLENDER_EXE",
+            "BLENDER_EXE",
+            "PATH:blender",
+        ],
         "pathPolicy": "repository_workspace_only",
+        "newAssetPolicy": "preflight_then_proxy_then_explicitly_approved_final",
     }
     emit(payload)
     return EXIT["OK"]
@@ -105,12 +147,21 @@ def cmd_cache_key(_: argparse.Namespace) -> int:
     m = manifest()
     version = str(m["upstream"]["tag"]).removeprefix("v")
     revision = str(m.get("cache", {}).get("revision", 1))
-    emit({"contract": "CH_BLENDER_CACHE_KEY_V1", "version": version, "key": f"ch-blender-binary-${{OS}}-${{ARCH}}-{version}-r{revision}"})
+    emit(
+        {
+            "contract": "CH_BLENDER_CACHE_KEY_V1",
+            "version": version,
+            "key": f"ch-blender-binary-${{OS}}-${{ARCH}}-{version}-r{revision}",
+        }
+    )
     return EXIT["OK"]
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(prog="ch-blender", description="Deterministic City Horizon Blender interface for agents")
+    root = argparse.ArgumentParser(
+        prog="ch-blender",
+        description="Deterministic City Horizon Blender interface for agents",
+    )
     sub = root.add_subparsers(dest="command", required=True)
 
     doctor = sub.add_parser("doctor")
@@ -140,7 +191,13 @@ def main() -> int:
         emit(error_report(None, exc))
         return EXIT.get(exc.code, 1)
     except Exception as exc:
-        emit({"contract": REPORT_CONTRACT, "status": "error", "error": {"code": "UNEXPECTED", "message": str(exc)}})
+        emit(
+            {
+                "contract": REPORT_CONTRACT,
+                "status": "error",
+                "error": {"code": "UNEXPECTED", "message": str(exc)},
+            }
+        )
         return 1
 
 

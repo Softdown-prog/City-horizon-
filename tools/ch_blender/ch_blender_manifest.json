@@ -28,6 +28,7 @@
     "machineReadable": true,
     "interactiveUiRequired": false,
     "operations": [
+      "guarded_blender_script",
       "canonical_bake",
       "blender_script"
     ]
@@ -60,6 +61,17 @@
     "replaceProductionBinary": false,
     "agentFirst": true,
     "deterministicWorker": true,
-    "repositoryContractsRemainAuthority": true
+    "repositoryContractsRemainAuthority": true,
+    "failFastAssetAuthoring": true
+  },
+  "qualityGates": {
+    "contract": "CH_ASSET_QUALITY_GATES_V1",
+    "preflight": "CH_SCENE_PREFLIGHT_V1",
+    "proxy": "CH_PROXY_RENDER_V1",
+    "approval": "CH_PROXY_APPROVAL_V1",
+    "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
+    "policy": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "newAgentAssetsMustUseGuardedBuilder": true,
+    "directFinalAllowedByDefault": false
   }
 }

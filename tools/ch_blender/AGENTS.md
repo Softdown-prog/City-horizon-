@@ -29,39 +29,104 @@ Binary resolution order:
 
 The executable must identify as Blender 4.2.3 while the manifest remains pinned to `v4.2.3`.
 
+## Mandatory fail-fast path for new agent-authored assets
+
+New Blender authoring created by agents must use `guarded_blender_script`. The required sequence is:
+
+```text
+preflight
+  -> proxy SOUTH
+  -> human visual review
+  -> final four-direction bake
+```
+
+Do not go directly from new geometry to a final Cycles bake.
+
+### Stage 1 — preflight
+
+`qualityStage: "preflight"` builds the scene but does not render the expensive final package. The Blender-side gate writes `CH_SCENE_PREFLIGHT_V1`.
+
+Stable rejection codes include:
+
+- `CH_PREFLIGHT_ASSET_ROOT`
+- `CH_PREFLIGHT_CAMERA`
+- `CH_PREFLIGHT_ALPHA`
+- `CH_PREFLIGHT_EMPTY`
+- `CH_PREFLIGHT_FOOTPRINT`
+- `CH_PREFLIGHT_MISSING_BODY_PART`
+- `CH_PREFLIGHT_BODY_LAYOUT`
+- `CH_PREFLIGHT_DETACHED_BODY_PART`
+- `CH_PREFLIGHT_GROUND_CONTACT`
+- `CH_PREFLIGHT_CAMERA_CROP`
+
+An agent must stop on failure and make one targeted correction.
+
+### Stage 2 — SOUTH proxy
+
+After preflight passes, run the same guarded builder with `qualityStage: "proxy"`.
+
+The proxy is intentionally cheap: gameplay-sized, one direction, and uses the preflight profile's proxy renderer. It exists to judge silhouette, proportions, pose, composition and obvious occlusion before spending on four-direction final output.
+
+The builder writes:
+
+- `preflight_report.json`
+- `proxy_south.png`
+- `proxy_report.json` (`CH_PROXY_RENDER_V1`, including SHA-256)
+
+A green proxy job is not artistic approval.
+
+### Stage 3 — final
+
+Final is rejected by the worker unless the job records explicit review:
+
+```json
+{
+  "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "<sha256 from reviewed proxy_report.json>"
+  }
+}
+```
+
+This is provenance for the human review. It prevents an agent from accidentally paying the cost of a final bake immediately after authoring new geometry.
+
+Default gate tuning is versioned in:
+
+`tools/ch_blender/preflight_profiles/ch_asset_default_v1.json`
+
 ## Job contract
 
 Every job uses `CH_BLENDER_AGENT_JOB_V1` and has a unique `jobId`.
 
-### Canonical source bake
+### Guarded Blender script — preferred for new assets
 
 ```json
 {
   "contract": "CH_BLENDER_AGENT_JOB_V1",
-  "jobId": "building.example.001",
-  "operation": "canonical_bake",
-  "assetConfig": "tools/tycoon_photo_studio/assets/example.source.json",
-  "studioPreset": "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
-  "outputDir": "out/ch_blender_agent/building.example.001",
-  "postprocess": true
-}
-```
-
-This delegates scene/render work to canonical `build_scene.py` and final packaging to canonical `postprocess.py`.
-
-### Repository Blender script
-
-```json
-{
-  "contract": "CH_BLENDER_AGENT_JOB_V1",
-  "jobId": "prop.example.001",
-  "operation": "blender_script",
-  "script": "tools/tycoon_photo_studio/build_example_blender.py",
-  "args": ["--output", "out/ch_blender_agent/prop.example.001/source"],
-  "expectedOutputs": ["out/ch_blender_agent/prop.example.001/source/studio_metadata.json"],
+  "jobId": "prop.example.preflight.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_example_guarded.py",
+  "qualityStage": "preflight",
+  "args": [
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/prop.example.001"
+  ],
   "outputDir": "out/ch_blender_agent/prop.example.001"
 }
 ```
+
+The worker owns `--stage`, `--preflight-profile` and `--approval-proxy-sha`; do not place those switches manually in `args`.
+
+### Canonical source bake
+
+`canonical_bake` remains available for established canonical sources and compatibility. New agent-authored direct Blender geometry should prefer the guarded operation until the generic canonical baker itself is migrated to the same three-stage gate.
+
+### Repository Blender script
+
+`blender_script` remains available as an unguarded compatibility escape hatch for established automation. Do not use it to introduce a new visual asset and immediately final-render it.
 
 `args` is an ordered string array. This avoids shell interpolation ambiguity and makes the job diff easy for another agent to audit.
 
@@ -106,10 +171,11 @@ Do not add independent Blender download/cache blocks to new workflows.
 - record output hashes from the worker report;
 - use unique job IDs for concurrent agent sessions;
 - keep official 4.2.3 available as the baseline until the internal CH Blender build passes equivalence gates;
-- do not change Cycles/render internals merely to solve an asset-specific art problem.
+- do not change Cycles/render internals merely to solve an asset-specific art problem;
+- new agent-authored visual assets must not skip preflight and SOUTH proxy review.
 
 ## Exit codes
 
-The CLI exposes the exact map through `print-contract`. Stable categories include invalid job/contract, Blender missing/version mismatch, Blender execution failure, postprocess failure and expected-output failure.
+The CLI exposes the exact map through `print-contract`. Stable categories include invalid job/contract, Blender missing/version mismatch, quality-gate approval required, Blender execution failure, postprocess failure and expected-output failure.
 
 An agent should stop on a non-zero code, inspect the JSON `error.code`, make one targeted correction, and rerun the same job contract rather than improvising a parallel pipeline.

@@ -1,0 +1,28 @@
+{
+  "contract": "CH_SCENE_PREFLIGHT_PROFILE_V1",
+  "id": "CH_ASSET_PREFLIGHT_DEFAULT_V1",
+  "blenderUnitsPerTile": 3.0,
+  "footprintMaxScale": 1.55,
+  "groundContactTolerance": 0.2,
+  "cameraMargin": 0.015,
+  "character": {
+    "requiredRoles": [
+      "character.torso",
+      "character.head"
+    ],
+    "maxHeadTorsoDistance": 1.35,
+    "maxHandTorsoDistance": 1.9,
+    "footRoles": [
+      "character.foot_left",
+      "character.foot_right"
+    ],
+    "handRoles": [
+      "character.hand_left",
+      "character.hand_right"
+    ]
+  },
+  "proxy": {
+    "resolution": 256,
+    "engine": "BLENDER_EEVEE_NEXT"
+  }
+}
