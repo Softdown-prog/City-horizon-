@@ -1,0 +1,61 @@
+{
+  "contract": "CITY_HORIZON_FERRIS_WHEEL_V1",
+  "assetId": "attraction.park_ferris_wheel.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 2,
+    "occupiedCells": [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]]
+  },
+  "geometry": {
+    "wheelRadius": 2.65,
+    "wheelCenterZ": 3.55,
+    "ringTubeRadius": 0.075,
+    "spokeRadius": 0.035,
+    "axleRadius": 0.16,
+    "axleDepth": 0.62,
+    "supportRadius": 0.09,
+    "supportBaseHalfWidth": 1.72,
+    "supportBaseHalfDepth": 0.78,
+    "supportFootZ": 0.16,
+    "hubRadius": 0.24,
+    "gondolaCount": 12,
+    "gondolaWidth": 0.62,
+    "gondolaDepth": 0.46,
+    "gondolaBodyHeight": 0.42,
+    "gondolaRoofHeight": 0.12,
+    "gondolaDrop": 0.34,
+    "entryPlatformWidth": 2.55,
+    "entryPlatformDepth": 0.74,
+    "entryPlatformHeight": 0.14
+  },
+  "animation": {
+    "enabled": true,
+    "frameStart": 1,
+    "frameEnd": 12,
+    "fps": 8,
+    "looping": true,
+    "rotationAxis": "Y",
+    "revolutionsPerLoop": 1.0,
+    "keepGondolasUpright": true
+  },
+  "materials": {
+    "frame": {"name":"FerrisFrameCream","rgba":[0.78,0.76,0.68,1.0],"roughness":0.70,"metallic":0.06},
+    "wheel": {"name":"FerrisWheelBlue","rgba":[0.05,0.31,0.62,1.0],"roughness":0.64,"metallic":0.05},
+    "hub": {"name":"FerrisHubWarmMetal","rgba":[0.48,0.50,0.52,1.0],"roughness":0.46,"metallic":0.28},
+    "platform": {"name":"FerrisPlatform","rgba":[0.36,0.38,0.37,1.0],"roughness":0.82,"metallic":0.02},
+    "accentA": {"name":"FerrisAccentCoral","rgba":[0.86,0.16,0.22,1.0],"roughness":0.68,"metallic":0.02},
+    "accentB": {"name":"FerrisAccentGold","rgba":[0.93,0.60,0.08,1.0],"roughness":0.68,"metallic":0.02},
+    "accentC": {"name":"FerrisAccentTeal","rgba":[0.04,0.58,0.60,1.0],"roughness":0.68,"metallic":0.02},
+    "dark": {"name":"FerrisDark","rgba":[0.055,0.065,0.075,1.0],"roughness":0.84,"metallic":0.05}
+  },
+  "prototypeNotes": {
+    "status": "geometry_prototype",
+    "terrainIncluded": false,
+    "designIntent": "Original compact park Ferris wheel with a strong circular silhouette, paired A-frame supports, twelve colorful upright gondolas and a small structural loading platform.",
+    "referencePolicy": "Use classic Tycoon readability only; do not copy a specific proprietary Ferris wheel design.",
+    "nextGate": "Render one SOUTH idle frame in the frozen studio, then four directions, then animated downsample review before classification."
+  }
+}
