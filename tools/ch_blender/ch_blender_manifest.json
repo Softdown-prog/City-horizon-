@@ -1,0 +1,28 @@
+{
+  "contract": "CH_BLENDER_INTERNAL_V1",
+  "productName": "CH Blender 4.2.3",
+  "upstream": {
+    "project": "Blender",
+    "repository": "https://projects.blender.org/blender/blender.git",
+    "tag": "v4.2.3",
+    "release": "4.2.3 LTS"
+  },
+  "usage": {
+    "scope": "internal_only",
+    "distribution": false,
+    "runtimeDependency": false
+  },
+  "cityHorizonContracts": {
+    "camera": "CH_CAMERA_V1",
+    "studio": "CH_TYCOON_STUDIO_V1",
+    "style": "CH_STYLIZED_PRERENDER_V1",
+    "bake": "TYCOON_ASSET_BAKE_V1"
+  },
+  "policy": {
+    "vendorFullUpstreamSource": false,
+    "rendererChangesAllowedByDefault": false,
+    "preferPythonIntegration": true,
+    "requireOfficialBaselineComparison": true,
+    "replaceProductionBinary": false
+  }
+}
