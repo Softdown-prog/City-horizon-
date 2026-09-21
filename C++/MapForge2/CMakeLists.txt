@@ -128,6 +128,18 @@ target_link_libraries(mapforge2_editor PUBLIC
     Qt6::Widgets
 )
 
+add_library(mapforge2_capture STATIC
+    src/map_capture_service.cpp
+)
+target_include_directories(mapforge2_capture PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CH_ROOT}
+)
+target_link_libraries(mapforge2_capture PUBLIC
+    mapforge2_canonical
+    Qt6::Gui
+)
+
 add_executable(MapForge2 WIN32
     src/main.cpp
     src/building_composer_asset_browser_ui_extension.cpp
@@ -168,13 +180,13 @@ add_executable(MapForge2MapCapture
     src/map_capture_main.cpp
 )
 target_include_directories(MapForge2MapCapture PRIVATE ${CH_ROOT})
-target_link_libraries(MapForge2MapCapture PRIVATE mapforge2_canonical Qt6::Gui)
+target_link_libraries(MapForge2MapCapture PRIVATE mapforge2_capture)
 
 add_executable(MapForge2CLI
     src/mapforge_cli_main.cpp
 )
 target_include_directories(MapForge2CLI PRIVATE ${CH_ROOT})
-target_link_libraries(MapForge2CLI PRIVATE mapforge2_canonical Qt6::Core)
+target_link_libraries(MapForge2CLI PRIVATE mapforge2_canonical mapforge2_capture Qt6::Core)
 
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
@@ -183,6 +195,7 @@ if(MSVC)
     target_compile_options(mapforge2_asset_document PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_asset_composer PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_editor PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(mapforge2_capture PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2 PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(CityHorizonAssetEditor PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
@@ -197,6 +210,7 @@ else()
     target_compile_options(mapforge2_asset_document PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_asset_composer PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_editor PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(mapforge2_capture PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2 PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(CityHorizonAssetEditor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
