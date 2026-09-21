@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
       - ".github/workflows/raspadinha-vendor-blender-preview.yml"
   workflow_dispatch:
 
@@ -19,6 +20,8 @@ jobs:
     env:
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       OUT_DIR: out/raspadinha_vendor_blender
+      SOURCE_DIR: out/raspadinha_vendor_blender/source
+      FINAL_DIR: out/raspadinha_vendor_blender/final
       BLENDER_VERSION: "4.2.3"
       PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
 
@@ -26,12 +29,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install headless dependencies
+      - name: Install headless and postprocess dependencies
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0 python3-pil
 
       - name: Restore Blender cache
         id: blender-cache
@@ -66,46 +69,41 @@ jobs:
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
           "$blender_exe" --version | head -n 1
 
-      - name: Build scene directly in Blender
+      - name: Build and bake four directions in Blender
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$OUT_DIR"
+          mkdir -p "$SOURCE_DIR" "$FINAL_DIR"
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup --python-use-system-env \
             --python tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py -- \
             --studio-preset "$STUDIO_PRESET" \
-            --save-blend "$OUT_DIR/raspadinha_vendor_v1.blend" \
-            --preview-direction south
-          test -f "$OUT_DIR/raspadinha_vendor_v1.blend"
+            --output "$SOURCE_DIR" \
+            --save-blend "$OUT_DIR/raspadinha_vendor_v1.blend"
+          test -f "$SOURCE_DIR/studio_metadata.json"
+          test -f "$SOURCE_DIR/prop.raspadinha_vendor.01_south_color_source.png"
+          test -f "$SOURCE_DIR/prop.raspadinha_vendor.01_east_color_source.png"
+          test -f "$SOURCE_DIR/prop.raspadinha_vendor.01_west_color_source.png"
+          test -f "$SOURCE_DIR/prop.raspadinha_vendor.01_north_color_source.png"
 
-      - name: Render idle preview
+      - name: Canonical postprocess and downsample
         shell: bash
         run: |
           set -euo pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
-            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_idle_####" \
-            --render-format PNG -f 1
+          python3 tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE_DIR" \
+            --output "$FINAL_DIR" \
+            --studio-preset "$STUDIO_PRESET"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_south.png"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_east.png"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_west.png"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_north.png"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_4view.png"
+          test -f "$FINAL_DIR/prop.raspadinha_vendor.01_review.png"
 
-      - name: Render greeting preview
-        shell: bash
-        run: |
-          set -euo pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
-            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_greet_####" \
-            --render-format PNG -f 6
-
-      - name: Render serving preview
-        shell: bash
-        run: |
-          set -euo pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
-            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_serve_####" \
-            --render-format PNG -f 10
-
-      - name: Upload Blender scene and previews
+      - name: Upload Blender scene and review package
         uses: actions/upload-artifact@v4
         with:
-          name: Raspadinha-Vendor-Blender-Preview
+          name: Raspadinha-Vendor-Blender-4Dir-Review
           path: out/raspadinha_vendor_blender
           if-no-files-found: error
           retention-days: 14
