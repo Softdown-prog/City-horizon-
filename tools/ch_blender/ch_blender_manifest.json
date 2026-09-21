@@ -18,11 +18,36 @@
     "style": "CH_STYLIZED_PRERENDER_V1",
     "bake": "TYCOON_ASSET_BAKE_V1"
   },
+  "agentInterface": {
+    "contract": "CH_BLENDER_AGENT_JOB_V1",
+    "reportContract": "CH_BLENDER_AGENT_REPORT_V1",
+    "cli": "tools/ch_blender/ch_blender_cli.py",
+    "worker": "tools/ch_blender/agent_worker.py",
+    "machineReadable": true,
+    "interactiveUiRequired": false,
+    "operations": [
+      "canonical_bake",
+      "blender_script"
+    ]
+  },
+  "cache": {
+    "contract": "CH_BLENDER_CACHE_V1",
+    "revision": 1,
+    "githubAction": ".github/actions/setup-ch-blender/action.yml",
+    "sharedAcrossWorkflows": true,
+    "invalidateWhen": [
+      "upstream.tag changes",
+      "cache.revision changes"
+    ]
+  },
   "policy": {
     "vendorFullUpstreamSource": false,
     "rendererChangesAllowedByDefault": false,
     "preferPythonIntegration": true,
     "requireOfficialBaselineComparison": true,
-    "replaceProductionBinary": false
+    "replaceProductionBinary": false,
+    "agentFirst": true,
+    "deterministicWorker": true,
+    "repositoryContractsRemainAuthority": true
   }
 }
