@@ -1,3 +1,4 @@
+#include "map_capture_service.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/validation.h"
 
@@ -72,14 +73,18 @@ int main(int argc, char** argv) {
             printUsage();
             return 2;
         }
+
+        const ch::studio::MapCaptureResult capture = ch::studio::runMapCapture(args.at(2), args.at(3), args.at(4));
         QJsonObject result;
         result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
         result.insert(QStringLiteral("command"), QStringLiteral("capture"));
-        result.insert(QStringLiteral("ok"), false);
-        result.insert(QStringLiteral("error"), QStringLiteral("capture is currently provided by MapForge2MapCapture; invoke that executable for this tranche"));
-        result.insert(QStringLiteral("mapCaptureArgs"), QJsonArray{args.at(2), args.at(3), args.at(4)});
+        result.insert(QStringLiteral("ok"), capture.ok);
+        result.insert(QStringLiteral("output"), QFileInfo(args.at(2)).absoluteFilePath());
+        result.insert(QStringLiteral("candidate"), QFileInfo(args.at(3)).absoluteFilePath());
+        result.insert(QStringLiteral("request"), QFileInfo(args.at(4)).absoluteFilePath());
+        if (!capture.ok) result.insert(QStringLiteral("error"), capture.error);
         printJson(result);
-        return 3;
+        return capture.ok ? 0 : capture.exit_code;
     }
 
     if ((command == QStringLiteral("inspect") || command == QStringLiteral("validate")) && args.size() == 3) {
