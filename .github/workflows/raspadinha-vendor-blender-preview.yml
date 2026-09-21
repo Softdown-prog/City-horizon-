@@ -19,6 +19,8 @@ jobs:
     env:
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       OUT_DIR: out/raspadinha_vendor_blender
+      BLENDER_VERSION: "4.2.3"
+      BLENDER_DIR: ${{ runner.temp }}/blender-4.2.3
 
     steps:
       - name: Checkout
@@ -31,21 +33,37 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
 
-      - name: Download pinned Blender 4.2.3 LTS
+      - name: Restore Blender cache
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BLENDER_DIR }}
+          key: blender-${{ runner.os }}-${{ env.BLENDER_VERSION }}-linux-x64
+
+      - name: Download pinned Blender 4.2.3 LTS on cache miss
+        if: steps.blender-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          version="4.2.3"
-          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
-          destination="$RUNNER_TEMP/blender"
-          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          archive="$RUNNER_TEMP/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          url="https://download.blender.org/release/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          rm -rf "$BLENDER_DIR"
+          mkdir -p "$BLENDER_DIR"
           curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
-          mkdir -p "$destination"
-          tar -xf "$archive" -C "$destination"
-          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
-          test -n "$blender_exe"
-          chmod +x "$blender_exe"
+          tar -xf "$archive" -C "$BLENDER_DIR" --strip-components=1
+          test -x "$BLENDER_DIR/blender"
+
+      - name: Configure Blender executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          blender_exe="$BLENDER_DIR/blender"
+          if [[ ! -x "$blender_exe" ]]; then
+            echo "Cached Blender executable not found: $blender_exe" >&2
+            exit 1
+          fi
           echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+          "$blender_exe" --version | head -n 1
 
       - name: Build scene directly in Blender
         shell: bash
