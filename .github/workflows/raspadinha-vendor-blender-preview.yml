@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$OUT_DIR"
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup --python-use-system-env \
             --python tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py -- \
             --studio-preset "$STUDIO_PRESET" \
             --save-blend "$OUT_DIR/raspadinha_vendor_v1.blend" \
