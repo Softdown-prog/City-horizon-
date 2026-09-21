@@ -1,0 +1,102 @@
+name: CH Blender Agent Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_path:
+        description: Repository-relative CH_BLENDER_AGENT_JOB_V1 JSON path
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/ch_blender/jobs/*.job.json"
+
+permissions:
+  contents: read
+
+jobs:
+  run-agent-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
+      LIBGL_ALWAYS_SOFTWARE: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install worker dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+
+      - name: Setup shared cached CH Blender
+        id: ch-blender
+        uses: ./.github/actions/setup-ch-blender
+
+      - name: Discover requested agent jobs
+        id: jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          jobs_file="$RUNNER_TEMP/ch_blender_jobs.txt"
+          : > "$jobs_file"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            printf '%s\n' "${{ inputs.job_path }}" >> "$jobs_file"
+          else
+            before="${{ github.event.before }}"
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" -- 'tools/ch_blender/jobs/*.job.json' >> "$jobs_file"
+            else
+              git diff --name-only "$before" "$GITHUB_SHA" -- 'tools/ch_blender/jobs/*.job.json' >> "$jobs_file"
+            fi
+          fi
+
+          sort -u "$jobs_file" -o "$jobs_file"
+          sed -i '/^[[:space:]]*$/d' "$jobs_file"
+          test -s "$jobs_file"
+
+          echo "jobs-file=$jobs_file" >> "$GITHUB_OUTPUT"
+          echo "Jobs selected:"
+          cat "$jobs_file"
+
+      - name: Validate CH Blender agent interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/ch_blender/ch_blender_cli.py doctor --report out/ch_blender_agent/doctor.json
+          python tools/ch_blender/ch_blender_cli.py print-contract > out/ch_blender_agent/contract.json
+
+      - name: Execute deterministic jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/ch_blender_agent/reports
+          while IFS= read -r job; do
+            test -f "$job"
+            safe="$(basename "$job" .job.json | tr -cd 'A-Za-z0-9._-')"
+            python tools/ch_blender/ch_blender_cli.py run-job \
+              --job "$job" \
+              --report "out/ch_blender_agent/reports/${safe}.report.json"
+          done < "${{ steps.jobs.outputs.jobs-file }}"
+
+      - name: Upload agent outputs and machine reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Blender-Agent-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/ch_blender_agent
+          if-no-files-found: warn
+          retention-days: 14
