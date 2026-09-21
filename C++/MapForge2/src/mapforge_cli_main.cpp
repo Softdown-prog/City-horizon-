@@ -1,5 +1,6 @@
 #include "map_capture_service.h"
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/semantic_grid.h"
 #include "src/ch_core/validation.h"
 
 #include <QCoreApplication>
@@ -31,6 +32,40 @@ QJsonObject inspectDocument(const ch::MapDocument& document, const QString& path
     return result;
 }
 
+QJsonObject tileInspection(const ch::MapDocument& document, const QString& path, const int tile_x, const int tile_y) {
+    ch::SemanticWorldView world;
+    world.map_document = &document;
+    const ch::TileSemanticInfo info = ch::SemanticGrid::inspect_tile_channels(world, ch::GridCoord{tile_x, tile_y});
+
+    QJsonObject states;
+    states.insert(QStringLiteral("footprint"), QString::fromLatin1(ch::to_string(info.footprint_state)));
+    states.insert(QStringLiteral("occupancy"), QString::fromLatin1(ch::to_string(info.occupancy_state)));
+    states.insert(QStringLiteral("buildable"), QString::fromLatin1(ch::to_string(info.buildable_state)));
+    states.insert(QStringLiteral("road"), QString::fromLatin1(ch::to_string(info.road_state)));
+    states.insert(QStringLiteral("sidewalk"), QString::fromLatin1(ch::to_string(info.sidewalk_state)));
+    states.insert(QStringLiteral("water"), QString::fromLatin1(ch::to_string(info.water_state)));
+    states.insert(QStringLiteral("pivot"), QString::fromLatin1(ch::to_string(info.pivot_state)));
+    states.insert(QStringLiteral("entrance"), QString::fromLatin1(ch::to_string(info.entrance_state)));
+    states.insert(QStringLiteral("connector"), QString::fromLatin1(ch::to_string(info.connector_state)));
+    states.insert(QStringLiteral("noBuild"), QString::fromLatin1(ch::to_string(info.no_build_state)));
+    states.insert(QStringLiteral("navigation"), QString::fromLatin1(ch::to_string(info.navigation_state)));
+    states.insert(QStringLiteral("region"), QString::fromLatin1(ch::to_string(info.region_state)));
+
+    QJsonObject result;
+    result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+    result.insert(QStringLiteral("command"), QStringLiteral("tile-inspect"));
+    result.insert(QStringLiteral("path"), QFileInfo(path).absoluteFilePath());
+    result.insert(QStringLiteral("tileX"), tile_x);
+    result.insert(QStringLiteral("tileY"), tile_y);
+    result.insert(QStringLiteral("terrainType"), QString::fromStdString(info.terrain_type));
+    result.insert(QStringLiteral("occupiedByAsset"), QString::fromStdString(info.occupied_by_asset));
+    result.insert(QStringLiteral("footprintWidth"), info.footprint_width);
+    result.insert(QStringLiteral("footprintHeight"), info.footprint_height);
+    result.insert(QStringLiteral("states"), states);
+    result.insert(QStringLiteral("ok"), true);
+    return result;
+}
+
 QJsonObject validateDocument(const ch::MapDocument& document, const QString& path) {
     const ch::MapValidationReport report = ch::validate_map_document(document);
     QJsonObject result;
@@ -52,6 +87,7 @@ void printJson(const QJsonObject& object) {
 void printUsage() {
     std::cerr << "MapForge2CLI usage:\n"
               << "  MapForge2CLI inspect <map.json>\n"
+              << "  MapForge2CLI tile-inspect <map.json> <tile_x> <tile_y>\n"
               << "  MapForge2CLI validate <map.json>\n"
               << "  MapForge2CLI capture <output.png> <candidate.png> <capture_request.json>\n";
 }
@@ -85,6 +121,38 @@ int main(int argc, char** argv) {
         if (!capture.ok) result.insert(QStringLiteral("error"), capture.error);
         printJson(result);
         return capture.ok ? 0 : capture.exit_code;
+    }
+
+    if (command == QStringLiteral("tile-inspect") && args.size() == 5) {
+        const QString path = args.at(2);
+        bool x_ok = false;
+        bool y_ok = false;
+        const int tile_x = args.at(3).toInt(&x_ok);
+        const int tile_y = args.at(4).toInt(&y_ok);
+        if (!x_ok || !y_ok) {
+            QJsonObject result;
+            result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+            result.insert(QStringLiteral("command"), command);
+            result.insert(QStringLiteral("ok"), false);
+            result.insert(QStringLiteral("error"), QStringLiteral("tile coordinates must be integers"));
+            printJson(result);
+            return 2;
+        }
+
+        const auto document = ch::MapDocument::load_from_file(path.toStdString());
+        if (!document) {
+            QJsonObject result;
+            result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+            result.insert(QStringLiteral("command"), command);
+            result.insert(QStringLiteral("path"), QFileInfo(path).absoluteFilePath());
+            result.insert(QStringLiteral("ok"), false);
+            result.insert(QStringLiteral("error"), QStringLiteral("unable to load map document"));
+            printJson(result);
+            return 4;
+        }
+
+        printJson(tileInspection(*document, path, tile_x, tile_y));
+        return 0;
     }
 
     if ((command == QStringLiteral("inspect") || command == QStringLiteral("validate")) && args.size() == 3) {
