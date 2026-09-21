@@ -20,7 +20,6 @@ jobs:
       STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       OUT_DIR: out/raspadinha_vendor_blender
       BLENDER_VERSION: "4.2.3"
-      BLENDER_DIR: ${{ runner.temp }}/blender-4.2.3
       PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
 
     steps:
@@ -38,8 +37,8 @@ jobs:
         id: blender-cache
         uses: actions/cache@v4
         with:
-          path: ${{ env.BLENDER_DIR }}
-          key: blender-${{ runner.os }}-${{ env.BLENDER_VERSION }}-linux-x64
+          path: ${{ runner.temp }}/blender-4.2.3
+          key: blender-${{ runner.os }}-4.2.3-linux-x64
 
       - name: Download pinned Blender 4.2.3 LTS on cache miss
         if: steps.blender-cache.outputs.cache-hit != 'true'
@@ -47,18 +46,19 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender-${BLENDER_VERSION}"
           url="https://download.blender.org/release/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          rm -rf "$BLENDER_DIR"
-          mkdir -p "$BLENDER_DIR"
+          rm -rf "$destination"
+          mkdir -p "$destination"
           curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
-          tar -xf "$archive" -C "$BLENDER_DIR" --strip-components=1
-          test -x "$BLENDER_DIR/blender"
+          tar -xf "$archive" -C "$destination" --strip-components=1
+          test -x "$destination/blender"
 
       - name: Configure Blender executable
         shell: bash
         run: |
           set -euo pipefail
-          blender_exe="$BLENDER_DIR/blender"
+          blender_exe="$RUNNER_TEMP/blender-${BLENDER_VERSION}/blender"
           if [[ ! -x "$blender_exe" ]]; then
             echo "Cached Blender executable not found: $blender_exe" >&2
             exit 1
