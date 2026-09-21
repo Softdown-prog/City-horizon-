@@ -1,0 +1,87 @@
+name: Test Atomic Path in MapForge
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_path:
+        description: Source tile image in repository
+        required: false
+        default: Tiles_test/file_000000006488820ea37cdc5012a4e189.png
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/test-atomic-path-in-mapforge.yml
+      - tools/test_atomic_path_in_mapforge.py
+      - tools/normalize_atomic_path_tile.py
+      - Tiles_test/file_000000006488820ea37cdc5012a4e189.png
+      - C++/MapForge2/src/map_capture_service.cpp
+      - C++/MapForge2/src/map_capture_service.h
+      - C++/MapForge2/src/map_capture_main.cpp
+      - C++/MapForge2/src/mapforge_cli_main.cpp
+      - C++/MapForge2/CMakeLists.txt
+
+jobs:
+  tile-test:
+    runs-on: windows-latest
+    env:
+      DEFAULT_INPUT: Tiles_test/file_000000006488820ea37cdc5012a4e189.png
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tile worker dependency
+        shell: pwsh
+        run: python -m pip install --upgrade pillow
+
+      - name: Install Qt
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Configure MapForge capture worker
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/mapforge-tile-test -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build MapForge capture worker
+        shell: pwsh
+        run: cmake --build build/mapforge-tile-test --config Release --target MapForge2MapCapture --parallel
+
+      - name: Resolve input tile
+        id: input
+        shell: pwsh
+        run: |
+          $requested = "${{ github.event.inputs.input_path }}"
+          if ([string]::IsNullOrWhiteSpace($requested)) { $requested = $env:DEFAULT_INPUT }
+          if (-not (Test-Path $requested)) { throw "Tile source not found: $requested" }
+          "path=$requested" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Testing tile source: $requested"
+
+      - name: Normalize and render tile in MapForge
+        shell: pwsh
+        run: |
+          python tools/test_atomic_path_in_mapforge.py "${{ steps.input.outputs.path }}" --out-dir out/tile_test --mapforge-exe "build/mapforge-tile-test/Release/MapForge2MapCapture.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Atomic path MapForge test failed" }
+          if (-not (Test-Path "out/tile_test/mapforge_atomic_path_capture.png")) { throw "MapForge capture PNG missing" }
+          if (-not (Test-Path "out/tile_test/normalized_atomic_path_128x64.png")) { throw "Normalized tile PNG missing" }
+          if (-not (Test-Path "out/tile_test/result.json")) { throw "Tile test result JSON missing" }
+
+      - name: Upload tile test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Atomic-Path-MapForge-Test
+          path: |
+            out/tile_test/normalized_atomic_path_128x64.png
+            out/tile_test/mapforge_atomic_path_capture.png
+            out/tile_test/capture_request.json
+            out/tile_test/result.json
+          if-no-files-found: error
+          retention-days: 14
