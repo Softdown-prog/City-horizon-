@@ -21,6 +21,7 @@ jobs:
       OUT_DIR: out/raspadinha_vendor_blender
       BLENDER_VERSION: "4.2.3"
       BLENDER_DIR: ${{ runner.temp }}/blender-4.2.3
+      PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
 
     steps:
       - name: Checkout
