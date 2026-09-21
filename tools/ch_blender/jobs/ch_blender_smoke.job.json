@@ -1,0 +1,11 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "ch_blender_smoke_v1",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/scripts/agent_smoke.py",
+  "args": [],
+  "expectedOutputs": [
+    "out/ch_blender_agent/ch_blender_smoke_v1/smoke.json"
+  ],
+  "outputDir": "out/ch_blender_agent/ch_blender_smoke_v1"
+}
