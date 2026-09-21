@@ -1,0 +1,92 @@
+name: Raspadinha Vendor Blender Preview
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py"
+      - ".github/workflows/raspadinha-vendor-blender-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  blender-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      OUT_DIR: out/raspadinha_vendor_blender
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install headless dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Download pinned Blender 4.2.3 LTS
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Build scene directly in Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT_DIR"
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py -- \
+            --studio-preset "$STUDIO_PRESET" \
+            --save-blend "$OUT_DIR/raspadinha_vendor_v1.blend" \
+            --preview-direction south
+          test -f "$OUT_DIR/raspadinha_vendor_v1.blend"
+
+      - name: Render idle preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
+            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_idle_####" \
+            --render-format PNG -f 1
+
+      - name: Render greeting preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
+            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_greet_####" \
+            --render-format PNG -f 6
+
+      - name: Render serving preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background "$OUT_DIR/raspadinha_vendor_v1.blend" \
+            --render-output "$PWD/$OUT_DIR/raspadinha_vendor_south_serve_####" \
+            --render-format PNG -f 10
+
+      - name: Upload Blender scene and previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raspadinha-Vendor-Blender-Preview
+          path: out/raspadinha_vendor_blender
+          if-no-files-found: error
+          retention-days: 14
