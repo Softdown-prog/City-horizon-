@@ -170,6 +170,12 @@ add_executable(MapForge2MapCapture
 target_include_directories(MapForge2MapCapture PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2MapCapture PRIVATE mapforge2_canonical Qt6::Gui)
 
+add_executable(MapForge2CLI
+    src/mapforge_cli_main.cpp
+)
+target_include_directories(MapForge2CLI PRIVATE ${CH_ROOT})
+target_link_libraries(MapForge2CLI PRIVATE mapforge2_canonical Qt6::Core)
+
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(mapforge2_render PRIVATE /W4 /permissive- /utf-8)
@@ -183,6 +189,7 @@ if(MSVC)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2MapCapture PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2CLI PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(mapforge2_canonical PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(mapforge2_render PRIVATE -Wall -Wextra -Wpedantic)
@@ -196,6 +203,7 @@ else()
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2MapCapture PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2CLI PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 add_custom_command(TARGET MapForge2 POST_BUILD
@@ -211,4 +219,4 @@ if(TARGET SDL3::SDL3-shared)
     )
 endif()
 
-install(TARGETS MapForge2 CityHorizonAssetEditor RUNTIME DESTINATION .)
+install(TARGETS MapForge2 CityHorizonAssetEditor MapForge2CLI RUNTIME DESTINATION .)
