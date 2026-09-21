@@ -1,5 +1,6 @@
 #include "map_capture_service.h"
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/placement_engine.h"
 #include "src/ch_core/semantic_grid.h"
 #include "src/ch_core/validation.h"
 
@@ -66,6 +67,83 @@ QJsonObject tileInspection(const ch::MapDocument& document, const QString& path,
     return result;
 }
 
+class FixedFootprintCatalog final : public ch::IAssetCatalogView {
+public:
+    FixedFootprintCatalog(std::string object_id, const int width, const int height)
+        : object_id_(std::move(object_id)), width_(width), height_(height) {}
+
+    ch::AssetFootprintInfo get_footprint(std::string_view asset_id) const override {
+        if (asset_id != object_id_) return {};
+        return ch::AssetFootprintInfo{width_, height_, true};
+    }
+
+private:
+    std::string object_id_;
+    int width_ = 1;
+    int height_ = 1;
+};
+
+bool parsePlacementCategory(const QString& text, ch::PlacementCategory* category) {
+    const QString value = text.trimmed().toLower();
+    if (value == QStringLiteral("building")) *category = ch::PlacementCategory::building;
+    else if (value == QStringLiteral("road")) *category = ch::PlacementCategory::road;
+    else if (value == QStringLiteral("tree")) *category = ch::PlacementCategory::tree;
+    else if (value == QStringLiteral("decoration")) *category = ch::PlacementCategory::decoration;
+    else if (value == QStringLiteral("water_structure") || value == QStringLiteral("water-structure")) *category = ch::PlacementCategory::water_structure;
+    else return false;
+    return true;
+}
+
+QJsonObject placementCheck(const ch::MapDocument& document, const QString& path,
+                           const QString& object_id, const ch::PlacementCategory category,
+                           const int tile_x, const int tile_y, const int rotation,
+                           const int footprint_width, const int footprint_height) {
+    ch::SemanticWorldView world;
+    world.map_document = &document;
+
+    FixedFootprintCatalog catalog(object_id.toStdString(), footprint_width, footprint_height);
+    ch::PlacementRequest request;
+    request.object_id = object_id.toStdString();
+    request.category = category;
+    request.origin = ch::GridCoord{tile_x, tile_y};
+    request.rotation = rotation;
+
+    const ch::PlacementResult placement = ch::PlacementEngine::can_place(request, world, catalog);
+
+    QJsonArray violations;
+    for (const ch::PlacementViolation violation : placement.violations) {
+        violations.append(QString::fromLatin1(ch::to_string(violation)));
+    }
+
+    QJsonArray affected_tiles;
+    for (const ch::GridCoord tile : placement.affected_tiles) {
+        affected_tiles.append(QJsonArray{tile.x, tile.y});
+    }
+
+    QJsonObject result;
+    result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+    result.insert(QStringLiteral("command"), QStringLiteral("placement-check"));
+    result.insert(QStringLiteral("path"), QFileInfo(path).absoluteFilePath());
+    result.insert(QStringLiteral("objectId"), object_id);
+    result.insert(QStringLiteral("category"), QString::fromLatin1(ch::to_string(category)));
+    result.insert(QStringLiteral("tileX"), tile_x);
+    result.insert(QStringLiteral("tileY"), tile_y);
+    result.insert(QStringLiteral("rotation"), rotation);
+    result.insert(QStringLiteral("footprintWidth"), footprint_width);
+    result.insert(QStringLiteral("footprintHeight"), footprint_height);
+    result.insert(QStringLiteral("state"), QString::fromLatin1(ch::to_string(placement.state)));
+    result.insert(QStringLiteral("violations"), violations);
+    result.insert(QStringLiteral("affectedTiles"), affected_tiles);
+    if (!placement.expected_connector.empty()) {
+        result.insert(QStringLiteral("expectedConnector"), QString::fromStdString(placement.expected_connector));
+    }
+    if (!placement.violations.empty()) {
+        result.insert(QStringLiteral("conflictingTile"), QJsonArray{placement.conflicting_tile.x, placement.conflicting_tile.y});
+    }
+    result.insert(QStringLiteral("ok"), placement.state == ch::SemanticState::valid);
+    return result;
+}
+
 QJsonObject validateDocument(const ch::MapDocument& document, const QString& path) {
     const ch::MapValidationReport report = ch::validate_map_document(document);
     QJsonObject result;
@@ -88,6 +166,7 @@ void printUsage() {
     std::cerr << "MapForge2CLI usage:\n"
               << "  MapForge2CLI inspect <map.json>\n"
               << "  MapForge2CLI tile-inspect <map.json> <tile_x> <tile_y>\n"
+              << "  MapForge2CLI placement-check <map.json> <object_id> <category> <tile_x> <tile_y> <rotation> <footprint_w> <footprint_h>\n"
               << "  MapForge2CLI validate <map.json>\n"
               << "  MapForge2CLI capture <output.png> <candidate.png> <capture_request.json>\n";
 }
@@ -121,6 +200,50 @@ int main(int argc, char** argv) {
         if (!capture.ok) result.insert(QStringLiteral("error"), capture.error);
         printJson(result);
         return capture.ok ? 0 : capture.exit_code;
+    }
+
+    if (command == QStringLiteral("placement-check") && args.size() == 10) {
+        const QString path = args.at(2);
+        const QString object_id = args.at(3);
+        ch::PlacementCategory category;
+        bool x_ok = false;
+        bool y_ok = false;
+        bool rotation_ok = false;
+        bool width_ok = false;
+        bool height_ok = false;
+        const int tile_x = args.at(5).toInt(&x_ok);
+        const int tile_y = args.at(6).toInt(&y_ok);
+        const int rotation = args.at(7).toInt(&rotation_ok);
+        const int footprint_width = args.at(8).toInt(&width_ok);
+        const int footprint_height = args.at(9).toInt(&height_ok);
+
+        if (!parsePlacementCategory(args.at(4), &category) || !x_ok || !y_ok || !rotation_ok || !width_ok || !height_ok ||
+            footprint_width < 1 || footprint_height < 1) {
+            QJsonObject result;
+            result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+            result.insert(QStringLiteral("command"), command);
+            result.insert(QStringLiteral("ok"), false);
+            result.insert(QStringLiteral("error"), QStringLiteral("invalid placement arguments"));
+            printJson(result);
+            return 2;
+        }
+
+        const auto document = ch::MapDocument::load_from_file(path.toStdString());
+        if (!document) {
+            QJsonObject result;
+            result.insert(QStringLiteral("contract"), QStringLiteral("MAPFORGE_CLI_RESULT_V1"));
+            result.insert(QStringLiteral("command"), command);
+            result.insert(QStringLiteral("path"), QFileInfo(path).absoluteFilePath());
+            result.insert(QStringLiteral("ok"), false);
+            result.insert(QStringLiteral("error"), QStringLiteral("unable to load map document"));
+            printJson(result);
+            return 4;
+        }
+
+        const QJsonObject result = placementCheck(*document, path, object_id, category, tile_x, tile_y,
+                                                  rotation, footprint_width, footprint_height);
+        printJson(result);
+        return result.value(QStringLiteral("ok")).toBool() ? 0 : 6;
     }
 
     if (command == QStringLiteral("tile-inspect") && args.size() == 5) {
