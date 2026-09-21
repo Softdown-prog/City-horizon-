@@ -1,0 +1,96 @@
+name: Setup CH Blender
+description: Resolve the pinned City Horizon Blender runtime with a repository-wide shared cache.
+
+inputs:
+  install-system-deps:
+    description: Install Linux headless runtime dependencies.
+    required: false
+    default: "true"
+
+outputs:
+  blender-exe:
+    description: Absolute path to the pinned Blender executable.
+    value: ${{ steps.locate.outputs.blender-exe }}
+  version:
+    description: Frozen Blender version from the CH Blender manifest.
+    value: ${{ steps.manifest.outputs.version }}
+  cache-key:
+    description: Shared cache key used by all City Horizon workflows.
+    value: ${{ steps.manifest.outputs.cache-key }}
+
+runs:
+  using: composite
+  steps:
+    - id: manifest
+      name: Read frozen CH Blender manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="$(python3 - <<'PY'
+        import json
+        from pathlib import Path
+        data = json.loads(Path('tools/ch_blender/ch_blender_manifest.json').read_text(encoding='utf-8'))
+        print(data['upstream']['tag'].removeprefix('v'))
+        PY
+        )"
+        revision="$(python3 - <<'PY'
+        import json
+        from pathlib import Path
+        data = json.loads(Path('tools/ch_blender/ch_blender_manifest.json').read_text(encoding='utf-8'))
+        print(data.get('cache', {}).get('revision', 1))
+        PY
+        )"
+        cache_dir="$RUNNER_TOOL_CACHE/ch-blender/$version/linux-x64"
+        cache_key="ch-blender-binary-${RUNNER_OS}-${RUNNER_ARCH}-${version}-r${revision}"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "cache-dir=$cache_dir" >> "$GITHUB_OUTPUT"
+        echo "cache-key=$cache_key" >> "$GITHUB_OUTPUT"
+
+    - name: Install headless runtime dependencies
+      if: inputs.install-system-deps == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+    - id: cache
+      name: Restore shared Blender binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.manifest.outputs.cache-dir }}
+        key: ${{ steps.manifest.outputs.cache-key }}
+
+    - name: Download pinned Blender on cache miss
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="${{ steps.manifest.outputs.version }}"
+        destination="${{ steps.manifest.outputs.cache-dir }}"
+        archive="$RUNNER_TEMP/blender-${version}-linux-x64.tar.xz"
+        url="https://download.blender.org/release/Blender4.2/blender-${version}-linux-x64.tar.xz"
+        rm -rf "$destination"
+        mkdir -p "$destination"
+        curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+        tar -xf "$archive" -C "$destination" --strip-components=1
+        test -x "$destination/blender"
+
+    - id: locate
+      name: Validate Blender runtime
+      shell: bash
+      run: |
+        set -euo pipefail
+        blender_exe="${{ steps.manifest.outputs.cache-dir }}/blender"
+        test -x "$blender_exe"
+        actual="$($blender_exe --version | head -n 1)"
+        expected="Blender ${{ steps.manifest.outputs.version }}"
+        case "$actual" in
+          "$expected"*) ;;
+          *) echo "Unexpected Blender runtime: $actual (expected $expected)" >&2; exit 1 ;;
+        esac
+        echo "blender-exe=$blender_exe" >> "$GITHUB_OUTPUT"
+        echo "CH_BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+        echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+        echo "CH Blender runtime: $actual"
+        echo "CH Blender cache key: ${{ steps.manifest.outputs.cache-key }}"
