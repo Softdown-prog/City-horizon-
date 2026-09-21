@@ -40,6 +40,16 @@ def parse_args():
     return p.parse_args(argv)
 
 
+def _parent_keep_world_fixed(obj, parent):
+    """Preserve world transform when moving an authored part under an animation pivot."""
+    world = obj.matrix_world.copy()
+    bpy.context.view_layer.update()
+    obj.parent = parent
+    obj.matrix_parent_inverse = parent.matrix_world.inverted()
+    obj.matrix_world = world
+    bpy.context.view_layer.update()
+
+
 def _tag_semantics():
     mapping = {
         "Torso": ("character.torso", False),
@@ -75,6 +85,11 @@ def build_for_gate(args):
     root["animationStates"] = "idle:1-4,greet:5-8,serve:9-12"
     root["directionPolicy"] = "rotate_asset_root_keep_camera_lights_fixed"
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
+
+    # The original WIP helper could leave head children with the pivot offset
+    # applied twice. Patch the helper in-memory so both gate builds and the later
+    # final rebuild use a transform-preserving parent operation.
+    rv.parent_keep_world = _parent_keep_world_fixed
 
     mats = rv.materials()
     rv.build_cart(root, mats)
