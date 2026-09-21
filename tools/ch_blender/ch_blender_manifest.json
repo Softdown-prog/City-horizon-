@@ -4,7 +4,9 @@
   "upstream": {
     "project": "Blender",
     "repository": "https://projects.blender.org/blender/blender.git",
+    "githubMirror": "https://github.com/blender/blender.git",
     "tag": "v4.2.3",
+    "commit": "0e22e4fcea037eeec1531fdbfc32d3acb88b4bd5",
     "release": "4.2.3 LTS"
   },
   "usage": {
@@ -29,6 +31,16 @@
       "canonical_bake",
       "blender_script"
     ]
+  },
+  "internalBuild": {
+    "contract": "CH_BLENDER_SOURCE_BUILD_V1",
+    "sourceStateContract": "CH_BLENDER_SOURCE_STATE_V1",
+    "sourceWorker": "tools/ch_blender/source_worker.py",
+    "patchSeries": "tools/ch_blender/patches/series.json",
+    "identityMarker": "City Horizon Internal",
+    "rendererModified": false,
+    "blendFileFormatModified": false,
+    "productionReplacementApproved": false
   },
   "cache": {
     "contract": "CH_BLENDER_CACHE_V1",

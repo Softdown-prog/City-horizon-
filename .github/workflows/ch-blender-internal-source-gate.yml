@@ -1,0 +1,110 @@
+name: CH Blender Internal Source Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/ch_blender_manifest.json"
+      - "tools/ch_blender/source_worker.py"
+      - "tools/ch_blender/patches/**"
+      - "tools/ch_blender/build_internal_linux.sh"
+      - ".github/workflows/ch-blender-internal-source-gate.yml"
+  workflow_dispatch:
+    inputs:
+      compile:
+        description: "Compile/cache the internal Blender binary after the source gate"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  source-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare frozen source and apply patch series
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/ch_blender_internal
+          python tools/ch_blender/source_worker.py prepare \
+            --workspace "$RUNNER_TEMP/ch-blender-source-gate" \
+            --report out/ch_blender_internal/source-state.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CH-Blender-Source-State-${{ github.run_id }}
+          path: out/ch_blender_internal/source-state.json
+          retention-days: 14
+
+  compile-internal:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.compile }}
+    needs: source-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Resolve patchset identity
+        id: patchset
+        shell: bash
+        run: |
+          set -euo pipefail
+          id="$(python tools/ch_blender/source_worker.py patchset-id --plain)"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+      - name: Restore internal binary cache
+        id: internal-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ch-blender-build
+          key: ch-blender-internal-${{ runner.os }}-${{ steps.patchset.outputs.id }}
+      - name: Restore Blender dependency cache
+        if: steps.internal-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ch-blender-workspace/lib
+          key: ch-blender-build-deps-${{ runner.os }}-4.2.3-v1
+      - name: Prepare source for compilation
+        if: steps.internal-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/ch_blender_internal
+          python tools/ch_blender/source_worker.py prepare \
+            --workspace "$RUNNER_TEMP/ch-blender-workspace" \
+            --report out/ch_blender_internal/source-state.json
+      - name: Compile CH Blender
+        if: steps.internal-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x tools/ch_blender/build_internal_linux.sh
+          tools/ch_blender/build_internal_linux.sh \
+            "$RUNNER_TEMP/ch-blender-workspace/blender-src" \
+            "$RUNNER_TEMP/ch-blender-build" \
+            out/ch_blender_internal/source-state.json
+      - name: Validate cached or freshly built identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe="$RUNNER_TEMP/ch-blender-build/bin/blender"
+          test -x "$exe"
+          version="$($exe --version | head -n 1)"
+          echo "$version"
+          [[ "$version" == *"Blender 4.2.3"* ]]
+          [[ "$version" == *"City Horizon Internal"* ]]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: CH-Blender-Internal-Build-State-${{ github.run_id }}
+          path: out/ch_blender_internal
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,14 @@
+{
+  "contract": "CH_BLENDER_PATCH_SERIES_V1",
+  "upstreamTag": "v4.2.3",
+  "upstreamCommit": "0e22e4fcea037eeec1531fdbfc32d3acb88b4bd5",
+  "patches": [
+    {
+      "id": "0001-city-horizon-internal-version-label",
+      "path": "tools/ch_blender/patches/0001-city-horizon-internal-version-label.patch",
+      "purpose": "Mark the human-readable Blender version string as City Horizon Internal without changing file format, renderer, or the upstream 4.2.3/LTS compatibility contract.",
+      "touchesRenderer": false,
+      "touchesBlendFileFormat": false
+    }
+  ]
+}

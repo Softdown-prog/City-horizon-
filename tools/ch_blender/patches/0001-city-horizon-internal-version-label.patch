@@ -1,0 +1,11 @@
+diff --git a/source/blender/blenkernel/intern/blender.cc b/source/blender/blenkernel/intern/blender.cc
+--- a/source/blender/blenkernel/intern/blender.cc
++++ b/source/blender/blenkernel/intern/blender.cc
+@@ -118,7 +118,7 @@
+ 
+   SNPRINTF(blender_version_string,
+-           "%d.%01d.%d%s%s",
++           "%d.%01d.%d%s%s [City Horizon Internal]",
+            BLENDER_VERSION / 100,
+            BLENDER_VERSION % 100,
+            BLENDER_VERSION_PATCH,
