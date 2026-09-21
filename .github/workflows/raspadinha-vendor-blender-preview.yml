@@ -22,59 +22,39 @@ jobs:
       OUT_DIR: out/raspadinha_vendor_blender
       SOURCE_DIR: out/raspadinha_vendor_blender/source
       FINAL_DIR: out/raspadinha_vendor_blender/final
-      BLENDER_VERSION: "4.2.3"
       PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
+      LIBGL_ALWAYS_SOFTWARE: "1"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install headless and postprocess dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0 python3-pil
-
-      - name: Restore Blender cache
-        id: blender-cache
-        uses: actions/cache@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          path: ${{ runner.temp }}/blender-4.2.3
-          key: blender-${{ runner.os }}-4.2.3-linux-x64
+          python-version: "3.12"
 
-      - name: Download pinned Blender 4.2.3 LTS on cache miss
-        if: steps.blender-cache.outputs.cache-hit != 'true'
+      - name: Install postprocess dependency
         shell: bash
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          destination="$RUNNER_TEMP/blender-${BLENDER_VERSION}"
-          url="https://download.blender.org/release/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          rm -rf "$destination"
-          mkdir -p "$destination"
-          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
-          tar -xf "$archive" -C "$destination" --strip-components=1
-          test -x "$destination/blender"
+          python -m pip install --upgrade pillow
 
-      - name: Configure Blender executable
+      - name: Setup shared cached CH Blender
+        uses: ./.github/actions/setup-ch-blender
+
+      - name: Validate agent-visible Blender runtime
         shell: bash
         run: |
           set -euo pipefail
-          blender_exe="$RUNNER_TEMP/blender-${BLENDER_VERSION}/blender"
-          if [[ ! -x "$blender_exe" ]]; then
-            echo "Cached Blender executable not found: $blender_exe" >&2
-            exit 1
-          fi
-          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
-          "$blender_exe" --version | head -n 1
+          python tools/ch_blender/ch_blender_cli.py doctor --report "$OUT_DIR/ch_blender_doctor.json"
 
       - name: Build and bake four directions in Blender
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$SOURCE_DIR" "$FINAL_DIR"
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup --python-use-system-env \
+          xvfb-run -a "$CH_BLENDER_EXE" --background --factory-startup --python-use-system-env \
             --python tools/tycoon_photo_studio/build_raspadinha_vendor_blender.py -- \
             --studio-preset "$STUDIO_PRESET" \
             --output "$SOURCE_DIR" \
@@ -89,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/tycoon_photo_studio/postprocess.py \
+          python tools/tycoon_photo_studio/postprocess.py \
             --input "$SOURCE_DIR" \
             --output "$FINAL_DIR" \
             --studio-preset "$STUDIO_PRESET"

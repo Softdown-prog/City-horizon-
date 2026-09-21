@@ -40,6 +40,39 @@ Keep project-specific artistic settings data-driven whenever possible:
 
 The internal Blender build is the host/tool. The repository remains the authority for City Horizon visual contracts.
 
+## Agent-first operating model
+
+CH Blender is optimized for repository and CI agents first, not for interactive human UI.
+
+The stable machine interface is:
+
+- manifest: `tools/ch_blender/ch_blender_manifest.json`
+- CLI: `tools/ch_blender/ch_blender_cli.py`
+- deterministic worker: `tools/ch_blender/agent_worker.py`
+- agent rules: `tools/ch_blender/AGENTS.md`
+- shared GitHub setup/cache: `.github/actions/setup-ch-blender/action.yml`
+- generic queue worker: `.github/workflows/ch-blender-agent-worker.yml`
+- queued jobs: `tools/ch_blender/jobs/*.job.json`
+
+Agents should communicate with CH Blender through versioned JSON jobs and JSON reports. Prompts are not part of the execution contract.
+
+Each agent session should use a unique `jobId` and unique job file. This lets multiple ChatGPT, Claude or other agent sessions operate concurrently without sharing mutable prompt state or overwriting a global queue file.
+
+The worker records the Blender identity plus SHA-256 hashes for job inputs and produced files so another agent can audit or reproduce the same operation.
+
+## GitHub cache policy
+
+All new Blender-based workflows must use the repository-local `setup-ch-blender` action instead of implementing their own Blender download/cache block.
+
+The shared action derives its cache identity from:
+
+- the pinned upstream Blender version in the manifest; and
+- `cache.revision`.
+
+Therefore the 4.2.3 binary is downloaded only on a cache miss. Changing an asset, worker, Blender script or job does not invalidate the Blender binary cache. A Blender version change or an intentional cache-revision change does.
+
+The action exports `CH_BLENDER_EXE` and `BLENDER_EXE`, giving both agents and legacy scripts one predictable executable contract.
+
 ## Modification layers
 
 ### Layer 0 — baseline
@@ -56,7 +89,8 @@ Prefer Python/configuration/add-on changes for:
 - locking or restoring the canonical camera and lights;
 - four-direction render commands;
 - export/review commands;
-- validation warnings for non-canonical settings.
+- validation warnings for non-canonical settings;
+- deterministic agent commands and machine-readable reports.
 
 ### Layer 2 — small source patches
 
@@ -86,7 +120,11 @@ Use:
 ```text
 tools/ch_blender/
   ch_blender_manifest.json
+  ch_blender_cli.py
+  agent_worker.py
+  AGENTS.md
   bootstrap_windows.ps1
+  jobs/
   patches/
   scripts/
 ```
@@ -111,7 +149,9 @@ The first CH Blender milestone is intentionally small:
 
 - reproducible checkout of Blender `v4.2.3`;
 - private/internal build workspace;
+- agent-first CLI and deterministic JSON worker;
+- shared repository-wide GitHub binary cache;
 - no renderer modifications;
-- no replacement of GitHub Actions production Blender yet;
+- no replacement of the official render baseline by a modified CH Blender binary yet;
 - establish patch and integration structure;
-- then add the City Horizon authoring UI/workspace as a separate step.
+- then add source-level internal branding/defaults only where they provide concrete value.
