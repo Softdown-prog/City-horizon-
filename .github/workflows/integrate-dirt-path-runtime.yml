@@ -19,81 +19,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Wire dirt path into gameplay renderer
+      - name: Sync latest main
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
 
-          main_path = Path('src/main.cpp')
-          main = main_path.read_text(encoding='utf-8')
-
-          load_old = '''    (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
-    (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
-    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
-'''
-          load_new = '''    (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
-    (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
-    static constexpr std::array<const char*, 16> kDirtPathSprites = {
-        "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
-        "dirt_path_04_end_s.png", "dirt_path_05_straight_ns.png", "dirt_path_06_curve_es.png", "dirt_path_07_tee_no_w.png",
-        "dirt_path_08_end_w.png", "dirt_path_09_curve_nw.png", "dirt_path_10_straight_ew.png", "dirt_path_11_tee_no_s.png",
-        "dirt_path_12_curve_sw.png", "dirt_path_13_tee_no_e.png", "dirt_path_14_tee_no_n.png", "dirt_path_15_cross.png",
-    };
-    for (const char* sprite : kDirtPathSprites) {
-        (void)textures.load(renderer, asset_root / "assets/terrain/paths/dirt_01" / sprite);
-    }
-    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
-'''
-          if load_old not in main:
-              raise SystemExit('startup texture load anchor not found')
-          main = main.replace(load_old, load_new, 1)
-
-          mode_old = '        status = "CEMENT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);'
-          mode_new = '        status = "DIRT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);'
-          if mode_old not in main:
-              raise SystemExit('path mode status anchor not found')
-          main = main.replace(mode_old, mode_new, 1)
-
-          placement_old = '''                        if (sidewalks.place_tile(tile.x, tile.y, "cement_path")) {
-                            ++placed;
-                        }
-                    }
-                    status = placed == 0 ? "CEMENT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
-                        "CEMENT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
-'''
-          placement_new = '''                        if (sidewalks.place_tile(tile.x, tile.y, "dirt_path")) {
-                            ++placed;
-                        }
-                    }
-                    status = placed == 0 ? "DIRT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
-                        "DIRT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
-'''
-          if placement_old not in main:
-              raise SystemExit('path placement anchor not found')
-          main = main.replace(placement_old, placement_new, 1)
-          main_path.write_text(main, encoding='utf-8')
-
-          renderer_path = Path('src/ch_render/map_renderer.cpp')
-          renderer = renderer_path.read_text(encoding='utf-8')
-          renderer_old = '''    if (style_id == "cement_path") {
-        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
-    }
-    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
-'''
-          renderer_new = '''    if (style_id == "cement_path") {
-        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
-    }
-    if (style_id == "dirt_path") {
-        return dirt_path_sprite(connections);
-    }
-    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
-'''
-          if renderer_old not in renderer:
-              raise SystemExit('sidewalk renderer anchor not found')
-          renderer = renderer.replace(renderer_old, renderer_new, 1)
-          renderer_path.write_text(renderer, encoding='utf-8')
-          PY
+      - name: Wire dirt path into gameplay renderer
+        shell: bash
+        run: python -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgptYWluX3BhdGggPSBQYXRoKCJzcmMvbWFpbi5jcHAiKQptYWluID0gbWFpbl9wYXRoLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQoKbG9hZF9vbGQgPSAiIiIgICAgKHZvaWQpdGV4dHVyZXMubG9hZChyZW5kZXJlciwgYXNzZXRfcm9vdCAvICJhc3NldHMvc2lkZXdhbGtzL2NvbmNyZXRlXzAxL3NpZGV3YWxrX2NvbmNyZXRlXzE1X3NlYW1sZXNzLnBuZyIpOwogICAgKHZvaWQpdGV4dHVyZXMubG9hZChyZW5kZXJlciwgYXNzZXRfcm9vdCAvICJhc3NldHMvdGVycmFpbi9wYXRocy9ncmFzc190b19jb25jcmV0ZV9wYXRoXzAxX2NvbmNyZXRlX3BhdGgucG5nIik7CiAgICAodm9pZCl0ZXh0dXJlcy5sb2FkKHJlbmRlcmVyLCBhc3NldF9yb290IC8gImFzc2V0cy9mYXJtaW5nL3ByZXBhcmVkX3NvaWwvcHJlcGFyZWRfc29pbF8wMS5wbmciKTsKIiIiCmxvYWRfbmV3ID0gIiIiICAgICh2b2lkKXRleHR1cmVzLmxvYWQocmVuZGVyZXIsIGFzc2V0X3Jvb3QgLyAiYXNzZXRzL3NpZGV3YWxrcy9jb25jcmV0ZV8wMS9zaWRld2Fsa19jb25jcmV0ZV8xNV9zZWFtbGVzcy5wbmciKTsKICAgICh2b2lkKXRleHR1cmVzLmxvYWQocmVuZGVyZXIsIGFzc2V0X3Jvb3QgLyAiYXNzZXRzL3RlcnJhaW4vcGF0aHMvZ3Jhc3NfdG9fY29uY3JldGVfcGF0aF8wMV9jb25jcmV0ZV9wYXRoLnBuZyIpOwogICAgc3RhdGljIGNvbnN0ZXhwciBzdGQ6OmFycmF5PGNvbnN0IGNoYXIqLCAxNj4ga0RpcnRQYXRoU3ByaXRlcyA9IHsKICAgICAgICAiZGlydF9wYXRoXzAwX2lzb2xhdGVkLnBuZyIsICJkaXJ0X3BhdGhfMDFfZW5kX24ucG5nIiwgImRpcnRfcGF0aF8wMl9lbmRfZS5wbmciLCAiZGlydF9wYXRoXzAzX2N1cnZlX25lLnBuZyIsCiAgICAgICAgImRpcnRfcGF0aF8wNF9lbmRfcy5wbmciLCAiZGlydF9wYXRoXzA1X3N0cmFpZ2h0X25zLnBuZyIsICJkaXJ0X3BhdGhfMDZfY3VydmVfZXMucG5nIiwgImRpcnRfcGF0aF8wN190ZWVfbm9fdy5wbmciLAogICAgICAgICJkaXJ0X3BhdGhfMDhfZW5kX3cucG5nIiwgImRpcnRfcGF0aF8wOV9jdXJ2ZV9udy5wbmciLCAiZGlydF9wYXRoXzEwX3N0cmFpZ2h0X2V3LnBuZyIsICJkaXJ0X3BhdGhfMTFfdGVlX25vX3MucG5nIiwKICAgICAgICAiZGlydF9wYXRoXzEyX2N1cnZlX3N3LnBuZyIsICJkaXJ0X3BhdGhfMTNfdGVlX25vX2UucG5nIiwgImRpcnRfcGF0aF8xNF90ZWVfbm9fbi5wbmciLCAiZGlydF9wYXRoXzE1X2Nyb3NzLnBuZyIsCiAgICB9OwogICAgZm9yIChjb25zdCBjaGFyKiBzcHJpdGUgOiBrRGlydFBhdGhTcHJpdGVzKSB7CiAgICAgICAgKHZvaWQpdGV4dHVyZXMubG9hZChyZW5kZXJlciwgYXNzZXRfcm9vdCAvICJhc3NldHMvdGVycmFpbi9wYXRocy9kaXJ0XzAxIiAvIHNwcml0ZSk7CiAgICB9CiAgICAodm9pZCl0ZXh0dXJlcy5sb2FkKHJlbmRlcmVyLCBhc3NldF9yb290IC8gImFzc2V0cy9mYXJtaW5nL3ByZXBhcmVkX3NvaWwvcHJlcGFyZWRfc29pbF8wMS5wbmciKTsKIiIiCmlmIGxvYWRfb2xkIG5vdCBpbiBtYWluOgogICAgcmFpc2UgU3lzdGVtRXhpdCgic3RhcnR1cCB0ZXh0dXJlIGxvYWQgYW5jaG9yIG5vdCBmb3VuZCIpCm1haW4gPSBtYWluLnJlcGxhY2UobG9hZF9vbGQsIGxvYWRfbmV3LCAxKQoKbW9kZV9vbGQgPSAnICAgICAgICBzdGF0dXMgPSAiQ0VNRU5UIFBBVEggTU9ERTogRFJBRyBPTiBPV05FRCBHUkFTUyI7ICh2b2lkKWF1ZGlvLnBsYXkoU291bmRFdmVudDo6dWlfc2VsZWN0KTsnCm1vZGVfbmV3ID0gJyAgICAgICAgc3RhdHVzID0gIkRJUlQgUEFUSCBNT0RFOiBEUkFHIE9OIE9XTkVEIEdSQVNTIjsgKHZvaWQpYXVkaW8ucGxheShTb3VuZEV2ZW50Ojp1aV9zZWxlY3QpOycKaWYgbW9kZV9vbGQgbm90IGluIG1haW46CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJwYXRoIG1vZGUgc3RhdHVzIGFuY2hvciBub3QgZm91bmQiKQptYWluID0gbWFpbi5yZXBsYWNlKG1vZGVfb2xkLCBtb2RlX25ldywgMSkKCnBsYWNlbWVudF9vbGQgPSAiIiIgICAgICAgICAgICAgICAgICAgICAgICBpZiAoc2lkZXdhbGtzLnBsYWNlX3RpbGUodGlsZS54LCB0aWxlLnksICJjZW1lbnRfcGF0aCIpKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICArK3BsYWNlZDsKICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBzdGF0dXMgPSBwbGFjZWQgPT0gMCA/ICJDRU1FTlQgUEFUSCBCTE9DS0VEIEJZIFJPQUQsIEJVSUxESU5HIE9SIFRJTEUiIDoKICAgICAgICAgICAgICAgICAgICAgICAgIkNFTUVOVCBQQVRIIFBMQUNFRDogIiArIHN0ZDo6dG9fc3RyaW5nKHBsYWNlZCkgKyAiIFRJTEUoUykiICsKIiIiCnBsYWNlbWVudF9uZXcgPSAiIiIgICAgICAgICAgICAgICAgICAgICAgICBpZiAoc2lkZXdhbGtzLnBsYWNlX3RpbGUodGlsZS54LCB0aWxlLnksICJkaXJ0X3BhdGgiKSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgKytwbGFjZWQ7CiAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgc3RhdHVzID0gcGxhY2VkID09IDAgPyAiRElSVCBQQVRIIEJMT0NLRUQgQlkgUk9BRCwgQlVJTERJTkcgT1IgVElMRSIgOgogICAgICAgICAgICAgICAgICAgICAgICAiRElSVCBQQVRIIFBMQUNFRDogIiArIHN0ZDo6dG9fc3RyaW5nKHBsYWNlZCkgKyAiIFRJTEUoUykiICsKIiIiCmlmIHBsYWNlbWVudF9vbGQgbm90IGluIG1haW46CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJwYXRoIHBsYWNlbWVudCBhbmNob3Igbm90IGZvdW5kIikKbWFpbiA9IG1haW4ucmVwbGFjZShwbGFjZW1lbnRfb2xkLCBwbGFjZW1lbnRfbmV3LCAxKQptYWluX3BhdGgud3JpdGVfdGV4dChtYWluLCBlbmNvZGluZz0idXRmLTgiKQoKcmVuZGVyZXJfcGF0aCA9IFBhdGgoInNyYy9jaF9yZW5kZXIvbWFwX3JlbmRlcmVyLmNwcCIpCnJlbmRlcmVyID0gcmVuZGVyZXJfcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKcmVuZGVyZXJfb2xkID0gIiIiICAgIGlmIChzdHlsZV9pZCA9PSAiY2VtZW50X3BhdGgiKSB7CiAgICAgICAgcmV0dXJuICJhc3NldHMvdGVycmFpbi9wYXRocy9ncmFzc190b19jb25jcmV0ZV9wYXRoXzAxX2NvbmNyZXRlX3BhdGgucG5nIjsKICAgIH0KICAgIGNvbnN0IHN0ZDo6c3RyaW5nIGJhc2UgPSAiYXNzZXRzL3NpZGV3YWxrcy8iICsgc3R5bGVfaWQgKyAiL3NpZGV3YWxrX2NvbmNyZXRlXyI7CiIiIgpyZW5kZXJlcl9uZXcgPSAiIiIgICAgaWYgKHN0eWxlX2lkID09ICJjZW1lbnRfcGF0aCIpIHsKICAgICAgICByZXR1cm4gImFzc2V0cy90ZXJyYWluL3BhdGhzL2dyYXNzX3RvX2NvbmNyZXRlX3BhdGhfMDFfY29uY3JldGVfcGF0aC5wbmciOwogICAgfQogICAgaWYgKHN0eWxlX2lkID09ICJkaXJ0X3BhdGgiKSB7CiAgICAgICAgcmV0dXJuIGRpcnRfcGF0aF9zcHJpdGUoY29ubmVjdGlvbnMpOwogICAgfQogICAgY29uc3Qgc3RkOjpzdHJpbmcgYmFzZSA9ICJhc3NldHMvc2lkZXdhbGtzLyIgKyBzdHlsZV9pZCArICIvc2lkZXdhbGtfY29uY3JldGVfIjsKIiIiCmlmIHJlbmRlcmVyX29sZCBub3QgaW4gcmVuZGVyZXI6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJzaWRld2FsayByZW5kZXJlciBhbmNob3Igbm90IGZvdW5kIikKcmVuZGVyZXIgPSByZW5kZXJlci5yZXBsYWNlKHJlbmRlcmVyX29sZCwgcmVuZGVyZXJfbmV3LCAxKQpyZW5kZXJlcl9wYXRoLndyaXRlX3RleHQocmVuZGVyZXIsIGVuY29kaW5nPSJ1dGYtOCIpCg=='))"
 
       - name: Verify targeted runtime wiring
         shell: bash
@@ -110,4 +45,5 @@ jobs:
           git rm .github/workflows/integrate-dirt-path-runtime.yml
           git add src/main.cpp src/ch_render/map_renderer.cpp
           git commit -m "game: wire dirt path autotile into runtime"
+          git pull --rebase origin main
           git push origin HEAD:main
