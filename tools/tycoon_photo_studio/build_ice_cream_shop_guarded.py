@@ -15,7 +15,7 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 import build_small_commercial_guarded as guarded  # noqa: E402
-import generate_ice_cream_shop_asset as ice_cream  # noqa: E402
+import generate_ice_cream_shop_asset_v3 as ice_cream  # noqa: E402
 
 # Reuse the proven gate, camera, lighting, color-mask validation and proxy
 # rendering. Replace the guarded builder's expander reference without mutating
