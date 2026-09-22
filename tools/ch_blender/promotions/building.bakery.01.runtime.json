@@ -1,6 +1,7 @@
 {
   "contract": "CH_RUNTIME_BUILDING_PROMOTION_V1",
   "approved": true,
+  "promotionAttempt": 2,
   "assetId": "building.bakery.01",
   "displayName": "Padaria",
   "fileStem": "bakery",
