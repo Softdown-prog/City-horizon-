@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: process-audio-assets-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   process:
     runs-on: ubuntu-24.04
@@ -21,6 +25,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
 
       - name: Set up Python
         uses: actions/setup-python@v5
