@@ -1,0 +1,116 @@
+name: Generate Sand Autotile
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Converter/file_00000000a974820eafcd5ead28332854.png"
+      - "tools/ground_tile_worker.py"
+      - "tools/generate_sand_paths.py"
+      - ".github/workflows/generate-sand-autotile.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: generate-sand-autotile
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Prepare flat canonical sand tile
+        run: |
+          python tools/ground_tile_worker.py \
+            Converter/file_00000000a974820eafcd5ead28332854.png \
+            assets/terrain/sand_isometric_01.png \
+            --strip-edge-band 6 \
+            --preview out/sand_repeated_preview.png \
+            --report out/sand_ground_tile_report.json
+
+      - name: Generate 16-mask sand family
+        run: |
+          python tools/generate_sand_paths.py \
+            --source assets/terrain/sand_isometric_01.png \
+            --output-dir assets/terrain/paths/sand_01 \
+            --preview out/sand_path_autotile_preview.png
+
+      - name: Validate generated tiles
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          source = Path('assets/terrain/sand_isometric_01.png')
+          with Image.open(source) as im:
+              im.load()
+              if im.mode != 'RGBA' or im.size != (128, 64):
+                  raise SystemExit(f'{source}: expected 128x64 RGBA, got {im.size} {im.mode}')
+
+          report = json.loads(Path('out/sand_ground_tile_report.json').read_text(encoding='utf-8'))
+          if not report.get('ok'):
+              raise SystemExit(f"sand seam gate failed: {report}")
+
+          root = Path('assets/terrain/paths/sand_01')
+          files = sorted(root.glob('sand_path_*.png'))
+          if len(files) != 16:
+              raise SystemExit(f'expected 16 sand autotile PNGs, found {len(files)}')
+
+          for i in range(16):
+              prefix = f'sand_path_{i:02d}_'
+              matches = [p for p in files if p.name.startswith(prefix)]
+              if len(matches) != 1:
+                  raise SystemExit(f'missing or duplicate mask {prefix}')
+
+          for path in files:
+              with Image.open(path) as im:
+                  im.load()
+                  if im.mode != 'RGBA' or im.size != (128, 64):
+                      raise SystemExit(f'{path}: expected 128x64 RGBA, got {im.size} {im.mode}')
+          print(f"PASS sand source=128x64 RGBA masks=16 edge_error={report['edgeError']}")
+          PY
+
+      - name: Upload sand previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Sand-Autotile-Preview
+          path: |
+            out/sand_repeated_preview.png
+            out/sand_path_autotile_preview.png
+            out/sand_ground_tile_report.json
+            assets/terrain/sand_isometric_01.png
+            assets/terrain/paths/sand_01/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit generated runtime tiles
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/terrain/sand_isometric_01.png assets/terrain/paths/sand_01
+          if git diff --cached --quiet; then
+            echo "Sand runtime tile and autotile family already up to date."
+            exit 0
+          fi
+          git commit -m "asset: add approved sand autotile family"
+          git pull --rebase origin main
+          git push origin HEAD:main
