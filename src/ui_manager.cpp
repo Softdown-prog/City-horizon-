@@ -16,6 +16,28 @@ constexpr float kTopBarHeight = 64.0F;
 constexpr float kToolbarHeight = 74.0F;
 constexpr float kButtonHeight = 30.0F;
 
+struct BuildingColorSwatch {
+    Uint8 r;
+    Uint8 g;
+    Uint8 b;
+};
+
+constexpr std::array<BuildingColorSwatch, 7> kBuildingColorPalette = {{
+    {226, 202, 160},  // warm cream
+    {190, 112, 81},   // brick
+    {203, 163, 91},   // ochre
+    {119, 151, 116},  // sage
+    {105, 143, 172},  // blue
+    {172, 119, 131},  // rose
+    {122, 132, 139},  // slate
+}};
+
+std::string color_payload(const BuildingColorSwatch swatch) {
+    return std::to_string(static_cast<int>(swatch.r)) + ":" +
+           std::to_string(static_cast<int>(swatch.g)) + ":" +
+           std::to_string(static_cast<int>(swatch.b));
+}
+
 void draw_panel(SDL_Renderer* renderer, const UiRect& bounds) {
     SDL_SetRenderDrawColor(renderer, 16, 25, 30, 232);
     const SDL_FRect rect = {bounds.x, bounds.y, bounds.width, bounds.height};
@@ -204,6 +226,24 @@ void draw_pause_panel(SDL_Renderer* renderer, const UiRect& bounds) {
     SDL_SetRenderDrawColor(renderer, 91, 188, 211, SDL_ALPHA_OPAQUE);
     SDL_RenderLine(renderer, bounds.x + 2.0F, bounds.y + 3.0F,
                    bounds.x + bounds.width - 2.0F, bounds.y + 3.0F);
+}
+
+void draw_color_swatch_button(SDL_Renderer* renderer, const UiButton& button) {
+    const SDL_FRect shadow = {button.bounds.x + 2.0F, button.bounds.y + 2.0F, button.bounds.width, button.bounds.height};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 70);
+    SDL_RenderFillRect(renderer, &shadow);
+    const SDL_FRect rect = {button.bounds.x, button.bounds.y, button.bounds.width, button.bounds.height};
+    SDL_SetRenderDrawColor(renderer, button.swatch_r, button.swatch_g, button.swatch_b, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &rect);
+    if (button.active) SDL_SetRenderDrawColor(renderer, 238, 246, 249, SDL_ALPHA_OPAQUE);
+    else if (button.state == UiButtonState::hover || button.state == UiButtonState::pressed)
+        SDL_SetRenderDrawColor(renderer, 91, 188, 211, SDL_ALPHA_OPAQUE);
+    else SDL_SetRenderDrawColor(renderer, 54, 78, 90, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &rect);
+    if (button.active) {
+        const SDL_FRect inner = {rect.x + 2.0F, rect.y + 2.0F, rect.w - 4.0F, rect.h - 4.0F};
+        SDL_RenderRect(renderer, &inner);
+    }
 }
 
 void draw_pause_button(SDL_Renderer* renderer, const UiButton& button) {
@@ -679,7 +719,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();
         const float service_height = item.has_service_pricing ? 82.0F : 0.0F;
-        const float required_height = 126.0F + service_height + static_cast<float>(detail_lines) * 17.0F;
+        const float color_height = item.has_color_customization ? 122.0F : 0.0F;
+        const float required_height = 126.0F + service_height + color_height + static_cast<float>(detail_lines) * 17.0F;
         const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);
         const float panel_height = std::min(maximum_height, std::max(308.0F, required_height));
         add_panel({panel_x, panel_y, panel_width, panel_height});
@@ -689,6 +730,29 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                        UiAction::decrease_service_price, item.can_decrease_service_price);
             add_button({panel_x + 282.0F, panel_y + 143.0F, 34.0F, 30.0F}, "+",
                        UiAction::increase_service_price, item.can_increase_service_price);
+        }
+        if (item.has_color_customization) {
+            const float color_top = panel_y + panel_height - 116.0F;
+            constexpr float swatch_size = 26.0F;
+            constexpr float swatch_gap = 5.0F;
+            const auto add_palette_row = [&](const float y, const UiAction action, const bool customized,
+                                             const int current_r, const int current_g, const int current_b) {
+                for (std::size_t index = 0; index < kBuildingColorPalette.size(); ++index) {
+                    const BuildingColorSwatch swatch = kBuildingColorPalette[index];
+                    const bool active = customized && current_r == swatch.r && current_g == swatch.g && current_b == swatch.b;
+                    add_button({panel_x + 96.0F + static_cast<float>(index) * (swatch_size + swatch_gap), y, swatch_size, swatch_size},
+                               "", action, true, active, color_payload(swatch));
+                    UiButton& button = buttons_.back();
+                    button.color_swatch = true;
+                    button.swatch_r = swatch.r; button.swatch_g = swatch.g; button.swatch_b = swatch.b;
+                }
+            };
+            add_palette_row(color_top + 21.0F, UiAction::set_wall_color, item.wall_color_customized,
+                            item.wall_tint_r, item.wall_tint_g, item.wall_tint_b);
+            add_palette_row(color_top + 53.0F, UiAction::set_roof_color, item.roof_color_customized,
+                            item.roof_tint_r, item.roof_tint_g, item.roof_tint_b);
+            add_button({panel_x + 216.0F, color_top + 84.0F, 100.0F, 24.0F}, "ORIGINAL",
+                       UiAction::reset_building_colors, item.wall_color_customized || item.roof_color_customized);
         }
     }
 
@@ -1024,7 +1088,10 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
     if (model_.selected_building) {
         const UiSelectedBuilding& item = *model_.selected_building;
         float panel_x = 0.0F;
-        for (const UiRect& panel : panels_) if (panel.width == 330.0F && panel.y == 84.0F) { panel_x = panel.x; break; }
+        float panel_height = 0.0F;
+        for (const UiRect& panel : panels_) if (panel.width == 330.0F && panel.y == 84.0F) {
+            panel_x = panel.x; panel_height = panel.height; break;
+        }
         const SDL_FRect preview = {panel_x + 12.0F, 116.0F, 78.0F, 68.0F};
         SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &preview);
         if (const UiThumbnail* thumbnail = thumbnail_for(renderer, item.thumbnail_path)) {
@@ -1060,6 +1127,16 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             detail("RECEITA ESTIMADA", item.commercial_current_revenue + "/MES"); detail("MANUTENCAO", item.monthly_maintenance + "/MES");
         }
         detail("ABASTECIMENTO LOCAL", item.local_supply);
+        if (item.has_color_customization) {
+            const float color_top = 84.0F + panel_height - 116.0F;
+            SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);
+            SDL_RenderLine(renderer, panel_x + 12.0F, color_top + 5.0F, panel_x + 316.0F, color_top + 5.0F);
+            draw_text(renderer, panel_x + 12.0F, color_top + 28.0F, "PAREDE", 164, 193, 205);
+            draw_text(renderer, panel_x + 12.0F, color_top + 60.0F, "TELHADO", 164, 193, 205);
+            draw_text(renderer, panel_x + 12.0F, color_top + 91.0F,
+                      item.wall_color_customized || item.roof_color_customized ? "CORES PERSONALIZADAS" : "CORES ORIGINAIS",
+                      118, 151, 166);
+        }
     }
 
     if (!model_.status.empty()) {
@@ -1076,6 +1153,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
     // dimmer/panel below so they remain visible and interactive.
     for (const UiButton& button : buttons_) {
         if (button.build_card) render_build_card(renderer, button);
+        else if (button.color_swatch) draw_color_swatch_button(renderer, button);
         else if (!draw_chrome_button(button)) {
             if (draw_state_atlas_button(button)) draw_button_content(renderer, button);
             else draw_button(renderer, button);

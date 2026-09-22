@@ -202,9 +202,10 @@ struct BuildingInstance {
     std::int64_t service_price = 0;
 
 
-    // Two instances of the same definition may carry different player colors.
-    // False means render the approved source PNG with no recolor pass.
-    bool color_customized = false;
+    // Wall and roof are intentionally independent: changing one channel
+    // must never brighten or recolor the other masked region.
+    bool wall_color_customized = false;
+    bool roof_color_customized = false;
     BuildingColorTint wall_tint{};
     BuildingColorTint roof_tint{};
     [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
@@ -268,6 +269,8 @@ public:
     [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
                                          std::int64_t service_price);
     [[nodiscard]] bool set_color_customization(std::uint64_t instance_id, BuildingColorTint wall, BuildingColorTint roof);
+    [[nodiscard]] bool set_wall_color_customization(std::uint64_t instance_id, BuildingColorTint wall);
+    [[nodiscard]] bool set_roof_color_customization(std::uint64_t instance_id, BuildingColorTint roof);
     [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id);
     std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;

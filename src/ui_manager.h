@@ -72,6 +72,9 @@ enum class UiAction : std::uint8_t {
     settings_apply,
     decrease_service_price,
     increase_service_price,
+    set_wall_color,
+    set_roof_color,
+    reset_building_colors,
     close_selection,
     upgrade_building,
 };
@@ -143,6 +146,15 @@ struct UiSelectedBuilding {
     bool has_service_pricing = false;
     bool can_decrease_service_price = false;
     bool can_increase_service_price = false;
+    bool has_color_customization = false;
+    bool wall_color_customized = false;
+    bool roof_color_customized = false;
+    int wall_tint_r = 255;
+    int wall_tint_g = 255;
+    int wall_tint_b = 255;
+    int roof_tint_r = 255;
+    int roof_tint_g = 255;
+    int roof_tint_b = 255;
 };
 
 struct UiLandDetails {
@@ -206,6 +218,10 @@ struct UiButton {
     std::string requirements;
     std::string thumbnail_path;
     bool build_card = false;
+    bool color_swatch = false;
+    Uint8 swatch_r = 255;
+    Uint8 swatch_g = 255;
+    Uint8 swatch_b = 255;
 };
 
 class GameplayUi {

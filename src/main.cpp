@@ -878,18 +878,23 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
 
                 // CH_COLOR_MASK_V1 is opt-in. The approved source sprite stays
                 // untouched until this concrete instance has player colors.
-                if (draw.building->color_customized && definition->supports_color_mask(visual_rotation)) {
+                if ((draw.building->wall_color_customized || draw.building->roof_color_customized) &&
+                    definition->supports_color_mask(visual_rotation)) {
                     constexpr Uint8 kTintOverlayAlpha = 184;
                     const auto mask_path = root / definition->color_mask_path_for(visual_rotation);
-                    if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
-                        render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
-                                        viewport_width, viewport_height, kTintOverlayAlpha,
-                                        draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
+                    if (draw.building->wall_color_customized) {
+                        if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
+                            render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
+                                            viewport_width, viewport_height, kTintOverlayAlpha,
+                                            draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
+                        }
                     }
-                    if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
-                        render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
-                                        viewport_width, viewport_height, kTintOverlayAlpha,
-                                        draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
+                    if (draw.building->roof_color_customized) {
+                        if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
+                            render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
+                                            viewport_width, viewport_height, kTintOverlayAlpha,
+                                            draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
+                        }
                     }
                 }
             }
@@ -2004,6 +2009,53 @@ int main() {
                 }
                 break;
             }
+            case UiAction::set_wall_color:
+            case UiAction::set_roof_color: {
+                if (!selected_instance_id) {
+                    status = "NO BUILDING SELECTED";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id);
+                const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);
+                if (instance == nullptr || definition == nullptr || !definition->supports_color_mask(instance->rotation)) {
+                    status = "BUILDING HAS NO COLOR MASK";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                const std::size_t first = action.payload.find(':');
+                const std::size_t second = first == std::string::npos ? std::string::npos : action.payload.find(':', first + 1);
+                if (first == std::string::npos || second == std::string::npos) {
+                    status = "INVALID COLOR";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                try {
+                    const int r = std::clamp(std::stoi(action.payload.substr(0, first)), 0, 255);
+                    const int g = std::clamp(std::stoi(action.payload.substr(first + 1, second - first - 1)), 0, 255);
+                    const int b = std::clamp(std::stoi(action.payload.substr(second + 1)), 0, 255);
+                    const BuildingColorTint tint{static_cast<std::uint8_t>(r), static_cast<std::uint8_t>(g), static_cast<std::uint8_t>(b)};
+                    const bool changed = action.action == UiAction::set_wall_color
+                        ? buildings.set_wall_color_customization(instance->instance_id, tint)
+                        : buildings.set_roof_color_customization(instance->instance_id, tint);
+                    status = changed ? definition->name + (action.action == UiAction::set_wall_color ? ": WALL COLOR" : ": ROOF COLOR")
+                                     : "COLOR CHANGE FAILED";
+                    (void)audio.play(changed ? SoundEvent::ui_click : SoundEvent::ui_error);
+                } catch (...) {
+                    status = "INVALID COLOR";
+                    (void)audio.play(SoundEvent::ui_error);
+                }
+                break;
+            }
+            case UiAction::reset_building_colors:
+                if (selected_instance_id && buildings.clear_color_customization(*selected_instance_id)) {
+                    status = "ORIGINAL BUILDING COLORS RESTORED";
+                    (void)audio.play(SoundEvent::ui_click);
+                } else {
+                    status = "COLOR RESET FAILED";
+                    (void)audio.play(SoundEvent::ui_error);
+                }
+                break;
             case UiAction::close_selection:
                 selected_instance_id.reset();
                 status = "INFO PANEL CLOSED";
@@ -2219,6 +2271,15 @@ int main() {
                         definition->default_service_price > 0,
                         definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,
                         definition->default_service_price > 0 && instance->service_price < definition->maximum_service_price,
+                        definition->color_mask.has_value() && definition->color_mask->enabled,
+                        instance->wall_color_customized,
+                        instance->roof_color_customized,
+                        static_cast<int>(instance->wall_tint.r),
+                        static_cast<int>(instance->wall_tint.g),
+                        static_cast<int>(instance->wall_tint.b),
+                        static_cast<int>(instance->roof_tint.r),
+                        static_cast<int>(instance->roof_tint.g),
+                        static_cast<int>(instance->roof_tint.b),
                     };
                 }
             }

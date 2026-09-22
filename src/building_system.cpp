@@ -890,7 +890,28 @@ bool BuildingManager::set_color_customization(const std::uint64_t instance_id, c
     if (found == instances_.end()) return false;
     found->wall_tint = wall;
     found->roof_tint = roof;
-    found->color_customized = true;
+    found->wall_color_customized = true;
+    found->roof_color_customized = true;
+    return true;
+}
+
+bool BuildingManager::set_wall_color_customization(const std::uint64_t instance_id, const BuildingColorTint wall) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->wall_tint = wall;
+    found->wall_color_customized = true;
+    return true;
+}
+
+bool BuildingManager::set_roof_color_customization(const std::uint64_t instance_id, const BuildingColorTint roof) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->roof_tint = roof;
+    found->roof_color_customized = true;
     return true;
 }
 
@@ -899,7 +920,8 @@ bool BuildingManager::clear_color_customization(const std::uint64_t instance_id)
         return instance.instance_id == instance_id;
     });
     if (found == instances_.end()) return false;
-    found->color_customized = false;
+    found->wall_color_customized = false;
+    found->roof_color_customized = false;
     found->wall_tint = {};
     found->roof_tint = {};
     return true;
