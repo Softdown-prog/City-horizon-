@@ -14,6 +14,7 @@ The current style contract is `CH_STYLIZED_PRERENDER_V1`. The target is a readab
 - studio: `CH_TYCOON_STUDIO_V1`
 - bake: `TYCOON_ASSET_BAKE_V1`
 - style: `CH_STYLIZED_PRERENDER_V1`
+- optional color mask: `CH_COLOR_MASK_V1`
 - grid reference: 128×64, 2:1
 - camera: orthographic, 45° yaw, 30° elevation
 - directions: SOUTH / EAST / WEST / NORTH
@@ -84,6 +85,39 @@ The studio remains frozen:
 
 Do not move the camera or lights independently for each direction.
 
+## Optional building/prop color masks
+
+Recolorable assets may opt into `CH_COLOR_MASK_V1`. Do not generate a mask for every asset by default.
+
+A mask-enabled `TYCOON_ASSET_SOURCE_V1` declares semantic channels such as:
+
+```json
+"colorMask": {
+  "contract": "CH_COLOR_MASK_V1",
+  "enabled": true,
+  "channels": {
+    "R": "wall",
+    "G": "roof",
+    "B": "trim"
+  },
+  "alpha": "coverage"
+}
+```
+
+Recolorable source materials then declare `maskRole` using one of those semantic names. Imported `.blend` materials may instead carry the custom property `ch_color_mask_role`; a whole imported part may use `maskRole` as a coarse override.
+
+V1 intentionally reserves alpha for object coverage rather than using it as a fourth tint group. This keeps the packed PNG inspectable and avoids conflating transparency with recolor data. If more than three independently tintable regions are genuinely required, define a later contract rather than silently changing V1.
+
+When enabled, Blender emits an aligned mask source for every canonical direction and post-process emits gameplay-scale mask PNGs plus a four-view and review sheet. Masks share the color sprite's camera, AssetRoot rotation, frame resolution and pivot.
+
+Mask data must not receive lighting, AO, cast shadows, palette reduction, dithering, edge outlines or background/halo removal. Unassigned visible surfaces stay RGB black and are therefore not recolored.
+
+Use masks where variation is valuable: houses, shops, apartment blocks, warehouses and modular buildings. Avoid automatic masks for landmarks, unique hero buildings, glass-heavy assets, terrain and authored identity colors unless the design explicitly requires recoloring.
+
+Authoring support does not imply runtime tinting is already implemented. The SDL runtime must separately sample `CH_COLOR_MASK_V1` and combine selected colors with the original sprite while preserving its lighting/value structure.
+
+Agent instructions: `tools/ch_blender/COLOR_MASK_AGENTS.md`.
+
 ## Why the final asset is reduced
 
 The source bake may be supersampled and more detailed than the final game sprite. `postprocess.py` downsamples to gameplay scale.
@@ -102,7 +136,8 @@ Do not increase source/detail scale just to make an isolated Blender image look 
 - shared pivot packaging;
 - fixed four-view sheet;
 - trimmed atlas generation;
-- review/context boards.
+- review/context boards;
+- opt-in `CH_COLOR_MASK_V1` downsample/review packaging.
 
 Therefore, do **not** automatically send every Blender render through a second background remover, halo remover or manual cropper. The Blender color pass is already intended to use a transparent background. Add an extra cleanup step only when inspection of the final PNG shows an actual defect.
 
@@ -120,6 +155,11 @@ Expected building-like outputs commonly include:
 - `<asset>_4dir_context.png`
 - atlas + manifest
 
+Mask-enabled assets additionally include:
+- `<asset>_<direction>_mask.png`
+- `<asset>_mask_4view.png`
+- `<asset>_mask_review.png`
+
 When a visual asset is generated through Actions, surface the review/capture artifact so the human can inspect the result before promotion.
 
 A green workflow means **execution succeeded**, not that the art was approved.
@@ -134,6 +174,7 @@ Review at minimum:
 - context board;
 - footprint and pivot consistency;
 - alpha/edge quality on representative backgrounds;
+- color-mask review when the asset opts into `CH_COLOR_MASK_V1`;
 - MapForge/runtime placement when integration matters.
 
 Once an asset is approved, freeze it. Do not reopen it for speculative polishing unless a concrete in-game problem appears.
