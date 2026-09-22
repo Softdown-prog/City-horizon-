@@ -255,5 +255,7 @@ private:
     int viewport_height_ = 1;
     float build_scroll_offset_ = 0.0F;
     float build_scroll_max_ = 0.0F;
+    float build_panel_header_height_ = 42.0F;
+    std::string build_category_filter_ = "TODOS";
     mutable std::unordered_map<std::string, UiThumbnail> thumbnails_;
 };
