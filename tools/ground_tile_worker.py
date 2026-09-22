@@ -8,10 +8,11 @@ the same intake instead of rebuilding one-off cleanup scripts.
 
 Pipeline:
 1. normalize arbitrary PNG/JPG input to the canonical 128x64 diamond;
-2. fill anti-aliased transparent edge texels from nearby interior texture;
-3. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
-4. soften opposite-edge colour mismatch in a narrow border band;
-5. render a grid-free repeated preview and write JSON metrics.
+2. optionally replace a baked visual border/bevel with nearby interior texture;
+3. fill anti-aliased transparent edge texels from nearby interior texture;
+4. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
+5. soften opposite-edge colour mismatch in a narrow border band;
+6. render a grid-free repeated preview and write JSON metrics.
 
 This worker does not invent topology/autotile art. A topology-specific generator
 can consume its prepared PNG afterwards.
@@ -35,6 +36,46 @@ def diamond_mask() -> Image.Image:
     alpha = Image.new("L", (W, H), 0)
     ImageDraw.Draw(alpha).polygon(((W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)), fill=255)
     return alpha
+
+
+def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
+    """Replace a baked rim/bevel with samples pulled from the interior texture.
+
+    Generated source art sometimes arrives as a raised diamond with a visible
+    side wall. Ground tiles must be a flat surface. For pixels near the diamond
+    boundary this function samples farther toward the centre, preserving the
+    material while discarding the decorative thickness/rim.
+    """
+    if band_pixels <= 0:
+        return source.convert("RGBA")
+    source = source.convert("RGBA")
+    src = source.load()
+    result = source.copy()
+    dst = result.load()
+    cx, cy = W / 2.0, H / 2.0
+    mask = diamond_mask()
+    mp = mask.load()
+
+    for y in range(H):
+        for x in range(W):
+            if mp[x, y] == 0:
+                continue
+            # 2:1 diamond distance: boundary is |x-cx|/64 + |y-cy|/32 = 1.
+            d = abs(x - cx) / (W / 2.0) + abs(y - cy) / (H / 2.0)
+            edge_depth = (1.0 - d) * (H / 2.0)
+            if edge_depth >= band_pixels:
+                continue
+            # Pull the sample inward by the missing depth plus one pixel.
+            pull = max(1.0, band_pixels - edge_depth + 1.0)
+            vx, vy = cx - x, cy - y
+            length = max(1.0, (vx * vx + vy * vy) ** 0.5)
+            sx = round(x + vx / length * pull)
+            sy = round(y + vy / length * pull)
+            sx = min(W - 1, max(0, sx))
+            sy = min(H - 1, max(0, sy))
+            dst[x, y] = src[sx, sy]
+    result.putalpha(mask)
+    return result
 
 
 def fill_transparent_edge(source: Image.Image) -> Image.Image:
@@ -94,7 +135,6 @@ def harmonize_edges(source: Image.Image, band_pixels: int = 8) -> Image.Image:
         (edge_points(top, right, 65), edge_points(left, bottom, 65)),
     )
 
-    # First force the exact border samples to a shared colour.
     for first, second in edge_pairs:
         for a, b in zip(first, second):
             ca, cb = px[a[0], a[1]], px[b[0], b[1]]
@@ -102,8 +142,6 @@ def harmonize_edges(source: Image.Image, band_pixels: int = 8) -> Image.Image:
             px[a[0], a[1]] = mean
             px[b[0], b[1]] = mean
 
-    # Then diffuse that border correction a few pixels toward the centre so the
-    # exact seam does not become a visible hard outline.
     centre = (W // 2, H // 2)
     border_samples = []
     for first, second in edge_pairs:
@@ -142,7 +180,7 @@ def repeated_preview(tile: Image.Image, path: Path) -> None:
     canvas.save(path)
 
 
-def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float) -> dict:
+def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float, strip_edge_pixels: int = 0) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         normalized_path = Path(tmp) / "normalized.png"
         with Image.open(source_path) as original:
@@ -153,7 +191,8 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
             normalize(source_path, normalized_path)
 
         normalized = Image.open(normalized_path).convert("RGBA")
-        prepared = harmonize_edges(fill_transparent_edge(normalized))
+        flattened = strip_edge_band(normalized, strip_edge_pixels)
+        prepared = harmonize_edges(fill_transparent_edge(flattened))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     prepared.save(output_path)
@@ -168,6 +207,7 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
         "width": W,
         "height": H,
         "mode": "RGBA",
+        "stripEdgePixels": strip_edge_pixels,
         "edgeError": round(error, 4),
         "maxEdgeError": max_edge_error,
     }
@@ -175,7 +215,7 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if not report["ok"]:
         raise SystemExit(f"ground tile seam gate failed: edge_error={error:.2f} > {max_edge_error:.2f}")
-    print(f"PASS ground tile prepared: {output_path} edge_error={error:.2f}")
+    print(f"PASS ground tile prepared: {output_path} edge_error={error:.2f} strip_edge={strip_edge_pixels}")
     return report
 
 
@@ -186,8 +226,9 @@ def main() -> None:
     parser.add_argument("--preview", type=Path, default=Path("out/ground_tile_preview.png"))
     parser.add_argument("--report", type=Path, default=Path("out/ground_tile_report.json"))
     parser.add_argument("--max-edge-error", type=float, default=DEFAULT_MAX_EDGE_ERROR)
+    parser.add_argument("--strip-edge-band", type=int, default=0, help="Replace this many boundary pixels with interior texture to remove a baked rim/bevel.")
     args = parser.parse_args()
-    prepare(args.source, args.output, args.preview, args.report, args.max_edge_error)
+    prepare(args.source, args.output, args.preview, args.report, args.max_edge_error, args.strip_edge_band)
 
 
 if __name__ == "__main__":
