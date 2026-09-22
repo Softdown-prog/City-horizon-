@@ -1028,35 +1028,61 @@ void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text
     SDL_RenderDebugText(renderer, x, y, text.c_str());
 }
 
-// The loading artwork is a single authored 1280x906 composition. Gameplay
-// state only supplies the live progress and status; it never owns the art.
-void render_loading_screen(SDL_Renderer* renderer, const TextureAsset& artwork,
-                           const int viewport_width, const int viewport_height,
-                           const float progress) {
+// Lightweight runtime loading UI. Progress advances only after real startup
+// milestones complete; no full-screen raster artwork or artificial delay is used.
+void render_loading_screen(SDL_Renderer* renderer, const int viewport_width, const int viewport_height,
+                           const float progress, const std::string& stage) {
     const float width = static_cast<float>(viewport_width);
     const float height = static_cast<float>(viewport_height);
-    const float ui_scale = std::min(width / 1280.0F, height / 906.0F);
     const float clamped_progress = std::clamp(progress, 0.0F, 1.0F);
 
-    SDL_SetRenderDrawColor(renderer, 4, 18, 29, SDL_ALPHA_OPAQUE);
+    SDL_SetRenderDrawColor(renderer, 4, 14, 20, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
-    const SDL_FRect artwork_destination = {(width - 1280.0F * ui_scale) * 0.5F,
-                                            (height - 906.0F * ui_scale) * 0.5F,
-                                            1280.0F * ui_scale, 906.0F * ui_scale};
-    SDL_RenderTexture(renderer, artwork.texture, nullptr, &artwork_destination);
+    const float panel_width = std::min(720.0F, std::max(340.0F, width - 80.0F));
+    const float panel_height = std::min(320.0F, std::max(250.0F, height - 120.0F));
+    const float panel_x = (width - panel_width) * 0.5F;
+    const float panel_y = (height - panel_height) * 0.5F;
 
-    const float origin_x = artwork_destination.x;
-    const float origin_y = artwork_destination.y;
-    const SDL_FRect fill = {origin_x + 66.0F * ui_scale, origin_y + 632.0F * ui_scale,
-                            618.0F * ui_scale * clamped_progress, 36.0F * ui_scale};
-    SDL_SetRenderDrawColor(renderer, 42, 206, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, &fill);
-    draw_text(renderer, origin_x + 288.0F * ui_scale, origin_y + 724.0F * ui_scale, "PREPARANDO A CIDADE...");
-    draw_text(renderer, origin_x + 792.0F * ui_scale, origin_y + 650.0F * ui_scale,
-              "DICA: RUAS E ESTRADAS", 188, 232, 252);
-    draw_text(renderer, origin_x + 792.0F * ui_scale, origin_y + 670.0F * ui_scale,
-              "ORGANIZAM SEUS BAIRROS.", 188, 232, 252);
+    const SDL_FRect shadow = {panel_x + 8.0F, panel_y + 10.0F, panel_width, panel_height};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 90);
+    SDL_RenderFillRect(renderer, &shadow);
+
+    const SDL_FRect panel = {panel_x, panel_y, panel_width, panel_height};
+    SDL_SetRenderDrawColor(renderer, 15, 33, 45, 250);
+    SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 70, 119, 145, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &panel);
+
+    const SDL_FRect accent = {panel_x, panel_y, panel_width, 4.0F};
+    SDL_SetRenderDrawColor(renderer, 91, 188, 211, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &accent);
+
+    draw_text(renderer, panel_x + 32.0F, panel_y + 38.0F, "CITY HORIZON", 238, 246, 249);
+    draw_text(renderer, panel_x + 32.0F, panel_y + 64.0F, "PREPARANDO A CIDADE", 158, 186, 199);
+
+    const float track_x = panel_x + 32.0F;
+    const float track_y = panel_y + 132.0F;
+    const float track_width = panel_width - 64.0F;
+    const SDL_FRect track = {track_x, track_y, track_width, 22.0F};
+    SDL_SetRenderDrawColor(renderer, 25, 48, 61, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &track);
+    SDL_SetRenderDrawColor(renderer, 64, 103, 123, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &track);
+
+    if (clamped_progress > 0.0F) {
+        const SDL_FRect fill = {track_x + 2.0F, track_y + 2.0F,
+                                (track_width - 4.0F) * clamped_progress, 18.0F};
+        SDL_SetRenderDrawColor(renderer, 91, 188, 211, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(renderer, &fill);
+    }
+
+    const int percent = static_cast<int>(std::lround(clamped_progress * 100.0F));
+    draw_text(renderer, panel_x + 32.0F, panel_y + 170.0F, stage, 219, 232, 238);
+    draw_text(renderer, panel_x + panel_width - 86.0F, panel_y + 170.0F,
+              std::to_string(percent) + "%", 158, 186, 199);
+    draw_text(renderer, panel_x + 32.0F, panel_y + panel_height - 48.0F,
+              "DICA: CONECTE BAIRROS COM RUAS E CAMINHOS.", 118, 151, 166);
 }
 
 void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& economy, const SimulationClock& clock,
@@ -1222,13 +1248,15 @@ int main() {
     (void)audio.initialize(asset_root / "assets/audio");
 
     TextureCache textures;
-    const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01_clean.png");
-    const TextureAsset* loading_ui_sheet = textures.load(renderer, asset_root / "assets/ui/loading/city_horizon_loading.png");
-    const Uint64 loading_screen_started = SDL_GetTicks();
-    if (loading_ui_sheet != nullptr) {
-        render_loading_screen(renderer, *loading_ui_sheet, 1280, 800, 0.12F);
+    const auto show_loading = [&](const float progress, const char* stage) {
+        int loading_width = 1280;
+        int loading_height = 800;
+        SDL_GetWindowSize(window, &loading_width, &loading_height);
+        render_loading_screen(renderer, loading_width, loading_height, progress, stage);
         SDL_RenderPresent(renderer);
-    }
+    };
+    show_loading(0.08F, "INICIALIZANDO RENDER E AUDIO");
+    const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01_clean.png");
 
     RoadVisualCatalog road_visuals;
     (void)road_visuals.load_from_file(asset_root / "assets/definitions/road_visual_catalog.json");
@@ -1257,6 +1285,7 @@ int main() {
         (void)textures.load(renderer, asset_root / "assets/terrain/paths/dirt_01" / sprite);
     }
     (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
+    show_loading(0.30F, "CARREGANDO TERRENO, RUAS E CAMINHOS");
 
     BuildingCatalog catalog;
     if (!catalog.load_from_directory(asset_root / "assets/definitions")) {
@@ -1296,6 +1325,7 @@ int main() {
             }
         }
     }
+    show_loading(0.58F, "CARREGANDO CATALOGO E CONSTRUCOES");
     ServiceVehicleCatalog service_vehicle_catalog;
     if (!service_vehicle_catalog.load_from_directory(asset_root / "assets/definitions/vehicles")) {
         std::cerr << "No valid service vehicle definitions were loaded.\n";
@@ -1312,6 +1342,7 @@ int main() {
     for (const std::string& frame_asset : mobile_animations.frame_assets()) {
         (void)textures.load(renderer, asset_root / frame_asset);
     }
+    show_loading(0.72F, "CARREGANDO VEICULOS E ENTIDADES");
 
     BuildingManager buildings(kMapMin, kMapMax);
     RoadManager roads(kMapMin, kMapMax);
@@ -1374,6 +1405,7 @@ int main() {
     }
     population.rebuild_capacity(buildings, catalog);
     power.rebuild(buildings, catalog);
+    show_loading(0.84F, "PREPARANDO ECONOMIA, POPULACAO E ENERGIA");
 
     std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
     std::vector<WaterSurfaceTile> scenario_water_tiles;
@@ -1451,6 +1483,7 @@ int main() {
             shoreline_overlays.push_back({x, y, overlay});
         }
     }
+    show_loading(0.97F, "FINALIZANDO CENARIO E MAPA");
 
     Camera camera;
     float seagull_seconds = 0.0F;
@@ -1495,6 +1528,7 @@ int main() {
     bool running = true;
     Uint64 last_simulation_ticks = SDL_GetTicks();
     GameplayUi gameplay_ui;
+    show_loading(1.0F, "PRONTO");
     const auto vehicle_traversable = [&](const int x, const int y) {
         const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, x, y);
         if (!lands.is_tile_owned(x, y) || occupancy.building || occupancy.road || occupancy.sidewalk) {
@@ -3064,15 +3098,6 @@ int main() {
 
         gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));
         gameplay_ui.render(renderer);
-        if (loading_ui_sheet != nullptr) {
-            constexpr Uint64 kLoadingScreenMinimumMs = 1400;
-            const Uint64 loading_elapsed = SDL_GetTicks() - loading_screen_started;
-            if (loading_elapsed < kLoadingScreenMinimumMs) {
-                render_loading_screen(renderer, *loading_ui_sheet, viewport_width, viewport_height,
-                                      0.12F + 0.88F * static_cast<float>(loading_elapsed) /
-                                      static_cast<float>(kLoadingScreenMinimumMs));
-            }
-        }
         SDL_RenderPresent(renderer);
     }
 
