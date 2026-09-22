@@ -12,11 +12,11 @@
   "geometry": {
     "wheelRadius": 3.25,
     "wheelCenterZ": 4.20,
-    "ringTubeRadius": 0.115,
-    "spokeRadius": 0.050,
+    "ringTubeRadius": 0.105,
+    "spokeRadius": 0.043,
     "axleRadius": 0.22,
     "axleDepth": 0.86,
-    "supportRadius": 0.125,
+    "supportRadius": 0.112,
     "supportBaseHalfWidth": 2.18,
     "supportBaseHalfDepth": 1.00,
     "supportFootZ": 0.18,
@@ -33,7 +33,7 @@
     "baseBeamHeight": 0.26,
     "baseBeamDepth": 0.38,
     "railingHeight": 0.74,
-    "railingRadius": 0.034,
+    "railingRadius": 0.030,
     "stairWidth": 1.10,
     "stairDepth": 0.66,
     "stairSteps": 3
@@ -49,19 +49,19 @@
     "keepGondolasUpright": true
   },
   "materials": {
-    "frame": {"name":"FerrisFrameCream","rgba":[0.78,0.76,0.68,1.0],"roughness":0.62,"metallic":0.10},
-    "wheel": {"name":"FerrisWheelBlue","rgba":[0.05,0.31,0.62,1.0],"roughness":0.56,"metallic":0.10},
-    "hub": {"name":"FerrisHubWarmMetal","rgba":[0.48,0.50,0.52,1.0],"roughness":0.42,"metallic":0.34},
-    "platform": {"name":"FerrisPlatform","rgba":[0.36,0.38,0.37,1.0],"roughness":0.78,"metallic":0.04},
-    "accentA": {"name":"FerrisAccentCoral","rgba":[0.86,0.16,0.22,1.0],"roughness":0.64,"metallic":0.03},
-    "accentB": {"name":"FerrisAccentGold","rgba":[0.93,0.60,0.08,1.0],"roughness":0.64,"metallic":0.03},
-    "accentC": {"name":"FerrisAccentTeal","rgba":[0.04,0.58,0.60,1.0],"roughness":0.64,"metallic":0.03},
-    "dark": {"name":"FerrisDark","rgba":[0.055,0.065,0.075,1.0],"roughness":0.78,"metallic":0.08}
+    "frame": {"name":"FerrisFrameCream","rgba":[0.70,0.68,0.60,1.0],"roughness":0.52,"metallic":0.16},
+    "wheel": {"name":"FerrisWheelBlue","rgba":[0.04,0.24,0.48,1.0],"roughness":0.50,"metallic":0.17},
+    "hub": {"name":"FerrisHubWarmMetal","rgba":[0.44,0.46,0.48,1.0],"roughness":0.38,"metallic":0.46},
+    "platform": {"name":"FerrisPlatform","rgba":[0.31,0.33,0.32,1.0],"roughness":0.72,"metallic":0.08},
+    "accentA": {"name":"FerrisAccentCoral","rgba":[0.72,0.12,0.16,1.0],"roughness":0.58,"metallic":0.05},
+    "accentB": {"name":"FerrisAccentGold","rgba":[0.78,0.45,0.06,1.0],"roughness":0.58,"metallic":0.05},
+    "accentC": {"name":"FerrisAccentTeal","rgba":[0.03,0.45,0.48,1.0],"roughness":0.58,"metallic":0.05},
+    "dark": {"name":"FerrisDark","rgba":[0.050,0.058,0.066,1.0],"roughness":0.74,"metallic":0.10}
   },
   "prototypeNotes": {
-    "status": "geometry_prototype_v3_open_scale",
+    "status": "geometry_prototype_v4_maturity_pass",
     "terrainIncluded": false,
-    "designIntent": "Original park Ferris wheel opened up into a larger 4x3 attraction: wider support stance, larger wheel diameter, more breathing room between gondolas, broader loading platform and less toy-like overall mass while preserving strong 2D readability.",
+    "designIntent": "Original 4x3 park Ferris wheel with a larger open silhouette, open-air framed gondolas, slightly finer fabricated members, restrained bevels and less saturated/less rubber-like materials while preserving strong 2D gameplay readability.",
     "referencePolicy": "Use classic Tycoon readability only; do not copy a specific proprietary Ferris wheel design.",
     "nextGate": "Run CH Blender preflight, then render one SOUTH proxy at gameplay scale for human review before final four-direction animation bake."
   }
