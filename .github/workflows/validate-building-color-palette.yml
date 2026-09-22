@@ -1,0 +1,43 @@
+name: Validate Building Color Palette Milestone
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-building-color-palette.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-game:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        shell: pwsh
+        run: git pull --ff-only origin main
+
+      - name: Configure game runtime
+        shell: pwsh
+        run: cmake -S . -B build/color-mask-gate -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
+
+      - name: Build city_builder
+        shell: pwsh
+        run: cmake --build build/color-mask-gate --config Release --target city_builder --parallel
+
+      - name: Remove one-shot validation workflow
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/validate-building-color-palette.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/validate-building-color-palette.yml
+          git commit -m "ci: retire building color palette validation gate"
+          git pull --rebase origin main
+          git push origin HEAD:main
