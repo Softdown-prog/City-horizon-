@@ -38,6 +38,13 @@
       "depth": 0.12,
       "z": 2.45,
       "breadMark": true
+    },
+    "details": {
+      "lowerTrimBand": true,
+      "displayBread": true,
+      "awningSupports": true,
+      "promoBoard": true,
+      "planter": true
     }
   },
   "sideWindows": {
@@ -46,11 +53,13 @@
   },
   "rear": {
     "serviceDoor": true,
-    "smallWindow": true
+    "smallWindow": true,
+    "deliveryCrates": true
   },
   "roofProps": {
     "chimney": true,
-    "acUnit": true
+    "acUnit": true,
+    "ovenVent": true
   },
   "materials": {
     "wall": {
@@ -128,6 +137,14 @@
       "roughness": 0.94,
       "seed": 47,
       "strength": 0.16
+    },
+    "plant": {
+      "name": "BakeryPlantGreen",
+      "rgba": [0.18, 0.34, 0.14, 1.0],
+      "recipe": "solid",
+      "roughness": 0.88,
+      "seed": 53,
+      "strength": 0.03
     }
   },
   "colorMask": {
@@ -141,14 +158,14 @@
     "alpha": "coverage"
   },
   "designIntent": {
-    "summary": "Compact neighborhood bakery with a warm facade, broad shop windows, awning and a bread-mark sign readable at gameplay scale.",
-    "readOrder": ["awning", "shop_windows", "bread_sign", "warm_wall_mass", "roofline"],
+    "summary": "Compact neighborhood bakery with a warm facade, broad shop windows, visible bread display, awning, restrained entrance props and a bread-mark sign readable at gameplay scale.",
+    "readOrder": ["awning", "bread_display", "shop_windows", "bread_sign", "warm_wall_mass", "roofline"],
     "rules": [
       "keep the silhouette compact and low-rise",
       "do not depend on readable text for bakery identity",
-      "make the bakery identity readable through warm bread colors, awning and bread-mark geometry",
+      "make the bakery identity readable through warm bread colors, awning, display bread and bread-mark geometry",
+      "use only a few gameplay-scale entrance and service details; avoid microdetail noise",
       "author all four sides because AssetRoot rotation produces canonical directions",
-      "keep microdetail restrained at final sprite scale",
       "keep the front apron visually flush for future road/sidewalk placement"
     ]
   }
