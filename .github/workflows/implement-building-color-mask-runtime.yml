@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  CH_COLOR_MASK_MIGRATION_REVISION: "2"
+
 jobs:
   implement:
     runs-on: ubuntu-latest
