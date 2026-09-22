@@ -1,0 +1,25 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_PROMOTION_V1",
+  "approved": true,
+  "promotionAttempt": 1,
+  "assetId": "building.coffee_shop.01",
+  "displayName": "Cafeteria",
+  "fileStem": "coffee_shop",
+  "sourceCommit": "936efb1e7dde6f5f2c35fce66d12a578635c5548",
+  "sourceWorkflowRun": 35739405296,
+  "sourceArtifactId": 10699429318,
+  "sourceArtifactName": "CH-Blender-Agent-35739405296-1",
+  "sourceDir": "building.coffee_shop.01.final.001",
+  "destination": "assets/buildings/coffee_shop",
+  "approvedProxySha256": "a6180f41325643351724e1ab4136374d70168f3f45593a50e8d4aafefefc5510",
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage"
+  }
+}
