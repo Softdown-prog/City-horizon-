@@ -1,0 +1,72 @@
+{
+  "_comment": "CH_COLOR_MASK_V1 — opt-in packed color-customization mask emitted by the CH Blender authoring pipeline.",
+  "contract": "CH_COLOR_MASK_V1",
+  "version": "1.0",
+  "description": "Packed RGB semantic recolor mask aligned pixel-for-pixel with the pre-rendered sprite. Alpha is object coverage, not a fourth recolor channel.",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "policy": {
+    "optIn": true,
+    "packedFormat": "PNG_RGBA",
+    "recolorChannels": ["R", "G", "B"],
+    "alphaMeaning": "object_coverage",
+    "unmaskedRgb": [0, 0, 0],
+    "alignment": "same camera, AssetRoot rotation, resolution and pivot as color pass",
+    "postProcess": "downsample only; never palette-quantize or dither masks",
+    "runtimeTinting": "separate runtime concern; authoring contract only guarantees mask output and metadata"
+  },
+  "recommendedSemanticRoles": {
+    "R": "wall_or_primary",
+    "G": "roof_or_secondary",
+    "B": "trim_or_accent"
+  },
+  "sourceDeclarationExample": {
+    "colorMask": {
+      "contract": "CH_COLOR_MASK_V1",
+      "enabled": true,
+      "channels": {
+        "R": "wall",
+        "G": "roof",
+        "B": "trim"
+      },
+      "alpha": "coverage"
+    },
+    "materials": {
+      "wall_plaster": {
+        "rgba": [0.74, 0.70, 0.61, 1.0],
+        "recipe": "plaster",
+        "maskRole": "wall"
+      },
+      "roof_tile": {
+        "rgba": [0.35, 0.16, 0.10, 1.0],
+        "recipe": "solid",
+        "maskRole": "roof"
+      },
+      "window_glass": {
+        "rgba": [0.20, 0.32, 0.38, 1.0],
+        "recipe": "glass"
+      }
+    }
+  },
+  "blenderImportRules": {
+    "materialCustomProperty": "ch_color_mask_role",
+    "objectCustomProperty": "ch_color_mask_role",
+    "partOverride": "Imported blend/fbx/glb parts may declare maskRole to classify the whole imported object set.",
+    "unassignedBehavior": "Rendered black in RGB while remaining inside alpha coverage. It is not recolored at runtime."
+  },
+  "expectedOutputsWhenEnabled": {
+    "source": "{assetId}_{direction}_mask_source.png",
+    "runtimeScale": "{assetId}_{direction}_mask.png",
+    "fourView": "{assetId}_mask_4view.png",
+    "review": "{assetId}_mask_review.png"
+  },
+  "constraints": [
+    "Do not use alpha as a fourth tint channel in V1.",
+    "Do not put lighting, AO or cast shadows into the color mask.",
+    "Do not color-mask glass, emissive signs or special materials unless design explicitly calls for recoloring them.",
+    "Every declared semantic role must be assigned to at least one rendered material or object.",
+    "Mask-enabled assets still follow preflight -> SOUTH proxy -> human review -> final bake for new agent-authored geometry.",
+    "V1 is intended for solid building/prop surfaces; cutout foliage and texture-alpha meshes require a later alpha-aware extension."
+  ]
+}
