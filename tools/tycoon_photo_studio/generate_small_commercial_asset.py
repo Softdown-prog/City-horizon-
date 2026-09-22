@@ -116,7 +116,7 @@ def expand(recipe):
         parts.append(_box("FrontLowerTrimBand", [-0.36, front_y - 0.050, base_h + 0.15], [width - 1.28, 0.075, 0.22], "trim", 0.010))
 
     # Coarse bakery display geometry: intentionally large forms that survive the
-    # 256 px final sprite instead of tiny decorative noise.
+    # final sprite instead of tiny decorative noise.
     if details.get("displayBread", False):
         display_y = front_y - 0.105
         for group, center_x in (("Left", -1.46), ("Right", 0.36)):
@@ -124,7 +124,18 @@ def expand(recipe):
             for i, dx in enumerate((-0.34, 0.0, 0.34)):
                 parts.append(_sphere(f"{group}DisplayBread_{i}", [center_x + dx, display_y - 0.055, sill + 0.27], 0.105, "bread"))
 
-    # Awning and simple broad stripes, all in trim mask group.
+    # Coffee-shop display is similarly broad: a continuous wood counter, one
+    # readable espresso-machine mass and a pair of oversized cup/saucer forms.
+    if details.get("displayCoffee", False):
+        display_y = front_y - 0.110
+        parts.append(_box("CoffeeDisplayCounter", [-0.55, display_y, sill + 0.13], [3.55, 0.11, 0.16], "door", 0.010))
+        parts.append(_box("EspressoMachineBody", [-1.27, display_y - 0.065, sill + 0.39], [0.78, 0.10, 0.44], "dark", 0.022))
+        parts.append(_box("EspressoMachineTop", [-1.27, display_y - 0.070, sill + 0.64], [0.58, 0.09, 0.10], "cup", 0.014))
+        for i, x in enumerate((-0.20, 0.30)):
+            parts.append(_box(f"CoffeeCup_{i}", [x, display_y - 0.060, sill + 0.29], [0.23, 0.075, 0.20], "cup", 0.025))
+            parts.append(_box(f"CoffeeSaucer_{i}", [x, display_y - 0.062, sill + 0.18], [0.31, 0.085, 0.045], "cup", 0.012))
+
+    # Awning and simple broad stripes.
     awning = facade.get("awning", {})
     if awning.get("enabled", False):
         aw_w = float(awning["width"])
@@ -132,7 +143,7 @@ def expand(recipe):
         aw_h = float(awning["height"])
         aw_z = float(awning["z"])
         aw_center_x = -0.34
-        parts.append(_box("BakeryAwning", [aw_center_x, front_y - aw_d / 2 - 0.06, aw_z], [aw_w, aw_d, aw_h], "awning", 0.025))
+        parts.append(_box("CommercialAwning", [aw_center_x, front_y - aw_d / 2 - 0.06, aw_z], [aw_w, aw_d, aw_h], "awning", 0.025))
         stripe_count = 7
         stripe_w = aw_w / stripe_count
         for i in range(0, stripe_count, 2):
@@ -144,32 +155,48 @@ def expand(recipe):
             for label, x in (("L", aw_center_x - aw_w / 2 + 0.17), ("R", aw_center_x + aw_w / 2 - 0.17)):
                 parts.append(_box(f"AwningSupport_{label}", [x, support_y, aw_z - support_h / 2 - 0.07], [0.075, 0.075, support_h], "dark", 0.010))
 
-    # Sign is intentionally geometry-based; bakery identity does not depend on text.
+    # Sign identity is geometry-based; no commercial type depends on readable text.
     sign = facade.get("sign", {})
     if sign.get("enabled", False):
         sign_w = float(sign["width"])
         sign_h = float(sign["height"])
         sign_d = float(sign["depth"])
         sign_z = float(sign["z"])
-        parts.append(_box("BakerySignBoard", [-0.28, front_y - sign_d / 2 - 0.04, sign_z], [sign_w, sign_d, sign_h], "trim", 0.035))
+        sign_y = front_y - sign_d / 2 - 0.04
+        parts.append(_box("CommercialSignBoard", [-0.28, sign_y, sign_z], [sign_w, sign_d, sign_h], "trim", 0.035))
         if sign.get("breadMark", False):
             # Three warm circular marks read as rolls/loaves at gameplay scale.
             for i, x in enumerate((-0.55, -0.28, -0.01)):
                 parts.append(_sphere(f"BreadMark_{i}", [x, front_y - sign_d - 0.07, sign_z], 0.105, "bread"))
+        if sign.get("coffeeCupMark", False):
+            mark_y = front_y - sign_d - 0.072
+            cup_x = -0.34
+            parts.append(_box("CoffeeSignCupBody", [cup_x, mark_y, sign_z], [0.44, 0.050, 0.25], "cup", 0.045))
+            parts.append(_box("CoffeeSignCupHandle", [cup_x + 0.29, mark_y, sign_z + 0.01], [0.13, 0.052, 0.14], "cup", 0.035))
+            parts.append(_box("CoffeeSignSaucer", [cup_x, mark_y, sign_z - 0.17], [0.60, 0.052, 0.055], "coffee", 0.015))
+            parts.append(_box("CoffeeSignSteamLeft", [cup_x - 0.08, mark_y, sign_z + 0.22], [0.045, 0.050, 0.18], "coffee", 0.018))
+            parts.append(_box("CoffeeSignSteamRight", [cup_x + 0.09, mark_y, sign_z + 0.24], [0.045, 0.050, 0.16], "coffee", 0.018))
 
-    # Small entrance props are deliberately sparse: one promotional board and
-    # one planter provide life without turning the storefront into visual noise.
+    # Small entrance props are deliberately sparse.
     if details.get("promoBoard", False):
         promo_x = door_x + 0.68
         promo_y = apron_y - 0.03
+        accent_material = "bread" if "bread" in materials else ("coffee" if "coffee" in materials else "trim")
         parts.append(_box("EntrancePromoBoard", [promo_x, promo_y, 0.48], [0.46, 0.10, 0.68], "door", 0.018))
-        parts.append(_box("EntrancePromoInset", [promo_x, promo_y - 0.060, 0.50], [0.34, 0.025, 0.46], "bread", 0.010))
+        parts.append(_box("EntrancePromoInset", [promo_x, promo_y - 0.060, 0.50], [0.34, 0.025, 0.46], accent_material, 0.010))
     if details.get("planter", False) and "plant" in materials:
         planter_x = -width / 2.0 + 0.38
         planter_y = apron_y
         parts.append(_box("EntrancePlanter", [planter_x, planter_y, 0.20], [0.42, 0.34, 0.34], "door", 0.030))
         for i, dx in enumerate((-0.10, 0.0, 0.10)):
             parts.append(_sphere(f"EntrancePlant_{i}", [planter_x + dx, planter_y, 0.48 + abs(dx) * 0.45], 0.16, "plant"))
+    if details.get("bistroSet", False):
+        table_x = 0.78
+        parts.append(_box("BistroTableTop", [table_x, apron_y, 0.58], [0.52, 0.40, 0.08], "door", 0.035))
+        parts.append(_box("BistroTablePedestal", [table_x, apron_y, 0.31], [0.10, 0.10, 0.50], "dark", 0.020))
+        for label, x in (("L", table_x - 0.46), ("R", table_x + 0.46)):
+            parts.append(_box(f"BistroSeat_{label}", [x, apron_y, 0.31], [0.28, 0.30, 0.10], "door", 0.025))
+            parts.append(_box(f"BistroSeatLeg_{label}", [x, apron_y, 0.16], [0.08, 0.08, 0.28], "dark", 0.015))
 
     # Side windows make EAST/WEST/NORTH useful rotations rather than blank backs.
     def side_windows(face, count):
@@ -206,17 +233,24 @@ def expand(recipe):
     if rear.get("deliveryCrates", False):
         for i, (x, z) in enumerate(((1.62, 0.18), (2.00, 0.15), (1.78, 0.48))):
             parts.append(_box(f"RearDeliveryCrate_{i}", [x, back_y + 0.22, z], [0.42, 0.34, 0.30], "door", 0.018))
+    if rear.get("coffeeSacks", False):
+        for i, (x, z) in enumerate(((1.46, 0.21), (1.82, 0.19), (1.64, 0.49))):
+            parts.append(_box(f"RearCoffeeSack_{i}", [x, back_y + 0.20, z], [0.38, 0.30, 0.34], "coffee", 0.060))
 
     roof_props = recipe.get("roofProps", {})
     if roof_props.get("chimney", False):
-        parts.append(_box("BakeryChimney", [-1.46, 0.74, roof_z + 0.48], [0.42, 0.42, 0.86], "roof", 0.025))
-        parts.append(_box("BakeryChimneyCap", [-1.46, 0.74, roof_z + 0.94], [0.55, 0.55, 0.10], "dark", 0.018))
+        parts.append(_box("CommercialChimney", [-1.46, 0.74, roof_z + 0.48], [0.42, 0.42, 0.86], "roof", 0.025))
+        parts.append(_box("CommercialChimneyCap", [-1.46, 0.74, roof_z + 0.94], [0.55, 0.55, 0.10], "dark", 0.018))
     if roof_props.get("acUnit", False):
-        parts.append(_box("BakeryACUnit", [1.25, 0.72, roof_z + 0.24], [0.78, 0.56, 0.34], "dark", 0.028))
+        parts.append(_box("CommercialACUnit", [1.25, 0.72, roof_z + 0.24], [0.78, 0.56, 0.34], "dark", 0.028))
     if roof_props.get("ovenVent", False):
         vent_x, vent_y = 0.18, 0.92
-        parts.append(_box("BakeryOvenVent", [vent_x, vent_y, roof_z + 0.34], [0.30, 0.30, 0.54], "dark", 0.018))
-        parts.append(_box("BakeryOvenVentCap", [vent_x, vent_y, roof_z + 0.65], [0.44, 0.44, 0.10], "dark", 0.016))
+        parts.append(_box("CommercialOvenVent", [vent_x, vent_y, roof_z + 0.34], [0.30, 0.30, 0.54], "dark", 0.018))
+        parts.append(_box("CommercialOvenVentCap", [vent_x, vent_y, roof_z + 0.65], [0.44, 0.44, 0.10], "dark", 0.016))
+    if roof_props.get("coffeeVent", False):
+        vent_x, vent_y = -0.12, 0.92
+        parts.append(_box("CoffeeShopVent", [vent_x, vent_y, roof_z + 0.27], [0.26, 0.26, 0.40], "dark", 0.018))
+        parts.append(_box("CoffeeShopVentCap", [vent_x, vent_y, roof_z + 0.50], [0.38, 0.38, 0.08], "dark", 0.014))
 
     occupied = [[x, y] for y in range(int(fp["depthTiles"])) for x in range(int(fp["widthTiles"]))]
     return {
