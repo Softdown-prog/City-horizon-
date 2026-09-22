@@ -29,6 +29,7 @@ if str(CH_BLENDER) not in sys.path:
 import build_scene as bs  # noqa: E402
 import build_ferris_wheel as fw  # noqa: E402
 import ferris_wheel_detail_pass as detail_pass  # noqa: E402
+import ferris_wheel_maturity_pass as maturity_pass  # noqa: E402
 import scene_gate  # noqa: E402
 
 
@@ -98,7 +99,8 @@ def build_for_gate(args):
     root["studioPreset"] = "CH_TYCOON_STUDIO_V1"
     root["groundIncludedInAsset"] = False
     root["runtimeRepresentation"] = "2D_RGBA_pre_rendered_sprite"
-    root["footprint"] = "3x2"
+    footprint = recipe["footprint"]
+    root["footprint"] = f"{footprint['widthTiles']}x{footprint['depthTiles']}"
     root["proceduralContract"] = recipe["contract"]
     root["directionPolicy"] = "rotate_asset_root_keep_camera_lights_fixed"
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
@@ -106,6 +108,14 @@ def build_for_gate(args):
     fw.build_supports(root, recipe["geometry"], mats)
     rotor, gondolas = fw.build_wheel(root, recipe["geometry"], mats)
     detail_pass.apply_detail_pass(
+        root,
+        rotor,
+        gondolas,
+        recipe["geometry"],
+        mats,
+        fw,
+    )
+    maturity_pass.apply_maturity_pass(
         root,
         rotor,
         gondolas,
