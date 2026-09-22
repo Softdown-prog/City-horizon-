@@ -34,7 +34,7 @@
     "candidate": {
       "tile": [0.5, 0.5],
       "footprint": [4, 3],
-      "scale": 1.0,
+      "scale": 2.0,
       "offsetPixels": [0, 0],
       "showFootprint": true,
       "showAnchor": false,
