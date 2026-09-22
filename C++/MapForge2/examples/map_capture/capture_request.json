@@ -1,9 +1,10 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "workflow": "tycoon-house-bake.yml",
-    "artifact": "City-Horizon-Residential-House-PNGs",
-    "file": "residential_house_2x2_01_south.png"
+    "repositoryFile": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
+    "frameIndex": 0,
+    "frameWidth": 256,
+    "frameHeight": 256
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -32,7 +33,7 @@
     },
     "candidate": {
       "tile": [0.5, 0.5],
-      "footprint": [2, 2],
+      "footprint": [4, 3],
       "scale": 1.0,
       "offsetPixels": [0, 0],
       "showFootprint": true,
