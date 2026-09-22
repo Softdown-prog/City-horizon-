@@ -1,0 +1,23 @@
+{
+  "contract": "CH_RUNTIME_COLOR_MASK_PROMOTION_V1",
+  "assetId": "building.agricultural_shop.01",
+  "maskContract": "CH_COLOR_MASK_V1",
+  "approved": true,
+  "sourceCommit": "343770151cde6296a9e16b8d54f0807ee8f32da6",
+  "sourceWorkflowRun": 35717953899,
+  "sourceArtifactId": 10690468188,
+  "sourceArtifactName": "CH-Blender-Agent-35717953899-1",
+  "sourceDir": "building.agricultural_shop.detail_v2.color_mask.v3",
+  "destination": "assets/buildings/agricultural_shop",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [256, 256],
+  "format": "PNG_RGBA",
+  "channels": {
+    "R": "wall",
+    "G": "roof"
+  },
+  "blueChannel": "unused",
+  "alpha": "coverage",
+  "scope": "large_surfaces_only",
+  "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061"
+}
