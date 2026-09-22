@@ -1,0 +1,156 @@
+{
+  "contract": "CH_ANIMATED_SPRITE_BAKE_V1",
+  "assetId": "attraction.park_ferris_wheel.01",
+  "assetType": "animated_attraction",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
+  "transparentCanvas": true,
+  "backgroundIncluded": false,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "frameStart": 1,
+  "frameEnd": 12,
+  "frameCount": 12,
+  "fps": 8,
+  "looping": true,
+  "frameResolution": [
+    256,
+    256
+  ],
+  "pivot": {
+    "x": 128,
+    "y": 146
+  },
+  "approvedProxySha256": "ef53a3a04b7877c42e64c82d2d022ab7ece0f67af31db709528f020ca3e56a6b",
+  "postprocess": "tools/tycoon_photo_studio/postprocess.py",
+  "directions": {
+    "south": {
+      "sheet": "attraction.park_ferris_wheel.01_south_animation.png",
+      "rows": 1,
+      "columns": 12,
+      "frameOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "firstFrameAlphaBounds": [
+        0,
+        29,
+        218,
+        256
+      ]
+    },
+    "east": {
+      "sheet": "attraction.park_ferris_wheel.01_east_animation.png",
+      "rows": 1,
+      "columns": 12,
+      "frameOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "firstFrameAlphaBounds": [
+        0,
+        29,
+        217,
+        256
+      ]
+    },
+    "west": {
+      "sheet": "attraction.park_ferris_wheel.01_west_animation.png",
+      "rows": 1,
+      "columns": 12,
+      "frameOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "firstFrameAlphaBounds": [
+        0,
+        29,
+        217,
+        256
+      ]
+    },
+    "north": {
+      "sheet": "attraction.park_ferris_wheel.01_north_animation.png",
+      "rows": 1,
+      "columns": 12,
+      "frameOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "firstFrameAlphaBounds": [
+        0,
+        29,
+        218,
+        256
+      ]
+    }
+  },
+  "combinedSheet": {
+    "file": "attraction.park_ferris_wheel.01_4dir_animation.png",
+    "rows": 4,
+    "columns": 12,
+    "rowOrder": [
+      "south",
+      "east",
+      "west",
+      "north"
+    ],
+    "frameOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ]
+  }
+}
