@@ -56,5 +56,85 @@
   "sourceWorkflowRun": 35670015174,
   "sourceArtifactId": 10670863942,
   "approvedProxySha256": "f401bacf15fa67d09d54f9f7e651fb67119896808bb065330047bf0d85c7c1a7",
-  "approvedForRuntime": true
+  "approvedForRuntime": true,
+  "animation": {
+    "contract": "CH_ANIMATED_SPRITE_V1",
+    "layout": "horizontal",
+    "frameSize": [
+      256,
+      256
+    ],
+    "frameCount": 5,
+    "states": {
+      "idle": {
+        "frames": [
+          0
+        ],
+        "looping": true
+      },
+      "greet": {
+        "frames": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "looping": false,
+        "triggerPolicy": "ambient_event",
+        "returnsTo": "idle"
+      }
+    },
+    "suggestedPlayback": {
+      "frameDurationMs": 180,
+      "idleHoldMs": 7000
+    },
+    "enginePlayback": {
+      "mode": "ambient_once",
+      "frameCount": 5,
+      "frameDurationMs": 180,
+      "idleFrame": 0,
+      "actionStartFrame": 1,
+      "actionFrameCount": 4,
+      "idleHoldMs": 7000
+    },
+    "directionSheets": {
+      "south": {
+        "file": "raspadinha_vendor_anim_south.png",
+        "pivot": {
+          "x": 128,
+          "y": 171
+        },
+        "sha256": "53bf6007b8acadf55e4b26ed20c49fe529c646b677717775f4fc15bb50ac0410"
+      },
+      "east": {
+        "file": "raspadinha_vendor_anim_east.png",
+        "pivot": {
+          "x": 128,
+          "y": 171
+        },
+        "sha256": "30cef7051ee436c3664b0be37c96f332143a04aa78d3d9f9ec85082f5c00f255"
+      },
+      "west": {
+        "file": "raspadinha_vendor_anim_west.png",
+        "pivot": {
+          "x": 128,
+          "y": 171
+        },
+        "sha256": "b8049b28d7a2847e555cb939e095fe1e26fa981371f7ab9a75e4985216ac471f"
+      },
+      "north": {
+        "file": "raspadinha_vendor_anim_north.png",
+        "pivot": {
+          "x": 128,
+          "y": 171
+        },
+        "sha256": "47f65e4c24907af3dadeaa590d78e0d7e60270d0433fe82cc982e31215bc4b2e"
+      }
+    },
+    "approvedProxySha256": "932bc6e0b9523d962c7dd21f02d5e6a85af8c4a9de4e701d1997aabfd493c888",
+    "sourceWorkflowRun": 35675552853,
+    "sourceArtifactId": 10672684903,
+    "approvedForRuntime": true,
+    "serveStateIncluded": false
+  }
 }
