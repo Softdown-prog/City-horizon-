@@ -1,0 +1,155 @@
+{
+  "contract": "CITY_HORIZON_SMALL_COMMERCIAL_V1",
+  "assetId": "building.bakery.01",
+  "category": "commercial",
+  "subtype": "bakery",
+  "seed": 1407,
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2
+  },
+  "mass": {
+    "width": 5.10,
+    "depth": 4.74,
+    "wallHeight": 2.26,
+    "baseHeight": 0.14,
+    "parapetHeight": 0.34
+  },
+  "facade": {
+    "front": "south",
+    "doorWidth": 0.78,
+    "doorHeight": 1.72,
+    "windowWidth": 1.30,
+    "windowHeight": 1.02,
+    "windowSill": 0.66,
+    "awning": {
+      "enabled": true,
+      "width": 4.28,
+      "depth": 0.56,
+      "height": 0.18,
+      "z": 1.96
+    },
+    "sign": {
+      "enabled": true,
+      "width": 2.42,
+      "height": 0.48,
+      "depth": 0.12,
+      "z": 2.45,
+      "breadMark": true
+    }
+  },
+  "sideWindows": {
+    "east": 2,
+    "west": 1
+  },
+  "rear": {
+    "serviceDoor": true,
+    "smallWindow": true
+  },
+  "roofProps": {
+    "chimney": true,
+    "acUnit": true
+  },
+  "materials": {
+    "wall": {
+      "name": "BakeryWarmPlaster",
+      "rgba": [0.84, 0.69, 0.49, 1.0],
+      "recipe": "plaster",
+      "roughness": 0.84,
+      "seed": 17,
+      "strength": 0.28,
+      "maskRole": "wall"
+    },
+    "roof": {
+      "name": "BakeryTerracottaRoof",
+      "rgba": [0.47, 0.16, 0.075, 1.0],
+      "recipe": "solid",
+      "roughness": 0.80,
+      "seed": 19,
+      "strength": 0.04,
+      "maskRole": "roof"
+    },
+    "trim": {
+      "name": "BakeryCreamTrim",
+      "rgba": [0.92, 0.83, 0.63, 1.0],
+      "recipe": "solid",
+      "roughness": 0.80,
+      "seed": 23,
+      "strength": 0.03,
+      "maskRole": "trim"
+    },
+    "awning": {
+      "name": "BakeryAwningAccent",
+      "rgba": [0.64, 0.16, 0.10, 1.0],
+      "recipe": "solid",
+      "roughness": 0.78,
+      "seed": 29,
+      "strength": 0.03,
+      "maskRole": "trim"
+    },
+    "glass": {
+      "name": "BakeryWindowGlass",
+      "rgba": [0.19, 0.38, 0.43, 1.0],
+      "recipe": "glass",
+      "roughness": 0.24,
+      "seed": 31,
+      "strength": 0.16
+    },
+    "door": {
+      "name": "BakeryDarkWood",
+      "rgba": [0.22, 0.105, 0.045, 1.0],
+      "recipe": "timber",
+      "roughness": 0.80,
+      "seed": 37,
+      "strength": 0.20
+    },
+    "bread": {
+      "name": "BakeryBreadGold",
+      "rgba": [0.90, 0.53, 0.12, 1.0],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 41,
+      "strength": 0.03
+    },
+    "dark": {
+      "name": "BakeryMetalDark",
+      "rgba": [0.075, 0.08, 0.075, 1.0],
+      "recipe": "solid",
+      "roughness": 0.72,
+      "seed": 43,
+      "strength": 0.02
+    },
+    "sidewalk": {
+      "name": "BakerySidewalk",
+      "rgba": [0.58, 0.56, 0.51, 1.0],
+      "recipe": "concrete",
+      "roughness": 0.94,
+      "seed": 47,
+      "strength": 0.16
+    }
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof",
+      "B": "trim"
+    },
+    "alpha": "coverage"
+  },
+  "designIntent": {
+    "summary": "Compact neighborhood bakery with a warm facade, broad shop windows, awning and a bread-mark sign readable at gameplay scale.",
+    "readOrder": ["awning", "shop_windows", "bread_sign", "warm_wall_mass", "roofline"],
+    "rules": [
+      "keep the silhouette compact and low-rise",
+      "do not depend on readable text for bakery identity",
+      "make the bakery identity readable through warm bread colors, awning and bread-mark geometry",
+      "author all four sides because AssetRoot rotation produces canonical directions",
+      "keep microdetail restrained at final sprite scale",
+      "keep the front apron visually flush for future road/sidewalk placement"
+    ]
+  }
+}
