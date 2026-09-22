@@ -361,13 +361,22 @@ template <typename Number>
         const auto tile_y = json_number<int>(building, "tileY");
         const auto rotation = json_number<int>(building, "rotation");
         const auto level = json_number<int>(building, "level");
+        const auto service_price = json_number<std::int64_t>(building, "servicePrice");
         const int current_level = level.has_value() ? std::max(1, *level) : 1;
         if (!instance_id || !definition_id || !tile_x || !tile_y || !rotation || *instance_id == 0 ||
             *rotation < 0 || *rotation > 3) {
             error = "building entry is invalid";
             return false;
         }
-        snapshot.buildings.push_back({*instance_id, *definition_id, *tile_x, *tile_y, static_cast<BuildingRotation>(*rotation), current_level});
+        BuildingInstance saved;
+        saved.instance_id = *instance_id;
+        saved.definition_id = *definition_id;
+        saved.tile_x = *tile_x;
+        saved.tile_y = *tile_y;
+        saved.rotation = static_cast<BuildingRotation>(*rotation);
+        saved.current_level = current_level;
+        saved.service_price = (*version >= 9 && service_price.has_value()) ? std::max<std::int64_t>(0, *service_price) : 0;
+        snapshot.buildings.push_back(std::move(saved));
     }
     for (const std::string_view road : *saved_roads) {
         const auto tile_x = json_number<int>(road, "tileX");
@@ -477,7 +486,8 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
         output << "    { \"instanceId\": " << building.instance_id << ", \"definitionId\": \"" << escape_json(building.definition_id)
                << "\", \"tileX\": " << building.tile_x << ", \"tileY\": " << building.tile_y
                << ", \"rotation\": " << static_cast<int>(building.rotation)
-               << ", \"level\": " << building.current_level << " }"
+               << ", \"level\": " << building.current_level
+               << ", \"servicePrice\": " << building.service_price << " }"
                << (index + 1U == buildings.instances().size() ? "\n" : ",\n");
     }
     output << "  ],\n  \"roads\": [\n";

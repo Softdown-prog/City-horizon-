@@ -1912,6 +1912,32 @@ int main() {
                 (void)audio.play(SoundEvent::ui_confirm);
                 break;
             }
+            case UiAction::decrease_service_price:
+            case UiAction::increase_service_price: {
+                if (!selected_instance_id) {
+                    status = "NO BUILDING SELECTED";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id);
+                const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);
+                if (instance == nullptr || definition == nullptr || definition->default_service_price <= 0) {
+                    status = "BUILDING HAS NO CUSTOMER PRICE";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                const std::int64_t delta = action.action == UiAction::increase_service_price ? 1 : -1;
+                if (buildings.set_service_price(instance->instance_id, *definition, instance->service_price + delta)) {
+                    const BuildingInstance* updated = buildings.find_by_id(instance->instance_id);
+                    status = definition->name + ": PRECO AO CLIENTE " +
+                        format_money(updated == nullptr ? instance->service_price : updated->service_price);
+                    (void)audio.play(SoundEvent::ui_click);
+                } else {
+                    status = "SERVICE PRICE CHANGE FAILED";
+                    (void)audio.play(SoundEvent::ui_error);
+                }
+                break;
+            }
             case UiAction::close_selection:
                 selected_instance_id.reset();
                 status = "INFO PANEL CLOSED";
@@ -2118,6 +2144,15 @@ int main() {
                         upgrade_btn_text,
                         can_upgrade,
                         is_max,
+                        definition->service_name,
+                        definition->default_service_price > 0 ? format_money(instance->service_price) : "",
+                        definition->default_service_price > 0
+                            ? "MIN " + format_money(definition->minimum_service_price) +
+                              "  |  MAX " + format_money(definition->maximum_service_price)
+                            : "",
+                        definition->default_service_price > 0,
+                        definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,
+                        definition->default_service_price > 0 && instance->service_price < definition->maximum_service_price,
                     };
                 }
             }

@@ -70,6 +70,8 @@ enum class UiAction : std::uint8_t {
     settings_reset,
     settings_cancel,
     settings_apply,
+    decrease_service_price,
+    increase_service_price,
     close_selection,
     upgrade_building,
 };
@@ -135,6 +137,12 @@ struct UiSelectedBuilding {
     std::string upgrade_button_text;
     bool can_upgrade = false;
     bool is_max_level = false;
+    std::string service_name;
+    std::string service_price;
+    std::string service_price_range;
+    bool has_service_pricing = false;
+    bool can_decrease_service_price = false;
+    bool can_increase_service_price = false;
 };
 
 struct UiLandDetails {

@@ -32,7 +32,7 @@ class MissionManager;
 // file format, version checks and user-data paths remain centralized here.
 class SaveManager {
 public:
-    static constexpr int kSaveVersion = 8;
+    static constexpr int kSaveVersion = 9;
 
     [[nodiscard]] static std::filesystem::path default_save_path();
     // Reserved path for a later timer-driven autosave; no automatic writes yet.

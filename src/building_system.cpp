@@ -215,6 +215,12 @@ template <typename Number>
     definition.property_tax_per_year = json_number<std::int64_t>(json, "propertyTaxPerYear").value_or(0);
     definition.required_population_for_full_revenue =
         json_number<std::uint32_t>(json, "requiredPopulationForFullRevenue").value_or(0);
+    definition.service_name = json_string(json, "serviceName").value_or("");
+    definition.default_service_price = json_number<std::int64_t>(json, "defaultServicePrice").value_or(0);
+    definition.minimum_service_price = json_number<std::int64_t>(json, "minimumServicePrice").value_or(
+        definition.default_service_price > 0 ? 1 : 0);
+    definition.maximum_service_price = json_number<std::int64_t>(json, "maximumServicePrice").value_or(
+        definition.default_service_price);
     definition.residential_capacity = json_number<std::uint32_t>(json, "residentialCapacity").value_or(0);
     definition.power_consumption = json_number<std::uint32_t>(json, "powerConsumption").value_or(0);
     definition.power_production = json_number<std::uint32_t>(json, "powerProduction").value_or(0);
@@ -336,6 +342,11 @@ template <typename Number>
     if (definition.id.empty() || definition.name.empty() || definition.texture_path.empty() ||
         definition.footprint_width <= 0 || definition.footprint_height <= 0 || definition.build_cost < 0 ||
         definition.maintenance_per_month < 0 || definition.tax_revenue_per_month < 0 ||
+        definition.default_service_price < 0 || definition.minimum_service_price < 0 ||
+        definition.maximum_service_price < definition.minimum_service_price ||
+        (definition.default_service_price > 0 &&
+            (definition.service_name.empty() || definition.default_service_price < definition.minimum_service_price ||
+             definition.default_service_price > definition.maximum_service_price)) ||
         definition.art_scale <= 0.0F) {
         return std::nullopt;
     }
@@ -720,6 +731,7 @@ std::optional<std::uint64_t> BuildingManager::place(const BuildingDefinition& de
     instance.tile_y = tile_y;
     instance.rotation = definition.rotatable ? rotation : BuildingRotation::r0;
     instance.operational = !definition.preplaced || definition.unlock_requirement.empty();
+    instance.service_price = definition.default_service_price;
     instances_.push_back(instance);
 
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
@@ -757,6 +769,13 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
     BuildingInstance instance = serialized;
     if (!definition.rotatable) {
         instance.rotation = BuildingRotation::r0;
+    }
+    if (definition.default_service_price > 0) {
+        if (instance.service_price <= 0) instance.service_price = definition.default_service_price;
+        instance.service_price = std::clamp(instance.service_price, definition.minimum_service_price,
+                                            definition.maximum_service_price);
+    } else {
+        instance.service_price = 0;
     }
     instances_.push_back(instance);
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
@@ -814,6 +833,21 @@ bool BuildingManager::set_operational(const std::uint64_t instance_id, const boo
         return false;
     }
     found->operational = operational;
+    return true;
+}
+
+bool BuildingManager::set_service_price(const std::uint64_t instance_id, const BuildingDefinition& definition,
+                                        const std::int64_t service_price) {
+    if (definition.default_service_price <= 0 || definition.maximum_service_price < definition.minimum_service_price) {
+        return false;
+    }
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end() || found->definition_id != definition.id) {
+        return false;
+    }
+    found->service_price = std::clamp(service_price, definition.minimum_service_price, definition.maximum_service_price);
     return true;
 }
 

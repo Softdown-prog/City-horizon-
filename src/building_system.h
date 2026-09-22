@@ -122,6 +122,11 @@ struct BuildingDefinition {
     // Zero disables population-driven commercial demand. Commercial revenue
     // reaches its configured total when current population reaches this value.
     std::uint32_t required_population_for_full_revenue = 0;
+    // Optional player-controlled customer price. Zero disables service pricing.
+    std::string service_name;
+    std::int64_t default_service_price = 0;
+    std::int64_t minimum_service_price = 0;
+    std::int64_t maximum_service_price = 0;
     // Zero for non-residential definitions. Capacity is owned by the
     // PopulationSystem; it does not determine property-tax revenue.
     std::uint32_t residential_capacity = 0;
@@ -177,6 +182,8 @@ struct BuildingInstance {
     BuildingRotation rotation = BuildingRotation::r0;
     int current_level = 1;
     bool operational = true;
+    // Per-instance customer price so two shops may use different strategies.
+    std::int64_t service_price = 0;
 
     [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition& current_level_definition(const BuildingDefinition& definition) const;
@@ -236,6 +243,8 @@ public:
     [[nodiscard]] bool is_occupied(int tile_x, int tile_y) const;
     [[nodiscard]] bool remove_instance(const BuildingDefinition& definition, std::uint64_t instance_id);
     [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+    [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
+                                         std::int64_t service_price);
     std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
 

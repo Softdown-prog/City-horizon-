@@ -165,6 +165,31 @@ void draw_toolbar_panel(SDL_Renderer* renderer, const UiRect& bounds) {
                    bounds.x + bounds.width - 2.0F, bounds.y + 2.0F);
 }
 
+void draw_bakery_service_icon(SDL_Renderer* renderer, const UiRect& bounds) {
+    const SDL_FRect background = {bounds.x, bounds.y, bounds.width, bounds.height};
+    SDL_SetRenderDrawColor(renderer, 26, 52, 64, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &background);
+    SDL_SetRenderDrawColor(renderer, 68, 111, 130, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &background);
+
+    const SDL_FRect loaf = {bounds.x + 7.0F, bounds.y + 11.0F, 28.0F, 22.0F};
+    SDL_SetRenderDrawColor(renderer, 211, 163, 88, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &loaf);
+    SDL_SetRenderDrawColor(renderer, 245, 208, 139, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, loaf.x + 7.0F, loaf.y + 4.0F, loaf.x + 3.0F, loaf.y + 12.0F);
+    SDL_RenderLine(renderer, loaf.x + 16.0F, loaf.y + 4.0F, loaf.x + 12.0F, loaf.y + 12.0F);
+    SDL_RenderLine(renderer, loaf.x + 25.0F, loaf.y + 4.0F, loaf.x + 21.0F, loaf.y + 12.0F);
+
+    const SDL_FRect sweet = {bounds.x + 34.0F, bounds.y + 29.0F, 12.0F, 12.0F};
+    SDL_SetRenderDrawColor(renderer, 220, 126, 151, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &sweet);
+    SDL_SetRenderDrawColor(renderer, 248, 193, 207, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, sweet.x - 5.0F, sweet.y + 2.0F, sweet.x, sweet.y + 6.0F);
+    SDL_RenderLine(renderer, sweet.x - 5.0F, sweet.y + 10.0F, sweet.x, sweet.y + 6.0F);
+    SDL_RenderLine(renderer, sweet.x + sweet.w, sweet.y + 6.0F, sweet.x + sweet.w + 5.0F, sweet.y + 2.0F);
+    SDL_RenderLine(renderer, sweet.x + sweet.w, sweet.y + 6.0F, sweet.x + sweet.w + 5.0F, sweet.y + 10.0F);
+}
+
 void draw_pause_panel(SDL_Renderer* renderer, const UiRect& bounds) {
     const SDL_FRect shadow = {bounds.x + 8.0F, bounds.y + 10.0F, bounds.width, bounds.height};
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 92);
@@ -636,6 +661,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
 
     if (model.selected_building) {
         const float panel_width = 330.0F;
+        const float panel_y = 84.0F;
+        const float panel_x = width - panel_width - kMargin;
         const UiSelectedBuilding& item = *model.selected_building;
         const std::vector<std::string> details = {
             "ACESSO A RUA: " + item.road_access_requirement + " / " + item.road_access,
@@ -651,11 +678,18 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         };
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();
-        const float required_height = 126.0F + static_cast<float>(detail_lines) * 17.0F;
+        const float service_height = item.has_service_pricing ? 82.0F : 0.0F;
+        const float required_height = 126.0F + service_height + static_cast<float>(detail_lines) * 17.0F;
         const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);
         const float panel_height = std::min(maximum_height, std::max(308.0F, required_height));
-        add_panel({width - panel_width - kMargin, 84.0F, panel_width, panel_height});
+        add_panel({panel_x, panel_y, panel_width, panel_height});
         add_button({width - 38.0F, 92.0F, 18.0F, 18.0F}, "X", UiAction::close_selection);
+        if (item.has_service_pricing) {
+            add_button({panel_x + 194.0F, panel_y + 143.0F, 34.0F, 30.0F}, "-",
+                       UiAction::decrease_service_price, item.can_decrease_service_price);
+            add_button({panel_x + 282.0F, panel_y + 143.0F, 34.0F, 30.0F}, "+",
+                       UiAction::increase_service_price, item.can_increase_service_price);
+        }
     }
 
     if (!model.status.empty()) {
@@ -1002,7 +1036,18 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         draw_text_fit(renderer, panel_x + 102.0F, 113.0F, 212.0F, item.category, 164, 193, 205);
         draw_text_fit(renderer, panel_x + 102.0F, 133.0F, 212.0F, "CUSTO: " + item.cost, 214, 230, 236);
         draw_text_fit(renderer, panel_x + 102.0F, 151.0F, 212.0F, "ROTACAO: " + item.rotation, 164, 193, 205);
+
         float detail_y = 198.0F;
+        if (item.has_service_pricing) {
+            const UiRect service_icon = {panel_x + 12.0F, 196.0F, 54.0F, 54.0F};
+            draw_bakery_service_icon(renderer, service_icon);
+            draw_text_fit(renderer, panel_x + 78.0F, 197.0F, 238.0F, "VENDE: " + item.service_name, 236, 223, 184);
+            draw_text_fit(renderer, panel_x + 78.0F, 214.0F, 238.0F, "PRECO AO CLIENTE", 164, 193, 205);
+            draw_text_centered_fit(renderer, {panel_x + 232.0F, 227.0F, 46.0F, 24.0F}, 235.0F, item.service_price,
+                                   238, 246, 249);
+            draw_text_fit(renderer, panel_x + 78.0F, 254.0F, 238.0F, item.service_price_range, 118, 151, 166);
+            detail_y = 281.0F;
+        }
         const auto detail = [&](const std::string& label, const std::string& value) {
             if (value.empty()) return;
             detail_y += 17.0F * static_cast<float>(draw_text_wrapped(renderer, panel_x + 12.0F, detail_y, 306.0F, label + ": " + value, 202, 219, 227));
@@ -1016,6 +1061,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         }
         detail("ABASTECIMENTO LOCAL", item.local_supply);
     }
+
     if (!model_.status.empty()) {
         const UiRect* toast = nullptr;
         for (const UiRect& panel : panels_) if (panel.y == 84.0F && panel.height == 28.0F) toast = &panel;

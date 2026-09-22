@@ -10,10 +10,22 @@
     "3": "assets/buildings/bakery/bakery_east.png"
   },
   "spriteAnchors": {
-    "0": { "x": 0.5, "y": 0.61805556 },
-    "1": { "x": 0.5, "y": 0.61805556 },
-    "2": { "x": 0.5, "y": 0.61805556 },
-    "3": { "x": 0.5, "y": 0.61805556 }
+    "0": {
+      "x": 0.5,
+      "y": 0.61805556
+    },
+    "1": {
+      "x": 0.5,
+      "y": 0.61805556
+    },
+    "2": {
+      "x": 0.5,
+      "y": 0.61805556
+    },
+    "3": {
+      "x": 0.5,
+      "y": 0.61805556
+    }
   },
   "rotatable": true,
   "requiresRoadAccess": true,
@@ -23,7 +35,7 @@
     "width": 2,
     "height": 2
   },
-  "buildCost": 0,
+  "buildCost": 2500,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "propertyTaxPerYear": 0,
@@ -46,5 +58,9 @@
       "2": "assets/buildings/bakery/bakery_north_mask.png",
       "3": "assets/buildings/bakery/bakery_east_mask.png"
     }
-  }
+  },
+  "serviceName": "Pães e doces",
+  "defaultServicePrice": 3,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 20
 }
