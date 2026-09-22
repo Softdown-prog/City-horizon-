@@ -27,14 +27,21 @@ Novos prédios, assets de farm, decoração, vegetação, pedra, água, props, r
 
 ## Estado temporário do runtime
 
-Por decisão de produção, o único asset visual legado de terreno mantido por enquanto é a grama canônica:
+A grama canônica permanece como asset legado de terreno:
 
 - `assets/terrain/grass_isometric_01.png`
 - `assets/terrain/grass_isometric_01.json`
 
+O primeiro tile de terra aprovado pelo pipeline atual também está promovido para uso do jogo:
+
+- `assets/terrain/dirt_isometric_01.png`
+- `assets/terrain/dirt_isometric_01.json`
+
+O tile de terra foi normalizado para 128×64 RGBA e validado no MapForge pelo workflow `Test Atomic Path in MapForge`, run `35670104713`. Ele é a fonte visual aprovada para futuras variantes de conexão/auto-tile; não reutilizar os sprites antigos de caminho como arte final.
+
 O contrato técnico de tile de chão também permanece em `assets/terrain/ground_tile_contract.json`.
 
-Água/costa, pedra, caminhos, decoração, farming, construções, props, veículos, parques, ruas, calçadas, variantes geradas e demais bibliotecas visuais antigas foram removidos. Quando alguma dessas categorias voltar ao jogo, ela deverá nascer novamente no pipeline Blender e passar pelo bake/validation gate atual.
+Água/costa, pedra, decoração, farming, construções, props, veículos, parques, ruas, calçadas e demais bibliotecas visuais antigas removidas devem voltar somente pelo pipeline atual e pelo gate de validação correspondente.
 
 ## Regra para novos assets
 
