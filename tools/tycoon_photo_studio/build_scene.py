@@ -48,6 +48,8 @@ except Exception:
     _mat_lib = None
     _MAT_LIB_AVAILABLE = False
 
+import ch_color_mask as _mask_lib
+
 DIRECTIONS = (
     {"id": "south", "quarterTurns": 0, "rotationDegrees": 0.0},
     {"id": "east", "quarterTurns": 1, "rotationDegrees": 90.0},
@@ -502,7 +504,7 @@ def build_asset(asset, asset_config_path=""):
 
     materials = {}
     for key, spec in asset.get("materials", {}).items():
-        materials[key] = make_material(
+        material = make_material(
             spec.get("name", key),
             spec["rgba"],
             float(spec.get("roughness", 0.72)),
@@ -511,6 +513,9 @@ def build_asset(asset, asset_config_path=""):
             seed=int(spec.get("seed", 0)),
             strength=float(spec.get("strength", 1.0)),
         )
+        if spec.get("maskRole"):
+            _mask_lib.tag_material(material, spec["maskRole"])
+        materials[key] = material
 
     authored = []
     for part in asset.get("parts", []):
@@ -540,14 +545,17 @@ def build_asset(asset, asset_config_path=""):
         # ── GAP 1: External mesh import ───────────────────────────────
         elif kind == "blend_import":
             objs = import_blend_collection(part, asset_config_path)
+            _mask_lib.tag_imported_objects(objs, part.get("maskRole"))
             authored.extend(objs)
 
         elif kind == "fbx_import":
             objs = import_fbx(part, asset_config_path)
+            _mask_lib.tag_imported_objects(objs, part.get("maskRole"))
             authored.extend(objs)
 
         elif kind == "glb_import":
             objs = import_glb(part, asset_config_path)
+            _mask_lib.tag_imported_objects(objs, part.get("maskRole"))
             authored.extend(objs)
 
         else:
@@ -964,6 +972,8 @@ def main():
     scene = configure_scene(studio, src_res, output_dir)
     authored = build_asset(asset, asset_config_path=args.asset_config)
     root = create_asset_root(authored)
+    mask_spec = _mask_lib.normalize_spec(asset)
+    mask_assignment = _mask_lib.assignment_summary(authored, mask_spec) if mask_spec else None
 
     # Footprint scale sanity check
     validate_footprint_scale(asset, authored)
@@ -994,14 +1004,22 @@ def main():
         direction_id = direction["id"]
         color_name = f"{asset_id}_{direction_id}_color_source.png"
         shadow_name = f"{asset_id}_{direction_id}_shadow_source.png"
+        mask_name = f"{asset_id}_{direction_id}_mask_source.png" if mask_spec else None
         render_color_pass(scene, authored, ground, os.path.join(output_dir, color_name))
         render_shadow_pass(scene, authored, ground, os.path.join(output_dir, shadow_name))
-        direction_metadata.append({
+        if mask_spec:
+            _mask_lib.render_mask_pass(
+                scene, authored, ground, os.path.join(output_dir, mask_name), mask_spec
+            )
+        direction_record = {
             **direction,
             "colorSource": color_name,
             "shadowSource": shadow_name,
             "groundOriginSourcePx": ground_origin_source_px(scene),
-        })
+        }
+        if mask_name:
+            direction_record["maskSource"] = mask_name
+        direction_metadata.append(direction_record)
 
     root.rotation_euler[2] = 0.0
     bpy.context.view_layer.update()
@@ -1046,6 +1064,7 @@ def main():
             "worldStrength": studio["world"]["strength"],
         },
         "postProcess": studio["postProcess"],
+        "colorMask": _mask_lib.metadata(mask_spec, mask_assignment) if mask_spec else {"enabled": False},
         "shadowMode": "Cycles shadow catcher with object hidden from camera",
         "sourceSummary": {
             "materialCount": len(asset.get("materials", {})),

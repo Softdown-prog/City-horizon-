@@ -223,10 +223,10 @@ def draw_pivot(draw, pivot):
     draw.line((x, y - 5, x, y + 5), fill=(230, 72, 58, 255), width=1)
 
 
-def make_direction_review(candidates, pivots):
+def make_direction_review(candidates, pivots, title="Tycoon Asset Baker V1 - four rotations, one source, frozen studio"):
     board = Image.new("RGBA", (4 * 300, 380), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((20, 14), "Tycoon Asset Baker V1 - four rotations, one source, frozen studio", fill=(32, 32, 32, 255))
+    draw.text((20, 14), title, fill=(32, 32, 32, 255))
     for index, direction in enumerate(DIRECTION_ORDER):
         x0 = index * 300 + 22
         y0 = 62
@@ -348,10 +348,13 @@ def main():
     if tuple(metadata.get("directionOrder", [])) != DIRECTION_ORDER:
         raise RuntimeError(f"Direction order must be {DIRECTION_ORDER}, got {metadata.get('directionOrder')}")
 
+    mask_meta = metadata.get("colorMask") or {}
+    mask_enabled = bool(mask_meta.get("enabled", False))
 
     candidates = {}
     pivots = {}
     all_variants = {}
+    masks = {}
     view_records = []
     for direction in DIRECTION_ORDER:
         meta = direction_meta[direction]
@@ -370,10 +373,25 @@ def main():
             image.save(output_dir / f"{asset_id}_{direction}_variant_{index:02d}.png")
         candidate.save(output_dir / f"{asset_id}_{direction}.png")
 
+        mask_small = None
+        if mask_enabled:
+            mask_source_name = meta.get("maskSource")
+            if not mask_source_name:
+                raise RuntimeError(f"Mask-enabled asset is missing maskSource for {direction}")
+            mask_source = Image.open(input_dir / mask_source_name).convert("RGBA")
+            if mask_source.size != color_source.size:
+                raise RuntimeError(
+                    f"Color/mask source size mismatch for {direction}: "
+                    f"{color_source.size} vs {mask_source.size}"
+                )
+            mask_small = downsample(mask_source)
+            mask_small.save(output_dir / f"{asset_id}_{direction}_mask.png")
+            masks[direction] = mask_small
+
         candidates[direction] = candidate
         pivots[direction] = pivot
         all_variants[direction] = variants
-        view_records.append({
+        view_record = {
             "direction": direction,
             "quarterTurns": meta["quarterTurns"],
             "rotationDegrees": meta["rotationDegrees"],
@@ -383,7 +401,11 @@ def main():
             "pivot": pivot,
             "objectAlphaBounds": alpha_bounds(color_small),
             "spriteAlphaBounds": alpha_bounds(candidate),
-        })
+        }
+        if mask_small is not None:
+            view_record["maskPass"] = f"{asset_id}_{direction}_mask.png"
+            view_record["maskAlphaBounds"] = alpha_bounds(mask_small)
+        view_records.append(view_record)
 
     unique_pivots = {(p["x"], p["y"]) for p in pivots.values()}
     if len(unique_pivots) != 1:
@@ -399,6 +421,11 @@ def main():
     context = make_context_board(candidates, pivots)
     context.save(output_dir / f"{asset_id}_4dir_context.png")
     context.save(output_dir / "tycoon_photo_studio_in_game_context.png")
+    if mask_enabled:
+        make_fixed_sheet(masks).save(output_dir / f"{asset_id}_mask_4view.png")
+        make_direction_review(
+            masks, pivots, "CH_COLOR_MASK_V1 - R/G/B semantic roles, alpha coverage"
+        ).save(output_dir / f"{asset_id}_mask_review.png")
 
     manifest = {
         "contract": "TYCOON_ASSET_BAKE_V1",
@@ -462,6 +489,20 @@ def main():
         "githubSha": os.environ.get("GITHUB_SHA", "local"),
         "approvalRule": "Golden kiosk guards the approved visual recipe; new assets must use the same frozen studio unless a new studio version is explicitly approved.",
     }
+    if mask_enabled:
+        manifest["colorMask"] = {
+            **mask_meta,
+            "postProcess": "downsample_only_no_palette_no_dither",
+            "files": {
+                direction: f"{asset_id}_{direction}_mask.png"
+                for direction in DIRECTION_ORDER
+            },
+            "fourView": f"{asset_id}_mask_4view.png",
+            "review": f"{asset_id}_mask_review.png",
+        }
+        manifest["files"]["colorMask4View"] = f"{asset_id}_mask_4view.png"
+        manifest["files"]["colorMaskReview"] = f"{asset_id}_mask_review.png"
+
     manifest_text = json.dumps(manifest, indent=2)
     (output_dir / f"{asset_id}_manifest.json").write_text(manifest_text, encoding="utf-8")
     (output_dir / "tycoon_photo_studio_manifest.json").write_text(manifest_text, encoding="utf-8")
