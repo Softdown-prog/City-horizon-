@@ -1,0 +1,165 @@
+name: Apply bakery pricing controls once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-bakery-pricing-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bakery-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Apply bakery pricing feature
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(path: str, old: str, new: str, label: str):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing expected block [{label}] in {path}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          def replace_span(path: str, start_marker: str, end_marker: str, new_block: str, label: str):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              start = text.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f'missing start [{label}] in {path}')
+              end = text.find(end_marker, start)
+              if end < 0:
+                  raise SystemExit(f'missing end [{label}] in {path}')
+              p.write_text(text[:start] + new_block.rstrip() + '\n\n' + text[end:], encoding='utf-8')
+
+          # Bakery data: construction cost plus data-driven service pricing contract.
+          bakery_path = Path('assets/definitions/bakery_01.json')
+          bakery = json.loads(bakery_path.read_text(encoding='utf-8'))
+          bakery['buildCost'] = 2500
+          bakery['serviceName'] = 'Pães e doces'
+          bakery['defaultServicePrice'] = 3
+          bakery['minimumServicePrice'] = 1
+          bakery['maximumServicePrice'] = 20
+          bakery_path.write_text(json.dumps(bakery, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          # Generic building definition / instance support.
+          replace_once('src/building_system.h',
+          '''    std::uint32_t required_population_for_full_revenue = 0;\n    // Zero for non-residential definitions.''',
+          '''    std::uint32_t required_population_for_full_revenue = 0;\n    // Optional player-controlled customer price. Zero disables service pricing.\n    std::string service_name;\n    std::int64_t default_service_price = 0;\n    std::int64_t minimum_service_price = 0;\n    std::int64_t maximum_service_price = 0;\n    // Zero for non-residential definitions.''', 'definition service fields')
+
+          replace_once('src/building_system.h',
+          '''    int current_level = 1;\n    bool operational = true;\n\n    [[nodiscard]] bool is_max_level''',
+          '''    int current_level = 1;\n    bool operational = true;\n    // Per-instance customer price so two shops may use different strategies.\n    std::int64_t service_price = 0;\n\n    [[nodiscard]] bool is_max_level''', 'instance service price')
+
+          replace_once('src/building_system.h',
+          '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);\n    std::size_t set_operational_by_definition''',
+          '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);\n    [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,\n                                         std::int64_t service_price);\n    std::size_t set_operational_by_definition''', 'manager service setter declaration')
+
+          replace_once('src/building_system.cpp',
+          '''    definition.required_population_for_full_revenue =\n        json_number<std::uint32_t>(json, "requiredPopulationForFullRevenue").value_or(0);\n    definition.residential_capacity''',
+          '''    definition.required_population_for_full_revenue =\n        json_number<std::uint32_t>(json, "requiredPopulationForFullRevenue").value_or(0);\n    definition.service_name = json_string(json, "serviceName").value_or("");\n    definition.default_service_price = json_number<std::int64_t>(json, "defaultServicePrice").value_or(0);\n    definition.minimum_service_price = json_number<std::int64_t>(json, "minimumServicePrice").value_or(\n        definition.default_service_price > 0 ? 1 : 0);\n    definition.maximum_service_price = json_number<std::int64_t>(json, "maximumServicePrice").value_or(\n        definition.default_service_price);\n    definition.residential_capacity''', 'parse service fields')
+
+          replace_once('src/building_system.cpp',
+          '''        definition.maintenance_per_month < 0 || definition.tax_revenue_per_month < 0 ||\n        definition.art_scale <= 0.0F) {''',
+          '''        definition.maintenance_per_month < 0 || definition.tax_revenue_per_month < 0 ||\n        definition.default_service_price < 0 || definition.minimum_service_price < 0 ||\n        definition.maximum_service_price < definition.minimum_service_price ||\n        (definition.default_service_price > 0 &&\n            (definition.service_name.empty() || definition.default_service_price < definition.minimum_service_price ||\n             definition.default_service_price > definition.maximum_service_price)) ||\n        definition.art_scale <= 0.0F) {''', 'validate service fields')
+
+          replace_once('src/building_system.cpp',
+          '''    instance.rotation = definition.rotatable ? rotation : BuildingRotation::r0;\n    instance.operational = !definition.preplaced || definition.unlock_requirement.empty();\n    instances_.push_back(instance);''',
+          '''    instance.rotation = definition.rotatable ? rotation : BuildingRotation::r0;\n    instance.operational = !definition.preplaced || definition.unlock_requirement.empty();\n    instance.service_price = definition.default_service_price;\n    instances_.push_back(instance);''', 'default instance service price')
+
+          replace_once('src/building_system.cpp',
+          '''    if (!definition.rotatable) {\n        instance.rotation = BuildingRotation::r0;\n    }\n    instances_.push_back(instance);''',
+          '''    if (!definition.rotatable) {\n        instance.rotation = BuildingRotation::r0;\n    }\n    if (definition.default_service_price > 0) {\n        if (instance.service_price <= 0) instance.service_price = definition.default_service_price;\n        instance.service_price = std::clamp(instance.service_price, definition.minimum_service_price,\n                                            definition.maximum_service_price);\n    } else {\n        instance.service_price = 0;\n    }\n    instances_.push_back(instance);''', 'restore service price')
+
+          replace_once('src/building_system.cpp',
+          '''bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {\n    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {\n        return instance.instance_id == instance_id;\n    });\n    if (found == instances_.end()) {\n        return false;\n    }\n    found->operational = operational;\n    return true;\n}\n\nstd::size_t BuildingManager::set_operational_by_definition''',
+          '''bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {\n    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {\n        return instance.instance_id == instance_id;\n    });\n    if (found == instances_.end()) {\n        return false;\n    }\n    found->operational = operational;\n    return true;\n}\n\nbool BuildingManager::set_service_price(const std::uint64_t instance_id, const BuildingDefinition& definition,\n                                        const std::int64_t service_price) {\n    if (definition.default_service_price <= 0 || definition.maximum_service_price < definition.minimum_service_price) {\n        return false;\n    }\n    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {\n        return instance.instance_id == instance_id;\n    });\n    if (found == instances_.end() || found->definition_id != definition.id) {\n        return false;\n    }\n    found->service_price = std::clamp(service_price, definition.minimum_service_price, definition.maximum_service_price);\n    return true;\n}\n\nstd::size_t BuildingManager::set_operational_by_definition''', 'service setter implementation')
+
+          # Save compatibility: v9 stores the per-instance service price.
+          replace_once('src/save_manager.h', 'static constexpr int kSaveVersion = 8;', 'static constexpr int kSaveVersion = 9;', 'save version')
+
+          replace_once('src/save_manager.cpp',
+          '''        const auto level = json_number<int>(building, "level");\n        const int current_level = level.has_value() ? std::max(1, *level) : 1;''',
+          '''        const auto level = json_number<int>(building, "level");\n        const auto service_price = json_number<std::int64_t>(building, "servicePrice");\n        const int current_level = level.has_value() ? std::max(1, *level) : 1;''', 'parse saved service price')
+
+          replace_once('src/save_manager.cpp',
+          '''        snapshot.buildings.push_back({*instance_id, *definition_id, *tile_x, *tile_y, static_cast<BuildingRotation>(*rotation), current_level});''',
+          '''        BuildingInstance saved;\n        saved.instance_id = *instance_id;\n        saved.definition_id = *definition_id;\n        saved.tile_x = *tile_x;\n        saved.tile_y = *tile_y;\n        saved.rotation = static_cast<BuildingRotation>(*rotation);\n        saved.current_level = current_level;\n        saved.service_price = (*version >= 9 && service_price.has_value()) ? std::max<std::int64_t>(0, *service_price) : 0;\n        snapshot.buildings.push_back(std::move(saved));''', 'restore saved service price')
+
+          replace_once('src/save_manager.cpp',
+          '''               << ", \\"rotation\\": " << static_cast<int>(building.rotation)\n               << ", \\"level\\": " << building.current_level << " }"''',
+          '''               << ", \\"rotation\\": " << static_cast<int>(building.rotation)\n               << ", \\"level\\": " << building.current_level\n               << ", \\"servicePrice\\": " << building.service_price << " }"''', 'serialize service price')
+
+          # Gameplay UI contract/actions.
+          replace_once('src/ui_manager.h',
+          '''    settings_apply,\n    close_selection,\n    upgrade_building,''',
+          '''    settings_apply,\n    decrease_service_price,\n    increase_service_price,\n    close_selection,\n    upgrade_building,''', 'service price UI actions')
+
+          replace_once('src/ui_manager.h',
+          '''    bool can_upgrade = false;\n    bool is_max_level = false;\n};''',
+          '''    bool can_upgrade = false;\n    bool is_max_level = false;\n    std::string service_name;\n    std::string service_price;\n    std::string service_price_range;\n    bool has_service_pricing = false;\n    bool can_decrease_service_price = false;\n    bool can_increase_service_price = false;\n};''', 'selected building service view model')
+
+          # Procedural icon: no new raster UI asset.
+          replace_once('src/ui_manager.cpp',
+          '''void draw_toolbar_panel(SDL_Renderer* renderer, const UiRect& bounds) {\n    const SDL_FRect shadow = {bounds.x + 3.0F, bounds.y + 4.0F, bounds.width, bounds.height};\n    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 74);\n    SDL_RenderFillRect(renderer, &shadow);\n    const SDL_FRect rect = {bounds.x, bounds.y, bounds.width, bounds.height};\n    SDL_SetRenderDrawColor(renderer, 12, 32, 46, 248);\n    SDL_RenderFillRect(renderer, &rect);\n    SDL_SetRenderDrawColor(renderer, 63, 105, 128, SDL_ALPHA_OPAQUE);\n    SDL_RenderRect(renderer, &rect);\n    SDL_SetRenderDrawColor(renderer, 78, 174, 199, SDL_ALPHA_OPAQUE);\n    SDL_RenderLine(renderer, bounds.x + 2.0F, bounds.y + 2.0F,\n                   bounds.x + bounds.width - 2.0F, bounds.y + 2.0F);\n}\n''',
+          '''void draw_toolbar_panel(SDL_Renderer* renderer, const UiRect& bounds) {\n    const SDL_FRect shadow = {bounds.x + 3.0F, bounds.y + 4.0F, bounds.width, bounds.height};\n    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 74);\n    SDL_RenderFillRect(renderer, &shadow);\n    const SDL_FRect rect = {bounds.x, bounds.y, bounds.width, bounds.height};\n    SDL_SetRenderDrawColor(renderer, 12, 32, 46, 248);\n    SDL_RenderFillRect(renderer, &rect);\n    SDL_SetRenderDrawColor(renderer, 63, 105, 128, SDL_ALPHA_OPAQUE);\n    SDL_RenderRect(renderer, &rect);\n    SDL_SetRenderDrawColor(renderer, 78, 174, 199, SDL_ALPHA_OPAQUE);\n    SDL_RenderLine(renderer, bounds.x + 2.0F, bounds.y + 2.0F,\n                   bounds.x + bounds.width - 2.0F, bounds.y + 2.0F);\n}\n\nvoid draw_bakery_service_icon(SDL_Renderer* renderer, const UiRect& bounds) {\n    const SDL_FRect background = {bounds.x, bounds.y, bounds.width, bounds.height};\n    SDL_SetRenderDrawColor(renderer, 26, 52, 64, SDL_ALPHA_OPAQUE);\n    SDL_RenderFillRect(renderer, &background);\n    SDL_SetRenderDrawColor(renderer, 68, 111, 130, SDL_ALPHA_OPAQUE);\n    SDL_RenderRect(renderer, &background);\n\n    const SDL_FRect loaf = {bounds.x + 7.0F, bounds.y + 11.0F, 28.0F, 22.0F};\n    SDL_SetRenderDrawColor(renderer, 211, 163, 88, SDL_ALPHA_OPAQUE);\n    SDL_RenderFillRect(renderer, &loaf);\n    SDL_SetRenderDrawColor(renderer, 245, 208, 139, SDL_ALPHA_OPAQUE);\n    SDL_RenderLine(renderer, loaf.x + 7.0F, loaf.y + 4.0F, loaf.x + 3.0F, loaf.y + 12.0F);\n    SDL_RenderLine(renderer, loaf.x + 16.0F, loaf.y + 4.0F, loaf.x + 12.0F, loaf.y + 12.0F);\n    SDL_RenderLine(renderer, loaf.x + 25.0F, loaf.y + 4.0F, loaf.x + 21.0F, loaf.y + 12.0F);\n\n    const SDL_FRect sweet = {bounds.x + 34.0F, bounds.y + 29.0F, 12.0F, 12.0F};\n    SDL_SetRenderDrawColor(renderer, 220, 126, 151, SDL_ALPHA_OPAQUE);\n    SDL_RenderFillRect(renderer, &sweet);\n    SDL_SetRenderDrawColor(renderer, 248, 193, 207, SDL_ALPHA_OPAQUE);\n    SDL_RenderLine(renderer, sweet.x - 5.0F, sweet.y + 2.0F, sweet.x, sweet.y + 6.0F);\n    SDL_RenderLine(renderer, sweet.x - 5.0F, sweet.y + 10.0F, sweet.x, sweet.y + 6.0F);\n    SDL_RenderLine(renderer, sweet.x + sweet.w, sweet.y + 6.0F, sweet.x + sweet.w + 5.0F, sweet.y + 2.0F);\n    SDL_RenderLine(renderer, sweet.x + sweet.w, sweet.y + 6.0F, sweet.x + sweet.w + 5.0F, sweet.y + 10.0F);\n}\n''', 'bakery service icon')
+
+          replace_span('src/ui_manager.cpp',
+          '    if (model.selected_building) {',
+          '    if (!model.status.empty()) {',
+          '''    if (model.selected_building) {\n        const float panel_width = 330.0F;\n        const float panel_y = 84.0F;\n        const float panel_x = width - panel_width - kMargin;\n        const UiSelectedBuilding& item = *model.selected_building;\n        const std::vector<std::string> details = {\n            "ACESSO A RUA: " + item.road_access_requirement + " / " + item.road_access,\n            item.energy_consumption.empty() ? "" : "CONSUMO ENERGIA: " + item.energy_consumption,\n            item.energy_production.empty() ? "" : "PRODUCAO ENERGIA: " + item.energy_production,\n            item.residential_capacity.empty() ? "" : "CAPACIDADE RESIDENCIAL: " + item.residential_capacity,\n            item.property_tax_per_year.empty() ? "" : "IPTU ANUAL: " + item.property_tax_per_year,\n            item.commercial_demand.empty() ? "" : "RECEITA BASE: " + item.monthly_tax + "/MES",\n            item.commercial_demand.empty() ? "" : "DEMANDA: " + item.commercial_demand,\n            item.commercial_current_revenue.empty() ? "" : "RECEITA ESTIMADA: " + item.commercial_current_revenue + "/MES",\n            item.commercial_demand.empty() ? "" : "MANUTENCAO: " + item.monthly_maintenance + "/MES",\n            item.local_supply.empty() ? "" : "ABASTECIMENTO LOCAL: " + item.local_supply,\n        };\n        std::size_t detail_lines = 0;\n        for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();\n        const float service_height = item.has_service_pricing ? 82.0F : 0.0F;\n        const float required_height = 126.0F + service_height + static_cast<float>(detail_lines) * 17.0F;\n        const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);\n        const float panel_height = std::min(maximum_height, std::max(308.0F, required_height));\n        add_panel({panel_x, panel_y, panel_width, panel_height});\n        add_button({width - 38.0F, 92.0F, 18.0F, 18.0F}, "X", UiAction::close_selection);\n        if (item.has_service_pricing) {\n            add_button({panel_x + 194.0F, panel_y + 143.0F, 34.0F, 30.0F}, "-",\n                       UiAction::decrease_service_price, item.can_decrease_service_price);\n            add_button({panel_x + 282.0F, panel_y + 143.0F, 34.0F, 30.0F}, "+",\n                       UiAction::increase_service_price, item.can_increase_service_price);\n        }\n    }''', 'selected panel layout')
+
+          replace_span('src/ui_manager.cpp',
+          '    if (model_.selected_building) {',
+          '    if (!model_.status.empty()) {',
+          '''    if (model_.selected_building) {\n        const UiSelectedBuilding& item = *model_.selected_building;\n        float panel_x = 0.0F;\n        for (const UiRect& panel : panels_) if (panel.width == 330.0F && panel.y == 84.0F) { panel_x = panel.x; break; }\n        const SDL_FRect preview = {panel_x + 12.0F, 116.0F, 78.0F, 68.0F};\n        SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &preview);\n        if (const UiThumbnail* thumbnail = thumbnail_for(renderer, item.thumbnail_path)) {\n            const float scale = std::min(preview.w / thumbnail->width, preview.h / thumbnail->height);\n            const SDL_FRect destination = {preview.x + (preview.w - thumbnail->width * scale) * 0.5F, preview.y + (preview.h - thumbnail->height * scale) * 0.5F, thumbnail->width * scale, thumbnail->height * scale};\n            SDL_RenderTexture(renderer, thumbnail->texture, nullptr, &destination);\n        } else { SDL_SetRenderDrawColor(renderer, 74, 112, 127, SDL_ALPHA_OPAQUE); SDL_RenderRect(renderer, &preview); }\n        draw_text_fit(renderer, panel_x + 102.0F, 96.0F, 212.0F, item.name, 236, 244, 248);\n        draw_text_fit(renderer, panel_x + 102.0F, 113.0F, 212.0F, item.category, 164, 193, 205);\n        draw_text_fit(renderer, panel_x + 102.0F, 133.0F, 212.0F, "CUSTO: " + item.cost, 214, 230, 236);\n        draw_text_fit(renderer, panel_x + 102.0F, 151.0F, 212.0F, "ROTACAO: " + item.rotation, 164, 193, 205);\n\n        float detail_y = 198.0F;\n        if (item.has_service_pricing) {\n            const UiRect service_icon = {panel_x + 12.0F, 196.0F, 54.0F, 54.0F};\n            draw_bakery_service_icon(renderer, service_icon);\n            draw_text_fit(renderer, panel_x + 78.0F, 197.0F, 238.0F, "VENDE: " + item.service_name, 236, 223, 184);\n            draw_text_fit(renderer, panel_x + 78.0F, 214.0F, 238.0F, "PRECO AO CLIENTE", 164, 193, 205);\n            draw_text_centered_fit(renderer, {panel_x + 232.0F, 227.0F, 46.0F, 24.0F}, 235.0F, item.service_price,\n                                   238, 246, 249);\n            draw_text_fit(renderer, panel_x + 78.0F, 254.0F, 238.0F, item.service_price_range, 118, 151, 166);\n            detail_y = 281.0F;\n        }\n        const auto detail = [&](const std::string& label, const std::string& value) {\n            if (value.empty()) return;\n            detail_y += 17.0F * static_cast<float>(draw_text_wrapped(renderer, panel_x + 12.0F, detail_y, 306.0F, label + ": " + value, 202, 219, 227));\n        };\n        detail("ACESSO A RUA", item.road_access_requirement + " / " + item.road_access);\n        detail("CONSUMO ENERGIA", item.energy_consumption); detail("PRODUCAO ENERGIA", item.energy_production);\n        if (!item.residential_capacity.empty()) { detail("CAPACIDADE RESIDENCIAL", item.residential_capacity); detail("IPTU ANUAL", item.property_tax_per_year); }\n        if (!item.commercial_demand.empty()) {\n            detail("RECEITA BASE", item.monthly_tax + "/MES"); detail("DEMANDA", item.commercial_demand);\n            detail("RECEITA ESTIMADA", item.commercial_current_revenue + "/MES"); detail("MANUTENCAO", item.monthly_maintenance + "/MES");\n        }\n        detail("ABASTECIMENTO LOCAL", item.local_supply);\n    }''', 'selected panel render')
+
+          # Runtime action handling and view-model binding.
+          replace_once('src/main.cpp',
+          '''            case UiAction::close_selection:\n                selected_instance_id.reset();''',
+          '''            case UiAction::decrease_service_price:\n            case UiAction::increase_service_price: {\n                if (!selected_instance_id) {\n                    status = "NO BUILDING SELECTED";\n                    (void)audio.play(SoundEvent::ui_error);\n                    break;\n                }\n                const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id);\n                const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);\n                if (instance == nullptr || definition == nullptr || definition->default_service_price <= 0) {\n                    status = "BUILDING HAS NO CUSTOMER PRICE";\n                    (void)audio.play(SoundEvent::ui_error);\n                    break;\n                }\n                const std::int64_t delta = action.action == UiAction::increase_service_price ? 1 : -1;\n                if (buildings.set_service_price(instance->instance_id, *definition, instance->service_price + delta)) {\n                    const BuildingInstance* updated = buildings.find_by_id(instance->instance_id);\n                    status = definition->name + ": PRECO AO CLIENTE " +\n                        format_money(updated == nullptr ? instance->service_price : updated->service_price);\n                    (void)audio.play(SoundEvent::ui_click);\n                } else {\n                    status = "SERVICE PRICE CHANGE FAILED";\n                    (void)audio.play(SoundEvent::ui_error);\n                }\n                break;\n            }\n            case UiAction::close_selection:\n                selected_instance_id.reset();''', 'service price actions')
+
+          replace_once('src/main.cpp',
+          '''                        can_upgrade,\n                        is_max,\n                    };''',
+          '''                        can_upgrade,\n                        is_max,\n                        definition->service_name,\n                        definition->default_service_price > 0 ? format_money(instance->service_price) : "",\n                        definition->default_service_price > 0\n                            ? "MIN " + format_money(definition->minimum_service_price) +\n                              "  |  MAX " + format_money(definition->maximum_service_price)\n                            : "",\n                        definition->default_service_price > 0,\n                        definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,\n                        definition->default_service_price > 0 && instance->service_price < definition->maximum_service_price,\n                    };''', 'bind service pricing model')
+
+          # Focused checks. Full build is deliberately left to the normal project CI.
+          workflow = Path('.github/workflows/apply-bakery-pricing-once.yml')
+          if workflow.exists():
+              workflow.unlink()
+          PY
+
+      - name: Validate focused changes
+        run: |
+          git diff --check
+          grep -q '"buildCost": 2500' assets/definitions/bakery_01.json
+          grep -q '"defaultServicePrice": 3' assets/definitions/bakery_01.json
+          grep -q 'set_service_price' src/building_system.cpp
+          grep -q 'servicePrice' src/save_manager.cpp
+          grep -q 'decrease_service_price' src/ui_manager.cpp
+          grep -q 'PRECO AO CLIENTE' src/main.cpp
+          test ! -e .github/workflows/apply-bakery-pricing-once.yml
+
+      - name: Commit to main
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'noreply@openai.com'
+          git add assets/definitions/bakery_01.json src/building_system.h src/building_system.cpp src/save_manager.h src/save_manager.cpp src/ui_manager.h src/ui_manager.cpp src/main.cpp .github/workflows/apply-bakery-pricing-once.yml
+          git commit -m 'Add bakery customer pricing controls'
+          git pull --rebase origin main
+          git push origin main
