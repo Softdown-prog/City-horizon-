@@ -3,6 +3,7 @@
   "assetId": "prop.raspadinha_vendor.01",
   "animationContract": "CH_ANIMATED_SPRITE_V1",
   "approved": true,
+  "promotionRevision": 1,
   "approvedProxySha256": "932bc6e0b9523d962c7dd21f02d5e6a85af8c4a9de4e701d1997aabfd493c888",
   "sourceWorkflowRun": 35675552853,
   "sourceArtifactId": 10672684903,
