@@ -211,7 +211,7 @@ void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, cons
         const auto& level_def = instance.current_level_definition(*definition);
         monthly_summary_.revenue += monthly_tax_revenue_for(*definition, level_def, population);
         ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
-        if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
+        if (farming != nullptr && !definition->resource_inputs.empty()) {
             const std::int64_t price = std::clamp(
                 instance.service_price > 0 ? instance.service_price : definition->default_service_price,
                 definition->minimum_service_price, definition->maximum_service_price);
@@ -250,7 +250,10 @@ void CityEconomy::on_month_closed(const BuildingManager& buildings, const Buildi
         if (expense != 0) {
             record(EconomyTransactionType::maintenance, -expense, closing_date, instance.instance_id);
         }
-        if (farming != nullptr && !definition->resource_inputs.empty()) {
+        // Service-priced shops consume resource inputs according to the customers
+        // actually served above. The legacy bonus path remains for non-service
+        // buildings only, preventing a second ingredient charge.
+        if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
             bool supplied = true;
             for (const BuildingResourceInput& input : definition->resource_inputs) {
                 if (farming->inventory_count(input.resource_id) < input.amount_per_month) { supplied = false; break; }
