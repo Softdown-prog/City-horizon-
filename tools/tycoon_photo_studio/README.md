@@ -74,10 +74,34 @@ Expected building outputs normally include:
 
 A successful workflow is not visual approval. Inspect the artifact at gameplay scale.
 
+## Optional color-customization masks
+
+Buildings/props that benefit from player recoloring may opt into `CH_COLOR_MASK_V1`.
+
+The source asset declares a top-level `colorMask` block and assigns semantic `maskRole` values to recolorable materials. V1 packs three semantic groups into RGB and reserves alpha for object coverage. A conventional building mapping is:
+
+- R = wall / primary body;
+- G = roof / secondary body;
+- B = trim / accent;
+- A = object coverage, not a fourth tint group.
+
+When enabled, the canonical Blender bake produces `<asset>_<direction>_mask_source.png` and post-process produces `<asset>_<direction>_mask.png`, `<asset>_mask_4view.png` and `<asset>_mask_review.png`.
+
+Masks are data outputs. They are downsampled to runtime scale but are never palette-quantized, dithered, outlined, shadowed or passed through halo/background-removal processing.
+
+The contract and agent guide are:
+
+- `contracts/ch_color_mask_v1.json`
+- `../ch_blender/COLOR_MASK_AGENTS.md`
+- `ch_color_mask.py`
+
+This prepares authoring output only. SDL/runtime tint application is a separate integration step.
+
 ## Important files
 
 - `build_scene.py` — canonical Blender baker.
 - `tycoon_material_library.py` — procedural material recipes.
+- `ch_color_mask.py` — optional packed RGB recolor-mask renderer.
 - `postprocess.py` — packaging/downsample/atlas/review stage.
 - `generate_suburban_house_asset.py` — simple suburban-house procedural expander.
 - `generate_shape_grammar_asset.py` — generic architecture grammar expander.
@@ -85,6 +109,7 @@ A successful workflow is not visual approval. Inspect the artifact at gameplay s
 - `stylize_building_2d.py` — building presentation layer.
 - `stylize_foliage_2d.py` — foliage presentation layer.
 - `contracts/ch_stylized_prerender_v1.json` — current visual contract.
+- `contracts/ch_color_mask_v1.json` — optional color-customization mask contract.
 - `studio_presets/ch_tycoon_studio_v1.json` — frozen studio.
 
 ## Procedural building policy
