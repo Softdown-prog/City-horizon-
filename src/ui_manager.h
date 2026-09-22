@@ -206,10 +206,17 @@ private:
         float height = 0.0F;
     };
 
+    enum class SettingsDragTarget : std::uint8_t {
+        none,
+        master,
+        effects,
+    };
+
     void add_button(UiRect bounds, std::string label, UiAction action, bool enabled = true,
                     bool active = false, std::string payload = {});
     void add_build_card(UiRect bounds, const UiBuildItem& item, bool active, UiAction action = UiAction::select_building);
     void add_panel(UiRect bounds);
+    void update_settings_draft_from_pointer(SettingsDragTarget target, float mouse_x);
     [[nodiscard]] const UiThumbnail* thumbnail_for(SDL_Renderer* renderer, const std::string& path) const;
     void render_build_card(SDL_Renderer* renderer, const UiButton& button) const;
     [[nodiscard]] static UiButtonState state_for(const UiButton& button, float mouse_x, float mouse_y,
@@ -223,6 +230,11 @@ private:
     bool primary_pressed_ = false;
     std::optional<UiRect> build_panel_bounds_;
     std::optional<UiRect> overlay_bounds_;
+    std::optional<UiRect> settings_master_slider_bounds_;
+    std::optional<UiRect> settings_effects_slider_bounds_;
+    SettingsDragTarget settings_drag_target_ = SettingsDragTarget::none;
+    int settings_draft_master_percent_ = 100;
+    int settings_draft_effects_percent_ = 100;
     int viewport_width_ = 1;
     int viewport_height_ = 1;
     float build_scroll_offset_ = 0.0F;

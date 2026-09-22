@@ -1734,17 +1734,27 @@ int main() {
                 (void)audio.play(SoundEvent::ui_close_panel);
                 break;
             case UiAction::settings_reset:
-                // The controls are visually present and their data contract is
-                // ready.  Sliders are intentionally not wired until their
-                // input behavior is implemented as a cohesive settings pass.
                 status = "SETTINGS DEFAULTS READY TO APPLY";
                 (void)audio.play(SoundEvent::ui_click);
                 break;
-            case UiAction::settings_apply:
+            case UiAction::settings_apply: {
+                const std::size_t separator = action.payload.find(':');
+                if (separator == std::string::npos) {
+                    status = "INVALID SETTINGS PAYLOAD";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                const int master_percent = std::clamp(std::stoi(action.payload.substr(0, separator)), 0, 100);
+                const int effects_percent = std::clamp(std::stoi(action.payload.substr(separator + 1)), 0, 100);
+                AudioVolumeSettings volumes = audio.volume_settings();
+                volumes.master = static_cast<float>(master_percent) / 100.0F;
+                volumes.effects = static_cast<float>(effects_percent) / 100.0F;
+                audio.set_volume_settings(volumes);
                 active_overlay = UiOverlay::none;
                 status = "SETTINGS APPLIED";
                 (void)audio.play(SoundEvent::ui_confirm);
                 break;
+            }
             case UiAction::close_selection:
                 selected_instance_id.reset();
                 status = "INFO PANEL CLOSED";
