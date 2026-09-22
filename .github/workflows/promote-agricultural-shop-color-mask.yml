@@ -1,0 +1,224 @@
+name: Promote Agricultural Shop Color Mask
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json"
+      - ".github/workflows/promote-agricultural-shop-color-mask.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-runtime-agricultural-shop-color-mask-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-color-mask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read mask promotion contract
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['contract'] == 'CH_RUNTIME_COLOR_MASK_PROMOTION_V1'
+          assert d['maskContract'] == 'CH_COLOR_MASK_V1'
+          assert d['approved'] is True
+          assert d['assetId'] == 'building.agricultural_shop.01'
+          assert d['finalSize'] == [256, 256]
+          assert d['format'] == 'PNG_RGBA'
+          assert d['directionOrder'] == ['south', 'east', 'west', 'north']
+          assert d['channels'] == {'R': 'wall', 'G': 'roof'}
+          assert d['blueChannel'] == 'unused'
+          assert d['alpha'] == 'coverage'
+          assert d['scope'] == 'large_surfaces_only'
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f"run_id={d['sourceWorkflowRun']}\n")
+              f.write(f"artifact_id={d['sourceArtifactId']}\n")
+              f.write(f"source_dir={d['sourceDir']}\n")
+              f.write(f"destination={d['destination']}\n")
+          PY
+
+      - name: Download approved CH Blender mask bake artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/color_mask_promotion/source
+
+      - name: Canonical Tycoon Photo Studio post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/color_mask_promotion/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            SOURCE="$(find out/color_mask_promotion/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$SOURCE"
+          fi
+          for d in south east west north; do
+            test -f "$SOURCE/building.agricultural_shop.01_${d}_mask_source.png"
+          done
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE" \
+            --output out/color_mask_promotion/final \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+      - name: Validate and stage mask-only runtime outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json, shutil
+
+          src = Path('out/color_mask_promotion/final')
+          dst = Path('assets/buildings/agricultural_shop')
+          promotion_path = Path('tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json')
+          promotion = json.loads(promotion_path.read_text(encoding='utf-8'))
+          runtime_path = dst / 'agricultural_shop.json'
+          runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
+          directions = ('south', 'east', 'west', 'north')
+          asset_id = 'building.agricultural_shop.01'
+
+          # Freeze the already approved normal runtime sprites. This promotion is
+          # mask-only and must never rewrite or silently change them.
+          for direction in directions:
+              view = runtime['views'][direction]
+              normal = dst / view['file']
+              actual = hashlib.sha256(normal.read_bytes()).hexdigest()
+              if actual != view['sha256']:
+                  raise SystemExit(f'{direction}: approved normal sprite hash changed before mask promotion')
+
+          mask_views = {}
+          for direction in directions:
+              source = src / f'{asset_id}_{direction}_mask.png'
+              if not source.is_file():
+                  raise SystemExit(f'{direction}: missing canonical runtime mask')
+              im = Image.open(source).convert('RGBA')
+              if im.size != (256, 256):
+                  raise SystemExit(f'{direction}: expected 256x256 mask, got {im.size}')
+
+              r, g, b, a = im.split()
+              if b.getextrema()[1] != 0:
+                  raise SystemExit(f'{direction}: B channel is not empty')
+              if r.getextrema()[1] == 0:
+                  raise SystemExit(f'{direction}: wall/R channel is empty')
+              if g.getextrema()[1] == 0:
+                  raise SystemExit(f'{direction}: roof/G channel is empty')
+              lo, hi = a.getextrema()
+              if lo != 0 or hi != 255:
+                  raise SystemExit(f'{direction}: invalid mask alpha range {(lo, hi)}')
+              corners = ((0,0),(255,0),(0,255),(255,255))
+              if any(a.getpixel(p) != 0 for p in corners):
+                  raise SystemExit(f'{direction}: mask background corners are not transparent')
+
+              # Report coverage without modifying mask pixels. RGB black inside
+              # alpha is intentional for fixed-color details under CH_COLOR_MASK_V1.
+              rp = sum(1 for v in r.getdata() if v > 0)
+              gp = sum(1 for v in g.getdata() if v > 0)
+              ap = sum(1 for v in a.getdata() if v > 0)
+              if rp >= ap or gp >= ap:
+                  raise SystemExit(f'{direction}: mask unexpectedly covers the entire object')
+
+              target = dst / f'agricultural_shop_{direction}_mask.png'
+              shutil.copyfile(source, target)
+              mask_views[direction] = {
+                  'file': target.name,
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                  'wallPixels': rp,
+                  'roofPixels': gp,
+                  'coveredPixels': ap,
+              }
+
+          composites = {
+              'fourView': (src / f'{asset_id}_mask_4view.png', dst / 'agricultural_shop_mask_4view.png'),
+              'review': (src / f'{asset_id}_mask_review.png', dst / 'agricultural_shop_mask_review.png'),
+          }
+          composite_meta = {}
+          for key, (source, target) in composites.items():
+              if not source.is_file():
+                  raise SystemExit(f'missing canonical {key}: {source}')
+              shutil.copyfile(source, target)
+              composite_meta[key] = {
+                  'file': target.name,
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+              }
+
+          runtime['colorMask'] = {
+              'contract': 'CH_COLOR_MASK_V1',
+              'enabled': True,
+              'channels': {'R': 'wall', 'G': 'roof'},
+              'blueChannel': 'unused',
+              'alpha': 'coverage',
+              'scope': 'large_surfaces_only',
+              'views': mask_views,
+              **composite_meta,
+              'sourceCommit': promotion['sourceCommit'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'postProcess': 'CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal',
+              'runtimeTintingImplemented': False,
+          }
+          runtime_path.write_text(json.dumps(runtime, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(runtime['colorMask'], indent=2))
+          PY
+
+      - name: Verify normal sprites remain untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- \
+            assets/buildings/agricultural_shop/agricultural_shop_south.png \
+            assets/buildings/agricultural_shop/agricultural_shop_east.png \
+            assets/buildings/agricultural_shop/agricultural_shop_west.png \
+            assets/buildings/agricultural_shop/agricultural_shop_north.png \
+            assets/buildings/agricultural_shop/agricultural_shop_4view.png
+
+      - name: Commit agricultural shop masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            assets/buildings/agricultural_shop/agricultural_shop_south_mask.png \
+            assets/buildings/agricultural_shop/agricultural_shop_east_mask.png \
+            assets/buildings/agricultural_shop/agricultural_shop_west_mask.png \
+            assets/buildings/agricultural_shop/agricultural_shop_north_mask.png \
+            assets/buildings/agricultural_shop/agricultural_shop_mask_4view.png \
+            assets/buildings/agricultural_shop/agricultural_shop_mask_review.png \
+            assets/buildings/agricultural_shop/agricultural_shop.json
+          if git diff --cached --quiet; then
+            echo "Agricultural shop masks already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote agricultural shop wall roof masks"
+          git pull --rebase origin main
+          git push origin HEAD:main
