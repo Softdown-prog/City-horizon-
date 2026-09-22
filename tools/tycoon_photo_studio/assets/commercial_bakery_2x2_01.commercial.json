@@ -86,8 +86,7 @@
       "recipe": "solid",
       "roughness": 0.80,
       "seed": 23,
-      "strength": 0.03,
-      "maskRole": "trim"
+      "strength": 0.03
     },
     "awning": {
       "name": "BakeryAwningAccent",
@@ -95,8 +94,7 @@
       "recipe": "solid",
       "roughness": 0.78,
       "seed": 29,
-      "strength": 0.03,
-      "maskRole": "trim"
+      "strength": 0.03
     },
     "glass": {
       "name": "BakeryWindowGlass",
@@ -152,8 +150,7 @@
     "enabled": true,
     "channels": {
       "R": "wall",
-      "G": "roof",
-      "B": "trim"
+      "G": "roof"
     },
     "alpha": "coverage"
   },
@@ -167,7 +164,8 @@
       "keep the final refinement restrained: slightly stronger sign and balanced side-window rhythm, no architectural redesign",
       "use only a few gameplay-scale entrance and service details; avoid microdetail noise",
       "author all four sides because AssetRoot rotation produces canonical directions",
-      "keep the front apron visually flush for future road/sidewalk placement"
+      "keep the front apron visually flush for future road/sidewalk placement",
+      "CH_COLOR_MASK_V1 recolors only wall (R) and roof/slab/parapet surfaces (G); trim, awning, glass and props keep authored colors"
     ]
   }
 }
