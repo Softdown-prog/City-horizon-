@@ -64,5 +64,17 @@
   "minimumServicePrice": 1,
   "maximumServicePrice": 20,
   "baseServiceCustomersPerMonth": 120,
-  "servicePopulationForFullDemand": 60
+  "servicePopulationForFullDemand": 60,
+  "resourceInputs": [
+    {
+      "resourceId": "wheat",
+      "amountPerMonth": 12,
+      "localSupplyBonus": 0
+    },
+    {
+      "resourceId": "sugar",
+      "amountPerMonth": 6,
+      "localSupplyBonus": 0
+    }
+  ]
 }

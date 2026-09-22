@@ -147,6 +147,7 @@ struct UiSelectedBuilding {
     std::string service_customers_per_month;
     std::string service_revenue_per_month;
     std::string service_net_per_month;
+    std::string service_supply_status;
     bool has_service_pricing = false;
     bool can_decrease_service_price = false;
     bool can_increase_service_price = false;

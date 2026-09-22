@@ -1,0 +1,6 @@
+{
+  "id": "wheat",
+  "name": "Trigo",
+  "baseSellPrice": 2,
+  "storageClass": "grain"
+}

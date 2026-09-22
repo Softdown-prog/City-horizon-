@@ -41,6 +41,8 @@ struct MonthlyEconomySummary {
 struct ServicePricingEstimate {
     std::uint32_t price_demand_percent = 0;
     std::uint32_t population_demand_percent = 0;
+    std::uint32_t customers_before_supply = 0;
+    std::uint32_t supply_percent = 100;
     std::uint32_t customers_per_month = 0;
     std::int64_t revenue_per_month = 0;
 };
@@ -62,7 +64,7 @@ public:
     void restore_last_property_tax_year(int year);
     [[nodiscard]] int last_property_tax_year() const;
     void rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
-                                 const PopulationSystem& population);
+                                 const PopulationSystem& population, const FarmingSystem* farming = nullptr);
     // Invoked once per calendar close, never polled from the frame loop.
     void on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
                          const PopulationSystem& population, const GameDate& closing_date,
@@ -84,7 +86,8 @@ public:
                                                                      std::int64_t service_price);
     [[nodiscard]] static ServicePricingEstimate service_pricing_estimate(const BuildingDefinition& definition,
                                                                           const BuildingInstance& instance,
-                                                                          std::uint32_t current_population);
+                                                                          std::uint32_t current_population,
+                                                                          const FarmingSystem* farming = nullptr);
 
 private:
     void record(EconomyTransactionType type, std::int64_t amount, const GameDate& date,

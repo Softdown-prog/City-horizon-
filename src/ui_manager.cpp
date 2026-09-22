@@ -718,7 +718,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         };
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();
-        const float service_height = item.has_service_pricing ? 158.0F : 0.0F;
+        const float service_height = item.has_service_pricing ? 176.0F : 0.0F;
         const float color_height = item.has_color_customization ? 122.0F : 0.0F;
         const float required_height = 126.0F + service_height + color_height + static_cast<float>(detail_lines) * 17.0F;
         const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);
@@ -1117,7 +1117,11 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             draw_text_fit(renderer, panel_x + 78.0F, 296.0F, 238.0F, "CLIENTES / MES: " + item.service_customers_per_month, 202, 219, 227);
             draw_text_fit(renderer, panel_x + 78.0F, 314.0F, 238.0F, "RECEITA VENDAS: " + item.service_revenue_per_month, 181, 221, 154);
             draw_text_fit(renderer, panel_x + 78.0F, 332.0F, 238.0F, "RESULTADO: " + item.service_net_per_month, 137, 226, 242);
-            detail_y = 357.0F;
+            draw_text_fit(renderer, panel_x + 78.0F, 350.0F, 238.0F, item.service_supply_status,
+                          item.service_supply_status.find("100%") != std::string::npos ? 181 : 255,
+                          item.service_supply_status.find("100%") != std::string::npos ? 221 : 188,
+                          item.service_supply_status.find("100%") != std::string::npos ? 154 : 128);
+            detail_y = 375.0F;
         }
         const auto detail = [&](const std::string& label, const std::string& value) {
             if (value.empty()) return;

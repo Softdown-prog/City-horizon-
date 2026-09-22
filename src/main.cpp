@@ -1365,8 +1365,7 @@ int main() {
     }
     CropCatalog crop_catalog;
     if (!crop_catalog.load_from_directory(asset_root / "assets/farming/crops")) {
-        std::cerr << "No valid crop definitions were loaded.\n";
-        audio.shutdown(); textures.clear(); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 1;
+        std::cerr << "No valid crop definitions were loaded; planting remains unavailable until crop data/art is restored.\n";
     }
     AgriculturalResourceCatalog resource_catalog;
     if (!resource_catalog.load_from_directory(asset_root / "assets/farming/resources")) {
@@ -2000,7 +1999,7 @@ int main() {
                 const std::int64_t delta = action.action == UiAction::increase_service_price ? 1 : -1;
                 if (buildings.set_service_price(instance->instance_id, *definition, instance->service_price + delta)) {
                     const BuildingInstance* updated = buildings.find_by_id(instance->instance_id);
-                    economy.rebuild_monthly_summary(buildings, catalog, population);
+                    economy.rebuild_monthly_summary(buildings, catalog, population, &farming);
                     status = definition->name + ": PRECO AO CLIENTE " +
                         format_money(updated == nullptr ? instance->service_price : updated->service_price);
                     (void)audio.play(SoundEvent::ui_click);
@@ -2226,18 +2225,31 @@ int main() {
                     const std::int64_t commercial_current_revenue = lvl_def.tax_revenue_per_month *
                         static_cast<std::int64_t>(commercial_demand_percent) / 100;
                     const ServicePricingEstimate service_estimate = CityEconomy::service_pricing_estimate(
-                        *definition, *instance, population.current_population());
+                        *definition, *instance, population.current_population(), &farming);
                     std::string local_supply;
                     if (!definition->resource_inputs.empty()) {
                         bool supplied = true; std::int64_t bonus = 0; std::string requirements;
                         for (const BuildingResourceInput& input : definition->resource_inputs) {
                             if (!requirements.empty()) requirements += ", ";
                             const AgriculturalResourceDefinition* resource = resource_catalog.find(input.resource_id);
-                            requirements += (resource == nullptr ? input.resource_id : resource->display_name) + " " + std::to_string(input.amount_per_month) + "/MES";
-                            supplied = supplied && farming.inventory_count(input.resource_id) >= input.amount_per_month;
+                            const int full_requirement = input.amount_per_month;
+                            const int demand_requirement = definition->default_service_price > 0 &&
+                                definition->base_service_customers_per_month > 0
+                                ? static_cast<int>((static_cast<std::uint64_t>(full_requirement) *
+                                      service_estimate.customers_before_supply + definition->base_service_customers_per_month - 1U) /
+                                      definition->base_service_customers_per_month)
+                                : full_requirement;
+                            const int available = farming.inventory_count(input.resource_id);
+                            requirements += (resource == nullptr ? input.resource_id : resource->display_name) + " " +
+                                std::to_string(available) + "/" + std::to_string(demand_requirement);
+                            supplied = supplied && available >= demand_requirement;
                             bonus += input.local_supply_bonus;
                         }
-                        local_supply = requirements + " | " + (supplied ? "ABASTECIDO +" + format_money(bonus) : "SEM ESTOQUE");
+                        if (definition->default_service_price > 0) {
+                            local_supply = requirements;
+                        } else {
+                            local_supply = requirements + " | " + (supplied ? "ABASTECIDO +" + format_money(bonus) : "SEM ESTOQUE");
+                        }
                     }
                     model.selected_building = UiSelectedBuilding{
                         definition->name,
@@ -2276,6 +2288,11 @@ int main() {
                         definition->default_service_price > 0 ? format_money(service_estimate.revenue_per_month) + "/MES" : "",
                         definition->default_service_price > 0
                             ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
+                            : "",
+                        definition->default_service_price > 0
+                            ? "INSUMOS: " + std::to_string(service_estimate.supply_percent) + "% - " +
+                              (service_estimate.supply_percent >= 100 ? "ABASTECIDA" :
+                               (service_estimate.supply_percent == 0 ? "SEM ESTOQUE" : "ESTOQUE LIMITADO"))
                             : "",
                         definition->default_service_price > 0,
                         definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,

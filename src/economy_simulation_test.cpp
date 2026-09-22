@@ -1,4 +1,5 @@
 #include "economy_system.h"
+#include "farming_system.h"
 #include "population_system.h"
 
 #include <algorithm>
@@ -67,6 +68,16 @@ int main(int argc, char** argv) {
     const ServicePricingEstimate bakery_expensive = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 60);
     bakery_instance.service_price = 3;
     const ServicePricingEstimate bakery_half_population = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 30);
+    FarmingSystem bakery_stock(-4, 4);
+    bakery_stock.restore_inventory({{"wheat", 12}, {"sugar", 6}});
+    const ServicePricingEstimate bakery_stocked = CityEconomy::service_pricing_estimate(
+        *bakery, bakery_instance, 60, &bakery_stock);
+    bakery_stock.restore_inventory({{"wheat", 6}, {"sugar", 3}});
+    const ServicePricingEstimate bakery_half_stock = CityEconomy::service_pricing_estimate(
+        *bakery, bakery_instance, 60, &bakery_stock);
+    bakery_stock.restore_inventory({});
+    const ServicePricingEstimate bakery_empty = CityEconomy::service_pricing_estimate(
+        *bakery, bakery_instance, 60, &bakery_stock);
     if (!require(bakery_default.price_demand_percent == 100 && bakery_default.customers_per_month == 120 &&
                      bakery_default.revenue_per_month == 360,
                  "bakery default price produces reference demand and revenue") ||
@@ -78,7 +89,16 @@ int main(int argc, char** argv) {
                  "bakery high price reduces demand and revenue") ||
         !require(bakery_half_population.population_demand_percent == 50 &&
                      bakery_half_population.customers_per_month == 60 && bakery_half_population.revenue_per_month == 180,
-                 "bakery customer volume is limited by local population")) {
+                 "bakery customer volume is limited by local population") ||
+        !require(bakery_stocked.supply_percent == 100 && bakery_stocked.customers_per_month == 120 &&
+                     bakery_stocked.revenue_per_month == 360,
+                 "fully stocked bakery serves its full priced demand") ||
+        !require(bakery_half_stock.supply_percent == 50 && bakery_half_stock.customers_per_month == 60 &&
+                     bakery_half_stock.revenue_per_month == 180,
+                 "half ingredient stock halves bakery customers and sales") ||
+        !require(bakery_empty.supply_percent == 0 && bakery_empty.customers_per_month == 0 &&
+                     bakery_empty.revenue_per_month == 0,
+                 "empty bakery stock stops customer sales")) {
         return 1;
     }
 

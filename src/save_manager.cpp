@@ -685,7 +685,7 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
         }
     }
     population.restore_current_population(snapshot.current_population, buildings, catalog, nullptr, nullptr, snapshot.months_without_power, snapshot.crisis_recovery_month);
-    economy.rebuild_monthly_summary(buildings, catalog, population);
+    economy.rebuild_monthly_summary(buildings, catalog, population, &farming);
     result.message = "loaded " + std::to_string(buildings.instances().size()) + " buildings and " +
         std::to_string(roads.tiles().size()) + " roads and " + std::to_string(sidewalks.tiles().size()) + " sidewalks";
     if (result.skipped_buildings != 0 || result.skipped_roads != 0 || result.skipped_sidewalks != 0 ||
