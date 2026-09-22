@@ -1,0 +1,113 @@
+name: Integrate Dirt Path Runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/integrate-dirt-path-runtime.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wire dirt path into gameplay renderer
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('src/main.cpp')
+          main = main_path.read_text(encoding='utf-8')
+
+          load_old = '''    (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
+    (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
+    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
+'''
+          load_new = '''    (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
+    (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
+    static constexpr std::array<const char*, 16> kDirtPathSprites = {
+        "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
+        "dirt_path_04_end_s.png", "dirt_path_05_straight_ns.png", "dirt_path_06_curve_es.png", "dirt_path_07_tee_no_w.png",
+        "dirt_path_08_end_w.png", "dirt_path_09_curve_nw.png", "dirt_path_10_straight_ew.png", "dirt_path_11_tee_no_s.png",
+        "dirt_path_12_curve_sw.png", "dirt_path_13_tee_no_e.png", "dirt_path_14_tee_no_n.png", "dirt_path_15_cross.png",
+    };
+    for (const char* sprite : kDirtPathSprites) {
+        (void)textures.load(renderer, asset_root / "assets/terrain/paths/dirt_01" / sprite);
+    }
+    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
+'''
+          if load_old not in main:
+              raise SystemExit('startup texture load anchor not found')
+          main = main.replace(load_old, load_new, 1)
+
+          mode_old = '        status = "CEMENT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);'
+          mode_new = '        status = "DIRT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);'
+          if mode_old not in main:
+              raise SystemExit('path mode status anchor not found')
+          main = main.replace(mode_old, mode_new, 1)
+
+          placement_old = '''                        if (sidewalks.place_tile(tile.x, tile.y, "cement_path")) {
+                            ++placed;
+                        }
+                    }
+                    status = placed == 0 ? "CEMENT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
+                        "CEMENT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
+'''
+          placement_new = '''                        if (sidewalks.place_tile(tile.x, tile.y, "dirt_path")) {
+                            ++placed;
+                        }
+                    }
+                    status = placed == 0 ? "DIRT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
+                        "DIRT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
+'''
+          if placement_old not in main:
+              raise SystemExit('path placement anchor not found')
+          main = main.replace(placement_old, placement_new, 1)
+          main_path.write_text(main, encoding='utf-8')
+
+          renderer_path = Path('src/ch_render/map_renderer.cpp')
+          renderer = renderer_path.read_text(encoding='utf-8')
+          renderer_old = '''    if (style_id == "cement_path") {
+        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
+    }
+    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
+'''
+          renderer_new = '''    if (style_id == "cement_path") {
+        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
+    }
+    if (style_id == "dirt_path") {
+        return dirt_path_sprite(connections);
+    }
+    const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
+'''
+          if renderer_old not in renderer:
+              raise SystemExit('sidewalk renderer anchor not found')
+          renderer = renderer.replace(renderer_old, renderer_new, 1)
+          renderer_path.write_text(renderer, encoding='utf-8')
+          PY
+
+      - name: Verify targeted runtime wiring
+        shell: bash
+        run: |
+          grep -F 'sidewalks.place_tile(tile.x, tile.y, "dirt_path")' src/main.cpp
+          grep -F 'if (style_id == "dirt_path")' src/ch_render/map_renderer.cpp
+          test "$(find assets/terrain/paths/dirt_01 -maxdepth 1 -name 'dirt_path_*.png' | wc -l)" -eq 16
+
+      - name: Commit runtime integration and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/integrate-dirt-path-runtime.yml
+          git add src/main.cpp src/ch_render/map_renderer.cpp
+          git commit -m "game: wire dirt path autotile into runtime"
+          git push origin HEAD:main
