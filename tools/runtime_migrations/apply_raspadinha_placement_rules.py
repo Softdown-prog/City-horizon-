@@ -70,7 +70,7 @@ replace_exact_count(
     main,
     '''buildings, roads, lands, sidewalks, farming, economy, power);''',
     '''buildings, roads, lands, sidewalks, farming, economy, power, active_map_doc ? &*active_map_doc : nullptr);''',
-    2,
+    3,
 )
 
 replace_once(
