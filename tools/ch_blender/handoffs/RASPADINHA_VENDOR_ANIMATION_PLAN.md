@@ -1,6 +1,6 @@
 # Raspadinha Vendor — Lightweight Animation Production Plan
 
-Status: approved production direction
+Status: approved production direction; Phase 2 SOUTH proxy v2 generated for review
 
 This document defines the intended animation scope for the approved `raspadinha_vendor` asset. The goal is to add a small amount of life without turning the prop into a complex character-animation project.
 
@@ -40,11 +40,29 @@ Target behavior:
 Preferred production target:
 
 - `IDLE`: 1 canonical pose per direction;
-- `GREET`: 1–2 additional key poses per direction, or the smallest frame count that reads clearly at gameplay scale;
+- `GREET`: smallest frame count that reads clearly at gameplay scale;
 - event-driven playback with long idle intervals;
 - static cart and umbrella unless a concrete visual reason requires otherwise.
 
 The objective is a "living sprite" effect, not modern full-character animation.
+
+### Current Phase 2 authority
+
+The original experimental GREET keyframes in `build_raspadinha_vendor_blender.py` are **not** production authority. Visual proxy review showed that they read as a downward/outward arm rather than a greeting.
+
+Use these files for the reviewed Phase 2 path:
+
+- `tools/tycoon_photo_studio/raspadinha_vendor_greet_v1.py` — lightweight raised-hand GREET pose authority for frames 5–8;
+- `tools/tycoon_photo_studio/build_raspadinha_vendor_animation_review_guarded.py` — cheap 20-sample structural review and SOUTH animation spritesheet;
+- `tools/tycoon_photo_studio/build_raspadinha_vendor_animated_v2_guarded.py` — canonical guarded builder for any future final bake.
+
+Current review frame order is:
+
+```text
+IDLE 1 -> GREET 5 -> GREET 6 -> GREET 7 -> GREET 8/return-to-idle
+```
+
+Do not use the older `build_raspadinha_vendor_animated_guarded.py` directly for a final production bake unless it has first been updated to apply the same GREET authority.
 
 ## Phase 3 — SERVE only when customer interaction exists
 
@@ -94,8 +112,8 @@ Any new animation authored through CH Blender must preserve the existing fail-fa
 
 ```text
 animation authoring
-  -> structural preflight
-  -> cheap SOUTH proxy
+  -> structural preflight across review poses
+  -> cheap SOUTH animation spritesheet
   -> visual review
   -> four-direction proxy if needed
   -> final bake only after approval
