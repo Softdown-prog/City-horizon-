@@ -1,6 +1,6 @@
 {
   "id": "sugar",
-  "name": "Açúcar",
+  "displayName": "Açúcar",
   "baseSellPrice": 3,
   "storageClass": "general"
 }
