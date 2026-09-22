@@ -1,24 +1,28 @@
-"""Author connected dirt-path tiles with a richer tycoon-like material.
+"""Generate the 16 connected dirt-path variants from the approved dirt tile.
 
-Topology remains identical to RoadManager/SidewalkManager:
-N=1, E=2, S=4 and W=8.  The visual authoring step is deliberately
-separate from topology: the mask defines connectivity while this generator
-defines a reusable soil material with macro, meso and micro variation.
+Topology matches RoadManager/SidewalkManager exactly:
+N=1, E=2, S=4 and W=8.
+
+The approved visual source is assets/terrain/dirt_isometric_01.png.  This
+script never invents a replacement soil material; it only prepares shared
+edges, adds subtle topology-aware wear and writes the canonical 16-mask set.
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
-import math
-import random
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 W, H, SS = 128, 64, 4
 NW, NH = W * SS, H * SS
 N, E, S, WEST = 1, 2, 4, 8
-PORTS = {N: (96 * SS, 16 * SS), E: (96 * SS, 48 * SS), S: (32 * SS, 48 * SS), WEST: (32 * SS, 16 * SS)}
+PORTS = {
+    N: (96 * SS, 16 * SS),
+    E: (96 * SS, 48 * SS),
+    S: (32 * SS, 48 * SS),
+    WEST: (32 * SS, 16 * SS),
+}
 CENTER = (64 * SS, 32 * SS)
 NAMES = (
     "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
@@ -28,123 +32,75 @@ NAMES = (
 )
 
 
-def diamond() -> Image.Image:
-    alpha = Image.new("L", (NW, NH), 0)
-    ImageDraw.Draw(alpha).polygon(((NW // 2, 0), (NW, NH // 2), (NW // 2, NH), (0, NH // 2)), fill=255)
-    return alpha
-
-
 def display_diamond() -> Image.Image:
-    """Keep the final shared edge hard so connected tiles do not reveal grass hairlines."""
+    """Hard shared edge so adjacent tiles never reveal grass hairlines."""
     alpha = Image.new("L", (W, H), 0)
     ImageDraw.Draw(alpha).polygon(((W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)), fill=255)
     return alpha
 
 
-def _seed(tag: str) -> int:
-    return int.from_bytes(hashlib.sha256(tag.encode("utf-8")).digest()[:8], "big")
+def load_source(path: Path) -> Image.Image:
+    source = Image.open(path).convert("RGBA")
+    if source.size != (W, H):
+        raise ValueError(f"Approved dirt source must be exactly {W}x{H}; got {source.size[0]}x{source.size[1]}")
 
+    # The normalized source intentionally contains anti-aliased transparent
+    # edge pixels.  For connected ground those pixels reveal the grass below.
+    # Fill them from the nearest interior texel before applying the canonical
+    # hard diamond alpha.  This changes only the technical edge, not the art.
+    src = source.load()
+    filled = Image.new("RGBA", source.size, (0, 0, 0, 0))
+    dst = filled.load()
+    cx, cy = W // 2, H // 2
 
-def _multiscale_noise() -> Image.Image:
-    """Build tileable-looking soil value variation at three spatial scales."""
-    rng = random.Random(_seed("CH_DIRT_PATH_V2:noise"))
-    out = Image.new("L", (NW, NH), 128)
-    for scale, amount in ((16, 46), (32, 30), (64, 18)):
-        sw = max(2, NW // scale)
-        sh = max(2, NH // scale)
-        src = Image.new("L", (sw, sh))
-        px = src.load()
-        for y in range(sh):
-            for x in range(sw):
-                px[x, y] = rng.randrange(0, 256)
-        layer = src.resize((NW, NH), Image.Resampling.BICUBIC).filter(ImageFilter.GaussianBlur(scale * 0.12))
-        out = ImageChops.add(out, layer.point(lambda v, a=amount: int((v - 128) * a / 128 + 128)), scale=2.0, offset=-64)
-    return out.filter(ImageFilter.GaussianBlur(SS * 0.7))
+    opaque = []
+    for y in range(H):
+        for x in range(W):
+            if src[x, y][3] >= 240:
+                opaque.append((x, y))
 
+    if not opaque:
+        raise ValueError("Approved dirt source has no opaque pixels")
 
-def dirt_surface() -> Image.Image:
-    """Create one shared material domain with macro/meso/micro soil structure."""
-    rng = random.Random(_seed("CH_DIRT_PATH_V2:surface"))
-    noise = _multiscale_noise()
-    base = Image.new("RGBA", (NW, NH), (128, 90, 50, 255))
-    bp = base.load()
-    np = noise.load()
-    for y in range(NH):
-        for x in range(NW):
-            n = np[x, y] - 128
-            # Warm compact earth palette.  Variation is low enough to remain
-            # readable after 4x downsample, but no longer looks flat-painted.
-            bp[x, y] = (
-                max(72, min(177, 128 + n // 3)),
-                max(49, min(135, 90 + n // 4)),
-                max(31, min(92, 50 + n // 6)),
-                255,
-            )
+    # 128x64 is tiny; the explicit nearest search keeps this dependency-free
+    # and deterministic on every agent/runner.
+    for y in range(H):
+        for x in range(W):
+            pixel = src[x, y]
+            if pixel[3] >= 240:
+                dst[x, y] = pixel
+                continue
+            nx, ny = min(opaque, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)
+            r, g, b, _ = src[nx, ny]
+            dst[x, y] = (r, g, b, 255)
 
-    detail = Image.new("RGBA", (NW, NH), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(detail)
-
-    # Meso-scale compressed patches / shallow pits.
-    for _ in range(95):
-        x = rng.randrange(0, NW)
-        y = rng.randrange(0, NH)
-        rx = rng.randrange(6, 28) * SS // 2
-        ry = max(2, rx // rng.randrange(2, 5))
-        dark = rng.choice(((69, 47, 30, 28), (91, 58, 33, 34), (77, 50, 31, 24)))
-        light = rng.choice(((178, 130, 76, 20), (160, 113, 66, 24)))
-        draw.ellipse((x - rx, y - ry, x + rx, y + ry), fill=dark)
-        draw.arc((x - rx, y - ry, x + rx, y + ry), 205, 338, fill=light, width=max(1, SS))
-
-    # Small stones and hard grains.  A paired highlight/shadow produces
-    # pre-rendered relief without requiring runtime normal mapping.
-    for _ in range(155):
-        x = rng.randrange(6 * SS, NW - 6 * SS)
-        y = rng.randrange(4 * SS, NH - 4 * SS)
-        rx = rng.randrange(1, 4) * SS
-        ry = max(SS, rx // 2)
-        stone = rng.choice(((111, 87, 60, 150), (143, 113, 77, 145), (88, 72, 52, 150), (160, 132, 91, 125)))
-        draw.ellipse((x - rx + SS, y - ry + SS, x + rx + SS, y + ry + SS), fill=(50, 35, 24, 72))
-        draw.ellipse((x - rx, y - ry, x + rx, y + ry), fill=stone)
-        draw.arc((x - rx, y - ry, x + rx, y + ry), 185, 300, fill=(205, 170, 118, 130), width=max(1, SS))
-
-    # Short cracks/scratches break up broad muddy patches.
-    for _ in range(58):
-        x = rng.randrange(8 * SS, NW - 8 * SS)
-        y = rng.randrange(5 * SS, NH - 5 * SS)
-        length = rng.randrange(3, 10) * SS
-        angle = rng.uniform(-0.45, 0.45)
-        x2 = x + int(math.cos(angle) * length)
-        y2 = y + int(math.sin(angle) * length * 0.42)
-        draw.line((x, y, x2, y2), fill=(58, 40, 27, rng.randrange(35, 70)), width=max(1, SS // 2))
-
-    detail = detail.filter(ImageFilter.GaussianBlur(SS * 0.22))
-    return Image.alpha_composite(base, detail)
+    filled.putalpha(display_diamond())
+    return filled
 
 
 def wear_overlay(mask: int) -> Image.Image:
-    """Topology only: compacted traffic/wear follows active ports."""
+    """Very subtle compacted wear indicates active N/E/S/W connections."""
     wear = Image.new("RGBA", (NW, NH), (0, 0, 0, 0))
     draw = ImageDraw.Draw(wear)
     active = [bit for bit in (N, E, S, WEST) if mask & bit]
 
     if not active:
-        # Isolated path tile still gets a small compacted center patch.
-        r = 16 * SS
-        draw.ellipse((CENTER[0] - r, CENTER[1] - r // 2, CENTER[0] + r, CENTER[1] + r // 2), fill=(92, 59, 35, 34))
+        radius = 16 * SS
+        draw.ellipse(
+            (CENTER[0] - radius, CENTER[1] - radius // 2, CENTER[0] + radius, CENTER[1] + radius // 2),
+            fill=(76, 48, 28, 18),
+        )
     else:
         for bit in active:
             px, py = PORTS[bit]
-            draw.line((CENTER, (px, py)), fill=(77, 49, 31, 54), width=15 * SS)
-            draw.line((CENTER, (px, py)), fill=(182, 133, 76, 28), width=6 * SS)
+            draw.line((CENTER, (px, py)), fill=(65, 40, 24, 38), width=13 * SS)
+            draw.line((CENTER, (px, py)), fill=(196, 145, 85, 16), width=5 * SS)
 
-    return wear.filter(ImageFilter.GaussianBlur(SS * 2.0))
+    return wear.filter(ImageFilter.GaussianBlur(SS * 2.0)).resize((W, H), Image.Resampling.LANCZOS)
 
 
-def render(mask: int) -> Image.Image:
-    image = dirt_surface()
-    image = Image.alpha_composite(image, wear_overlay(mask))
-    image.putalpha(diamond())
-    result = image.resize((W, H), Image.Resampling.LANCZOS)
+def render(mask: int, source: Image.Image) -> Image.Image:
+    result = Image.alpha_composite(source, wear_overlay(mask))
     result.putalpha(display_diamond())
     return result
 
@@ -162,23 +118,28 @@ def preview(tiles: dict[int, Image.Image], path: Path) -> None:
         (2, 3, 3), (4, 3, 7), (6, 3, 15),
         (2, 5, 1), (4, 5, 6), (6, 5, 14),
     ]
-    for x, y, m in layout:
-        canvas.alpha_composite(tiles[m], at(x, y))
+    for x, y, mask in layout:
+        canvas.alpha_composite(tiles[mask], at(x, y))
     canvas.save(path)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=Path, default=Path("assets/terrain/dirt_isometric_01.png"))
     parser.add_argument("--output-dir", type=Path, default=Path("assets/terrain/paths/dirt_01"))
     parser.add_argument("--preview", type=Path, default=Path("work/dirt_path_autotile_preview.png"))
     args = parser.parse_args()
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.preview.parent.mkdir(parents=True, exist_ok=True)
 
-    tiles = {mask: render(mask) for mask in range(16)}
+    source = load_source(args.source)
+    tiles = {mask: render(mask, source) for mask in range(16)}
     for mask, tile in tiles.items():
         tile.save(args.output_dir / NAMES[mask])
     preview(tiles, args.preview)
+
+    print(f"PASS source={args.source} masks=16 output={args.output_dir}")
 
 
 if __name__ == "__main__":
