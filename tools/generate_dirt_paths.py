@@ -11,7 +11,6 @@ adds subtle topology-aware wear and writes the canonical 16-mask set.
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
@@ -42,14 +41,29 @@ def display_diamond() -> Image.Image:
 
 
 def uv_to_xy(u: float, v: float) -> tuple[float, float]:
-    """Map logical tile coordinates to the 2:1 screen-space diamond."""
-    return (W * 0.5 + (u - v) * W * 0.5, (u + v) * H * 0.5)
+    """Map logical square coordinates to the exact raster diamond vertices."""
+    u = min(1.0, max(0.0, u))
+    v = min(1.0, max(0.0, v))
+    top = (W // 2, 0)
+    right = (W - 1, H // 2)
+    bottom = (W // 2, H - 1)
+    left = (0, H // 2)
+    weights = (
+        ((1.0 - u) * (1.0 - v), top),
+        (u * (1.0 - v), right),
+        (u * v, bottom),
+        ((1.0 - u) * v, left),
+    )
+    return (
+        sum(weight * point[0] for weight, point in weights),
+        sum(weight * point[1] for weight, point in weights),
+    )
 
 
 def bilinear_rgb(image: Image.Image, u: float, v: float) -> tuple[float, float, float]:
-    x, y = uv_to_xy(min(1.0, max(0.0, u)), min(1.0, max(0.0, v)))
-    x = min(W - 1.001, max(0.0, x))
-    y = min(H - 1.001, max(0.0, y))
+    x, y = uv_to_xy(u, v)
+    x = min(W - 1.0, max(0.0, x))
+    y = min(H - 1.0, max(0.0, y))
     x0, y0 = int(x), int(y)
     x1, y1 = min(W - 1, x0 + 1), min(H - 1, y0 + 1)
     tx, ty = x - x0, y - y0
@@ -73,51 +87,66 @@ def smoothstep(value: float) -> float:
     return value * value * (3.0 - 2.0 * value)
 
 
-def harmonize_shared_edges(source: Image.Image, band: float = 0.14) -> Image.Image:
-    """Make opposite isometric edges meet without changing the tile centre.
+def mean_rgb(*colors: tuple[float, float, float]) -> tuple[float, float, float]:
+    count = float(len(colors))
+    return tuple(sum(color[i] for color in colors) / count for i in range(3))
 
-    A diamond is a square in logical (u,v) tile coordinates. Neighbouring
-    ground tiles meet at u=0/1 or v=0/1, so those opposite edge samples must
-    agree. Only a narrow band is cross-faded; the approved centre texture is
-    untouched. This removes the visible 'one diamond per block' repetition
-    while preserving the original soil artwork.
+
+def harmonize_shared_edges(source: Image.Image, band: float = 0.18) -> Image.Image:
+    """Force opposite isometric borders to share the same texture samples.
+
+    The logical diamond is a square in (u,v). For each texel near a u seam we
+    blend toward the mean of u=0 and u=1 at the same v. The same is done for v.
+    Where both bands overlap we blend toward the mean of all four corners, so
+    correcting one seam cannot re-open the other. The centre stays untouched.
     """
     result = source.copy()
     src = source.load()
     dst = result.load()
+
+    corner_mean = mean_rgb(
+        bilinear_rgb(source, 0.0, 0.0),
+        bilinear_rgb(source, 1.0, 0.0),
+        bilinear_rgb(source, 0.0, 1.0),
+        bilinear_rgb(source, 1.0, 1.0),
+    )
 
     for y in range(H):
         for x in range(W):
             if source.getpixel((x, y))[3] == 0:
                 continue
 
-            # Inverse of x=64+64(u-v), y=32(u+v).
+            # Stable inverse for the logical 2:1 grid. The exact raster diamond
+            # differs by at most one pixel at right/bottom, which is intentional.
             s = y / (H * 0.5)
             d = (x - W * 0.5) / (W * 0.5)
-            u = (s + d) * 0.5
-            v = (s - d) * 0.5
-            if not (-1e-6 <= u <= 1.0 + 1e-6 and -1e-6 <= v <= 1.0 + 1e-6):
-                continue
-            u = min(1.0, max(0.0, u))
-            v = min(1.0, max(0.0, v))
+            u = min(1.0, max(0.0, (s + d) * 0.5))
+            v = min(1.0, max(0.0, (s - d) * 0.5))
 
-            r, g, b, _ = src[x, y]
-            color = [float(r), float(g), float(b)]
-
+            base = tuple(float(channel) for channel in src[x, y][:3])
             du = min(u, 1.0 - u)
-            if du < band:
-                opposite_u = 1.0 - u
-                other = bilinear_rgb(source, opposite_u, v)
-                edge_weight = 0.5 * (1.0 - smoothstep(du / band))
-                color = [color[i] * (1.0 - edge_weight) + other[i] * edge_weight for i in range(3)]
-
             dv = min(v, 1.0 - v)
-            if dv < band:
-                opposite_v = 1.0 - v
-                other = bilinear_rgb(source, u, opposite_v)
-                edge_weight = 0.5 * (1.0 - smoothstep(dv / band))
-                color = [color[i] * (1.0 - edge_weight) + other[i] * edge_weight for i in range(3)]
+            wu = 1.0 - smoothstep(du / band) if du < band else 0.0
+            wv = 1.0 - smoothstep(dv / band) if dv < band else 0.0
 
+            seam_u = mean_rgb(
+                bilinear_rgb(source, 0.0, v),
+                bilinear_rgb(source, 1.0, v),
+            )
+            seam_v = mean_rgb(
+                bilinear_rgb(source, u, 0.0),
+                bilinear_rgb(source, u, 1.0),
+            )
+
+            # Bilinear blend of four targets. At u=0/1 this resolves to the same
+            # seam_u value; at v=0/1 it resolves to the same seam_v value.
+            color = tuple(
+                base[i] * (1.0 - wu) * (1.0 - wv)
+                + seam_u[i] * wu * (1.0 - wv)
+                + seam_v[i] * (1.0 - wu) * wv
+                + corner_mean[i] * wu * wv
+                for i in range(3)
+            )
             dst[x, y] = tuple(int(round(min(255.0, max(0.0, c)))) for c in color) + (255,)
 
     result.putalpha(display_diamond())
@@ -146,8 +175,6 @@ def load_source(path: Path) -> Image.Image:
     if not opaque:
         raise ValueError("Approved dirt source has no opaque pixels")
 
-    # 128x64 is tiny; the explicit nearest search keeps this dependency-free
-    # and deterministic on every agent/runner.
     for y in range(H):
         for x in range(W):
             pixel = src[x, y]
@@ -211,11 +238,8 @@ def preview(tiles: dict[int, Image.Image], path: Path) -> None:
         return origin[0] + (x - y) * 64 - 64, origin[1] + (x + y) * 32
 
     layout = [
-        # Horizontal strip.
         (0, 0, 2), (1, 0, 10), (2, 0, 10), (3, 0, 8),
-        # Vertical strip crossing the horizontal strip.
         (2, -2, 4), (2, -1, 5), (2, 0, 15), (2, 1, 5), (2, 2, 1),
-        # Two bends to expose diagonal shared edges.
         (-1, 3, 6), (0, 3, 9), (4, 3, 3), (5, 3, 12),
     ]
     for x, y, mask in layout:
