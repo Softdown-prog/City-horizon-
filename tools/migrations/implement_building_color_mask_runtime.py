@@ -1,0 +1,423 @@
+from pathlib import Path
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{path}: expected exactly one match, found {count}")
+    p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+# building_system.h: CH_COLOR_MASK_V1 data contract and per-instance state.
+replace_once(
+    "src/building_system.h",
+    '''struct BuildingAnimationDefinition {
+    int frame_count = 1;
+    int frame_duration_ms = 120;
+    std::string layout = "horizontal";
+    // "loop" preserves the legacy continuous animation contract.
+    // "ambient_once" holds an idle frame, plays one action sequence, then
+    // returns to idle before the next deterministic ambient cycle.
+    std::string playback = "loop";
+    int idle_frame = 0;
+    int action_start_frame = 1;
+    int action_frame_count = 0;
+    int idle_hold_ms = 0;
+};
+''',
+    '''struct BuildingAnimationDefinition {
+    int frame_count = 1;
+    int frame_duration_ms = 120;
+    std::string layout = "horizontal";
+    // "loop" preserves the legacy continuous animation contract.
+    // "ambient_once" holds an idle frame, plays one action sequence, then
+    // returns to idle before the next deterministic ambient cycle.
+    std::string playback = "loop";
+    int idle_frame = 0;
+    int action_start_frame = 1;
+    int action_frame_count = 0;
+    int idle_hold_ms = 0;
+};
+
+// CH_COLOR_MASK_V1 runtime contract. A is object coverage while R/G identify
+// independently recolorable wall and roof regions.
+struct BuildingColorTint {
+    std::uint8_t r = 255;
+    std::uint8_t g = 255;
+    std::uint8_t b = 255;
+};
+
+struct BuildingColorMaskDefinition {
+    bool enabled = false;
+    std::array<std::string, 4> sprite_paths;
+};
+''',
+)
+replace_once(
+    "src/building_system.h",
+    '''    std::optional<InitialBuildingPlacement> initial_placement;
+    std::optional<BuildingAnimationDefinition> animation;
+
+    // Multi-level progression data (Nível 1 a Nível N).
+''',
+    '''    std::optional<InitialBuildingPlacement> initial_placement;
+    std::optional<BuildingAnimationDefinition> animation;
+    std::optional<BuildingColorMaskDefinition> color_mask;
+
+    // Multi-level progression data (Nível 1 a Nível N).
+''',
+)
+replace_once(
+    "src/building_system.h",
+    '''    [[nodiscard]] const std::string& texture_path_for(BuildingRotation rotation, int level = 1) const;
+    [[nodiscard]] float anchor_x_for(BuildingRotation rotation, int level = 1) const;
+''',
+    '''    [[nodiscard]] const std::string& texture_path_for(BuildingRotation rotation, int level = 1) const;
+    [[nodiscard]] const std::string& color_mask_path_for(BuildingRotation rotation) const;
+    [[nodiscard]] bool supports_color_mask(BuildingRotation rotation) const;
+    [[nodiscard]] float anchor_x_for(BuildingRotation rotation, int level = 1) const;
+''',
+)
+replace_once(
+    "src/building_system.h",
+    '''    BuildingRotation rotation = BuildingRotation::r0;
+    int current_level = 1;
+    bool operational = true;
+
+    [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
+''',
+    '''    BuildingRotation rotation = BuildingRotation::r0;
+    int current_level = 1;
+    bool operational = true;
+
+    // Two instances of the same definition may carry different player colors.
+    // False means render the approved source PNG with no recolor pass.
+    bool color_customized = false;
+    BuildingColorTint wall_tint{};
+    BuildingColorTint roof_tint{};
+
+    [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
+''',
+)
+replace_once(
+    "src/building_system.h",
+    '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+    std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
+''',
+    '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+    [[nodiscard]] bool set_color_customization(std::uint64_t instance_id, BuildingColorTint wall, BuildingColorTint roof);
+    [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id);
+    std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
+''',
+)
+
+# building_system.cpp: parse mask paths and expose instance setters.
+replace_once(
+    "src/building_system.cpp",
+    '''    } else {
+        // A legacy definition has one fixed PNG and intentionally ignores rotation.
+        definition.rotatable = false;
+        definition.sprite_paths.fill(definition.texture_path);
+        definition.available_rotations.fill(true);
+    }
+
+    if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
+''',
+    '''    } else {
+        // A legacy definition has one fixed PNG and intentionally ignores rotation.
+        definition.rotatable = false;
+        definition.sprite_paths.fill(definition.texture_path);
+        definition.available_rotations.fill(true);
+    }
+
+    if (const auto serialized_mask = json_object(json, "colorMask")) {
+        const bool enabled = json_bool(*serialized_mask, "enabled").value_or(false);
+        if (enabled) {
+            if (json_string(*serialized_mask, "contract").value_or("") != "CH_COLOR_MASK_V1") return std::nullopt;
+            const auto channels = json_object(*serialized_mask, "channels");
+            const auto mask_sprites = json_object(*serialized_mask, "sprites");
+            if (!channels || !mask_sprites || json_string(*channels, "R").value_or("") != "wall" ||
+                json_string(*channels, "G").value_or("") != "roof") {
+                return std::nullopt;
+            }
+            BuildingColorMaskDefinition mask;
+            mask.enabled = true;
+            for (std::size_t index = 0; index < mask.sprite_paths.size(); ++index) {
+                mask.sprite_paths[index] = json_string(*mask_sprites, std::to_string(index)).value_or("");
+                if (definition.available_rotations[index] && mask.sprite_paths[index].empty()) return std::nullopt;
+            }
+            definition.color_mask = mask;
+        }
+    }
+
+    if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
+''',
+)
+replace_once(
+    "src/building_system.cpp",
+    '''const std::string& BuildingDefinition::texture_path_for(const BuildingRotation rotation, const int level) const {
+    const auto& lvl = level_definition(level);
+    if (rotatable && supports_rotation(rotation)) {
+        return lvl.sprite_paths[static_cast<std::size_t>(rotation)];
+    }
+    if (level > 1 && !lvl.sprite_paths[0].empty()) {
+        return lvl.sprite_paths[0];
+    }
+    if (!texture_path.empty()) {
+        return texture_path;
+    }
+    return lvl.sprite_paths[0];
+}
+
+float BuildingDefinition::anchor_x_for''',
+    '''const std::string& BuildingDefinition::texture_path_for(const BuildingRotation rotation, const int level) const {
+    const auto& lvl = level_definition(level);
+    if (rotatable && supports_rotation(rotation)) {
+        return lvl.sprite_paths[static_cast<std::size_t>(rotation)];
+    }
+    if (level > 1 && !lvl.sprite_paths[0].empty()) {
+        return lvl.sprite_paths[0];
+    }
+    if (!texture_path.empty()) {
+        return texture_path;
+    }
+    return lvl.sprite_paths[0];
+}
+
+const std::string& BuildingDefinition::color_mask_path_for(const BuildingRotation rotation) const {
+    static const std::string empty;
+    if (!supports_color_mask(rotation)) return empty;
+    return color_mask->sprite_paths[static_cast<std::size_t>(rotation)];
+}
+
+bool BuildingDefinition::supports_color_mask(const BuildingRotation rotation) const {
+    return color_mask.has_value() && color_mask->enabled && supports_rotation(rotation) &&
+           !color_mask->sprite_paths[static_cast<std::size_t>(rotation)].empty();
+}
+
+float BuildingDefinition::anchor_x_for''',
+)
+replace_once(
+    "src/building_system.cpp",
+    '''bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) {
+        return false;
+    }
+    found->operational = operational;
+    return true;
+}
+
+std::size_t BuildingManager::set_operational_by_definition''',
+    '''bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) {
+        return false;
+    }
+    found->operational = operational;
+    return true;
+}
+
+bool BuildingManager::set_color_customization(const std::uint64_t instance_id, const BuildingColorTint wall,
+                                              const BuildingColorTint roof) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->wall_tint = wall;
+    found->roof_tint = roof;
+    found->color_customized = true;
+    return true;
+}
+
+bool BuildingManager::clear_color_customization(const std::uint64_t instance_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->color_customized = false;
+    found->wall_tint = {};
+    found->roof_tint = {};
+    return true;
+}
+
+std::size_t BuildingManager::set_operational_by_definition''',
+)
+
+# main.cpp: extract R/G mask channels once and render them as tint overlays.
+replace_once(
+    "src/main.cpp",
+    '''    [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
+        const auto found = textures_.find(path.generic_string());
+        return found == textures_.end() ? nullptr : &found->second;
+    }
+
+    void clear() {
+''',
+    '''    [[nodiscard]] const TextureAsset* load_mask_channel(SDL_Renderer* renderer, const std::filesystem::path& path,
+                                                        const char channel) {
+        if (channel != 'R' && channel != 'G') return nullptr;
+        const std::string key = path.generic_string() + "#CH_COLOR_MASK_" + channel;
+        if (const auto existing = textures_.find(key); existing != textures_.end()) return &existing->second;
+
+        SDL_Surface* source = SDL_LoadPNG(path.string().c_str());
+        if (source == nullptr) {
+            std::cerr << "Color mask could not be loaded: " << path << "\\nSDL error: " << SDL_GetError() << '\\n';
+            return nullptr;
+        }
+        SDL_Surface* extracted = SDL_CreateSurface(source->w, source->h, SDL_PIXELFORMAT_RGBA32);
+        if (extracted == nullptr) {
+            SDL_DestroySurface(source);
+            return nullptr;
+        }
+        for (int y = 0; y < source->h; ++y) {
+            for (int x = 0; x < source->w; ++x) {
+                Uint8 r = 0, g = 0, b = 0, a = 0;
+                if (!SDL_ReadSurfacePixel(source, x, y, &r, &g, &b, &a)) continue;
+                const Uint8 coverage = channel == 'R' ? r : g;
+                const Uint8 mask_alpha = static_cast<Uint8>((static_cast<unsigned>(coverage) * static_cast<unsigned>(a)) / 255U);
+                (void)SDL_WriteSurfacePixel(extracted, x, y, 255, 255, 255, mask_alpha);
+            }
+        }
+        SDL_DestroySurface(source);
+
+        TextureAsset asset;
+        asset.texture = SDL_CreateTextureFromSurface(renderer, extracted);
+        asset.source_width = static_cast<float>(extracted->w);
+        asset.source_height = static_cast<float>(extracted->h);
+        SDL_DestroySurface(extracted);
+        if (asset.texture == nullptr) return nullptr;
+        SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+        return &textures_.emplace(key, asset).first->second;
+    }
+
+    [[nodiscard]] const TextureAsset* find_mask_channel(const std::filesystem::path& path, const char channel) const {
+        const std::string key = path.generic_string() + "#CH_COLOR_MASK_" + channel;
+        const auto found = textures_.find(key);
+        return found == textures_.end() ? nullptr : &found->second;
+    }
+
+    [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
+        const auto found = textures_.find(path.generic_string());
+        return found == textures_.end() ? nullptr : &found->second;
+    }
+
+    void clear() {
+''',
+)
+replace_once(
+    "src/main.cpp",
+    '''                if (definition.supports_rotation(logical_rotation)) {
+                    (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
+                }
+''',
+    '''                if (definition.supports_rotation(logical_rotation)) {
+                    (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
+                    if (lvl.level == 1 && definition.supports_color_mask(logical_rotation)) {
+                        const auto mask_path = asset_root / definition.color_mask_path_for(logical_rotation);
+                        (void)textures.load_mask_channel(renderer, mask_path, 'R');
+                        (void)textures.load_mask_channel(renderer, mask_path, 'G');
+                    }
+                }
+''',
+)
+replace_once(
+    "src/main.cpp",
+    '''                render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+            }
+            continue;
+''',
+    '''                render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+
+                // CH_COLOR_MASK_V1 is opt-in. The approved source sprite stays
+                // untouched until this concrete instance has player colors.
+                if (draw.building->color_customized && definition->supports_color_mask(visual_rotation)) {
+                    constexpr Uint8 kTintOverlayAlpha = 184;
+                    const auto mask_path = root / definition->color_mask_path_for(visual_rotation);
+                    if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
+                        render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
+                                        viewport_width, viewport_height, kTintOverlayAlpha,
+                                        draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
+                    }
+                    if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
+                        render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
+                                        viewport_width, viewport_height, kTintOverlayAlpha,
+                                        draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
+                    }
+                }
+            }
+            continue;
+''',
+)
+
+# save_manager.cpp: optional fields keep old saves compatible and persist new colors.
+replace_once(
+    "src/save_manager.cpp",
+    '''        snapshot.buildings.push_back({*instance_id, *definition_id, *tile_x, *tile_y, static_cast<BuildingRotation>(*rotation), current_level});
+''',
+    '''        BuildingInstance saved_instance{*instance_id, *definition_id, *tile_x, *tile_y,
+                                               static_cast<BuildingRotation>(*rotation), current_level};
+        const auto wr = json_number<int>(building, "wallTintR");
+        const auto wg = json_number<int>(building, "wallTintG");
+        const auto wb = json_number<int>(building, "wallTintB");
+        const auto rr = json_number<int>(building, "roofTintR");
+        const auto rg = json_number<int>(building, "roofTintG");
+        const auto rb = json_number<int>(building, "roofTintB");
+        const bool has_any_tint = wr || wg || wb || rr || rg || rb;
+        if (has_any_tint) {
+            if (!wr || !wg || !wb || !rr || !rg || !rb ||
+                *wr < 0 || *wr > 255 || *wg < 0 || *wg > 255 || *wb < 0 || *wb > 255 ||
+                *rr < 0 || *rr > 255 || *rg < 0 || *rg > 255 || *rb < 0 || *rb > 255) {
+                error = "building color customization is invalid";
+                return false;
+            }
+            saved_instance.color_customized = true;
+            saved_instance.wall_tint = {static_cast<std::uint8_t>(*wr), static_cast<std::uint8_t>(*wg), static_cast<std::uint8_t>(*wb)};
+            saved_instance.roof_tint = {static_cast<std::uint8_t>(*rr), static_cast<std::uint8_t>(*rg), static_cast<std::uint8_t>(*rb)};
+        }
+        snapshot.buildings.push_back(saved_instance);
+''',
+)
+replace_once(
+    "src/save_manager.cpp",
+    '''        output << "    { \\"instanceId\\": " << building.instance_id << ", \\"definitionId\\": \\"" << escape_json(building.definition_id)
+               << "\\", \\"tileX\\": " << building.tile_x << ", \\"tileY\\": " << building.tile_y
+               << ", \\"rotation\\": " << static_cast<int>(building.rotation)
+               << ", \\"level\\": " << building.current_level << " }"
+               << (index + 1U == buildings.instances().size() ? "\\n" : ",\\n");
+''',
+    '''        output << "    { \\"instanceId\\": " << building.instance_id << ", \\"definitionId\\": \\"" << escape_json(building.definition_id)
+               << "\\", \\"tileX\\": " << building.tile_x << ", \\"tileY\\": " << building.tile_y
+               << ", \\"rotation\\": " << static_cast<int>(building.rotation)
+               << ", \\"level\\": " << building.current_level;
+        if (building.color_customized) {
+            output << ", \\"wallTintR\\": " << static_cast<int>(building.wall_tint.r)
+                   << ", \\"wallTintG\\": " << static_cast<int>(building.wall_tint.g)
+                   << ", \\"wallTintB\\": " << static_cast<int>(building.wall_tint.b)
+                   << ", \\"roofTintR\\": " << static_cast<int>(building.roof_tint.r)
+                   << ", \\"roofTintG\\": " << static_cast<int>(building.roof_tint.g)
+                   << ", \\"roofTintB\\": " << static_cast<int>(building.roof_tint.b);
+        }
+        output << " }" << (index + 1U == buildings.instances().size() ? "\\n" : ",\\n");
+''',
+)
+
+manifest = Path("assets/buildings/bakery/bakery.json")
+manifest_text = manifest.read_text(encoding="utf-8")
+if '"runtimeTintingImplemented": false' not in manifest_text:
+    raise SystemExit("bakery manifest: expected runtimeTintingImplemented false")
+manifest.write_text(manifest_text.replace('"runtimeTintingImplemented": false', '"runtimeTintingImplemented": true', 1), encoding="utf-8")
+
+# Lightweight contract checks only; the project preference is not to rebuild on every edit.
+definition = Path("assets/definitions/bakery_01.json").read_text(encoding="utf-8")
+assert "CH_COLOR_MASK_V1" in definition
+assert '"R": "wall"' in definition and '"G": "roof"' in definition
+assert "bakery_south_mask.png" in definition and "bakery_north_mask.png" in definition
+print("CH_COLOR_MASK_V1 runtime migration prepared successfully")
