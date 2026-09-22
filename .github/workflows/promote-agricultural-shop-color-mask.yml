@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json"
-      - ".github/workflows/promote-agricultural-shop-color-mask.yml"
+      - "tools/ch_blender/promotions/color_masks/building.agricultural_shop.01.runtime.json"
   workflow_dispatch:
 
 permissions:
@@ -42,7 +41,7 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
-          p = Path('tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json')
+          p = Path('tools/ch_blender/promotions/color_masks/building.agricultural_shop.01.runtime.json')
           d = json.loads(p.read_text(encoding='utf-8'))
           assert d['contract'] == 'CH_RUNTIME_COLOR_MASK_PROMOTION_V1'
           assert d['maskContract'] == 'CH_COLOR_MASK_V1'
@@ -99,7 +98,7 @@ jobs:
 
           src = Path('out/color_mask_promotion/final')
           dst = Path('assets/buildings/agricultural_shop')
-          promotion_path = Path('tools/ch_blender/promotions/building.agricultural_shop.01.color_mask.runtime.json')
+          promotion_path = Path('tools/ch_blender/promotions/color_masks/building.agricultural_shop.01.runtime.json')
           promotion = json.loads(promotion_path.read_text(encoding='utf-8'))
           runtime_path = dst / 'agricultural_shop.json'
           runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
