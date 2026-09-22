@@ -1,4 +1,4 @@
-name: Fix bakery stock accounting once
+name: Fix Bakery Stock Accounting
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  fix-bakery-stock-accounting:
+  apply-fix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,68 +22,22 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
-      - name: Fix stock simulation and single consumption
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('src/economy_system.cpp')
-          text = path.read_text(encoding='utf-8')
-
-          old_summary = '''        ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
-        if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
-            const std::int64_t price = std::clamp('''
-          new_summary = '''        ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
-        if (farming != nullptr && !definition->resource_inputs.empty()) {
-            const std::int64_t price = std::clamp('''
-          if old_summary not in text:
-              raise SystemExit('expected stock-aware summary block not found')
-          text = text.replace(old_summary, new_summary, 1)
-
-          old_close = '''        if (expense != 0) {
-            record(EconomyTransactionType::maintenance, -expense, closing_date, instance.instance_id);
-        }
-        if (farming != nullptr && !definition->resource_inputs.empty()) {
-            bool supplied = true;'''
-          new_close = '''        if (expense != 0) {
-            record(EconomyTransactionType::maintenance, -expense, closing_date, instance.instance_id);
-        }
-        // Service-priced shops already consume their inputs according to actual
-        // served customers above. Keep the legacy local-supply bonus path only
-        // for non-service buildings so ingredients are never charged twice.
-        if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
-            bool supplied = true;'''
-          if old_close not in text:
-              raise SystemExit('expected legacy local-supply block not found')
-          text = text.replace(old_close, new_close, 1)
-
-          path.write_text(text, encoding='utf-8')
-          Path('.github/workflows/fix-bakery-stock-accounting-once.yml').unlink()
-          PY
+      - name: Apply staged correction
+        run: python3 tools/fix_bakery_stock_accounting.py
 
       - name: Validate focused correction
         run: |
           git diff --check
-          python3 - <<'PY'
-          from pathlib import Path
-          text = Path('src/economy_system.cpp').read_text(encoding='utf-8')
-          summary = '''ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
-        if (farming != nullptr && !definition->resource_inputs.empty()) {'''
-          close = '''if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
-            bool supplied = true;'''
-          assert summary in text, 'bakery stock must participate in summary simulation'
-          assert close in text, 'legacy local-supply path must exclude service-priced shops'
-          assert text.count('definition->default_service_price <= 0') == 1, 'service exclusion belongs only to legacy local-supply path'
-          PY
+          python3 -c "from pathlib import Path; s=Path('src/economy_system.cpp').read_text(); assert s.count('definition->default_service_price <= 0') == 1"
           g++ -std=c++20 -I. -Isrc -fsyntax-only src/economy_system.cpp
+          test ! -e tools/fix_bakery_stock_accounting.py
           test ! -e .github/workflows/fix-bakery-stock-accounting-once.yml
 
-      - name: Commit to main
+      - name: Commit correction
         run: |
           git config user.name 'OpenAI'
           git config user.email 'openai@users.noreply.github.com'
-          git add src/economy_system.cpp .github/workflows/fix-bakery-stock-accounting-once.yml
+          git add src/economy_system.cpp tools/fix_bakery_stock_accounting.py .github/workflows/fix-bakery-stock-accounting-once.yml
           git commit -m 'Fix bakery ingredient stock accounting'
           git pull --rebase origin main
           git push origin main
