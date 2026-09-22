@@ -41,5 +41,8 @@
     "Notification": [
       "ui/bong_001.ogg"
     ]
+  },
+  "music": {
+    "Loading": "music/loading_horizonte_de_sal.ogg"
   }
 }
