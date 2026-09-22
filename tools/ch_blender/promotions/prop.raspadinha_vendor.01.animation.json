@@ -1,0 +1,35 @@
+{
+  "contract": "CH_RUNTIME_ANIMATION_PROMOTION_V1",
+  "assetId": "prop.raspadinha_vendor.01",
+  "animationContract": "CH_ANIMATED_SPRITE_V1",
+  "approved": true,
+  "approvedProxySha256": "932bc6e0b9523d962c7dd21f02d5e6a85af8c4a9de4e701d1997aabfd493c888",
+  "sourceWorkflowRun": 35675552853,
+  "sourceArtifactId": 10672684903,
+  "sourceArtifactName": "CH-Blender-Agent-35675552853-1",
+  "sourceDir": "prop.raspadinha_vendor.anim.final.001",
+  "destination": "assets/props/raspadinha_vendor",
+  "format": "PNG_RGBA",
+  "frameSize": [256, 256],
+  "layout": "horizontal",
+  "directionOrder": ["south", "east", "west", "north"],
+  "states": {
+    "idle": {
+      "sourceFrames": [1],
+      "runtimeFrames": [0],
+      "looping": true
+    },
+    "greet": {
+      "sourceFrames": [5, 6, 7, 8],
+      "runtimeFrames": [1, 2, 3, 4],
+      "looping": false,
+      "triggerPolicy": "ambient_event"
+    }
+  },
+  "suggestedPlayback": {
+    "frameDurationMs": 180,
+    "idleHoldMs": 7000
+  },
+  "serveStateIncluded": false,
+  "note": "Promote only the human-approved IDLE+GREET v2 bake. Static runtime views remain untouched as fallback."
+}
