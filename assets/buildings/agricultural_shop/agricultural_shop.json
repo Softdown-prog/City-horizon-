@@ -1,0 +1,66 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.agricultural_shop.01",
+  "displayName": "Agricultural Shop",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    256,
+    256
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2
+  },
+  "views": {
+    "south": {
+      "file": "agricultural_shop_south.png",
+      "pivot": {
+        "x": 128,
+        "y": 161
+      },
+      "sha256": "10d910b2340e8bc2e431d5642f6452e7dd03bbbacf2533afa5ada8aca708e001"
+    },
+    "east": {
+      "file": "agricultural_shop_east.png",
+      "pivot": {
+        "x": 128,
+        "y": 161
+      },
+      "sha256": "5269867cdca676609c4458f040f1e7c70bf5c3545c7427f26578ced2a6d2ccd6"
+    },
+    "west": {
+      "file": "agricultural_shop_west.png",
+      "pivot": {
+        "x": 128,
+        "y": 161
+      },
+      "sha256": "519a5aaf198c0ae46f32b395b202891b88a6767e1459be482f3921054db811f6"
+    },
+    "north": {
+      "file": "agricultural_shop_north.png",
+      "pivot": {
+        "x": 128,
+        "y": 161
+      },
+      "sha256": "9643c808ae6d83ed59a1ea9dc44be3aa1a5bd32b3367a4f4d88b6856f85ff97e"
+    }
+  },
+  "spriteSheet": "agricultural_shop_4view.png",
+  "sourceCommit": "2faba790429a4306d285753d168c0efc6fb95ef5",
+  "sourceWorkflowRun": 35686217355,
+  "sourceArtifactId": 10676618125,
+  "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061",
+  "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess + shadow-only transparent edge guard",
+  "approvedForRuntime": true
+}
