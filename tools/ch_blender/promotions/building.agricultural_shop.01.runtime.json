@@ -1,0 +1,20 @@
+{
+  "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
+  "assetId": "building.agricultural_shop.01",
+  "approved": true,
+  "sourceCommit": "2faba790429a4306d285753d168c0efc6fb95ef5",
+  "sourceWorkflowRun": 35686217355,
+  "sourceArtifactId": 10676618125,
+  "sourceArtifactName": "CH-Blender-Agent-35686217355-1",
+  "sourceDir": "building.agricultural_shop.detail_v2",
+  "destination": "assets/buildings/agricultural_shop",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [256, 256],
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2
+  },
+  "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061"
+}
