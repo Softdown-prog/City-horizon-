@@ -1,0 +1,18 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "prop.raspadinha_vendor.anim.final.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_raspadinha_vendor_animated_v2_guarded.py",
+  "qualityStage": "final",
+  "args": [
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/prop.raspadinha_vendor.anim.final.001"
+  ],
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "932bc6e0b9523d962c7dd21f02d5e6a85af8c4a9de4e701d1997aabfd493c888"
+  },
+  "outputDir": "out/ch_blender_agent/prop.raspadinha_vendor.anim.final.001"
+}
