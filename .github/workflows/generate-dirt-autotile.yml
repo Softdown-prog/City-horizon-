@@ -1,0 +1,90 @@
+name: Generate Dirt Autotile
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "assets/terrain/dirt_isometric_01.png"
+      - "tools/generate_dirt_paths.py"
+      - ".github/workflows/generate-dirt-autotile.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-dirt-autotile
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Generate 16-mask dirt family
+        run: |
+          python tools/generate_dirt_paths.py \
+            --source assets/terrain/dirt_isometric_01.png \
+            --output-dir assets/terrain/paths/dirt_01 \
+            --preview out/dirt_path_autotile_preview.png
+
+      - name: Validate generated tiles
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('assets/terrain/paths/dirt_01')
+          files = sorted(root.glob('dirt_path_*.png'))
+          if len(files) != 16:
+              raise SystemExit(f'expected 16 dirt autotile PNGs, found {len(files)}')
+
+          expected = [f'dirt_path_{i:02d}_' for i in range(16)]
+          for prefix in expected:
+              matches = [p for p in files if p.name.startswith(prefix)]
+              if len(matches) != 1:
+                  raise SystemExit(f'missing or duplicate mask {prefix}')
+
+          for path in files:
+              with Image.open(path) as im:
+                  if im.mode != 'RGBA':
+                      raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
+                  if im.size != (128, 64):
+                      raise SystemExit(f'{path}: expected 128x64, got {im.size}')
+          print('PASS masks=16 size=128x64 mode=RGBA')
+          PY
+
+      - name: Upload autotile preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Dirt-Autotile-Preview
+          path: |
+            out/dirt_path_autotile_preview.png
+            assets/terrain/paths/dirt_01/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit generated runtime tiles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/terrain/paths/dirt_01
+          if git diff --cached --quiet; then
+            echo "Dirt autotile family already up to date."
+            exit 0
+          fi
+          git commit -m "asset: regenerate approved dirt autotile family"
+          git push origin HEAD:main
