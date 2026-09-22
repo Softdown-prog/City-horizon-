@@ -1,0 +1,16 @@
+{
+  "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
+  "assetId": "prop.raspadinha_vendor.01",
+  "approved": true,
+  "sourceCommit": "e67da780e70353aaa538c1f6c077b794faee1526",
+  "sourceWorkflowRun": 35670015174,
+  "sourceArtifactId": 10670863942,
+  "sourceArtifactName": "CH-Blender-Agent-35670015174-1",
+  "sourceDir": "prop.raspadinha_vendor.quality",
+  "destination": "assets/props/raspadinha_vendor",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [256, 256],
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "approvedProxySha256": "f401bacf15fa67d09d54f9f7e651fb67119896808bb065330047bf0d85c7c1a7"
+}
