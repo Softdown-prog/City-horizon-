@@ -1,5 +1,6 @@
 name: Apply settings UI migration once
 
+# One-shot trigger revision 2: workflow already exists on main before this push.
 on:
   push:
     paths:
