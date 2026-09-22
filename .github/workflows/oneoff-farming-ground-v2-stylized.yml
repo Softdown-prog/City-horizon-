@@ -1,0 +1,33 @@
+name: One-off Farming Ground V2 Stylized
+
+on:
+  push:
+    paths:
+      - '.github/workflows/oneoff-farming-ground-v2-stylized.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply stylized farming ground patch
+        run: python3 .github/scripts/patch_farming_ground_v2_stylized.py
+      - name: Validate patch
+        run: git diff --check
+      - name: Commit directly to main
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'City Horizon Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/ch_render/map_renderer.cpp
+          git commit -m 'render: stylize continuous farming ground v2'
+          git push origin HEAD:main
