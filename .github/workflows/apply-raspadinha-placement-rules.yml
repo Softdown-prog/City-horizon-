@@ -1,0 +1,39 @@
+name: Apply Raspadinha Placement Rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/runtime_migrations/apply_raspadinha_placement_rules.py
+      - .github/workflows/apply-raspadinha-placement-rules.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-placement-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded placement migration
+        run: python tools/runtime_migrations/apply_raspadinha_placement_rules.py
+
+      - name: Validate patch whitespace
+        run: git diff --check
+
+      - name: Commit placement rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/building_system.h src/building_system.cpp src/main.cpp assets/definitions/raspadinha_vendor_01.json
+          git rm --ignore-unmatch tools/runtime_migrations/apply_raspadinha_placement_rules.py
+          git rm --ignore-unmatch .github/workflows/apply-raspadinha-placement-rules.yml
+          git commit -m "gameplay: add roadside raspadinha placement rules"
+          git pull --rebase origin main
+          git push origin main
