@@ -1,0 +1,20 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "building.agricultural_shop.detail_v2.color_mask.final.002",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_agricultural_shop_color_mask.py",
+  "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061"
+  },
+  "args": [
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--reference",
+    "Converter/file_00000000764881f5865c6948120ef88f.png",
+    "--output",
+    "out/ch_blender_agent/building.agricultural_shop.detail_v2.color_mask.v2"
+  ],
+  "outputDir": "out/ch_blender_agent/building.agricultural_shop.detail_v2.color_mask.v2"
+}

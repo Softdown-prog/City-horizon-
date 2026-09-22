@@ -181,6 +181,7 @@ def _mask_scene_override(scene, authored, ground, spec: dict):
 
     original_engine = scene.render.engine
     original_transparent = scene.render.film_transparent
+    original_dither_intensity = scene.render.dither_intensity
     original_view_transform = scene.view_settings.view_transform
     original_look = scene.view_settings.look
     original_exposure = scene.view_settings.exposure
@@ -193,6 +194,10 @@ def _mask_scene_override(scene, authored, ground, spec: dict):
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
         scene.render.film_transparent = True
+        # CH_COLOR_MASK_V1 is data, not artwork. Blender's default output dither
+        # perturbs exact zero channels into 1-2 values, so it must be disabled
+        # only for the mask pass and restored immediately afterwards.
+        scene.render.dither_intensity = 0.0
         try:
             scene.view_settings.view_transform = "Standard"
         except Exception:
@@ -249,6 +254,7 @@ def _mask_scene_override(scene, authored, ground, spec: dict):
         ground.hide_render = ground_hidden
         scene.render.engine = original_engine
         scene.render.film_transparent = original_transparent
+        scene.render.dither_intensity = original_dither_intensity
         try:
             scene.view_settings.view_transform = original_view_transform
         except Exception:
