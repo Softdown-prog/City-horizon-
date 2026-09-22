@@ -1,0 +1,31 @@
+{
+  "contract": "CH_CROP_OVERLAY_RECIPE_V1",
+  "id": "crop.wheat.overlay.v1",
+  "displayName": "Trigo",
+  "cropId": "wheat",
+  "renderMode": "transparent_overlay_only",
+  "groundEmbedded": false,
+  "canvas": {"width": 256, "height": 256},
+  "anchor": {"x": 0.5, "y": 0.78},
+  "overlayScale": 0.92,
+  "stages": [
+    {"id": "sprout", "height": 0.28, "density": 0.36, "seed": 1101},
+    {"id": "young", "height": 0.48, "density": 0.56, "seed": 1102},
+    {"id": "mature", "height": 0.68, "density": 0.78, "seed": 1103},
+    {"id": "ripe", "height": 0.72, "density": 0.84, "seed": 1104, "feature": "golden_heads"}
+  ],
+  "proceduralGrammar": {
+    "layout": "row_clusters",
+    "clusterCount": 11,
+    "stemsPerCluster": [5, 9],
+    "silhouette": "thin_dense_grass",
+    "palette": ["#6d8d3c", "#88a94b", "#b99b46", "#d6bb62"],
+    "notes": "No soil, no shadow plate, no tile border. Keep row readability at gameplay scale."
+  },
+  "handoff": {
+    "nextStage": "CH_BLENDER",
+    "camera": "CH_CAMERA_V1",
+    "studio": "CH_TYCOON_STUDIO_V1",
+    "finalOutput": "RGBA transparent crop overlays with identical canvas and anchor for every growth stage"
+  }
+}
