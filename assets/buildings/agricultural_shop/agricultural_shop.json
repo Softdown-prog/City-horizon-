@@ -62,5 +62,60 @@
   "sourceArtifactId": 10676618125,
   "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061",
   "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess + shadow-only transparent edge guard",
-  "approvedForRuntime": true
+  "approvedForRuntime": true,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "blueChannel": "unused",
+    "alpha": "coverage",
+    "scope": "large_surfaces_only",
+    "views": {
+      "south": {
+        "file": "agricultural_shop_south_mask.png",
+        "sha256": "c459888a401698de087458082fa61724cdc870d5507329b3104ef4ecd95b6d7d",
+        "wallPixels": 6477,
+        "roofPixels": 12637,
+        "coveredPixels": 28097
+      },
+      "east": {
+        "file": "agricultural_shop_east_mask.png",
+        "sha256": "37f77d2453300d0c928da9f5337b2aea984ca30660ab72f926444b0dc6e6b0b3",
+        "wallPixels": 7083,
+        "roofPixels": 12634,
+        "coveredPixels": 28071
+      },
+      "west": {
+        "file": "agricultural_shop_west_mask.png",
+        "sha256": "c658c3a205a45f2581b6dc5530a808861919412a5a59f6a0612f278051344d87",
+        "wallPixels": 11172,
+        "roofPixels": 10788,
+        "coveredPixels": 27364
+      },
+      "north": {
+        "file": "agricultural_shop_north_mask.png",
+        "sha256": "7d3e341d417a3611af1b62347352d0647f9b4045694b219a7179a788d425294f",
+        "wallPixels": 11868,
+        "roofPixels": 10788,
+        "coveredPixels": 27334
+      }
+    },
+    "fourView": {
+      "file": "agricultural_shop_mask_4view.png",
+      "sha256": "8cdd7bc5aa711cda42f44565ad4cac19e115e3c228c3a6465c5f5f1dce2fd4a0"
+    },
+    "review": {
+      "file": "agricultural_shop_mask_review.png",
+      "sha256": "4e50a65ad8157f082ffc6d47edcd8ddbaff37d5c3cbda13e5493eef2f14814d2"
+    },
+    "sourceCommit": "343770151cde6296a9e16b8d54f0807ee8f32da6",
+    "sourceWorkflowRun": 35717953899,
+    "sourceArtifactId": 10690468188,
+    "approvedProxySha256": "1690447322a1590b5ea78f7cdb07b0422147e89435c6619f44c5da2f3b716061",
+    "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
+    "runtimeTintingImplemented": false
+  }
 }
