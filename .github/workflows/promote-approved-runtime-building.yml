@@ -1,0 +1,268 @@
+name: Promote Approved Runtime Building
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/building.*.runtime.json"
+  workflow_dispatch:
+    inputs:
+      promotion_path:
+        description: Repository-relative CH_RUNTIME_BUILDING_PROMOTION_V1 JSON path
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-runtime-building-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-building:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Discover promotion contract
+        id: promotion_path
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            path="${{ inputs.promotion_path }}"
+          else
+            before="${{ github.event.before }}"
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              mapfile -t changed < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" -- 'tools/ch_blender/promotions/building.*.runtime.json')
+            else
+              mapfile -t changed < <(git diff --name-only "$before" "$GITHUB_SHA" -- 'tools/ch_blender/promotions/building.*.runtime.json')
+            fi
+            if [[ ${#changed[@]} -ne 1 ]]; then
+              echo "Expected exactly one building promotion descriptor, found ${#changed[@]}" >&2
+              printf '%s\n' "${changed[@]}" >&2
+              exit 1
+            fi
+            path="${changed[0]}"
+          fi
+          test -f "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Read promotion contract
+        id: promotion
+        shell: bash
+        env:
+          PROMOTION_PATH: ${{ steps.promotion_path.outputs.path }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['PROMOTION_PATH'])
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['contract'] == 'CH_RUNTIME_BUILDING_PROMOTION_V1'
+          assert d['approved'] is True
+          assert d['format'] == 'PNG_RGBA'
+          assert d['transparentBackground'] is True
+          assert d['colorMask']['contract'] == 'CH_COLOR_MASK_V1'
+          assert d['colorMask']['channels'] == {'R': 'wall', 'G': 'roof'}
+          for key in ('sourceWorkflowRun','sourceArtifactId','sourceArtifactName','sourceDir','destination','assetId','fileStem','displayName','approvedProxySha256','sourceCommit'):
+              assert d.get(key), key
+          destination = Path(d['destination'])
+          if not destination.as_posix().startswith('assets/buildings/'):
+              raise SystemExit('destination must be under assets/buildings/')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              for key, value in {
+                  'run_id': d['sourceWorkflowRun'],
+                  'artifact_id': d['sourceArtifactId'],
+                  'artifact_name': d['sourceArtifactName'],
+                  'source_dir': d['sourceDir'],
+                  'destination': d['destination'],
+                  'asset_id': d['assetId'],
+                  'file_stem': d['fileStem'],
+                  'display_name': d['displayName'],
+              }.items():
+                  f.write(f'{key}={value}\n')
+          PY
+
+      - name: Download approved final artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_building_promotion/source
+
+      - name: Canonical post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_building_promotion/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_building_promotion/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE" \
+            --output out/runtime_building_promotion/final \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+      - name: Validate and stage runtime building
+        shell: bash
+        env:
+          PROMOTION_PATH: ${{ steps.promotion_path.outputs.path }}
+          ASSET_ID: ${{ steps.promotion.outputs.asset_id }}
+          FILE_STEM: ${{ steps.promotion.outputs.file_stem }}
+          DISPLAY_NAME: ${{ steps.promotion.outputs.display_name }}
+          DESTINATION: ${{ steps.promotion.outputs.destination }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json, os, shutil
+
+          src = Path('out/runtime_building_promotion/final')
+          dst = Path(os.environ['DESTINATION'])
+          dst.mkdir(parents=True, exist_ok=True)
+          asset_id = os.environ['ASSET_ID']
+          stem = os.environ['FILE_STEM']
+          directions = ('south', 'east', 'west', 'north')
+          promotion = json.loads(Path(os.environ['PROMOTION_PATH']).read_text(encoding='utf-8'))
+          baked = json.loads((src / f'{asset_id}_manifest.json').read_text(encoding='utf-8'))
+          frame_size = tuple(map(int, baked['finalFrameResolution']))
+          views = {}
+          masks = {}
+
+          def validate_rgba(path, expected_size):
+              im = Image.open(path)
+              if im.mode != 'RGBA':
+                  raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
+              if im.size != expected_size:
+                  raise SystemExit(f'{path}: expected {expected_size}, got {im.size}')
+              alpha = im.getchannel('A')
+              lo, hi = alpha.getextrema()
+              if hi == 0:
+                  raise SystemExit(f'{path}: empty alpha')
+              return im
+
+          for index, direction in enumerate(directions):
+              color_src = src / f'{asset_id}_{direction}.png'
+              mask_src = src / f'{asset_id}_{direction}_mask.png'
+              validate_rgba(color_src, frame_size)
+              mask_im = validate_rgba(mask_src, frame_size)
+
+              color_dst = dst / f'{stem}_{direction}.png'
+              mask_dst = dst / f'{stem}_{direction}_mask.png'
+              shutil.copy2(color_src, color_dst)
+              shutil.copy2(mask_src, mask_dst)
+
+              # CH_COLOR_MASK_V1 for this building intentionally uses only R/G.
+              r, g, b, a = mask_im.split()
+              if b.getbbox() is not None:
+                  if b.getextrema()[1] != 0:
+                      raise SystemExit(f'{mask_src}: blue channel must be unused')
+              rp = sum(1 for v in r.getdata() if v > 127)
+              gp = sum(1 for v in g.getdata() if v > 127)
+              ap = sum(1 for v in a.getdata() if v > 0)
+              if rp == 0 or gp == 0:
+                  raise SystemExit(f'{mask_src}: expected both wall and roof pixels')
+
+              pivot = baked['views'][index]['pivot']
+              views[direction] = {
+                  'file': color_dst.name,
+                  'pivot': pivot,
+                  'sha256': hashlib.sha256(color_dst.read_bytes()).hexdigest(),
+              }
+              masks[direction] = {
+                  'file': mask_dst.name,
+                  'sha256': hashlib.sha256(mask_dst.read_bytes()).hexdigest(),
+                  'wallPixels': rp,
+                  'roofPixels': gp,
+                  'coveredPixels': ap,
+              }
+
+          sheet_src = src / f'{asset_id}_4view.png'
+          sheet_dst = dst / f'{stem}_4view.png'
+          shutil.copy2(sheet_src, sheet_dst)
+          mask4_src = src / f'{asset_id}_mask_4view.png'
+          mask4_dst = dst / f'{stem}_mask_4view.png'
+          shutil.copy2(mask4_src, mask4_dst)
+          mask_review_src = src / f'{asset_id}_mask_review.png'
+          mask_review_dst = dst / f'{stem}_mask_review.png'
+          shutil.copy2(mask_review_src, mask_review_dst)
+
+          runtime_manifest = {
+              'contract': 'CH_RUNTIME_BUILDING_V1',
+              'assetId': asset_id,
+              'displayName': os.environ['DISPLAY_NAME'],
+              'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'studioPreset': 'CH_TYCOON_STUDIO_V1',
+              'format': 'PNG_RGBA',
+              'frameSize': list(frame_size),
+              'transparentBackground': True,
+              'directionOrder': list(directions),
+              'pivotPolicy': 'projected world origin fixed across directions',
+              'footprint': baked['footprint'],
+              'views': views,
+              'spriteSheet': sheet_dst.name,
+              'sourceCommit': promotion['sourceCommit'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'postProcess': 'CH_TYCOON_STUDIO_V1 canonical postprocess',
+              'approvedForRuntime': True,
+              'colorMask': {
+                  'contract': 'CH_COLOR_MASK_V1',
+                  'enabled': True,
+                  'channels': {'R': 'wall', 'G': 'roof'},
+                  'blueChannel': 'unused',
+                  'alpha': 'coverage',
+                  'scope': 'wall_and_roof_only',
+                  'views': masks,
+                  'fourView': {
+                      'file': mask4_dst.name,
+                      'sha256': hashlib.sha256(mask4_dst.read_bytes()).hexdigest(),
+                  },
+                  'review': {
+                      'file': mask_review_dst.name,
+                      'sha256': hashlib.sha256(mask_review_dst.read_bytes()).hexdigest(),
+                  },
+                  'postProcess': 'CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal',
+                  'runtimeTintingImplemented': False,
+              },
+          }
+          (dst / f'{stem}.json').write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(runtime_manifest, indent=2))
+          PY
+
+      - name: Commit promoted building
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.promotion.outputs.destination }}"
+          if git diff --cached --quiet; then
+            echo "Runtime building already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote approved ${{ steps.promotion.outputs.asset_id }} to runtime"
+          git push origin HEAD:main
