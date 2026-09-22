@@ -28,6 +28,7 @@ if str(CH_BLENDER) not in sys.path:
 
 import build_scene as bs  # noqa: E402
 import build_ferris_wheel as fw  # noqa: E402
+import ferris_wheel_detail_pass as detail_pass  # noqa: E402
 import scene_gate  # noqa: E402
 
 
@@ -104,6 +105,14 @@ def build_for_gate(args):
 
     fw.build_supports(root, recipe["geometry"], mats)
     rotor, gondolas = fw.build_wheel(root, recipe["geometry"], mats)
+    detail_pass.apply_detail_pass(
+        root,
+        rotor,
+        gondolas,
+        recipe["geometry"],
+        mats,
+        fw,
+    )
     fw.animate(rotor, gondolas, recipe["animation"])
 
     receiver = studio["shadowReceiver"]
