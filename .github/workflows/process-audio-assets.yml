@@ -1,0 +1,66 @@
+name: Process Audio Assets
+
+on:
+  push:
+    paths:
+      - 'Converter/*.mp3'
+      - 'tools/audio_asset_worker.py'
+      - 'tools/audio_jobs/*.json'
+      - '.github/workflows/process-audio-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  process:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Process UI mouse click
+        run: |
+          python tools/audio_asset_worker.py tools/audio_jobs/ui_mouse_click.json
+
+      - name: Validate OGG and catalog
+        run: |
+          test -f assets/audio/ui/mouse_click_002.ogg
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 assets/audio/ui/mouse_click_002.ogg
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          catalog = json.loads(Path('assets/audio/audio_catalog.json').read_text(encoding='utf-8'))
+          expected = 'ui/mouse_click_002.ogg'
+          if expected not in catalog['events']['UiClick']:
+              raise SystemExit('UiClick catalog entry missing converted mouse click')
+          print('PASS UiClick catalog contains', expected)
+          PY
+
+      - name: Commit converted runtime audio
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/audio/ui/mouse_click_002.ogg assets/audio/audio_catalog.json
+          if git diff --cached --quiet; then
+            echo "Runtime audio already up to date."
+            exit 0
+          fi
+          git commit -m "audio: integrate UI mouse click effect"
+          git pull --rebase origin main
+          git push origin HEAD:main
