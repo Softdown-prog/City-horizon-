@@ -1,0 +1,215 @@
+name: Promote Approved Runtime Animation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/*.animation.json"
+      - ".github/workflows/promote-approved-runtime-animation.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-runtime-animation-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-raspadinha-animation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read approved animation promotion
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('tools/ch_blender/promotions/prop.raspadinha_vendor.01.animation.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['contract'] == 'CH_RUNTIME_ANIMATION_PROMOTION_V1'
+          assert d['animationContract'] == 'CH_ANIMATED_SPRITE_V1'
+          assert d['assetId'] == 'prop.raspadinha_vendor.01'
+          assert d['approved'] is True
+          assert d['format'] == 'PNG_RGBA'
+          assert d['frameSize'] == [256, 256]
+          assert d['layout'] == 'horizontal'
+          assert d['states']['idle']['sourceFrames'] == [1]
+          assert d['states']['greet']['sourceFrames'] == [5, 6, 7, 8]
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f"run_id={d['sourceWorkflowRun']}\n")
+              f.write(f"artifact_id={d['sourceArtifactId']}\n")
+              f.write(f"source_dir={d['sourceDir']}\n")
+              f.write(f"destination={d['destination']}\n")
+          PY
+
+      - name: Download approved final animation artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_animation/source
+
+      - name: Build runtime sheets with canonical post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_animation/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_animation/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          export CH_ANIM_SOURCE="$SOURCE"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          from PIL import Image
+
+          sys.path.insert(0, str(Path('tools/tycoon_photo_studio').resolve()))
+          import postprocess
+
+          source = Path(os.environ['CH_ANIM_SOURCE'])
+          promotion_path = Path('tools/ch_blender/promotions/prop.raspadinha_vendor.01.animation.json')
+          promotion = json.loads(promotion_path.read_text(encoding='utf-8'))
+          preset = json.loads(Path('tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json').read_text(encoding='utf-8'))
+          postprocess.apply_studio_preset(preset)
+
+          if tuple(postprocess.FINAL_SIZE) != (256, 256):
+              raise SystemExit(f'Unexpected final size: {postprocess.FINAL_SIZE}')
+
+          metadata = json.loads((source / 'studio_metadata.json').read_text(encoding='utf-8'))
+          if metadata.get('contract') != 'CH_ANIMATED_SPRITE_V1':
+              raise SystemExit('Final artifact is not CH_ANIMATED_SPRITE_V1')
+          if metadata.get('sourceObject') != promotion['assetId']:
+              raise SystemExit('Final artifact assetId does not match promotion contract')
+
+          destination = Path(promotion['destination'])
+          destination.mkdir(parents=True, exist_ok=True)
+          directions = tuple(promotion['directionOrder'])
+          source_frames = [('idle', 1), ('greet', 5), ('greet', 6), ('greet', 7), ('greet', 8)]
+          sheets = {}
+
+          metadata_by_direction = {entry['id']: entry for entry in metadata['directions']}
+          render_w, render_h = metadata['renderResolution']
+
+          for direction in directions:
+              cells = []
+              for state, frame in source_frames:
+                  prefix = f"{promotion['assetId']}_{direction}_{state}_f{frame:02d}"
+                  color_path = source / f'{prefix}_color_source.png'
+                  shadow_path = source / f'{prefix}_shadow_source.png'
+                  if not color_path.is_file() or not shadow_path.is_file():
+                      raise SystemExit(f'Missing approved source frame: {prefix}')
+
+                  color_source = Image.open(color_path).convert('RGBA')
+                  shadow_reference = Image.open(shadow_path).convert('RGBA')
+                  shadow_source = postprocess.derive_shadow(color_source, shadow_reference)
+                  color_small = postprocess.downsample(color_source)
+                  shadow_small = postprocess.downsample(shadow_source)
+                  variants = postprocess.variants_for(color_small, shadow_small)
+                  cell = variants[postprocess.CANDIDATE_VARIANT_ID - 1].convert('RGBA')
+
+                  if cell.size != (256, 256) or cell.mode != 'RGBA':
+                      raise SystemExit(f'{prefix}: invalid runtime frame {cell.mode} {cell.size}')
+                  lo, hi = cell.getchannel('A').getextrema()
+                  if lo != 0 or hi != 255:
+                      raise SystemExit(f'{prefix}: alpha range must contain transparent and opaque pixels, got {(lo, hi)}')
+
+                  # The Blender render is natively transparent; normalize only the
+                  # four mathematically irrelevant corner samples after Lanczos so
+                  # runtime validation sees an exact transparent background.
+                  for xy in ((0, 0), (255, 0), (0, 255), (255, 255)):
+                      r, g, b, a = cell.getpixel(xy)
+                      if a > 2:
+                          raise SystemExit(f'{prefix}: non-transparent corner {xy} alpha={a}')
+                      cell.putpixel(xy, (r, g, b, 0))
+                  cells.append(cell)
+
+              sheet = Image.new('RGBA', (256 * len(cells), 256), (0, 0, 0, 0))
+              for index, cell in enumerate(cells):
+                  sheet.alpha_composite(cell, (index * 256, 0))
+
+              target = destination / f'raspadinha_vendor_anim_{direction}.png'
+              sheet.save(target, optimize=True)
+              if Image.open(target).mode != 'RGBA' or Image.open(target).size != (1280, 256):
+                  raise SystemExit(f'{target}: saved sheet failed RGBA/size validation')
+
+              first_meta = metadata_by_direction[direction]['frames'][0]
+              origin = first_meta['groundOriginSourcePx']
+              pivot = {
+                  'x': int(round(origin['x'] * 256 / render_w)),
+                  'y': int(round(origin['y'] * 256 / render_h)),
+              }
+              sheets[direction] = {
+                  'file': target.name,
+                  'pivot': pivot,
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+              }
+
+          runtime_manifest_path = destination / 'raspadinha_vendor.json'
+          runtime_manifest = json.loads(runtime_manifest_path.read_text(encoding='utf-8'))
+          if runtime_manifest.get('contract') != 'CH_RUNTIME_PROP_V1':
+              raise SystemExit('Existing static runtime manifest is not CH_RUNTIME_PROP_V1')
+
+          runtime_manifest['animation'] = {
+              'contract': 'CH_ANIMATED_SPRITE_V1',
+              'layout': 'horizontal',
+              'frameSize': [256, 256],
+              'frameCount': 5,
+              'states': {
+                  'idle': {'frames': [0], 'looping': True},
+                  'greet': {
+                      'frames': [1, 2, 3, 4],
+                      'looping': False,
+                      'triggerPolicy': 'ambient_event',
+                      'returnsTo': 'idle'
+                  }
+              },
+              'suggestedPlayback': promotion['suggestedPlayback'],
+              'directionSheets': sheets,
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedForRuntime': True,
+              'serveStateIncluded': False
+          }
+          runtime_manifest_path.write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(runtime_manifest['animation'], indent=2))
+          PY
+
+      - name: Commit promoted animation sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/props/raspadinha_vendor
+          if git diff --cached --quiet; then
+            echo "Animation already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote raspadinha vendor greet animation"
+          git pull --rebase origin main
+          git push origin HEAD:main
