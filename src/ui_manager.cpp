@@ -309,7 +309,7 @@ std::string ui_overlay_path(const UiOverlay overlay) {
     switch (overlay) {
         case UiOverlay::administration: return (root / "assets" / "ui" / "panels" / "administration_panel.png").string();
         case UiOverlay::reports: return (root / "assets" / "ui" / "panels" / "reports_panel.png").string();
-        case UiOverlay::settings: return (root / "assets" / "ui" / "panels" / "settings_panel.png").string();
+        case UiOverlay::settings:
         case UiOverlay::pause:
         case UiOverlay::none: break;
     }
@@ -543,6 +543,19 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         pause_button(3, "CONFIGURACOES", UiAction::none, false);
         pause_button(4, "MENU PRINCIPAL", UiAction::none, false);
         pause_button(5, "SAIR DO JOGO", UiAction::none, false);
+    } else if (model.overlay == UiOverlay::settings) {
+        const float panel_width = std::min(620.0F, std::max(360.0F, width - 48.0F));
+        const float panel_height = std::min(470.0F, std::max(390.0F, height - 64.0F));
+        const UiRect panel = {(width - panel_width) * 0.5F, (height - panel_height) * 0.5F, panel_width, panel_height};
+        overlay_bounds_ = panel;
+        const float horizontal_padding = std::clamp(panel.width * 0.06F, 22.0F, 36.0F);
+        const float button_gap = 12.0F;
+        const float button_y = panel.y + panel.height - 72.0F;
+        const float available = panel.width - horizontal_padding * 2.0F - button_gap * 2.0F;
+        const float button_width = available / 3.0F;
+        add_button({panel.x + horizontal_padding, button_y, button_width, 42.0F}, "PADRAO", UiAction::settings_reset);
+        add_button({panel.x + horizontal_padding + button_width + button_gap, button_y, button_width, 42.0F}, "CANCELAR", UiAction::settings_cancel);
+        add_button({panel.x + horizontal_padding + (button_width + button_gap) * 2.0F, button_y, button_width, 42.0F}, "APLICAR", UiAction::settings_apply);
     } else if (model.overlay != UiOverlay::none) {
         const float scale = std::min(width * 0.94F / 1280.0F, height * 0.90F / 960.0F);
         const UiRect panel = {(width - 1280.0F * scale) * 0.5F, (height - 960.0F * scale) * 0.5F, 1280.0F * scale, 960.0F * scale};
@@ -553,11 +566,6 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         add_button(source_rect(1160.0F, 88.0F, 78.0F, 78.0F), "X", UiAction::close_modal);
         if (model.overlay == UiOverlay::administration) add_button(source_rect(926.0F, 820.0F, 286.0F, 72.0F), "RELATORIOS", UiAction::open_reports);
         if (model.overlay == UiOverlay::reports) add_button(source_rect(1010.0F, 876.0F, 216.0F, 64.0F), "VOLTAR", UiAction::open_administration);
-        if (model.overlay == UiOverlay::settings) {
-            add_button(source_rect(132.0F, 848.0F, 320.0F, 70.0F), "PADRAO", UiAction::settings_reset);
-            add_button(source_rect(524.0F, 848.0F, 250.0F, 70.0F), "CANCELAR", UiAction::settings_cancel);
-            add_button(source_rect(830.0F, 848.0F, 290.0F, 70.0F), "APLICAR", UiAction::settings_apply);
-        }
     }
 
     handle_mouse_motion(mouse_x_, mouse_y_);
@@ -790,6 +798,42 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             return;
         }
 
+        if (model_.overlay == UiOverlay::settings) {
+            draw_pause_panel(renderer, panel);
+            draw_text_centered(renderer, panel, panel.y + 36.0F, "CONFIGURACOES", 238, 246, 249);
+            draw_text_centered(renderer, panel, panel.y + 66.0F, "AUDIO", 158, 186, 199);
+            draw_text_centered(renderer, panel, panel.y + 86.0F, "VALORES ATUAIS DO JOGO", 118, 151, 166);
+
+            const float meter_x = panel.x + std::clamp(panel.width * 0.10F, 28.0F, 54.0F);
+            const float meter_width = panel.width - (meter_x - panel.x) * 2.0F;
+            const auto draw_meter = [&](const float y, const char* label, int percent) {
+                percent = std::clamp(percent, 0, 100);
+                draw_text(renderer, meter_x, y, label, 219, 232, 238);
+                draw_text_fit(renderer, meter_x + meter_width - 48.0F, y, 48.0F, std::to_string(percent) + "%", 238, 246, 249);
+                const SDL_FRect track = {meter_x, y + 25.0F, meter_width, 16.0F};
+                SDL_SetRenderDrawColor(renderer, 25, 48, 61, SDL_ALPHA_OPAQUE);
+                SDL_RenderFillRect(renderer, &track);
+                SDL_SetRenderDrawColor(renderer, 64, 91, 104, SDL_ALPHA_OPAQUE);
+                SDL_RenderRect(renderer, &track);
+                const float fill_width = (meter_width - 4.0F) * static_cast<float>(percent) / 100.0F;
+                const SDL_FRect fill = {meter_x + 2.0F, y + 27.0F, fill_width, 12.0F};
+                SDL_SetRenderDrawColor(renderer, 91, 188, 211, SDL_ALPHA_OPAQUE);
+                SDL_RenderFillRect(renderer, &fill);
+            };
+            draw_meter(panel.y + 132.0F, "VOLUME GERAL", model_.master_volume_percent);
+            draw_meter(panel.y + 210.0F, "EFEITOS", model_.effects_volume_percent);
+            draw_text_centered(renderer, panel, panel.y + 286.0F, "CONTROLES INTERATIVOS ENTRAM NA PROXIMA ETAPA", 118, 151, 166);
+
+            for (const UiButton& button : buttons_) {
+                if (button.action == UiAction::settings_reset || button.action == UiAction::settings_cancel ||
+                    button.action == UiAction::settings_apply) {
+                    draw_pause_button(renderer, button);
+                }
+            }
+            draw_text_centered(renderer, panel, panel.y + panel.height - 22.0F, "ESC  -  FECHAR", 158, 186, 199);
+            return;
+        }
+
         const SDL_FRect destination = {panel.x, panel.y, panel.width, panel.height};
         if (const UiThumbnail* artwork = thumbnail_for(renderer, ui_overlay_path(model_.overlay))) SDL_RenderTexture(renderer, artwork->texture, nullptr, &destination);
         else { draw_panel(renderer, panel); draw_text(renderer, panel.x + 24.0F, panel.y + 24.0F, "UI ARTWORK NOT FOUND", 255, 160, 130); }
@@ -805,9 +849,6 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             text_at(900.0F, 340.0F, model_.population + " / " + model_.residential_capacity);
             text_at(92.0F, 650.0F, model_.power_demand + " / " + model_.power_capacity);
             text_at(330.0F, 852.0F, model_.administration_alerts, 188, 215, 228);
-        } else {
-            text_at(1080.0F, 316.0F, std::to_string(model_.master_volume_percent) + "%");
-            text_at(1080.0F, 351.0F, std::to_string(model_.effects_volume_percent) + "%");
         }
     }
 }
