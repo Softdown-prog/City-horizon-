@@ -1,0 +1,9 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "test.color_mask.v1.001",
+  "operation": "canonical_bake",
+  "assetConfig": "tools/tycoon_photo_studio/assets/tests/color_mask_smoke.asset.json",
+  "studioPreset": "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+  "postprocess": true,
+  "outputDir": "out/ch_blender_agent/test.color_mask.v1.001"
+}
