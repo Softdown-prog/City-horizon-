@@ -253,10 +253,27 @@ template <typename Number>
     }
     if (const auto anim = json_object(json, "animation")) {
         const int frame_count = json_number<int>(*anim, "frameCount").value_or(1);
-        const int frame_duration_ms = json_number<int>(*anim, "frameDurationMs").value_or(120);
-        const std::string layout = json_string(*anim, "layout").value_or("horizontal");
         if (frame_count > 1) {
-            definition.animation = {frame_count, frame_duration_ms, layout};
+            BuildingAnimationDefinition parsed_animation;
+            parsed_animation.frame_count = frame_count;
+            parsed_animation.frame_duration_ms =
+                std::max(1, json_number<int>(*anim, "frameDurationMs").value_or(120));
+            parsed_animation.layout = json_string(*anim, "layout").value_or("horizontal");
+            parsed_animation.playback = json_string(*anim, "playback").value_or("loop");
+            if (parsed_animation.playback != "loop" && parsed_animation.playback != "ambient_once") {
+                return std::nullopt;
+            }
+            parsed_animation.idle_frame = std::clamp(
+                json_number<int>(*anim, "idleFrame").value_or(0), 0, frame_count - 1);
+            parsed_animation.action_start_frame = std::clamp(
+                json_number<int>(*anim, "actionStartFrame").value_or(1), 0, frame_count - 1);
+            const int available_action_frames = frame_count - parsed_animation.action_start_frame;
+            parsed_animation.action_frame_count = std::clamp(
+                json_number<int>(*anim, "actionFrameCount").value_or(available_action_frames),
+                0, available_action_frames);
+            parsed_animation.idle_hold_ms =
+                std::max(0, json_number<int>(*anim, "idleHoldMs").value_or(0));
+            definition.animation = parsed_animation;
         }
     }
     definition.sprite_anchor_x.fill(definition.anchor_x);

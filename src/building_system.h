@@ -76,6 +76,14 @@ struct BuildingAnimationDefinition {
     int frame_count = 1;
     int frame_duration_ms = 120;
     std::string layout = "horizontal";
+    // "loop" preserves the legacy continuous animation contract.
+    // "ambient_once" holds an idle frame, plays one action sequence, then
+    // returns to idle before the next deterministic ambient cycle.
+    std::string playback = "loop";
+    int idle_frame = 0;
+    int action_start_frame = 1;
+    int action_frame_count = 0;
+    int idle_hold_ms = 0;
 };
 
 struct BuildingDefinition {

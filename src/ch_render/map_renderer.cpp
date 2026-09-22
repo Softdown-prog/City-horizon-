@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
 
@@ -505,9 +506,42 @@ void MapRenderer::render_building(SDL_Renderer* renderer, const BuildingDefiniti
     SDL_SetTextureColorMod(texture, red, green, blue);
 
     if (definition.animation.has_value() && definition.animation->frame_count > 1) {
-        const int frame_count = std::max(1, definition.animation->frame_count);
-        const int duration_ms = std::max(1, definition.animation->frame_duration_ms);
-        const int frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
+        const BuildingAnimationDefinition& animation = *definition.animation;
+        const int frame_count = std::max(1, animation.frame_count);
+        const int duration_ms = std::max(1, animation.frame_duration_ms);
+        int frame_index = 0;
+
+        if (animation.playback == "ambient_once") {
+            const int idle_frame = std::clamp(animation.idle_frame, 0, frame_count - 1);
+            const int action_start = std::clamp(animation.action_start_frame, 0, frame_count - 1);
+            const int action_count = std::clamp(animation.action_frame_count, 0, frame_count - action_start);
+            frame_index = idle_frame;
+
+            if (action_count > 0) {
+                const std::uint64_t idle_hold_ms = static_cast<std::uint64_t>(std::max(0, animation.idle_hold_ms));
+                const std::uint64_t action_duration_ms =
+                    static_cast<std::uint64_t>(action_count) * static_cast<std::uint64_t>(duration_ms);
+                const std::uint64_t cycle_duration_ms = idle_hold_ms + action_duration_ms;
+                // Stable per-instance staggering avoids a row of vendors waving
+                // in perfect synchrony while remaining deterministic across runs.
+                const std::uint64_t instance_offset_ms = instance.instance_id * 977ULL;
+                const std::uint64_t phase_ms = cycle_duration_ms > 0
+                    ? (static_cast<std::uint64_t>(SDL_GetTicks()) + instance_offset_ms) % cycle_duration_ms
+                    : 0;
+                if (phase_ms >= idle_hold_ms && action_duration_ms > 0) {
+                    const std::uint64_t action_elapsed_ms = phase_ms - idle_hold_ms;
+                    const int action_index = std::min(
+                        action_count - 1,
+                        static_cast<int>(action_elapsed_ms / static_cast<std::uint64_t>(duration_ms)));
+                    frame_index = action_start + action_index;
+                }
+            }
+        } else {
+            // Legacy behaviour: every multi-frame building keeps looping exactly
+            // as before unless its data explicitly opts into ambient_once.
+            frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
+        }
+
         const float frame_w = source_width / static_cast<float>(frame_count);
         const float frame_h = source_height;
         const SDL_FRect src_rect = { frame_index * frame_w, 0.0F, frame_w, frame_h };
