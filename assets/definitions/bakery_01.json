@@ -62,5 +62,7 @@
   "serviceName": "Pães e doces",
   "defaultServicePrice": 3,
   "minimumServicePrice": 1,
-  "maximumServicePrice": 20
+  "maximumServicePrice": 20,
+  "baseServiceCustomersPerMonth": 120,
+  "servicePopulationForFullDemand": 60
 }

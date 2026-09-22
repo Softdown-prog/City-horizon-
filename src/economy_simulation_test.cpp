@@ -44,10 +44,41 @@ int main(int argc, char** argv) {
     }
     const BuildingDefinition* cafe = catalog.find("cafe_01");
     const BuildingDefinition* house = catalog.find("house_suburban_01");
+    const BuildingDefinition* bakery = catalog.find("bakery_01");
     if (!require(cafe != nullptr, "cafe definition exists") || !require(house != nullptr, "house definition exists") ||
+        !require(bakery != nullptr, "bakery definition exists") ||
         !require(cafe->build_cost == 2'500 && cafe->maintenance_per_month == 80 && cafe->tax_revenue_per_month == 220 &&
                      cafe->required_population_for_full_revenue == 20,
-                 "cafe economics come from JSON")) {
+                 "cafe economics come from JSON") ||
+        !require(bakery->build_cost == 2'500 && bakery->default_service_price == 3 &&
+                     bakery->base_service_customers_per_month == 120 &&
+                     bakery->service_population_for_full_demand == 60,
+                 "bakery pricing economy comes from JSON")) {
+        return 1;
+    }
+
+    BuildingInstance bakery_instance;
+    bakery_instance.definition_id = bakery->id;
+    bakery_instance.service_price = 3;
+    const ServicePricingEstimate bakery_default = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 60);
+    bakery_instance.service_price = 2;
+    const ServicePricingEstimate bakery_discount = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 60);
+    bakery_instance.service_price = 5;
+    const ServicePricingEstimate bakery_expensive = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 60);
+    bakery_instance.service_price = 3;
+    const ServicePricingEstimate bakery_half_population = CityEconomy::service_pricing_estimate(*bakery, bakery_instance, 30);
+    if (!require(bakery_default.price_demand_percent == 100 && bakery_default.customers_per_month == 120 &&
+                     bakery_default.revenue_per_month == 360,
+                 "bakery default price produces reference demand and revenue") ||
+        !require(bakery_discount.price_demand_percent == 120 && bakery_discount.customers_per_month == 144 &&
+                     bakery_discount.revenue_per_month == 288,
+                 "bakery discount increases customers but lowers total sales revenue") ||
+        !require(bakery_expensive.price_demand_percent == 36 && bakery_expensive.customers_per_month == 43 &&
+                     bakery_expensive.revenue_per_month == 215,
+                 "bakery high price reduces demand and revenue") ||
+        !require(bakery_half_population.population_demand_percent == 50 &&
+                     bakery_half_population.customers_per_month == 60 && bakery_half_population.revenue_per_month == 180,
+                 "bakery customer volume is limited by local population")) {
         return 1;
     }
 

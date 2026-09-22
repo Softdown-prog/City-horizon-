@@ -67,9 +67,9 @@ int CityEconomy::last_property_tax_year() const {
 
 namespace {
 
-[[nodiscard]] std::int64_t monthly_revenue_for(const BuildingDefinition& definition,
-                                                const BuildingLevelDefinition& level_def,
-                                                const PopulationSystem& population) {
+[[nodiscard]] std::int64_t monthly_tax_revenue_for(const BuildingDefinition& definition,
+                                                    const BuildingLevelDefinition& level_def,
+                                                    const PopulationSystem& population) {
     return level_def.tax_revenue_per_month *
         static_cast<std::int64_t>(CityEconomy::commercial_demand_percent(definition, population.current_population())) / 100;
 }
@@ -92,6 +92,49 @@ std::uint32_t CityEconomy::commercial_demand_percent(const BuildingDefinition& d
     return std::max(kMinimumDemandPercent, static_cast<std::uint32_t>(std::min<std::uint64_t>(100U, population_percent)));
 }
 
+std::uint32_t CityEconomy::service_price_demand_percent(const BuildingDefinition& definition,
+                                                         const std::int64_t service_price) {
+    if (definition.default_service_price <= 0 || service_price <= 0) return 0;
+    const std::int64_t price = std::clamp(service_price, definition.minimum_service_price,
+                                          definition.maximum_service_price);
+    const std::int64_t reference = definition.default_service_price;
+    if (price <= reference) {
+        const std::int64_t bonus = (reference - price) * 20;
+        return static_cast<std::uint32_t>(std::clamp<std::int64_t>(100 + bonus, 0, 160));
+    }
+
+    // Above the reference price demand follows an inverse-square curve. This makes
+    // extreme prices visibly unattractive instead of becoming a revenue exploit.
+    const std::uint64_t numerator = static_cast<std::uint64_t>(reference) *
+                                    static_cast<std::uint64_t>(reference) * 100U;
+    const std::uint64_t denominator = static_cast<std::uint64_t>(price) *
+                                      static_cast<std::uint64_t>(price);
+    return std::max<std::uint32_t>(5U, static_cast<std::uint32_t>(numerator / denominator));
+}
+
+ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefinition& definition,
+                                                              const BuildingInstance& instance,
+                                                              const std::uint32_t current_population) {
+    ServicePricingEstimate estimate;
+    if (definition.default_service_price <= 0 || definition.base_service_customers_per_month == 0 ||
+        definition.service_population_for_full_demand == 0) {
+        return estimate;
+    }
+
+    const std::int64_t price = std::clamp(
+        instance.service_price > 0 ? instance.service_price : definition.default_service_price,
+        definition.minimum_service_price, definition.maximum_service_price);
+    estimate.price_demand_percent = service_price_demand_percent(definition, price);
+    estimate.population_demand_percent = static_cast<std::uint32_t>(std::min<std::uint64_t>(
+        100U, static_cast<std::uint64_t>(current_population) * 100U /
+                  definition.service_population_for_full_demand));
+    const std::uint64_t customers = static_cast<std::uint64_t>(definition.base_service_customers_per_month) *
+                                    estimate.price_demand_percent * estimate.population_demand_percent / 10'000U;
+    estimate.customers_per_month = static_cast<std::uint32_t>(customers);
+    estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
+    return estimate;
+}
+
 void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                           const PopulationSystem& population) {
     monthly_summary_ = {};
@@ -101,7 +144,8 @@ void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, cons
             continue;
         }
         const auto& level_def = instance.current_level_definition(*definition);
-        monthly_summary_.revenue += monthly_revenue_for(*definition, level_def, population);
+        monthly_summary_.revenue += monthly_tax_revenue_for(*definition, level_def, population);
+        monthly_summary_.revenue += service_pricing_estimate(*definition, instance, population.current_population()).revenue_per_month;
         monthly_summary_.expenses += monthly_expense_for(level_def);
     }
     monthly_summary_.balance = monthly_summary_.revenue - monthly_summary_.expenses;
@@ -117,12 +161,16 @@ void CityEconomy::on_month_closed(const BuildingManager& buildings, const Buildi
             continue;
         }
         const auto& level_def = instance.current_level_definition(*definition);
-        const std::int64_t revenue = monthly_revenue_for(*definition, level_def, population);
-        monthly_summary_.revenue += revenue;
+        const std::int64_t tax_revenue = monthly_tax_revenue_for(*definition, level_def, population);
+        const ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
+        monthly_summary_.revenue += tax_revenue + service.revenue_per_month;
         const std::int64_t expense = monthly_expense_for(level_def);
         monthly_summary_.expenses += expense;
-        if (revenue != 0) {
-            record(EconomyTransactionType::tax_revenue, revenue, closing_date, instance.instance_id);
+        if (tax_revenue != 0) {
+            record(EconomyTransactionType::tax_revenue, tax_revenue, closing_date, instance.instance_id);
+        }
+        if (service.revenue_per_month != 0) {
+            record(EconomyTransactionType::service_revenue, service.revenue_per_month, closing_date, instance.instance_id);
         }
         if (expense != 0) {
             record(EconomyTransactionType::maintenance, -expense, closing_date, instance.instance_id);
@@ -181,6 +229,7 @@ const char* economy_transaction_label(const EconomyTransactionType type) {
         case EconomyTransactionType::building_construction: return "BUILD";
         case EconomyTransactionType::land_purchase: return "LAND PURCHASE";
         case EconomyTransactionType::tax_revenue: return "TAX";
+        case EconomyTransactionType::service_revenue: return "SERVICE SALES";
         case EconomyTransactionType::property_tax: return "IPTU";
         case EconomyTransactionType::maintenance: return "MAINTENANCE";
         case EconomyTransactionType::agricultural_sale: return "AGRICULTURAL SALE";

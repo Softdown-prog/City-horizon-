@@ -718,7 +718,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         };
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();
-        const float service_height = item.has_service_pricing ? 82.0F : 0.0F;
+        const float service_height = item.has_service_pricing ? 158.0F : 0.0F;
         const float color_height = item.has_color_customization ? 122.0F : 0.0F;
         const float required_height = 126.0F + service_height + color_height + static_cast<float>(detail_lines) * 17.0F;
         const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);
@@ -1112,8 +1112,12 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             draw_text_fit(renderer, panel_x + 78.0F, 214.0F, 238.0F, "PRECO AO CLIENTE", 164, 193, 205);
             draw_text_centered_fit(renderer, {panel_x + 232.0F, 227.0F, 46.0F, 24.0F}, 235.0F, item.service_price,
                                    238, 246, 249);
-            draw_text_fit(renderer, panel_x + 78.0F, 254.0F, 238.0F, item.service_price_range, 118, 151, 166);
-            detail_y = 281.0F;
+            draw_text_fit(renderer, panel_x + 78.0F, 258.0F, 238.0F, item.service_price_range, 118, 151, 166);
+            draw_text_fit(renderer, panel_x + 78.0F, 278.0F, 238.0F, "DEMANDA PELO PRECO: " + item.service_price_demand, 202, 219, 227);
+            draw_text_fit(renderer, panel_x + 78.0F, 296.0F, 238.0F, "CLIENTES / MES: " + item.service_customers_per_month, 202, 219, 227);
+            draw_text_fit(renderer, panel_x + 78.0F, 314.0F, 238.0F, "RECEITA VENDAS: " + item.service_revenue_per_month, 181, 221, 154);
+            draw_text_fit(renderer, panel_x + 78.0F, 332.0F, 238.0F, "RESULTADO: " + item.service_net_per_month, 137, 226, 242);
+            detail_y = 357.0F;
         }
         const auto detail = [&](const std::string& label, const std::string& value) {
             if (value.empty()) return;

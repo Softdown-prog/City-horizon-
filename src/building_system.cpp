@@ -221,6 +221,10 @@ template <typename Number>
         definition.default_service_price > 0 ? 1 : 0);
     definition.maximum_service_price = json_number<std::int64_t>(json, "maximumServicePrice").value_or(
         definition.default_service_price);
+    definition.base_service_customers_per_month =
+        json_number<std::uint32_t>(json, "baseServiceCustomersPerMonth").value_or(0);
+    definition.service_population_for_full_demand =
+        json_number<std::uint32_t>(json, "servicePopulationForFullDemand").value_or(0);
     definition.residential_capacity = json_number<std::uint32_t>(json, "residentialCapacity").value_or(0);
     definition.power_consumption = json_number<std::uint32_t>(json, "powerConsumption").value_or(0);
     definition.power_production = json_number<std::uint32_t>(json, "powerProduction").value_or(0);
@@ -366,7 +370,9 @@ template <typename Number>
         definition.maximum_service_price < definition.minimum_service_price ||
         (definition.default_service_price > 0 &&
             (definition.service_name.empty() || definition.default_service_price < definition.minimum_service_price ||
-             definition.default_service_price > definition.maximum_service_price)) ||
+             definition.default_service_price > definition.maximum_service_price ||
+             definition.base_service_customers_per_month == 0 ||
+             definition.service_population_for_full_demand == 0)) ||
         definition.art_scale <= 0.0F) {
         return std::nullopt;
     }

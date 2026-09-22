@@ -2000,6 +2000,7 @@ int main() {
                 const std::int64_t delta = action.action == UiAction::increase_service_price ? 1 : -1;
                 if (buildings.set_service_price(instance->instance_id, *definition, instance->service_price + delta)) {
                     const BuildingInstance* updated = buildings.find_by_id(instance->instance_id);
+                    economy.rebuild_monthly_summary(buildings, catalog, population);
                     status = definition->name + ": PRECO AO CLIENTE " +
                         format_money(updated == nullptr ? instance->service_price : updated->service_price);
                     (void)audio.play(SoundEvent::ui_click);
@@ -2224,6 +2225,8 @@ int main() {
                     const bool has_commercial_demand = definition->required_population_for_full_revenue != 0;
                     const std::int64_t commercial_current_revenue = lvl_def.tax_revenue_per_month *
                         static_cast<std::int64_t>(commercial_demand_percent) / 100;
+                    const ServicePricingEstimate service_estimate = CityEconomy::service_pricing_estimate(
+                        *definition, *instance, population.current_population());
                     std::string local_supply;
                     if (!definition->resource_inputs.empty()) {
                         bool supplied = true; std::int64_t bonus = 0; std::string requirements;
@@ -2267,6 +2270,12 @@ int main() {
                         definition->default_service_price > 0
                             ? "MIN " + format_money(definition->minimum_service_price) +
                               "  |  MAX " + format_money(definition->maximum_service_price)
+                            : "",
+                        definition->default_service_price > 0 ? std::to_string(service_estimate.price_demand_percent) + "%" : "",
+                        definition->default_service_price > 0 ? std::to_string(service_estimate.customers_per_month) : "",
+                        definition->default_service_price > 0 ? format_money(service_estimate.revenue_per_month) + "/MES" : "",
+                        definition->default_service_price > 0
+                            ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
                             : "",
                         definition->default_service_price > 0,
                         definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,

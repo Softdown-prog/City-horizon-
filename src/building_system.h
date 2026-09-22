@@ -140,6 +140,10 @@ struct BuildingDefinition {
     std::int64_t default_service_price = 0;
     std::int64_t minimum_service_price = 0;
     std::int64_t maximum_service_price = 0;
+    // Customer traffic at the default price once the local population reaches
+    // service_population_for_full_demand. These values keep shop balancing data-driven.
+    std::uint32_t base_service_customers_per_month = 0;
+    std::uint32_t service_population_for_full_demand = 0;
     // Zero for non-residential definitions. Capacity is owned by the
     // PopulationSystem; it does not determine property-tax revenue.
     std::uint32_t residential_capacity = 0;

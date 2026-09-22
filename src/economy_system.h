@@ -16,6 +16,7 @@ enum class EconomyTransactionType : std::uint8_t {
     building_construction,
     land_purchase,
     tax_revenue,
+    service_revenue,
     property_tax,
     maintenance,
     agricultural_sale,
@@ -35,6 +36,13 @@ struct MonthlyEconomySummary {
     std::int64_t revenue = 0;
     std::int64_t expenses = 0;
     std::int64_t balance = 0;
+};
+
+struct ServicePricingEstimate {
+    std::uint32_t price_demand_percent = 0;
+    std::uint32_t population_demand_percent = 0;
+    std::uint32_t customers_per_month = 0;
+    std::int64_t revenue_per_month = 0;
 };
 
 class CityEconomy {
@@ -70,6 +78,13 @@ public:
     // supplied population. Definitions without a requirement keep full revenue.
     [[nodiscard]] static std::uint32_t commercial_demand_percent(const BuildingDefinition& definition,
                                                                   std::uint32_t current_population);
+    // Price elasticity for player-controlled shops. Default price is the 100% reference;
+    // lowering price attracts more customers while higher prices progressively reduce demand.
+    [[nodiscard]] static std::uint32_t service_price_demand_percent(const BuildingDefinition& definition,
+                                                                     std::int64_t service_price);
+    [[nodiscard]] static ServicePricingEstimate service_pricing_estimate(const BuildingDefinition& definition,
+                                                                          const BuildingInstance& instance,
+                                                                          std::uint32_t current_population);
 
 private:
     void record(EconomyTransactionType type, std::int64_t amount, const GameDate& date,
