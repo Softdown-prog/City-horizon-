@@ -1,0 +1,31 @@
+{
+  "contract": "CH_CROP_OVERLAY_RECIPE_V1",
+  "id": "crop.sugar_cane.overlay.v1",
+  "displayName": "Cana-de-acucar",
+  "cropId": "sugar_cane",
+  "renderMode": "transparent_overlay_only",
+  "groundEmbedded": false,
+  "canvas": {"width": 256, "height": 256},
+  "anchor": {"x": 0.5, "y": 0.8},
+  "overlayScale": 0.94,
+  "stages": [
+    {"id": "sprout", "height": 0.3, "density": 0.28, "seed": 2101},
+    {"id": "young", "height": 0.52, "density": 0.46, "seed": 2102},
+    {"id": "mature", "height": 0.78, "density": 0.66, "seed": 2103},
+    {"id": "ripe", "height": 0.86, "density": 0.72, "seed": 2104, "feature": "thicker_segmented_stalks"}
+  ],
+  "proceduralGrammar": {
+    "layout": "parallel_rows",
+    "rowCount": 6,
+    "stalksPerRow": [6, 9],
+    "silhouette": "tall_segmented_stalks_with_long_leaves",
+    "palette": ["#547f36", "#6e9b44", "#86aa50", "#a6bb62"],
+    "notes": "No soil, no shadow plate, no tile border. Keep stalks grouped and legible without becoming a solid green wall."
+  },
+  "handoff": {
+    "nextStage": "CH_BLENDER",
+    "camera": "CH_CAMERA_V1",
+    "studio": "CH_TYCOON_STUDIO_V1",
+    "finalOutput": "RGBA transparent crop overlays with identical canvas and anchor for every growth stage"
+  }
+}
