@@ -26,17 +26,17 @@
     "windowSill": 0.66,
     "awning": {
       "enabled": true,
-      "width": 4.28,
+      "width": 4.34,
       "depth": 0.56,
       "height": 0.18,
       "z": 1.96
     },
     "sign": {
       "enabled": true,
-      "width": 2.42,
-      "height": 0.48,
-      "depth": 0.12,
-      "z": 2.45,
+      "width": 2.56,
+      "height": 0.54,
+      "depth": 0.14,
+      "z": 2.46,
       "breadMark": true
     },
     "details": {
@@ -49,7 +49,7 @@
   },
   "sideWindows": {
     "east": 2,
-    "west": 1
+    "west": 2
   },
   "rear": {
     "serviceDoor": true,
@@ -164,6 +164,7 @@
       "keep the silhouette compact and low-rise",
       "do not depend on readable text for bakery identity",
       "make the bakery identity readable through warm bread colors, awning, display bread and bread-mark geometry",
+      "keep the final refinement restrained: slightly stronger sign and balanced side-window rhythm, no architectural redesign",
       "use only a few gameplay-scale entrance and service details; avoid microdetail noise",
       "author all four sides because AssetRoot rotation produces canonical directions",
       "keep the front apron visually flush for future road/sidewalk placement"
