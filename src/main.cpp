@@ -242,6 +242,50 @@ public:
         return &textures_.emplace(key, asset).first->second;
     }
 
+    [[nodiscard]] const TextureAsset* load_mask_channel(SDL_Renderer* renderer, const std::filesystem::path& path,
+                                                        const char channel) {
+        if (channel != 'R' && channel != 'G') return nullptr;
+        const std::string key = path.generic_string() + "#CH_COLOR_MASK_" + channel;
+        if (const auto existing = textures_.find(key); existing != textures_.end()) return &existing->second;
+
+        SDL_Surface* source = SDL_LoadPNG(path.string().c_str());
+        if (source == nullptr) {
+            std::cerr << "Color mask could not be loaded: " << path << "\nSDL error: " << SDL_GetError() << '\n';
+            return nullptr;
+        }
+        SDL_Surface* extracted = SDL_CreateSurface(source->w, source->h, SDL_PIXELFORMAT_RGBA32);
+        if (extracted == nullptr) {
+            SDL_DestroySurface(source);
+            return nullptr;
+        }
+        for (int y = 0; y < source->h; ++y) {
+            for (int x = 0; x < source->w; ++x) {
+                Uint8 r = 0, g = 0, b = 0, a = 0;
+                if (!SDL_ReadSurfacePixel(source, x, y, &r, &g, &b, &a)) continue;
+                const Uint8 coverage = channel == 'R' ? r : g;
+                const Uint8 mask_alpha = static_cast<Uint8>((static_cast<unsigned>(coverage) * static_cast<unsigned>(a)) / 255U);
+                (void)SDL_WriteSurfacePixel(extracted, x, y, 255, 255, 255, mask_alpha);
+            }
+        }
+        SDL_DestroySurface(source);
+
+        TextureAsset asset;
+        asset.texture = SDL_CreateTextureFromSurface(renderer, extracted);
+        asset.source_width = static_cast<float>(extracted->w);
+        asset.source_height = static_cast<float>(extracted->h);
+        SDL_DestroySurface(extracted);
+        if (asset.texture == nullptr) return nullptr;
+        SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+        return &textures_.emplace(key, asset).first->second;
+    }
+
+    [[nodiscard]] const TextureAsset* find_mask_channel(const std::filesystem::path& path, const char channel) const {
+        const std::string key = path.generic_string() + "#CH_COLOR_MASK_" + channel;
+        const auto found = textures_.find(key);
+        return found == textures_.end() ? nullptr : &found->second;
+    }
+
     [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
         const auto found = textures_.find(path.generic_string());
         return found == textures_.end() ? nullptr : &found->second;
@@ -831,6 +875,23 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                 const Uint8 g = is_owned ? 255 : 145;
                 const Uint8 b = is_owned ? 255 : 155;
                 render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+
+                // CH_COLOR_MASK_V1 is opt-in. The approved source sprite stays
+                // untouched until this concrete instance has player colors.
+                if (draw.building->color_customized && definition->supports_color_mask(visual_rotation)) {
+                    constexpr Uint8 kTintOverlayAlpha = 184;
+                    const auto mask_path = root / definition->color_mask_path_for(visual_rotation);
+                    if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
+                        render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
+                                        viewport_width, viewport_height, kTintOverlayAlpha,
+                                        draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
+                    }
+                    if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
+                        render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
+                                        viewport_width, viewport_height, kTintOverlayAlpha,
+                                        draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
+                    }
+                }
             }
             continue;
         }
@@ -1321,6 +1382,11 @@ int main() {
                 const BuildingRotation logical_rotation = static_cast<BuildingRotation>(rotation);
                 if (definition.supports_rotation(logical_rotation)) {
                     (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
+                    if (lvl.level == 1 && definition.supports_color_mask(logical_rotation)) {
+                        const auto mask_path = asset_root / definition.color_mask_path_for(logical_rotation);
+                        (void)textures.load_mask_channel(renderer, mask_path, 'R');
+                        (void)textures.load_mask_channel(renderer, mask_path, 'G');
+                    }
                 }
             }
         }

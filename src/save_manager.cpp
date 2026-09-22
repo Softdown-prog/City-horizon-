@@ -362,6 +362,12 @@ template <typename Number>
         const auto rotation = json_number<int>(building, "rotation");
         const auto level = json_number<int>(building, "level");
         const auto service_price = json_number<std::int64_t>(building, "servicePrice");
+        const auto wall_tint_r = json_number<int>(building, "wallTintR");
+        const auto wall_tint_g = json_number<int>(building, "wallTintG");
+        const auto wall_tint_b = json_number<int>(building, "wallTintB");
+        const auto roof_tint_r = json_number<int>(building, "roofTintR");
+        const auto roof_tint_g = json_number<int>(building, "roofTintG");
+        const auto roof_tint_b = json_number<int>(building, "roofTintB");
         const int current_level = level.has_value() ? std::max(1, *level) : 1;
         if (!instance_id || !definition_id || !tile_x || !tile_y || !rotation || *instance_id == 0 ||
             *rotation < 0 || *rotation > 3) {
@@ -376,6 +382,21 @@ template <typename Number>
         saved.rotation = static_cast<BuildingRotation>(*rotation);
         saved.current_level = current_level;
         saved.service_price = (*version >= 9 && service_price.has_value()) ? std::max<std::int64_t>(0, *service_price) : 0;
+        const bool has_any_tint = wall_tint_r || wall_tint_g || wall_tint_b || roof_tint_r || roof_tint_g || roof_tint_b;
+        if (has_any_tint) {
+            if (!wall_tint_r || !wall_tint_g || !wall_tint_b || !roof_tint_r || !roof_tint_g || !roof_tint_b ||
+                *wall_tint_r < 0 || *wall_tint_r > 255 || *wall_tint_g < 0 || *wall_tint_g > 255 ||
+                *wall_tint_b < 0 || *wall_tint_b > 255 || *roof_tint_r < 0 || *roof_tint_r > 255 ||
+                *roof_tint_g < 0 || *roof_tint_g > 255 || *roof_tint_b < 0 || *roof_tint_b > 255) {
+                error = "building color customization is invalid";
+                return false;
+            }
+            saved.color_customized = true;
+            saved.wall_tint = {static_cast<std::uint8_t>(*wall_tint_r), static_cast<std::uint8_t>(*wall_tint_g),
+                               static_cast<std::uint8_t>(*wall_tint_b)};
+            saved.roof_tint = {static_cast<std::uint8_t>(*roof_tint_r), static_cast<std::uint8_t>(*roof_tint_g),
+                               static_cast<std::uint8_t>(*roof_tint_b)};
+        }
         snapshot.buildings.push_back(std::move(saved));
     }
     for (const std::string_view road : *saved_roads) {
@@ -487,8 +508,16 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
                << "\", \"tileX\": " << building.tile_x << ", \"tileY\": " << building.tile_y
                << ", \"rotation\": " << static_cast<int>(building.rotation)
                << ", \"level\": " << building.current_level
-               << ", \"servicePrice\": " << building.service_price << " }"
-               << (index + 1U == buildings.instances().size() ? "\n" : ",\n");
+               << ", \"servicePrice\": " << building.service_price;
+        if (building.color_customized) {
+            output << ", \"wallTintR\": " << static_cast<int>(building.wall_tint.r)
+                   << ", \"wallTintG\": " << static_cast<int>(building.wall_tint.g)
+                   << ", \"wallTintB\": " << static_cast<int>(building.wall_tint.b)
+                   << ", \"roofTintR\": " << static_cast<int>(building.roof_tint.r)
+                   << ", \"roofTintG\": " << static_cast<int>(building.roof_tint.g)
+                   << ", \"roofTintB\": " << static_cast<int>(building.roof_tint.b);
+        }
+        output << " }" << (index + 1U == buildings.instances().size() ? "\n" : ",\n");
     }
     output << "  ],\n  \"roads\": [\n";
     for (std::size_t index = 0; index < roads.tiles().size(); ++index) {

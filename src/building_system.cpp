@@ -316,6 +316,26 @@ template <typename Number>
         definition.available_rotations.fill(true);
     }
 
+    if (const auto serialized_mask = json_object(json, "colorMask")) {
+        const bool enabled = json_bool(*serialized_mask, "enabled").value_or(false);
+        if (enabled) {
+            if (json_string(*serialized_mask, "contract").value_or("") != "CH_COLOR_MASK_V1") return std::nullopt;
+            const auto channels = json_object(*serialized_mask, "channels");
+            const auto mask_sprites = json_object(*serialized_mask, "sprites");
+            if (!channels || !mask_sprites || json_string(*channels, "R").value_or("") != "wall" ||
+                json_string(*channels, "G").value_or("") != "roof") {
+                return std::nullopt;
+            }
+            BuildingColorMaskDefinition mask;
+            mask.enabled = true;
+            for (std::size_t index = 0; index < mask.sprite_paths.size(); ++index) {
+                mask.sprite_paths[index] = json_string(*mask_sprites, std::to_string(index)).value_or("");
+                if (definition.available_rotations[index] && mask.sprite_paths[index].empty()) return std::nullopt;
+            }
+            definition.color_mask = mask;
+        }
+    }
+
     if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
         for (const std::string& serialized_access_point : *serialized_access_points) {
             const auto facing = parse_grid_direction(json_string(serialized_access_point, "facing").value_or(""));
@@ -458,6 +478,17 @@ const std::string& BuildingDefinition::texture_path_for(const BuildingRotation r
         return texture_path;
     }
     return lvl.sprite_paths[0];
+}
+
+const std::string& BuildingDefinition::color_mask_path_for(const BuildingRotation rotation) const {
+    static const std::string empty;
+    if (!supports_color_mask(rotation)) return empty;
+    return color_mask->sprite_paths[static_cast<std::size_t>(rotation)];
+}
+
+bool BuildingDefinition::supports_color_mask(const BuildingRotation rotation) const {
+    return color_mask.has_value() && color_mask->enabled && supports_rotation(rotation) &&
+           !color_mask->sprite_paths[static_cast<std::size_t>(rotation)].empty();
 }
 
 float BuildingDefinition::anchor_x_for(const BuildingRotation rotation, const int level) const {
@@ -848,6 +879,29 @@ bool BuildingManager::set_service_price(const std::uint64_t instance_id, const B
         return false;
     }
     found->service_price = std::clamp(service_price, definition.minimum_service_price, definition.maximum_service_price);
+    return true;
+}
+
+bool BuildingManager::set_color_customization(const std::uint64_t instance_id, const BuildingColorTint wall,
+                                              const BuildingColorTint roof) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->wall_tint = wall;
+    found->roof_tint = roof;
+    found->color_customized = true;
+    return true;
+}
+
+bool BuildingManager::clear_color_customization(const std::uint64_t instance_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    found->color_customized = false;
+    found->wall_tint = {};
+    found->roof_tint = {};
     return true;
 }
 

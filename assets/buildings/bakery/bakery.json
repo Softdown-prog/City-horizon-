@@ -130,6 +130,6 @@
       "sha256": "5fa33efe716a130a2570e038abf946b3d4ab446ae26850c871c94bc51c7a4755"
     },
     "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
-    "runtimeTintingImplemented": false
+    "runtimeTintingImplemented": true
   }
 }

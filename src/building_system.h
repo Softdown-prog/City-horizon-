@@ -86,6 +86,19 @@ struct BuildingAnimationDefinition {
     int idle_hold_ms = 0;
 };
 
+// CH_COLOR_MASK_V1 runtime contract. A is object coverage while R/G identify
+// independently recolorable wall and roof regions.
+struct BuildingColorTint {
+    std::uint8_t r = 255;
+    std::uint8_t g = 255;
+    std::uint8_t b = 255;
+};
+
+struct BuildingColorMaskDefinition {
+    bool enabled = false;
+    std::array<std::string, 4> sprite_paths;
+};
+
 struct BuildingDefinition {
     std::string id;
     std::string name;
@@ -156,12 +169,15 @@ struct BuildingDefinition {
     std::vector<BuildingAccessPoint> access_points;
     std::optional<InitialBuildingPlacement> initial_placement;
     std::optional<BuildingAnimationDefinition> animation;
+    std::optional<BuildingColorMaskDefinition> color_mask;
 
     // Multi-level progression data (Nível 1 a Nível N).
     std::vector<BuildingLevelDefinition> levels;
 
     [[nodiscard]] const BuildingLevelDefinition& level_definition(int level = 1) const;
     [[nodiscard]] const std::string& texture_path_for(BuildingRotation rotation, int level = 1) const;
+    [[nodiscard]] const std::string& color_mask_path_for(BuildingRotation rotation) const;
+    [[nodiscard]] bool supports_color_mask(BuildingRotation rotation) const;
     [[nodiscard]] float anchor_x_for(BuildingRotation rotation, int level = 1) const;
     [[nodiscard]] float anchor_y_for(BuildingRotation rotation, int level = 1) const;
     [[nodiscard]] bool supports_rotation(BuildingRotation rotation) const;
@@ -185,6 +201,12 @@ struct BuildingInstance {
     // Per-instance customer price so two shops may use different strategies.
     std::int64_t service_price = 0;
 
+
+    // Two instances of the same definition may carry different player colors.
+    // False means render the approved source PNG with no recolor pass.
+    bool color_customized = false;
+    BuildingColorTint wall_tint{};
+    BuildingColorTint roof_tint{};
     [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition& current_level_definition(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition* next_level_definition(const BuildingDefinition& definition) const;
@@ -245,6 +267,8 @@ public:
     [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
     [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
                                          std::int64_t service_price);
+    [[nodiscard]] bool set_color_customization(std::uint64_t instance_id, BuildingColorTint wall, BuildingColorTint roof);
+    [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id);
     std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
 
