@@ -173,11 +173,9 @@ jobs:
               shutil.copy2(color_src, color_dst)
               shutil.copy2(mask_src, mask_dst)
 
-              # CH_COLOR_MASK_V1 for this building intentionally uses only R/G.
               r, g, b, a = mask_im.split()
-              if b.getbbox() is not None:
-                  if b.getextrema()[1] != 0:
-                      raise SystemExit(f'{mask_src}: blue channel must be unused')
+              if b.getextrema()[1] != 0:
+                  raise SystemExit(f'{mask_src}: blue channel must be unused')
               rp = sum(1 for v in r.getdata() if v > 127)
               gp = sum(1 for v in g.getdata() if v > 127)
               ap = sum(1 for v in a.getdata() if v > 0)
@@ -265,4 +263,8 @@ jobs:
             exit 0
           fi
           git commit -m "asset: promote approved ${{ steps.promotion.outputs.asset_id }} to runtime"
+          # Main may advance while this job post-processes a large artifact. Rebase the
+          # asset-only commit onto the latest main before pushing instead of force-pushing.
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
