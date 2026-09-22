@@ -1,0 +1,45 @@
+name: Add Building Color Palette UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/add-building-color-palette-ui.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        shell: bash
+        run: git pull --ff-only origin main
+
+      - name: Patch canonical runtime and UI
+        shell: bash
+        run: python tools/migrations/add_building_color_palette_ui.py
+
+      - name: Commit palette UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/add-building-color-palette-ui.yml
+          rm tools/migrations/add_building_color_palette_ui.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/building_system.h src/building_system.cpp src/main.cpp src/save_manager.h src/save_manager.cpp src/ui_manager.h src/ui_manager.cpp .github/workflows/add-building-color-palette-ui.yml tools/migrations/add_building_color_palette_ui.py
+          git commit -m "ui: add per-building wall and roof color palette"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          exit 1
