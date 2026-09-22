@@ -1,0 +1,135 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.bakery.01",
+  "displayName": "Padaria",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    320,
+    288
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2,
+    "occupiedCells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  "views": {
+    "south": {
+      "file": "bakery_south.png",
+      "pivot": {
+        "x": 160,
+        "y": 178
+      },
+      "sha256": "a63c045ee06d60608199eee65829367da1f9be197d7b377ff769154f75852a12"
+    },
+    "east": {
+      "file": "bakery_east.png",
+      "pivot": {
+        "x": 160,
+        "y": 178
+      },
+      "sha256": "8470a2280514809caa058c85569956bf1630c960ae1673974a303d0844493836"
+    },
+    "west": {
+      "file": "bakery_west.png",
+      "pivot": {
+        "x": 160,
+        "y": 178
+      },
+      "sha256": "28cb1d68563c558827e576880df4b81bdf298230b6a9aea0a950b0db4774d97a"
+    },
+    "north": {
+      "file": "bakery_north.png",
+      "pivot": {
+        "x": 160,
+        "y": 178
+      },
+      "sha256": "669fa73835104ce1170f6cd3442fc4d47792ba9e2b8642fbcac4567f0d7e51e5"
+    }
+  },
+  "spriteSheet": "bakery_4view.png",
+  "sourceCommit": "325452f91363e0af31568095232c15f6395a7703",
+  "sourceWorkflowRun": 35729309430,
+  "sourceArtifactId": 10694909449,
+  "approvedProxySha256": "6e3a3d94d5943566f25bb75d59ff16b0da1125f6c5f2926c210a2187261eb6e7",
+  "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess",
+  "approvedForRuntime": true,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "blueChannel": "unused",
+    "alpha": "coverage",
+    "scope": "wall_and_roof_only",
+    "views": {
+      "south": {
+        "file": "bakery_south_mask.png",
+        "sha256": "b5cfb490f170cfc187657bc2c341f2a051d54c5741d4cba3b67352dd83a1b181",
+        "wallPixels": 7554,
+        "roofPixels": 15749,
+        "coveredPixels": 36076
+      },
+      "east": {
+        "file": "bakery_east_mask.png",
+        "sha256": "851e23c7712e8edaa00f48f6b6e633d17b965433fa9618a78200e028b27ac383",
+        "wallPixels": 7831,
+        "roofPixels": 15744,
+        "coveredPixels": 35959
+      },
+      "west": {
+        "file": "bakery_west_mask.png",
+        "sha256": "495ad938088f8cf3d75883a510bbdb68cd43044a603195ad06f71bd29ab6b46c",
+        "wallPixels": 11437,
+        "roofPixels": 16307,
+        "coveredPixels": 34480
+      },
+      "north": {
+        "file": "bakery_north_mask.png",
+        "sha256": "052ac9b87a00738d87500d8725d19df9d697e3d5da03efac67d29ee5f763abf2",
+        "wallPixels": 11404,
+        "roofPixels": 16325,
+        "coveredPixels": 34616
+      }
+    },
+    "fourView": {
+      "file": "bakery_mask_4view.png",
+      "sha256": "18657fe7da1736aa358ef291e47b0a0051cdddb79f70f039345311b3e603181b"
+    },
+    "review": {
+      "file": "bakery_mask_review.png",
+      "sha256": "5fa33efe716a130a2570e038abf946b3d4ab446ae26850c871c94bc51c7a4755"
+    },
+    "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
+    "runtimeTintingImplemented": false
+  }
+}
