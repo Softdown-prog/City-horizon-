@@ -37,9 +37,6 @@ constexpr float kGrassOpaqueLeft = 53.0F;
 constexpr float kGrassOpaqueTop = 23.0F;
 constexpr float kGrassOpaqueWidth = 1175.0F;
 
-constexpr float kFarmOpaqueLeft = 16.0F;
-constexpr float kFarmOpaqueTop = 151.0F;
-constexpr float kFarmOpaqueWidth = 1220.0F;
 
 constexpr TileCoordinate road_access_offset(const GridDirection direction) {
     switch (direction) {
@@ -581,38 +578,53 @@ void MapRenderer::render_farming(SDL_Renderer* renderer, const FarmingSystem& fa
                                 const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
                                 const std::filesystem::path& root, const CameraState& camera,
                                 const float viewport_width, const float viewport_height) {
-    for (const FarmTile& tile : farming.tiles()) {
-        const WorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
-        const ScreenPoint top = world_to_screen_point(visual_top.x, visual_top.y, camera, viewport_width, viewport_height);
-        const CropDefinition* crop = tile.state == FarmTileState::prepared_soil ? nullptr : crops.find(tile.crop_id);
-        const bool legacy_composite = crop != nullptr && !crop->has_stage_overlays();
+    // CH_FARM_GROUND_V2 pilot: the simulation remains tile based, but the
+    // presentation no longer repeats a complete prepared-soil PNG per cell.
+    // Crops are intentionally hidden during this ground-only visual gate.
+    (void)crops;
+    (void)find_texture;
+    (void)root;
 
-        if (!legacy_composite) {
-            if (const TextureAsset* soil = find_texture(root / "assets/farming/prepared_soil/prepared_soil_01.png")) {
-                const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
-                const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
-                                               top.y - kFarmOpaqueTop * scale,
-                                               soil->source_width * scale, soil->source_height * scale};
-                SDL_RenderTexture(renderer, soil->texture, nullptr, &destination);
-            }
+    if (renderer == nullptr || farming.tiles().empty()) return;
+
+    // One identical opaque material over all logical farm cells. Because no
+    // outline or per-cell variation is drawn, neighbouring cells read as one
+    // continuous field while placement/save semantics remain unchanged.
+    constexpr SDL_FColor kPreparedSoil = {
+        116.0F / 255.0F,
+        76.0F / 255.0F,
+        43.0F / 255.0F,
+        1.0F,
+    };
+    for (const FarmTile& tile : farming.tiles()) {
+        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera,
+                         viewport_width, viewport_height, kPreparedSoil);
+    }
+
+    // Furrows live in canonical world coordinates. One line spans each
+    // contiguous horizontal farm run, so internal tile boundaries never
+    // interrupt a row. Camera rotation changes projection only.
+    constexpr std::array<float, 5> kFurrowOffsets = {0.10F, 0.30F, 0.50F, 0.70F, 0.90F};
+    SDL_SetRenderDrawColor(renderer, 83, 49, 28, 205);
+
+    for (const FarmTile& tile : farming.tiles()) {
+        if (farming.is_occupied(tile.tile_x - 1, tile.tile_y)) continue;
+
+        int run_end_x = tile.tile_x;
+        while (farming.is_occupied(run_end_x + 1, tile.tile_y)) {
+            ++run_end_x;
         }
-        if (crop == nullptr || tile.stage < 0 || tile.stage >= crop->stage_count()) continue;
-        const TextureAsset* sprite = find_texture(root / crop->active_stage_sprites()[static_cast<std::size_t>(tile.stage)]);
-        if (sprite == nullptr) continue;
-        if (legacy_composite) {
-            const float scale = (kTileWidth / kFarmOpaqueWidth) * camera.zoom;
-            const SDL_FRect destination = {top.x - kTileWidth * camera.zoom * 0.5F - kFarmOpaqueLeft * scale,
-                                           top.y - kFarmOpaqueTop * scale,
-                                           sprite->source_width * scale, sprite->source_height * scale};
-            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
-        } else {
-            const float canvas_width = crop->overlay_canvas_width > 0 ? static_cast<float>(crop->overlay_canvas_width) : static_cast<float>(sprite->source_width);
-            const float canvas_height = crop->overlay_canvas_height > 0 ? static_cast<float>(crop->overlay_canvas_height) : static_cast<float>(sprite->source_height);
-            const float scale = (kTileWidth / canvas_width) * camera.zoom * crop->overlay_scale;
-            const SDL_FRect destination = {top.x - crop->overlay_anchor_x * canvas_width * scale,
-                                           top.y - crop->overlay_anchor_y * canvas_height * scale,
-                                           sprite->source_width * scale, sprite->source_height * scale};
-            SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
+
+        for (const float offset : kFurrowOffsets) {
+            const ScreenPoint start = world_to_screen_point(
+                static_cast<float>(tile.tile_x),
+                static_cast<float>(tile.tile_y) + offset,
+                camera, viewport_width, viewport_height);
+            const ScreenPoint end = world_to_screen_point(
+                static_cast<float>(run_end_x + 1),
+                static_cast<float>(tile.tile_y) + offset,
+                camera, viewport_width, viewport_height);
+            SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
         }
     }
 }
