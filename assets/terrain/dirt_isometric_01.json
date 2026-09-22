@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "dirt_isometric_01",
+  "image": "dirt_isometric_01.png",
+  "category": "terrain",
+  "subtype": "dirt",
+  "displayName": "Tile de Terra",
+  "status": "approved",
+  "gridFootprint": {
+    "width": 1,
+    "height": 1
+  },
+  "tileCanvas": {
+    "width": 128,
+    "height": 64,
+    "projection": "isometric_2_to_1"
+  },
+  "opaqueBounds": {
+    "left": 1,
+    "top": 0,
+    "right": 127,
+    "bottom": 64,
+    "width": 126,
+    "height": 64
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 0.92
+  },
+  "tags": [
+    "terra",
+    "solo",
+    "terreno",
+    "tile",
+    "isometrico"
+  ],
+  "validation": {
+    "mapForgeWorkflow": "Test Atomic Path in MapForge",
+    "runId": 35670104713,
+    "result": "PASS",
+    "normalized": true,
+    "runtimeScaleApproved": true
+  },
+  "notes": "Tile-base de terra aprovado visualmente e validado no MapForge em 128x64 RGBA. Este arquivo e a fonte visual validada; variantes de auto-tile devem derivar dele, sem reutilizar os sprites antigos."
+}
