@@ -1190,6 +1190,15 @@ int main() {
     }
     (void)textures.load(renderer, asset_root / "assets/sidewalks/concrete_01/sidewalk_concrete_15_seamless.png");
     (void)textures.load(renderer, asset_root / "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png");
+    static constexpr std::array<const char*, 16> kDirtPathSprites = {
+        "dirt_path_00_isolated.png", "dirt_path_01_end_n.png", "dirt_path_02_end_e.png", "dirt_path_03_curve_ne.png",
+        "dirt_path_04_end_s.png", "dirt_path_05_straight_ns.png", "dirt_path_06_curve_es.png", "dirt_path_07_tee_no_w.png",
+        "dirt_path_08_end_w.png", "dirt_path_09_curve_nw.png", "dirt_path_10_straight_ew.png", "dirt_path_11_tee_no_s.png",
+        "dirt_path_12_curve_sw.png", "dirt_path_13_tee_no_e.png", "dirt_path_14_tee_no_n.png", "dirt_path_15_cross.png",
+    };
+    for (const char* sprite : kDirtPathSprites) {
+        (void)textures.load(renderer, asset_root / "assets/terrain/paths/dirt_01" / sprite);
+    }
     (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
 
     BuildingCatalog catalog;
@@ -1558,7 +1567,7 @@ int main() {
     };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
-        status = "CEMENT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);
+        status = "DIRT PATH MODE: DRAG ON OWNED GRASS"; (void)audio.play(SoundEvent::ui_select);
     };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
@@ -2338,12 +2347,12 @@ int main() {
                             ++blocked;
                             continue;
                         }
-                        if (sidewalks.place_tile(tile.x, tile.y, "cement_path")) {
+                        if (sidewalks.place_tile(tile.x, tile.y, "dirt_path")) {
                             ++placed;
                         }
                     }
-                    status = placed == 0 ? "CEMENT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
-                        "CEMENT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
+                    status = placed == 0 ? "DIRT PATH BLOCKED BY ROAD, BUILDING OR TILE" :
+                        "DIRT PATH PLACED: " + std::to_string(placed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " SKIPPED");
                     (void)audio.play(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;

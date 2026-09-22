@@ -100,6 +100,9 @@ std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMas
     if (style_id == "cement_path") {
         return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
     }
+    if (style_id == "dirt_path") {
+        return dirt_path_sprite(connections);
+    }
     const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
     const int mask = static_cast<int>(connections);
     if (mask == 15) return base + "15_seamless.png";
