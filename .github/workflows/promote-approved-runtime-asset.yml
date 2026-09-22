@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "tools/ch_blender/promotions/*.runtime.json"
-      - ".github/workflows/promote-approved-runtime-asset.yml"
+      - "tools/ch_blender/promotions/prop.raspadinha_vendor.01.runtime.json"
   workflow_dispatch:
 
 permissions:
