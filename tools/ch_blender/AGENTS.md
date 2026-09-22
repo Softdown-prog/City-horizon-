@@ -95,6 +95,24 @@ Default gate tuning is versioned in:
 
 `tools/ch_blender/preflight_profiles/ch_asset_default_v1.json`
 
+## Optional color-customization masks
+
+Color masks are opt-in. Before authoring a recolorable building/prop, read:
+
+`tools/ch_blender/COLOR_MASK_AGENTS.md`
+
+The authoritative mask contract is `CH_COLOR_MASK_V1` in:
+
+`tools/tycoon_photo_studio/contracts/ch_color_mask_v1.json`
+
+V1 uses packed RGB semantic roles and reserves alpha for object coverage. Typical building mapping is R=wall, G=roof, B=trim. Do not invent a different per-asset convention when the normal semantic roles are sufficient.
+
+For canonical `TYCOON_ASSET_SOURCE_V1` assets, declare top-level `colorMask` and set `maskRole` only on materials intended for recoloring. Assets without `colorMask` must retain the existing bake behavior and outputs.
+
+Mask PNGs are data: do not palette-reduce, dither, add AO/shadows/outlines, or run background/halo removers on them. Review the mask alongside the normal visual asset before runtime promotion.
+
+This authoring contract does not by itself mean runtime SDL tinting is implemented. Never claim player recoloring works in-game until the runtime reads and applies the mask.
+
 ## Job contract
 
 Every job uses `CH_BLENDER_AGENT_JOB_V1` and has a unique `jobId`.
