@@ -1,0 +1,67 @@
+{
+  "_comment": "CH_ANIMATED_SPRITE_V1 — runtime contract for pre-rendered animated sprites with named behavior states.",
+  "contract": "CH_ANIMATED_SPRITE_V1",
+  "version": "1.0",
+  "description": "Minimal animated sprite contract for city-builder props. Encodes named behavior states (IDLE, GREET, SERVE, ...) as frame ranges within a per-direction spritesheet. Designed for event-driven playback with long idle intervals.",
+  "cameraContract": "CH_CAMERA_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "policy": {
+    "directionPolicy": "rotate_asset_root_keep_camera_lights_fixed",
+    "frameFormat": "PNG_RGBA",
+    "transparentBackground": true,
+    "pivotPolicy": "projected world origin fixed across directions and frames",
+    "playbackPolicy": "event_driven",
+    "idleIntervalPolicy": "long",
+    "loopPolicy": "state_loops_independently",
+    "promotionPolicy": "human_approval_required_before_runtime"
+  },
+  "requiredStates": ["idle"],
+  "optionalStates": ["greet", "serve"],
+  "stateRules": {
+    "idle": {
+      "description": "Canonical resting pose. 1 frame per direction is preferred.",
+      "minFrames": 1,
+      "maxFrames": 4,
+      "looping": true
+    },
+    "greet": {
+      "description": "Short wave/greeting toward the street. Returns to idle base pose.",
+      "minFrames": 1,
+      "maxFrames": 8,
+      "looping": false,
+      "triggerPolicy": "event_driven",
+      "constraints": [
+        "no full-body locomotion",
+        "no continuous looping wave",
+        "static cart and umbrella unless visual reason requires otherwise",
+        "returns to exact base pose"
+      ]
+    },
+    "serve": {
+      "description": "Serving/preparing interaction. Implement only after gameplay NPC interaction exists.",
+      "minFrames": 1,
+      "maxFrames": 8,
+      "looping": false,
+      "triggerPolicy": "customer_interaction",
+      "implementWhen": "gameplay has a real customer/NPC interaction that can trigger the behavior",
+      "constraints": [
+        "torso mostly stable",
+        "one arm reaches toward product area",
+        "optional small head turn",
+        "no locomotion",
+        "no complex finger animation"
+      ]
+    }
+  },
+  "bakeContract": {
+    "outputPerDirection": "color_source + shadow_source per frame",
+    "namingConvention": "{assetId}_{direction}_{state}_f{frame:02d}_{pass}_source.png",
+    "mandatoryQualityFlow": [
+      "preflight",
+      "proxy SOUTH IDLE frame",
+      "visual review",
+      "final bake after approval"
+    ]
+  }
+}
