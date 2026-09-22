@@ -39,15 +39,15 @@ def diamond_mask() -> Image.Image:
 
 
 def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
-    """Replace a baked rim/bevel with samples pulled from the interior texture.
+    """Replace a baked rim/bevel with nearby interior texture.
 
-    Generated source art sometimes arrives as a raised diamond with a visible
-    side wall. Ground tiles must be a flat surface. For pixels near the diamond
-    boundary this function samples farther toward the centre, preserving the
-    material while discarding the decorative thickness/rim.
+    Samples move inward along the local edge normal instead of toward the tile
+    centre. That removes a raised rim without stretching the material into a
+    radial/star pattern at the four diamond corners.
     """
     if band_pixels <= 0:
         return source.convert("RGBA")
+
     source = source.convert("RGBA")
     src = source.load()
     result = source.copy()
@@ -60,20 +60,42 @@ def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
         for x in range(W):
             if mp[x, y] == 0:
                 continue
-            # 2:1 diamond distance: boundary is |x-cx|/64 + |y-cy|/32 = 1.
-            d = abs(x - cx) / (W / 2.0) + abs(y - cy) / (H / 2.0)
+
+            dx = x - cx
+            dy = y - cy
+            d = abs(dx) / (W / 2.0) + abs(dy) / (H / 2.0)
             edge_depth = (1.0 - d) * (H / 2.0)
             if edge_depth >= band_pixels:
                 continue
-            # Pull the sample inward by the missing depth plus one pixel.
+
+            # Local inward normal of the active 2:1 diamond edge.  The edge
+            # gradient is (sign(dx)/64, sign(dy)/32); negating it points inward.
+            # This preserves texture direction much better than a centre pull.
+            sign_x = -1.0 if dx < 0 else 1.0
+            sign_y = -1.0 if dy < 0 else 1.0
+            nx = -sign_x / (W / 2.0)
+            ny = -sign_y / (H / 2.0)
+            length = max(1e-6, (nx * nx + ny * ny) ** 0.5)
+            nx /= length
+            ny /= length
+
             pull = max(1.0, band_pixels - edge_depth + 1.0)
-            vx, vy = cx - x, cy - y
-            length = max(1.0, (vx * vx + vy * vy) ** 0.5)
-            sx = round(x + vx / length * pull)
-            sy = round(y + vy / length * pull)
+            sx = round(x + nx * pull)
+            sy = round(y + ny * pull)
             sx = min(W - 1, max(0, sx))
             sy = min(H - 1, max(0, sy))
+
+            # If rounding lands outside the diamond, continue walking inward
+            # along the same normal until a valid surface texel is reached.
+            for step in range(0, band_pixels + 3):
+                tx = round(sx + nx * step)
+                ty = round(sy + ny * step)
+                if 0 <= tx < W and 0 <= ty < H and mp[tx, ty] != 0:
+                    sx, sy = tx, ty
+                    break
+
             dst[x, y] = src[sx, sy]
+
     result.putalpha(mask)
     return result
 
