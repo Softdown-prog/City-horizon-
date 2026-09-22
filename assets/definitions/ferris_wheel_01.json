@@ -1,0 +1,40 @@
+{
+  "id": "ferris_wheel_01",
+  "name": "Roda-gigante",
+  "category": "decor",
+  "texture": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
+  "sprites": {
+    "0": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
+    "1": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_west_animation.png",
+    "2": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_north_animation.png",
+    "3": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_east_animation.png"
+  },
+  "spriteAnchors": {
+    "0": { "x": 0.25, "y": 0.8125 },
+    "1": { "x": 0.25, "y": 0.8125 },
+    "2": { "x": 0.25, "y": 0.8125 },
+    "3": { "x": 0.25, "y": 0.8125 }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 4,
+    "height": 3
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 2.0,
+  "animation": {
+    "layout": "horizontal",
+    "frameCount": 12,
+    "frameDurationMs": 125,
+    "playback": "loop"
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable_approved"
+}
