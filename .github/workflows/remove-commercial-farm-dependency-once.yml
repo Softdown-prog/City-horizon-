@@ -1,0 +1,180 @@
+name: Remove Commercial Farm Dependency Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/remove-commercial-farm-dependency-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  decouple-commerce-from-farming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Decouple commercial buildings from agricultural stock
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          # Bakery: no agricultural ingredients are required to operate.
+          bakery_path = Path('assets/definitions/bakery_01.json')
+          bakery = json.loads(bakery_path.read_text(encoding='utf-8'))
+          bakery.pop('resourceInputs', None)
+          bakery_path.write_text(json.dumps(bakery, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          # Economy: agricultural inventory is no longer a supply source for city commerce.
+          economy_path = Path('src/economy_system.cpp')
+          economy = economy_path.read_text(encoding='utf-8')
+          economy = economy.replace('#include <unordered_map>\n', '')
+
+          helper_start = economy.find('[[nodiscard]] int scaled_service_input_units')
+          helper_end = economy.find('\n\n}  // namespace', helper_start)
+          if helper_start == -1 or helper_end == -1:
+              raise SystemExit('service supply helper block not found')
+          economy = economy[:helper_start] + economy[helper_end:]
+
+          old_service_tail = '''    const auto* inventory = farming == nullptr ? nullptr : &farming->inventory();
+              apply_service_supply(definition, price, estimate, inventory);
+              return estimate;'''
+          new_service_tail = '''    // Commerce demand is intentionally independent from farming stock. Crops are
+              // an agricultural production-and-sale loop, not ingredients required by shops.
+              estimate.supply_percent = 100;
+              estimate.customers_per_month = estimate.customers_before_supply;
+              estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
+              (void)farming;
+              return estimate;'''
+          if old_service_tail not in economy:
+              raise SystemExit('service pricing supply tail not found')
+          economy = economy.replace(old_service_tail, new_service_tail, 1)
+
+          old_virtual = '''    std::unordered_map<std::string, int> virtual_inventory = farming == nullptr
+                  ? std::unordered_map<std::string, int>{}
+                  : farming->inventory();
+              for (const BuildingInstance& instance : buildings.instances()) {'''
+          new_virtual = '''    (void)farming;
+              for (const BuildingInstance& instance : buildings.instances()) {'''
+          if old_virtual not in economy:
+              raise SystemExit('virtual inventory block not found')
+          economy = economy.replace(old_virtual, new_virtual, 1)
+
+          old_rebuild_supply = '''        ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
+                  if (farming != nullptr && !definition->resource_inputs.empty()) {
+                      const std::int64_t price = std::clamp(
+                          instance.service_price > 0 ? instance.service_price : definition->default_service_price,
+                          definition->minimum_service_price, definition->maximum_service_price);
+                      apply_service_supply(*definition, price, service, &virtual_inventory);
+                      consume_service_inputs_from_inventory(*definition, service.customers_per_month, virtual_inventory);
+                  }
+                  monthly_summary_.revenue += service.revenue_per_month;'''
+          new_rebuild_supply = '''        const ServicePricingEstimate service = service_pricing_estimate(
+                      *definition, instance, population.current_population());
+                  monthly_summary_.revenue += service.revenue_per_month;'''
+          if old_rebuild_supply not in economy:
+              raise SystemExit('monthly summary supply block not found')
+          economy = economy.replace(old_rebuild_supply, new_rebuild_supply, 1)
+
+          economy = economy.replace('        consume_service_inputs(*definition, service, farming);\n', '', 1)
+          legacy_start = economy.find('        // Service-priced shops consume resource inputs according to the customers')
+          legacy_end = economy.find('\n    }\n    if (vehicle_catalog != nullptr', legacy_start)
+          if legacy_start == -1 or legacy_end == -1:
+              raise SystemExit('legacy local supply block not found')
+          economy = economy[:legacy_start] + economy[legacy_end:]
+          economy_path.write_text(economy, encoding='utf-8')
+
+          # View model: do not expose agricultural supply requirements in building panels.
+          main_path = Path('src/main.cpp')
+          main = main_path.read_text(encoding='utf-8')
+          supply_start = main.find('                    std::string local_supply;\n                    if (!definition->resource_inputs.empty()) {')
+          supply_end = main.find('                    model.selected_building = UiSelectedBuilding{', supply_start)
+          if supply_start == -1 or supply_end == -1:
+              raise SystemExit('selected-building local supply block not found')
+          main = main[:supply_start] + '                    const std::string local_supply;\n' + main[supply_end:]
+
+          status_start = main.find('                        definition->default_service_price > 0\n                            ? "INSUMOS: "')
+          status_end = main.find('                        definition->default_service_price > 0,', status_start)
+          if status_start == -1 or status_end == -1:
+              raise SystemExit('service supply status initializer not found')
+          main = main[:status_start] + '                        "",\n' + main[status_end:]
+          main_path.write_text(main, encoding='utf-8')
+
+          # UI: remove the ingredient/stock metric and reclaim its vertical space.
+          ui_path = Path('src/ui_manager.cpp')
+          ui = ui_path.read_text(encoding='utf-8')
+          ui = ui.replace('const float service_height = item.has_service_pricing ? 218.0F : 0.0F;',
+                          'const float service_height = item.has_service_pricing ? 197.0F : 0.0F;', 1)
+          ui = ui.replace('const SDL_FRect service_card = {panel_x + 10.0F, 192.0F, 310.0F, 216.0F};',
+                          'const SDL_FRect service_card = {panel_x + 10.0F, 192.0F, 310.0F, 195.0F};', 1)
+          old_metrics = '''            service_metric("service_demand", 280.0F, "DEMANDA", item.service_price_demand, 202, 219, 227);
+                      service_metric("service_customers", 301.0F, "CLIENTES / MES", item.service_customers_per_month, 202, 219, 227);
+                      service_metric("service_stock", 322.0F, "INSUMOS", item.service_supply_status,
+                                     item.service_supply_status.find("100%") != std::string::npos ? 181 : 255,
+                                     item.service_supply_status.find("100%") != std::string::npos ? 221 : 188,
+                                     item.service_supply_status.find("100%") != std::string::npos ? 154 : 128);
+                      service_metric("service_revenue", 343.0F, "RECEITA VENDAS", item.service_revenue_per_month, 181, 221, 154);
+                      service_metric("service_profit", 364.0F, "RESULTADO", item.service_net_per_month, 137, 226, 242);
+                      service_metric("service_maintenance", 385.0F, "MANUTENCAO", item.monthly_maintenance + "/MES", 202, 219, 227);
+                      detail_y = 418.0F;'''
+          new_metrics = '''            service_metric("service_demand", 280.0F, "DEMANDA", item.service_price_demand, 202, 219, 227);
+                      service_metric("service_customers", 301.0F, "CLIENTES / MES", item.service_customers_per_month, 202, 219, 227);
+                      service_metric("service_revenue", 322.0F, "RECEITA VENDAS", item.service_revenue_per_month, 181, 221, 154);
+                      service_metric("service_profit", 343.0F, "RESULTADO", item.service_net_per_month, 137, 226, 242);
+                      service_metric("service_maintenance", 364.0F, "MANUTENCAO", item.monthly_maintenance + "/MES", 202, 219, 227);
+                      detail_y = 397.0F;'''
+          if old_metrics not in ui:
+              raise SystemExit('service stock metric block not found')
+          ui = ui.replace(old_metrics, new_metrics, 1)
+          ui = ui.replace('        detail("ABASTECIMENTO LOCAL", item.local_supply);\n', '', 1)
+          ui_path.write_text(ui, encoding='utf-8')
+          PY
+
+      - name: Validate focused change
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          bakery = json.loads(Path('assets/definitions/bakery_01.json').read_text(encoding='utf-8'))
+          cafe = json.loads(Path('assets/definitions/coffee_shop_01.json').read_text(encoding='utf-8'))
+          assert 'resourceInputs' not in bakery
+          assert 'resourceInputs' not in cafe
+
+          economy = Path('src/economy_system.cpp').read_text(encoding='utf-8')
+          assert 'apply_service_supply' not in economy
+          assert 'consume_service_inputs' not in economy
+          assert 'farming->try_remove_resource' not in economy
+          assert 'estimate.customers_per_month = estimate.customers_before_supply;' in economy
+
+          main = Path('src/main.cpp').read_text(encoding='utf-8')
+          assert 'sell_resource:' in main and 'VENDER TUDO' in main
+          assert '"INSUMOS: "' not in main
+
+          ui = Path('src/ui_manager.cpp').read_text(encoding='utf-8')
+          assert 'service_metric("service_stock"' not in ui
+          assert 'detail("ABASTECIMENTO LOCAL"' not in ui
+          PY
+
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/remove-commercial-farm-dependency-once.yml
+
+      - name: Commit decoupling
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'openai@users.noreply.github.com'
+          git add assets/definitions/bakery_01.json src/economy_system.cpp src/main.cpp src/ui_manager.cpp .github/workflows/remove-commercial-farm-dependency-once.yml
+          git commit -m 'Decouple city commerce from farming stock'
+          git pull --rebase origin main
+          git push origin main
