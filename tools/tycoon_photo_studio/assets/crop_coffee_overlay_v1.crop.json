@@ -1,0 +1,31 @@
+{
+  "contract": "CH_CROP_OVERLAY_RECIPE_V1",
+  "id": "crop.coffee.overlay.v1",
+  "displayName": "Cafe",
+  "cropId": "coffee",
+  "renderMode": "transparent_overlay_only",
+  "groundEmbedded": false,
+  "canvas": {"width": 256, "height": 256},
+  "anchor": {"x": 0.5, "y": 0.8},
+  "overlayScale": 0.9,
+  "stages": [
+    {"id": "sprout", "height": 0.24, "density": 0.26, "seed": 3101},
+    {"id": "young", "height": 0.42, "density": 0.44, "seed": 3102},
+    {"id": "mature", "height": 0.58, "density": 0.68, "seed": 3103},
+    {"id": "ripe", "height": 0.62, "density": 0.72, "seed": 3104, "feature": "red_cherries"}
+  ],
+  "proceduralGrammar": {
+    "layout": "compact_bush_rows",
+    "rowCount": 4,
+    "bushesPerRow": [4, 6],
+    "silhouette": "low_rounded_leafy_bushes",
+    "palette": ["#426f38", "#578842", "#6f9a4b", "#b74334"],
+    "notes": "No soil, no shadow plate, no tile border. Keep bushes separated enough to preserve row rhythm; ripe cherries should read as small red accents, not dominate the silhouette."
+  },
+  "handoff": {
+    "nextStage": "CH_BLENDER",
+    "camera": "CH_CAMERA_V1",
+    "studio": "CH_TYCOON_STUDIO_V1",
+    "finalOutput": "RGBA transparent crop overlays with identical canvas and anchor for every growth stage"
+  }
+}
