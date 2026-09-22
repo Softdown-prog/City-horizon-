@@ -1,0 +1,87 @@
+name: Cleanup Commerce Farm UI Fields Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-commerce-farm-ui-fields-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+      - name: Remove obsolete supply presentation fields
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          header = Path('src/ui_manager.h')
+          text = header.read_text(encoding='utf-8')
+          for line in ['    std::string local_supply;\n', '    std::string service_supply_status;\n']:
+              if line not in text:
+                  raise SystemExit(f'missing field: {line.strip()}')
+              text = text.replace(line, '', 1)
+          header.write_text(text, encoding='utf-8')
+
+          ui = Path('src/ui_manager.cpp')
+          text = ui.read_text(encoding='utf-8')
+          line = '            item.local_supply.empty() ? "" : "ABASTECIMENTO LOCAL: " + item.local_supply,\n'
+          if line not in text:
+              raise SystemExit('obsolete local supply detail not found')
+          text = text.replace(line, '', 1)
+          ui.write_text(text, encoding='utf-8')
+
+          main = Path('src/main.cpp')
+          text = main.read_text(encoding='utf-8')
+          line = '                    const std::string local_supply;\n'
+          if line not in text:
+              raise SystemExit('local_supply placeholder not found')
+          text = text.replace(line, '', 1)
+          needle = '''                        has_commercial_demand ? format_money(commercial_current_revenue) : "",
+                        local_supply,
+                        level_label,'''
+          repl = '''                        has_commercial_demand ? format_money(commercial_current_revenue) : "",
+                        level_label,'''
+          if needle not in text:
+              raise SystemExit('local_supply initializer not found')
+          text = text.replace(needle, repl, 1)
+          needle = '''                        definition->default_service_price > 0
+                            ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
+                            : "",
+                        "",
+                        definition->default_service_price > 0,'''
+          repl = '''                        definition->default_service_price > 0
+                            ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
+                            : "",
+                        definition->default_service_price > 0,'''
+          if needle not in text:
+              raise SystemExit('service supply status initializer not found')
+          text = text.replace(needle, repl, 1)
+          main.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate focused cleanup
+        run: |
+          git diff --check
+          ! grep -R "local_supply\|service_supply_status\|ABASTECIMENTO LOCAL\|service_metric(\"service_stock\"\|\"INSUMOS: \"" -n src/main.cpp src/ui_manager.cpp src/ui_manager.h
+          grep -q 'sell_resource:' src/main.cpp
+          grep -q 'VENDER TUDO' src/main.cpp
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/cleanup-commerce-farm-ui-fields-once.yml
+      - name: Commit cleanup
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'openai@users.noreply.github.com'
+          git add src/main.cpp src/ui_manager.cpp src/ui_manager.h .github/workflows/cleanup-commerce-farm-ui-fields-once.yml
+          git commit -m 'Remove obsolete farm supply UI state'
+          git pull --rebase origin main
+          git push origin main
