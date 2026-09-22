@@ -3,16 +3,43 @@
   "masterVolume": 1.0,
   "effectsVolume": 0.8,
   "events": {
-    "UiClick": ["ui/click_001.ogg"],
-    "UiSelect": ["ui/select_001.ogg", "ui/select_002.ogg"],
-    "UiBack": ["ui/back_001.ogg"],
-    "UiOpenPanel": ["ui/open_001.ogg"],
-    "UiClosePanel": ["ui/close_001.ogg"],
-    "UiConfirm": ["ui/confirmation_001.ogg", "ui/confirmation_003.ogg"],
-    "UiError": ["ui/error_001.ogg", "ui/error_003.ogg"],
-    "BuildingPlace": ["ui/drop_002.ogg", "ui/drop_003.ogg"],
-    "UiToggle": ["ui/toggle_004.ogg"],
-    "UiScroll": ["ui/scroll_001.ogg"],
-    "Notification": ["ui/bong_001.ogg"]
+    "UiClick": [
+      "ui/click_001.ogg",
+      "ui/mouse_click_002.ogg"
+    ],
+    "UiSelect": [
+      "ui/select_001.ogg",
+      "ui/select_002.ogg"
+    ],
+    "UiBack": [
+      "ui/back_001.ogg"
+    ],
+    "UiOpenPanel": [
+      "ui/open_001.ogg"
+    ],
+    "UiClosePanel": [
+      "ui/close_001.ogg"
+    ],
+    "UiConfirm": [
+      "ui/confirmation_001.ogg",
+      "ui/confirmation_003.ogg"
+    ],
+    "UiError": [
+      "ui/error_001.ogg",
+      "ui/error_003.ogg"
+    ],
+    "BuildingPlace": [
+      "ui/drop_002.ogg",
+      "ui/drop_003.ogg"
+    ],
+    "UiToggle": [
+      "ui/toggle_004.ogg"
+    ],
+    "UiScroll": [
+      "ui/scroll_001.ogg"
+    ],
+    "Notification": [
+      "ui/bong_001.ogg"
+    ]
   }
 }
