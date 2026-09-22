@@ -1631,7 +1631,7 @@ int main() {
         build_panel_open = false;
         decoration_mode = true;
         selected_instance_id.reset();
-        status = "DECORATION WILL BE AVAILABLE SOON";
+        status = "DECORATION: SELECT AN ITEM";
         (void)audio.play(SoundEvent::ui_select);
     };
     const auto open_agriculture_panel = [&]() {
@@ -1849,7 +1849,7 @@ int main() {
             model.decor_items.push_back({definition.id, definition.name, "DECORACAO",
                                          format_money(definition.build_cost), true,
                                          catalog_thumbnail_path(asset_root, definition),
-                                         catalog_footprint_label(definition), "LIVRE NO TERRENO"});
+                                         catalog_footprint_label(definition), catalog_requirements_label(definition)});
         }
         model.farming_items.push_back({"prepared_soil_01", "Terra Preparada", "SOLO", "SEM CUSTO", true,
                                        (asset_root / "assets/farming/prepared_soil/prepared_soil_01.png").string()});
@@ -2249,7 +2249,7 @@ int main() {
                         road_dragging = true;
                         road_drag_start = {clicked_tile.first, clicked_tile.second};
                     } else if (decoration_mode) {
-                        status = "DECORATION WILL BE AVAILABLE SOON";
+                        status = "DECORATION: SELECT AN ITEM";
                     } else if (placement_definition_id.empty()) {
                         const BuildingInstance* clicked = buildings.instance_at(clicked_tile.first, clicked_tile.second);
                         if (clicked == nullptr) {

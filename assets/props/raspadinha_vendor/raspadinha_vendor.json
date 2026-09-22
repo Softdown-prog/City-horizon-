@@ -136,5 +136,30 @@
     "sourceArtifactId": 10672684903,
     "approvedForRuntime": true,
     "serveStateIncluded": false
+  },
+  "placement": {
+    "contract": "CH_PROP_PLACEMENT_V1",
+    "footprint": {
+      "widthTiles": 1,
+      "depthTiles": 1
+    },
+    "baseTerrain": [
+      "grass"
+    ],
+    "requiredAdjacent": [
+      "road",
+      "path"
+    ],
+    "adjacency": "cardinal_any",
+    "blockedOwnTile": [
+      "building",
+      "object",
+      "road",
+      "path",
+      "farm",
+      "water",
+      "non_grass_terrain"
+    ],
+    "requiresOwnedLand": true
   }
 }
