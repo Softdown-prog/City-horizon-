@@ -1,0 +1,60 @@
+{
+  "contract": "CH_RUNTIME_PROP_V1",
+  "assetId": "prop.raspadinha_vendor.01",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    256,
+    256
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "views": {
+    "south": {
+      "file": "raspadinha_vendor_south.png",
+      "pivot": {
+        "x": 128,
+        "y": 177
+      },
+      "sha256": "464e93b9e10ee19b6bebf11e1ae3061baeb71b3f65d7a2be37829005f4b23d80"
+    },
+    "east": {
+      "file": "raspadinha_vendor_east.png",
+      "pivot": {
+        "x": 128,
+        "y": 177
+      },
+      "sha256": "059c647174d852aae2266fd362f24a2e09725a451e7c27f8e73d066a5c006bed"
+    },
+    "west": {
+      "file": "raspadinha_vendor_west.png",
+      "pivot": {
+        "x": 128,
+        "y": 177
+      },
+      "sha256": "2d6c02935cf4d69640f0f7d7f60c53ca4c1f775ca8503f95bd622f9f9366920b"
+    },
+    "north": {
+      "file": "raspadinha_vendor_north.png",
+      "pivot": {
+        "x": 128,
+        "y": 177
+      },
+      "sha256": "72d16e2196e70218a01d8c05ae124cfb085b11dfe32c57916546cb3f6d03dc92"
+    }
+  },
+  "spriteSheet": "raspadinha_vendor_4view.png",
+  "sourceCommit": "e67da780e70353aaa538c1f6c077b794faee1526",
+  "sourceWorkflowRun": 35670015174,
+  "sourceArtifactId": 10670863942,
+  "approvedProxySha256": "f401bacf15fa67d09d54f9f7e651fb67119896808bb065330047bf0d85c7c1a7",
+  "approvedForRuntime": true
+}
