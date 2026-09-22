@@ -12,24 +12,31 @@
   "geometry": {
     "wheelRadius": 2.65,
     "wheelCenterZ": 3.55,
-    "ringTubeRadius": 0.075,
-    "spokeRadius": 0.035,
-    "axleRadius": 0.16,
-    "axleDepth": 0.62,
-    "supportRadius": 0.09,
+    "ringTubeRadius": 0.12,
+    "spokeRadius": 0.055,
+    "axleRadius": 0.20,
+    "axleDepth": 0.74,
+    "supportRadius": 0.13,
     "supportBaseHalfWidth": 1.72,
     "supportBaseHalfDepth": 0.78,
-    "supportFootZ": 0.16,
-    "hubRadius": 0.24,
+    "supportFootZ": 0.18,
+    "hubRadius": 0.30,
     "gondolaCount": 12,
-    "gondolaWidth": 0.62,
-    "gondolaDepth": 0.46,
-    "gondolaBodyHeight": 0.42,
-    "gondolaRoofHeight": 0.12,
-    "gondolaDrop": 0.34,
-    "entryPlatformWidth": 2.55,
-    "entryPlatformDepth": 0.74,
-    "entryPlatformHeight": 0.14
+    "gondolaWidth": 0.78,
+    "gondolaDepth": 0.58,
+    "gondolaBodyHeight": 0.52,
+    "gondolaRoofHeight": 0.16,
+    "gondolaDrop": 0.38,
+    "entryPlatformWidth": 2.80,
+    "entryPlatformDepth": 0.90,
+    "entryPlatformHeight": 0.20,
+    "baseBeamHeight": 0.24,
+    "baseBeamDepth": 0.34,
+    "railingHeight": 0.72,
+    "railingRadius": 0.035,
+    "stairWidth": 0.92,
+    "stairDepth": 0.54,
+    "stairSteps": 3
   },
   "animation": {
     "enabled": true,
@@ -52,10 +59,10 @@
     "dark": {"name":"FerrisDark","rgba":[0.055,0.065,0.075,1.0],"roughness":0.84,"metallic":0.05}
   },
   "prototypeNotes": {
-    "status": "geometry_prototype",
+    "status": "geometry_prototype_v2",
     "terrainIncluded": false,
-    "designIntent": "Original compact park Ferris wheel with a strong circular silhouette, paired A-frame supports, twelve colorful upright gondolas and a small structural loading platform.",
+    "designIntent": "Original compact park Ferris wheel with a stronger circular silhouette, heavier structural members, twelve fuller upright gondolas, and a professional loading base with stairs and safety railings.",
     "referencePolicy": "Use classic Tycoon readability only; do not copy a specific proprietary Ferris wheel design.",
-    "nextGate": "Render one SOUTH idle frame in the frozen studio, then four directions, then animated downsample review before classification."
+    "nextGate": "Run CH Blender preflight, then render one SOUTH proxy at gameplay scale for human review before any final four-direction animation bake."
   }
 }
