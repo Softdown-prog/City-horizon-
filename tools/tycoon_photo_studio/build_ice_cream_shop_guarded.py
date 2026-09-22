@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -17,8 +18,10 @@ import build_small_commercial_guarded as guarded  # noqa: E402
 import generate_ice_cream_shop_asset as ice_cream  # noqa: E402
 
 # Reuse the proven gate, camera, lighting, color-mask validation and proxy
-# rendering. Only the recipe expander changes for this commercial subtype.
-guarded.commercial.expand = ice_cream.expand
+# rendering. Replace the guarded builder's expander reference without mutating
+# generate_small_commercial_asset itself: the ice-cream specialization calls
+# that base expander internally, so mutating the shared module would recurse.
+guarded.commercial = SimpleNamespace(expand=ice_cream.expand)
 
 
 def main():
