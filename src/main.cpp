@@ -1680,6 +1680,40 @@ int main() {
             (void)audio.play(SoundEvent::ui_click);
         }
     };
+    const auto save_current_city = [&]() {
+        const SaveOperationResult result = save_manager.save(save_path, economy, simulation_clock, buildings, roads,
+                                                             sidewalks, farming, lands, population, &service_vehicles, &mission_manager);
+        status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
+        (void)audio.play(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+        return result.success;
+    };
+    const auto load_current_city = [&](const bool keep_paused) {
+        const SaveOperationResult result = save_manager.load(save_path, catalog, economy, simulation_clock, buildings, roads,
+                                                             sidewalks, farming, lands, population, &service_vehicle_catalog,
+                                                             &service_vehicles, &mission_manager);
+        if (result.success) {
+            power.rebuild(buildings, catalog);
+            status = "LOAD COMPLETE: " + result.message;
+            if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
+                status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
+            }
+            selected_instance_id.reset();
+            clear_map_modes();
+            build_panel_open = false;
+            if (keep_paused) {
+                simulation_clock.set_speed(SimulationSpeed::paused);
+            } else if (simulation_clock.speed() != SimulationSpeed::paused) {
+                simulation_clock.set_speed(SimulationSpeed::speed1);
+            }
+            last_simulation_ticks = SDL_GetTicks();
+            simulation_scheduler.reset();
+            (void)audio.play(SoundEvent::ui_confirm);
+        } else {
+            status = "LOAD FAILED: " + result.message;
+            (void)audio.play(SoundEvent::ui_error);
+        }
+        return result.success;
+    };
     const auto apply_ui_action = [&](const UiActionEvent& action) {
         switch (action.action) {
             case UiAction::open_build_panel: open_build_panel(); break;
@@ -1726,6 +1760,24 @@ int main() {
                 active_overlay = UiOverlay::settings;
                 status = "SETTINGS OPEN";
                 (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::open_save_load:
+                if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                active_overlay = UiOverlay::save_load;
+                status = std::filesystem::exists(save_path) ? "SAVE SLOT READY" : "SAVE SLOT EMPTY";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::save_game:
+                (void)save_current_city();
+                break;
+            case UiAction::load_game:
+                (void)load_current_city(true);
+                break;
+            case UiAction::back_to_pause:
+                if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                active_overlay = UiOverlay::pause;
+                status = "GAME PAUSED";
+                (void)audio.play(SoundEvent::ui_back);
                 break;
             case UiAction::close_modal:
             case UiAction::settings_cancel:
@@ -1792,6 +1844,7 @@ int main() {
         model.administration_alerts = status.empty() ? "NO ACTIVE ALERTS" : status;
         model.master_volume_percent = static_cast<int>(std::lround(audio.volume_settings().master * 100.0F));
         model.effects_volume_percent = static_cast<int>(std::lround(audio.volume_settings().effects * 100.0F));
+        model.save_available = std::filesystem::exists(save_path);
         model.build_panel_open = build_panel_open;
         model.farming_panel_open = agriculture_panel_open;
         model.selected_farming_id = farming_selection_id;
@@ -2452,6 +2505,8 @@ int main() {
                     if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
                         if (active_overlay == UiOverlay::pause) {
                             apply_ui_action({UiAction::resume_game, {}});
+                        } else if (active_overlay == UiOverlay::save_load) {
+                            apply_ui_action({UiAction::back_to_pause, {}});
                         } else {
                             active_overlay = UiOverlay::none;
                             status = "PANEL CLOSED";
@@ -2539,46 +2594,12 @@ int main() {
                     case SDL_SCANCODE_SPACE:
                         apply_ui_action({UiAction::toggle_pause, {}});
                         break;
-                    case SDL_SCANCODE_F5: {
-                        const SaveOperationResult result = save_manager.save(save_path, economy, simulation_clock, buildings, roads, sidewalks, farming, lands, population, &service_vehicles, &mission_manager);
-                        status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
-                        (void)audio.play(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                    case SDL_SCANCODE_F5:
+                        (void)save_current_city();
                         break;
-                    }
-                    case SDL_SCANCODE_F9: {
-                        const SaveOperationResult result = save_manager.load(save_path, catalog, economy, simulation_clock, buildings, roads, sidewalks, farming, lands, population,
-                                                                            &service_vehicle_catalog, &service_vehicles, &mission_manager);
-                        if (result.success) {
-                            power.rebuild(buildings, catalog);
-                            status = "LOAD COMPLETE: " + result.message;
-                            if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
-                                status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
-                            }
-                            selected_instance_id.reset();
-                            placement_definition_id.clear();
-                            build_panel_open = false;
-                            road_mode = false;
-                            road_removal_mode = false;
-                            road_dragging = false;
-                            sidewalk_dragging = false;
-                            land_mode = false;
-                            sidewalk_mode = false;
-                            agriculture_mode = false;
-                            agriculture_panel_open = false;
-                            farming_selection_id.clear();
-                            decoration_mode = false;
-                            if (simulation_clock.speed() != SimulationSpeed::paused) {
-                                simulation_clock.set_speed(SimulationSpeed::speed1);
-                            }
-                            last_simulation_ticks = SDL_GetTicks();
-                            simulation_scheduler.reset();
-                            (void)audio.play(SoundEvent::ui_confirm);
-                        } else {
-                            status = "LOAD FAILED: " + result.message;
-                            (void)audio.play(SoundEvent::ui_error);
-                        }
+                    case SDL_SCANCODE_F9:
+                        (void)load_current_city(false);
                         break;
-                    }
                     case SDL_SCANCODE_F10: {
                         // Developer-only, read-only scenario load.  It never overwrites
                         // the player save and exists solely to vet asset geometry before
