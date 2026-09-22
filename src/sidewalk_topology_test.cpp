@@ -2,6 +2,7 @@
 #include "sidewalk_system.h"
 
 #include <cassert>
+#include <cstdint>
 
 int main() {
     RoadManager roads{-4, 4};
@@ -28,6 +29,22 @@ int main() {
     assert(sidewalks.remove_tile(1, -1));
     assert(sidewalks.connection_mask(1, 0) == (tile_connection_west | tile_connection_east));
     assert(sidewalks.connection_mask(1, -1) == 0);
+
+    // Dirt-path regression: the runtime path topology is the 4-bit N/E/S/W
+    // mask consumed by the 16 authored dirt sprites. Exercise every mask so a
+    // future topology change cannot silently select the wrong corner/end/T.
+    for (std::uint8_t expected = 0; expected < 16; ++expected) {
+        SidewalkManager dirt{-2, 2};
+        assert(dirt.place_tile(0, 0, "dirt_path"));
+        if ((expected & tile_connection_north) != 0) assert(dirt.place_tile(0, -1, "dirt_path"));
+        if ((expected & tile_connection_east) != 0) assert(dirt.place_tile(1, 0, "dirt_path"));
+        if ((expected & tile_connection_south) != 0) assert(dirt.place_tile(0, 1, "dirt_path"));
+        if ((expected & tile_connection_west) != 0) assert(dirt.place_tile(-1, 0, "dirt_path"));
+        const SidewalkTile* centre = dirt.tile_at(0, 0);
+        assert(centre != nullptr);
+        assert(centre->style_id == "dirt_path");
+        assert(dirt.connection_mask(0, 0) == expected);
+    }
 
     assert(roads.place_tile(0, 0));
     assert(roads.place_tile(0, 1));
