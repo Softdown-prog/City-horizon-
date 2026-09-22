@@ -1,0 +1,135 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.coffee_shop.01",
+  "displayName": "Cafeteria",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    320,
+    288
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2,
+    "occupiedCells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  "views": {
+    "south": {
+      "file": "coffee_shop_south.png",
+      "pivot": {
+        "x": 160,
+        "y": 179
+      },
+      "sha256": "0d74c5ccff4962d44decd71c89251fde1f4a55deb04095630061442ad8c43e3c"
+    },
+    "east": {
+      "file": "coffee_shop_east.png",
+      "pivot": {
+        "x": 160,
+        "y": 179
+      },
+      "sha256": "8cb16b3e4a186df5526b8a09dbc74c1ce455a316f30db224fef20bc6a2cbabbb"
+    },
+    "west": {
+      "file": "coffee_shop_west.png",
+      "pivot": {
+        "x": 160,
+        "y": 179
+      },
+      "sha256": "afe350e4f94c9d700b4927f30f1ac0c7688edffe45d395d3e9776bcd2f237710"
+    },
+    "north": {
+      "file": "coffee_shop_north.png",
+      "pivot": {
+        "x": 160,
+        "y": 179
+      },
+      "sha256": "bf882d5b95c80042cdb8674ad7c8e5c6c43da055ec3989a49e598175b3fd8d9a"
+    }
+  },
+  "spriteSheet": "coffee_shop_4view.png",
+  "sourceCommit": "936efb1e7dde6f5f2c35fce66d12a578635c5548",
+  "sourceWorkflowRun": 35739405296,
+  "sourceArtifactId": 10699429318,
+  "approvedProxySha256": "a6180f41325643351724e1ab4136374d70168f3f45593a50e8d4aafefefc5510",
+  "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess",
+  "approvedForRuntime": true,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "blueChannel": "unused",
+    "alpha": "coverage",
+    "scope": "wall_and_roof_only",
+    "views": {
+      "south": {
+        "file": "coffee_shop_south_mask.png",
+        "sha256": "a4afdf4e74a21f21a396ba4c97428f2af6644f3c8d70519ab909eb6f14dfac44",
+        "wallPixels": 7490,
+        "roofPixels": 15612,
+        "coveredPixels": 35970
+      },
+      "east": {
+        "file": "coffee_shop_east_mask.png",
+        "sha256": "7660c1930daa4c08085fd9a5e7ccb40b94c6bfd1ed5edb660ed416ea3621cf1a",
+        "wallPixels": 7775,
+        "roofPixels": 15608,
+        "coveredPixels": 35902
+      },
+      "west": {
+        "file": "coffee_shop_west_mask.png",
+        "sha256": "9eaf63e9842d3fab3be387ad1f15b9d914fe648142e05d6c535ef8f3b7e714fd",
+        "wallPixels": 11647,
+        "roofPixels": 16070,
+        "coveredPixels": 34339
+      },
+      "north": {
+        "file": "coffee_shop_north_mask.png",
+        "sha256": "6cd3c141f1708be37bb1432d836ce33784334a8e0d4d85efcfc6fffd28c6630d",
+        "wallPixels": 11589,
+        "roofPixels": 16062,
+        "coveredPixels": 34443
+      }
+    },
+    "fourView": {
+      "file": "coffee_shop_mask_4view.png",
+      "sha256": "f816f7f5a091e28ebb4718c4d1e600355e1f13e3a5d6e0fc5a05d27f1f15a63c"
+    },
+    "review": {
+      "file": "coffee_shop_mask_review.png",
+      "sha256": "3093f0d8c5e2ad00cc7fbcee2751a1297d35fe7c43c8a44ab806df3e9ae5351d"
+    },
+    "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
+    "runtimeTintingImplemented": false
+  }
+}
