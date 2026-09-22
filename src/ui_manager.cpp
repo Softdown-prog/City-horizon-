@@ -559,6 +559,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     const float toolbar_y = height - kToolbarHeight - kMargin;
     const float toolbar_width = std::max(100.0F, width - kMargin * 2.0F);
     const float context_width = std::clamp(toolbar_width * 0.25F, 190.0F, 330.0F);
+    const float context_x = kMargin + toolbar_width - context_width;
     const float tools_width = std::max(1.0F, toolbar_width - context_width - 8.0F);
     const float tool_width = tools_width / 7.0F;
     add_panel({kMargin, toolbar_y, toolbar_width, kToolbarHeight});
@@ -571,6 +572,14 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     add_button({kMargin + 4.0F + tool_width * 4.0F, tool_y, tool_width - 6.0F, tool_height}, "DEMOLIR", UiAction::activate_remove, true, model.active_tool == UiTool::remove);
     add_button({kMargin + 4.0F + tool_width * 5.0F, tool_y, tool_width - 6.0F, tool_height}, "AGRICULTURA", UiAction::open_agriculture_panel, true, model.active_tool == UiTool::agriculture);
     add_button({kMargin + 4.0F + tool_width * 6.0F, tool_y, tool_width - 6.0F, tool_height}, "DECORACAO", UiAction::activate_decoration, true, model.active_tool == UiTool::decoration);
+
+    if (model.placement_rotatable && model.active_tool == UiTool::buildings) {
+        constexpr float rotation_gap = 6.0F;
+        const float rotation_width = std::max(72.0F, (context_width - 18.0F - rotation_gap) * 0.5F);
+        const float rotation_y = toolbar_y + 39.0F;
+        add_button({context_x + 6.0F, rotation_y, rotation_width, 28.0F}, "ESQ", UiAction::rotate_left);
+        add_button({context_x + 12.0F + rotation_width, rotation_y, rotation_width, 28.0F}, "DIR", UiAction::rotate_right);
+    }
 
     if (model.build_panel_open) {
         const float maximum_panel_width = std::max(320.0F, width - kMargin * 2.0F);
@@ -994,7 +1003,11 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         std::string title = "SELECIONE UMA FERRAMENTA";
         std::string description = "ESCOLHA UMA CATEGORIA ABAIXO";
         switch (model_.active_tool) {
-            case UiTool::buildings: title = "MODO CONSTRUCOES"; description = model_.build_panel_open ? "SELECIONE UM ITEM PARA POSICIONAR" : "ESCOLHA UMA CONSTRUCAO"; break;
+            case UiTool::buildings:
+                title = "MODO CONSTRUCOES";
+                description = model_.placement_rotatable ? "ROTACIONE COM Z/X OU OS BOTOES" :
+                    (model_.build_panel_open ? "SELECIONE UM ITEM PARA POSICIONAR" : "ESCOLHA UMA CONSTRUCAO");
+                break;
             case UiTool::roads: title = "MODO ESTRADAS"; description = "CLIQUE E ARRASTE PARA CONSTRUIR"; break;
             case UiTool::sidewalks: title = "MODO CALCADAS"; description = "CLIQUE OU ARRASTE EM TERRENO PROPRIO"; break;
             case UiTool::land: title = "MODO TERRENO"; description = "SELECIONE UM TERRENO VIZINHO"; break;
