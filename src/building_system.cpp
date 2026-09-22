@@ -205,6 +205,8 @@ template <typename Number>
     definition.category = json_string(json, "category").value_or("other");
     definition.texture_path = json_string(json, "texture").value_or("");
     definition.requires_road_access = json_bool(json, "requiresRoadAccess").value_or(false);
+    definition.requires_road_or_path_access = json_bool(json, "requiresRoadOrPathAccess").value_or(false);
+    definition.grass_only = json_bool(json, "grassOnly").value_or(false);
     definition.footprint_width = json_number<int>(*footprint, "width").value_or(0);
     definition.footprint_height = json_number<int>(*footprint, "height").value_or(0);
     definition.build_cost = json_number<std::int64_t>(json, "buildCost").value_or(0);

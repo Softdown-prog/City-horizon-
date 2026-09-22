@@ -524,6 +524,52 @@ void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const 
     return false;
 }
 
+[[nodiscard]] bool building_has_required_edge_access(const BuildingDefinition& definition,
+                                                        const BuildingRotation rotation,
+                                                        const int tile_x, const int tile_y,
+                                                        const RoadManager& roads,
+                                                        const SidewalkManager& sidewalks) {
+    if (!definition.requires_road_or_path_access) {
+        return roads.has_required_road_access(definition, tile_x, tile_y, rotation);
+    }
+
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    const auto edge_is_accessible = [&](const int x, const int y) {
+        return roads.is_road(x, y) || sidewalks.is_sidewalk(x, y);
+    };
+    for (int x = 0; x < footprint.width; ++x) {
+        if (edge_is_accessible(tile_x + x, tile_y - 1) ||
+            edge_is_accessible(tile_x + x, tile_y + footprint.height)) {
+            return true;
+        }
+    }
+    for (int y = 0; y < footprint.height; ++y) {
+        if (edge_is_accessible(tile_x - 1, tile_y + y) ||
+            edge_is_accessible(tile_x + footprint.width, tile_y + y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] bool building_footprint_is_grass(const BuildingDefinition& definition,
+                                                const BuildingRotation rotation,
+                                                const int tile_x, const int tile_y,
+                                                const ch::MapDocument* map_document) {
+    if (!definition.grass_only || map_document == nullptr) return true;
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    for (int y = 0; y < footprint.height; ++y) {
+        for (int x = 0; x < footprint.width; ++x) {
+            const auto terrain = map_document->get_terrain_at(tile_x + x, tile_y + y);
+            // The runtime's implicit base terrain is grass. Explicit terrain
+            // entries must identify themselves as grass; water, sand and
+            // unresolved legacy terrain fail closed for grass-only props.
+            if (terrain && terrain->terrain_definition != "grass") return false;
+        }
+    }
+    return true;
+}
+
 [[nodiscard]] const char* placement_failure_text(PlacementFailure failure);
 
 struct BuildingPlacementValidation {
@@ -533,6 +579,8 @@ struct BuildingPlacementValidation {
     bool on_sidewalk = false;
     bool on_farm = false;
     bool on_owned_land = false;
+    bool on_allowed_terrain = true;
+    bool accepts_path_access = false;
     bool has_road_access = false;
     bool has_power = false;
 
@@ -542,14 +590,15 @@ struct BuildingPlacementValidation {
         // the catalogue at the base capacity made most civic/commercial
         // buildings impossible to add before the player could expand power.
         return failure == PlacementFailure::none && affordable && !on_road && !on_sidewalk && !on_farm &&
-               on_owned_land && has_road_access;
+               on_owned_land && on_allowed_terrain && has_road_access;
     }
 };
 
 [[nodiscard]] BuildingPlacementValidation validate_building_placement(
     const BuildingDefinition& definition, const BuildingRotation rotation, const int tile_x, const int tile_y,
     const BuildingManager& buildings, const RoadManager& roads, const LandManager& lands,
-    const SidewalkManager& sidewalks, const FarmingSystem& farming, const CityEconomy& economy, const PowerSystem& power) {
+    const SidewalkManager& sidewalks, const FarmingSystem& farming, const CityEconomy& economy, const PowerSystem& power,
+    const ch::MapDocument* map_document) {
     return {
         buildings.validate(definition, tile_x, tile_y, rotation),
         economy.can_afford(definition.build_cost),
@@ -557,7 +606,9 @@ struct BuildingPlacementValidation {
         building_overlaps_sidewalk(definition, rotation, tile_x, tile_y, sidewalks),
         building_overlaps_farm(definition, rotation, tile_x, tile_y, farming),
         building_is_on_owned_land(definition, rotation, tile_x, tile_y, lands),
-        roads.has_required_road_access(definition, tile_x, tile_y, rotation),
+        building_footprint_is_grass(definition, rotation, tile_x, tile_y, map_document),
+        definition.requires_road_or_path_access,
+        building_has_required_edge_access(definition, rotation, tile_x, tile_y, roads, sidewalks),
         power.can_support(definition),
     };
 }
@@ -578,8 +629,11 @@ struct BuildingPlacementValidation {
     if (validation.on_farm) {
         return "BUILDING BLOCKED BY FARM TILE";
     }
+    if (!validation.on_allowed_terrain) {
+        return "REQUIRES GRASS TILE";
+    }
     if (!validation.has_road_access) {
-        return "ROAD AT ENTRANCE REQUIRED";
+        return validation.accepts_path_access ? "ROAD OR PATH ADJACENCY REQUIRED" : "ROAD AT ENTRANCE REQUIRED";
     }
     if (!validation.affordable) {
         return "NOT ENOUGH FUNDS";
@@ -924,7 +978,10 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
 }
 
 [[nodiscard]] std::string catalog_requirements_label(const BuildingDefinition& definition) {
-    std::string label = definition.requires_road_access ? "RUA OBRIGATORIA" : "SEM RUA";
+    std::string label = definition.requires_road_or_path_access
+        ? "RUA OU CAMINHO ADJACENTE"
+        : (definition.requires_road_access ? "RUA OBRIGATORIA" : "SEM RUA");
+    if (definition.grass_only) label += " | SOMENTE GRAMA";
     if (definition.power_consumption != 0) {
         label += " | ENERGIA " + std::to_string(definition.power_consumption);
     } else if (definition.power_production != 0) {
@@ -1874,13 +1931,14 @@ int main() {
                         format_money(lvl_def.maintenance_per_month),
                         format_balance(lvl_def.tax_revenue_per_month - lvl_def.maintenance_per_month),
                         rotation_label(instance->rotation),
-                        roads.has_required_road_access(*definition, instance->tile_x, instance->tile_y, instance->rotation)
-                            ? "ROAD CONNECTED"
-                            : "NO ROAD",
+                        building_has_required_edge_access(*definition, instance->rotation, instance->tile_x, instance->tile_y, roads, sidewalks)
+                            ? (definition->requires_road_or_path_access ? "ROAD/PATH CONNECTED" : "ROAD CONNECTED")
+                            : (definition->requires_road_or_path_access ? "NO ROAD/PATH" : "NO ROAD"),
                         std::to_string(instance->instance_id),
                         has_commercial_demand ? std::to_string(commercial_demand_percent) + "%" : "",
                         (asset_root / definition->texture_path_for(instance->rotation, instance->current_level)).string(),
-                        definition->requires_road_access ? "REQUIRED" : "NOT REQUIRED",
+                        definition->requires_road_or_path_access ? "ROAD OR PATH" :
+                            (definition->requires_road_access ? "REQUIRED" : "NOT REQUIRED"),
                         lvl_def.power_consumption == 0 ? "" : std::to_string(lvl_def.power_consumption),
                         definition->power_production == 0 ? "" : "+" + std::to_string(definition->power_production),
                         lvl_def.residential_capacity == 0 ? "" : std::to_string(lvl_def.residential_capacity),
@@ -1950,7 +2008,7 @@ int main() {
                 if (const BuildingDefinition* definition = catalog.find(placement_definition_id)) {
                     const BuildingPlacementValidation validation = validate_building_placement(
                         *definition, placement_rotation, hovered_tile.first, hovered_tile.second,
-                        buildings, roads, lands, sidewalks, farming, economy, power);
+                        buildings, roads, lands, sidewalks, farming, economy, power, active_map_doc ? &*active_map_doc : nullptr);
                     model.debug_lines.push_back("PLACEMENT: " + std::string(validation.valid() ? "VALID" : placement_validation_text(validation)));
                     model.debug_lines.push_back("FRONTAGE: " + std::string(road_access_mode_label(resolved_road_access_mode(*definition))) +
                                                 " | " + access_points_label(*definition, placement_rotation));
@@ -2205,7 +2263,7 @@ int main() {
                     } else if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
                         const BuildingPlacementValidation validation = validate_building_placement(
                             *placement, placement_rotation, clicked_tile.first, clicked_tile.second,
-                            buildings, roads, lands, sidewalks, farming, economy, power);
+                            buildings, roads, lands, sidewalks, farming, economy, power, active_map_doc ? &*active_map_doc : nullptr);
                         if (!validation.valid()) {
                             status = placement_validation_text(validation);
                             (void)audio.play(SoundEvent::ui_error);
@@ -2724,7 +2782,7 @@ int main() {
         const BuildingPlacementValidation placement_validation = placement_definition == nullptr
             ? BuildingPlacementValidation{}
             : validate_building_placement(*placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second,
-                                          buildings, roads, lands, sidewalks, farming, economy, power);
+                                          buildings, roads, lands, sidewalks, farming, economy, power, active_map_doc ? &*active_map_doc : nullptr);
         const std::vector<TileCoordinate> road_preview = road_mode && !road_removal_mode
             ? roads.line_between(road_dragging ? road_drag_start : TileCoordinate{mouse_tile.first, mouse_tile.second},
                                  {mouse_tile.first, mouse_tile.second})

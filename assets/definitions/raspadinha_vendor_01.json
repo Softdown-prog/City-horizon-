@@ -1,0 +1,56 @@
+{
+  "id": "raspadinha_vendor_01",
+  "name": "Carrinho de Raspadinha",
+  "category": "decor",
+  "texture": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_south.png",
+  "sprites": {
+    "0": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_south.png",
+    "1": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_west.png",
+    "2": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_north.png",
+    "3": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_east.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.5,
+      "y": 0.66796875
+    },
+    "1": {
+      "x": 0.5,
+      "y": 0.66796875
+    },
+    "2": {
+      "x": 0.5,
+      "y": 0.66796875
+    },
+    "3": {
+      "x": 0.5,
+      "y": 0.66796875
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "animation": {
+    "layout": "horizontal",
+    "frameCount": 5,
+    "frameDurationMs": 180,
+    "playback": "ambient_once",
+    "idleFrame": 0,
+    "actionStartFrame": 1,
+    "actionFrameCount": 4,
+    "idleHoldMs": 7000
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_placement_candidate"
+}

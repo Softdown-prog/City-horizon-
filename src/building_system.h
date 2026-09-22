@@ -101,6 +101,11 @@ struct BuildingDefinition {
     // this is true. Save restoration deliberately does not retroactively apply
     // this gameplay rule to older cities.
     bool requires_road_access = false;
+    // Small roadside/pathside props may accept either a road edge or a path
+    // edge while still occupying their own grass tile. This is independent
+    // from the stricter building entrance road contract above.
+    bool requires_road_or_path_access = false;
+    bool grass_only = false;
     RoadAccessMode road_access_mode = RoadAccessMode::any_perimeter;
     // Lets code distinguish absent legacy data from an explicit
     // roadAccessMode: "any_perimeter" declaration.
