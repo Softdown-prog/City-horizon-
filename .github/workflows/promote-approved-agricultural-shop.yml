@@ -1,0 +1,198 @@
+name: Promote Approved Agricultural Shop
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/building.agricultural_shop.01.runtime.json"
+      - ".github/workflows/promote-approved-agricultural-shop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-runtime-agricultural-shop-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-agricultural-shop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read promotion contract
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('tools/ch_blender/promotions/building.agricultural_shop.01.runtime.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['contract'] == 'CH_RUNTIME_ASSET_PROMOTION_V1'
+          assert d['approved'] is True
+          assert d['assetId'] == 'building.agricultural_shop.01'
+          assert d['finalSize'] == [256, 256]
+          assert d['format'] == 'PNG_RGBA'
+          assert d['transparentBackground'] is True
+          assert d['directionOrder'] == ['south', 'east', 'west', 'north']
+          assert d['footprint'] == {'widthTiles': 2, 'depthTiles': 2}
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f"run_id={d['sourceWorkflowRun']}\n")
+              f.write(f"artifact_id={d['sourceArtifactId']}\n")
+              f.write(f"artifact_name={d['sourceArtifactName']}\n")
+              f.write(f"source_dir={d['sourceDir']}\n")
+              f.write(f"destination={d['destination']}\n")
+          PY
+
+      - name: Download approved CH Blender Stage 3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_promotion/source
+
+      - name: Canonical Tycoon Photo Studio post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_promotion/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_promotion/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE" \
+            --output out/runtime_promotion/final \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+      - name: Validate, clean shadow edge and stage runtime PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json, shutil
+
+          src = Path('out/runtime_promotion/final')
+          dst = Path('assets/buildings/agricultural_shop')
+          dst.mkdir(parents=True, exist_ok=True)
+          directions = ('south', 'east', 'west', 'north')
+          asset_id = 'building.agricultural_shop.01'
+          promotion_path = Path('tools/ch_blender/promotions/building.agricultural_shop.01.runtime.json')
+          promotion = json.loads(promotion_path.read_text(encoding='utf-8'))
+          bake_manifest = json.loads((src / f'{asset_id}_manifest.json').read_text(encoding='utf-8'))
+          views = {}
+
+          def guard_shadow_edge(final_im, color_im, border=8):
+              # The Blender object itself has a safe transparent margin. Only the
+              # very soft cast-shadow filter can reach the canvas edge. Fade that
+              # shadow-only residue to zero so runtime sprites have no background
+              # fringe/halo while preserving all object antialiasing.
+              final_im = final_im.convert('RGBA')
+              color_im = color_im.convert('RGBA')
+              fa = final_im.getchannel('A')
+              ca = color_im.getchannel('A')
+              fp = fa.load(); cp = ca.load()
+              w, h = final_im.size
+              for y in range(h):
+                  for x in range(w):
+                      if cp[x, y] != 0:
+                          continue
+                      dist = min(x, y, w - 1 - x, h - 1 - y)
+                      if dist >= border:
+                          continue
+                      fp[x, y] = int(round(fp[x, y] * max(0.0, dist / float(border))))
+              final_im.putalpha(fa)
+              return final_im
+
+          for idx, direction in enumerate(directions):
+              source = src / f'{asset_id}_{direction}.png'
+              color_pass = src / f'{asset_id}_{direction}_color_pass.png'
+              if not source.is_file() or not color_pass.is_file():
+                  raise SystemExit(f'missing post-process output for {direction}')
+              im = Image.open(source).convert('RGBA')
+              color = Image.open(color_pass).convert('RGBA')
+              if im.size != (256, 256) or color.size != (256, 256):
+                  raise SystemExit(f'{direction}: expected 256x256')
+              im = guard_shadow_edge(im, color)
+              alpha = im.getchannel('A')
+              lo, hi = alpha.getextrema()
+              if lo != 0 or hi != 255:
+                  raise SystemExit(f'{direction}: invalid alpha range {(lo, hi)}')
+              corners = [(0,0),(255,0),(0,255),(255,255)]
+              if any(alpha.getpixel(p) != 0 for p in corners):
+                  raise SystemExit(f'{direction}: background corners are not transparent')
+              target = dst / f'agricultural_shop_{direction}.png'
+              im.save(target)
+              views[direction] = {
+                  'file': target.name,
+                  'pivot': bake_manifest['views'][idx]['pivot'],
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+              }
+
+          sheet = Image.new('RGBA', (1024, 256), (0, 0, 0, 0))
+          for idx, direction in enumerate(directions):
+              sheet.alpha_composite(Image.open(dst / f'agricultural_shop_{direction}.png').convert('RGBA'), (idx * 256, 0))
+          sheet_target = dst / 'agricultural_shop_4view.png'
+          sheet.save(sheet_target)
+
+          runtime_manifest = {
+              'contract': 'CH_RUNTIME_BUILDING_V1',
+              'assetId': asset_id,
+              'displayName': 'Agricultural Shop',
+              'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'studioPreset': 'CH_TYCOON_STUDIO_V1',
+              'format': 'PNG_RGBA',
+              'frameSize': [256, 256],
+              'transparentBackground': True,
+              'directionOrder': list(directions),
+              'pivotPolicy': 'projected world origin fixed across directions',
+              'footprint': promotion['footprint'],
+              'views': views,
+              'spriteSheet': sheet_target.name,
+              'sourceCommit': promotion['sourceCommit'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'postProcess': 'CH_TYCOON_STUDIO_V1 canonical postprocess + shadow-only transparent edge guard',
+              'approvedForRuntime': True,
+          }
+          (dst / 'agricultural_shop.json').write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(runtime_manifest, indent=2))
+          PY
+
+      - name: Commit promoted runtime building
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/buildings/agricultural_shop
+          if git diff --cached --quiet; then
+            echo "Agricultural shop already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote approved agricultural shop to runtime"
+          git pull --rebase origin main
+          git push origin HEAD:main
