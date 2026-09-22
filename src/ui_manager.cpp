@@ -708,7 +708,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         };
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();
-        const float service_height = item.has_service_pricing ? 218.0F : 0.0F;
+        const float service_height = item.has_service_pricing ? 197.0F : 0.0F;
         const float color_height = item.has_color_customization ? 122.0F : 0.0F;
         const float required_height = 126.0F + service_height + color_height + static_cast<float>(detail_lines) * 17.0F;
         const float maximum_height = std::max(120.0F, toolbar_y - 92.0F);
@@ -1109,7 +1109,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
 
         float detail_y = 198.0F;
         if (item.has_service_pricing) {
-            const SDL_FRect service_card = {panel_x + 10.0F, 192.0F, 310.0F, 216.0F};
+            const SDL_FRect service_card = {panel_x + 10.0F, 192.0F, 310.0F, 195.0F};
             SDL_SetRenderDrawColor(renderer, 12, 35, 48, 244);
             SDL_RenderFillRect(renderer, &service_card);
             SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);
@@ -1133,14 +1133,10 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
 
             service_metric("service_demand", 280.0F, "DEMANDA", item.service_price_demand, 202, 219, 227);
             service_metric("service_customers", 301.0F, "CLIENTES / MES", item.service_customers_per_month, 202, 219, 227);
-            service_metric("service_stock", 322.0F, "INSUMOS", item.service_supply_status,
-                           item.service_supply_status.find("100%") != std::string::npos ? 181 : 255,
-                           item.service_supply_status.find("100%") != std::string::npos ? 221 : 188,
-                           item.service_supply_status.find("100%") != std::string::npos ? 154 : 128);
-            service_metric("service_revenue", 343.0F, "RECEITA VENDAS", item.service_revenue_per_month, 181, 221, 154);
-            service_metric("service_profit", 364.0F, "RESULTADO", item.service_net_per_month, 137, 226, 242);
-            service_metric("service_maintenance", 385.0F, "MANUTENCAO", item.monthly_maintenance + "/MES", 202, 219, 227);
-            detail_y = 418.0F;
+            service_metric("service_revenue", 322.0F, "RECEITA VENDAS", item.service_revenue_per_month, 181, 221, 154);
+            service_metric("service_profit", 343.0F, "RESULTADO", item.service_net_per_month, 137, 226, 242);
+            service_metric("service_maintenance", 364.0F, "MANUTENCAO", item.monthly_maintenance + "/MES", 202, 219, 227);
+            detail_y = 397.0F;
         }
         const auto detail = [&](const std::string& label, const std::string& value) {
             if (value.empty()) return;
@@ -1153,7 +1149,6 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             detail("RECEITA BASE", item.monthly_tax + "/MES"); detail("DEMANDA", item.commercial_demand);
             detail("RECEITA ESTIMADA", item.commercial_current_revenue + "/MES"); detail("MANUTENCAO", item.monthly_maintenance + "/MES");
         }
-        detail("ABASTECIMENTO LOCAL", item.local_supply);
         if (item.has_color_customization) {
             const float color_top = 84.0F + panel_height - 116.0F;
             SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);

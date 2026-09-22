@@ -5,7 +5,6 @@
 #include "farming_system.h"
 
 #include <algorithm>
-#include <unordered_map>
 
 CityEconomy::CityEconomy(const std::int64_t initial_funds)
     : funds_(initial_funds) {}
@@ -79,64 +78,7 @@ namespace {
     return level_def.maintenance_per_month;
 }
 
-[[nodiscard]] int scaled_service_input_units(const BuildingResourceInput& input,
-                                             const std::uint32_t customers,
-                                             const std::uint32_t base_customers) {
-    if (customers == 0 || base_customers == 0) return 0;
-    const std::uint64_t numerator = static_cast<std::uint64_t>(input.amount_per_month) * customers;
-    return static_cast<int>((numerator + base_customers - 1U) / base_customers);
-}
 
-void apply_service_supply(const BuildingDefinition& definition, const std::int64_t price,
-                          ServicePricingEstimate& estimate,
-                          const std::unordered_map<std::string, int>* inventory) {
-    estimate.supply_percent = 100;
-    if (definition.resource_inputs.empty() || inventory == nullptr || estimate.customers_before_supply == 0) {
-        estimate.customers_per_month = estimate.customers_before_supply;
-        estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
-        return;
-    }
-
-    for (const BuildingResourceInput& input : definition.resource_inputs) {
-        const int required = scaled_service_input_units(input, estimate.customers_before_supply,
-                                                        definition.base_service_customers_per_month);
-        if (required <= 0) continue;
-        const auto found = inventory->find(input.resource_id);
-        const int available = found == inventory->end() ? 0 : std::max(0, found->second);
-        const std::uint32_t input_percent = static_cast<std::uint32_t>(std::min<std::int64_t>(
-            100, static_cast<std::int64_t>(available) * 100 / required));
-        estimate.supply_percent = std::min(estimate.supply_percent, input_percent);
-    }
-    estimate.customers_per_month = static_cast<std::uint32_t>(
-        static_cast<std::uint64_t>(estimate.customers_before_supply) * estimate.supply_percent / 100U);
-    estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
-}
-
-void consume_service_inputs_from_inventory(const BuildingDefinition& definition,
-                                           const std::uint32_t served_customers,
-                                           std::unordered_map<std::string, int>& inventory) {
-    if (served_customers == 0 || definition.base_service_customers_per_month == 0) return;
-    for (const BuildingResourceInput& input : definition.resource_inputs) {
-        const int requested = scaled_service_input_units(input, served_customers,
-                                                         definition.base_service_customers_per_month);
-        if (requested <= 0) continue;
-        auto found = inventory.find(input.resource_id);
-        if (found == inventory.end()) continue;
-        found->second = std::max(0, found->second - std::min(requested, found->second));
-        if (found->second == 0) inventory.erase(found);
-    }
-}
-
-void consume_service_inputs(const BuildingDefinition& definition,
-                            const ServicePricingEstimate& estimate, FarmingSystem* farming) {
-    if (farming == nullptr || estimate.customers_per_month == 0 ||
-        definition.base_service_customers_per_month == 0) return;
-    for (const BuildingResourceInput& input : definition.resource_inputs) {
-        const int requested = scaled_service_input_units(input, estimate.customers_per_month,
-                                                         definition.base_service_customers_per_month);
-        if (requested > 0) (void)farming->try_remove_resource(input.resource_id, requested);
-    }
-}
 
 }  // namespace
 
@@ -192,17 +134,19 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
     estimate.customers_before_supply = static_cast<std::uint32_t>(
         static_cast<std::uint64_t>(definition.base_service_customers_per_month) *
         estimate.price_demand_percent * estimate.population_demand_percent / 10'000U);
-    const auto* inventory = farming == nullptr ? nullptr : &farming->inventory();
-    apply_service_supply(definition, price, estimate, inventory);
+    // Commerce demand is intentionally independent from farming stock. Crops are
+    // an agricultural production-and-sale loop, not ingredients required by shops.
+    estimate.supply_percent = 100;
+    estimate.customers_per_month = estimate.customers_before_supply;
+    estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
+    (void)farming;
     return estimate;
 }
 
 void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                           const PopulationSystem& population, const FarmingSystem* farming) {
     monthly_summary_ = {};
-    std::unordered_map<std::string, int> virtual_inventory = farming == nullptr
-        ? std::unordered_map<std::string, int>{}
-        : farming->inventory();
+    (void)farming;
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition == nullptr) {
@@ -210,14 +154,8 @@ void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, cons
         }
         const auto& level_def = instance.current_level_definition(*definition);
         monthly_summary_.revenue += monthly_tax_revenue_for(*definition, level_def, population);
-        ServicePricingEstimate service = service_pricing_estimate(*definition, instance, population.current_population());
-        if (farming != nullptr && !definition->resource_inputs.empty()) {
-            const std::int64_t price = std::clamp(
-                instance.service_price > 0 ? instance.service_price : definition->default_service_price,
-                definition->minimum_service_price, definition->maximum_service_price);
-            apply_service_supply(*definition, price, service, &virtual_inventory);
-            consume_service_inputs_from_inventory(*definition, service.customers_per_month, virtual_inventory);
-        }
+        const ServicePricingEstimate service = service_pricing_estimate(
+            *definition, instance, population.current_population());
         monthly_summary_.revenue += service.revenue_per_month;
         monthly_summary_.expenses += monthly_expense_for(level_def);
     }
@@ -246,25 +184,10 @@ void CityEconomy::on_month_closed(const BuildingManager& buildings, const Buildi
         if (service.revenue_per_month != 0) {
             record(EconomyTransactionType::service_revenue, service.revenue_per_month, closing_date, instance.instance_id);
         }
-        consume_service_inputs(*definition, service, farming);
         if (expense != 0) {
             record(EconomyTransactionType::maintenance, -expense, closing_date, instance.instance_id);
         }
-        // Service-priced shops consume resource inputs according to the customers
-        // actually served above. The legacy bonus path remains for non-service
-        // buildings only, preventing a second ingredient charge.
-        if (farming != nullptr && !definition->resource_inputs.empty() && definition->default_service_price <= 0) {
-            bool supplied = true;
-            for (const BuildingResourceInput& input : definition->resource_inputs) {
-                if (farming->inventory_count(input.resource_id) < input.amount_per_month) { supplied = false; break; }
-            }
-            if (supplied) {
-                std::int64_t bonus = 0;
-                for (const BuildingResourceInput& input : definition->resource_inputs) { (void)farming->try_remove_resource(input.resource_id, input.amount_per_month); bonus += input.local_supply_bonus; }
-                monthly_summary_.revenue += bonus;
-                if (bonus != 0) record(EconomyTransactionType::local_supply_bonus, bonus, closing_date, instance.instance_id);
-            }
-        }
+
     }
     if (vehicle_catalog != nullptr && vehicles != nullptr) {
         for (const ServiceVehicleInstance& vehicle : vehicles->instances()) {
