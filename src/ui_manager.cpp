@@ -91,6 +91,24 @@ void draw_text_centered(SDL_Renderer* renderer, const UiRect& bounds, float y, c
               printable, red, green, blue);
 }
 
+void draw_text_centered_fit(SDL_Renderer* renderer, const UiRect& bounds, float y, const std::string& text,
+                            Uint8 red = 238, Uint8 green = 244, Uint8 blue = 238) {
+    std::string printable = ascii_debug_text(text);
+    const float usable_width = std::max(0.0F, bounds.width - 10.0F);
+    const std::size_t maximum_characters = static_cast<std::size_t>(usable_width / 8.0F);
+    if (maximum_characters == 0) return;
+    if (printable.size() > maximum_characters) {
+        if (maximum_characters <= 3) printable.resize(maximum_characters);
+        else {
+            printable.resize(maximum_characters - 3);
+            printable += "...";
+        }
+    }
+    const float text_width = static_cast<float>(printable.size()) * 8.0F;
+    draw_text(renderer, bounds.x + std::max(5.0F, (bounds.width - text_width) * 0.5F), y,
+              printable, red, green, blue);
+}
+
 std::vector<std::string> wrap_debug_text(const std::string& text, const float available_width) {
     const std::size_t maximum_characters = static_cast<std::size_t>(std::max(0.0F, available_width) / 8.0F);
     if (maximum_characters == 0 || text.empty()) return {};
@@ -134,14 +152,17 @@ void draw_hud_panel(SDL_Renderer* renderer, const UiRect& bounds) {
 }
 
 void draw_toolbar_panel(SDL_Renderer* renderer, const UiRect& bounds) {
+    const SDL_FRect shadow = {bounds.x + 3.0F, bounds.y + 4.0F, bounds.width, bounds.height};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 74);
+    SDL_RenderFillRect(renderer, &shadow);
     const SDL_FRect rect = {bounds.x, bounds.y, bounds.width, bounds.height};
-    SDL_SetRenderDrawColor(renderer, 14, 35, 50, 246);
+    SDL_SetRenderDrawColor(renderer, 12, 32, 46, 248);
     SDL_RenderFillRect(renderer, &rect);
-    SDL_SetRenderDrawColor(renderer, 66, 105, 127, SDL_ALPHA_OPAQUE);
+    SDL_SetRenderDrawColor(renderer, 63, 105, 128, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &rect);
-    SDL_SetRenderDrawColor(renderer, 29, 62, 80, SDL_ALPHA_OPAQUE);
-    SDL_RenderLine(renderer, bounds.x + 1.0F, bounds.y + 2.0F,
-                   bounds.x + bounds.width - 1.0F, bounds.y + 2.0F);
+    SDL_SetRenderDrawColor(renderer, 78, 174, 199, SDL_ALPHA_OPAQUE);
+    SDL_RenderLine(renderer, bounds.x + 2.0F, bounds.y + 2.0F,
+                   bounds.x + bounds.width - 2.0F, bounds.y + 2.0F);
 }
 
 void draw_pause_panel(SDL_Renderer* renderer, const UiRect& bounds) {
@@ -382,15 +403,58 @@ void draw_button_content(SDL_Renderer* renderer, const UiButton& button) {
         SDL_RenderRect(renderer, &gear_center);
         return;
     }
-    const bool primary_tool = is_primary_tool_action(button.action);
-    if (primary_tool) draw_tool_icon(renderer, button.bounds.x + 10.0F, button.bounds.y + 7.0F, button.action);
+    if (is_primary_tool_action(button.action)) {
+        const float icon_x = button.bounds.x + std::max(4.0F, (button.bounds.width - 22.0F) * 0.5F);
+        draw_tool_icon(renderer, icon_x, button.bounds.y + 5.0F, button.action);
+        draw_text_centered_fit(renderer, button.bounds, button.bounds.y + button.bounds.height - 15.0F,
+                               button.label, button.enabled ? 236 : 128, button.enabled ? 244 : 137,
+                               button.enabled ? 248 : 144);
+        return;
+    }
+    if (button.action == UiAction::none && button.payload.rfind("build_category:", 0) == 0) {
+        draw_text_centered_fit(renderer, button.bounds, button.bounds.y + 11.0F, button.label,
+                               button.enabled ? 225 : 128, button.enabled ? 238 : 137,
+                               button.enabled ? 244 : 144);
+        return;
+    }
     const bool icon_text_control = button.action == UiAction::toggle_pause || button.action == UiAction::rotate_left || button.action == UiAction::rotate_right;
-    const float label_x = primary_tool ? 40.0F : (icon_text_control ? 36.0F : 8.0F);
+    const float label_x = icon_text_control ? 36.0F : 8.0F;
     draw_text(renderer, button.bounds.x + label_x, button.bounds.y + 13.0F, button.label,
               button.enabled ? 238 : 135, button.enabled ? 244 : 140, button.enabled ? 238 : 145);
 }
 
 void draw_button(SDL_Renderer* renderer, const UiButton& button) {
+    const bool primary_tool = is_primary_tool_action(button.action);
+    const bool category_tab = button.action == UiAction::none && button.payload.rfind("build_category:", 0) == 0;
+    if (primary_tool || category_tab) {
+        Uint8 red = category_tab ? 19 : 16;
+        Uint8 green = category_tab ? 48 : 45;
+        Uint8 blue = category_tab ? 64 : 62;
+        Uint8 border_red = 55, border_green = 98, border_blue = 120;
+        if (!button.enabled) {
+            red = 31; green = 39; blue = 44;
+            border_red = 55; border_green = 63; border_blue = 68;
+        } else if (button.state == UiButtonState::pressed || button.active) {
+            red = 22; green = 78; blue = 99;
+            border_red = 91; border_green = 188; border_blue = 211;
+        } else if (button.state == UiButtonState::hover) {
+            red = 22; green = 61; blue = 78;
+            border_red = 77; border_green = 143; border_blue = 168;
+        }
+        const SDL_FRect rect = {button.bounds.x, button.bounds.y, button.bounds.width, button.bounds.height};
+        SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, border_red, border_green, border_blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderRect(renderer, &rect);
+        if (button.active && button.enabled) {
+            SDL_SetRenderDrawColor(renderer, 104, 211, 231, SDL_ALPHA_OPAQUE);
+            SDL_RenderLine(renderer, button.bounds.x + 3.0F, button.bounds.y + button.bounds.height - 3.0F,
+                           button.bounds.x + button.bounds.width - 3.0F, button.bounds.y + button.bounds.height - 3.0F);
+        }
+        draw_button_content(renderer, button);
+        return;
+    }
+
     const bool hud_control = button.action == UiAction::toggle_pause || button.action == UiAction::open_administration || button.action == UiAction::open_settings;
     Uint8 red = hud_control ? 23 : 52, green = hud_control ? 78 : 80, blue = hud_control ? 109 : 66;
     if (!button.enabled) { red = 42; green = 47; blue = 48; }
@@ -802,6 +866,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         }
     };
     const auto draw_chrome_button = [&](const UiButton& button) -> bool {
+        if (is_primary_tool_action(button.action)) return false;
         const char* chrome_name = chrome_name_for(button.action);
         if (chrome_name == nullptr) return false;
         const UiThumbnail* chrome = thumbnail_for(renderer, ui_chrome_path(chrome_name));
@@ -814,7 +879,8 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         return true;
     };
     const auto draw_state_atlas_button = [&](const UiButton& button) -> bool {
-        if (button.build_card) return false;
+        if (button.build_card || is_primary_tool_action(button.action) ||
+            (button.action == UiAction::none && button.payload.rfind("build_category:", 0) == 0)) return false;
         const UiButtonState state = !button.enabled ? UiButtonState::disabled : (button.active ? UiButtonState::pressed : button.state);
         const bool is_close = button.action == UiAction::close_modal || button.action == UiAction::close_selection;
         const bool is_back = button.action == UiAction::open_administration && model_.overlay == UiOverlay::reports;
@@ -970,11 +1036,12 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         }
     }
     for (const UiButton& button : buttons_) {
-        if (button.build_card || chrome_name_for(button.action) != nullptr) continue;
+        if (button.build_card) continue;
         if (button.action == UiAction::close_selection || button.action == UiAction::close_modal) continue;
         if (const char* icon_name = icon_name_for(button.action)) {
             const bool primary_tool = is_primary_tool_action(button.action);
-            const SDL_FRect icon_bounds = primary_tool ? SDL_FRect{button.bounds.x + 9.0F, button.bounds.y + 5.0F, 26.0F, 25.0F}
+            const SDL_FRect icon_bounds = primary_tool
+                ? SDL_FRect{button.bounds.x + std::max(4.0F, (button.bounds.width - 30.0F) * 0.5F), button.bounds.y + 4.0F, 30.0F, 27.0F}
                 : SDL_FRect{button.bounds.x + 5.0F, button.bounds.y + 5.0F, 22.0F, 22.0F};
             draw_ui_icon(icon_name, icon_bounds);
         }
@@ -1294,30 +1361,90 @@ const GameplayUi::UiThumbnail* GameplayUi::thumbnail_for(SDL_Renderer* renderer,
 }
 
 void GameplayUi::render_build_card(SDL_Renderer* renderer, const UiButton& button) const {
-    Uint8 red = 25, green = 56, blue = 73;
-    if (!button.enabled) { red = 32; green = 40; blue = 46; }
-    else if (button.state == UiButtonState::pressed || button.active) { red = 28; green = 104; blue = 131; }
-    else if (button.state == UiButtonState::hover) { red = 37; green = 78; blue = 99; }
+    std::string category = button.detail;
+    std::string cost;
+    std::string footprint;
+    const std::string separator = "  |  ";
+    const std::size_t first = category.find(separator);
+    if (first != std::string::npos) {
+        cost = category.substr(first + separator.size());
+        category.resize(first);
+        const std::size_t second = cost.find(separator);
+        if (second != std::string::npos) {
+            footprint = cost.substr(second + separator.size());
+            cost.resize(second);
+        }
+    }
+
+    const SDL_FRect shadow = {button.bounds.x + 2.0F, button.bounds.y + 3.0F, button.bounds.width, button.bounds.height};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 68);
+    SDL_RenderFillRect(renderer, &shadow);
+
+    Uint8 red = 20, green = 49, blue = 65;
+    Uint8 border_red = 59, border_green = 104, border_blue = 126;
+    if (!button.enabled) {
+        red = 30; green = 38; blue = 43;
+        border_red = 62; border_green = 70; border_blue = 75;
+    } else if (button.state == UiButtonState::pressed || button.active) {
+        red = 22; green = 72; blue = 91;
+        border_red = 100; border_green = 197; border_blue = 219;
+    } else if (button.state == UiButtonState::hover) {
+        red = 25; green = 62; blue = 80;
+        border_red = 77; border_green = 145; border_blue = 169;
+    }
+
     const SDL_FRect card = {button.bounds.x, button.bounds.y, button.bounds.width, button.bounds.height};
-    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &card);
-    SDL_SetRenderDrawColor(renderer, button.active ? 112 : 74, button.active ? 192 : 125, button.active ? 218 : 148, SDL_ALPHA_OPAQUE); SDL_RenderRect(renderer, &card);
-    const SDL_FRect preview = {button.bounds.x + 7.0F, button.bounds.y + 7.0F, 82.0F, 82.0F};
-    SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &preview);
+    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &card);
+    SDL_SetRenderDrawColor(renderer, border_red, border_green, border_blue, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &card);
+    if (button.active && button.enabled) {
+        const SDL_FRect accent = {button.bounds.x + 1.0F, button.bounds.y + 1.0F, 4.0F, button.bounds.height - 2.0F};
+        SDL_SetRenderDrawColor(renderer, 103, 208, 228, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(renderer, &accent);
+    }
+
+    const float preview_size = std::clamp(button.bounds.height - 16.0F, 64.0F, 92.0F);
+    const SDL_FRect preview = {button.bounds.x + 8.0F, button.bounds.y + 8.0F, preview_size, preview_size};
+    SDL_SetRenderDrawColor(renderer, 10, 28, 40, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &preview);
+    SDL_SetRenderDrawColor(renderer, 48, 86, 105, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &preview);
     if (const UiThumbnail* thumbnail = thumbnail_for(renderer, button.thumbnail_path)) {
         const float scale = std::min(preview.w / thumbnail->width, preview.h / thumbnail->height);
-        const SDL_FRect destination = {preview.x + (preview.w - thumbnail->width * scale) * 0.5F, preview.y + (preview.h - thumbnail->height * scale) * 0.5F, thumbnail->width * scale, thumbnail->height * scale};
+        const SDL_FRect destination = {preview.x + (preview.w - thumbnail->width * scale) * 0.5F,
+                                       preview.y + (preview.h - thumbnail->height * scale) * 0.5F,
+                                       thumbnail->width * scale, thumbnail->height * scale};
         SDL_RenderTexture(renderer, thumbnail->texture, nullptr, &destination);
-    } else {
-        SDL_SetRenderDrawColor(renderer, 74, 112, 127, SDL_ALPHA_OPAQUE); SDL_RenderRect(renderer, &preview);
-        if (button.thumbnail_path.empty()) draw_text(renderer, preview.x + 25.0F, preview.y + 22.0F, "$", 182, 210, 111);
+    } else if (button.thumbnail_path.empty()) {
+        draw_text(renderer, preview.x + preview.w * 0.5F - 4.0F, preview.y + preview.h * 0.5F - 4.0F,
+                  "$", 182, 210, 111);
     }
-    const float text_x = button.bounds.x + 101.0F;
-    const float text_width = button.bounds.width - 109.0F;
-    draw_text_fit(renderer, text_x, button.bounds.y + 10.0F, text_width, button.label, button.enabled ? 236 : 142, button.enabled ? 244 : 149, button.enabled ? 246 : 154);
-    draw_text_fit(renderer, text_x, button.bounds.y + 28.0F, text_width, button.detail, button.enabled ? 165 : 113, button.enabled ? 193 : 126, button.enabled ? 204 : 135);
-    draw_text_fit(renderer, text_x, button.bounds.y + 46.0F, text_width, button.requirements, button.enabled ? 177 : 122, button.enabled ? 207 : 135, button.enabled ? 215 : 143);
-    if (button.active) draw_text(renderer, text_x, button.bounds.y + 66.0F, "SELECIONADO", 173, 231, 245);
-    else if (!button.enabled) draw_text(renderer, text_x, button.bounds.y + 66.0F, "INDISPONIVEL", 205, 144, 135);
+
+    const float text_x = preview.x + preview.w + 11.0F;
+    const float text_width = std::max(24.0F, button.bounds.x + button.bounds.width - text_x - 9.0F);
+    draw_text_fit(renderer, text_x, button.bounds.y + 9.0F, text_width, button.label,
+                  button.enabled ? 238 : 145, button.enabled ? 246 : 151, button.enabled ? 249 : 156);
+    if (button.bounds.height >= 104.0F) {
+        draw_text_fit(renderer, text_x, button.bounds.y + 26.0F, text_width, category,
+                      button.enabled ? 143 : 105, button.enabled ? 178 : 116, button.enabled ? 194 : 123);
+        draw_text_fit(renderer, text_x, button.bounds.y + 44.0F, text_width, "CUSTO  " + cost,
+                      button.enabled ? 181 : 113, button.enabled ? 221 : 125, button.enabled ? 154 : 120);
+        draw_text_fit(renderer, text_x, button.bounds.y + 61.0F, text_width, "LOTE  " + footprint,
+                      button.enabled ? 183 : 116, button.enabled ? 207 : 128, button.enabled ? 218 : 134);
+        draw_text_fit(renderer, text_x, button.bounds.y + 78.0F, text_width, button.requirements,
+                      button.enabled ? 202 : 126, button.enabled ? 219 : 137, button.enabled ? 227 : 144);
+    } else {
+        draw_text_fit(renderer, text_x, button.bounds.y + 29.0F, text_width, "CUSTO  " + cost,
+                      button.enabled ? 181 : 113, button.enabled ? 221 : 125, button.enabled ? 154 : 120);
+        draw_text_fit(renderer, text_x, button.bounds.y + 46.0F, text_width, "LOTE  " + footprint,
+                      button.enabled ? 183 : 116, button.enabled ? 207 : 128, button.enabled ? 218 : 134);
+        draw_text_fit(renderer, text_x, button.bounds.y + 63.0F, text_width, button.requirements,
+                      button.enabled ? 202 : 126, button.enabled ? 219 : 137, button.enabled ? 227 : 144);
+    }
+    const float state_y = button.bounds.y + button.bounds.height - 14.0F;
+    if (button.active) draw_text_fit(renderer, text_x, state_y, text_width, "SELECIONADO", 137, 226, 242);
+    else if (!button.enabled) draw_text_fit(renderer, text_x, state_y, text_width, "INDISPONIVEL", 211, 147, 138);
 }
 
 UiButtonState GameplayUi::state_for(const UiButton& button, float mouse_x, float mouse_y, bool pressed) {
