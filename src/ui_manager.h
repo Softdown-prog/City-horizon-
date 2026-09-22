@@ -55,10 +55,15 @@ enum class UiAction : std::uint8_t {
     open_administration,
     open_reports,
     open_settings,
+    open_main_menu,
     open_save_load,
     save_game,
     load_game,
     back_to_pause,
+    back_from_save_load,
+    open_quit_confirm,
+    cancel_quit,
+    quit_game,
     close_modal,
     settings_reset,
     settings_cancel,
@@ -75,7 +80,9 @@ enum class UiOverlay : std::uint8_t {
     administration,
     reports,
     settings,
+    main_menu,
     save_load,
+    quit_confirm,
 };
 
 struct UiActionEvent {

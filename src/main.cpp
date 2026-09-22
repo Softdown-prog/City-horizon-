@@ -1483,6 +1483,9 @@ int main() {
     TileCoordinate planting_drag_start;
     std::string status = "CLICK A BUILDING TO SELECT IT";
     UiOverlay active_overlay = UiOverlay::none;
+    UiOverlay settings_return_overlay = UiOverlay::none;
+    UiOverlay save_load_return_overlay = UiOverlay::pause;
+    UiOverlay quit_return_overlay = UiOverlay::pause;
     bool debug_visible = false;
     bool navigation_debug_uses_roads = true;
     std::optional<NavigationTile> navigation_debug_start;
@@ -1757,12 +1760,21 @@ int main() {
                 (void)audio.play(SoundEvent::ui_open_panel);
                 break;
             case UiAction::open_settings:
+                settings_return_overlay = active_overlay == UiOverlay::pause || active_overlay == UiOverlay::main_menu
+                    ? active_overlay : UiOverlay::none;
                 active_overlay = UiOverlay::settings;
                 status = "SETTINGS OPEN";
                 (void)audio.play(SoundEvent::ui_open_panel);
                 break;
+            case UiAction::open_main_menu:
+                if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                active_overlay = UiOverlay::main_menu;
+                status = "MAIN MENU OPEN";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
             case UiAction::open_save_load:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                save_load_return_overlay = active_overlay == UiOverlay::main_menu ? UiOverlay::main_menu : UiOverlay::pause;
                 active_overlay = UiOverlay::save_load;
                 status = std::filesystem::exists(save_path) ? "SAVE SLOT READY" : "SAVE SLOT EMPTY";
                 (void)audio.play(SoundEvent::ui_open_panel);
@@ -1779,10 +1791,38 @@ int main() {
                 status = "GAME PAUSED";
                 (void)audio.play(SoundEvent::ui_back);
                 break;
+            case UiAction::back_from_save_load:
+                if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                active_overlay = save_load_return_overlay;
+                status = active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "GAME PAUSED";
+                (void)audio.play(SoundEvent::ui_back);
+                break;
+            case UiAction::open_quit_confirm:
+                if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                quit_return_overlay = active_overlay == UiOverlay::main_menu ? UiOverlay::main_menu : UiOverlay::pause;
+                active_overlay = UiOverlay::quit_confirm;
+                status = "CONFIRM EXIT";
+                (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::cancel_quit:
+                active_overlay = quit_return_overlay;
+                status = active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "GAME PAUSED";
+                (void)audio.play(SoundEvent::ui_back);
+                break;
+            case UiAction::quit_game:
+                status = "EXITING CITY HORIZON";
+                (void)audio.play(SoundEvent::ui_confirm);
+                running = false;
+                break;
             case UiAction::close_modal:
-            case UiAction::settings_cancel:
                 active_overlay = UiOverlay::none;
                 status = "PANEL CLOSED";
+                (void)audio.play(SoundEvent::ui_close_panel);
+                break;
+            case UiAction::settings_cancel:
+                active_overlay = settings_return_overlay;
+                status = active_overlay == UiOverlay::pause ? "GAME PAUSED" :
+                    (active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "PANEL CLOSED");
                 (void)audio.play(SoundEvent::ui_close_panel);
                 break;
             case UiAction::settings_reset:
@@ -1802,8 +1842,9 @@ int main() {
                 volumes.master = static_cast<float>(master_percent) / 100.0F;
                 volumes.effects = static_cast<float>(effects_percent) / 100.0F;
                 audio.set_volume_settings(volumes);
-                active_overlay = UiOverlay::none;
-                status = "SETTINGS APPLIED";
+                active_overlay = settings_return_overlay;
+                status = active_overlay == UiOverlay::pause ? "SETTINGS APPLIED - GAME PAUSED" :
+                    (active_overlay == UiOverlay::main_menu ? "SETTINGS APPLIED - MAIN MENU" : "SETTINGS APPLIED");
                 (void)audio.play(SoundEvent::ui_confirm);
                 break;
             }
@@ -2506,7 +2547,13 @@ int main() {
                         if (active_overlay == UiOverlay::pause) {
                             apply_ui_action({UiAction::resume_game, {}});
                         } else if (active_overlay == UiOverlay::save_load) {
+                            apply_ui_action({UiAction::back_from_save_load, {}});
+                        } else if (active_overlay == UiOverlay::settings) {
+                            apply_ui_action({UiAction::settings_cancel, {}});
+                        } else if (active_overlay == UiOverlay::main_menu) {
                             apply_ui_action({UiAction::back_to_pause, {}});
+                        } else if (active_overlay == UiOverlay::quit_confirm) {
+                            apply_ui_action({UiAction::cancel_quit, {}});
                         } else {
                             active_overlay = UiOverlay::none;
                             status = "PANEL CLOSED";

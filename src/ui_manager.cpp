@@ -538,9 +538,34 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         pause_button(0, "CONTINUAR", UiAction::resume_game, true);
         pause_button(1, "SALVAR JOGO", UiAction::open_save_load, true);
         pause_button(2, "CARREGAR JOGO", UiAction::open_save_load, true);
-        pause_button(3, "CONFIGURACOES", UiAction::none, false);
-        pause_button(4, "MENU PRINCIPAL", UiAction::none, false);
-        pause_button(5, "SAIR DO JOGO", UiAction::none, false);
+        pause_button(3, "CONFIGURACOES", UiAction::open_settings, true);
+        pause_button(4, "MENU PRINCIPAL", UiAction::open_main_menu, true);
+        pause_button(5, "SAIR DO JOGO", UiAction::open_quit_confirm, true);
+    } else if (model.overlay == UiOverlay::main_menu) {
+        const float panel_width = std::min(560.0F, std::max(340.0F, width - 48.0F));
+        const float panel_height = std::min(520.0F, std::max(430.0F, height - 64.0F));
+        const UiRect panel = {(width - panel_width) * 0.5F, (height - panel_height) * 0.5F, panel_width, panel_height};
+        overlay_bounds_ = panel;
+        const float padding = std::clamp(panel.width * 0.065F, 22.0F, 36.0F);
+        const float button_width = panel.width - padding * 2.0F;
+        const float button_top = panel.y + 190.0F;
+        const float button_gap = 10.0F;
+        const float button_height = 48.0F;
+        add_button({panel.x + padding, button_top, button_width, button_height}, "CONTINUAR CIDADE", UiAction::resume_game);
+        add_button({panel.x + padding, button_top + (button_height + button_gap), button_width, button_height}, "SALVAR / CARREGAR", UiAction::open_save_load);
+        add_button({panel.x + padding, button_top + (button_height + button_gap) * 2.0F, button_width, button_height}, "CONFIGURACOES", UiAction::open_settings);
+        add_button({panel.x + padding, button_top + (button_height + button_gap) * 3.0F, button_width, button_height}, "SAIR DO JOGO", UiAction::open_quit_confirm);
+    } else if (model.overlay == UiOverlay::quit_confirm) {
+        const float panel_width = std::min(500.0F, std::max(340.0F, width - 48.0F));
+        const float panel_height = std::min(300.0F, std::max(260.0F, height - 96.0F));
+        const UiRect panel = {(width - panel_width) * 0.5F, (height - panel_height) * 0.5F, panel_width, panel_height};
+        overlay_bounds_ = panel;
+        const float padding = std::clamp(panel.width * 0.07F, 24.0F, 36.0F);
+        const float gap = 12.0F;
+        const float button_width = (panel.width - padding * 2.0F - gap) * 0.5F;
+        const float button_y = panel.y + panel.height - 70.0F;
+        add_button({panel.x + padding, button_y, button_width, 44.0F}, "CANCELAR", UiAction::cancel_quit);
+        add_button({panel.x + padding + button_width + gap, button_y, button_width, 44.0F}, "SAIR", UiAction::quit_game);
     } else if (model.overlay == UiOverlay::save_load) {
         const float panel_width = std::min(620.0F, std::max(360.0F, width - 48.0F));
         const float panel_height = std::min(440.0F, std::max(370.0F, height - 64.0F));
@@ -553,7 +578,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         const float button_width = available / 3.0F;
         add_button({panel.x + horizontal_padding, button_y, button_width, 42.0F}, "SALVAR AGORA", UiAction::save_game);
         add_button({panel.x + horizontal_padding + button_width + button_gap, button_y, button_width, 42.0F}, "CARREGAR", UiAction::load_game, model.save_available);
-        add_button({panel.x + horizontal_padding + (button_width + button_gap) * 2.0F, button_y, button_width, 42.0F}, "VOLTAR", UiAction::back_to_pause);
+        add_button({panel.x + horizontal_padding + (button_width + button_gap) * 2.0F, button_y, button_width, 42.0F}, "VOLTAR", UiAction::back_from_save_load);
     } else if (model.overlay == UiOverlay::settings) {
         const float panel_width = std::min(620.0F, std::max(360.0F, width - 48.0F));
         const float panel_height = std::min(470.0F, std::max(390.0F, height - 64.0F));
@@ -852,6 +877,48 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                 }
             }
             draw_text_centered(renderer, panel, panel.y + panel.height - 25.0F, "ESC  -  CONTINUAR", 158, 186, 199);
+            return;
+        }
+
+        if (model_.overlay == UiOverlay::main_menu) {
+            draw_pause_panel(renderer, panel);
+            draw_text_centered(renderer, panel, panel.y + 38.0F, "CITY HORIZON", 238, 246, 249);
+            draw_text_centered(renderer, panel, panel.y + 68.0F, "MENU PRINCIPAL", 158, 186, 199);
+
+            const float info_x = panel.x + std::clamp(panel.width * 0.08F, 28.0F, 44.0F);
+            const float info_width = panel.width - (info_x - panel.x) * 2.0F;
+            const SDL_FRect info = {info_x, panel.y + 98.0F, info_width, 68.0F};
+            SDL_SetRenderDrawColor(renderer, 20, 44, 59, 252);
+            SDL_RenderFillRect(renderer, &info);
+            SDL_SetRenderDrawColor(renderer, 64, 103, 123, SDL_ALPHA_OPAQUE);
+            SDL_RenderRect(renderer, &info);
+            draw_text(renderer, info.x + 14.0F, info.y + 12.0F, "CIDADE ATUAL", 158, 186, 199);
+            draw_text_fit(renderer, info.x + 14.0F, info.y + 33.0F, info.w - 28.0F,
+                          model_.day_month + " | " + model_.year + " | " + model_.funds, 219, 232, 238);
+            draw_text_fit(renderer, info.x + 14.0F, info.y + 50.0F, info.w - 28.0F,
+                          "POPULACAO " + model_.population + " / " + model_.residential_capacity, 158, 186, 199);
+
+            for (const UiButton& button : buttons_) {
+                if (button.action == UiAction::resume_game || button.action == UiAction::open_save_load ||
+                    button.action == UiAction::open_settings || button.action == UiAction::open_quit_confirm) {
+                    draw_pause_button(renderer, button);
+                }
+            }
+            draw_text_centered(renderer, panel, panel.y + panel.height - 20.0F, "ESC  -  VOLTAR AO PAUSE", 158, 186, 199);
+            return;
+        }
+
+        if (model_.overlay == UiOverlay::quit_confirm) {
+            draw_pause_panel(renderer, panel);
+            draw_text_centered(renderer, panel, panel.y + 42.0F, "SAIR DO JOGO?", 238, 246, 249);
+            draw_text_centered(renderer, panel, panel.y + 82.0F, "ALTERACOES NAO SALVAS SERAO PERDIDAS", 255, 180, 160);
+            draw_text_centered(renderer, panel, panel.y + 108.0F, "SALVE A CIDADE ANTES DE ENCERRAR SE NECESSARIO", 158, 186, 199);
+            for (const UiButton& button : buttons_) {
+                if (button.action == UiAction::cancel_quit || button.action == UiAction::quit_game) {
+                    draw_pause_button(renderer, button);
+                }
+            }
+            draw_text_centered(renderer, panel, panel.y + panel.height - 20.0F, "ESC  -  CANCELAR", 158, 186, 199);
             return;
         }
 
