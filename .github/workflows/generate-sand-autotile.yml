@@ -41,7 +41,7 @@ jobs:
           python tools/ground_tile_worker.py \
             Converter/file_00000000a974820eafcd5ead28332854.png \
             assets/terrain/sand_isometric_01.png \
-            --strip-edge-band 6 \
+            --strip-edge-band 12 \
             --preview out/sand_repeated_preview.png \
             --report out/sand_ground_tile_report.json
 
