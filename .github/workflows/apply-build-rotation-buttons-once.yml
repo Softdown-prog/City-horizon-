@@ -1,0 +1,66 @@
+name: Apply Build Rotation Buttons Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-build-rotation-buttons-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-rotation-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Apply rotation controls
+        run: python3 tools/apply_build_rotation_buttons.py
+
+      - name: Validate focused change
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          ui = Path('src/ui_manager.cpp').read_text(encoding='utf-8')
+          main = Path('src/main.cpp').read_text(encoding='utf-8')
+          for token in [
+              'model.placement_rotatable && model.active_tool == UiTool::buildings',
+              'UiAction::rotate_left',
+              'UiAction::rotate_right',
+              '"ESQ"',
+              '"DIR"',
+              'ROTACIONE COM Z/X OU OS BOTOES',
+          ]:
+              assert token in ui, token
+          for token in [
+              'placement_rotation = placement->next_supported_rotation(placement_rotation, clockwise)',
+              'case UiAction::rotate_left: rotate_placement(false); break;',
+              'case UiAction::rotate_right: rotate_placement(true); break;',
+              'case SDL_SCANCODE_Z:',
+              'case SDL_SCANCODE_X:',
+          ]:
+              assert token in main, token
+          PY
+
+      - name: Remove one-shot helpers
+        run: |
+          rm tools/apply_build_rotation_buttons.py
+          rm .github/workflows/apply-build-rotation-buttons-once.yml
+
+      - name: Commit integration
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'openai@users.noreply.github.com'
+          git add src/ui_manager.cpp tools/apply_build_rotation_buttons.py .github/workflows/apply-build-rotation-buttons-once.yml
+          git commit -m 'Expose build rotation controls in gameplay UI'
+          git pull --rebase origin main
+          git push origin main
