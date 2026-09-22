@@ -1,0 +1,24 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_PROMOTION_V1",
+  "approved": true,
+  "assetId": "building.bakery.01",
+  "displayName": "Padaria",
+  "fileStem": "bakery",
+  "sourceCommit": "325452f91363e0af31568095232c15f6395a7703",
+  "sourceWorkflowRun": 35729309430,
+  "sourceArtifactId": 10694909449,
+  "sourceArtifactName": "CH-Blender-Agent-35729309430-1",
+  "sourceDir": "building.bakery.01.final.002",
+  "destination": "assets/buildings/bakery",
+  "approvedProxySha256": "6e3a3d94d5943566f25bb75d59ff16b0da1125f6c5f2926c210a2187261eb6e7",
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage"
+  }
+}
