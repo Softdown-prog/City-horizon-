@@ -1,0 +1,22 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_ferris_wheel.final.002",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_ferris_wheel_final_guarded.py",
+  "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "ef53a3a04b7877c42e64c82d2d022ab7ece0f67af31db709528f020ca3e56a6b"
+  },
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/park_ferris_wheel_3x2.ferris.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/attraction.park_ferris_wheel.final.v2",
+    "--save-blend",
+    "out/ch_blender_agent/attraction.park_ferris_wheel.final.v2/attraction.park_ferris_wheel.final.blend"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.park_ferris_wheel.final.v2"
+}
