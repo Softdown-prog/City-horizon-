@@ -32,6 +32,7 @@ for p in (str(HERE), str(CH_BLENDER)):
 
 import build_scene as bs  # noqa: E402
 import build_raspadinha_vendor_animated_guarded as anim  # noqa: E402
+import raspadinha_vendor_greet_v1 as greet  # noqa: E402
 import scene_gate  # noqa: E402
 
 ASSET_ID = anim.ASSET_ID
@@ -211,6 +212,10 @@ def main():
     args = parse_args()
     profile = scene_gate.load_profile(args.preflight_profile)
     studio, scene, root, ground, authored, out = anim.build_scene_for_gate(args)
+
+    # Override only the GREET key poses. The static/idle baseline and all other
+    # authored states remain untouched.
+    greet.apply()
 
     preflight = run_animation_preflight(scene, root, authored, profile, out)
     scene_gate.require_pass(preflight)
