@@ -1,0 +1,164 @@
+name: Promote Approved Runtime Asset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/*.runtime.json"
+      - ".github/workflows/promote-approved-runtime-asset.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-runtime-asset-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-raspadinha-vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read promotion contract
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('tools/ch_blender/promotions/prop.raspadinha_vendor.01.runtime.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['contract'] == 'CH_RUNTIME_ASSET_PROMOTION_V1'
+          assert d['approved'] is True
+          assert d['assetId'] == 'prop.raspadinha_vendor.01'
+          assert d['finalSize'] == [256, 256]
+          assert d['format'] == 'PNG_RGBA'
+          assert d['transparentBackground'] is True
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f"run_id={d['sourceWorkflowRun']}\n")
+              f.write(f"artifact_id={d['sourceArtifactId']}\n")
+              f.write(f"artifact_name={d['sourceArtifactName']}\n")
+              f.write(f"source_dir={d['sourceDir']}\n")
+              f.write(f"destination={d['destination']}\n")
+          PY
+
+      - name: Download approved Stage 3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_promotion/source
+
+      - name: Canonical post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_promotion/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_promotion/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE" \
+            --output out/runtime_promotion/final \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+
+      - name: Validate and stage runtime PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import json, hashlib, shutil
+
+          src = Path('out/runtime_promotion/final')
+          dst = Path('assets/props/raspadinha_vendor')
+          dst.mkdir(parents=True, exist_ok=True)
+          directions = ('south', 'east', 'west', 'north')
+          asset_id = 'prop.raspadinha_vendor.01'
+          views = {}
+
+          manifest_src = json.loads((src / f'{asset_id}_manifest.json').read_text(encoding='utf-8'))
+          for direction in directions:
+              source = src / f'{asset_id}_{direction}.png'
+              target = dst / f'raspadinha_vendor_{direction}.png'
+              im = Image.open(source)
+              if im.mode != 'RGBA':
+                  raise SystemExit(f'{source}: expected RGBA, got {im.mode}')
+              if im.size != (256, 256):
+                  raise SystemExit(f'{source}: expected 256x256, got {im.size}')
+              alpha = im.getchannel('A')
+              lo, hi = alpha.getextrema()
+              if lo != 0 or hi != 255:
+                  raise SystemExit(f'{source}: invalid alpha range {(lo, hi)}')
+              for x, y in ((0,0),(255,0),(0,255),(255,255)):
+                  if alpha.getpixel((x,y)) != 0:
+                      raise SystemExit(f'{source}: background corner is not transparent')
+              shutil.copy2(source, target)
+              views[direction] = {
+                  'file': target.name,
+                  'pivot': manifest_src['views'][directions.index(direction)]['pivot'],
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+              }
+
+          sheet_source = src / f'{asset_id}_4view.png'
+          sheet_target = dst / 'raspadinha_vendor_4view.png'
+          shutil.copy2(sheet_source, sheet_target)
+
+          promotion = json.loads(Path('tools/ch_blender/promotions/prop.raspadinha_vendor.01.runtime.json').read_text(encoding='utf-8'))
+          runtime_manifest = {
+              'contract': 'CH_RUNTIME_PROP_V1',
+              'assetId': asset_id,
+              'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'studioPreset': 'CH_TYCOON_STUDIO_V1',
+              'format': 'PNG_RGBA',
+              'frameSize': [256, 256],
+              'transparentBackground': True,
+              'directionOrder': list(directions),
+              'pivotPolicy': 'projected world origin fixed across directions',
+              'views': views,
+              'spriteSheet': sheet_target.name,
+              'sourceCommit': promotion['sourceCommit'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'approvedForRuntime': True,
+          }
+          (dst / 'raspadinha_vendor.json').write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(runtime_manifest, indent=2))
+          PY
+
+      - name: Commit promoted runtime asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/props/raspadinha_vendor
+          if git diff --cached --quiet; then
+            echo "Runtime asset already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote approved raspadinha vendor to runtime"
+          git push origin HEAD:main
