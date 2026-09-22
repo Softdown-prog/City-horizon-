@@ -1,0 +1,62 @@
+{
+  "id": "coffee_shop_01",
+  "name": "Cafeteria",
+  "category": "commercial",
+  "texture": "assets/buildings/coffee_shop/coffee_shop_south.png",
+  "sprites": {
+    "0": "assets/buildings/coffee_shop/coffee_shop_south.png",
+    "1": "assets/buildings/coffee_shop/coffee_shop_west.png",
+    "2": "assets/buildings/coffee_shop/coffee_shop_north.png",
+    "3": "assets/buildings/coffee_shop/coffee_shop_east.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.5,
+      "y": 0.62152778
+    },
+    "1": {
+      "x": 0.5,
+      "y": 0.62152778
+    },
+    "2": {
+      "x": 0.5,
+      "y": 0.62152778
+    },
+    "3": {
+      "x": 0.5,
+      "y": 0.62152778
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage",
+    "sprites": {
+      "0": "assets/buildings/coffee_shop/coffee_shop_south_mask.png",
+      "1": "assets/buildings/coffee_shop/coffee_shop_west_mask.png",
+      "2": "assets/buildings/coffee_shop/coffee_shop_north_mask.png",
+      "3": "assets/buildings/coffee_shop/coffee_shop_east_mask.png"
+    }
+  }
+}
