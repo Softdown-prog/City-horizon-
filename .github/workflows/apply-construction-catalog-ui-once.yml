@@ -1,0 +1,40 @@
+name: Apply construction catalog UI migration once
+
+on:
+  push:
+    paths:
+      - '.github/ui-construction-catalog-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-construction-catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply patch
+        run: python tools/apply_construction_catalog_ui_patch.py
+      - name: Validate focused changes
+        run: |
+          git diff --check
+          grep -q 'std::string build_category_filter_ = "TODOS"' src/ui_manager.h
+          grep -q 'CATALOGO DE CONSTRUCAO' src/ui_manager.cpp
+          grep -q 'build_category:' src/ui_manager.cpp
+          grep -q 'panel_width >= 620.0F ? 2 : 1' src/ui_manager.cpp
+          grep -q 'UiAction::select_building' src/ui_manager.cpp
+          grep -q 'handle_mouse_wheel' src/ui_manager.cpp
+      - name: Commit focused migration
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/ui_manager.h src/ui_manager.cpp
+          git commit -m 'Redesign in-game construction catalog'
+          git push origin HEAD:main
