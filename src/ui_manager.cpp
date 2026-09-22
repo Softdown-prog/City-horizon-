@@ -704,7 +704,6 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
             item.commercial_demand.empty() ? "" : "DEMANDA: " + item.commercial_demand,
             item.commercial_current_revenue.empty() ? "" : "RECEITA ESTIMADA: " + item.commercial_current_revenue + "/MES",
             item.commercial_demand.empty() ? "" : "MANUTENCAO: " + item.monthly_maintenance + "/MES",
-            item.local_supply.empty() ? "" : "ABASTECIMENTO LOCAL: " + item.local_supply,
         };
         std::size_t detail_lines = 0;
         for (const std::string& detail : details) if (!detail.empty()) detail_lines += wrap_debug_text(detail, 306.0F).size();

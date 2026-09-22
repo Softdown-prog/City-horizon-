@@ -135,7 +135,6 @@ struct UiSelectedBuilding {
     std::string residential_capacity;
     std::string property_tax_per_year;
     std::string commercial_current_revenue;
-    std::string local_supply;
     std::string level_label;
     std::string upgrade_button_text;
     bool can_upgrade = false;
@@ -147,7 +146,6 @@ struct UiSelectedBuilding {
     std::string service_customers_per_month;
     std::string service_revenue_per_month;
     std::string service_net_per_month;
-    std::string service_supply_status;
     bool has_service_pricing = false;
     bool can_decrease_service_price = false;
     bool can_increase_service_price = false;

@@ -2226,7 +2226,6 @@ int main() {
                         static_cast<std::int64_t>(commercial_demand_percent) / 100;
                     const ServicePricingEstimate service_estimate = CityEconomy::service_pricing_estimate(
                         *definition, *instance, population.current_population(), &farming);
-                    const std::string local_supply;
                     model.selected_building = UiSelectedBuilding{
                         definition->name,
                         std::string(category_label(definition->category)),
@@ -2248,7 +2247,6 @@ int main() {
                         lvl_def.residential_capacity == 0 ? "" : std::to_string(lvl_def.residential_capacity),
                         lvl_def.residential_capacity == 0 ? "" : format_money(definition->property_tax_per_year),
                         has_commercial_demand ? format_money(commercial_current_revenue) : "",
-                        local_supply,
                         level_label,
                         upgrade_btn_text,
                         can_upgrade,
@@ -2265,7 +2263,6 @@ int main() {
                         definition->default_service_price > 0
                             ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
                             : "",
-                        "",
                         definition->default_service_price > 0,
                         definition->default_service_price > 0 && instance->service_price > definition->minimum_service_price,
                         definition->default_service_price > 0 && instance->service_price < definition->maximum_service_price,
