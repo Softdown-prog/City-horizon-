@@ -1,14 +1,65 @@
 {
   "schema": "city_horizon.ui_assets.v1",
-  "canvas": { "width": 1280, "height": 960 },
+  "canvas": {
+    "width": 1280,
+    "height": 960
+  },
   "assets": {
-    "feedback_atlas": { "path": "assets/ui/atlas/modal_feedback_atlas.png", "role": "future_dialog_and_toast_atlas" },
-    "button_states": { "path": "assets/ui/atlas/button_states_v1.png", "role": "runtime_button_state_atlas", "manifest": "assets/ui/atlas/button_states_v1.json" },
-    "goals_controls": { "path": "assets/ui/atlas/goals_controls_v1.png", "role": "goals_and_shared_controls_atlas", "manifest": "assets/ui/atlas/goals_controls_v1.json" },
-    "settings_controls": { "path": "assets/ui/atlas/settings_controls_v1.png", "role": "settings_controls_atlas", "manifest": "assets/ui/atlas/settings_controls_v1.json" },
-    "pause_controls": { "path": "assets/ui/atlas/pause_controls_v1.png", "role": "pause_menu_controls_atlas", "canvas": [1280, 960] },
-    "land_expansion_controls": { "path": "assets/ui/atlas/land_expansion_controls_v1.png", "role": "land_expansion_controls_atlas", "canvas": [1280, 960] },
-    "new_city_controls": { "path": "assets/ui/atlas/new_city_controls_v1.png", "role": "new_city_setup_controls_atlas", "canvas": [1280, 960] },
-    "save_load_controls": { "path": "assets/ui/atlas/save_load_controls_v1.png", "role": "save_load_controls_atlas", "canvas": [1280, 960] }
+    "feedback_atlas": {
+      "path": "assets/ui/atlas/modal_feedback_atlas.png",
+      "role": "future_dialog_and_toast_atlas"
+    },
+    "button_states": {
+      "path": "assets/ui/atlas/button_states_v1.png",
+      "role": "runtime_button_state_atlas",
+      "manifest": "assets/ui/atlas/button_states_v1.json"
+    },
+    "goals_controls": {
+      "path": "assets/ui/atlas/goals_controls_v1.png",
+      "role": "goals_and_shared_controls_atlas",
+      "manifest": "assets/ui/atlas/goals_controls_v1.json"
+    },
+    "settings_controls": {
+      "path": "assets/ui/atlas/settings_controls_v1.png",
+      "role": "settings_controls_atlas",
+      "manifest": "assets/ui/atlas/settings_controls_v1.json"
+    },
+    "pause_controls": {
+      "path": "assets/ui/atlas/pause_controls_v1.png",
+      "role": "pause_menu_controls_atlas",
+      "canvas": [
+        1280,
+        960
+      ]
+    },
+    "land_expansion_controls": {
+      "path": "assets/ui/atlas/land_expansion_controls_v1.png",
+      "role": "land_expansion_controls_atlas",
+      "canvas": [
+        1280,
+        960
+      ]
+    },
+    "new_city_controls": {
+      "path": "assets/ui/atlas/new_city_controls_v1.png",
+      "role": "new_city_setup_controls_atlas",
+      "canvas": [
+        1280,
+        960
+      ]
+    },
+    "save_load_controls": {
+      "path": "assets/ui/atlas/save_load_controls_v1.png",
+      "role": "save_load_controls_atlas",
+      "canvas": [
+        1280,
+        960
+      ]
+    },
+    "service_icons": {
+      "path": "assets/ui/icons/service",
+      "role": "procedural_service_and_shop_icons",
+      "manifest": "assets/ui/icons/service/service_icons_v1.json"
+    }
   }
 }

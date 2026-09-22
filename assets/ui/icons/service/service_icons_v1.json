@@ -1,0 +1,54 @@
+{
+  "schema": "city_horizon.ui_icon_pack.v1",
+  "id": "service_icons_v1",
+  "size": [
+    64,
+    64
+  ],
+  "format": "PNG_RGBA",
+  "background": "transparent",
+  "style": {
+    "direction": "stylized_tycoon_ui",
+    "outline": "dark_navy",
+    "lighting": "soft_flat_volume",
+    "palette": "City Horizon procedural HUD palette",
+    "intendedDisplaySize": [
+      24,
+      48
+    ]
+  },
+  "icons": {
+    "bakery_products": {
+      "path": "assets/ui/icons/service/bakery_products.png",
+      "role": "bakery_product_bread_and_pastry"
+    },
+    "service_price": {
+      "path": "assets/ui/icons/service/service_price.png",
+      "role": "customer_price"
+    },
+    "service_demand": {
+      "path": "assets/ui/icons/service/service_demand.png",
+      "role": "price_demand"
+    },
+    "service_customers": {
+      "path": "assets/ui/icons/service/service_customers.png",
+      "role": "customers_per_month"
+    },
+    "service_stock": {
+      "path": "assets/ui/icons/service/service_stock.png",
+      "role": "ingredient_stock"
+    },
+    "service_revenue": {
+      "path": "assets/ui/icons/service/service_revenue.png",
+      "role": "sales_revenue"
+    },
+    "service_profit": {
+      "path": "assets/ui/icons/service/service_profit.png",
+      "role": "net_result"
+    },
+    "service_maintenance": {
+      "path": "assets/ui/icons/service/service_maintenance.png",
+      "role": "maintenance_cost"
+    }
+  }
+}
