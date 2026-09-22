@@ -43,30 +43,20 @@ jobs:
 
           main = Path('src/main.cpp')
           text = main.read_text(encoding='utf-8')
-          line = '                    const std::string local_supply;\n'
-          if line not in text:
-              raise SystemExit('local_supply placeholder not found')
-          text = text.replace(line, '', 1)
-          needle = '''                        has_commercial_demand ? format_money(commercial_current_revenue) : "",
-                        local_supply,
-                        level_label,'''
-          repl = '''                        has_commercial_demand ? format_money(commercial_current_revenue) : "",
-                        level_label,'''
-          if needle not in text:
-              raise SystemExit('local_supply initializer not found')
-          text = text.replace(needle, repl, 1)
-          needle = '''                        definition->default_service_price > 0
-                            ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
-                            : "",
-                        "",
-                        definition->default_service_price > 0,'''
-          repl = '''                        definition->default_service_price > 0
-                            ? format_balance(service_estimate.revenue_per_month - lvl_def.maintenance_per_month) + "/MES"
-                            : "",
-                        definition->default_service_price > 0,'''
-          if needle not in text:
-              raise SystemExit('service supply status initializer not found')
-          text = text.replace(needle, repl, 1)
+          for old in [
+              '                    const std::string local_supply;\n',
+              '                        local_supply,\n',
+          ]:
+              if old not in text:
+                  raise SystemExit(f'missing main token: {old.strip()}')
+              text = text.replace(old, '', 1)
+
+          # This empty aggregate value was service_supply_status. It is directly
+          # followed by has_service_pricing, so remove only this exact occurrence.
+          old = '                        "",\n                        definition->default_service_price > 0,\n'
+          if old not in text:
+              raise SystemExit('service supply status aggregate value not found')
+          text = text.replace(old, '                        definition->default_service_price > 0,\n', 1)
           main.write_text(text, encoding='utf-8')
           PY
       - name: Validate focused cleanup
