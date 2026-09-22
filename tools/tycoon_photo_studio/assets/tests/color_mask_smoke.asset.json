@@ -1,0 +1,75 @@
+{
+  "contract": "TYCOON_ASSET_SOURCE_V1",
+  "assetId": "test_color_mask_v1",
+  "assetType": "static_prop",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof",
+      "B": "trim"
+    },
+    "alpha": "coverage"
+  },
+  "materials": {
+    "wall": {
+      "name": "MaskSmokeWall",
+      "rgba": [0.72, 0.64, 0.52, 1.0],
+      "roughness": 0.82,
+      "maskRole": "wall"
+    },
+    "roof": {
+      "name": "MaskSmokeRoof",
+      "rgba": [0.32, 0.16, 0.10, 1.0],
+      "roughness": 0.78,
+      "maskRole": "roof"
+    },
+    "trim": {
+      "name": "MaskSmokeTrim",
+      "rgba": [0.86, 0.80, 0.66, 1.0],
+      "roughness": 0.76,
+      "maskRole": "trim"
+    },
+    "fixed": {
+      "name": "MaskSmokeFixed",
+      "rgba": [0.12, 0.25, 0.32, 1.0],
+      "roughness": 0.40
+    }
+  },
+  "parts": [
+    {
+      "type": "box",
+      "name": "SmokeBody",
+      "location": [0.0, 0.0, 0.70],
+      "dimensions": [1.9, 1.55, 1.35],
+      "material": "wall"
+    },
+    {
+      "type": "box",
+      "name": "SmokeRoof",
+      "location": [0.0, 0.0, 1.47],
+      "dimensions": [2.1, 1.75, 0.20],
+      "material": "roof"
+    },
+    {
+      "type": "box",
+      "name": "SmokeTrim",
+      "location": [0.0, -0.79, 0.86],
+      "dimensions": [1.25, 0.08, 0.16],
+      "material": "trim"
+    },
+    {
+      "type": "box",
+      "name": "SmokeFixedWindow",
+      "location": [0.0, -0.835, 0.62],
+      "dimensions": [0.72, 0.04, 0.34],
+      "material": "fixed"
+    }
+  ]
+}
