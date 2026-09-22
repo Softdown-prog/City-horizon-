@@ -15,7 +15,7 @@
     "depth": 4.66,
     "wallHeight": 2.24,
     "baseHeight": 0.14,
-    "parapetHeight": 0.20
+    "parapetHeight": 0.16
   },
   "facade": {
     "front": "south",
@@ -27,16 +27,16 @@
     "awning": {
       "enabled": true,
       "width": 4.24,
-      "depth": 0.55,
+      "depth": 0.53,
       "height": 0.16,
       "z": 1.95
     },
     "sign": {
       "enabled": true,
-      "width": 3.02,
-      "height": 0.68,
+      "width": 3.20,
+      "height": 0.72,
       "depth": 0.15,
-      "z": 2.47
+      "z": 2.45
     },
     "details": {
       "lowerTrimBand": true,
@@ -67,7 +67,8 @@
     "colorPillars": true,
     "facadeCrown": true,
     "sideAccentBand": true,
-    "rotatingPopsicleSign": true
+    "rotatingPopsicleSign": true,
+    "polishV3": true
   },
   "animation": {
     "enabled": true,
@@ -204,15 +205,16 @@
     "alpha": "coverage"
   },
   "designIntent": {
-    "summary": "Colorful neighborhood ice cream shop with a framed pastel storefront, oversized flavor display, large sundae mark and a slowly rotating corner popsicle totem.",
-    "readOrder": ["corner_popsicle", "sundae_sign", "striped_awning", "flavor_display", "framed_storefront", "pastel_wall_mass", "roofline"],
+    "summary": "Colorful neighborhood ice cream shop with a framed pastel storefront, oversized flavor display, strong sundae sign, side identity badge and a slowly rotating corner popsicle totem.",
+    "readOrder": ["corner_popsicle", "sundae_sign", "striped_awning", "flavor_display", "framed_storefront", "side_badge", "pastel_wall_mass", "roofline"],
     "rules": [
       "keep the silhouette compact and readable at gameplay scale",
       "do not depend on readable text for ice-cream identity",
       "use broad pastel color blocks rather than tiny decorative noise",
-      "make the storefront read as designed architecture through a crown, vertical color rhythm and stronger freezer display",
+      "make the storefront read as designed architecture through a crown, sign surround, vertical color rhythm and stronger freezer display",
       "keep the animation slow and localized to the corner popsicle totem so the building does not visually jitter",
       "keep the roof visually subordinate to the storefront by using a lower parapet",
+      "carry ice-cream identity onto the side elevation with one large badge instead of microdetail",
       "author all four sides because AssetRoot rotation produces canonical directions",
       "keep the front apron visually flush for future road/sidewalk placement",
       "CH_COLOR_MASK_V1 recolors only wall in R and roof in G; awning, flavor colors, glass, trim and animated sign keep authored colors"
