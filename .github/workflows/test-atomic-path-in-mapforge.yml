@@ -5,23 +5,10 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/test-atomic-path-in-mapforge.yml"
-      - "tools/test_atomic_path_in_mapforge.py"
-      - "tools/normalize_atomic_path_tile.py"
-      - "Tiles_test/file_000000006488820ea37cdc5012a4e189.png"
-      - "C++/MapForge2/src/map_capture_service.cpp"
-      - "C++/MapForge2/src/map_capture_service.h"
-      - "C++/MapForge2/src/map_capture_main.cpp"
-      - "C++/MapForge2/src/mapforge_cli_main.cpp"
-      - "C++/MapForge2/CMakeLists.txt"
 
 jobs:
   tile-test:
     runs-on: windows-latest
-    env:
-      INPUT_TILE: "Tiles_test/file_000000006488820ea37cdc5012a4e189.png"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,22 +31,18 @@ jobs:
 
       - name: Configure MapForge capture worker
         shell: pwsh
-        run: cmake -S "C++/MapForge2" -B build/mapforge-tile-test -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+        run: cmake -S "C++/MapForge2" -B build/mapforge-tile-test -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
 
       - name: Build MapForge capture worker
         shell: pwsh
         run: cmake --build build/mapforge-tile-test --config Release --target MapForge2MapCapture --parallel
 
-      - name: Verify input tile
-        shell: pwsh
-        run: |
-          if (-not (Test-Path $env:INPUT_TILE)) { throw "Tile source not found: $env:INPUT_TILE" }
-          Write-Host "Testing tile source: $env:INPUT_TILE"
-
       - name: Normalize and render tile in MapForge
         shell: pwsh
         run: |
-          python tools/test_atomic_path_in_mapforge.py "$env:INPUT_TILE" --out-dir out/tile_test --mapforge-exe "build/mapforge-tile-test/Release/MapForge2MapCapture.exe"
+          $inputTile = "Tiles_test/file_000000006488820ea37cdc5012a4e189.png"
+          if (-not (Test-Path $inputTile)) { throw "Tile source not found: $inputTile" }
+          python tools/test_atomic_path_in_mapforge.py "$inputTile" --out-dir out/tile_test --mapforge-exe "build/mapforge-tile-test/Release/MapForge2MapCapture.exe"
           if ($LASTEXITCODE -ne 0) { throw "Atomic path MapForge test failed" }
           if (-not (Test-Path "out/tile_test/mapforge_atomic_path_capture.png")) { throw "MapForge capture PNG missing" }
           if (-not (Test-Path "out/tile_test/normalized_atomic_path_128x64.png")) { throw "Normalized tile PNG missing" }
