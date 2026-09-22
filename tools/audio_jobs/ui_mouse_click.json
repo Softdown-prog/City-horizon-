@@ -1,0 +1,7 @@
+{
+  "source": "Converter/universfield-computer-mouse-click-352734.mp3",
+  "output": "assets/audio/ui/mouse_click_002.ogg",
+  "catalog": "assets/audio/audio_catalog.json",
+  "event": "UiClick",
+  "mode": "append"
+}
