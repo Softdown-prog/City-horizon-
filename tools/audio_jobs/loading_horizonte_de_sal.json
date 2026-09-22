@@ -1,0 +1,8 @@
+{
+  "kind": "music",
+  "source": "Converter/horizonte_de_sal.mp4",
+  "output": "assets/audio/music/loading_horizonte_de_sal.ogg",
+  "catalog": "assets/audio/audio_catalog.json",
+  "slot": "Loading",
+  "mode": "replace"
+}
