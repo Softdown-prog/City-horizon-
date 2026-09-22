@@ -15,7 +15,7 @@
     "depth": 4.66,
     "wallHeight": 2.24,
     "baseHeight": 0.14,
-    "parapetHeight": 0.32
+    "parapetHeight": 0.20
   },
   "facade": {
     "front": "south",
@@ -26,17 +26,17 @@
     "windowSill": 0.62,
     "awning": {
       "enabled": true,
-      "width": 4.18,
-      "depth": 0.58,
-      "height": 0.18,
-      "z": 1.98
+      "width": 4.24,
+      "depth": 0.55,
+      "height": 0.16,
+      "z": 1.95
     },
     "sign": {
       "enabled": true,
-      "width": 2.62,
-      "height": 0.60,
-      "depth": 0.14,
-      "z": 2.50
+      "width": 3.02,
+      "height": 0.68,
+      "depth": 0.15,
+      "z": 2.47
     },
     "details": {
       "lowerTrimBand": true,
@@ -65,6 +65,8 @@
     "freezerCase": true,
     "sundaeSign": true,
     "colorPillars": true,
+    "facadeCrown": true,
+    "sideAccentBand": true,
     "rotatingPopsicleSign": true
   },
   "animation": {
@@ -74,7 +76,7 @@
     "fps": 4,
     "looping": true,
     "bladeObjectName": "IceCreamSpinner",
-    "intent": "slow continuous rotation of the rooftop popsicle sign"
+    "intent": "slow continuous rotation of the corner popsicle sign"
   },
   "materials": {
     "wall": {
@@ -109,8 +111,7 @@
       "recipe": "solid",
       "roughness": 0.78,
       "seed": 149,
-      "strength": 0.03,
-      "maskRole": "accent"
+      "strength": 0.03
     },
     "glass": {
       "name": "IceCreamCoolGlass",
@@ -198,23 +199,23 @@
     "enabled": true,
     "channels": {
       "R": "wall",
-      "G": "roof",
-      "B": "accent"
+      "G": "roof"
     },
     "alpha": "coverage"
   },
   "designIntent": {
-    "summary": "Colorful neighborhood ice cream shop with broad glazing, visible flavor tubs, a sundae-shaped facade mark, candy-striped awning and a slowly rotating rooftop popsicle sign.",
-    "readOrder": ["rotating_popsicle", "striped_awning", "sundae_sign", "flavor_display", "pastel_wall_mass", "large_windows", "roofline"],
+    "summary": "Colorful neighborhood ice cream shop with a framed pastel storefront, oversized flavor display, large sundae mark and a slowly rotating corner popsicle totem.",
+    "readOrder": ["corner_popsicle", "sundae_sign", "striped_awning", "flavor_display", "framed_storefront", "pastel_wall_mass", "roofline"],
     "rules": [
       "keep the silhouette compact and readable at gameplay scale",
       "do not depend on readable text for ice-cream identity",
       "use broad pastel color blocks rather than tiny decorative noise",
-      "make the storefront readable through oversized flavor tubs and a geometric sundae mark",
-      "keep the animation slow and localized to the rooftop sign so the building does not visually jitter",
+      "make the storefront read as designed architecture through a crown, vertical color rhythm and stronger freezer display",
+      "keep the animation slow and localized to the corner popsicle totem so the building does not visually jitter",
+      "keep the roof visually subordinate to the storefront by using a lower parapet",
       "author all four sides because AssetRoot rotation produces canonical directions",
       "keep the front apron visually flush for future road/sidewalk placement",
-      "CH_COLOR_MASK_V1 recolors wall in R, roof in G and awning/accent in B; glass, product colors, dark metal and props keep authored colors"
+      "CH_COLOR_MASK_V1 recolors only wall in R and roof in G; awning, flavor colors, glass, trim and animated sign keep authored colors"
     ]
   }
 }
