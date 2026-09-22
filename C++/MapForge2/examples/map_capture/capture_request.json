@@ -1,10 +1,7 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "repositoryFile": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
-    "frameIndex": 0,
-    "frameWidth": 256,
-    "frameHeight": 256
+    "repositoryFile": "assets/terrain/dirt_isometric_01.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -18,8 +15,8 @@
     },
     "camera": {
       "zoom": 0.92,
-      "focusTile": [0.5, 0.5],
-      "focusScreen": [0.5, 0.58]
+      "focusTile": [0.0, 0.0],
+      "focusScreen": [0.5, 0.56]
     },
     "stage": {
       "minTile": -6,
@@ -32,15 +29,19 @@
       "grassSpeckleColor": "#5f7f50"
     },
     "candidate": {
-      "tile": [0.5, 0.5],
-      "footprint": [4, 3],
-      "scale": 2.0,
+      "tile": [0.0, 0.0],
+      "footprint": [1, 1],
+      "scale": 1.0,
       "offsetPixels": [0, 0],
-      "showFootprint": true,
+      "showFootprint": false,
       "showAnchor": false,
-      "renderAsGroundTile": false,
-      "footprintColor": "#f6c448",
-      "anchorColor": "#ffd640"
+      "renderAsGroundTile": true,
+      "tiles": [
+        [-3, -2], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2],
+        [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+        [-3, 0], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0],
+        [-3, 1], [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1]
+      ]
     }
   }
 }
