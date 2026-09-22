@@ -1481,8 +1481,10 @@ int main() {
     TileCoordinate harvest_drag_start;
     TileCoordinate preparation_drag_start;
     TileCoordinate planting_drag_start;
-    std::string status = "CLICK A BUILDING TO SELECT IT";
-    UiOverlay active_overlay = UiOverlay::none;
+    std::string status = "MAIN MENU";
+    UiOverlay active_overlay = UiOverlay::main_menu;
+    bool startup_main_menu = true;
+    simulation_clock.set_speed(SimulationSpeed::paused);
     UiOverlay settings_return_overlay = UiOverlay::none;
     UiOverlay save_load_return_overlay = UiOverlay::pause;
     UiOverlay quit_return_overlay = UiOverlay::pause;
@@ -1768,9 +1770,37 @@ int main() {
                 break;
             case UiAction::open_main_menu:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
+                startup_main_menu = false;
                 active_overlay = UiOverlay::main_menu;
                 status = "MAIN MENU OPEN";
                 (void)audio.play(SoundEvent::ui_open_panel);
+                break;
+            case UiAction::start_new_city:
+                clear_map_modes();
+                build_panel_open = false;
+                selected_instance_id.reset();
+                startup_main_menu = false;
+                active_overlay = UiOverlay::none;
+                simulation_clock.set_speed(SimulationSpeed::speed1);
+                last_simulation_ticks = SDL_GetTicks();
+                simulation_scheduler.reset();
+                status = "NEW CITY STARTED";
+                (void)audio.play(SoundEvent::ui_confirm);
+                break;
+            case UiAction::continue_saved_city:
+                if (!std::filesystem::exists(save_path)) {
+                    status = "NO SAVE AVAILABLE";
+                    (void)audio.play(SoundEvent::ui_error);
+                    break;
+                }
+                if (load_current_city(false)) {
+                    startup_main_menu = false;
+                    active_overlay = UiOverlay::none;
+                    simulation_clock.set_speed(SimulationSpeed::speed1);
+                    last_simulation_ticks = SDL_GetTicks();
+                    simulation_scheduler.reset();
+                    status = "CITY CONTINUED";
+                }
                 break;
             case UiAction::open_save_load:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
@@ -1886,6 +1916,7 @@ int main() {
         model.master_volume_percent = static_cast<int>(std::lround(audio.volume_settings().master * 100.0F));
         model.effects_volume_percent = static_cast<int>(std::lround(audio.volume_settings().effects * 100.0F));
         model.save_available = std::filesystem::exists(save_path);
+        model.startup_main_menu = startup_main_menu;
         model.build_panel_open = build_panel_open;
         model.farming_panel_open = agriculture_panel_open;
         model.selected_farming_id = farming_selection_id;
@@ -2551,7 +2582,7 @@ int main() {
                         } else if (active_overlay == UiOverlay::settings) {
                             apply_ui_action({UiAction::settings_cancel, {}});
                         } else if (active_overlay == UiOverlay::main_menu) {
-                            apply_ui_action({UiAction::back_to_pause, {}});
+                            apply_ui_action({startup_main_menu ? UiAction::open_quit_confirm : UiAction::back_to_pause, {}});
                         } else if (active_overlay == UiOverlay::quit_confirm) {
                             apply_ui_action({UiAction::cancel_quit, {}});
                         } else {

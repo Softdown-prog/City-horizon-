@@ -551,8 +551,15 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         const float button_top = panel.y + 190.0F;
         const float button_gap = 10.0F;
         const float button_height = 48.0F;
-        add_button({panel.x + padding, button_top, button_width, button_height}, "CONTINUAR CIDADE", UiAction::resume_game);
-        add_button({panel.x + padding, button_top + (button_height + button_gap), button_width, button_height}, "SALVAR / CARREGAR", UiAction::open_save_load);
+        if (model.startup_main_menu) {
+            add_button({panel.x + padding, button_top, button_width, button_height}, "NOVA CIDADE", UiAction::start_new_city);
+            add_button({panel.x + padding, button_top + (button_height + button_gap), button_width, button_height},
+                       "CONTINUAR CIDADE", UiAction::continue_saved_city, model.save_available);
+        } else {
+            add_button({panel.x + padding, button_top, button_width, button_height}, "CONTINUAR CIDADE", UiAction::resume_game);
+            add_button({panel.x + padding, button_top + (button_height + button_gap), button_width, button_height},
+                       "SALVAR / CARREGAR", UiAction::open_save_load);
+        }
         add_button({panel.x + padding, button_top + (button_height + button_gap) * 2.0F, button_width, button_height}, "CONFIGURACOES", UiAction::open_settings);
         add_button({panel.x + padding, button_top + (button_height + button_gap) * 3.0F, button_width, button_height}, "SAIR DO JOGO", UiAction::open_quit_confirm);
     } else if (model.overlay == UiOverlay::quit_confirm) {
@@ -892,19 +899,30 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             SDL_RenderFillRect(renderer, &info);
             SDL_SetRenderDrawColor(renderer, 64, 103, 123, SDL_ALPHA_OPAQUE);
             SDL_RenderRect(renderer, &info);
-            draw_text(renderer, info.x + 14.0F, info.y + 12.0F, "CIDADE ATUAL", 158, 186, 199);
-            draw_text_fit(renderer, info.x + 14.0F, info.y + 33.0F, info.w - 28.0F,
-                          model_.day_month + " | " + model_.year + " | " + model_.funds, 219, 232, 238);
-            draw_text_fit(renderer, info.x + 14.0F, info.y + 50.0F, info.w - 28.0F,
-                          "POPULACAO " + model_.population + " / " + model_.residential_capacity, 158, 186, 199);
+            if (model_.startup_main_menu) {
+                draw_text(renderer, info.x + 14.0F, info.y + 12.0F, "BEM-VINDO", 158, 186, 199);
+                draw_text_fit(renderer, info.x + 14.0F, info.y + 33.0F, info.w - 28.0F,
+                              "ESCOLHA COMO COMECAR SUA CIDADE", 219, 232, 238);
+                draw_text_fit(renderer, info.x + 14.0F, info.y + 50.0F, info.w - 28.0F,
+                              model_.save_available ? "SAVE EXISTENTE DETECTADO" : "NENHUM SAVE EXISTENTE",
+                              158, 186, 199);
+            } else {
+                draw_text(renderer, info.x + 14.0F, info.y + 12.0F, "CIDADE ATUAL", 158, 186, 199);
+                draw_text_fit(renderer, info.x + 14.0F, info.y + 33.0F, info.w - 28.0F,
+                              model_.day_month + " | " + model_.year + " | " + model_.funds, 219, 232, 238);
+                draw_text_fit(renderer, info.x + 14.0F, info.y + 50.0F, info.w - 28.0F,
+                              "POPULACAO " + model_.population + " / " + model_.residential_capacity, 158, 186, 199);
+            }
 
             for (const UiButton& button : buttons_) {
-                if (button.action == UiAction::resume_game || button.action == UiAction::open_save_load ||
+                if (button.action == UiAction::resume_game || button.action == UiAction::start_new_city ||
+                    button.action == UiAction::continue_saved_city || button.action == UiAction::open_save_load ||
                     button.action == UiAction::open_settings || button.action == UiAction::open_quit_confirm) {
                     draw_pause_button(renderer, button);
                 }
             }
-            draw_text_centered(renderer, panel, panel.y + panel.height - 20.0F, "ESC  -  VOLTAR AO PAUSE", 158, 186, 199);
+            draw_text_centered(renderer, panel, panel.y + panel.height - 20.0F,
+                               model_.startup_main_menu ? "ESC  -  SAIR" : "ESC  -  VOLTAR AO PAUSE", 158, 186, 199);
             return;
         }
 

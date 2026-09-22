@@ -56,6 +56,8 @@ enum class UiAction : std::uint8_t {
     open_reports,
     open_settings,
     open_main_menu,
+    start_new_city,
+    continue_saved_city,
     open_save_load,
     save_game,
     load_game,
@@ -164,6 +166,7 @@ struct GameplayUiModel {
     int master_volume_percent = 100;
     int effects_volume_percent = 100;
     bool save_available = false;
+    bool startup_main_menu = false;
     UiTool active_tool = UiTool::none;
     bool build_panel_open = false;
     bool farming_panel_open = false;
