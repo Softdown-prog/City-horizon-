@@ -44,6 +44,7 @@ jobs:
             Converter/file_00000000a974820eafcd5ead28332854.png \
             assets/terrain/sand_isometric_01.png \
             --strip-edge-band 12 \
+            --decontaminate-edge-band 14 \
             --preview out/sand_repeated_preview.png \
             --report out/sand_ground_tile_report.json
 
@@ -72,6 +73,8 @@ jobs:
               raise SystemExit(f"sand seam gate failed: {report}")
           if report.get('edgeHarmonization') != 'exact-border-only':
               raise SystemExit(f"sand worker used unexpected edge harmonization: {report}")
+          if report.get('decontaminateEdgePixels') != 14:
+              raise SystemExit(f"sand edge decontamination was not enabled: {report}")
 
           root = Path('assets/terrain/paths/sand_01')
           files = sorted(root.glob('sand_path_*.png'))
@@ -89,7 +92,10 @@ jobs:
                   im.load()
                   if im.mode != 'RGBA' or im.size != (128, 64):
                       raise SystemExit(f'{path}: expected 128x64 RGBA, got {im.size} {im.mode}')
-          print(f"PASS sand source=128x64 RGBA masks=16 edge_error={report['edgeError']}")
+          print(
+              f"PASS sand source=128x64 RGBA masks=16 edge_error={report['edgeError']} "
+              f"decontaminated={report.get('decontaminatedPixels', 0)}"
+          )
           PY
 
       - name: Validate City Horizon ground-tile contract
