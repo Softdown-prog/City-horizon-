@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "C++/MapForge2/examples/map_capture/**"
+      - "C++/MapForge2/src/**"
+      - "C++/MapForge2/CMakeLists.txt"
+      - "tools/map_forge/**"
+      - ".github/workflows/mapforge-capture.yml"
 
 jobs:
   capture:
