@@ -75,6 +75,31 @@ def _tag_semantics():
         scene_gate.tag(obj, role, ground_contact=contact)
 
 
+def _is_descendant_of(obj, ancestor):
+    current = obj.parent
+    while current is not None:
+        if current == ancestor:
+            return True
+        current = current.parent
+    return False
+
+
+def _tag_runtime_layers(root, rotor, authored, recipe):
+    layers = recipe.get("runtimeLayers") or {}
+    contract = layers.get("contract", "CH_ATTRACTION_MOTION_OVERLAY_V1")
+    root["runtimeLayerContract"] = contract
+    root["motionActivationTrigger"] = (
+        layers.get("motionOverlay", {}).get("activation", {}).get("trigger", "passenger_boarded")
+    )
+    root["motionMinimumPassengers"] = int(
+        layers.get("motionOverlay", {}).get("activation", {}).get("minimumPassengers", 1)
+    )
+    rotor["runtimeLayer"] = "motion_overlay"
+    rotor["activationTrigger"] = root["motionActivationTrigger"]
+    for obj in authored:
+        obj["runtimeLayer"] = "motion_overlay" if (obj == rotor or _is_descendant_of(obj, rotor)) else "static_base"
+
+
 def build_for_gate(args):
     recipe = fw.load_json(args.recipe)
     if recipe.get("contract") != "CITY_HORIZON_FERRIS_WHEEL_V1":
@@ -125,6 +150,7 @@ def build_for_gate(args):
     )
 
     authored = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and obj != ground]
+    _tag_runtime_layers(root, rotor, authored, recipe)
     bs.calibrate_ortho_scale(scene, authored, safety_margin=0.14)
     bs.set_direction(root, bs.DIRECTIONS[0])
     scene.frame_set(int(recipe["animation"].get("frameStart", 1)))
@@ -171,11 +197,14 @@ def _frame_metadata(recipe, studio, scene, frame, directions_meta):
             "looping": bool(animation.get("looping", True)),
             "keepGondolasUpright": bool(animation.get("keepGondolasUpright", True)),
         },
+        "runtimeLayers": recipe.get("runtimeLayers"),
         "sourceSummary": {
             "groundIncludedInAsset": False,
             "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
             "detailPass": "FERRIS_2D_READABILITY_V1",
             "maturityPass": "FERRIS_MATURITY_V1",
+            "motionLayer": "WheelRotor_and_descendants",
+            "staticLayer": "all_other_authored_meshes",
         },
         "directions": directions_meta,
     }
@@ -252,6 +281,7 @@ def render_final_animation(recipe, studio, scene, root, ground, authored, out, a
         "frameEnd": frame_end,
         "frameCount": frame_end - frame_start + 1,
         "fps": fps,
+        "runtimeLayers": recipe.get("runtimeLayers"),
         "runtimeDir": "runtime",
         "sourceDir": "final_source",
     }
