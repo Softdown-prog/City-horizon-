@@ -10,9 +10,7 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
     "--output",
-    "out/ch_blender_agent/building.ice_cream_shop.01.activity.v1",
-    "--stage",
-    "preflight"
+    "out/ch_blender_agent/building.ice_cream_shop.01.activity.v1"
   ],
   "outputDir": "out/ch_blender_agent/building.ice_cream_shop.01.activity.v1"
 }
