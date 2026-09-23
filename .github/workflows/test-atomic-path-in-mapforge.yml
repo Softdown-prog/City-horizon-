@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "Tiles_test/**"
+      - "tools/test_atomic_path_in_mapforge.py"
+      - "C++/MapForge2/src/**"
+      - "C++/MapForge2/CMakeLists.txt"
+      - ".github/workflows/test-atomic-path-in-mapforge.yml"
 
 jobs:
   tile-test:
