@@ -1,0 +1,111 @@
+{
+  "contract": "CH_VISITOR_SOURCE_V1",
+  "assetId": "visitor_male_base_01",
+  "assetType": "visitor_npc",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "referenceRole": "generic_city_visitor_old_tycoon_readability",
+  "referenceNotes": "First City Horizon pedestrian MVP. One deterministic 3D source, four directions, two conservative walk poses. Human visual approval of SOUTH idle/walk is required before any full bake or female variant.",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1,
+    "occupiedCells": [[0, 0]]
+  },
+  "directions": [
+    {"id": "south", "rotationDegrees": 0},
+    {"id": "east", "rotationDegrees": 90},
+    {"id": "north", "rotationDegrees": 180},
+    {"id": "west", "rotationDegrees": 270}
+  ],
+  "walk": {
+    "contract": "CH_VISITOR_WALK_2FRAME_V1",
+    "frameCount": 2,
+    "frameDurationMs": 170,
+    "loop": true,
+    "strideDegrees": 12.0,
+    "armSwingDegrees": 6.0,
+    "kneeBendDegrees": 10.0,
+    "elbowDegrees": 4.0,
+    "verticalBob": 0.006,
+    "torsoSwayDegrees": 0.35,
+    "intent": "short restrained steps, low arm motion, no visible hopping"
+  },
+  "features": {
+    "nose": true,
+    "backpack": false,
+    "shirtStripe": false
+  },
+  "materials": {
+    "skin": {
+      "name": "VisitorMaleSkin01",
+      "rgba": [0.63, 0.40, 0.27, 1.0],
+      "roughness": 0.96
+    },
+    "hair": {
+      "name": "VisitorMaleHairBrown01",
+      "rgba": [0.16, 0.07, 0.025, 1.0],
+      "roughness": 0.98
+    },
+    "shirt": {
+      "name": "VisitorMaleGreenShirt01",
+      "rgba": [0.075, 0.48, 0.26, 1.0],
+      "roughness": 0.96
+    },
+    "pants": {
+      "name": "VisitorMaleBlueJeans01",
+      "rgba": [0.055, 0.17, 0.37, 1.0],
+      "roughness": 0.97
+    },
+    "shoe": {
+      "name": "VisitorMaleBrownShoe01",
+      "rgba": [0.18, 0.075, 0.030, 1.0],
+      "roughness": 0.98
+    },
+    "sole": {
+      "name": "VisitorMaleSole01",
+      "rgba": [0.055, 0.050, 0.045, 1.0],
+      "roughness": 0.99
+    }
+  },
+  "proportions": {
+    "pelvisCenterZ": 0.88,
+    "pelvisDimensions": [0.42, 0.32, 0.20],
+    "torsoCenterZ": 1.20,
+    "torsoDimensions": [0.57, 0.37, 0.54],
+    "neckCenter": [0.0, 0.0, 1.505],
+    "neckRadius": 0.078,
+    "neckDepth": 0.12,
+    "headCenter": [0.0, -0.025, 1.69],
+    "headScale": [0.190, 0.180, 0.225],
+    "hairCenter": [0.0, 0.018, 1.805],
+    "hairScale": [0.202, 0.186, 0.118],
+    "noseCenter": [0.0, -0.203, 1.685],
+    "noseScale": [0.036, 0.048, 0.041],
+    "hipX": 0.135,
+    "hipZ": 0.88,
+    "upperLegLength": 0.37,
+    "lowerLegLength": 0.36,
+    "legRadius": 0.112,
+    "shoeDimensions": [0.225, 0.34, 0.105],
+    "soleDimensions": [0.23, 0.35, 0.024],
+    "shoeForwardY": -0.068,
+    "shoeDrop": 0.010,
+    "soleDrop": 0.060,
+    "shoulderX": 0.305,
+    "shoulderZ": 1.39,
+    "upperArmLength": 0.285,
+    "forearmLength": 0.255,
+    "armRadius": 0.088,
+    "handScale": [0.073, 0.068, 0.086]
+  },
+  "runtimeIntent": {
+    "contract": "CH_VISITOR_RUNTIME_INTENT_V1",
+    "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
+    "directionCount": 4,
+    "directionOrder": ["south", "east", "north", "west"],
+    "walkFrameCount": 2,
+    "idleFramesPerDirection": 1,
+    "anchorPolicy": "shared_projected_world_origin",
+    "futureBehavior": ["walk", "idle", "enter_building", "board_attraction", "leave_attraction"]
+  },
+  "status": "south_proxy_candidate"
+}
