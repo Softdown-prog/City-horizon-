@@ -708,6 +708,82 @@ void MapRenderer::render_buildings(SDL_Renderer* renderer, const BuildingManager
             const Uint8 b = is_owned ? 255 : 155;
             render_building(renderer, *definition, *instance, visual_rot, texture->texture, texture->source_width, texture->source_height,
                             camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+
+
+            // CH_BUILDING_ACTIVITY_OVERLAY_V1: transparent temporary effects are
+            // rendered over the approved base sprite only while the instance is active.
+            if (instance->activity_active() && definition->activity_overlay.has_value() &&
+                definition->activity_overlay->enabled) {
+                const BuildingActivityOverlayDefinition& activity = *definition->activity_overlay;
+                const std::size_t activity_rotation = static_cast<std::size_t>(visual_rot);
+                if (activity_rotation < activity.sprite_paths.size() &&
+                    !activity.sprite_paths[activity_rotation].empty()) {
+                    const TextureAsset* overlay_texture =
+                        find_texture(asset_root / activity.sprite_paths[activity_rotation]);
+                    if (overlay_texture != nullptr) {
+                        // Use the base sprite frame geometry so the effect shares the
+                        // exact same ground anchor, scale and rotation alignment.
+                        const BuildingSpriteGeometry geometry = building_sprite_geometry(
+                            *definition, *instance, visual_rot,
+                            texture->source_width, texture->source_height,
+                            camera, viewport_width, viewport_height);
+                        SDL_Texture* overlay = overlay_texture->texture;
+                        SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                        SDL_SetTextureColorMod(overlay, 255, 255, 255);
+
+                        if (activity.animation.has_value() && activity.animation->frame_count > 1) {
+                            const BuildingAnimationDefinition& animation = *activity.animation;
+                            const int frame_count = std::max(1, animation.frame_count);
+                            const int duration_ms = std::max(1, animation.frame_duration_ms);
+                            int frame_index = 0;
+
+                            if (animation.playback == "ambient_once") {
+                                const int idle_frame = std::clamp(animation.idle_frame, 0, frame_count - 1);
+                                const int action_start = std::clamp(
+                                    animation.action_start_frame, 0, frame_count - 1);
+                                const int action_count = std::clamp(
+                                    animation.action_frame_count, 0, frame_count - action_start);
+                                frame_index = idle_frame;
+                                if (action_count > 0) {
+                                    const std::uint64_t idle_hold_ms = static_cast<std::uint64_t>(
+                                        std::max(0, animation.idle_hold_ms));
+                                    const std::uint64_t action_duration_ms =
+                                        static_cast<std::uint64_t>(action_count) *
+                                        static_cast<std::uint64_t>(duration_ms);
+                                    const std::uint64_t cycle_duration_ms = idle_hold_ms + action_duration_ms;
+                                    const std::uint64_t phase_ms = cycle_duration_ms > 0
+                                        ? (static_cast<std::uint64_t>(SDL_GetTicks()) +
+                                           instance->instance_id * 977ULL) % cycle_duration_ms
+                                        : 0;
+                                    if (phase_ms >= idle_hold_ms && action_duration_ms > 0) {
+                                        frame_index = action_start + std::min(
+                                            action_count - 1,
+                                            static_cast<int>((phase_ms - idle_hold_ms) /
+                                                             static_cast<std::uint64_t>(duration_ms)));
+                                    }
+                                }
+                            } else {
+                                frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
+                            }
+
+                            const float frame_width =
+                                overlay_texture->source_width / static_cast<float>(frame_count);
+                            const SDL_FRect source = {
+                                frame_width * frame_index,
+                                0.0F,
+                                frame_width,
+                                overlay_texture->source_height,
+                            };
+                            SDL_RenderTexture(renderer, overlay, &source, &geometry.sprite_bounds);
+                        } else {
+                            SDL_RenderTexture(renderer, overlay, nullptr, &geometry.sprite_bounds);
+                        }
+
+                        SDL_SetTextureColorMod(overlay, 255, 255, 255);
+                        SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                    }
+                }
+            }
         }
     }
 }

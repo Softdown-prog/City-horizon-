@@ -86,6 +86,14 @@ struct BuildingAnimationDefinition {
     int idle_hold_ms = 0;
 };
 
+// CH_BUILDING_ACTIVITY_OVERLAY_V1. Transparent temporary visual activity,
+// authored per rotation and deliberately independent from CH_COLOR_MASK_V1.
+struct BuildingActivityOverlayDefinition {
+    bool enabled = false;
+    std::array<std::string, 4> sprite_paths;
+    std::optional<BuildingAnimationDefinition> animation;
+};
+
 // CH_COLOR_MASK_V1 runtime contract. A is object coverage while R/G identify
 // independently recolorable wall and roof regions.
 struct BuildingColorTint {
@@ -174,6 +182,7 @@ struct BuildingDefinition {
     std::optional<InitialBuildingPlacement> initial_placement;
     std::optional<BuildingAnimationDefinition> animation;
     std::optional<BuildingColorMaskDefinition> color_mask;
+    std::optional<BuildingActivityOverlayDefinition> activity_overlay;
 
     // Multi-level progression data (Nível 1 a Nível N).
     std::vector<BuildingLevelDefinition> levels;
@@ -212,6 +221,12 @@ struct BuildingInstance {
     bool roof_color_customized = false;
     BuildingColorTint wall_tint{};
     BuildingColorTint roof_tint{};
+
+    // Runtime-only usage state. Multiple visitors may overlap; the overlay
+    // remains active until the final activity source leaves.
+    std::uint32_t activity_count = 0;
+    [[nodiscard]] bool activity_active() const noexcept { return activity_count > 0; }
+
     [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition& current_level_definition(const BuildingDefinition& definition) const;
     [[nodiscard]] const BuildingLevelDefinition* next_level_definition(const BuildingDefinition& definition) const;
@@ -270,6 +285,8 @@ public:
     [[nodiscard]] bool is_occupied(int tile_x, int tile_y) const;
     [[nodiscard]] bool remove_instance(const BuildingDefinition& definition, std::uint64_t instance_id);
     [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+    [[nodiscard]] bool begin_activity(std::uint64_t instance_id);
+    [[nodiscard]] bool end_activity(std::uint64_t instance_id);
     [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
                                          std::int64_t service_price);
     [[nodiscard]] bool set_color_customization(std::uint64_t instance_id, BuildingColorTint wall, BuildingColorTint roof);

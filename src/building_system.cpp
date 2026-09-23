@@ -340,6 +340,60 @@ template <typename Number>
         }
     }
 
+    if (const auto serialized_activity = json_object(json, "activityOverlay")) {
+        const bool enabled = json_bool(*serialized_activity, "enabled").value_or(true);
+        if (enabled) {
+            if (json_string(*serialized_activity, "contract").value_or("") !=
+                "CH_BUILDING_ACTIVITY_OVERLAY_V1") {
+                return std::nullopt;
+            }
+            const auto activity_sprites = json_object(*serialized_activity, "sprites");
+            if (!activity_sprites) return std::nullopt;
+
+            BuildingActivityOverlayDefinition activity;
+            activity.enabled = true;
+            for (std::size_t index = 0; index < activity.sprite_paths.size(); ++index) {
+                activity.sprite_paths[index] =
+                    json_string(*activity_sprites, std::to_string(index)).value_or("");
+                // Never mirror or synthesize an overlay for an authored orientation.
+                if (definition.available_rotations[index] && activity.sprite_paths[index].empty()) {
+                    return std::nullopt;
+                }
+            }
+
+            if (const auto overlay_animation = json_object(*serialized_activity, "animation")) {
+                const int frame_count = json_number<int>(*overlay_animation, "frameCount").value_or(1);
+                if (frame_count < 1) return std::nullopt;
+                if (frame_count > 1) {
+                    BuildingAnimationDefinition parsed_animation;
+                    parsed_animation.frame_count = frame_count;
+                    parsed_animation.frame_duration_ms = std::max(
+                        1, json_number<int>(*overlay_animation, "frameDurationMs").value_or(120));
+                    parsed_animation.layout =
+                        json_string(*overlay_animation, "layout").value_or("horizontal");
+                    parsed_animation.playback =
+                        json_string(*overlay_animation, "playback").value_or("loop");
+                    if (parsed_animation.layout != "horizontal" ||
+                        (parsed_animation.playback != "loop" && parsed_animation.playback != "ambient_once")) {
+                        return std::nullopt;
+                    }
+                    parsed_animation.idle_frame = std::clamp(
+                        json_number<int>(*overlay_animation, "idleFrame").value_or(0), 0, frame_count - 1);
+                    parsed_animation.action_start_frame = std::clamp(
+                        json_number<int>(*overlay_animation, "actionStartFrame").value_or(1), 0, frame_count - 1);
+                    const int available_action_frames = frame_count - parsed_animation.action_start_frame;
+                    parsed_animation.action_frame_count = std::clamp(
+                        json_number<int>(*overlay_animation, "actionFrameCount").value_or(available_action_frames),
+                        0, available_action_frames);
+                    parsed_animation.idle_hold_ms = std::max(
+                        0, json_number<int>(*overlay_animation, "idleHoldMs").value_or(0));
+                    activity.animation = parsed_animation;
+                }
+            }
+            definition.activity_overlay = activity;
+        }
+    }
+
     if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
         for (const std::string& serialized_access_point : *serialized_access_points) {
             const auto facing = parse_grid_direction(json_string(serialized_access_point, "facing").value_or(""));
@@ -804,6 +858,9 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
     }
 
     BuildingInstance instance = serialized;
+    // Activity represents visitors currently inside and is intentionally not
+    // restored from a save session.
+    instance.activity_count = 0;
     if (!definition.rotatable) {
         instance.rotation = BuildingRotation::r0;
     }
@@ -870,6 +927,26 @@ bool BuildingManager::set_operational(const std::uint64_t instance_id, const boo
         return false;
     }
     found->operational = operational;
+    return true;
+}
+
+bool BuildingManager::begin_activity(const std::uint64_t instance_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end()) return false;
+    if (found->activity_count < std::numeric_limits<std::uint32_t>::max()) {
+        ++found->activity_count;
+    }
+    return true;
+}
+
+bool BuildingManager::end_activity(const std::uint64_t instance_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+        return instance.instance_id == instance_id;
+    });
+    if (found == instances_.end() || found->activity_count == 0) return false;
+    --found->activity_count;
     return true;
 }
 
