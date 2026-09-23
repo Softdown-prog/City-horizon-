@@ -5,38 +5,41 @@
   "styleContract": "CH_TYCOON_MINIATURE_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "footprint": {
-    "widthTiles": 5,
-    "depthTiles": 4,
-    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3]]
+    "widthTiles": 6,
+    "depthTiles": 5,
+    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[0,4],[1,4],[2,4],[3,4],[4,4],[5,4]]
   },
   "geometry": {
-    "wheelRadius": 4.50,
-    "wheelCenterZ": 5.55,
-    "ringTubeRadius": 0.120,
-    "spokeRadius": 0.047,
-    "axleRadius": 0.25,
-    "axleDepth": 1.02,
-    "supportRadius": 0.125,
-    "supportBaseHalfWidth": 2.85,
-    "supportBaseHalfDepth": 1.25,
+    "wheelRadius": 5.35,
+    "wheelCenterZ": 6.55,
+    "ringTubeRadius": 0.155,
+    "ringHalfDepth": 0.78,
+    "rimCrossMemberRadius": 0.050,
+    "spokeRadius": 0.058,
+    "axleRadius": 0.29,
+    "axleDepth": 1.55,
+    "supportRadius": 0.145,
+    "supportBaseHalfWidth": 3.45,
+    "supportBaseHalfDepth": 1.70,
     "supportFootZ": 0.18,
-    "hubRadius": 0.39,
-    "gondolaCount": 12,
-    "gondolaWidth": 0.96,
-    "gondolaDepth": 0.68,
-    "gondolaBodyHeight": 0.58,
-    "gondolaRoofHeight": 0.17,
-    "gondolaDrop": 0.56,
-    "entryPlatformWidth": 4.30,
-    "entryPlatformDepth": 1.18,
-    "entryPlatformHeight": 0.22,
-    "baseBeamHeight": 0.28,
-    "baseBeamDepth": 0.42,
-    "railingHeight": 0.78,
-    "railingRadius": 0.030,
-    "stairWidth": 1.20,
-    "stairDepth": 0.70,
-    "stairSteps": 3
+    "hubRadius": 0.46,
+    "gondolaCount": 16,
+    "gondolaWidth": 1.20,
+    "gondolaDepth": 0.86,
+    "gondolaBodyHeight": 0.70,
+    "gondolaRoofHeight": 0.20,
+    "gondolaDrop": 0.64,
+    "gondolaHangerRadius": 0.052,
+    "entryPlatformWidth": 5.20,
+    "entryPlatformDepth": 1.35,
+    "entryPlatformHeight": 0.24,
+    "baseBeamHeight": 0.31,
+    "baseBeamDepth": 0.48,
+    "railingHeight": 0.82,
+    "railingRadius": 0.034,
+    "stairWidth": 1.42,
+    "stairDepth": 0.82,
+    "stairSteps": 4
   },
   "animation": {
     "enabled": true,
@@ -53,12 +56,12 @@
     "staticBase": {
       "role": "attraction_static_base",
       "animated": false,
-      "includes": ["supports", "loading_platform", "railings", "operator_console", "fixed_structure"]
+      "includes": ["supports", "loading_platform", "stairs", "railings", "operator_console", "fixed_structure"]
     },
     "motionOverlay": {
       "role": "attraction_motion_overlay",
       "animated": true,
-      "includes": ["WheelRotor", "wheel_rings", "spokes", "hub", "gondolas", "moving_shadow"],
+      "includes": ["WheelRotor", "parallel_rims", "paired_spokes", "rim_cross_members", "hub", "gondolas", "moving_shadow"],
       "idleFrame": 1,
       "frameStart": 1,
       "frameEnd": 12,
@@ -83,10 +86,10 @@
     "dark": {"name":"FerrisDark","rgba":[0.050,0.058,0.066,1.0],"roughness":0.74,"metallic":0.10}
   },
   "prototypeNotes": {
-    "status": "geometry_prototype_v5_monumental_overlay",
+    "status": "geometry_prototype_v6_landmark_dual_rim_rebuild",
     "terrainIncluded": false,
-    "designIntent": "Original 5x4 park Ferris wheel preserving the approved City Horizon visual language while increasing radius, axle height and support stance for landmark presence. Runtime motion is authored as a separate wheel/gondola overlay so the attraction can remain visually idle until at least one passenger boards.",
-    "referencePolicy": "Use classic Tycoon-scale readability and landmark presence only; do not copy a specific proprietary Ferris wheel design.",
-    "nextGate": "Run CH Blender preflight, then render one SOUTH proxy at gameplay scale for human review before any new final four-direction overlay bake."
+    "designIntent": "Large landmark Ferris wheel with two parallel full-diameter circular rims, sixteen cabin stations between the rims, paired front/rear spoke systems, visible cross-members tying both circles together, and a substantial boarding platform with stairs and protective railings. Preserve City Horizon 2D gameplay readability while making the attraction visibly imposing at map scale.",
+    "referencePolicy": "Use real Ferris-wheel structural logic and classic Tycoon-scale readability without copying a proprietary attraction design.",
+    "nextGate": "Run CH Blender preflight with the landmark guarded builder, then render one SOUTH proxy for human review before any final four-direction overlay bake."
   }
 }
