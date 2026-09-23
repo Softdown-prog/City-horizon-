@@ -1,0 +1,127 @@
+name: MapForge Ice Cream Comparison
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mapforge-ice-cream-comparison.yml"
+
+jobs:
+  compare:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Qt and Pillow
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade aqtinstall pillow
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download approved inactive and active proxies
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force -Path out/ice_inactive | Out-Null
+          New-Item -ItemType Directory -Force -Path out/ice_active | Out-Null
+          gh run download 35933517251 --name "CH-Blender-Agent-35933517251-1" --dir out/ice_inactive
+          gh run download 35929337666 --name "CH-Blender-Agent-35929337666-1" --dir out/ice_active
+          $inactive = Get-ChildItem out/ice_inactive -Recurse -File | Where-Object { $_.Name -eq "proxy_south.png" } | Select-Object -First 1
+          $active = Get-ChildItem out/ice_active -Recurse -File | Where-Object { $_.Name -eq "proxy_south_active.png" } | Select-Object -First 1
+          if ($null -eq $inactive) { throw "Inactive ice cream proxy not found" }
+          if ($null -eq $active) { throw "Active ice cream proxy not found" }
+          "INACTIVE_PNG=$($inactive.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ACTIVE_PNG=$($active.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Compose side-by-side review candidate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out/mapforge_ice_compare | Out-Null
+          @'
+          from PIL import Image, ImageDraw
+          import os
+          inactive = Image.open(os.environ['INACTIVE_PNG']).convert('RGBA').resize((256,256), Image.Resampling.LANCZOS)
+          active = Image.open(os.environ['ACTIVE_PNG']).convert('RGBA').resize((256,256), Image.Resampling.LANCZOS)
+          canvas = Image.new('RGBA', (640, 320), (0,0,0,0))
+          canvas.alpha_composite(inactive, (30, 38))
+          canvas.alpha_composite(active, (354, 38))
+          draw = ImageDraw.Draw(canvas)
+          draw.rounded_rectangle((72, 8, 244, 34), 8, fill=(25,31,28,220))
+          draw.rounded_rectangle((396, 8, 568, 34), 8, fill=(25,31,28,220))
+          draw.text((116, 14), 'APAGADA', fill=(245,245,240,255))
+          draw.text((449, 14), 'ATIVA', fill=(255,235,150,255))
+          canvas.save('out/mapforge_ice_compare/ice_cream_pair.png')
+          '@ | Set-Content out/mapforge_ice_compare/compose.py
+          python out/mapforge_ice_compare/compose.py
+
+      - name: Write MapForge comparison request
+        shell: pwsh
+        run: |
+          @'
+          {
+            "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
+            "capture": {
+              "canvas": {
+                "width": 1280,
+                "height": 820,
+                "background": "#313934"
+              },
+              "camera": {
+                "zoom": 0.92,
+                "focusTile": [0.5, 0.5],
+                "focusScreen": [0.5, 0.60]
+              },
+              "stage": {
+                "minTile": -7,
+                "maxTile": 7,
+                "groundColor": "#708963",
+                "alternateGroundColor": "#768f69",
+                "gridColor": "#3e4f3b",
+                "drawGrid": true,
+                "drawGrassTexture": true,
+                "grassSpeckleColor": "#5f7f50"
+              },
+              "candidate": {
+                "tile": [0.5, 0.5],
+                "footprint": [8, 3],
+                "scale": 1.25,
+                "offsetPixels": [0, 80],
+                "showFootprint": false,
+                "showAnchor": false,
+                "renderAsGroundTile": false
+              }
+            }
+          }
+          '@ | Set-Content out/mapforge_ice_compare/request.json
+
+      - name: Configure capture worker
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/mapforge-ice-compare -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build capture worker
+        shell: pwsh
+        run: cmake --build build/mapforge-ice-compare --config Release --target MapForge2MapCapture --parallel
+
+      - name: Render comparison in MapForge
+        shell: pwsh
+        run: |
+          & "build/mapforge-ice-compare/Release/MapForge2MapCapture.exe" "out/mapforge_ice_compare/mapforge_ice_cream_inactive_vs_active.png" "out/mapforge_ice_compare/ice_cream_pair.png" "out/mapforge_ice_compare/request.json"
+          if ($LASTEXITCODE -ne 0) { throw "MapForge comparison capture failed" }
+          if (-not (Test-Path "out/mapforge_ice_compare/mapforge_ice_cream_inactive_vs_active.png")) { throw "Comparison PNG missing" }
+
+      - name: Upload comparison PNG
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge-Ice-Cream-Inactive-vs-Active
+          path: out/mapforge_ice_compare/mapforge_ice_cream_inactive_vs_active.png
+          if-no-files-found: error
+          retention-days: 14
