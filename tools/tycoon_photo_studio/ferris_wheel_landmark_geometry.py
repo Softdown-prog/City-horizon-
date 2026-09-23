@@ -26,12 +26,14 @@ def build_wheel(root, g, mats, fw):
     axle_depth = float(g["axleDepth"])
     ring_half_depth = float(g.get("ringHalfDepth", 0.72))
     cross_member_r = float(g.get("rimCrossMemberRadius", max(0.035, spoke_r * 0.78)))
+    primary_cross_member_r = float(g.get("rimPrimaryCrossMemberRadius", cross_member_r * 1.25))
 
     rotor = fw.empty("WheelRotor", (0.0, 0.0, center_z), root)
 
     # Two actual side-by-side wheel circles, rather than concentric circles in
-    # the same plane. This gives the attraction the broad mechanical silhouette
-    # of a full-size Ferris wheel and leaves a real volume for cabins between.
+    # the same plane. Their increased separation gives the attraction a broad
+    # mechanical silhouette and makes the passenger bay legible in the final 2D
+    # downsample.
     fw.torus(
         "WheelOuterRing",
         (0.0, -ring_half_depth, 0.0),
@@ -74,8 +76,8 @@ def build_wheel(root, g, mats, fw):
         x = math.sin(angle) * radius
         z = math.cos(angle) * radius
 
-        # Paired spokes on both wheel planes make the radial structure much
-        # denser while retaining clean 2D readability after downsample.
+        # Paired spokes on both wheel planes make the radial structure dense
+        # without collapsing into a single flat disc.
         for y, label in ((-ring_half_depth, "Front"), (ring_half_depth, "Rear")):
             fw.cylinder_between(
                 f"Spoke_{label}_{i:02d}",
@@ -97,16 +99,18 @@ def build_wheel(root, g, mats, fw):
                 vertices=18,
             )
 
-        # Cross-member physically ties the two circular rims at every cabin
-        # station. This is intentionally chunky enough to survive gameplay scale.
+        # Every cabin station ties both rims together. Alternating primary
+        # members are deliberately thicker so the double-rim structure remains
+        # obvious at gameplay scale rather than turning into uniform wire noise.
+        member_radius = primary_cross_member_r if i % 2 == 0 else cross_member_r
         fw.cylinder_between(
             f"RimCrossMember_{i:02d}",
             (x, -ring_half_depth, z),
             (x, ring_half_depth, z),
-            cross_member_r,
+            member_radius,
             mats["frame"],
             rotor,
-            vertices=16,
+            vertices=18 if i % 2 == 0 else 16,
         )
 
         # Cabin pivot sits halfway between the two rims. Its hanger drops from
