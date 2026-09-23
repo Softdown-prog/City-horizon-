@@ -21,7 +21,8 @@
     "look": "Medium High Contrast",
     "exposure": 0.0,
     "gamma": 1.0,
-    "transparent": true
+    "transparent": true,
+    "outputFormat": "PNG_RGBA_FULL_COLOR"
   },
   "world": {
     "color": [0.13, 0.16, 0.20, 1.0],
@@ -56,13 +57,22 @@
     "roughness": 1.0
   },
   "postProcess": {
-    "productionMode": "stylized_prerendered_default",
+    "productionMode": "stylized_prerendered_full_rgba",
+    "productionColorMode": "PNG_RGBA_FULL_COLOR",
+    "productionPaletteLimit": null,
     "candidateVariant": 1,
     "paletteColors": 128,
+    "paletteColorsScope": "retro_comparison_review_only_not_production",
     "paletteReductionRequired": false,
     "ditherRequired": false,
     "strictRetroEmulation": false,
     "optionalRetroProfilesAllowed": true,
+    "retroComparison": {
+      "enabled": true,
+      "purpose": "review_only",
+      "productionEligible": false,
+      "paletteVariantIds": [2, 3, 4]
+    },
     "shadowColor": [29, 33, 37],
     "shadowAlphaScale": 0.72,
     "shadowAlphaMax": 132,

@@ -10,8 +10,10 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 FINAL_SIZE = (256, 256)
+# Review-only palette budget used by optional retro comparison variants 02-04.
+# Production City Horizon output is variant 01: full-color PNG RGBA.
 PALETTE_COLORS = 128
-CANDIDATE_VARIANT_ID = 3
+CANDIDATE_VARIANT_ID = 1
 SHADOW_COLOR = (29, 33, 37)
 SHADOW_ALPHA_SCALE = 0.72
 SHADOW_ALPHA_MAX = 132
@@ -42,9 +44,17 @@ def apply_studio_preset(preset):
 
     render = preset["render"]
     post = preset["postProcess"]
+    retro = post.get("retroComparison", {})
     FINAL_SIZE = tuple(map(int, render["finalResolution"]))
-    PALETTE_COLORS = int(post["paletteColors"])
-    CANDIDATE_VARIANT_ID = int(post["candidateVariant"])
+    PALETTE_COLORS = int(post.get("paletteColors", retro.get("paletteColors", 128)))
+    CANDIDATE_VARIANT_ID = int(post.get("candidateVariant", 1))
+    if CANDIDATE_VARIANT_ID not in (1, 2, 3, 4):
+        raise RuntimeError(f"Unsupported post-process variant: {CANDIDATE_VARIANT_ID}")
+    if CANDIDATE_VARIANT_ID != 1 and not bool(retro.get("productionEligible", False)):
+        raise RuntimeError(
+            "Palette-reduced variants 02-04 are retro comparison outputs only; "
+            "production must use variant 01 Full Color under CH_TYCOON_STUDIO_V1"
+        )
     SHADOW_COLOR = tuple(map(int, post["shadowColor"]))
     SHADOW_ALPHA_SCALE = float(post["shadowAlphaScale"])
     SHADOW_ALPHA_MAX = int(post["shadowAlphaMax"])
@@ -56,6 +66,36 @@ def apply_studio_preset(preset):
     EDGE_ALPHA_THRESHOLD = int(post["edgeAlphaThreshold"])
     EDGE_OPACITY_SCALE = float(post["edgeOpacityScale"])
     EDGE_OPACITY_MAX = int(post["edgeOpacityMax"])
+
+
+def postprocess_variant_metadata(variant_id):
+    variants = {
+        1: {
+            "mode": "full_rgba",
+            "paletteReduced": False,
+            "dither": "none",
+            "edgeCleanup": "none",
+        },
+        2: {
+            "mode": "retro_palette_review",
+            "paletteReduced": True,
+            "dither": "none",
+            "edgeCleanup": "none",
+        },
+        3: {
+            "mode": "retro_palette_review",
+            "paletteReduced": True,
+            "dither": "floyd_steinberg",
+            "edgeCleanup": "none",
+        },
+        4: {
+            "mode": "retro_palette_review",
+            "paletteReduced": True,
+            "dither": "floyd_steinberg",
+            "edgeCleanup": "alpha_edge_cleanup",
+        },
+    }
+    return dict(variants[variant_id])
 
 
 def percentile_from_histogram(hist, percentile):
@@ -243,13 +283,18 @@ def make_direction_review(candidates, pivots, title="Tycoon Asset Baker V1 - fou
 
 
 def make_style_matrix(all_variants):
-    labels = ("01 Full Color", "02 Palette", "03 Palette+Dither", "04 +Edge Cleanup")
+    labels = (
+        "01 Full Color [PRODUCTION]",
+        "02 Retro Palette [REVIEW]",
+        "03 Retro Palette+Dither [REVIEW]",
+        "04 Retro +Edge Cleanup [REVIEW]",
+    )
     cell = 276
     left = 110
     top = 62
     board = Image.new("RGBA", (left + 4 * cell, top + 4 * cell + 36), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((18, 14), "Four-direction style matrix - same Blender source bake", fill=(32, 32, 32, 255))
+    draw.text((18, 14), "Four-direction style matrix - production vs optional retro review", fill=(32, 32, 32, 255))
     for column, label in enumerate(labels):
         draw.text((left + column * cell + 8, 40), label, fill=(55, 55, 55, 255))
     for row, direction in enumerate(DIRECTION_ORDER):
@@ -427,6 +472,14 @@ def main():
             masks, pivots, "CH_COLOR_MASK_V1 - R/G/B semantic roles, alpha coverage"
         ).save(output_dir / f"{asset_id}_mask_review.png")
 
+    post_config = preset.get("postProcess", {})
+    retro_config = post_config.get("retroComparison", {})
+    candidate_metadata = postprocess_variant_metadata(CANDIDATE_VARIANT_ID)
+    candidate_metadata.update({
+        "variantId": CANDIDATE_VARIANT_ID,
+        "studioPreset": metadata.get("studioPreset"),
+    })
+
     manifest = {
         "contract": "TYCOON_ASSET_BAKE_V1",
         "status": "golden_pipeline_candidate",
@@ -447,17 +500,19 @@ def main():
         "renderEngine": metadata.get("renderEngine", "unknown"),
         "renderResolution": metadata.get("renderResolution", [1024, 1024]),
         "finalFrameResolution": list(FINAL_SIZE),
+        "productionColorMode": post_config.get("productionColorMode", "PNG_RGBA_FULL_COLOR"),
+        "productionPaletteLimit": post_config.get("productionPaletteLimit"),
         "directionCount": 4,
         "directionOrder": list(DIRECTION_ORDER),
         "rotationPolicy": metadata.get("rotationPolicy", {}),
         "pivotPolicy": "projected world origin (0,0,0), fixed across all directions",
-        "paletteColorCount": PALETTE_COLORS,
-        "candidatePostProcess": {
-            "variantId": CANDIDATE_VARIANT_ID,
-            "mode": "palette_reduced",
-            "dither": "floyd_steinberg",
-            "edgeCleanup": "none",
-            "studioPreset": metadata.get("studioPreset"),
+        "candidatePostProcess": candidate_metadata,
+        "retroComparison": {
+            "enabled": bool(retro_config.get("enabled", True)),
+            "purpose": retro_config.get("purpose", "review_only"),
+            "productionEligible": bool(retro_config.get("productionEligible", False)),
+            "paletteColorCount": PALETTE_COLORS,
+            "variantIds": retro_config.get("paletteVariantIds", [2, 3, 4]),
         },
         "sourceSummary": metadata.get("sourceSummary", {}),
         "views": view_records,
