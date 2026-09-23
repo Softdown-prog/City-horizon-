@@ -1,5 +1,8 @@
+#include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -20,6 +23,19 @@
 #include <algorithm>
 
 namespace {
+
+struct LaunchOptions {
+    QString base_path;
+    QString overlay_path;
+    QString direction;
+    QString asset_name;
+    int base_frames = 1;
+    int base_duration_ms = 125;
+    int overlay_frames = 1;
+    int overlay_duration_ms = 125;
+    double anchor_x = 0.5;
+    double anchor_y = 0.82;
+};
 
 struct AlphaStats {
     qint64 opaque = 0;
@@ -91,9 +107,25 @@ public:
 
     void setBaseImage(const QImage& image) { base_ = image.convertToFormat(QImage::Format_ARGB32); update(); }
     void setOverlayImage(const QImage& image) { overlay_ = image.convertToFormat(QImage::Format_ARGB32); update(); }
-    void clearOverlay() { overlay_ = QImage(); update(); }
-    void setFrameCount(int count) { frame_count_ = std::max(1, count); frame_index_ %= frame_count_; update(); }
-    void setFrameIndex(int index) { frame_index_ = std::clamp(index, 0, std::max(0, frame_count_ - 1)); update(); }
+    void clearOverlay() { overlay_ = QImage(); overlay_frame_index_ = 0; update(); }
+    void setBaseFrameCount(int count) {
+        base_frame_count_ = std::max(1, count);
+        base_frame_index_ = std::min(base_frame_index_, base_frame_count_ - 1);
+        update();
+    }
+    void setOverlayFrameCount(int count) {
+        overlay_frame_count_ = std::max(1, count);
+        overlay_frame_index_ = std::min(overlay_frame_index_, overlay_frame_count_ - 1);
+        update();
+    }
+    void setBaseFrameIndex(int index) {
+        base_frame_index_ = std::clamp(index, 0, std::max(0, base_frame_count_ - 1));
+        update();
+    }
+    void setOverlayFrameIndex(int index) {
+        overlay_frame_index_ = std::clamp(index, 0, std::max(0, overlay_frame_count_ - 1));
+        update();
+    }
     void setAnchor(QPointF anchor) { anchor_ = anchor; update(); }
     void setShowBounds(bool value) { show_bounds_ = value; update(); }
     void setShowCheckerboard(bool value) { show_checkerboard_ = value; update(); }
@@ -101,21 +133,17 @@ public:
 
     const QImage& baseImage() const { return base_; }
     const QImage& overlayImage() const { return overlay_; }
-    int frameCount() const { return frame_count_; }
-    int frameIndex() const { return frame_index_; }
+    int baseFrameCount() const { return base_frame_count_; }
+    int overlayFrameCount() const { return overlay_frame_count_; }
+    int baseFrameIndex() const { return base_frame_index_; }
+    int overlayFrameIndex() const { return overlay_frame_index_; }
 
     QRect baseFrameRect() const {
-        if (base_.isNull()) return {};
-        const int width = base_.width() / std::max(1, frame_count_);
-        if (width <= 0) return {};
-        return QRect(frame_index_ * width, 0, width, base_.height()).intersected(base_.rect());
+        return frameRect(base_, base_frame_count_, base_frame_index_);
     }
 
     QRect overlayFrameRect() const {
-        if (overlay_.isNull()) return {};
-        if (overlay_.width() % std::max(1, frame_count_) != 0) return overlay_.rect();
-        const int width = overlay_.width() / std::max(1, frame_count_);
-        return QRect(frame_index_ * width, 0, width, overlay_.height()).intersected(overlay_.rect());
+        return frameRect(overlay_, overlay_frame_count_, overlay_frame_index_);
     }
 
 protected:
@@ -161,11 +189,11 @@ protected:
             if (!stats.opaque_bounds.isEmpty()) {
                 const double sx = target.width() / source.width();
                 const double sy = target.height() / source.height();
-                QRect local = stats.opaque_bounds.translated(-source.topLeft());
-                QRectF bounds(target.left() + local.left() * sx,
-                              target.top() + local.top() * sy,
-                              local.width() * sx,
-                              local.height() * sy);
+                const QRect local = stats.opaque_bounds.translated(-source.topLeft());
+                const QRectF bounds(target.left() + local.left() * sx,
+                                    target.top() + local.top() * sy,
+                                    local.width() * sx,
+                                    local.height() * sy);
                 QPen pen(QColor(255, 196, 64));
                 pen.setWidth(2);
                 painter.setPen(pen);
@@ -184,14 +212,27 @@ protected:
 
         painter.setPen(QColor(230, 234, 239));
         painter.drawText(QRectF(12.0, 8.0, width() - 24.0, 24.0), Qt::AlignLeft | Qt::AlignVCenter,
-                         QStringLiteral("Frame %1 / %2").arg(frame_index_ + 1).arg(frame_count_));
+                         QStringLiteral("Base %1/%2   Overlay %3/%4")
+                             .arg(base_frame_index_ + 1).arg(base_frame_count_)
+                             .arg(overlay_frame_index_ + 1).arg(overlay_frame_count_));
     }
 
 private:
+    static QRect frameRect(const QImage& image, int frame_count, int frame_index) {
+        if (image.isNull()) return {};
+        frame_count = std::max(1, frame_count);
+        const int width = image.width() / frame_count;
+        if (width <= 0) return {};
+        frame_index = std::clamp(frame_index, 0, frame_count - 1);
+        return QRect(frame_index * width, 0, width, image.height()).intersected(image.rect());
+    }
+
     QImage base_;
     QImage overlay_;
-    int frame_count_ = 1;
-    int frame_index_ = 0;
+    int base_frame_count_ = 1;
+    int overlay_frame_count_ = 1;
+    int base_frame_index_ = 0;
+    int overlay_frame_index_ = 0;
     QPointF anchor_{0.5, 0.82};
     bool show_bounds_ = true;
     bool show_checkerboard_ = true;
@@ -200,9 +241,9 @@ private:
 
 class SpriteWorkshopWindow final : public QMainWindow {
 public:
-    SpriteWorkshopWindow() {
+    explicit SpriteWorkshopWindow(const LaunchOptions& options) {
         setWindowTitle(QStringLiteral("City Horizon Sprite Workshop"));
-        resize(1120, 720);
+        resize(1160, 760);
 
         auto* root = new QWidget(this);
         auto* root_layout = new QHBoxLayout(root);
@@ -210,15 +251,19 @@ public:
         root_layout->addWidget(canvas_, 1);
 
         auto* panel = new QWidget(root);
-        panel->setMinimumWidth(330);
+        panel->setMinimumWidth(360);
         auto* panel_layout = new QVBoxLayout(panel);
 
-        auto* title = new QLabel(QStringLiteral("Sprite Workshop V1"), panel);
+        auto* title = new QLabel(QStringLiteral("Sprite Workshop V1.1"), panel);
         QFont title_font = title->font();
         title_font.setPointSize(title_font.pointSize() + 2);
         title_font.setBold(true);
         title->setFont(title_font);
         panel_layout->addWidget(title);
+
+        context_label_ = new QLabel(panel);
+        context_label_->setWordWrap(true);
+        panel_layout->addWidget(context_label_);
 
         auto* open_base = new QPushButton(QStringLiteral("Open base PNG..."), panel);
         auto* open_overlay = new QPushButton(QStringLiteral("Open activity overlay..."), panel);
@@ -228,16 +273,22 @@ public:
         panel_layout->addWidget(clear_overlay);
 
         auto* form = new QFormLayout();
-        frame_count_ = new QSpinBox(panel);
-        frame_count_->setRange(1, 128);
-        frame_count_->setValue(1);
-        frame_index_ = new QSpinBox(panel);
-        frame_index_->setRange(1, 1);
-        frame_index_->setValue(1);
-        duration_ms_ = new QSpinBox(panel);
-        duration_ms_->setRange(16, 5000);
-        duration_ms_->setValue(125);
-        duration_ms_->setSuffix(QStringLiteral(" ms"));
+        base_frame_count_ = new QSpinBox(panel);
+        base_frame_count_->setRange(1, 128);
+        base_frame_index_ = new QSpinBox(panel);
+        base_frame_index_->setRange(1, 1);
+        base_duration_ms_ = new QSpinBox(panel);
+        base_duration_ms_->setRange(16, 5000);
+        base_duration_ms_->setSuffix(QStringLiteral(" ms"));
+
+        overlay_frame_count_ = new QSpinBox(panel);
+        overlay_frame_count_->setRange(1, 128);
+        overlay_frame_index_ = new QSpinBox(panel);
+        overlay_frame_index_->setRange(1, 1);
+        overlay_duration_ms_ = new QSpinBox(panel);
+        overlay_duration_ms_->setRange(16, 5000);
+        overlay_duration_ms_->setSuffix(QStringLiteral(" ms"));
+
         anchor_x_ = new QDoubleSpinBox(panel);
         anchor_y_ = new QDoubleSpinBox(panel);
         for (QDoubleSpinBox* spin : {anchor_x_, anchor_y_}) {
@@ -245,11 +296,13 @@ public:
             spin->setSingleStep(0.01);
             spin->setDecimals(3);
         }
-        anchor_x_->setValue(0.5);
-        anchor_y_->setValue(0.82);
-        form->addRow(QStringLiteral("Frames (horizontal)"), frame_count_);
-        form->addRow(QStringLiteral("Current frame"), frame_index_);
-        form->addRow(QStringLiteral("Frame duration"), duration_ms_);
+
+        form->addRow(QStringLiteral("Base frames"), base_frame_count_);
+        form->addRow(QStringLiteral("Base current frame"), base_frame_index_);
+        form->addRow(QStringLiteral("Base frame duration"), base_duration_ms_);
+        form->addRow(QStringLiteral("Overlay frames"), overlay_frame_count_);
+        form->addRow(QStringLiteral("Overlay current frame"), overlay_frame_index_);
+        form->addRow(QStringLiteral("Overlay frame duration"), overlay_duration_ms_);
         form->addRow(QStringLiteral("Anchor X"), anchor_x_);
         form->addRow(QStringLiteral("Anchor Y"), anchor_y_);
         panel_layout->addLayout(form);
@@ -271,43 +324,61 @@ public:
         diagnostics_ = new QLabel(panel);
         diagnostics_->setWordWrap(true);
         diagnostics_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        diagnostics_->setMinimumHeight(150);
+        diagnostics_->setMinimumHeight(170);
         diagnostics_->setStyleSheet(QStringLiteral("QLabel { background: #20242b; border: 1px solid #3b424d; padding: 8px; }"));
         panel_layout->addWidget(diagnostics_);
 
-        auto* export_frame = new QPushButton(QStringLiteral("Export current frame..."), panel);
+        auto* export_frame = new QPushButton(QStringLiteral("Export current composite..."), panel);
         panel_layout->addWidget(export_frame);
         panel_layout->addStretch(1);
 
         root_layout->addWidget(panel);
         setCentralWidget(root);
 
-        timer_.setInterval(duration_ms_->value());
-        connect(&timer_, &QTimer::timeout, this, [this]() {
-            const int next = (canvas_->frameIndex() + 1) % canvas_->frameCount();
-            canvas_->setFrameIndex(next);
-            frame_index_->setValue(next + 1);
+        connect(&base_timer_, &QTimer::timeout, this, [this]() {
+            const int next = (canvas_->baseFrameIndex() + 1) % canvas_->baseFrameCount();
+            canvas_->setBaseFrameIndex(next);
+            base_frame_index_->setValue(next + 1);
+            refreshDiagnostics();
+        });
+        connect(&overlay_timer_, &QTimer::timeout, this, [this]() {
+            const int next = (canvas_->overlayFrameIndex() + 1) % canvas_->overlayFrameCount();
+            canvas_->setOverlayFrameIndex(next);
+            overlay_frame_index_->setValue(next + 1);
             refreshDiagnostics();
         });
 
-        connect(open_base, &QPushButton::clicked, this, [this]() { openBase(); });
-        connect(open_overlay, &QPushButton::clicked, this, [this]() { openOverlay(); });
+        connect(open_base, &QPushButton::clicked, this, [this]() { openBaseDialog(); });
+        connect(open_overlay, &QPushButton::clicked, this, [this]() { openOverlayDialog(); });
         connect(clear_overlay, &QPushButton::clicked, this, [this]() {
             canvas_->clearOverlay();
             overlay_path_.clear();
             refreshDiagnostics();
         });
-        connect(frame_count_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
-            canvas_->setFrameCount(value);
-            frame_index_->setRange(1, value);
-            frame_index_->setValue(std::min(frame_index_->value(), value));
+        connect(base_frame_count_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+            canvas_->setBaseFrameCount(value);
+            base_frame_index_->setRange(1, value);
+            base_frame_index_->setValue(std::min(base_frame_index_->value(), value));
+            syncTimers();
             refreshDiagnostics();
         });
-        connect(frame_index_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
-            canvas_->setFrameIndex(value - 1);
+        connect(overlay_frame_count_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+            canvas_->setOverlayFrameCount(value);
+            overlay_frame_index_->setRange(1, value);
+            overlay_frame_index_->setValue(std::min(overlay_frame_index_->value(), value));
+            syncTimers();
             refreshDiagnostics();
         });
-        connect(duration_ms_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) { timer_.setInterval(value); });
+        connect(base_frame_index_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+            canvas_->setBaseFrameIndex(value - 1);
+            refreshDiagnostics();
+        });
+        connect(overlay_frame_index_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+            canvas_->setOverlayFrameIndex(value - 1);
+            refreshDiagnostics();
+        });
+        connect(base_duration_ms_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { syncTimers(); });
+        connect(overlay_duration_ms_, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { syncTimers(); });
         connect(anchor_x_, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) { refreshAnchor(); });
         connect(anchor_y_, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double) { refreshAnchor(); });
         connect(checkerboard_, &QCheckBox::toggled, canvas_, [this](bool value) { canvas_->setShowCheckerboard(value); });
@@ -315,44 +386,76 @@ public:
         connect(show_overlay_, &QCheckBox::toggled, canvas_, [this](bool value) { canvas_->setShowOverlay(value); });
         connect(play_, &QPushButton::toggled, this, [this](bool playing) {
             play_->setText(playing ? QStringLiteral("Pause animation") : QStringLiteral("Play animation"));
-            if (playing) timer_.start(); else timer_.stop();
+            syncTimers();
         });
-        connect(export_frame, &QPushButton::clicked, this, [this]() { exportCurrentFrame(); });
+        connect(export_frame, &QPushButton::clicked, this, [this]() { exportCurrentComposite(); });
 
         auto* file_menu = menuBar()->addMenu(QStringLiteral("&File"));
         auto* open_base_action = file_menu->addAction(QStringLiteral("Open &base PNG..."));
         auto* open_overlay_action = file_menu->addAction(QStringLiteral("Open &activity overlay..."));
         file_menu->addSeparator();
-        auto* export_action = file_menu->addAction(QStringLiteral("&Export current frame..."));
-        connect(open_base_action, &QAction::triggered, this, [this]() { openBase(); });
-        connect(open_overlay_action, &QAction::triggered, this, [this]() { openOverlay(); });
-        connect(export_action, &QAction::triggered, this, [this]() { exportCurrentFrame(); });
+        auto* export_action = file_menu->addAction(QStringLiteral("&Export current composite..."));
+        connect(open_base_action, &QAction::triggered, this, [this]() { openBaseDialog(); });
+        connect(open_overlay_action, &QAction::triggered, this, [this]() { openOverlayDialog(); });
+        connect(export_action, &QAction::triggered, this, [this]() { exportCurrentComposite(); });
 
-        refreshDiagnostics();
+        applyLaunchOptions(options);
     }
 
 private:
-    void openBase() {
+    void applyLaunchOptions(const LaunchOptions& options) {
+        asset_name_ = options.asset_name;
+        direction_ = options.direction;
+        context_label_->setText(asset_name_.isEmpty()
+            ? (direction_.isEmpty() ? QStringLiteral("Manual inspection") : direction_)
+            : QStringLiteral("%1 — %2").arg(asset_name_, direction_.isEmpty() ? QStringLiteral("sprite") : direction_));
+
+        base_frame_count_->setValue(std::max(1, options.base_frames));
+        base_duration_ms_->setValue(std::max(16, options.base_duration_ms));
+        overlay_frame_count_->setValue(std::max(1, options.overlay_frames));
+        overlay_duration_ms_->setValue(std::max(16, options.overlay_duration_ms));
+        anchor_x_->setValue(std::clamp(options.anchor_x, 0.0, 1.0));
+        anchor_y_->setValue(std::clamp(options.anchor_y, 0.0, 1.0));
+        refreshAnchor();
+
+        if (!options.base_path.isEmpty()) loadBase(options.base_path);
+        if (!options.overlay_path.isEmpty()) loadOverlay(options.overlay_path);
+
+        if (!asset_name_.isEmpty() || !direction_.isEmpty()) {
+            setWindowTitle(QStringLiteral("City Horizon Sprite Workshop — %1%2")
+                               .arg(asset_name_.isEmpty() ? QStringLiteral("Asset") : asset_name_)
+                               .arg(direction_.isEmpty() ? QString() : QStringLiteral(" — %1").arg(direction_)));
+        }
+        refreshDiagnostics();
+    }
+
+    void openBaseDialog() {
         const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Open City Horizon PNG"), QString(),
                                                           QStringLiteral("PNG image (*.png);;Images (*.png *.bmp *.webp)"));
-        if (path.isEmpty()) return;
+        if (!path.isEmpty()) loadBase(path);
+    }
+
+    void openOverlayDialog() {
+        const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Open CH_BUILDING_ACTIVITY_OVERLAY_V1 PNG"), QString(),
+                                                          QStringLiteral("PNG image (*.png)"));
+        if (!path.isEmpty()) loadOverlay(path);
+    }
+
+    void loadBase(const QString& path) {
         QImage image(path);
         if (image.isNull()) {
-            statusBar()->showMessage(QStringLiteral("Could not open image."), 5000);
+            statusBar()->showMessage(QStringLiteral("Could not open base image."), 5000);
             return;
         }
         base_path_ = path;
         canvas_->setBaseImage(image);
-        canvas_->setFrameIndex(0);
-        frame_index_->setValue(1);
+        canvas_->setBaseFrameIndex(0);
+        base_frame_index_->setValue(1);
         refreshDiagnostics();
         statusBar()->showMessage(QStringLiteral("Opened %1").arg(QFileInfo(path).fileName()), 5000);
     }
 
-    void openOverlay() {
-        const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Open CH_BUILDING_ACTIVITY_OVERLAY_V1 PNG"), QString(),
-                                                          QStringLiteral("PNG image (*.png)"));
-        if (path.isEmpty()) return;
+    void loadOverlay(const QString& path) {
         QImage image(path);
         if (image.isNull()) {
             statusBar()->showMessage(QStringLiteral("Could not open overlay."), 5000);
@@ -360,28 +463,40 @@ private:
         }
         overlay_path_ = path;
         canvas_->setOverlayImage(image);
+        canvas_->setOverlayFrameIndex(0);
+        overlay_frame_index_->setValue(1);
         refreshDiagnostics();
-        statusBar()->showMessage(QStringLiteral("Overlay loaded for composited inspection."), 5000);
+        statusBar()->showMessage(QStringLiteral("Activity overlay loaded."), 5000);
     }
 
     void refreshAnchor() {
         canvas_->setAnchor(QPointF(anchor_x_->value(), anchor_y_->value()));
     }
 
+    void syncTimers() {
+        base_timer_.stop();
+        overlay_timer_.stop();
+        if (!play_->isChecked()) return;
+        if (canvas_->baseFrameCount() > 1) base_timer_.start(base_duration_ms_->value());
+        if (canvas_->overlayFrameCount() > 1 && !canvas_->overlayImage().isNull()) {
+            overlay_timer_.start(overlay_duration_ms_->value());
+        }
+    }
+
     void refreshDiagnostics() {
         const QImage& base = canvas_->baseImage();
         if (base.isNull()) {
-            diagnostics_->setText(QStringLiteral("No sprite loaded.\n\nOpen a PNG to inspect alpha, edge fringe, frame geometry and anchor alignment."));
+            diagnostics_->setText(QStringLiteral("No sprite loaded.\n\nOpen a PNG or launch this tool from CityHorizonAssetEditor."));
             return;
         }
 
-        const int frames = canvas_->frameCount();
-        const bool divisible = base.width() % frames == 0;
+        const int base_frames = canvas_->baseFrameCount();
+        const bool base_divisible = base.width() % base_frames == 0;
         const QRect source = canvas_->baseFrameRect();
         const AlphaStats stats = analyzeAlpha(base, source);
-        QString text = QStringLiteral("Base: %1 × %2 px\nFrames: %3%4\nCurrent frame: %5 × %6 px\nOpaque: %7\nSemi-transparent: %8\nTransparent: %9\nEdge fringe: %10")
-                           .arg(base.width()).arg(base.height()).arg(frames)
-                           .arg(divisible ? QString() : QStringLiteral("  [WIDTH NOT DIVISIBLE]"))
+        QString text = QStringLiteral("Base: %1 × %2 px\nBase frames: %3%4\nBase frame: %5 × %6 px\nOpaque: %7\nSemi-transparent: %8\nTransparent: %9\nEdge fringe: %10")
+                           .arg(base.width()).arg(base.height()).arg(base_frames)
+                           .arg(base_divisible ? QString() : QStringLiteral("  [WIDTH NOT DIVISIBLE]"))
                            .arg(source.width()).arg(source.height())
                            .arg(stats.opaque).arg(stats.semi_transparent).arg(stats.transparent).arg(stats.edge_fringe);
 
@@ -393,36 +508,40 @@ private:
 
         const QImage& overlay = canvas_->overlayImage();
         if (!overlay.isNull()) {
+            const int overlay_frames = canvas_->overlayFrameCount();
+            const bool overlay_divisible = overlay.width() % overlay_frames == 0;
             const QRect overlay_frame = canvas_->overlayFrameRect();
             const bool geometry_match = overlay_frame.size() == source.size();
-            text += QStringLiteral("\n\nActivity overlay: %1 × %2 px\nOverlay frame: %3 × %4 px\nGeometry: %5")
-                        .arg(overlay.width()).arg(overlay.height())
+            text += QStringLiteral("\n\nActivity overlay: %1 × %2 px\nOverlay frames: %3%4\nOverlay frame: %5 × %6 px\nGeometry: %7")
+                        .arg(overlay.width()).arg(overlay.height()).arg(overlay_frames)
+                        .arg(overlay_divisible ? QString() : QStringLiteral("  [WIDTH NOT DIVISIBLE]"))
                         .arg(overlay_frame.width()).arg(overlay_frame.height())
                         .arg(geometry_match ? QStringLiteral("MATCH") : QStringLiteral("MISMATCH — fix before runtime"));
         }
 
+        text += QStringLiteral("\n\nAnchor: %1, %2").arg(anchor_x_->value(), 0, 'f', 3).arg(anchor_y_->value(), 0, 'f', 3);
         if (stats.edge_fringe > 0) {
-            text += QStringLiteral("\n\nNote: fringe count means semi-transparent edge pixels touching transparency. This is a diagnostic, not automatic proof of a bad halo; normal anti-aliasing can produce valid fringe.");
+            text += QStringLiteral("\n\nFringe is diagnostic only; valid anti-aliasing can also create semi-transparent edge pixels.");
         }
         diagnostics_->setText(text);
     }
 
-    void exportCurrentFrame() {
+    void exportCurrentComposite() {
         const QImage& base = canvas_->baseImage();
         const QRect source = canvas_->baseFrameRect();
         if (base.isNull() || source.isEmpty()) return;
 
         const QString suggested = base_path_.isEmpty()
-            ? QStringLiteral("sprite_frame_%1.png").arg(canvas_->frameIndex(), 2, 10, QLatin1Char('0'))
-            : QFileInfo(base_path_).completeBaseName() + QStringLiteral("_frame_%1.png").arg(canvas_->frameIndex(), 2, 10, QLatin1Char('0'));
-        const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("Export inspected frame"), suggested,
+            ? QStringLiteral("sprite_composite.png")
+            : QFileInfo(base_path_).completeBaseName() + QStringLiteral("_inspection.png");
+        const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("Export inspected composite"), suggested,
                                                           QStringLiteral("PNG image (*.png)"));
         if (path.isEmpty()) return;
 
         QImage output = base.copy(source).convertToFormat(QImage::Format_ARGB32);
         if (show_overlay_->isChecked() && !canvas_->overlayImage().isNull()) {
             const QRect overlay_source = canvas_->overlayFrameRect();
-            QImage overlay_frame = canvas_->overlayImage().copy(overlay_source);
+            const QImage overlay_frame = canvas_->overlayImage().copy(overlay_source);
             if (overlay_frame.size() == output.size()) {
                 QPainter painter(&output);
                 painter.drawImage(QPoint(0, 0), overlay_frame);
@@ -433,27 +552,70 @@ private:
     }
 
     SpriteCanvas* canvas_ = nullptr;
-    QSpinBox* frame_count_ = nullptr;
-    QSpinBox* frame_index_ = nullptr;
-    QSpinBox* duration_ms_ = nullptr;
+    QSpinBox* base_frame_count_ = nullptr;
+    QSpinBox* base_frame_index_ = nullptr;
+    QSpinBox* base_duration_ms_ = nullptr;
+    QSpinBox* overlay_frame_count_ = nullptr;
+    QSpinBox* overlay_frame_index_ = nullptr;
+    QSpinBox* overlay_duration_ms_ = nullptr;
     QDoubleSpinBox* anchor_x_ = nullptr;
     QDoubleSpinBox* anchor_y_ = nullptr;
     QPushButton* play_ = nullptr;
     QCheckBox* checkerboard_ = nullptr;
     QCheckBox* bounds_ = nullptr;
     QCheckBox* show_overlay_ = nullptr;
+    QLabel* context_label_ = nullptr;
     QLabel* diagnostics_ = nullptr;
-    QTimer timer_;
+    QTimer base_timer_;
+    QTimer overlay_timer_;
     QString base_path_;
     QString overlay_path_;
+    QString direction_;
+    QString asset_name_;
 };
+
+LaunchOptions parseLaunchOptions(QApplication& app) {
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("City Horizon raster QA and activity-overlay workshop"));
+    parser.addHelpOption();
+
+    const QCommandLineOption base_option(QStringLiteral("base"), QStringLiteral("Base sprite/spritesheet PNG."), QStringLiteral("path"));
+    const QCommandLineOption overlay_option(QStringLiteral("overlay"), QStringLiteral("Activity overlay PNG."), QStringLiteral("path"));
+    const QCommandLineOption base_frames_option(QStringLiteral("base-frames"), QStringLiteral("Horizontal base frame count."), QStringLiteral("count"), QStringLiteral("1"));
+    const QCommandLineOption base_duration_option(QStringLiteral("base-duration"), QStringLiteral("Base frame duration in ms."), QStringLiteral("ms"), QStringLiteral("125"));
+    const QCommandLineOption overlay_frames_option(QStringLiteral("overlay-frames"), QStringLiteral("Horizontal overlay frame count."), QStringLiteral("count"), QStringLiteral("1"));
+    const QCommandLineOption overlay_duration_option(QStringLiteral("overlay-duration"), QStringLiteral("Overlay frame duration in ms."), QStringLiteral("ms"), QStringLiteral("125"));
+    const QCommandLineOption anchor_x_option(QStringLiteral("anchor-x"), QStringLiteral("Normalized anchor X."), QStringLiteral("value"), QStringLiteral("0.5"));
+    const QCommandLineOption anchor_y_option(QStringLiteral("anchor-y"), QStringLiteral("Normalized anchor Y."), QStringLiteral("value"), QStringLiteral("0.82"));
+    const QCommandLineOption direction_option(QStringLiteral("direction"), QStringLiteral("Direction label."), QStringLiteral("name"));
+    const QCommandLineOption asset_option(QStringLiteral("asset"), QStringLiteral("Asset display name."), QStringLiteral("name"));
+
+    parser.addOptions({base_option, overlay_option, base_frames_option, base_duration_option,
+                       overlay_frames_option, overlay_duration_option, anchor_x_option, anchor_y_option,
+                       direction_option, asset_option});
+    parser.process(app);
+
+    LaunchOptions options;
+    options.base_path = parser.value(base_option);
+    options.overlay_path = parser.value(overlay_option);
+    options.direction = parser.value(direction_option);
+    options.asset_name = parser.value(asset_option);
+    options.base_frames = std::max(1, parser.value(base_frames_option).toInt());
+    options.base_duration_ms = std::max(16, parser.value(base_duration_option).toInt());
+    options.overlay_frames = std::max(1, parser.value(overlay_frames_option).toInt());
+    options.overlay_duration_ms = std::max(16, parser.value(overlay_duration_option).toInt());
+    options.anchor_x = parser.value(anchor_x_option).toDouble();
+    options.anchor_y = parser.value(anchor_y_option).toDouble();
+    return options;
+}
 
 } // namespace
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("City Horizon Sprite Workshop"));
-    SpriteWorkshopWindow window;
+    const LaunchOptions options = parseLaunchOptions(app);
+    SpriteWorkshopWindow window(options);
     window.show();
     return app.exec();
 }

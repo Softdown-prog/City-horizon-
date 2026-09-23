@@ -27,6 +27,10 @@ class AssetProjectEditorWindow final : public QMainWindow {
 public:
     AssetProjectEditorWindow();
 
+    [[nodiscard]] const AssetDocument& document() const { return document_; }
+    [[nodiscard]] const QString& currentPath() const { return current_path_; }
+    [[nodiscard]] const QString& previewDirection() const { return preview_direction_; }
+
 private:
     void buildUi();
     void buildMenus();
