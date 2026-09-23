@@ -1,0 +1,18 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "building.ice_cream_shop.01.activity.final.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_ice_cream_shop_activity_guarded.py",
+  "qualityStage": "final",
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/commercial_ice_cream_shop_2x2_01.commercial.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/building.ice_cream_shop.01.activity.final",
+    "--approval-proxy-sha",
+    "fdf05021b41ad10566b34b57956c3a49f024f8630c41778e7f664b82ff4ea051"
+  ],
+  "outputDir": "out/ch_blender_agent/building.ice_cream_shop.01.activity.final"
+}
