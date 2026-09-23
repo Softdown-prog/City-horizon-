@@ -7,25 +7,47 @@ from __future__ import annotations
 
 import importlib
 import json
-import math
 import sys
 from pathlib import Path
 
 import bpy
 
 
-def dynamic_import(absolute_package_str: str, key: str):
-    for amod in list(sys.modules):
-        if amod.endswith(absolute_package_str):
-            module = importlib.import_module(amod)
-            if not hasattr(module, key):
-                raise AttributeError(f"Module {amod} missing {key}")
-            return getattr(module, key)
-    raise RuntimeError(f"MPFB module not loaded: {absolute_package_str}")
+def import_symbol(extension_module: str, relative_module: str, key: str):
+    """Import one MPFB symbol from Blender's extension namespace.
+
+    MPFB 2.x runs under names such as ``bl_ext.user_default.mpfb``. Importing
+    only the root package does not eagerly load the service modules, so scanning
+    ``sys.modules`` is insufficient in headless jobs. Import the exact service
+    module first, then fall back to a suffix scan for compatibility.
+    """
+    candidates = [
+        f"{extension_module}.{relative_module}",
+        f"mpfb.{relative_module}",
+    ]
+    errors = []
+    for name in candidates:
+        try:
+            module = importlib.import_module(name)
+            if hasattr(module, key):
+                return getattr(module, key)
+            errors.append(f"{name}: missing {key}")
+        except Exception as exc:
+            errors.append(f"{name}: {exc!r}")
+
+    wanted_suffix = f"mpfb.{relative_module}"
+    for loaded_name in list(sys.modules):
+        if loaded_name.endswith(wanted_suffix):
+            module = importlib.import_module(loaded_name)
+            if hasattr(module, key):
+                return getattr(module, key)
+
+    raise RuntimeError(
+        f"Could not import MPFB symbol {key} from {relative_module}; attempts={errors}"
+    )
 
 
 def find_mpfb_extension_module() -> str:
-    # Import every extension package candidate that visibly contains mpfb.
     for addon_name in bpy.context.preferences.addons.keys():
         if "mpfb" in addon_name.lower():
             try:
@@ -34,18 +56,18 @@ def find_mpfb_extension_module() -> str:
             except Exception:
                 pass
 
-    # Blender 4.2 extension namespace. Try known conventional suffixes.
     candidates = [
         "bl_ext.user_default.mpfb",
         "bl_ext.blender_org.mpfb",
     ]
+    errors = []
     for name in candidates:
         try:
             importlib.import_module(name)
             return name
-        except Exception:
-            continue
-    raise RuntimeError("MPFB extension could not be imported after bootstrap")
+        except Exception as exc:
+            errors.append(f"{name}: {exc!r}")
+    raise RuntimeError(f"MPFB extension could not be imported after bootstrap: {errors}")
 
 
 def setup_camera_and_light(human: bpy.types.Object) -> bpy.types.Camera:
@@ -87,28 +109,35 @@ def setup_camera_and_light(human: bpy.types.Object) -> bpy.types.Camera:
 def main() -> None:
     argv = sys.argv
     argv = argv[argv.index("--") + 1:] if "--" in argv else []
-    output_dir = Path(argv[0] if argv else "out/ch_blender_agent/character.forge.mpfb.human.001").resolve()
+    output_dir = Path(
+        argv[0] if argv else "out/ch_blender_agent/character.forge.mpfb.human.003"
+    ).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
     extension_module = find_mpfb_extension_module()
-    # Register extension when imported outside normal interactive startup.
     module = importlib.import_module(extension_module)
+    register_error = None
     if hasattr(module, "register"):
         try:
             module.register()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Some extension registration paths are already initialized by Blender.
+            # Keep the error in the report, but continue to direct service imports.
+            register_error = repr(exc)
 
-    HumanService = dynamic_import("mpfb.services.humanservice", "HumanService")
-    TargetService = dynamic_import("mpfb.services.targetservice", "TargetService")
-    HumanObjectProperties = dynamic_import("mpfb.entities.objectproperties", "HumanObjectProperties")
+    HumanService = import_symbol(extension_module, "services.humanservice", "HumanService")
+    TargetService = import_symbol(extension_module, "services.targetservice", "TargetService")
+    HumanObjectProperties = import_symbol(
+        extension_module, "entities.objectproperties", "HumanObjectProperties"
+    )
 
     human = HumanService.create_human(feet_on_ground=True, scale=0.1)
     human.name = "CH_Visitor_Male_MPFB_Probe"
 
-    # MPFB uses 0..1 macro values. Bias toward adult male but not muscular/heavy.
+    # MPFB macro values are normalized 0..1. Keep this adult male deliberately
+    # ordinary: neither muscular nor heavy, because the first gate is silhouette.
     for key, value in {
         "gender": 0.88,
         "age": 0.50,
@@ -117,13 +146,9 @@ def main() -> None:
         "proportions": 0.48,
         "height": 0.48,
     }.items():
-        try:
-            HumanObjectProperties.set_value(key, value, entity_reference=human)
-        except Exception:
-            pass
+        HumanObjectProperties.set_value(key, value, entity_reference=human)
     TargetService.reapply_macro_details(human)
 
-    # Stylized viewport material: intentionally simple, because this is a silhouette test.
     mat = bpy.data.materials.new("CHVisitorSkinProbe")
     mat.diffuse_color = (0.56, 0.33, 0.20, 1.0)
     if human.data.materials:
@@ -148,13 +173,16 @@ def main() -> None:
         "contract": "CH_CHARACTER_FORGE_MPFB_HUMAN_V1",
         "status": "ok",
         "extensionModule": extension_module,
+        "registerError": register_error,
         "blender": bpy.app.version_string,
         "object": human.name,
         "vertexCount": len(human.data.vertices),
         "output": "mpfb_male_south_idle.png",
         "purpose": "silhouette_and_human_base_mesh_evaluation_only",
     }
-    (output_dir / "mpfb_human_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (output_dir / "mpfb_male_south_idle.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
     print(json.dumps(report, indent=2))
 
 
