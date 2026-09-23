@@ -1,0 +1,13 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "character.forge.mpfb.probe.001",
+  "operation": "blender_script",
+  "script": "tools/character_forge/mpfb_probe.py",
+  "args": [
+    "out/ch_blender_agent/character.forge.mpfb.probe.001/mpfb_probe.json"
+  ],
+  "outputDir": "out/ch_blender_agent/character.forge.mpfb.probe.001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/character.forge.mpfb.probe.001/mpfb_probe.json"
+  ]
+}
