@@ -69,8 +69,20 @@ jobs:
           test -s "$jobs_file"
 
           echo "jobs-file=$jobs_file" >> "$GITHUB_OUTPUT"
+          if grep -q 'character\.forge\.' "$jobs_file"; then
+            echo "needs-character-forge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs-character-forge=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "Jobs selected:"
           cat "$jobs_file"
+
+      - name: Bootstrap MPFB for Character Forge
+        if: steps.jobs.outputs.needs-character-forge == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/character_forge/bootstrap_mpfb.sh
 
       - name: Validate CH Blender agent interface
         shell: bash
