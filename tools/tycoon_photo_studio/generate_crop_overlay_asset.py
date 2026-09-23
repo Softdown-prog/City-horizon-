@@ -27,7 +27,7 @@ def hex_rgba(value: str, alpha: float = 1.0) -> list[float]:
 
 
 def mat(name: str, color: str, roughness: float = 0.78) -> dict:
-    return {"id": name, "rgba": hex_rgba(color), "roughness": roughness, "metallic": 0.0}
+    return {"rgba": hex_rgba(color), "roughness": roughness, "metallic": 0.0}
 
 
 def box(name: str, location, scale, material: str, rotation=None) -> dict:
@@ -77,14 +77,14 @@ def add_leaf(parts, prefix, x, y, z, length, width, material, yaw, pitch=18.0):
     ))
 
 
-def build_wheat(recipe: dict, stage: dict) -> tuple[list[dict], list[dict]]:
+def build_wheat(recipe: dict, stage: dict) -> tuple[dict[str, dict], list[dict]]:
     rng = random.Random(stage["seed"])
     colors = recipe["proceduralGrammar"]["palette"]
-    materials = [
-        mat("leaf", colors[0]),
-        mat("stem", colors[1]),
-        mat("head", colors[3] if stage.get("feature") == "golden_heads" else colors[2]),
-    ]
+    materials = {
+        "leaf": mat("leaf", colors[0]),
+        "stem": mat("stem", colors[1]),
+        "head": mat("head", colors[3] if stage.get("feature") == "golden_heads" else colors[2]),
+    }
     parts: list[dict] = []
     height = 0.35 + stage["height"] * 1.35
     clusters = recipe["proceduralGrammar"]["clusterCount"]
@@ -106,10 +106,14 @@ def build_wheat(recipe: dict, stage: dict) -> tuple[list[dict], list[dict]]:
     return materials, parts
 
 
-def build_sugar_cane(recipe: dict, stage: dict) -> tuple[list[dict], list[dict]]:
+def build_sugar_cane(recipe: dict, stage: dict) -> tuple[dict[str, dict], list[dict]]:
     rng = random.Random(stage["seed"])
     colors = recipe["proceduralGrammar"]["palette"]
-    materials = [mat("stalk", colors[1]), mat("stalk_light", colors[2]), mat("leaf", colors[0])]
+    materials = {
+        "stalk": mat("stalk", colors[1]),
+        "stalk_light": mat("stalk_light", colors[2]),
+        "leaf": mat("leaf", colors[0]),
+    }
     parts: list[dict] = []
     height = 0.45 + stage["height"] * 2.0
     rows = recipe["proceduralGrammar"]["rowCount"]
@@ -132,10 +136,16 @@ def build_sugar_cane(recipe: dict, stage: dict) -> tuple[list[dict], list[dict]]
     return materials, parts
 
 
-def build_coffee(recipe: dict, stage: dict) -> tuple[list[dict], list[dict]]:
+def build_coffee(recipe: dict, stage: dict) -> tuple[dict[str, dict], list[dict]]:
     rng = random.Random(stage["seed"])
     colors = recipe["proceduralGrammar"]["palette"]
-    materials = [mat("stem", "#5a4934"), mat("leaf_dark", colors[0]), mat("leaf", colors[1]), mat("leaf_light", colors[2]), mat("fruit", colors[3])]
+    materials = {
+        "stem": mat("stem", "#5a4934"),
+        "leaf_dark": mat("leaf_dark", colors[0]),
+        "leaf": mat("leaf", colors[1]),
+        "leaf_light": mat("leaf_light", colors[2]),
+        "fruit": mat("fruit", colors[3]),
+    }
     parts: list[dict] = []
     rows = recipe["proceduralGrammar"]["rowCount"]
     lo, hi = recipe["proceduralGrammar"]["bushesPerRow"]
