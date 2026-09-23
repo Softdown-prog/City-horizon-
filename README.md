@@ -196,6 +196,24 @@ This is a solo-development project. Preserve working systems and make narrow cha
 
 For the current solo workflow, **do not create a new branch unless the user explicitly asks for one**. Make requested repository commits directly to `main` after reading the current target files. Do not silently open PR branches or duplicate worktrees.
 
+### GitHub Actions budget / trigger policy
+
+GitHub Actions minutes are a finite project resource. Workflows must be path-scoped so an unrelated commit does not fan out into multiple expensive Windows/Blender jobs.
+
+Durable rule for all future chats/agents:
+
+- do **not** add a bare `push` trigger on `main` for heavy workflows;
+- use `paths:` (or an equivalent narrow trigger) that names the files/subtrees the workflow actually validates;
+- CH Blender agent jobs should trigger from `tools/ch_blender/jobs/*.job.json` only unless there is a concrete dependency requiring more;
+- MapForge Windows builds should trigger only for MapForge/editor/runtime-asset inputs that can affect that build;
+- MapForge capture should trigger only for capture request / capture worker inputs;
+- atomic path tests should trigger only for their tile test source/tool/MapForge capture worker inputs;
+- keep `workflow_dispatch` available where manual execution is useful;
+- when adding a new workflow, document why each trigger path is required;
+- before widening a trigger, prefer manual dispatch over making every commit pay the cost.
+
+If a commit that only changes `tools/ch_blender/jobs/` starts MapForge Windows, MapForge Capture or unrelated tile workflows, treat that as a CI trigger regression and fix the workflow filters before continuing routine asset jobs.
+
 ## Current production priority
 
 Build a small coherent playable city before chasing large content breadth.
