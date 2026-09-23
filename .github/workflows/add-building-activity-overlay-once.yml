@@ -1,0 +1,449 @@
+name: Add Building Activity Overlay Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-building-activity-overlay-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  add-building-activity-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Add activity overlay contract and runtime
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # ------------------------------------------------------------------
+          # Building data/runtime contract
+          # ------------------------------------------------------------------
+          header = Path('src/building_system.h')
+          text = header.read_text(encoding='utf-8')
+
+          animation_anchor = '''struct BuildingAnimationDefinition {
+              int frame_count = 1;
+              int frame_duration_ms = 120;
+              std::string layout = "horizontal";
+              // "loop" preserves the legacy continuous animation contract.
+              // "ambient_once" holds an idle frame, plays one action sequence, then
+              // returns to idle before the next deterministic ambient cycle.
+              std::string playback = "loop";
+              int idle_frame = 0;
+              int action_start_frame = 1;
+              int action_frame_count = 0;
+              int idle_hold_ms = 0;
+          };
+          '''
+          activity_struct = animation_anchor + '''
+          // CH_BUILDING_ACTIVITY_OVERLAY_V1. A transparent, rotation-specific layer
+          // drawn over the approved building art only while this instance is active.
+          // It is deliberately separate from CH_COLOR_MASK_V1 customization.
+          struct BuildingActivityOverlayDefinition {
+              bool enabled = false;
+              std::array<std::string, 4> sprite_paths;
+              std::optional<BuildingAnimationDefinition> animation;
+          };
+          '''
+          if animation_anchor not in text:
+              raise SystemExit('BuildingAnimationDefinition anchor not found')
+          text = text.replace(animation_anchor, activity_struct, 1)
+
+          old = '''    std::optional<BuildingAnimationDefinition> animation;
+              std::optional<BuildingColorMaskDefinition> color_mask;
+          '''
+          new = '''    std::optional<BuildingAnimationDefinition> animation;
+              std::optional<BuildingColorMaskDefinition> color_mask;
+              std::optional<BuildingActivityOverlayDefinition> activity_overlay;
+          '''
+          if old not in text:
+              raise SystemExit('BuildingDefinition optional fields anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    BuildingColorTint wall_tint{};
+              BuildingColorTint roof_tint{};
+              [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
+          '''
+          new = '''    BuildingColorTint wall_tint{};
+              BuildingColorTint roof_tint{};
+
+              // Transient runtime state: intentionally not part of save persistence.
+              // A counter supports overlapping visitors; the overlay remains active
+              // until the last activity source leaves the building.
+              std::uint32_t activity_count = 0;
+              [[nodiscard]] bool activity_active() const noexcept { return activity_count > 0; }
+
+              [[nodiscard]] bool is_max_level(const BuildingDefinition& definition) const;
+          '''
+          if old not in text:
+              raise SystemExit('BuildingInstance activity anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+              [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
+          '''
+          new = '''    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
+              [[nodiscard]] bool begin_activity(std::uint64_t instance_id);
+              [[nodiscard]] bool end_activity(std::uint64_t instance_id);
+              [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
+          '''
+          if old not in text:
+              raise SystemExit('BuildingManager activity API anchor not found')
+          text = text.replace(old, new, 1)
+          header.write_text(text, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Parser + activity counter implementation
+          # ------------------------------------------------------------------
+          impl = Path('src/building_system.cpp')
+          text = impl.read_text(encoding='utf-8')
+
+          color_mask_end = '''            definition.color_mask = mask;
+                  }
+              }
+          
+              if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
+          '''
+          activity_parser = '''            definition.color_mask = mask;
+                  }
+              }
+          
+              if (const auto serialized_activity = json_object(json, "activityOverlay")) {
+                  const bool enabled = json_bool(*serialized_activity, "enabled").value_or(true);
+                  if (enabled) {
+                      if (json_string(*serialized_activity, "contract").value_or("") !=
+                          "CH_BUILDING_ACTIVITY_OVERLAY_V1") {
+                          return std::nullopt;
+                      }
+                      const auto activity_sprites = json_object(*serialized_activity, "sprites");
+                      if (!activity_sprites) return std::nullopt;
+          
+                      BuildingActivityOverlayDefinition activity;
+                      activity.enabled = true;
+                      for (std::size_t index = 0; index < activity.sprite_paths.size(); ++index) {
+                          activity.sprite_paths[index] =
+                              json_string(*activity_sprites, std::to_string(index)).value_or("");
+                          // Every building orientation that can be placed must have a
+                          // matching authored overlay; runtime never mirrors/fakes one.
+                          if (definition.available_rotations[index] && activity.sprite_paths[index].empty()) {
+                              return std::nullopt;
+                          }
+                      }
+          
+                      if (const auto overlay_animation = json_object(*serialized_activity, "animation")) {
+                          const int frame_count = json_number<int>(*overlay_animation, "frameCount").value_or(1);
+                          if (frame_count < 1) return std::nullopt;
+                          if (frame_count > 1) {
+                              BuildingAnimationDefinition parsed_animation;
+                              parsed_animation.frame_count = frame_count;
+                              parsed_animation.frame_duration_ms = std::max(
+                                  1, json_number<int>(*overlay_animation, "frameDurationMs").value_or(120));
+                              parsed_animation.layout =
+                                  json_string(*overlay_animation, "layout").value_or("horizontal");
+                              parsed_animation.playback =
+                                  json_string(*overlay_animation, "playback").value_or("loop");
+                              if (parsed_animation.layout != "horizontal" ||
+                                  (parsed_animation.playback != "loop" &&
+                                   parsed_animation.playback != "ambient_once")) {
+                                  return std::nullopt;
+                              }
+                              parsed_animation.idle_frame = std::clamp(
+                                  json_number<int>(*overlay_animation, "idleFrame").value_or(0),
+                                  0, frame_count - 1);
+                              parsed_animation.action_start_frame = std::clamp(
+                                  json_number<int>(*overlay_animation, "actionStartFrame").value_or(1),
+                                  0, frame_count - 1);
+                              const int available_action_frames =
+                                  frame_count - parsed_animation.action_start_frame;
+                              parsed_animation.action_frame_count = std::clamp(
+                                  json_number<int>(*overlay_animation, "actionFrameCount").value_or(
+                                      available_action_frames),
+                                  0, available_action_frames);
+                              parsed_animation.idle_hold_ms = std::max(
+                                  0, json_number<int>(*overlay_animation, "idleHoldMs").value_or(0));
+                              activity.animation = parsed_animation;
+                          }
+                      }
+                      definition.activity_overlay = activity;
+                  }
+              }
+          
+              if (const auto serialized_access_points = json_array_objects(json, "accessPoints")) {
+          '''
+          if color_mask_end not in text:
+              raise SystemExit('color mask/parser insertion anchor not found')
+          text = text.replace(color_mask_end, activity_parser, 1)
+
+          old = '''    BuildingInstance instance = serialized;
+              if (!definition.rotatable) {
+          '''
+          new = '''    BuildingInstance instance = serialized;
+              // Occupancy/activity is session state. Never resurrect a visitor that
+              // happened to be inside a shop when the city was saved.
+              instance.activity_count = 0;
+              if (!definition.rotatable) {
+          '''
+          if old not in text:
+              raise SystemExit('restore_instance transient state anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''bool BuildingManager::set_service_price(const std::uint64_t instance_id, const BuildingDefinition& definition,
+                                                  const std::int64_t service_price) {
+          '''
+          methods = '''bool BuildingManager::begin_activity(const std::uint64_t instance_id) {
+              const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+                  return instance.instance_id == instance_id;
+              });
+              if (found == instances_.end()) return false;
+              ++found->activity_count;
+              return true;
+          }
+          
+          bool BuildingManager::end_activity(const std::uint64_t instance_id) {
+              const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
+                  return instance.instance_id == instance_id;
+              });
+              if (found == instances_.end() || found->activity_count == 0) return false;
+              --found->activity_count;
+              return true;
+          }
+          
+          bool BuildingManager::set_service_price(const std::uint64_t instance_id, const BuildingDefinition& definition,
+                                                  const std::int64_t service_price) {
+          '''
+          if old not in text:
+              raise SystemExit('BuildingManager method insertion anchor not found')
+          text = text.replace(old, methods, 1)
+          impl.write_text(text, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Renderer pass: base building -> activity overlay. The overlay uses
+          # the base frame's exact screen bounds/anchor, never a separate pivot.
+          # ------------------------------------------------------------------
+          renderer = Path('src/ch_render/map_renderer.cpp')
+          text = renderer.read_text(encoding='utf-8')
+          old = '''            render_building(renderer, *definition, *instance, visual_rot, texture->texture, texture->source_width, texture->source_height,
+                              camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+                  }
+              }
+          }
+          '''
+          new = '''            render_building(renderer, *definition, *instance, visual_rot, texture->texture, texture->source_width, texture->source_height,
+                              camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+          
+                      // CH_BUILDING_ACTIVITY_OVERLAY_V1 is a transparent effect layer
+                      // aligned to the already-approved base sprite. It is runtime
+                      // state, independent from permanent color customization.
+                      if (instance->activity_active() && definition->activity_overlay.has_value() &&
+                          definition->activity_overlay->enabled) {
+                          const BuildingActivityOverlayDefinition& activity = *definition->activity_overlay;
+                          const std::size_t activity_rotation = static_cast<std::size_t>(visual_rot);
+                          if (activity_rotation < activity.sprite_paths.size() &&
+                              !activity.sprite_paths[activity_rotation].empty()) {
+                              const TextureAsset* overlay_texture =
+                                  find_texture(asset_root / activity.sprite_paths[activity_rotation]);
+                              if (overlay_texture != nullptr) {
+                                  const BuildingSpriteGeometry geometry = building_sprite_geometry(
+                                      *definition, *instance, visual_rot,
+                                      texture->source_width, texture->source_height,
+                                      camera, viewport_width, viewport_height);
+                                  SDL_Texture* overlay = overlay_texture->texture;
+                                  SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                                  SDL_SetTextureColorMod(overlay, 255, 255, 255);
+          
+                                  if (activity.animation.has_value() && activity.animation->frame_count > 1) {
+                                      const BuildingAnimationDefinition& animation = *activity.animation;
+                                      const int frame_count = std::max(1, animation.frame_count);
+                                      const int duration_ms = std::max(1, animation.frame_duration_ms);
+                                      int frame_index = 0;
+                                      if (animation.playback == "ambient_once") {
+                                          const int idle_frame = std::clamp(animation.idle_frame, 0, frame_count - 1);
+                                          const int action_start = std::clamp(
+                                              animation.action_start_frame, 0, frame_count - 1);
+                                          const int action_count = std::clamp(
+                                              animation.action_frame_count, 0, frame_count - action_start);
+                                          frame_index = idle_frame;
+                                          if (action_count > 0) {
+                                              const std::uint64_t idle_hold_ms = static_cast<std::uint64_t>(
+                                                  std::max(0, animation.idle_hold_ms));
+                                              const std::uint64_t action_duration_ms =
+                                                  static_cast<std::uint64_t>(action_count) *
+                                                  static_cast<std::uint64_t>(duration_ms);
+                                              const std::uint64_t cycle_duration_ms =
+                                                  idle_hold_ms + action_duration_ms;
+                                              const std::uint64_t phase_ms = cycle_duration_ms > 0
+                                                  ? (static_cast<std::uint64_t>(SDL_GetTicks()) +
+                                                     instance->instance_id * 977ULL) % cycle_duration_ms
+                                                  : 0;
+                                              if (phase_ms >= idle_hold_ms && action_duration_ms > 0) {
+                                                  frame_index = action_start + std::min(
+                                                      action_count - 1,
+                                                      static_cast<int>((phase_ms - idle_hold_ms) /
+                                                                       static_cast<std::uint64_t>(duration_ms)));
+                                              }
+                                          }
+                                      } else {
+                                          frame_index = static_cast<int>(
+                                              (SDL_GetTicks() / duration_ms) % frame_count);
+                                      }
+          
+                                      const float overlay_frame_width =
+                                          overlay_texture->source_width / static_cast<float>(frame_count);
+                                      const SDL_FRect source = {
+                                          overlay_frame_width * frame_index,
+                                          0.0F,
+                                          overlay_frame_width,
+                                          overlay_texture->source_height,
+                                      };
+                                      SDL_RenderTexture(renderer, overlay, &source, &geometry.sprite_bounds);
+                                  } else {
+                                      SDL_RenderTexture(renderer, overlay, nullptr, &geometry.sprite_bounds);
+                                  }
+                                  SDL_SetTextureColorMod(overlay, 255, 255, 255);
+                                  SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          '''
+          if old not in text:
+              raise SystemExit('render_buildings activity insertion anchor not found')
+          text = text.replace(old, new, 1)
+          renderer.write_text(text, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Authoring/runtime contract
+          # ------------------------------------------------------------------
+          doc = Path('docs/BUILDING_ACTIVITY_OVERLAY_V1.md')
+          doc.write_text('''# CH_BUILDING_ACTIVITY_OVERLAY_V1
+          
+          Status: runtime contract v1.
+          
+          Building activity overlays are transparent RGBA layers used for temporary
+          activity while a building is being used: lit windows, steam, a moving door,
+          a machine, a sign, or another small effect. They do **not** replace the base
+          building sprite and they are not color-customization masks.
+          
+          ## Runtime order
+          
+          1. Render the approved building sprite.
+          2. Apply normal building customization/state passes.
+          3. If `BuildingInstance::activity_count > 0`, render `activityOverlay`.
+          4. Render selection/debug chrome afterwards.
+          
+          Activity is transient. Save/load resets `activity_count` to zero.
+          
+          ## Definition
+          
+          ```json
+          "activityOverlay": {
+            "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
+            "enabled": true,
+            "sprites": {
+              "0": "assets/buildings/example/example_south_activity.png",
+              "1": "assets/buildings/example/example_west_activity.png",
+              "2": "assets/buildings/example/example_north_activity.png",
+              "3": "assets/buildings/example/example_east_activity.png"
+            },
+            "animation": {
+              "layout": "horizontal",
+              "frameCount": 4,
+              "frameDurationMs": 160,
+              "playback": "loop"
+            }
+          }
+          ```
+          
+          The `animation` object is optional. Without it the overlay is a static image,
+          which is appropriate for effects such as a window/light switching on.
+          
+          ## Art rules
+          
+          - PNG RGBA with transparent background.
+          - Draw only the temporary effect. Do not duplicate opaque building pixels.
+          - Author one overlay for every rotation supported by the building.
+          - The overlay frame canvas must match the corresponding base building frame
+            canvas and anchor exactly. The runtime deliberately does not invent a new
+            pivot, rotate, mirror, or realign overlay artwork.
+          - Animated overlays use a horizontal spritesheet. Every frame uses the same
+            canvas dimensions and anchor.
+          - `playback` accepts `loop` or `ambient_once`, matching the existing building
+            animation semantics.
+          - `CH_COLOR_MASK_V1` remains exclusively for permanent wall/roof recoloring.
+          
+          ## Gameplay trigger
+          
+          `BuildingManager::begin_activity(instance_id)` increments the activity counter.
+          `BuildingManager::end_activity(instance_id)` decrements it. A visitor system can
+          therefore enter/leave independently, and the visual remains active until the
+          final visitor leaves.
+          
+          The contract intentionally does not decide *why* a building is active. Pedestrian
+          visits, production, scripted events, or other gameplay systems may use the same
+          trigger without coupling the renderer to those systems.
+          ''', encoding='utf-8')
+          PY
+
+      - name: Validate focused activity overlay change
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+
+          h = Path('src/building_system.h').read_text(encoding='utf-8')
+          cpp = Path('src/building_system.cpp').read_text(encoding='utf-8')
+          render = Path('src/ch_render/map_renderer.cpp').read_text(encoding='utf-8')
+          doc = Path('docs/BUILDING_ACTIVITY_OVERLAY_V1.md').read_text(encoding='utf-8')
+
+          for token in [
+              'BuildingActivityOverlayDefinition',
+              'activity_overlay',
+              'activity_count',
+              'activity_active()',
+              'begin_activity',
+              'end_activity',
+          ]:
+              assert token in h, token
+          for token in [
+              'activityOverlay',
+              'CH_BUILDING_ACTIVITY_OVERLAY_V1',
+              'instance.activity_count = 0;',
+              'BuildingManager::begin_activity',
+              'BuildingManager::end_activity',
+          ]:
+              assert token in cpp, token
+          for token in [
+              'instance->activity_active()',
+              'activity.sprite_paths',
+              'SDL_RenderTexture(renderer, overlay',
+          ]:
+              assert token in render, token
+          assert 'CH_BUILDING_ACTIVITY_OVERLAY_V1' in doc
+          PY
+
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/add-building-activity-overlay-once.yml
+
+      - name: Commit activity overlay pipeline
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'openai@users.noreply.github.com'
+          git add src/building_system.h src/building_system.cpp src/ch_render/map_renderer.cpp docs/BUILDING_ACTIVITY_OVERLAY_V1.md .github/workflows/add-building-activity-overlay-once.yml
+          git commit -m 'Add building activity overlay pipeline'
+          git pull --rebase origin main
+          git push origin main
