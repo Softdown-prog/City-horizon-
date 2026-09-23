@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "C++/MapForge2/**"
+      - "tools/map_forge/**"
+      - "tools/visual_reference_gate.py"
+      - "tools/carousel_production_gate.py"
+      - "assets/**"
+      - ".github/workflows/mapforge2-windows.yml"
   workflow_dispatch:
 
 jobs:
@@ -82,10 +89,6 @@ jobs:
       - name: Visual reference gate (Building Composer MAE)
         shell: pwsh
         run: |
-          # Compare freshly rendered review PNG against stored golden reference.
-          # MAE threshold: 2.0 (per channel, per pixel, 0-255 scale).
-          # On first run (no golden stored yet) the candidate is promoted automatically
-          # as the new golden and the step passes with a promotion notice.
           python tools/visual_reference_gate.py `
             --candidate dist/MapForge2/visual_tests/building_composer_pilot_review.png `
             --golden    C++/MapForge2/examples/golden_building_composer_pilot_review.png `
@@ -123,8 +126,6 @@ jobs:
       - name: DPI smoke gate (CH_STUDIO_CANONICAL_VIEWPORT_V1)
         shell: pwsh
         run: |
-          # Headless DPI contract test for the SDL3 viewport.
-          # Gate: must pass before CH_STUDIO_CANONICAL_VIEWPORT_V1 is marked FROZEN.
           $env:QT_QPA_PLATFORM = "offscreen"
           python -m pip install --quiet PySide6
           python -m pytest tools/map_forge/tests/test_viewport_dpi_smoke.py -v --tb=short
