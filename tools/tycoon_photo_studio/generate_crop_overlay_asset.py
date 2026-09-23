@@ -187,6 +187,8 @@ def expand(recipe: dict, stage_id: str) -> dict:
         "id": f"{recipe['id']}.{stage_id}",
         "category": "crop_overlay",
         "displayName": f"{recipe['displayName']} - {stage_id}",
+        "studioPreset": recipe["handoff"]["studio"],
+        "cameraContract": recipe["handoff"]["camera"],
         "footprint": {"widthTiles": 1, "depthTiles": 1},
         "groundEmbedded": False,
         "transparentBackground": True,
