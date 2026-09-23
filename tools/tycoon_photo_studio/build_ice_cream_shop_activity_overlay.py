@@ -43,6 +43,9 @@ def parse_args():
     parser.add_argument("--studio-preset", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--stage", choices=("preflight", "proxy", "final"), required=True)
+    # Injected by the CH Blender worker for guarded stages. This baker owns its
+    # checks internally, but must accept the canonical worker argument.
+    parser.add_argument("--preflight-profile", default=None)
     return parser.parse_args(argv)
 
 
@@ -97,7 +100,6 @@ def add_overlay_geometry(asset, recipe, root):
     static_overlay = []
     active_glow = []
 
-    # Storefront windows.
     for label, x in (("Left", -1.46), ("Right", 0.36)):
         active_glow.append(box(
             f"ActivityFrontWindow{label}",
@@ -107,7 +109,6 @@ def add_overlay_geometry(asset, recipe, root):
             0.012,
         ))
 
-    # Lit door glass / entrance cue.
     active_glow.append(box(
         "ActivityDoorGlass",
         [door_x, front_y - 0.126, base_h + door_h * 0.69],
@@ -116,7 +117,6 @@ def add_overlay_geometry(asset, recipe, root):
         0.012,
     ))
 
-    # Side windows, matching the generic commercial geometry exactly.
     for face, x, outward in (("East", east_x, 1.0), ("West", west_x, -1.0)):
         count = int(recipe.get("sideWindows", {}).get(face.lower(), 0))
         if count <= 0:
@@ -144,8 +144,6 @@ def add_overlay_geometry(asset, recipe, root):
             0.010,
         ))
 
-    # Cover the authored static sign before drawing the rotating activity sign.
-    # The backing is intentionally a visible decorative plaque, not an eraser.
     spinner_part = part_by_name(asset, "IceCreamSpinner")
     spinner_loc = [float(v) for v in spinner_part["location"]]
     spinner_dims = [float(v) for v in spinner_part["dimensions"]]
@@ -262,8 +260,6 @@ def main():
     calibrated_scale = bs.calibrate_ortho_scale(scene, base_objects, safety_margin=0.12)
     overlay = add_overlay_geometry(asset, recipe, root)
 
-    # All overlay effects are deliberately shadowless/groundless. They are a
-    # transparent runtime pass over already-rendered approved building art.
     set_overlay_visible(overlay["all"], True)
 
     if args.stage == "proxy":
