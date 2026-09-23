@@ -53,6 +53,23 @@ def expand(recipe):
     front_y = -depth / 2.0
     east_x = width / 2.0
 
+    # Raise the complete corner totem as one visual unit. The V2 proportions are
+    # preserved; only its height changes so the animated sign clears the awning
+    # and remains readable in all four runtime rotations.
+    totem_raise = 0.18
+    for part in parts:
+        if part.get("name") in {
+            "IceCreamSpinnerBracket",
+            "IceCreamSpinnerMast",
+            "IceCreamSpinnerStick",
+            "IceCreamSpinner",
+            "IceCreamSpinnerStripe",
+        }:
+            location = list(part.get("location", []))
+            if len(location) == 3:
+                location[2] = round(float(location[2]) + totem_raise, 4)
+                part["location"] = location
+
     sign = facade.get("sign", {})
     sign_w = float(sign.get("width", 3.2))
     sign_h = float(sign.get("height", 0.72))
@@ -110,7 +127,7 @@ def expand(recipe):
     spinner_y = front_y - 0.28
     parts.append(_sphere(
         "IceCreamV3TotemCap",
-        [spinner_x, spinner_y, 3.10],
+        [spinner_x, spinner_y, 3.10 + totem_raise],
         0.25,
         "vanilla",
     ))
@@ -119,6 +136,7 @@ def expand(recipe):
     generation.update({
         "specialization": "CITY_HORIZON_ICE_CREAM_SHOP_V3",
         "v3Polish": True,
+        "totemRaise": totem_raise,
         "partCount": len(parts),
     })
     asset["generation"] = generation
