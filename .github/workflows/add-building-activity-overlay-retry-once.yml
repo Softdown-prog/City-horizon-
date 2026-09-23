@@ -1,0 +1,165 @@
+name: Retry Building Activity Overlay Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-building-activity-overlay-retry-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  retry-building-activity-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Apply activity overlay pipeline with current renderer anchor
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          workflow = Path('.github/workflows/add-building-activity-overlay-once.yml').read_text(encoding='utf-8')
+          match = re.search(
+              r"run: \|\n\s+python3 - <<'PY'\n(.*?)\n\s+PY\n\n\s+- name: Validate focused activity overlay change",
+              workflow,
+              re.S,
+          )
+          if not match:
+              raise SystemExit('original activity overlay patch script not found')
+          script = textwrap.dedent(match.group(1))
+
+          start = script.index("renderer = Path('src/ch_render/map_renderer.cpp')")
+          marker = "renderer.write_text(text, encoding='utf-8')"
+          end = script.index(marker, start) + len(marker)
+
+          renderer_patch = r'''renderer = Path('src/ch_render/map_renderer.cpp')
+          text = renderer.read_text(encoding='utf-8')
+          call = ''' + "'''" + r'''            render_building(renderer, *definition, *instance, visual_rot, texture->texture, texture->source_width, texture->source_height,
+                                      camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+          ''' + "'''" + r'''
+          if call not in text:
+              raise SystemExit('render_building call anchor not found')
+
+          overlay_pass = r'''
+
+                      // CH_BUILDING_ACTIVITY_OVERLAY_V1 is a transparent effect layer
+                      // aligned to the approved building canvas. It is independent
+                      // from CH_COLOR_MASK_V1 and exists only while activity_count > 0.
+                      if (instance->activity_active() && definition->activity_overlay.has_value() &&
+                          definition->activity_overlay->enabled) {
+                          const BuildingActivityOverlayDefinition& activity = *definition->activity_overlay;
+                          const std::size_t activity_rotation = static_cast<std::size_t>(visual_rot);
+                          if (activity_rotation < activity.sprite_paths.size() &&
+                              !activity.sprite_paths[activity_rotation].empty()) {
+                              const TextureAsset* overlay_texture =
+                                  find_texture(asset_root / activity.sprite_paths[activity_rotation]);
+                              if (overlay_texture != nullptr) {
+                                  const BuildingSpriteGeometry geometry = building_sprite_geometry(
+                                      *definition, *instance, visual_rot,
+                                      texture->source_width, texture->source_height,
+                                      camera, viewport_width, viewport_height);
+                                  SDL_Texture* overlay = overlay_texture->texture;
+                                  SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                                  SDL_SetTextureColorMod(overlay, 255, 255, 255);
+
+                                  if (activity.animation.has_value() && activity.animation->frame_count > 1) {
+                                      const BuildingAnimationDefinition& animation = *activity.animation;
+                                      const int frame_count = std::max(1, animation.frame_count);
+                                      const int duration_ms = std::max(1, animation.frame_duration_ms);
+                                      int frame_index = 0;
+                                      if (animation.playback == "ambient_once") {
+                                          const int idle_frame = std::clamp(animation.idle_frame, 0, frame_count - 1);
+                                          const int action_start = std::clamp(
+                                              animation.action_start_frame, 0, frame_count - 1);
+                                          const int action_count = std::clamp(
+                                              animation.action_frame_count, 0, frame_count - action_start);
+                                          frame_index = idle_frame;
+                                          if (action_count > 0) {
+                                              const std::uint64_t idle_hold_ms = static_cast<std::uint64_t>(
+                                                  std::max(0, animation.idle_hold_ms));
+                                              const std::uint64_t action_duration_ms =
+                                                  static_cast<std::uint64_t>(action_count) *
+                                                  static_cast<std::uint64_t>(duration_ms);
+                                              const std::uint64_t cycle_duration_ms = idle_hold_ms + action_duration_ms;
+                                              const std::uint64_t phase_ms = cycle_duration_ms > 0
+                                                  ? (static_cast<std::uint64_t>(SDL_GetTicks()) +
+                                                     instance->instance_id * 977ULL) % cycle_duration_ms
+                                                  : 0;
+                                              if (phase_ms >= idle_hold_ms && action_duration_ms > 0) {
+                                                  frame_index = action_start + std::min(
+                                                      action_count - 1,
+                                                      static_cast<int>((phase_ms - idle_hold_ms) /
+                                                                       static_cast<std::uint64_t>(duration_ms)));
+                                              }
+                                          }
+                                      } else {
+                                          frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
+                                      }
+
+                                      const float overlay_frame_width =
+                                          overlay_texture->source_width / static_cast<float>(frame_count);
+                                      const SDL_FRect source = {
+                                          overlay_frame_width * frame_index,
+                                          0.0F,
+                                          overlay_frame_width,
+                                          overlay_texture->source_height,
+                                      };
+                                      SDL_RenderTexture(renderer, overlay, &source, &geometry.sprite_bounds);
+                                  } else {
+                                      SDL_RenderTexture(renderer, overlay, nullptr, &geometry.sprite_bounds);
+                                  }
+                                  SDL_SetTextureColorMod(overlay, 255, 255, 255);
+                                  SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
+                              }
+                          }
+                      }'''
+          text = text.replace(call, call + overlay_pass, 1)
+          renderer.write_text(text, encoding='utf-8')'''
+
+          script = script[:start] + renderer_patch + script[end:]
+          exec(compile(script, '<activity-overlay-patch>', 'exec'))
+          PY
+
+      - name: Validate focused activity overlay change
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          h = Path('src/building_system.h').read_text(encoding='utf-8')
+          cpp = Path('src/building_system.cpp').read_text(encoding='utf-8')
+          render = Path('src/ch_render/map_renderer.cpp').read_text(encoding='utf-8')
+          doc = Path('docs/BUILDING_ACTIVITY_OVERLAY_V1.md').read_text(encoding='utf-8')
+          for token in ['BuildingActivityOverlayDefinition', 'activity_overlay', 'activity_count', 'activity_active()', 'begin_activity', 'end_activity']:
+              assert token in h, token
+          for token in ['activityOverlay', 'CH_BUILDING_ACTIVITY_OVERLAY_V1', 'instance.activity_count = 0;', 'BuildingManager::begin_activity', 'BuildingManager::end_activity']:
+              assert token in cpp, token
+          for token in ['instance->activity_active()', 'activity.sprite_paths', 'SDL_RenderTexture(renderer, overlay']:
+              assert token in render, token
+          assert 'CH_BUILDING_ACTIVITY_OVERLAY_V1' in doc
+          PY
+
+      - name: Remove one-shot workflows
+        run: |
+          rm .github/workflows/add-building-activity-overlay-once.yml
+          rm .github/workflows/add-building-activity-overlay-retry-once.yml
+
+      - name: Commit activity overlay pipeline
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'openai@users.noreply.github.com'
+          git add src/building_system.h src/building_system.cpp src/ch_render/map_renderer.cpp docs/BUILDING_ACTIVITY_OVERLAY_V1.md .github/workflows/add-building-activity-overlay-once.yml .github/workflows/add-building-activity-overlay-retry-once.yml
+          git commit -m 'Add building activity overlay pipeline'
+          git pull --rebase origin main
+          git push origin main
