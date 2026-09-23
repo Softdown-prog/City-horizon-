@@ -1,0 +1,59 @@
+{
+  "contract": "CH_VISITOR_BASE_MESH_V1",
+  "id": "visitor_male_base_mesh_v1",
+  "sourceAsset": "visitor_male_base_01",
+  "status": "south_visual_target_candidate",
+  "purpose": "Canonical reusable male visitor body mesh. Rig, walk poses, directions and clothing variants must reuse this body instead of rebuilding from primitive boxes.",
+  "visualTarget": {
+    "style": "small rounded old-tycoon pedestrian readability",
+    "fullColorRGBA": true,
+    "avoid": [
+      "box torso",
+      "ball shoulders",
+      "tube legs",
+      "oversized hands",
+      "oversized head",
+      "block shoes",
+      "visible vertical walk bob"
+    ],
+    "priorities": [
+      "human silhouette at small scale",
+      "soft shoulder-to-torso transition",
+      "gentle chest-to-waist taper",
+      "slim tapered limbs",
+      "compact feet",
+      "simple readable hair mass"
+    ]
+  },
+  "shape": {
+    "torso": {
+      "segments": 20,
+      "rings": [
+        {"z": -0.50, "width": 0.72, "depth": 0.76},
+        {"z": -0.32, "width": 0.76, "depth": 0.80},
+        {"z": -0.08, "width": 0.82, "depth": 0.84},
+        {"z": 0.18, "width": 0.91, "depth": 0.88},
+        {"z": 0.38, "width": 0.98, "depth": 0.90},
+        {"z": 0.50, "width": 0.88, "depth": 0.84}
+      ],
+      "subdivision": 1
+    },
+    "pelvisScale": [0.46, 0.43, 0.52],
+    "headScaleMultiplier": [0.92, 0.92, 0.94],
+    "hairScaleMultiplier": [0.94, 0.94, 0.90],
+    "shoulderCapScale": [0.80, 0.76, 0.82],
+    "hipCapScale": [0.92, 0.88, 0.92],
+    "upperArmRadiusMultiplier": 0.92,
+    "forearmRadiusMultiplier": 0.76,
+    "upperLegRadiusMultiplier": 0.94,
+    "lowerLegRadiusMultiplier": 0.72,
+    "shoeScale": [0.88, 0.86, 0.82],
+    "handScaleMultiplier": 0.86
+  },
+  "approvalGate": {
+    "direction": "south",
+    "requiredPoses": ["idle", "walk_a", "walk_b"],
+    "otherDirectionsBlocked": true,
+    "femaleVariantBlocked": true
+  }
+}
