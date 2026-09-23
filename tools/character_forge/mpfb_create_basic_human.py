@@ -1,12 +1,13 @@
 """Create one neutral/male MPFB human for Character Forge evaluation.
 
-Experimental only: no runtime promotion. This script assumes MPFB is already
-bootstrapped into Blender user resources for the current worker run.
+Experimental only: no runtime promotion. MPFB is installed into an isolated
+Blender user profile by ``bootstrap_mpfb.sh`` before this script is executed.
 """
 from __future__ import annotations
 
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -14,13 +15,7 @@ import bpy
 
 
 def import_symbol(extension_module: str, relative_module: str, key: str):
-    """Import one MPFB symbol from Blender's extension namespace.
-
-    MPFB 2.x runs under names such as ``bl_ext.user_default.mpfb``. Importing
-    only the root package does not eagerly load the service modules, so scanning
-    ``sys.modules`` is insufficient in headless jobs. Import the exact service
-    module first, then fall back to a suffix scan for compatibility.
-    """
+    """Import one MPFB symbol from Blender's extension namespace."""
     candidates = [
         f"{extension_module}.{relative_module}",
         f"mpfb.{relative_module}",
@@ -50,11 +45,7 @@ def import_symbol(extension_module: str, relative_module: str, key: str):
 def find_mpfb_extension_module() -> str:
     for addon_name in bpy.context.preferences.addons.keys():
         if "mpfb" in addon_name.lower():
-            try:
-                importlib.import_module(addon_name)
-                return addon_name
-            except Exception:
-                pass
+            return addon_name
 
     candidates = [
         "bl_ext.user_default.mpfb",
@@ -70,8 +61,47 @@ def find_mpfb_extension_module() -> str:
     raise RuntimeError(f"MPFB extension could not be imported after bootstrap: {errors}")
 
 
+def ensure_mpfb_enabled(extension_module: str) -> None:
+    """Enable MPFB in the current Blender process if --factory-startup hid prefs.
+
+    CH Blender jobs traditionally launch with --factory-startup. The Character
+    Forge bootstrap installs and enables MPFB in an isolated user profile, but a
+    factory-startup process can begin with an empty add-on preference set. The
+    extension package is still discoverable, so explicitly enable it before any
+    MPFB service asks for add-on preferences.
+    """
+    if extension_module in bpy.context.preferences.addons:
+        return
+
+    try:
+        bpy.ops.preferences.addon_enable(module=extension_module)
+    except Exception as exc:
+        raise RuntimeError(
+            f"MPFB package exists but could not be enabled in this Blender process: {exc!r}"
+        ) from exc
+
+    if extension_module not in bpy.context.preferences.addons:
+        raise RuntimeError(
+            f"MPFB enable returned without registering preferences: {extension_module}"
+        )
+
+
+def clear_scene_objects() -> None:
+    """Clear scene content without resetting Blender preferences/extensions."""
+    if bpy.context.object is not None and bpy.context.object.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+
+    # Remove orphan scene-level render data only. Do not touch preferences,
+    # extensions, MPFB data, or the isolated Character Forge user profile.
+    for datablocks in (bpy.data.cameras, bpy.data.lights):
+        for block in list(datablocks):
+            if block.users == 0:
+                datablocks.remove(block)
+
+
 def setup_camera_and_light(human: bpy.types.Object) -> bpy.types.Camera:
-    # Character review camera only. This is not the final runtime scale gate.
     camera_data = bpy.data.cameras.new("CHCharacterForgeCamera")
     camera = bpy.data.objects.new("CHCharacterForgeCamera", camera_data)
     bpy.context.scene.collection.objects.link(camera)
@@ -109,23 +139,22 @@ def setup_camera_and_light(human: bpy.types.Object) -> bpy.types.Camera:
 def main() -> None:
     argv = sys.argv
     argv = argv[argv.index("--") + 1:] if "--" in argv else []
-    output_dir = Path(
-        argv[0] if argv else "out/ch_blender_agent/character.forge.mpfb.human.003"
-    ).resolve()
+    output_value = (
+        argv[0]
+        if argv
+        else os.environ.get(
+            "CH_AGENT_OUTPUT_DIR",
+            "out/ch_blender_agent/character.forge.mpfb.human.manual",
+        )
+    )
+    output_dir = Path(output_value).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-
+    # Never call bpy.ops.wm.read_factory_settings() here. That would erase the
+    # extension preference state the Character Forge bootstrap just prepared.
     extension_module = find_mpfb_extension_module()
-    module = importlib.import_module(extension_module)
-    register_error = None
-    if hasattr(module, "register"):
-        try:
-            module.register()
-        except Exception as exc:
-            # Some extension registration paths are already initialized by Blender.
-            # Keep the error in the report, but continue to direct service imports.
-            register_error = repr(exc)
+    ensure_mpfb_enabled(extension_module)
+    clear_scene_objects()
 
     HumanService = import_symbol(extension_module, "services.humanservice", "HumanService")
     TargetService = import_symbol(extension_module, "services.targetservice", "TargetService")
@@ -136,8 +165,8 @@ def main() -> None:
     human = HumanService.create_human(feet_on_ground=True, scale=0.1)
     human.name = "CH_Visitor_Male_MPFB_Probe"
 
-    # MPFB macro values are normalized 0..1. Keep this adult male deliberately
-    # ordinary: neither muscular nor heavy, because the first gate is silhouette.
+    # Deliberately ordinary adult male. This first gate is about human silhouette,
+    # not final clothes, hair, face detail, rigging or gameplay scale.
     for key, value in {
         "gender": 0.88,
         "age": 0.50,
@@ -173,7 +202,7 @@ def main() -> None:
         "contract": "CH_CHARACTER_FORGE_MPFB_HUMAN_V1",
         "status": "ok",
         "extensionModule": extension_module,
-        "registerError": register_error,
+        "addonEnabled": extension_module in bpy.context.preferences.addons,
         "blender": bpy.app.version_string,
         "object": human.name,
         "vertexCount": len(human.data.vertices),
