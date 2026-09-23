@@ -1,0 +1,58 @@
+{
+  "contract": "CH_VISITOR_BASE_MESH_V2",
+  "id": "visitor_male_base_mesh_v2",
+  "sourceAsset": "visitor_male_base_01",
+  "status": "south_visual_target_candidate",
+  "purpose": "Second canonical male visitor body candidate focused on continuous old-tycoon human silhouette rather than assembled primitive parts.",
+  "visualTarget": {
+    "style": "small rounded old-tycoon pedestrian readability",
+    "fullColorRGBA": true,
+    "referenceIntent": "match the pleasant compact human silhouette of the approved generated reference without copying pixels",
+    "avoid": [
+      "box torso",
+      "ball shoulders",
+      "detached sleeve look",
+      "tube legs",
+      "oversized hands",
+      "oversized head",
+      "block shoes",
+      "visible vertical walk bob"
+    ]
+  },
+  "shape": {
+    "torso": {
+      "segments": 24,
+      "rings": [
+        {"z": -0.50, "width": 0.67, "depth": 0.72},
+        {"z": -0.34, "width": 0.71, "depth": 0.76},
+        {"z": -0.10, "width": 0.78, "depth": 0.80},
+        {"z": 0.14, "width": 0.88, "depth": 0.84},
+        {"z": 0.34, "width": 0.96, "depth": 0.86},
+        {"z": 0.46, "width": 0.91, "depth": 0.82},
+        {"z": 0.50, "width": 0.80, "depth": 0.76}
+      ],
+      "subdivision": 1
+    },
+    "pelvisScale": [0.42, 0.40, 0.48],
+    "headScaleMultiplier": [0.86, 0.88, 0.91],
+    "hairScaleMultiplier": [0.89, 0.90, 0.88],
+    "shoulderXMultiplier": 0.84,
+    "shoulderZOffset": -0.022,
+    "shoulderCapScale": [0.54, 0.56, 0.58],
+    "hipXMultiplier": 0.86,
+    "hipCapScale": [0.76, 0.74, 0.78],
+    "upperArmProfile": [1.00, 0.92, 0.80, 0.70],
+    "forearmProfile": [0.78, 0.70, 0.60, 0.52],
+    "upperLegProfile": [1.02, 0.96, 0.84, 0.76],
+    "lowerLegProfile": [0.80, 0.72, 0.62, 0.54],
+    "shoeScale": [0.80, 0.78, 0.76],
+    "soleScale": [0.80, 0.78, 0.88],
+    "handScaleMultiplier": 0.78
+  },
+  "approvalGate": {
+    "direction": "south",
+    "requiredPoses": ["idle", "walk_a", "walk_b"],
+    "otherDirectionsBlocked": true,
+    "femaleVariantBlocked": true
+  }
+}
