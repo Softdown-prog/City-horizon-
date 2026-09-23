@@ -8,6 +8,8 @@ on:
       - "Converter/file_00000000a974820eafcd5ead28332854.png"
       - "tools/ground_tile_worker.py"
       - "tools/generate_sand_paths.py"
+      - "tools/validate_ground_tiles.py"
+      - "assets/terrain/ground_tile_contract.json"
       - ".github/workflows/generate-sand-autotile.yml"
 
 permissions:
@@ -68,6 +70,8 @@ jobs:
           report = json.loads(Path('out/sand_ground_tile_report.json').read_text(encoding='utf-8'))
           if not report.get('ok'):
               raise SystemExit(f"sand seam gate failed: {report}")
+          if report.get('edgeHarmonization') != 'exact-border-only':
+              raise SystemExit(f"sand worker used unexpected edge harmonization: {report}")
 
           root = Path('assets/terrain/paths/sand_01')
           files = sorted(root.glob('sand_path_*.png'))
@@ -87,6 +91,14 @@ jobs:
                       raise SystemExit(f'{path}: expected 128x64 RGBA, got {im.size} {im.mode}')
           print(f"PASS sand source=128x64 RGBA masks=16 edge_error={report['edgeError']}")
           PY
+
+      - name: Validate City Horizon ground-tile contract
+        run: |
+          python tools/validate_ground_tiles.py \
+            --profile atomic-path \
+            --file assets/terrain/sand_isometric_01.png \
+            --directory assets/terrain/paths/sand_01 \
+            --debug
 
       - name: Upload sand previews
         uses: actions/upload-artifact@v4
