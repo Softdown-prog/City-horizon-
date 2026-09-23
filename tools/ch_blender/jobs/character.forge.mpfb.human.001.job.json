@@ -1,0 +1,14 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "character.forge.mpfb.human.001",
+  "operation": "blender_script",
+  "script": "tools/character_forge/mpfb_create_basic_human.py",
+  "args": [
+    "out/ch_blender_agent/character.forge.mpfb.human.001"
+  ],
+  "outputDir": "out/ch_blender_agent/character.forge.mpfb.human.001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/character.forge.mpfb.human.001/mpfb_male_south_idle.png",
+    "out/ch_blender_agent/character.forge.mpfb.human.001/mpfb_human_report.json"
+  ]
+}
