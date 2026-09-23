@@ -1,5 +1,6 @@
 name: MapForge Ice Cream Comparison
 
+# One-off visual review: inactive vs active ice cream shop in MapForge.
 on:
   push:
     branches:
