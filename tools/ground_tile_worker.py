@@ -9,10 +9,11 @@ the same intake instead of rebuilding one-off cleanup scripts.
 Pipeline:
 1. normalize arbitrary PNG/JPG input to the canonical 128x64 diamond;
 2. optionally replace a baked visual border/bevel with nearby interior texture;
-3. fill anti-aliased transparent edge texels from nearby interior texture;
-4. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
-5. match only the exact opposite-edge samples needed for seamless repetition;
-6. render a grid-free repeated preview and write JSON metrics.
+3. optionally decontaminate obvious dark/saturated edge outliers using nearby valid material samples;
+4. fill anti-aliased transparent edge texels from nearby interior texture;
+5. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
+6. match only the exact opposite-edge samples needed for seamless repetition;
+7. render a grid-free repeated preview and write JSON metrics.
 
 The seam stage deliberately does not diffuse border colours into the interior.
 That keeps authored texture/style intact and avoids radial streaks or stains.
@@ -22,6 +23,7 @@ can consume its prepared PNG afterwards.
 from __future__ import annotations
 
 import argparse
+import colorsys
 import json
 import tempfile
 from pathlib import Path
@@ -97,6 +99,81 @@ def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
     return result
 
 
+def decontaminate_edge_outliers(source: Image.Image, band_pixels: int) -> tuple[Image.Image, int]:
+    """Replace obvious non-material pixels near the diamond perimeter.
+
+    This is intentionally conservative and only touches the outer band. A pixel
+    is considered contaminated when it is very dark, or when it is strongly
+    saturated red/blue/green compared with the warm sand/soil family. Replacement
+    samples are taken from valid pixels farther inward along the local edge normal.
+    The tile centre is never modified by this stage.
+    """
+    if band_pixels <= 0:
+        return source.convert("RGBA"), 0
+
+    source = source.convert("RGBA")
+    src = source.load()
+    result = source.copy()
+    dst = result.load()
+    mask = diamond_mask()
+    mp = mask.load()
+    cx, cy = W / 2.0, H / 2.0
+    replaced = 0
+
+    def contaminated(r: int, g: int, b: int, a: int) -> bool:
+        if a < 240:
+            return False
+        value = max(r, g, b)
+        if value < 70:
+            return True
+        h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        if v < 0.42 and s > 0.45:
+            return True
+        # Reject vivid red/magenta/green/blue specks but keep warm yellow/orange sand.
+        hue_deg = h * 360.0
+        non_sand_hue = hue_deg < 18.0 or 95.0 < hue_deg < 330.0
+        return s > 0.68 and v > 0.28 and non_sand_hue
+
+    for y in range(H):
+        for x in range(W):
+            if mp[x, y] == 0:
+                continue
+            dx = x - cx
+            dy = y - cy
+            d = abs(dx) / (W / 2.0) + abs(dy) / (H / 2.0)
+            edge_depth = (1.0 - d) * (H / 2.0)
+            if edge_depth >= band_pixels:
+                continue
+            r, g, b, a = src[x, y]
+            if not contaminated(r, g, b, a):
+                continue
+
+            sign_x = -1.0 if dx < 0 else 1.0
+            sign_y = -1.0 if dy < 0 else 1.0
+            nx = (-sign_x / (W / 2.0))
+            ny = (-sign_y / (H / 2.0))
+            length = max(1e-6, (nx * nx + ny * ny) ** 0.5)
+            nx /= length
+            ny /= length
+
+            replacement = None
+            for step in range(band_pixels + 2, band_pixels + 28):
+                tx = round(x + nx * step)
+                ty = round(y + ny * step)
+                if not (0 <= tx < W and 0 <= ty < H) or mp[tx, ty] == 0:
+                    continue
+                tr, tg, tb, ta = src[tx, ty]
+                if ta >= 240 and not contaminated(tr, tg, tb, ta):
+                    replacement = (tr, tg, tb, 255)
+                    break
+            if replacement is not None:
+                dst[x, y] = replacement
+                replaced += 1
+
+    result.putalpha(mask)
+    return result, replaced
+
+
 def fill_transparent_edge(source: Image.Image) -> Image.Image:
     source = source.convert("RGBA")
     src = source.load()
@@ -145,14 +222,7 @@ def edge_error(tile: Image.Image) -> float:
 
 
 def harmonize_edges(source: Image.Image, band_pixels: int = 0) -> Image.Image:
-    """Match exact opposite border samples without touching interior texels.
-
-    Earlier versions diffused the corrected edge colour several pixels toward
-    the centre. That could create visible rays/stains in authored materials such
-    as sand. The only required seam operation is equality on the samples that
-    actually meet their opposite neighbour, so the interior is left untouched.
-    ``band_pixels`` is retained for API compatibility and intentionally ignored.
-    """
+    """Match exact opposite border samples without touching interior texels."""
     del band_pixels
     result = source.copy().convert("RGBA")
     px = result.load()
@@ -185,7 +255,7 @@ def repeated_preview(tile: Image.Image, path: Path) -> None:
     canvas.save(path)
 
 
-def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float, strip_edge_pixels: int = 0) -> dict:
+def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float, strip_edge_pixels: int = 0, decontaminate_edge_pixels: int = 0) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         normalized_path = Path(tmp) / "normalized.png"
         with Image.open(source_path) as original:
@@ -197,7 +267,8 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
 
         normalized = Image.open(normalized_path).convert("RGBA")
         flattened = strip_edge_band(normalized, strip_edge_pixels)
-        prepared = harmonize_edges(fill_transparent_edge(flattened))
+        decontaminated, replaced = decontaminate_edge_outliers(flattened, decontaminate_edge_pixels)
+        prepared = harmonize_edges(fill_transparent_edge(decontaminated))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     prepared.save(output_path)
@@ -213,6 +284,8 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
         "height": H,
         "mode": "RGBA",
         "stripEdgePixels": strip_edge_pixels,
+        "decontaminateEdgePixels": decontaminate_edge_pixels,
+        "decontaminatedPixels": replaced,
         "edgeHarmonization": "exact-border-only",
         "edgeError": round(error, 4),
         "maxEdgeError": max_edge_error,
@@ -221,7 +294,10 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if not report["ok"]:
         raise SystemExit(f"ground tile seam gate failed: edge_error={error:.2f} > {max_edge_error:.2f}")
-    print(f"PASS ground tile prepared: {output_path} edge_error={error:.2f} strip_edge={strip_edge_pixels}")
+    print(
+        f"PASS ground tile prepared: {output_path} edge_error={error:.2f} "
+        f"strip_edge={strip_edge_pixels} decontaminated={replaced}"
+    )
     return report
 
 
@@ -233,8 +309,17 @@ def main() -> None:
     parser.add_argument("--report", type=Path, default=Path("out/ground_tile_report.json"))
     parser.add_argument("--max-edge-error", type=float, default=DEFAULT_MAX_EDGE_ERROR)
     parser.add_argument("--strip-edge-band", type=int, default=0, help="Replace this many boundary pixels with interior texture to remove a baked rim/bevel.")
+    parser.add_argument("--decontaminate-edge-band", type=int, default=0, help="Replace obvious dark/saturated outlier pixels within this many boundary pixels using valid interior material samples.")
     args = parser.parse_args()
-    prepare(args.source, args.output, args.preview, args.report, args.max_edge_error, args.strip_edge_band)
+    prepare(
+        args.source,
+        args.output,
+        args.preview,
+        args.report,
+        args.max_edge_error,
+        args.strip_edge_band,
+        args.decontaminate_edge_band,
+    )
 
 
 if __name__ == "__main__":
