@@ -29,16 +29,17 @@ if [[ ! -d "$SRC" ]]; then
   tar -xzf "$ARCHIVE" -C "$SRC" --strip-components=1
 fi
 
-rm -rf "$EXT_DIR"
-mkdir -p "$EXT_DIR"
-
-# MPFB 2.x is a Blender extension. The distributable package content lives in src/.
-cp -a "$SRC/src/." "$EXT_DIR/"
-
-if [[ ! -f "$EXT_DIR/blender_manifest.toml" ]]; then
-  echo "MPFB bootstrap failed: blender_manifest.toml missing after extraction" >&2
+# MPFB 2.x is a Blender extension whose package root is src/mpfb/.
+PACKAGE_ROOT="$SRC/src/mpfb"
+if [[ ! -f "$PACKAGE_ROOT/blender_manifest.toml" ]]; then
+  echo "MPFB bootstrap failed: expected manifest missing at $PACKAGE_ROOT/blender_manifest.toml" >&2
+  find "$SRC" -maxdepth 4 -name blender_manifest.toml -print >&2 || true
   exit 31
 fi
+
+rm -rf "$EXT_DIR"
+mkdir -p "$EXT_DIR"
+cp -a "$PACKAGE_ROOT/." "$EXT_DIR/"
 
 cat > "$ROOT/mpfb_bootstrap.json" <<JSON
 {
@@ -47,6 +48,7 @@ cat > "$ROOT/mpfb_bootstrap.json" <<JSON
   "tag": "${MPFB_TAG}",
   "commit": "${MPFB_COMMIT}",
   "sourceUrl": "${MPFB_URL}",
+  "packageRoot": "${PACKAGE_ROOT}",
   "extensionDir": "${EXT_DIR}",
   "blenderUserResources": "${BLENDER_USER_RESOURCES}",
   "scope": "character_forge_only"
