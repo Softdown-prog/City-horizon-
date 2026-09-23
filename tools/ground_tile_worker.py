@@ -11,9 +11,11 @@ Pipeline:
 2. optionally replace a baked visual border/bevel with nearby interior texture;
 3. fill anti-aliased transparent edge texels from nearby interior texture;
 4. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
-5. soften opposite-edge colour mismatch in a narrow border band;
+5. match only the exact opposite-edge samples needed for seamless repetition;
 6. render a grid-free repeated preview and write JSON metrics.
 
+The seam stage deliberately does not diffuse border colours into the interior.
+That keeps authored texture/style intact and avoids radial streaks or stains.
 This worker does not invent topology/autotile art. A topology-specific generator
 can consume its prepared PNG afterwards.
 """
@@ -68,9 +70,6 @@ def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
             if edge_depth >= band_pixels:
                 continue
 
-            # Local inward normal of the active 2:1 diamond edge.  The edge
-            # gradient is (sign(dx)/64, sign(dy)/32); negating it points inward.
-            # This preserves texture direction much better than a centre pull.
             sign_x = -1.0 if dx < 0 else 1.0
             sign_y = -1.0 if dy < 0 else 1.0
             nx = -sign_x / (W / 2.0)
@@ -85,8 +84,6 @@ def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
             sx = min(W - 1, max(0, sx))
             sy = min(H - 1, max(0, sy))
 
-            # If rounding lands outside the diamond, continue walking inward
-            # along the same normal until a valid surface texel is reached.
             for step in range(0, band_pixels + 3):
                 tx = round(sx + nx * step)
                 ty = round(sy + ny * step)
@@ -147,8 +144,16 @@ def edge_error(tile: Image.Image) -> float:
     return sum(values) / len(values)
 
 
-def harmonize_edges(source: Image.Image, band_pixels: int = 8) -> Image.Image:
-    """Blend opposite raster borders toward their shared mean, inward gradually."""
+def harmonize_edges(source: Image.Image, band_pixels: int = 0) -> Image.Image:
+    """Match exact opposite border samples without touching interior texels.
+
+    Earlier versions diffused the corrected edge colour several pixels toward
+    the centre. That could create visible rays/stains in authored materials such
+    as sand. The only required seam operation is equality on the samples that
+    actually meet their opposite neighbour, so the interior is left untouched.
+    ``band_pixels`` is retained for API compatibility and intentionally ignored.
+    """
+    del band_pixels
     result = source.copy().convert("RGBA")
     px = result.load()
     top, right, bottom, left = (W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)
@@ -163,28 +168,6 @@ def harmonize_edges(source: Image.Image, band_pixels: int = 8) -> Image.Image:
             mean = tuple(round((ca[i] + cb[i]) / 2) for i in range(3)) + (255,)
             px[a[0], a[1]] = mean
             px[b[0], b[1]] = mean
-
-    centre = (W // 2, H // 2)
-    border_samples = []
-    for first, second in edge_pairs:
-        border_samples.extend(first)
-        border_samples.extend(second)
-    for bx, by in border_samples:
-        br, bg, bb, _ = px[bx, by]
-        for depth in range(1, band_pixels + 1):
-            t = depth / (band_pixels + 1)
-            x = round(bx * (1.0 - t) + centre[0] * t)
-            y = round(by * (1.0 - t) + centre[1] * t)
-            if not (0 <= x < W and 0 <= y < H) or px[x, y][3] == 0:
-                continue
-            strength = (1.0 - t) * 0.22
-            r, g, b, a = px[x, y]
-            px[x, y] = (
-                round(r * (1.0 - strength) + br * strength),
-                round(g * (1.0 - strength) + bg * strength),
-                round(b * (1.0 - strength) + bb * strength),
-                a,
-            )
 
     result.putalpha(diamond_mask())
     return result
@@ -230,6 +213,7 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
         "height": H,
         "mode": "RGBA",
         "stripEdgePixels": strip_edge_pixels,
+        "edgeHarmonization": "exact-border-only",
         "edgeError": round(error, 4),
         "maxEdgeError": max_edge_error,
     }
