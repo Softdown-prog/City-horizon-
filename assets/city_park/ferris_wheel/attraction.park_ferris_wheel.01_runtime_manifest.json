@@ -17,14 +17,14 @@
   "fps": 8,
   "looping": true,
   "frameResolution": [
-    256,
-    256
+    1024,
+    1024
   ],
   "pivot": {
-    "x": 128,
-    "y": 146
+    "x": 512,
+    "y": 554
   },
-  "approvedProxySha256": "ef53a3a04b7877c42e64c82d2d022ab7ece0f67af31db709528f020ca3e56a6b",
+  "approvedProxySha256": "5c57e70a352d50776733b7fba7520256868018abf55fadc470f809c1e400637a",
   "postprocess": "tools/tycoon_photo_studio/postprocess.py",
   "directions": {
     "south": {
@@ -47,9 +47,9 @@
       ],
       "firstFrameAlphaBounds": [
         0,
-        29,
-        218,
-        256
+        0,
+        1024,
+        1024
       ]
     },
     "east": {
@@ -72,9 +72,9 @@
       ],
       "firstFrameAlphaBounds": [
         0,
-        29,
-        217,
-        256
+        0,
+        1024,
+        1024
       ]
     },
     "west": {
@@ -97,9 +97,9 @@
       ],
       "firstFrameAlphaBounds": [
         0,
-        29,
-        217,
-        256
+        0,
+        1024,
+        1024
       ]
     },
     "north": {
@@ -122,9 +122,9 @@
       ],
       "firstFrameAlphaBounds": [
         0,
-        29,
-        218,
-        256
+        0,
+        1024,
+        1024
       ]
     }
   },

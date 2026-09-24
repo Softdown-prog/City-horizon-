@@ -10,10 +10,22 @@
     "3": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_east_animation.png"
   },
   "spriteAnchors": {
-    "0": { "x": 0.25, "y": 0.8125 },
-    "1": { "x": 0.25, "y": 0.8125 },
-    "2": { "x": 0.25, "y": 0.8125 },
-    "3": { "x": 0.25, "y": 0.8125 }
+    "0": {
+      "x": 0.25,
+      "y": 0.8125
+    },
+    "1": {
+      "x": 0.25,
+      "y": 0.8125
+    },
+    "2": {
+      "x": 0.25,
+      "y": 0.8125
+    },
+    "3": {
+      "x": 0.25,
+      "y": 0.8125
+    }
   },
   "rotatable": true,
   "requiresRoadAccess": false,
@@ -21,14 +33,14 @@
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
-    "width": 4,
-    "height": 3
+    "width": 6,
+    "height": 5
   },
   "buildCost": 0,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 0,
-  "artScale": 2.0,
+  "artScale": 0.6703,
   "animation": {
     "layout": "horizontal",
     "frameCount": 12,
@@ -36,5 +48,8 @@
     "playback": "loop"
   },
   "playerBuildable": true,
-  "productionStatus": "runtime_buildable_approved"
+  "productionStatus": "runtime_landmark_large1024_approved",
+  "renderClass": "large_asset_1024",
+  "runtimeManifest": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_runtime_manifest.json",
+  "sourceApprovedProxySha256": "5c57e70a352d50776733b7fba7520256868018abf55fadc470f809c1e400637a"
 }
