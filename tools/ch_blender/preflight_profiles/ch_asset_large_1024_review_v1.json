@@ -1,0 +1,19 @@
+{
+  "contract": "CH_SCENE_PREFLIGHT_PROFILE_V1",
+  "id": "CH_ASSET_LARGE_1024_REVIEW_V1",
+  "blenderUnitsPerTile": 3.0,
+  "footprintMaxScale": 1.55,
+  "groundContactTolerance": 0.20,
+  "cameraMargin": 0.015,
+  "character": {
+    "requiredRoles": ["character.torso", "character.head"],
+    "maxHeadTorsoDistance": 1.35,
+    "maxHandTorsoDistance": 1.90,
+    "footRoles": ["character.foot_left", "character.foot_right"],
+    "handRoles": ["character.hand_left", "character.hand_right"]
+  },
+  "proxy": {
+    "resolution": 1024,
+    "engine": "CYCLES"
+  }
+}
