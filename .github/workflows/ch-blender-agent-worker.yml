@@ -90,6 +90,7 @@ jobs:
         with:
           path: ~/.cache/ch-character-forge/makehuman-system-assets
           key: makehuman-system-assets-cc0-2026-09-24-v1
+          save-always: true
 
       - name: Bootstrap MakeHuman system assets for Character Forge
         if: steps.jobs.outputs.needs-character-forge == 'true'
