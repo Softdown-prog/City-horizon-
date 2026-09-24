@@ -5,11 +5,10 @@ from typing import Callable
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-# V2 keeps the original procedural language, but adds a deliberate mass pass:
-# broader torso/limbs, chunkier hands and shoes, a fuller head silhouette and a
-# stronger near/far read for the SOUTH 3/4 view. The goal is game readability,
-# not realistic anatomy.
-STYLE_CONTRACT = "CH_VISITOR_FORGE_2D_TYCOON_MASS_V2"
+# V3 keeps the mass gained in V2, but redistributes it into a more organic game
+# silhouette: sloped shoulders, a visible short neck, a tapered waist, softer
+# limb transitions and feet that agree on the SOUTH 3/4 facing direction.
+STYLE_CONTRACT = "CH_VISITOR_FORGE_2D_TYCOON_SHAPE_V3"
 CHARACTER_ID = "visitor_male_01"
 DIRECTION = "south"
 
@@ -27,12 +26,7 @@ def _painted_part(
     bottom_value: int = 184,
     right_shade: int = 22,
 ) -> Image.Image:
-    """Create a neutral grayscale RGBA part intended for palette tinting.
-
-    The source art is deliberately neutral. The compositor multiplies it by the
-    character palette later, so one painted silhouette/shading pass can be
-    reused with different skin, hair and clothing colors.
-    """
+    """Create a neutral grayscale RGBA part intended for palette tinting."""
     width, height = size
     mask = Image.new("L", size, 0)
     draw_mask = ImageDraw.Draw(mask)
@@ -40,8 +34,6 @@ def _painted_part(
     if edge_blur > 0:
         mask = mask.filter(ImageFilter.GaussianBlur(edge_blur))
 
-    # Broad top-left light and bottom-right shade. It intentionally avoids
-    # micro-detail so the volume survives the 512 -> 128 gameplay downscale.
     vertical = Image.new("L", size)
     vdraw = ImageDraw.Draw(vertical)
     for y in range(height):
@@ -81,58 +73,60 @@ def _painted_part(
 
 
 def _head() -> Image.Image:
-    """Fuller stylized head with a stronger SOUTH 3/4 read."""
+    """Slightly smaller face mass with a built-in short neck."""
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        # Wider cranium and jaw than V1. The right-side ear/nose direction keeps
-        # the character from reading as a perfectly frontal paper doll.
-        draw.ellipse((10, 4, 91, 89), fill=255)
-        draw.rounded_rectangle((17, 38, 86, 96), radius=29, fill=255)
-        draw.ellipse((82, 39, 99, 62), fill=238)
-        draw.ellipse((79, 50, 94, 70), fill=220)
+        # Keep the readable stylized head but remove the V2 balloon effect.
+        draw.ellipse((13, 7, 89, 87), fill=255)
+        draw.rounded_rectangle((20, 39, 84, 94), radius=27, fill=255)
+        # Near-side ear and cheek support the screen-right SOUTH 3/4 turn.
+        draw.ellipse((80, 40, 96, 62), fill=236)
+        draw.ellipse((78, 51, 92, 69), fill=216)
+        # A real neck bridge prevents the head from floating on the collar.
+        draw.rounded_rectangle((45, 80, 66, 103), radius=8, fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        # Facial marks stay intentionally broad. They should suggest direction
-        # at 128 px, not become a miniature portrait.
-        draw.ellipse((60, 41, 66, 47), fill=(70, 70, 70, 205))
-        draw.ellipse((40, 42, 45, 47), fill=(104, 104, 104, 142))
-        draw.line((65, 49, 71, 59), fill=(132, 132, 132, 178), width=3)
-        draw.line((52, 71, 65, 71), fill=(118, 118, 118, 150), width=2)
-        draw.ellipse((25, 34, 50, 58), fill=(255, 255, 255, 20))
-        # Small jaw-side tone supports the 3/4 turn after downscale.
-        draw.arc((50, 48, 87, 91), 300, 80, fill=(92, 92, 92, 62), width=3)
+        # Far eye is smaller/lighter; near eye and nose carry the facing read.
+        draw.ellipse((42, 42, 46, 46), fill=(106, 106, 106, 132))
+        draw.ellipse((62, 40, 68, 46), fill=(70, 70, 70, 202))
+        draw.line((68, 48, 74, 58), fill=(128, 128, 128, 176), width=3)
+        draw.line((55, 70, 67, 70), fill=(118, 118, 118, 144), width=2)
+        draw.ellipse((28, 34, 49, 55), fill=(255, 255, 255, 18))
+        draw.arc((51, 49, 86, 89), 300, 78, fill=(90, 90, 90, 56), width=3)
+        # Neck-side shade makes the collar connection readable at 128 px.
+        draw.line((63, 83, 64, 100), fill=(90, 90, 90, 44), width=3)
 
     return _painted_part((104, 104), mask, paint_details=details, edge_blur=0.45)
 
 
 def _hair() -> Image.Image:
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        draw.pieslice((8, 0, 96, 84), 180, 360, fill=255)
+        draw.pieslice((11, 2, 94, 81), 180, 360, fill=255)
         draw.polygon(
             [
-                (10, 40),
-                (13, 21),
-                (28, 7),
-                (49, 1),
-                (72, 6),
-                (90, 19),
-                (96, 34),
-                (94, 50),
-                (81, 42),
-                (70, 34),
+                (13, 40),
+                (16, 22),
+                (30, 9),
+                (50, 3),
+                (71, 7),
+                (88, 19),
+                (94, 34),
+                (92, 49),
+                (80, 42),
+                (69, 34),
                 (57, 31),
-                (45, 34),
-                (31, 31),
-                (18, 42),
+                (46, 34),
+                (32, 32),
+                (20, 42),
             ],
             fill=255,
         )
-        draw.polygon([(80, 33), (94, 40), (93, 62), (82, 57)], fill=255)
+        draw.polygon([(79, 34), (92, 41), (91, 59), (81, 55)], fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        draw.arc((22, 6, 82, 50), 195, 330, fill=(255, 255, 255, 28), width=4)
-        draw.line((52, 6, 46, 28), fill=(88, 88, 88, 90), width=2)
-        draw.line((74, 12, 83, 32), fill=(76, 76, 76, 62), width=3)
+        draw.arc((24, 8, 81, 49), 195, 330, fill=(255, 255, 255, 27), width=4)
+        draw.line((52, 8, 47, 27), fill=(88, 88, 88, 86), width=2)
+        draw.line((73, 13, 81, 32), fill=(76, 76, 76, 58), width=3)
 
     return _painted_part(
         (104, 104),
@@ -146,44 +140,48 @@ def _hair() -> Image.Image:
 
 
 def _torso() -> Image.Image:
-    """Broader, heavier shirt mass with asymmetric SOUTH 3/4 silhouette."""
+    """Organic shirt silhouette: broad chest, sloped shoulders, tapered waist."""
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
+        # Chest stays substantial, but the sides now narrow through the waist
+        # before opening slightly at the hem. This avoids the V2 rectangle.
         draw.polygon(
             [
-                (27, 21),
-                (52, 8),
-                (83, 8),
-                (118, 27),
-                (124, 54),
-                (116, 119),
-                (99, 136),
-                (43, 136),
-                (22, 119),
-                (16, 53),
+                (29, 26),
+                (50, 11),
+                (82, 9),
+                (113, 27),
+                (122, 49),
+                (117, 76),
+                (109, 108),
+                (99, 134),
+                (45, 134),
+                (33, 116),
+                (25, 83),
+                (18, 51),
             ],
             fill=255,
         )
-        # Shoulder caps deliberately differ: the screen-right side is the near
-        # side in this SOUTH 3/4 gate and carries slightly more visual weight.
-        draw.ellipse((15, 16, 62, 60), fill=255)
-        draw.ellipse((78, 15, 131, 64), fill=255)
-        draw.rounded_rectangle((25, 95, 117, 139), radius=18, fill=255)
+        # Soft shoulder caps bridge into the articulated arms.
+        draw.ellipse((17, 17, 61, 58), fill=255)
+        draw.ellipse((78, 15, 128, 61), fill=255)
+        # Rounded hem keeps the lower torso from ending in a hard box.
+        draw.rounded_rectangle((34, 108, 108, 138), radius=15, fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
+        # Collar opens around the visible neck instead of touching the chin.
         draw.polygon(
-            [(51, 12), (68, 29), (86, 11), (77, 7), (68, 20), (59, 7)],
-            fill=(112, 112, 112, 104),
+            [(51, 13), (68, 30), (85, 12), (77, 8), (68, 20), (59, 8)],
+            fill=(112, 112, 112, 102),
         )
-        # Center seam is shifted slightly toward the near side rather than dead
-        # center, reinforcing that the torso is turned.
-        draw.line((70, 30, 72, 112), fill=(118, 118, 118, 45), width=3)
-        draw.line((34, 118, 105, 118), fill=(88, 88, 88, 62), width=4)
-        draw.line((31, 58, 106, 58), fill=(255, 255, 255, 18), width=4)
-        draw.line((111, 35, 108, 112), fill=(74, 74, 74, 54), width=4)
-        draw.arc((20, 12, 66, 64), 210, 320, fill=(255, 255, 255, 16), width=3)
+        draw.line((70, 31, 71, 110), fill=(118, 118, 118, 42), width=3)
+        draw.line((39, 119, 103, 119), fill=(88, 88, 88, 56), width=3)
+        draw.line((31, 58, 106, 58), fill=(255, 255, 255, 16), width=3)
+        # Near-side seam/shade strengthens the 3/4 turn without texture noise.
+        draw.line((110, 37, 106, 108), fill=(74, 74, 74, 50), width=4)
+        draw.arc((20, 15, 64, 62), 210, 320, fill=(255, 255, 255, 16), width=3)
 
-    return _painted_part((144, 144), mask, paint_details=details, edge_blur=0.4)
+    return _painted_part((144, 144), mask, paint_details=details, edge_blur=0.45)
 
 
 def _tapered_limb(
@@ -193,115 +191,130 @@ def _tapered_limb(
     *,
     side: str,
     cuff: bool = False,
+    curve: int = 0,
 ) -> Image.Image:
+    """Paint a softly curved articulated segment instead of a straight tube."""
     width, height = size
-    center = width // 2
+    top_center = width // 2
+    bottom_center = top_center + curve
 
-    # Near side receives a little more silhouette weight. This is intentionally
-    # subtle because z-order does most of the 3/4 work.
     side_bonus = 2 if side == "right" else 0
     top_width += side_bonus
     bottom_width += side_bonus
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        points = [
-            (center - top_width // 2, 2),
-            (center + top_width // 2, 2),
-            (center + bottom_width // 2, height - 7),
-            (center + bottom_width // 2 - 2, height - 2),
-            (center - bottom_width // 2 + 2, height - 2),
-            (center - bottom_width // 2, height - 7),
-        ]
-        draw.polygon(points, fill=255)
+        mid_y = height // 2
+        mid_center = round((top_center + bottom_center) / 2)
+        mid_width = round((top_width + bottom_width) / 2)
+        draw.polygon(
+            [
+                (top_center - top_width // 2, 3),
+                (top_center + top_width // 2, 3),
+                (mid_center + mid_width // 2, mid_y),
+                (bottom_center + bottom_width // 2, height - 7),
+                (bottom_center + bottom_width // 2 - 2, height - 2),
+                (bottom_center - bottom_width // 2 + 2, height - 2),
+                (bottom_center - bottom_width // 2, height - 7),
+                (mid_center - mid_width // 2, mid_y),
+            ],
+            fill=255,
+        )
         draw.ellipse(
-            (center - top_width // 2, 0, center + top_width // 2, top_width),
+            (top_center - top_width // 2, 0, top_center + top_width // 2, top_width),
             fill=255,
         )
         draw.ellipse(
             (
-                center - bottom_width // 2,
+                bottom_center - bottom_width // 2,
                 height - bottom_width - 2,
-                center + bottom_width // 2,
+                bottom_center + bottom_width // 2,
                 height - 2,
             ),
             fill=255,
         )
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        x = center + (top_width // 4 if side == "right" else -top_width // 4)
-        draw.line((x, 8, x, height - 10), fill=(255, 255, 255, 20), width=2)
-        shade_x = center - top_width // 3 if side == "left" else center + top_width // 3
-        draw.line((shade_x, 10, shade_x, height - 11), fill=(76, 76, 76, 30), width=2)
+        highlight_x = top_center + (top_width // 4 if side == "right" else -top_width // 4)
+        draw.line((highlight_x, 9, bottom_center, height - 11), fill=(255, 255, 255, 18), width=2)
         if cuff:
             draw.line(
                 (
-                    center - bottom_width // 2 + 2,
+                    bottom_center - bottom_width // 2 + 2,
                     height - 13,
-                    center + bottom_width // 2 - 2,
+                    bottom_center + bottom_width // 2 - 2,
                     height - 13,
                 ),
-                fill=(88, 88, 88, 82),
+                fill=(88, 88, 88, 72),
                 width=3,
             )
 
-    return _painted_part(size, mask, paint_details=details, edge_blur=0.35)
+    return _painted_part(size, mask, paint_details=details, edge_blur=0.4)
 
 
 def _hand(side: str) -> Image.Image:
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        # Hand is intentionally mitten-like: a readable game shape, not fingers.
-        draw.ellipse((7, 3, 31, 34), fill=255)
+        draw.ellipse((8, 4, 30, 34), fill=255)
         if side == "left":
-            draw.ellipse((3, 15, 15, 29), fill=240)
+            draw.ellipse((4, 16, 15, 29), fill=236)
         else:
-            draw.ellipse((25, 15, 37, 29), fill=240)
+            draw.ellipse((24, 15, 36, 29), fill=238)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
         if side == "right":
-            draw.arc((12, 8, 33, 31), 280, 70, fill=(92, 92, 92, 42), width=2)
+            draw.arc((12, 9, 32, 31), 280, 70, fill=(92, 92, 92, 38), width=2)
         else:
-            draw.arc((7, 8, 28, 31), 110, 250, fill=(92, 92, 92, 34), width=2)
+            draw.arc((7, 9, 28, 31), 110, 250, fill=(92, 92, 92, 30), width=2)
 
     return _painted_part((40, 40), mask, paint_details=details, edge_blur=0.4)
 
 
 def _lower_leg(side: str) -> Image.Image:
-    width_bonus = 2 if side == "right" else 0
+    """Continuous calf shape without a circular knee marker."""
+    near_bonus = 2 if side == "right" else 0
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        left = 10 - width_bonus
-        right = 50 + width_bonus
+        left = 12 - near_bonus
+        right = 48 + near_bonus
+        draw.rounded_rectangle((left, 1, right, 34), radius=15, fill=255)
         draw.polygon(
-            [(left, 2), (right, 2), (right - 3, 72), (right - 8, 78), (left + 9, 78), (left + 4, 72)],
+            [
+                (left + 2, 20),
+                (right - 1, 20),
+                (right - 5, 67),
+                (right - 10, 78),
+                (left + 10, 78),
+                (left + 5, 67),
+            ],
             fill=255,
         )
-        draw.ellipse((left, 0, right, 36), fill=255)
-        draw.ellipse((left + 3, 59, right - 3, 80), fill=255)
+        draw.ellipse((left + 5, 61, right - 5, 80), fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        x = 18 if side == "left" else 43
-        draw.line((x, 13, x, 68), fill=(255, 255, 255, 18), width=2)
-        draw.arc((10, 0, 50, 34), 10, 170, fill=(96, 96, 96, 52), width=2)
-        draw.line((17, 64, 45, 64), fill=(78, 78, 78, 34), width=2)
+        x = 20 if side == "left" else 40
+        draw.line((x, 14, x, 66), fill=(255, 255, 255, 16), width=2)
+        # Only a faint cloth fold remains where the knee bends.
+        draw.line((19, 30, 43, 31), fill=(82, 82, 82, 24), width=2)
+        draw.line((19, 66, 42, 66), fill=(78, 78, 78, 28), width=2)
 
-    return _painted_part((60, 82), mask, paint_details=details, edge_blur=0.35)
+    return _painted_part((60, 82), mask, paint_details=details, edge_blur=0.4)
 
 
 def _shoe(side: str) -> Image.Image:
+    """Both feet point toward screen-right, matching the SOUTH 3/4 body turn."""
+
     def mask(draw: ImageDraw.ImageDraw) -> None:
         if side == "left":
-            draw.rounded_rectangle((10, 7, 58, 31), radius=9, fill=255)
-            draw.ellipse((2, 10, 29, 34), fill=255)
+            # Far foot: slightly smaller but still points in the same direction.
+            draw.rounded_rectangle((9, 8, 51, 30), radius=9, fill=255)
+            draw.ellipse((38, 10, 63, 33), fill=255)
         else:
-            draw.rounded_rectangle((9, 7, 57, 31), radius=9, fill=255)
-            draw.ellipse((39, 10, 66, 34), fill=255)
+            # Near foot carries a little more silhouette weight.
+            draw.rounded_rectangle((8, 7, 55, 31), radius=10, fill=255)
+            draw.ellipse((41, 9, 67, 34), fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        draw.line((6, 30, 61, 30), fill=(68, 68, 68, 96), width=3)
-        if side == "left":
-            draw.line((17, 13, 39, 15), fill=(255, 255, 255, 24), width=2)
-        else:
-            draw.line((28, 15, 50, 13), fill=(255, 255, 255, 24), width=2)
+        draw.line((7, 30, 62, 30), fill=(68, 68, 68, 92), width=3)
+        draw.line((21, 13, 47, 14), fill=(255, 255, 255, 22), width=2)
 
     return _painted_part(
         (68, 38),
@@ -316,7 +329,7 @@ def _shoe(side: str) -> Image.Image:
 def _ground_shadow() -> Image.Image:
     mask = Image.new("L", (112, 36), 0)
     draw = ImageDraw.Draw(mask)
-    draw.ellipse((8, 8, 104, 30), fill=118)
+    draw.ellipse((8, 8, 104, 30), fill=112)
     mask = mask.filter(ImageFilter.GaussianBlur(5))
     image = Image.new("RGBA", (112, 36), (28, 31, 34, 0))
     image.putalpha(mask)
@@ -332,10 +345,18 @@ def build_v1_south_parts() -> dict[str, Image.Image]:
         "torso": _torso(),
     }
     for side in ("left", "right"):
-        parts[f"upper_arm_{side}"] = _tapered_limb((54, 78), 36, 29, side=side, cuff=True)
-        parts[f"lower_arm_{side}"] = _tapered_limb((50, 68), 29, 22, side=side)
+        arm_curve = -3 if side == "left" else 3
+        forearm_curve = 2 if side == "left" else -2
+        parts[f"upper_arm_{side}"] = _tapered_limb(
+            (54, 78), 35, 28, side=side, cuff=True, curve=arm_curve
+        )
+        parts[f"lower_arm_{side}"] = _tapered_limb(
+            (50, 68), 28, 21, side=side, curve=forearm_curve
+        )
         parts[f"hand_{side}"] = _hand(side)
-        parts[f"upper_leg_{side}"] = _tapered_limb((62, 86), 40, 34, side=side)
+        parts[f"upper_leg_{side}"] = _tapered_limb(
+            (62, 86), 38, 31, side=side, curve=(1 if side == "right" else -1)
+        )
         parts[f"lower_leg_{side}"] = _lower_leg(side)
         parts[f"shoe_{side}"] = _shoe(side)
     return parts

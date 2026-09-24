@@ -16,49 +16,49 @@
   },
   "joints": [
     {"id": "pelvis", "position": [258, 304]},
-    {"id": "spine", "parent": "pelvis", "position": [258, 238]},
-    {"id": "neck", "parent": "spine", "position": [258, 181]},
-    {"id": "head", "parent": "neck", "position": [258, 145]},
+    {"id": "spine", "parent": "pelvis", "position": [258, 239]},
+    {"id": "neck", "parent": "spine", "position": [259, 184]},
+    {"id": "head", "parent": "neck", "position": [260, 146]},
 
-    {"id": "shoulder_left", "parent": "spine", "position": [216, 208]},
-    {"id": "elbow_left", "parent": "shoulder_left", "position": [201, 260]},
-    {"id": "wrist_left", "parent": "elbow_left", "position": [197, 301]},
+    {"id": "shoulder_left", "parent": "spine", "position": [219, 210]},
+    {"id": "elbow_left", "parent": "shoulder_left", "position": [204, 259]},
+    {"id": "wrist_left", "parent": "elbow_left", "position": [207, 299]},
 
     {"id": "shoulder_right", "parent": "spine", "position": [298, 216]},
-    {"id": "elbow_right", "parent": "shoulder_right", "position": [313, 267]},
-    {"id": "wrist_right", "parent": "elbow_right", "position": [318, 306]},
+    {"id": "elbow_right", "parent": "shoulder_right", "position": [314, 264]},
+    {"id": "wrist_right", "parent": "elbow_right", "position": [311, 304]},
 
-    {"id": "hip_left", "parent": "pelvis", "position": [237, 304]},
-    {"id": "knee_left", "parent": "hip_left", "position": [237, 371]},
-    {"id": "ankle_left", "parent": "knee_left", "position": [237, 433]},
+    {"id": "hip_left", "parent": "pelvis", "position": [240, 304]},
+    {"id": "knee_left", "parent": "hip_left", "position": [239, 371]},
+    {"id": "ankle_left", "parent": "knee_left", "position": [241, 433]},
 
-    {"id": "hip_right", "parent": "pelvis", "position": [278, 309]},
-    {"id": "knee_right", "parent": "hip_right", "position": [278, 375]},
-    {"id": "ankle_right", "parent": "knee_right", "position": [278, 437]}
+    {"id": "hip_right", "parent": "pelvis", "position": [278, 308]},
+    {"id": "knee_right", "parent": "hip_right", "position": [280, 374]},
+    {"id": "ankle_right", "parent": "knee_right", "position": [281, 436]}
   ],
   "layers": [
-    {"id": "ground_shadow", "source": "visitor_male_01/south/ground_shadow.png", "position": [258, 458], "pivot": [56, 18], "zIndex": 0, "opacity": 0.72},
+    {"id": "ground_shadow", "source": "visitor_male_01/south/ground_shadow.png", "position": [259, 458], "pivot": [56, 18], "zIndex": 0, "opacity": 0.68},
 
-    {"id": "upper_leg_left", "source": "visitor_male_01/south/upper_leg_left.png", "position": [237, 304], "pivot": [31, 10], "zIndex": 10, "paletteSlot": "pants"},
-    {"id": "lower_leg_left", "source": "visitor_male_01/south/lower_leg_left.png", "position": [237, 371], "pivot": [30, 10], "zIndex": 11, "paletteSlot": "pants"},
-    {"id": "shoe_left", "source": "visitor_male_01/south/shoe_left.png", "position": [237, 433], "pivot": [27, 8], "zIndex": 12, "paletteSlot": "shoes"},
+    {"id": "upper_leg_left", "source": "visitor_male_01/south/upper_leg_left.png", "position": [240, 304], "pivot": [31, 10], "zIndex": 10, "paletteSlot": "pants"},
+    {"id": "lower_leg_left", "source": "visitor_male_01/south/lower_leg_left.png", "position": [239, 371], "pivot": [30, 10], "zIndex": 11, "paletteSlot": "pants"},
+    {"id": "shoe_left", "source": "visitor_male_01/south/shoe_left.png", "position": [241, 433], "pivot": [27, 8], "zIndex": 12, "paletteSlot": "shoes"},
 
-    {"id": "upper_leg_right", "source": "visitor_male_01/south/upper_leg_right.png", "position": [278, 309], "pivot": [31, 10], "zIndex": 14, "paletteSlot": "pants"},
-    {"id": "lower_leg_right", "source": "visitor_male_01/south/lower_leg_right.png", "position": [278, 375], "pivot": [30, 10], "zIndex": 15, "paletteSlot": "pants"},
-    {"id": "shoe_right", "source": "visitor_male_01/south/shoe_right.png", "position": [278, 437], "pivot": [27, 8], "zIndex": 16, "paletteSlot": "shoes"},
+    {"id": "upper_leg_right", "source": "visitor_male_01/south/upper_leg_right.png", "position": [278, 308], "pivot": [31, 10], "zIndex": 14, "paletteSlot": "pants"},
+    {"id": "lower_leg_right", "source": "visitor_male_01/south/lower_leg_right.png", "position": [280, 374], "pivot": [30, 10], "zIndex": 15, "paletteSlot": "pants"},
+    {"id": "shoe_right", "source": "visitor_male_01/south/shoe_right.png", "position": [281, 436], "pivot": [27, 8], "zIndex": 16, "paletteSlot": "shoes"},
 
-    {"id": "upper_arm_left", "source": "visitor_male_01/south/upper_arm_left.png", "position": [216, 208], "pivot": [27, 11], "zIndex": 20, "paletteSlot": "shirt"},
-    {"id": "lower_arm_left", "source": "visitor_male_01/south/lower_arm_left.png", "position": [201, 260], "pivot": [25, 9], "zIndex": 21, "paletteSlot": "skin"},
-    {"id": "hand_left", "source": "visitor_male_01/south/hand_left.png", "position": [197, 301], "pivot": [20, 9], "zIndex": 22, "paletteSlot": "skin"},
+    {"id": "upper_arm_left", "source": "visitor_male_01/south/upper_arm_left.png", "position": [219, 210], "pivot": [27, 11], "zIndex": 20, "paletteSlot": "shirt"},
+    {"id": "lower_arm_left", "source": "visitor_male_01/south/lower_arm_left.png", "position": [204, 259], "pivot": [25, 9], "zIndex": 21, "paletteSlot": "skin"},
+    {"id": "hand_left", "source": "visitor_male_01/south/hand_left.png", "position": [207, 299], "pivot": [20, 9], "zIndex": 22, "paletteSlot": "skin"},
 
-    {"id": "torso", "source": "visitor_male_01/south/torso.png", "position": [258, 238], "pivot": [72, 46], "zIndex": 30, "paletteSlot": "shirt"},
+    {"id": "torso", "source": "visitor_male_01/south/torso.png", "position": [258, 239], "pivot": [72, 46], "zIndex": 30, "paletteSlot": "shirt"},
 
     {"id": "upper_arm_right", "source": "visitor_male_01/south/upper_arm_right.png", "position": [298, 216], "pivot": [27, 11], "zIndex": 34, "paletteSlot": "shirt"},
-    {"id": "lower_arm_right", "source": "visitor_male_01/south/lower_arm_right.png", "position": [313, 267], "pivot": [25, 9], "zIndex": 35, "paletteSlot": "skin"},
-    {"id": "hand_right", "source": "visitor_male_01/south/hand_right.png", "position": [318, 306], "pivot": [20, 9], "zIndex": 36, "paletteSlot": "skin"},
+    {"id": "lower_arm_right", "source": "visitor_male_01/south/lower_arm_right.png", "position": [314, 264], "pivot": [25, 9], "zIndex": 35, "paletteSlot": "skin"},
+    {"id": "hand_right", "source": "visitor_male_01/south/hand_right.png", "position": [311, 304], "pivot": [20, 9], "zIndex": 36, "paletteSlot": "skin"},
 
-    {"id": "head", "source": "visitor_male_01/south/head.png", "position": [258, 145], "pivot": [52, 47], "zIndex": 40, "paletteSlot": "skin"},
-    {"id": "hair", "source": "visitor_male_01/south/hair.png", "position": [258, 145], "pivot": [52, 47], "zIndex": 50, "paletteSlot": "hair"}
+    {"id": "head", "source": "visitor_male_01/south/head.png", "position": [260, 146], "pivot": [52, 47], "zIndex": 40, "paletteSlot": "skin"},
+    {"id": "hair", "source": "visitor_male_01/south/hair.png", "position": [260, 146], "pivot": [52, 47], "zIndex": 50, "paletteSlot": "hair"}
   ],
   "parts": [
     {"id": "upper_leg_right", "layer": "upper_leg_right", "joint": "hip_right"},
@@ -80,16 +80,19 @@
     {"id": "hair", "layer": "hair", "joint": "head"}
   ],
   "visualStyle": {
-    "contract": "CH_VISITOR_FORGE_2D_TYCOON_MASS_V2",
+    "contract": "CH_VISITOR_FORGE_2D_TYCOON_SHAPE_V3",
     "view": "south_3q",
     "source": "procedural_2d",
     "massPass": true,
+    "shapeRefinement": true,
     "nearSide": "screen_right",
     "goals": [
-      "chunkier gameplay silhouette",
-      "stronger near/far layer separation",
-      "simple readable face and clothing masses",
-      "stable foot anchor across idle and walk"
+      "organic shoulder-to-arm transitions",
+      "visible short neck and cleaner head-to-torso connection",
+      "tapered torso instead of rectangular mass",
+      "continuous legs with subdued knee joints",
+      "feet sharing one SOUTH 3/4 facing direction",
+      "depth-led walk with stable gameplay anchor"
     ]
   }
 }

@@ -3,15 +3,24 @@
   "direction": "south",
   "frameDurationMs": 220,
   "joints": {
-    "shoulder_left": {"rotationDegrees": -4.0},
-    "shoulder_right": {"rotationDegrees": 4.0},
-    "elbow_left": {"rotationDegrees": -3.0},
-    "elbow_right": {"rotationDegrees": 3.0},
-    "hip_left": {"rotationDegrees": 8.0},
-    "hip_right": {"rotationDegrees": -8.0},
-    "knee_left": {"rotationDegrees": -6.0},
-    "knee_right": {"rotationDegrees": 3.0},
-    "ankle_left": {"rotationDegrees": -2.0},
-    "ankle_right": {"rotationDegrees": 2.0}
+    "shoulder_left": {"rotationDegrees": -2.5},
+    "shoulder_right": {"rotationDegrees": 2.5},
+    "elbow_left": {"rotationDegrees": -1.5},
+    "elbow_right": {"rotationDegrees": 1.5},
+
+    "hip_left": {
+      "rotationDegrees": 3.0,
+      "translation": [2.0, 2.0],
+      "scale": [1.01, 1.02]
+    },
+    "hip_right": {
+      "rotationDegrees": -3.0,
+      "translation": [-2.0, -1.0],
+      "scale": [0.98, 0.97]
+    },
+    "knee_left": {"rotationDegrees": -2.5},
+    "knee_right": {"rotationDegrees": 1.5},
+    "ankle_left": {"rotationDegrees": -1.0},
+    "ankle_right": {"rotationDegrees": 1.0}
   }
 }
