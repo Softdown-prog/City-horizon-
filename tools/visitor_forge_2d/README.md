@@ -274,6 +274,27 @@ de classificar esse conjunto, verificar as vistas no mapa, retocar as juntas
 visíveis durante a caminhada e confirmar que EAST/WEST têm leitura direcional
 distinta perto dos elementos da cidade.
 
+#### Revisão de orientação SOUTH pendente
+
+O master SOUTH atual apresenta rosto e tronco em 3/4 voltados para a direita.
+Como `south_walk_a` e `south_walk_b` reutilizam esse master, os dois frames
+também parecem caminhar para sudeste. Ajustar apenas os ângulos das juntas não
+muda essa orientação. Tentativas de gerar um novo master frontal alteraram o
+rosto, as proporções e o acabamento; não substituíram os PNGs versionados.
+
+Um novo desenho SOUTH precisa manter o mesmo personagem, paleta, textura e
+silhueta na escala de jogo; rosto e peito devem ler como frente, sem apontar
+para EAST. Ao corrigir SOUTH, revisar juntos `idle`, `walk_a` e `walk_b` para
+evitar um salto de orientação ao parar. Manter 128×128, o anchor [64, 116],
+os pés no mesmo chão e o passo curto. EAST, NORTH e WEST não fazem parte dessa
+correção. Conferir a aparência com corpo de 56 px e depois em movimento na
+engine antes de substituir a prévia existente.
+
+Na câmera isométrica padrão, o deslocamento lógico SOUTH (y+) projeta um
+passo de tile para a esquerda e para baixo na tela: (-64, +32) em zoom 1.
+Essa trajetória é propriedade do mapa; corrigir a orientação visual do
+personagem não a transforma em uma linha vertical na tela.
+
 ### Escala no mapa real
 
 Uma captura do MapForge com a loja de sorvete mostrou que o corpo de 97 px
