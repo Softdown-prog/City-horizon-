@@ -373,15 +373,26 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const float z0 = base_z + floor_h * 0.08F;
         const float outer_spring = base_z + floor_h * 0.55F;
         const float outer_arch = floor_h * 0.24F;
+        const QPolygonF outer = archedFace(a, b, center, half, z0, outer_spring, outer_arch, view, canvas);
+        const QPolygonF opening = archedFace(a, b, center, half * 0.72F,
+                                             z0 + floor_h * 0.01F,
+                                             base_z + floor_h * 0.53F,
+                                             floor_h * 0.18F, view, canvas);
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F), 1.15));
         painter.setBrush(scaledColor(spec.trim_color, 0.98F));
-        painter.drawPolygon(archedFace(a, b, center, half, z0, outer_spring, outer_arch, view, canvas));
-        painter.setPen(QPen(scaledColor(spec.wall_color, 0.22F), 1.0));
-        painter.setBrush(scaledColor(spec.wall_color, 0.20F));
-        painter.drawPolygon(archedFace(a, b, center, half * 0.72F,
-                                       z0 + floor_h * 0.01F,
-                                       base_z + floor_h * 0.53F,
-                                       floor_h * 0.18F, view, canvas));
+        painter.drawPolygon(outer);
+
+        // A passage is actual negative space in the sprite, not a black painted
+        // doorway. Clearing the inner arch lets the map/ground behind the
+        // building remain visible through the opening in every rotated view.
+        painter.setCompositionMode(QPainter::CompositionMode_Clear);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::transparent);
+        painter.drawPolygon(opening);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.55F, 185), 0.90));
+        painter.drawPolygon(opening);
     } else if (module.kind == BuildingFacadeModuleKind::StripedAwning) {
         const float z = base_z + floor_h * 0.73F;
         const Point3 n = outwardNormal(edge);
