@@ -9,6 +9,59 @@
 #include <unordered_map>
 #include <vector>
 
+namespace ch {
+
+// Customer-facing product/service prices may use minor currency units without
+// forcing the whole city treasury to migrate away from integer dollars.
+struct ServicePrice {
+    std::int64_t minor_units = 0;
+    std::int64_t units_per_dollar = 1;
+    std::int64_t step_minor_units = 1;
+
+    constexpr ServicePrice() = default;
+    constexpr ServicePrice(const std::int64_t value, const std::int64_t units = 1, const std::int64_t step = 1)
+        : minor_units(value), units_per_dollar(units > 0 ? units : 1), step_minor_units(step > 0 ? step : 1) {}
+
+    constexpr operator std::int64_t() const noexcept { return minor_units; }
+
+    ServicePrice& operator=(const std::int64_t value) noexcept {
+        minor_units = value;
+        return *this;
+    }
+
+    [[nodiscard]] constexpr ServicePrice with_minor_units(const std::int64_t value) const noexcept {
+        return ServicePrice{value, units_per_dollar, step_minor_units};
+    }
+};
+
+// ADL lets runtime UI code keep calling format_money(...) while a ServicePrice
+// receives the correct decimal rendering and ordinary city money stays integer.
+[[nodiscard]] inline std::string format_money(const ServicePrice& price) {
+    const bool negative = price.minor_units < 0;
+    const std::uint64_t magnitude = negative
+        ? static_cast<std::uint64_t>(-(price.minor_units + 1)) + 1U
+        : static_cast<std::uint64_t>(price.minor_units);
+    const std::uint64_t scale = static_cast<std::uint64_t>(price.units_per_dollar > 0 ? price.units_per_dollar : 1);
+    const std::uint64_t whole = magnitude / scale;
+    const std::uint64_t remainder = magnitude % scale;
+
+    std::string digits = std::to_string(whole);
+    for (int index = static_cast<int>(digits.size()) - 3; index > 0; index -= 3) {
+        digits.insert(static_cast<std::size_t>(index), ".");
+    }
+
+    std::string result = negative ? "-$" : "$";
+    result += digits;
+    if (scale == 100U) {
+        result += ".";
+        if (remainder < 10U) result += "0";
+        result += std::to_string(remainder);
+    }
+    return result;
+}
+
+}  // namespace ch
+
 enum class BuildingRotation : std::uint8_t {
     r0 = 0,
     r90 = 1,
@@ -144,10 +197,12 @@ struct BuildingDefinition {
     // reaches its configured total when current population reaches this value.
     std::uint32_t required_population_for_full_revenue = 0;
     // Optional player-controlled customer price. Zero disables service pricing.
+    // Legacy definitions use whole-dollar units; CH_SERVICE_PRICE_V1 may opt a
+    // service into cents while the city treasury remains integer dollars.
     std::string service_name;
-    std::int64_t default_service_price = 0;
-    std::int64_t minimum_service_price = 0;
-    std::int64_t maximum_service_price = 0;
+    ch::ServicePrice default_service_price{};
+    ch::ServicePrice minimum_service_price{};
+    ch::ServicePrice maximum_service_price{};
     // Customer traffic at the default price once the local population reaches
     // service_population_for_full_demand. These values keep shop balancing data-driven.
     std::uint32_t base_service_customers_per_month = 0;
@@ -212,7 +267,7 @@ struct BuildingInstance {
     int current_level = 1;
     bool operational = true;
     // Per-instance customer price so two shops may use different strategies.
-    std::int64_t service_price = 0;
+    ch::ServicePrice service_price{};
 
 
     // Wall and roof are intentionally independent: changing one channel
