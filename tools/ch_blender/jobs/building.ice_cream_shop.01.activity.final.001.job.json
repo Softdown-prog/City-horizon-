@@ -14,5 +14,9 @@
     "--approval-proxy-sha",
     "fdf05021b41ad10566b34b57956c3a49f024f8630c41778e7f664b82ff4ea051"
   ],
-  "outputDir": "out/ch_blender_agent/building.ice_cream_shop.01.activity.final"
+  "outputDir": "out/ch_blender_agent/building.ice_cream_shop.01.activity.final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "fdf05021b41ad10566b34b57956c3a49f024f8630c41778e7f664b82ff4ea051"
+  }
 }
