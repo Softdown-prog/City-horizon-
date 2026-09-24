@@ -1,11 +1,11 @@
-name: Generate 2D Ticket Booth Prototype
+name: Generate Visitor Forge 2D Ticket Booth
 
 on:
   push:
     branches:
       - main
     paths:
-      - "tools/ticket_booth_2d/**"
+      - "tools/visitor_forge_2d/**"
       - ".github/workflows/generate-ticket-booth-2d.yml"
   workflow_dispatch:
 
@@ -22,46 +22,52 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Pillow
-        run: python -m pip install --quiet pillow
+      - name: Install Visitor Forge 2D
+        run: python -m pip install --quiet -e tools/visitor_forge_2d
 
-      - name: Generate SOUTH 2D procedural prototype
+      - name: Generate SOUTH structure with Visitor Forge 2D
         run: |
-          python tools/ticket_booth_2d/generate_ticket_booth.py \
-            --output out/ticket_booth_2d
+          python -m visitor_forge_2d.structure.ticket_booth \
+            --output out/visitor_forge_2d/ticket_booth
 
-      - name: Validate prototype package
+      - name: Validate Visitor Forge 2D structure package
         shell: python
         run: |
+          import hashlib
           import json
           from pathlib import Path
           from PIL import Image
 
-          root = Path("out/ticket_booth_2d")
-          sprite = root / "park_ticket_booth_2d_south.png"
-          review = root / "park_ticket_booth_2d_review.png"
-          manifest_path = root / "park_ticket_booth_2d_manifest.json"
+          root = Path("out/visitor_forge_2d/ticket_booth")
+          sprite = root / "park_ticket_booth_01_south.png"
+          review = root / "park_ticket_booth_01_south_review.png"
+          manifest_path = root / "park_ticket_booth_01_manifest.json"
           for path in (sprite, review, manifest_path):
               if not path.is_file():
                   raise SystemExit(f"missing expected output: {path}")
 
           image = Image.open(sprite).convert("RGBA")
-          if image.size != (512, 512):
+          if image.size != (256, 256):
               raise SystemExit(f"unexpected sprite size: {image.size}")
-          if image.getchannel("A").getextrema()[0] != 0:
-              raise SystemExit("sprite has no transparent background")
+          alpha = image.getchannel("A")
+          if alpha.getbbox() is None or alpha.getextrema()[0] != 0:
+              raise SystemExit("sprite must contain visible art on a transparent canvas")
 
           data = json.loads(manifest_path.read_text(encoding="utf-8"))
-          assert data["contract"] == "CH_TICKET_BOOTH_2D_PROTOTYPE_V1"
-          assert data["status"] == "prototype_review_only"
+          assert data["contract"] == "CH_LAYERED_STRUCTURE_2D_V1"
+          assert data["status"] == "south_visual_gate"
+          assert data["generator"] == "tools/visitor_forge_2d"
           assert data["direction"] == "south"
+          assert data["projection"] == "isometric_2_to_1"
           assert data["footprint"] == {"widthTiles": 2, "depthTiles": 2}
+          assert data["groundIncluded"] is False
           assert data["runtimeApproved"] is False
+          assert data["spriteSha256"] == hashlib.sha256(sprite.read_bytes()).hexdigest()
 
       - name: Upload review artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ticket-Booth-2D-Prototype-${{ github.run_id }}
-          path: out/ticket_booth_2d
+          name: Visitor-Forge-2D-Ticket-Booth-${{ github.run_id }}
+          path: out/visitor_forge_2d/ticket_booth
           if-no-files-found: error
           retention-days: 14
