@@ -1,0 +1,17 @@
+{
+  "poseId": "south_walk_a",
+  "direction": "south",
+  "frameDurationMs": 220,
+  "joints": {
+    "shoulder_left": {"rotationDegrees": 4.0},
+    "shoulder_right": {"rotationDegrees": -4.0},
+    "elbow_left": {"rotationDegrees": 3.0},
+    "elbow_right": {"rotationDegrees": -3.0},
+    "hip_left": {"rotationDegrees": -8.0},
+    "hip_right": {"rotationDegrees": 8.0},
+    "knee_left": {"rotationDegrees": 3.0},
+    "knee_right": {"rotationDegrees": -6.0},
+    "ankle_left": {"rotationDegrees": 2.0},
+    "ankle_right": {"rotationDegrees": -2.0}
+  }
+}

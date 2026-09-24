@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "city-horizon-visitor-forge-2d"
+version = "0.1.0"
+description = "Procedural 2D visitor compositor for City Horizon"
+requires-python = ">=3.11"
+dependencies = [
+  "Pillow>=10.4,<13"
+]
+
+[project.scripts]
+ch-visitor-forge-2d = "visitor_forge_2d.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
