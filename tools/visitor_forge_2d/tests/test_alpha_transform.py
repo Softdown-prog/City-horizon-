@@ -12,7 +12,7 @@ from PIL import Image
 
 from visitor_forge_2d.core import LayerComposer
 from visitor_forge_2d.cli import command_prototype
-from visitor_forge_2d.character import validate_v1_character
+from visitor_forge_2d.character import generate_v1_south_assets, validate_v1_character
 from visitor_forge_2d.core import load_character_definition, load_pose
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +52,30 @@ class AlphaTransformTests(unittest.TestCase):
                 command_prototype(args)
             self.assertTrue((root / "output/visitor_review_test_south_review_strip.png").is_file())
             self.assertTrue((root / "output/visitor_review_test_south_gameplay_strip.png").is_file())
+            self.assertTrue((root / "output/visitor_review_test_south_in_world_review.png").is_file())
+            measurements = json.loads((root / "output/visitor_review_test_south_review_metrics.json").read_text())
+            self.assertLessEqual(measurements["footRowRangePx"], 2)
+            self.assertTrue(all(value > 0 for value in measurements["changedSilhouetteFractionFromIdle"]))
+            self.assertFalse(measurements["artApproved"])
+
+    def test_prototype_preserves_manual_part_until_explicit_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            generate_v1_south_assets(root)
+            part = root / "visitor_male_01/south/torso.png"
+            with Image.open(part) as image:
+                edited = image.copy()
+            edited.putpixel((70, 75), (255, 0, 0, 255))
+            edited.save(part)
+            manual_bytes = part.read_bytes()
+
+            generate_v1_south_assets(root)
+            self.assertEqual(part.read_bytes(), manual_bytes)
+            manifest = json.loads((part.parent / "generated_parts.json").read_text())
+            self.assertIn("torso.png", manifest["preservedOverrides"])
+
+            generate_v1_south_assets(root, overwrite=True)
+            self.assertNotEqual(part.read_bytes(), manual_bytes)
 
 
 if __name__ == "__main__":

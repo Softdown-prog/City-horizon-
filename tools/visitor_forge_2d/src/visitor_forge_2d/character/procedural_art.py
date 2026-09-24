@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Callable
 
@@ -374,14 +376,34 @@ def build_v1_south_parts() -> dict[str, Image.Image]:
     return parts
 
 
-def generate_v1_south_assets(asset_root: str | Path) -> list[Path]:
-    """Write the deterministic V1 source parts used by the layer compositor."""
+def generate_v1_south_assets(asset_root: str | Path, *, overwrite: bool = False) -> list[Path]:
+    """Refresh generated parts without overwriting manually refined PNGs."""
     destination = Path(asset_root) / CHARACTER_ID / DIRECTION
     destination.mkdir(parents=True, exist_ok=True)
+    manifest_path = destination / "generated_parts.json"
+    previous = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    previous_hashes = previous.get("generatedHashes", {})
+    if not isinstance(previous_hashes, dict):
+        raise ValueError(f"Invalid generated-parts manifest: {manifest_path}")
+
+    def digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
 
     written: list[Path] = []
+    generated_hashes: dict[str, str] = {}
+    preserved: list[str] = []
     for part_id, image in build_v1_south_parts().items():
         path = destination / f"{part_id}.png"
-        image.convert("RGBA").save(path, format="PNG", optimize=False)
+        if path.exists() and not overwrite and previous_hashes.get(path.name) != digest(path):
+            preserved.append(path.name)
+        else:
+            image.convert("RGBA").save(path, format="PNG", optimize=False)
+            generated_hashes[path.name] = digest(path)
         written.append(path)
+    manifest_path.write_text(json.dumps({
+        "contract": "CH_VISITOR_2D_GENERATED_PARTS_V1",
+        "styleContract": STYLE_CONTRACT,
+        "generatedHashes": generated_hashes,
+        "preservedOverrides": preserved,
+    }, indent=2) + "\n", encoding="utf-8")
     return written

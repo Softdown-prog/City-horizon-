@@ -162,11 +162,24 @@ O comando `prototype` produz também:
 
 - `visitor_male_01_south_review_strip.png`;
 - `visitor_male_01_south_gameplay_strip.png`.
+- `visitor_male_01_south_in_world_review.png` (128 px reais sobre fundo neutro ou terreno fornecido);
+- `visitor_male_01_south_review_metrics.json` (bounds do corpo, pés, variação de silhueta e anchor).
 
 Esses strips existem para comparar as três poses sem precisar integrar nada ao jogo.
 Os nomes dos strips usam `characterId` e direção da definição. O comando rejeita
 IDs de pose repetidos antes da exportação, evitando sobrescrever um frame.
 O strip ampliado usa a mesma redução com alpha premultiplicado dos PNGs de gameplay.
+Para revisar no terreno do jogo, acrescente `--background assets/terrain/grass_isometric_01.png`.
+O fundo é só visualização e nunca entra no PNG RGBA exportado.
+
+### Refinamento manual sem perda de trabalho
+
+Cada biblioteca gerada registra os hashes em `generated_parts.json`. Uma nova execução
+atualiza peças ainda iguais às geradas e **preserva PNGs desconhecidos ou editados**.
+Assim, é possível começar com o desenho procedural e pintar uma peça específica sem
+que o próximo `prototype` a substitua. `--overwrite-parts` força a reconstrução de
+todas as peças; use somente quando quiser descartar esses refinamentos.
+Em bibliotecas antigas sem manifesto, os PNGs existentes são preservados por segurança.
 
 ## Metadata de saída
 
@@ -195,6 +208,18 @@ Antes de qualquer expansão para EAST/WEST/NORTH ou visitantes femininos, o conj
 3. comparação dentro do mapa sobre calçada/rua e próximo a construções.
 
 Se o personagem só ficar bom ampliado, a V1 ainda não está aprovada.
+As medidas do relatório são diagnósticas: anchor e amplitude coerentes não certificam
+silhueta, roupa, perspectiva ou qualidade de arte.
+
+## Próximos passos artísticos
+
+O protótipo atual ainda não atinge a referência: a pose SOUTH permanece frontal e
+as massas da roupa/membros parecem recortes rígidos em escala real. Antes de multiplicar
+personagens, desenhar e aprovar **uma** biblioteca de peças para um visitante em 3/4,
+incluindo roupa, cabelo e rosto em planos claros. O procedural deve controlar rig,
+proporção, paleta e variações pequenas; mudanças reais de figurino e silhueta pedem
+peças desenhadas próprias. Depois, criar bibliotecas específicas para EAST/WEST/NORTH
+com o mesmo anchor e um preview sobre o mapa. Não derivar essas vistas espelhando SOUTH.
 
 ## Integração futura
 
@@ -204,6 +229,6 @@ O núcleo genérico também poderá ser reaproveitado por funcionários, vendedo
 
 ## Status
 
-**Estado atual:** núcleo procedural V0.1 + primeiro gerador visual SOUTH implementados. A ferramenta já consegue construir as próprias partes 2D, compor `idle`, `walk A`, `walk B` e produzir strips de revisão. Ainda é um gate artístico; nada foi promovido ao runtime.
+**Estado atual:** núcleo procedural V0.1 + candidato visual SOUTH implementados. A ferramenta constrói partes 2D, compõe `idle`, `walk A`, `walk B`, preserva peças pintadas e produz comparações em escala real. Ainda é um gate artístico; nada foi promovido ao runtime.
 
 **Próxima tarefa:** executar e revisar o primeiro strip produzido pelo pipeline real, ajustar proporções/silhueta/3/4 até o visitante chegar ao padrão visual desejado e somente depois congelar o estilo V1.

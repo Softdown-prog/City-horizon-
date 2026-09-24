@@ -11,11 +11,17 @@ from .character import (
     generate_v1_south_assets,
     validate_v1_character,
 )
+from .character.review import frame_measurements, gameplay_review
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
 def _load_poses(paths: list[str]) -> list:
     return [load_pose(path) for path in paths]
+
+
+def _part_manifest(generated: list[Path]) -> tuple[Path, dict]:
+    manifest_path = generated[0].parent / "generated_parts.json"
+    return manifest_path, json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
 def command_validate(args: argparse.Namespace) -> int:
@@ -38,12 +44,15 @@ def command_validate(args: argparse.Namespace) -> int:
 
 
 def command_build_assets(args: argparse.Namespace) -> int:
-    written = generate_v1_south_assets(args.asset_root)
+    written = generate_v1_south_assets(args.asset_root, overwrite=getattr(args, "overwrite_parts", False))
+    manifest_path, manifest = _part_manifest(written)
     summary = {
         "status": "ok",
         "styleContract": STYLE_CONTRACT,
         "assetRoot": str(Path(args.asset_root)),
         "outputs": [str(path) for path in written],
+        "partManifest": str(manifest_path),
+        "preservedParts": manifest["preservedOverrides"],
     }
     print(json.dumps(summary, indent=2))
     return 0
@@ -99,7 +108,8 @@ def _horizontal_sheet(images: list[Image.Image], *, gap: int = 12) -> Image.Imag
 
 
 def command_prototype(args: argparse.Namespace) -> int:
-    generated = generate_v1_south_assets(args.asset_root)
+    generated = generate_v1_south_assets(args.asset_root, overwrite=getattr(args, "overwrite_parts", False))
+    manifest_path, manifest = _part_manifest(generated)
     working_frames, produced = _compose_and_export(
         args.definition,
         args.pose,
@@ -127,13 +137,31 @@ def command_prototype(args: argparse.Namespace) -> int:
     gameplay_path = output_dir / f"{strip_name}_gameplay_strip.png"
     gameplay_sheet.save(gameplay_path, format="PNG", optimize=False)
 
+    background = None
+    if getattr(args, "background", None):
+        with Image.open(args.background) as terrain:
+            background = terrain.convert("RGBA")
+    in_world_path = output_dir / f"{strip_name}_in_world_review.png"
+    gameplay_review(gameplay_frames, background).save(in_world_path, format="PNG", optimize=False)
+
+    measurements = frame_measurements(
+        gameplay_frames,
+        (definition.canvas.anchor.x, definition.canvas.anchor.y),
+    )
+    metrics_path = output_dir / f"{strip_name}_review_metrics.json"
+    metrics_path.write_text(json.dumps(measurements, indent=2) + "\n", encoding="utf-8")
+
     summary = {
         "status": "ok",
         "styleContract": STYLE_CONTRACT,
         "generatedParts": [str(path) for path in generated],
+        "partManifest": str(manifest_path),
+        "preservedParts": manifest["preservedOverrides"],
         "outputs": [str(path) for path in produced],
         "reviewStrip": str(review_path),
         "gameplayStrip": str(gameplay_path),
+        "inWorldReview": str(in_world_path),
+        "reviewMeasurements": str(metrics_path),
         "runtimePromotion": False,
         "nextGate": "visual review at gameplay scale before EAST/WEST/NORTH",
     }
@@ -158,6 +186,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="generate the deterministic V1 SOUTH 2D source-part library",
     )
     build_assets.add_argument("--asset-root", required=True)
+    build_assets.add_argument("--overwrite-parts", action="store_true", help="Replace even manually edited source PNGs")
     build_assets.set_defaults(func=command_build_assets)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
@@ -174,7 +203,9 @@ def build_parser() -> argparse.ArgumentParser:
     prototype.add_argument("--definition", required=True)
     prototype.add_argument("--pose", action="append", required=True)
     prototype.add_argument("--asset-root", required=True)
+    prototype.add_argument("--overwrite-parts", action="store_true", help="Replace even manually edited source PNGs")
     prototype.add_argument("--output", required=True)
+    prototype.add_argument("--background", help="Optional terrain PNG for a native-size review strip")
     prototype.set_defaults(func=command_prototype)
 
     return parser
