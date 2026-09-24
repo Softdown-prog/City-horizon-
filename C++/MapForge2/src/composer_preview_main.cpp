@@ -183,21 +183,76 @@ int main(int argc, char** argv) {
     };
     if (!writeAsset(output_dir, "building_composer_facade_floor_gate", facade_gate)) return 7;
 
+    // Park ticket booth: authored entirely as a reusable Building Composer recipe.
+    // No standalone renderer and no Blender source are involved. The same 2x2
+    // structure is rotated by the Composer for all four game directions.
+    ch::studio::BuildingComposerSpec ticket_booth = residence;
+    ticket_booth.footprint_width_tiles = 2;
+    ticket_booth.footprint_depth_tiles = 2;
+    ticket_booth.floor_count = 1;
+    ticket_booth.floor_height_px = 84;
+    ticket_booth.wall_height_px = 84;
+    ticket_booth.floor_bands_enabled = false;
+    ticket_booth.roof_style = ch::studio::BuildingRoofStyle::Pyramid;
+    ticket_booth.roof_height_px = 48;
+    ticket_booth.roof_pitch_degrees = 42.0F;
+    ticket_booth.roof_overhang = 0.12F;
+    ticket_booth.roof_fascia_thickness_px = 3.2F;
+    ticket_booth.roof_chimney = false;
+    ticket_booth.wall_color = QColor("#e8dbbe");
+    ticket_booth.roof_color = QColor("#c73f31");
+    ticket_booth.trim_color = QColor("#f7ebd1");
+    ticket_booth.glass_color = QColor("#305b91");
+    ticket_booth.door_color = QColor("#af702b");
+    ticket_booth.accent_color = QColor("#d34130");
+    ticket_booth.secondary_accent_color = QColor("#2c7b32");
+    ticket_booth.ornament_color = QColor("#e3a630");
+    ticket_booth.wall_material = ch::studio::BuildingWallMaterial::Plaster;
+    ticket_booth.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
+    ticket_booth.material_strength = 0.50F;
+    ticket_booth.material_scale = 0.85F;
+    ticket_booth.material_variation = 0.25F;
+    ticket_booth.material_contrast = 0.48F;
+    ticket_booth.material_seed = 149;
+    ticket_booth.windows = false;
+    ticket_booth.south_door = false;
+    ticket_booth.south_awning = false;
+    ticket_booth.south_sign = false;
+    ticket_booth.sidewalk_enabled = false;
+    ticket_booth.road_socket_enabled = false;
+    ticket_booth.facade_editor_enabled = true;
+    ticket_booth.facade_modules = {
+        {Kind::CornerQuoins, Edge::South, 0, 0.50F, 0.90F, true},
+        {Kind::CornerQuoins, Edge::East, 0, 0.50F, 0.90F, true},
+        {Kind::CornerQuoins, Edge::North, 0, 0.50F, 0.90F, true},
+        {Kind::CornerQuoins, Edge::West, 0, 0.50F, 0.90F, true},
+        {Kind::TicketWindow, Edge::South, 0, 0.23F, 0.34F, true},
+        {Kind::StripedAwning, Edge::South, 0, 0.23F, 0.40F, true},
+        {Kind::ArchedPassage, Edge::South, 0, 0.72F, 0.42F, true},
+        {Kind::CurvedPediment, Edge::South, 0, 0.72F, 0.36F, true},
+        {Kind::EaveTrim, Edge::South, 0, 0.50F, 0.96F, true},
+        {Kind::EaveTrim, Edge::East, 0, 0.50F, 0.96F, true},
+        {Kind::EaveTrim, Edge::North, 0, 0.50F, 0.96F, true},
+        {Kind::EaveTrim, Edge::West, 0, 0.50F, 0.96F, true},
+        {Kind::RoofFlag, Edge::South, 0, 0.50F, 0.08F, true},
+    };
+    if (!writeAsset(output_dir, "building_composer_ticket_booth", ticket_booth)) return 8;
+
     const QString block_gate_path = QDir(output_dir).filePath(QStringLiteral("building_composer_small_block_gate.png"));
     if (!ch::studio::BuildingBlockPreviewRenderer::render(facade_gate, QSize(960, 560), 401).save(block_gate_path, "PNG")) {
         std::cerr << "Unable to save small block preview gate.\n";
-        return 8;
+        return 9;
     }
     std::cout << block_gate_path.toStdString() << "\n";
 
     const QString lod_gate_path = QDir(output_dir).filePath(QStringLiteral("building_composer_lod_gate.png"));
     if (!ch::studio::BuildingLodValidator::renderReviewSheet(facade_gate, QSize(960, 420)).save(lod_gate_path, "PNG")) {
         std::cerr << "Unable to save LOD visual gate.\n";
-        return 9;
+        return 10;
     }
     std::cout << lod_gate_path.toStdString() << "\n";
 
-    if (!writeVisualReferenceGate(output_dir)) return 10;
+    if (!writeVisualReferenceGate(output_dir)) return 11;
 
     std::cout << "Building Composer visual gates generated.\n";
     return 0;
