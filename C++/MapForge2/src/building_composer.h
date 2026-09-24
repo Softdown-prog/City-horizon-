@@ -21,7 +21,26 @@ enum class BuildingRoofMaterial { Solid, CeramicTile, MetalSeam, AsphaltShingle 
 enum class BuildingStreetEdge { South, East, North, West };
 enum class BuildingRoadSocketType { LocalStreet, Avenue, ServiceRoad };
 enum class BuildingFootprintShape { Rectangle, LShape, Courtyard, Annex };
-enum class BuildingFacadeModuleKind { Window, Door, Storefront, Sign, Awning, DoubleDoor, GarageDoor, Balcony, Marquee, Hvac, Planter };
+enum class BuildingFacadeModuleKind {
+    Window,
+    Door,
+    Storefront,
+    Sign,
+    Awning,
+    DoubleDoor,
+    GarageDoor,
+    Balcony,
+    Marquee,
+    Hvac,
+    Planter,
+    TicketWindow,
+    ArchedPassage,
+    StripedAwning,
+    CurvedPediment,
+    CornerQuoins,
+    EaveTrim,
+    RoofFlag,
+};
 enum class BuildingTypology {
     Custom,
     SmallHouse,
@@ -100,6 +119,8 @@ struct BuildingComposerSpec {
     QColor glass_color = QColor("#78b9d1");
     QColor door_color = QColor("#6d4c41");
     QColor accent_color = QColor("#d79b38");
+    QColor secondary_accent_color = QColor("#3f7f49");
+    QColor ornament_color = QColor("#e3a630");
 
     bool windows = true;
     bool south_door = true;
@@ -210,6 +231,13 @@ public:
             case BuildingFacadeModuleKind::Marquee: return QStringLiteral("marquee");
             case BuildingFacadeModuleKind::Hvac: return QStringLiteral("hvac");
             case BuildingFacadeModuleKind::Planter: return QStringLiteral("planter");
+            case BuildingFacadeModuleKind::TicketWindow: return QStringLiteral("ticket_window");
+            case BuildingFacadeModuleKind::ArchedPassage: return QStringLiteral("arched_passage");
+            case BuildingFacadeModuleKind::StripedAwning: return QStringLiteral("striped_awning");
+            case BuildingFacadeModuleKind::CurvedPediment: return QStringLiteral("curved_pediment");
+            case BuildingFacadeModuleKind::CornerQuoins: return QStringLiteral("corner_quoins");
+            case BuildingFacadeModuleKind::EaveTrim: return QStringLiteral("eave_trim");
+            case BuildingFacadeModuleKind::RoofFlag: return QStringLiteral("roof_flag");
         }
         return QStringLiteral("window");
     }
@@ -227,6 +255,13 @@ public:
             case BuildingFacadeModuleKind::Marquee: return QStringLiteral("marquee.flat_canopy.v1");
             case BuildingFacadeModuleKind::Hvac: return QStringLiteral("hvac.wall_unit.v1");
             case BuildingFacadeModuleKind::Planter: return QStringLiteral("planter.facade_box.v1");
+            case BuildingFacadeModuleKind::TicketWindow: return QStringLiteral("window.ticket_counter.v1");
+            case BuildingFacadeModuleKind::ArchedPassage: return QStringLiteral("passage.arch_open.v1");
+            case BuildingFacadeModuleKind::StripedAwning: return QStringLiteral("awning.striped_canvas.v1");
+            case BuildingFacadeModuleKind::CurvedPediment: return QStringLiteral("pediment.curved_medallion.v1");
+            case BuildingFacadeModuleKind::CornerQuoins: return QStringLiteral("trim.corner_quoins.v1");
+            case BuildingFacadeModuleKind::EaveTrim: return QStringLiteral("roof.eave_trim.v1");
+            case BuildingFacadeModuleKind::RoofFlag: return QStringLiteral("roof.flag_finial.v1");
         }
         return QStringLiteral("window.classic_framed.v1");
     }
