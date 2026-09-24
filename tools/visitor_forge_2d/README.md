@@ -192,6 +192,8 @@ ch-visitor-forge-2d prototype \
 
 O arquivo `visitor_male_01_south_concept_comparison.png` mostra à esquerda o
 `south_idle` procedural e à direita o conceito, ambos no canvas real de 128 px.
+Uma captura inicial sobre o fundo neutro está versionada em
+`art/concepts/visitor_male_01_south_comparison.png`.
 O resumo inclui caminho, SHA-256 e bounds do conceito. É possível acrescentar
 `--background` para comparar sobre um terreno do jogo. O PNG do conceito é um
 alvo artístico estático, não uma fonte de peças para `--art-root`, nem um frame
