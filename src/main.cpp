@@ -3050,7 +3050,11 @@ int main() {
                         const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
                             mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 : 5;
                         pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
-                        pedestrians.configure_visual_test(pedestrian_visual_preset(0.80F));
+                        // Two SOUTH walk frames cover a short planted step at
+                        // 220 ms each. Keep this opt-in frontal candidate slow
+                        // enough for the feet to read against world movement.
+                        const float preview_speed = pedestrian_visual_index == 4 ? 0.30F : 0.80F;
+                        pedestrians.configure_visual_test(pedestrian_visual_preset(preview_speed));
                         status = std::string("PEDESTRIAN LOOK: ") + std::string(pedestrian_visual_label());
                         break;
                     }

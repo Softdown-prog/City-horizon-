@@ -1,6 +1,6 @@
 {
   "id": "visitor_male_01_south_front_candidate",
-  "status": "visual_candidate_not_approved",
+  "status": "south_appearance_approved_walk_pending_runtime_review",
   "clips": [
     {
       "id": "idle_south",

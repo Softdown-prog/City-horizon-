@@ -285,8 +285,11 @@ rosto, as proporções e o acabamento; não substituíram os PNGs versionados.
 Um estudo posterior está em `art/concepts/south_front_candidate_v1/`: traz
 master frontal, `idle/walk A/walk B` e comparações no tamanho real e a 56 px.
 Ele pode ser escolhido separadamente no teste F8 quando o build habilita
-`CH_VISITOR_FORGE_PREVIEW=ON`. Ainda é candidato para revisão, não substitui
-o SOUTH atual e precisa ser comparado com o personagem original em movimento.
+`CH_VISITOR_FORGE_PREVIEW=ON`. A aparência frontal foi aprovada; as novas
+poses próprias alternam pé de apoio e balanço dos braços, preservando a linha
+115 dos pés. O teste da caminhada em movimento no motor ainda está pendente:
+o candidato não substitui o SOUTH atual até observar o contato e calibrar a
+velocidade no jogo.
 
 Um novo desenho SOUTH precisa manter o mesmo personagem, paleta, textura e
 silhueta na escala de jogo; rosto e peito devem ler como frente, sem apontar
