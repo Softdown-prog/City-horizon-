@@ -1,0 +1,82 @@
+{
+  "id": "ice_cream_shop_01",
+  "name": "Sorveteria",
+  "category": "commercial",
+  "texture": "assets/buildings/ice_cream_shop/ice_cream_shop_south.png",
+  "sprites": {
+    "0": "assets/buildings/ice_cream_shop/ice_cream_shop_south.png",
+    "1": "assets/buildings/ice_cream_shop/ice_cream_shop_west.png",
+    "2": "assets/buildings/ice_cream_shop/ice_cream_shop_north.png",
+    "3": "assets/buildings/ice_cream_shop/ice_cream_shop_east.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.500000048828125,
+      "y": 0.61926484375
+    },
+    "1": {
+      "x": 0.500000048828125,
+      "y": 0.61926484375
+    },
+    "2": {
+      "x": 0.500000048828125,
+      "y": 0.61926484375
+    },
+    "3": {
+      "x": 0.500000048828125,
+      "y": 0.61926484375
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable",
+  "resourceInputs": [],
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage",
+    "sprites": {
+      "0": "assets/buildings/ice_cream_shop/ice_cream_shop_south_mask.png",
+      "1": "assets/buildings/ice_cream_shop/ice_cream_shop_west_mask.png",
+      "2": "assets/buildings/ice_cream_shop/ice_cream_shop_north_mask.png",
+      "3": "assets/buildings/ice_cream_shop/ice_cream_shop_east_mask.png"
+    }
+  },
+  "activityOverlay": {
+    "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
+    "enabled": true,
+    "sprites": {
+      "0": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_south.png",
+      "1": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_west.png",
+      "2": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_north.png",
+      "3": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_east.png"
+    },
+    "animation": {
+      "frameCount": 8,
+      "frameDurationMs": 250,
+      "layout": "horizontal",
+      "playback": "loop",
+      "idleFrame": 0,
+      "actionStartFrame": 0,
+      "actionFrameCount": 8
+    }
+  }
+}

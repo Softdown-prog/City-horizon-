@@ -768,6 +768,49 @@ void render_building(SDL_Renderer* renderer, const BuildingDefinition& definitio
                                      alpha, red, green, blue);
 }
 
+
+void render_building_activity_overlay(SDL_Renderer* renderer, const BuildingDefinition& definition,
+                                      const BuildingInstance& instance, const BuildingRotation visual_rotation,
+                                      const TextureCache& textures, const std::filesystem::path& asset_root,
+                                      const Camera& camera, const float viewport_width, const float viewport_height) {
+    if (!instance.activity_active() || !definition.activity_overlay || !definition.activity_overlay->enabled) return;
+    const std::size_t rotation_index = static_cast<std::size_t>(visual_rotation);
+    if (rotation_index >= definition.activity_overlay->sprite_paths.size()) return;
+    const std::string& relative_path = definition.activity_overlay->sprite_paths[rotation_index];
+    if (relative_path.empty()) return;
+    const TextureAsset* texture = textures.find(asset_root / relative_path);
+    if (texture == nullptr || texture->texture == nullptr) return;
+
+    const BuildingAnimationDefinition* animation = definition.activity_overlay->animation
+        ? &*definition.activity_overlay->animation : nullptr;
+    const int frame_count = animation == nullptr ? 1 : std::max(1, animation->frame_count);
+    const int frame_duration_ms = animation == nullptr ? 1 : std::max(1, animation->frame_duration_ms);
+    int frame_index = 0;
+    if (frame_count > 1) {
+        const Uint64 elapsed_ms = SDL_GetTicks();
+        if (animation->playback == "ambient_once") {
+            frame_index = std::min(frame_count - 1, static_cast<int>(elapsed_ms / static_cast<Uint64>(frame_duration_ms)));
+        } else {
+            frame_index = static_cast<int>((elapsed_ms / static_cast<Uint64>(frame_duration_ms)) % static_cast<Uint64>(frame_count));
+        }
+    }
+
+    const float frame_width = texture->source_width / static_cast<float>(frame_count);
+    const float frame_height = texture->source_height;
+    const SDL_FRect source = {frame_width * static_cast<float>(frame_index), 0.0F, frame_width, frame_height};
+    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+    const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
+    const SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
+    const float scale = definition.art_scale * camera.zoom;
+    const SDL_FRect destination = {
+        anchor.x - frame_width * scale * definition.anchor_x_for(visual_rotation, instance.current_level),
+        anchor.y - frame_height * scale * definition.anchor_y_for(visual_rotation, instance.current_level),
+        frame_width * scale,
+        frame_height * scale,
+    };
+    SDL_RenderTexture(renderer, texture->texture, &source, &destination);
+}
+
 void render_anchor_cross(SDL_Renderer* renderer, const SDL_FPoint point, const float radius,
                          const Uint8 red, const Uint8 green, const Uint8 blue) {
     SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
@@ -897,6 +940,8 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                         }
                     }
                 }
+                render_building_activity_overlay(renderer, *definition, *draw.building, visual_rotation,
+                                                 textures, root, camera, viewport_width, viewport_height);
             }
             continue;
         }
@@ -1390,6 +1435,12 @@ int main() {
                         const auto mask_path = asset_root / definition.color_mask_path_for(logical_rotation);
                         (void)textures.load_mask_channel(renderer, mask_path, 'R');
                         (void)textures.load_mask_channel(renderer, mask_path, 'G');
+                    }
+                    if (lvl.level == 1 && definition.activity_overlay && definition.activity_overlay->enabled) {
+                        const std::string& overlay_path = definition.activity_overlay->sprite_paths[rotation];
+                        if (!overlay_path.empty()) {
+                            (void)textures.load(renderer, asset_root / overlay_path);
+                        }
                     }
                 }
             }
@@ -2869,6 +2920,30 @@ int main() {
                     case SDL_SCANCODE_F9:
                         (void)load_current_city(false);
                         break;
+                    case SDL_SCANCODE_F8: {
+                        if (!selected_instance_id) {
+                            status = "ACTIVITY TEST: SELECT A BUILDING FIRST";
+                            break;
+                        }
+                        const BuildingInstance* selected = buildings.find_by_id(*selected_instance_id);
+                        const BuildingDefinition* definition = selected == nullptr ? nullptr : catalog.find(selected->definition_id);
+                        if (selected == nullptr || definition == nullptr || !definition->activity_overlay || !definition->activity_overlay->enabled) {
+                            status = "ACTIVITY TEST: SELECT A BUILDING WITH OVERLAY";
+                            break;
+                        }
+                        const bool was_active = selected->activity_active();
+                        if (was_active) {
+                            while (true) {
+                                const BuildingInstance* current = buildings.find_by_id(*selected_instance_id);
+                                if (current == nullptr || !current->activity_active()) break;
+                                (void)buildings.end_activity(*selected_instance_id);
+                            }
+                        } else {
+                            (void)buildings.begin_activity(*selected_instance_id);
+                        }
+                        status = std::string("ICE CREAM ACTIVITY TEST: ") + (was_active ? "OFF" : "ON");
+                        break;
+                    }
                     case SDL_SCANCODE_F10: {
                         // Developer-only, read-only scenario load.  It never overwrites
                         // the player save and exists solely to vet asset geometry before

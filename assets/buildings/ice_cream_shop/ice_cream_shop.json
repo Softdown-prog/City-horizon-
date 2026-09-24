@@ -1,0 +1,91 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.ice_cream_shop.01",
+  "displayName": "Sorveteria",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    320,
+    288
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2,
+    "occupiedCells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  "approvedForRuntime": true,
+  "sourceCommit": "b62d61e94e1828b7268afe9f2f9986f00f9568b5",
+  "sourceWorkflowRun": 35938008873,
+  "sourceArtifactId": 10784398293,
+  "approvedProxySha256": "688cc86ec243b0db741a831e1b0dccdcca8b039d8ecce2b8d7c7a2ee278c7e4e",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage",
+    "runtimeTintingImplemented": true
+  },
+  "activityOverlay": {
+    "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
+    "frameCount": 8,
+    "frameDurationMs": 250,
+    "layout": "horizontal",
+    "playback": "loop",
+    "sourceCommit": "8073b3a30cc8dcc5317d00c1897c9cf4e00d5b56",
+    "sourceWorkflowRun": 35938018823,
+    "sourceArtifactId": 10784607433,
+    "approvedProxySha256": "fdf05021b41ad10566b34b57956c3a49f024f8630c41778e7f664b82ff4ea051",
+    "sprites": {
+      "south": "ice_cream_shop_activity_south.png",
+      "east": "ice_cream_shop_activity_east.png",
+      "west": "ice_cream_shop_activity_west.png",
+      "north": "ice_cream_shop_activity_north.png"
+    }
+  },
+  "sha256": {
+    "ice_cream_shop_4view.png": "cb2a411319d0c97f560e50f7b4308fe556ba626784865551fd239a5a0dfc7f8a",
+    "ice_cream_shop_activity_east.png": "df67cdce6a81e70ab0f4a429add60d2aa2c7421940dc796cdd89a864bfa461f2",
+    "ice_cream_shop_activity_north.png": "d700fa596df1a09a1f6dfa42ddd7851eb87d849d1215d0c16985019a46831649",
+    "ice_cream_shop_activity_south.png": "ac9b8e689d2509671b81d7079d1b06441afcfdecd8fcfb35f0ee5aa00f4ca029",
+    "ice_cream_shop_activity_west.png": "226ba257d38548b17c18114c8205a1d05ef144f4f18114a999dec492d5304e02",
+    "ice_cream_shop_east.png": "f73b84c44299f8d91980508fd9fd6bdb493023e6a3eb0a395b1aaa4cd4aaac70",
+    "ice_cream_shop_east_mask.png": "bf7633cc6c8ad2d9cdaf8fd8dc7a3071c33ae278f1e17b41bcd775a286bb9090",
+    "ice_cream_shop_mask_4view.png": "1466b89b26ad22484a8e025a6c88c12f893e00fccc83e84046b9cff01e1081be",
+    "ice_cream_shop_mask_review.png": "f99156ce02484620d8e68860961afe13f884539bd5f02496bcabf14a9c387bdf",
+    "ice_cream_shop_north.png": "93a371bef0b633e1bad24f649bd59f3f5e8cbe7a4079f702e3db4fb35b60b05c",
+    "ice_cream_shop_north_mask.png": "7046ebd4ea5d5ab35d19a9a9afaba5a43e1e90a8f375291a366e7efa9aa86b88",
+    "ice_cream_shop_south.png": "0c30c0726fe0b1ce0de68018069a3a54b327b15c8e5e30d6309082f727a57b2e",
+    "ice_cream_shop_south_mask.png": "19ed62e2107cfd162756eee2fa065ae2f61cb3307e5cba459e5b952b7406db52",
+    "ice_cream_shop_west.png": "9dd8f859664c58a6b6bf39a8653272be5a9a00c5ae125776c559baff3c2246a7",
+    "ice_cream_shop_west_mask.png": "66e8b42ec93108b56430d0bfe5757c3ba2b53d603c4df7958349f3a8719437e2"
+  }
+}
