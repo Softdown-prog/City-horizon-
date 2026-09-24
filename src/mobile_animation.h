@@ -45,6 +45,8 @@ struct MobileAnimationPlayer {
 class MobileAnimationCatalog {
 public:
     [[nodiscard]] bool load_from_directory(const std::filesystem::path& directory);
+    // Add isolated preview sets without replacing approved animation definitions.
+    [[nodiscard]] bool append_from_directory(const std::filesystem::path& directory);
     [[nodiscard]] const MobileAnimationSet* find_set(std::string_view id) const;
     [[nodiscard]] const MobileAnimationClip* resolve_clip(std::string_view set_id, std::string_view state,
                                                            MobileEntityDirection direction) const;

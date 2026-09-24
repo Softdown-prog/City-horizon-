@@ -100,6 +100,11 @@ namespace {
 
 bool MobileAnimationCatalog::load_from_directory(const std::filesystem::path& directory) {
     sets_.clear();
+    return append_from_directory(directory);
+}
+
+bool MobileAnimationCatalog::append_from_directory(const std::filesystem::path& directory) {
+    bool added = false;
     std::error_code error;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(directory, error)) {
         if (error || !entry.is_regular_file() || entry.path().extension() != ".json") continue;
@@ -129,9 +134,12 @@ bool MobileAnimationCatalog::load_from_directory(const std::filesystem::path& di
                 if (!fallback.state.empty() && !fallback.fallback_state.empty()) set.fallbacks.push_back(std::move(fallback));
             }
         }
-        if (!set.clips.empty()) sets_.push_back(std::move(set));
+        if (!set.clips.empty() && find_set(set.id) == nullptr) {
+            sets_.push_back(std::move(set));
+            added = true;
+        }
     }
-    return !sets_.empty();
+    return added;
 }
 
 const MobileAnimationSet* MobileAnimationCatalog::find_set(const std::string_view id) const {

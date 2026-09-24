@@ -309,6 +309,27 @@ altura visual da porta e ainda permite ler as quatro direções. Confirmar a
 escala na engine com calçadas, perspectiva/oclusão e outros edifícios antes
 de fixar o tamanho de exibição ou promover qualquer sprite.
 
+### Prévia em movimento na engine
+
+O catálogo de prévia em `runtime_preview/visitor_male_01.json` referencia os
+12 PNGs de `art/concepts/frames_preview/`, sem copiar ou classificar esses
+sprites em `assets/`. A engine carrega esse catálogo adicionalmente às
+animações aprovadas. O visitante só aparece ao selecioná-lo no teste de
+pedestres com **F8** (quarto visual, após as três opções existentes). Use
+**F7** em um mapa com seis tiles de rua em linha na direção +X para fazê-lo
+caminhar na borda da calçada. Pressione F7 de novo para comparar velocidades
+de 0,50, 0,65 e 0,80 tile/s; F8 volta ao visual inicial depois do candidato.
+Para rever NORTH, SOUTH e WEST, marque início e fim em ruas com F3 e F4,
+respectivamente, e inicie o percurso com F6; a direção vem da rota existente.
+
+O frame é 128×128, a altura ocupada pelo corpo é 97 px, e a escala da
+prévia é `56/97` em zoom 1. O pivô dos pés fica em `[64,116]` em todas as
+poses; o ciclo alterna `walk A/B` a cada 220 ms. As outras opções F7/F8
+conservam escala, pivô e cadência anteriores. Conferir na engine as quatro
+direções, o contato com o chão durante o passo, oclusão junto a construções
+e textura no zoom real. Essa ligação de depuração não aprova a arte nem muda
+o personagem usado normalmente pelo jogo.
+
 ### Refinamento manual sem perda de trabalho
 
 Cada biblioteca gerada registra os hashes em `generated_parts.json`. Uma nova execução

@@ -1452,7 +1452,10 @@ int main() {
         std::cerr << "No valid service vehicle definitions were loaded.\n";
     }
     MobileAnimationCatalog mobile_animations;
-    if (!mobile_animations.load_from_directory(asset_root / "assets/definitions/animations")) {
+    const bool approved_animations_loaded = mobile_animations.load_from_directory(asset_root / "assets/definitions/animations");
+    // Visitor Forge remains a review candidate: only the F8 test selects this set.
+    const bool preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/visitor_forge_2d/runtime_preview");
+    if (!approved_animations_loaded && !preview_animations_loaded) {
         std::cerr << "No valid mobile animation sets were loaded; directional static sprites remain available.\n";
     }
     for (const ServiceVehicleDefinition& definition : service_vehicle_catalog.definitions()) {
@@ -1676,6 +1679,7 @@ int main() {
         switch (pedestrian_visual_index) {
             case 1: return "citizen_female_light_blue";
             case 2: return "citizen_female_dark_coral";
+            case 3: return "visitor_male_01_forge_preview";
             default: return "worker_cleaner_female";
         }
     };
@@ -1683,19 +1687,32 @@ int main() {
         switch (pedestrian_visual_index) {
             case 1: return "CITIZEN LIGHT BLUE";
             case 2: return "CITIZEN DARK CORAL";
+            case 3: return "VISITOR FORGE PREVIEW";
             default: return "CLEANER";
         }
     };
+    const auto pedestrian_visual_preset = [&](const float speed) {
+        if (pedestrian_visual_index == 3) {
+            // 128 px canvas, 97 px body: 97 * (56 / 97) = 56 px at zoom 1.
+            // The shared foot pivot is [64, 116] in every direction and pose.
+            return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 56.0F / 97.0F,
+                                              0.5F, 116.0F / 128.0F, speed, 1.0F, 0.5F, 0.72F};
+        }
+        return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F,
+                                          0.5F, 0.862F, speed, 125.0F / 175.0F, 0.5F, 0.72F};
+    };
     const auto send_mixamo_se_test = [&]() {
-        const PedestrianVisualDefinition preset = [&]() {
+        const float speed = [&]() {
             switch (mixamo_gait_preset_index) {
-                case 0: return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F, 0.5F, 0.862F, 0.50F, 125.0F / 175.0F, 0.5F, 0.72F};
-                case 1: return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F, 0.5F, 0.862F, 0.65F, 125.0F / 175.0F, 0.5F, 0.72F};
-                default: return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F, 0.5F, 0.862F, 0.80F, 125.0F / 175.0F, 0.5F, 0.72F};
+                case 0: return 0.50F;
+                case 1: return 0.65F;
+                default: return 0.80F;
             }
         }();
+        const PedestrianVisualDefinition preset = pedestrian_visual_preset(speed);
         const char* preset_name = mixamo_gait_preset_index == 0 ? "A 0.50" : mixamo_gait_preset_index == 1 ? "B 0.65" : "C 0.80";
-        constexpr int duration_ms = 175;
+        const bool visitor_preview = pedestrian_visual_index == 3;
+        const int duration_ms = visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
         constexpr int kRequiredSidewalkTiles = 6;
         const PedestrianLaneNavigationNetwork network{roads};
@@ -1710,7 +1727,8 @@ int main() {
                 }
                 if (straight_road && pedestrians.send_test_pedestrian({x, y}, {x + kRequiredSidewalkTiles - 1, y}, network)) {
                     status = std::string(pedestrian_visual_label()) + " " + preset_name + ": " + std::to_string(duration_ms) + " MS | " +
-                             std::to_string(preset.movement_speed_tiles_per_second) + " T/S | 32 PX";
+                             std::to_string(preset.movement_speed_tiles_per_second) +
+                             (visitor_preview ? " T/S | 56 PX PREVIEW" : " T/S | 32 PX");
                     mixamo_gait_preset_index = (mixamo_gait_preset_index + 1) % 3;
                     return;
                 }
@@ -3024,10 +3042,14 @@ int main() {
                         send_mixamo_se_test();
                         break;
                     case SDL_SCANCODE_F8:
-                        pedestrian_visual_index = (pedestrian_visual_index + 1) % 3;
-                        pedestrians.configure_visual_test(PedestrianVisualDefinition{
-                            std::string(pedestrian_visual_id()), 1.0F, 0.5F, 0.862F,
-                            0.80F, 125.0F / 175.0F, 0.5F, 0.72F});
+                        pedestrian_visual_index = (pedestrian_visual_index + 1) % 4;
+                        if (pedestrian_visual_index == 3 &&
+                            mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr) {
+                            status = "VISITOR FORGE PREVIEW: DEFINITION NOT FOUND";
+                            pedestrian_visual_index = 0;
+                            break;
+                        }
+                        pedestrians.configure_visual_test(pedestrian_visual_preset(0.80F));
                         status = std::string("PEDESTRIAN LOOK: ") + std::string(pedestrian_visual_label());
                         break;
                     case SDL_SCANCODE_COMMA:
