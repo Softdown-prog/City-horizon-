@@ -1,0 +1,67 @@
+name: Generate 2D Ticket Booth Prototype
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/ticket_booth_2d/**"
+      - ".github/workflows/generate-ticket-booth-2d.yml"
+  workflow_dispatch:
+
+jobs:
+  render-prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --quiet pillow
+
+      - name: Generate SOUTH 2D procedural prototype
+        run: |
+          python tools/ticket_booth_2d/generate_ticket_booth.py \
+            --output out/ticket_booth_2d
+
+      - name: Validate prototype package
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path("out/ticket_booth_2d")
+          sprite = root / "park_ticket_booth_2d_south.png"
+          review = root / "park_ticket_booth_2d_review.png"
+          manifest_path = root / "park_ticket_booth_2d_manifest.json"
+          for path in (sprite, review, manifest_path):
+              if not path.is_file():
+                  raise SystemExit(f"missing expected output: {path}")
+
+          image = Image.open(sprite).convert("RGBA")
+          if image.size != (512, 512):
+              raise SystemExit(f"unexpected sprite size: {image.size}")
+          if image.getchannel("A").getextrema()[0] != 0:
+              raise SystemExit("sprite has no transparent background")
+
+          data = json.loads(manifest_path.read_text(encoding="utf-8"))
+          assert data["contract"] == "CH_TICKET_BOOTH_2D_PROTOTYPE_V1"
+          assert data["status"] == "prototype_review_only"
+          assert data["direction"] == "south"
+          assert data["footprint"] == {"widthTiles": 2, "depthTiles": 2}
+          assert data["runtimeApproved"] is False
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ticket-Booth-2D-Prototype-${{ github.run_id }}
+          path: out/ticket_booth_2d
+          if-no-files-found: error
+          retention-days: 14
