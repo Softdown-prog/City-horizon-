@@ -8,6 +8,7 @@ set -euo pipefail
 ASSET_PACK_URL="https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
 ASSET_PACK_NAME="makehuman_system_assets_cc0.zip"
 ASSET_PACK_LICENSE="CC0-1.0"
+ASSET_PACK_SHA256="b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107"
 CACHE_ROOT="${HOME}/.cache/ch-character-forge/makehuman-system-assets"
 ARCHIVE="$CACHE_ROOT/$ASSET_PACK_NAME"
 
@@ -28,10 +29,18 @@ else
   echo "Character Forge: using cached MakeHuman system assets archive."
 fi
 
-python3 - "$ARCHIVE" "$USER_DATA" "$MANIFEST" <<'PY'
+actual_sha256="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+if [[ "$actual_sha256" != "$ASSET_PACK_SHA256" ]]; then
+  echo "MakeHuman system-assets checksum mismatch." >&2
+  echo "expected: $ASSET_PACK_SHA256" >&2
+  echo "actual:   $actual_sha256" >&2
+  rm -f "$ARCHIVE"
+  exit 41
+fi
+
+python3 - "$ARCHIVE" "$USER_DATA" "$MANIFEST" "$ASSET_PACK_SHA256" <<'PY'
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 import zipfile
@@ -40,14 +49,17 @@ from pathlib import Path, PurePosixPath
 archive = Path(sys.argv[1])
 destination = Path(sys.argv[2])
 manifest_path = Path(sys.argv[3])
+expected_sha256 = sys.argv[4]
 
 # Gate-only subset. Keep whole directories because MHCLO assets reference
-# sibling OBJ/material/texture files by relative path.
+# sibling OBJ/material/texture files by relative path. low-poly eyes also
+# reference the shared eyes/materials directory.
 required_dirs = {
     "clothes/male_casualsuit01",
     "clothes/shoes01",
     "hair/short01",
     "eyes/low-poly",
+    "eyes/materials",
     "eyebrows/eyebrow001",
 }
 required_pack_files = {
@@ -91,25 +103,26 @@ required = [
     destination / "clothes/shoes01/shoes01.mhclo",
     destination / "hair/short01/short01.mhclo",
     destination / "eyes/low-poly/low-poly.mhclo",
+    destination / "eyes/materials/brown.mhmat",
     destination / "eyebrows/eyebrow001/eyebrow001.mhclo",
 ]
 missing = [str(path) for path in required if not path.is_file()]
 if missing:
     raise RuntimeError(f"MakeHuman asset bootstrap incomplete; missing: {missing}")
 
-sha256 = hashlib.sha256(archive.read_bytes()).hexdigest()
 manifest = {
     "contract": "CH_CHARACTER_FORGE_MAKEHUMAN_SYSTEM_ASSETS_V1",
     "source": "https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
     "license": "CC0-1.0",
     "archive": str(archive),
-    "archiveSha256Observed": sha256,
+    "archiveSha256": expected_sha256,
     "userData": str(destination),
     "subset": [
         "clothes/male_casualsuit01",
         "clothes/shoes01",
         "hair/short01",
         "eyes/low-poly",
+        "eyes/materials",
         "eyebrows/eyebrow001",
     ],
     "purpose": "Character Forge visitor SOUTH visual gate",
@@ -121,5 +134,6 @@ PY
 echo "CH_CHARACTER_FORGE_MAKEHUMAN_DATA=$USER_DATA" >> "$GITHUB_ENV"
 echo "CH_CHARACTER_FORGE_MAKEHUMAN_ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 echo "CH_CHARACTER_FORGE_MAKEHUMAN_LICENSE=$ASSET_PACK_LICENSE" >> "$GITHUB_ENV"
+echo "CH_CHARACTER_FORGE_MAKEHUMAN_SHA256=$ASSET_PACK_SHA256" >> "$GITHUB_ENV"
 
 echo "Character Forge MakeHuman system-assets subset ready: $USER_DATA"
