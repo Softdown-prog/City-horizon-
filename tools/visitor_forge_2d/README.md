@@ -81,6 +81,7 @@ Regras:
 - PNG RGBA full-color;
 - render interno em 512x512 e saída inicial em 128x128;
 - downscale Lanczos com alpha premultiplicado quando suportado pelo Pillow;
+- transformações de peças articuladas em alpha premultiplicado, evitando que RGB oculto em pixels transparentes contamine as bordas;
 - não promover ao runtime antes de aprovação visual.
 
 ## Gerador visual procedural V1

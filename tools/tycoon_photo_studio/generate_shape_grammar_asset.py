@@ -17,6 +17,20 @@ from pathlib import Path
 TILE_WORLD = 3.0
 
 
+def _positive(value, name):
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{name} must be a finite positive number")
+    return number
+
+
+def _nonnegative_integer(value, name):
+    number = int(value)
+    if isinstance(value, bool) or number != float(value) or number < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return number
+
+
 def _box(name, loc, dims, material, bevel=0.025):
     return {
         "type": "box",
@@ -59,24 +73,28 @@ def expand(grammar):
     seed = int(grammar.get("seed", 0))
     rng = random.Random(seed)
     footprint = grammar["footprint"]
-    w_tiles = int(footprint["widthTiles"])
-    d_tiles = int(footprint["depthTiles"])
+    w_tiles = _nonnegative_integer(footprint["widthTiles"], "footprint.widthTiles")
+    d_tiles = _nonnegative_integer(footprint["depthTiles"], "footprint.depthTiles")
     if w_tiles < 1 or d_tiles < 1:
         raise ValueError("footprint dimensions must be >= 1")
 
     mass = grammar["mass"]
-    width = float(mass.get("width", w_tiles * TILE_WORLD * 0.82))
-    depth = float(mass.get("depth", d_tiles * TILE_WORLD * 0.82))
+    width = _positive(mass.get("width", w_tiles * TILE_WORLD * 0.82), "mass.width")
+    depth = _positive(mass.get("depth", d_tiles * TILE_WORLD * 0.82), "mass.depth")
     max_w = w_tiles * TILE_WORLD
     max_d = d_tiles * TILE_WORLD
     if width > max_w or depth > max_d:
         raise ValueError("building mass exceeds declared footprint")
+    if width <= 0.72 or depth <= 0.72:
+        raise ValueError("building mass is too small for the facade opening margins")
 
-    floor_h = float(mass["floorHeight"])
+    floor_h = _positive(mass["floorHeight"], "mass.floorHeight")
     floor_spec = mass["floorCount"]
-    floors = rng.randint(int(floor_spec["min"]), int(floor_spec["max"]))
-    if floors < 2:
+    floor_min = _nonnegative_integer(floor_spec["min"], "mass.floorCount.min")
+    floor_max = _nonnegative_integer(floor_spec["max"], "mass.floorCount.max")
+    if floor_min < 2 or floor_max < floor_min:
         raise ValueError("mixed-use grammar requires at least 2 floors")
+    floors = rng.randint(floor_min, floor_max)
 
     materials = grammar["materials"]
     wall_key = _choose(rng, materials["wallPalette"])
@@ -87,7 +105,10 @@ def expand(grammar):
         raise ValueError(f"Missing material definitions: {sorted(missing)}")
 
     parts = []
-    ground_h = float(grammar["grammar"]["vertical"][0].get("height", floor_h * 1.15))
+    vertical = grammar["grammar"]["vertical"]
+    if not vertical:
+        raise ValueError("grammar.vertical must contain at least one level")
+    ground_h = _positive(vertical[0].get("height", floor_h * 1.15), "grammar.vertical[0].height")
     upper_count = floors - 1
     body_h = ground_h + upper_count * floor_h
 
@@ -127,8 +148,10 @@ def expand(grammar):
     # Deterministic upper-floor facade grammar.
     facade = grammar["grammar"]["facades"]["residential"]
     patterns = facade["patternChoices"]
-    module_w = float(facade["moduleWidth"])
-    max_balconies = int(grammar["constraints"].get("balconyMaxPerFacade", 2))
+    if not patterns or any(not pattern or any(token not in {"wall", "window", "balcony"} for token in pattern) for pattern in patterns):
+        raise ValueError("residential.patternChoices must contain non-empty wall/window/balcony patterns")
+    module_w = _positive(facade["moduleWidth"], "residential.moduleWidth")
+    max_balconies = _nonnegative_integer(grammar["constraints"].get("balconyMaxPerFacade", 2), "constraints.balconyMaxPerFacade")
 
     def add_residential_face(face, level, pattern):
         z = ground_h + floor_h * (level + 0.52)
@@ -169,7 +192,7 @@ def expand(grammar):
             add_residential_face(face, level, rng.choice(patterns))
 
     # Crown / parapet.
-    crown_h = float(grammar["grammar"]["vertical"][-1].get("height", 0.24))
+    crown_h = _positive(vertical[-1].get("height", 0.24), "grammar.vertical[-1].height")
     crown_z = body_h + crown_h / 2
     parts.append(_box("Crown_South", [0, -depth / 2 + 0.08, crown_z], [width, 0.16, crown_h], trim, 0.02))
     parts.append(_box("Crown_North", [0, depth / 2 - 0.08, crown_z], [width, 0.16, crown_h], trim, 0.02))
@@ -178,10 +201,17 @@ def expand(grammar):
 
     # Roof props with deterministic Poisson-disk spacing.
     roof_spec = grammar.get("roofProps", {})
-    prop_count = rng.randint(1, int(roof_spec.get("maxCount", 3))) if roof_spec else 0
+    prop_max = _nonnegative_integer(roof_spec.get("maxCount", 3), "roofProps.maxCount") if roof_spec else 0
+    prop_count = rng.randint(1, prop_max) if prop_max else 0
     prop_mat = materials["roof"]
-    for i, (x, y, z) in enumerate(_poisson_roof_props(rng, width, depth, prop_count, float(roof_spec.get("radius", 0.55)), body_h + 0.18)):
-        kind = rng.choice(roof_spec.get("choices", ["vent_stack"]))
+    radius = _positive(roof_spec.get("radius", 0.55), "roofProps.radius") if prop_count else 0.55
+    if prop_count and (width <= 0.84 or depth <= 0.84):
+        raise ValueError("roof props need mass.width and mass.depth greater than 0.84")
+    choices = roof_spec.get("choices", ["vent_stack"])
+    if prop_count and (not choices or any(choice not in {"vent_stack", "water_tank_small", "ac_unit_small"} for choice in choices)):
+        raise ValueError("roofProps.choices contains an unsupported or empty roof prop list")
+    for i, (x, y, z) in enumerate(_poisson_roof_props(rng, width, depth, prop_count, radius, body_h + 0.18)):
+        kind = rng.choice(choices)
         if kind == "water_tank_small":
             dims = [0.48, 0.48, 0.42]
         elif kind == "ac_unit_small":

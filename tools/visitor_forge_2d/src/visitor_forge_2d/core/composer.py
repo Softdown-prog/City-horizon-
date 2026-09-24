@@ -168,12 +168,16 @@ class LayerComposer:
     @staticmethod
     def _transform_canvas(image: Image.Image, matrix: Matrix) -> Image.Image:
         inverse = _inverse(matrix)
-        return image.transform(
+        # Interpolate premultiplied colors: transparent pixels in source parts
+        # can contain arbitrary RGB and must not bleed into rotated edges.
+        premultiplied = image.convert("RGBA").convert("RGBa")
+        transformed = premultiplied.transform(
             image.size,
             Image.Transform.AFFINE,
             inverse,
             resample=Image.Resampling.BICUBIC,
         )
+        return transformed.convert("RGBA")
 
     def compose(self, definition: CharacterDefinition, pose: PoseSpec) -> Image.Image:
         if pose.direction != definition.direction:

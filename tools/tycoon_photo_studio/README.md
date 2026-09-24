@@ -44,6 +44,11 @@ Generic/more complex architecture can use grammar tooling such as:
 
 The expander should be deterministic for a given recipe/seed.
 
+The shape-grammar expander validates footprint, dimensions, floor ranges,
+facade patterns and roof-prop parameters before Blender starts. Set
+`roofProps.maxCount` to `0` to deliberately omit roof props. Invalid recipes
+fail at expansion time instead of producing broken geometry during the bake.
+
 ### 3. Blender bake
 
 `build_scene.py` consumes canonical asset source and executes geometry/material instructions inside Blender headless.
