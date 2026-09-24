@@ -1,0 +1,12 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "character.forge.mpfb.visitor.002",
+  "operation": "blender_script",
+  "script": "tools/character_forge/mpfb_create_stylized_visitor_v2.py",
+  "outputDir": "out/ch_blender_agent/character.forge.mpfb.visitor.002",
+  "expectedOutputs": [
+    "out/ch_blender_agent/character.forge.mpfb.visitor.002/visitor_male_stylized_south_review.png",
+    "out/ch_blender_agent/character.forge.mpfb.visitor.002/visitor_male_stylized_south_gameplay.png",
+    "out/ch_blender_agent/character.forge.mpfb.visitor.002/visitor_male_stylized_south.json"
+  ]
+}
