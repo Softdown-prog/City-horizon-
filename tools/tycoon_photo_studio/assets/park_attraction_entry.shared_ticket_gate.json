@@ -47,6 +47,10 @@
     "kioskCenterY": -0.52,
     "counterHeight": 1.02,
     "canopyOverhang": 0.18,
+    "kioskFrameWidth": 0.10,
+    "awningDepth": 0.52,
+    "awningSideOverhang": 0.24,
+    "awningStripeCount": 7,
 
     "gateCenterX": 0.72,
     "gateCenterY": -0.78,
@@ -58,6 +62,16 @@
     "archBeamHeight": 0.34,
     "archSignWidth": 1.10,
     "archSignHeight": 0.42,
+    "archSpringZ": 2.76,
+    "archRise": 0.78,
+    "archSegments": 16,
+    "marqueeDepth": 0.30,
+    "marqueeOuterThickness": 0.40,
+    "marqueeInnerThickness": 0.25,
+    "marqueeBulbCount": 7,
+    "marqueeBulbRadius": 0.075,
+    "flagPoleHeight": 0.72,
+    "flagPoleRadius": 0.038,
 
     "turnstileCount": 2,
     "turnstileWidth": 0.54,
@@ -68,6 +82,7 @@
     "queueDepth": 2.35,
     "queueRightX": 2.42,
     "queueDividerX": 1.48,
+    "queueFinialRadius": 0.075,
     "railingHeight": 0.82,
     "railingRadius": 0.034,
 
@@ -79,14 +94,24 @@
     "skeletonBase": {"name":"EntrySkeletonBase","rgba":[0.30,0.32,0.34,1.0],"roughness":0.72,"metallic":0.06},
     "skeletonStructure": {"name":"EntrySkeletonStructure","rgba":[0.72,0.69,0.60,1.0],"roughness":0.58,"metallic":0.10},
     "skeletonKiosk": {"name":"EntrySkeletonKiosk","rgba":[0.05,0.25,0.48,1.0],"roughness":0.55,"metallic":0.08},
-    "skeletonRail": {"name":"EntrySkeletonRail","rgba":[0.37,0.42,0.48,1.0],"roughness":0.42,"metallic":0.38},
-    "skeletonGate": {"name":"EntrySkeletonGate","rgba":[0.76,0.45,0.08,1.0],"roughness":0.52,"metallic":0.08}
+    "skeletonRail": {"name":"EntrySkeletonRail","rgba":[0.24,0.31,0.40,1.0],"roughness":0.42,"metallic":0.38},
+    "skeletonGate": {"name":"EntrySkeletonGate","rgba":[0.76,0.45,0.08,1.0],"roughness":0.52,"metallic":0.08},
+
+    "parkBlue": {"name":"EntryParkBlue","rgba":[0.035,0.22,0.48,1.0],"roughness":0.46,"metallic":0.10},
+    "parkGold": {"name":"EntryParkGold","rgba":[0.90,0.55,0.06,1.0],"roughness":0.42,"metallic":0.12},
+    "parkCream": {"name":"EntryParkCream","rgba":[0.82,0.77,0.66,1.0],"roughness":0.56,"metallic":0.06},
+    "parkCoral": {"name":"EntryParkCoral","rgba":[0.76,0.10,0.14,1.0],"roughness":0.50,"metallic":0.04},
+    "parkBulb": {"name":"EntryParkBulb","rgba":[1.00,0.66,0.12,1.0],"roughness":0.28,"metallic":0.04},
+    "parkGlass": {"name":"EntryParkGlass","rgba":[0.055,0.15,0.23,1.0],"roughness":0.24,"metallic":0.18},
+    "parkGreen": {"name":"EntryParkGreen","rgba":[0.08,0.68,0.24,1.0],"roughness":0.40,"metallic":0.04},
+    "parkRail": {"name":"EntryParkRail","rgba":[0.34,0.42,0.52,1.0],"roughness":0.34,"metallic":0.46}
   },
   "skeletonNotes": {
-    "status": "mathematical_blockout_v1",
+    "status": "themed_style_pass_v2",
     "terrainIncluded": false,
-    "designIntent": "Reusable ticket booth + controlled queue + gate module shared by park attractions. The skeleton deliberately inherits the Ferris wheel loading-platform width, stair width and railing height so it reads as part of the same physical system without competing with the landmark scale.",
+    "designIntent": "Reusable ticket booth + controlled queue + gate module shared by park attractions. Preserve the Ferris-wheel-derived physical datum, then dress it with a curved marquee, warm bulbs, flags, striped kiosk awning, readable ticket window, refined queue accents and turnstiles so the module belongs to the same attraction family without competing with the landmark.",
+    "referencePolicy": "Use the generated attraction-entry concept as visual direction only; preserve City Horizon camera, scale and procedural ownership rather than tracing image pixels.",
     "notFinalArt": true,
-    "nextGate": "Preflight the mathematical blockout, then render SOUTH proxy for human proportion review before adding decorative styling."
+    "nextGate": "Preflight themed style pass, then render a SOUTH proxy for human review. Do not final-bake before that proxy is explicitly approved."
   }
 }
