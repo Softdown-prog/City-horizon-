@@ -1,0 +1,92 @@
+{
+  "contract": "CITY_HORIZON_ATTRACTION_ENTRANCE_V1",
+  "assetId": "attraction.shared_ticket_entry.01",
+  "assetType": "static_attraction_module",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "renderPipeline": {
+    "contract": "CH_RENDER_PIPELINES_V1",
+    "class": "compact_256",
+    "preset": "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json",
+    "sourceResolution": [1024, 1024],
+    "finalResolution": [256, 256],
+    "reason": "Reusable attraction entrance is a normal-scale modular prop; escalate only if gameplay review proves thin queue rails need a larger class."
+  },
+  "balanceReference": {
+    "recipe": "tools/tycoon_photo_studio/assets/park_ferris_wheel_3x2.ferris.json",
+    "ferrisWheelDiameter": 10.70,
+    "ferrisWheelTopZ": 11.90,
+    "ferrisLoadingPlatformWidth": 5.20,
+    "ferrisStairWidth": 1.42,
+    "ferrisRailingHeight": 0.82,
+    "rules": {
+      "overallWidthEqualsFerrisLoadingPlatformWidth": true,
+      "entryStairWidthEqualsFerrisStairWidth": true,
+      "railingHeightEqualsFerrisRailingHeight": true,
+      "entranceHeightToFerrisTop": 0.273,
+      "kioskWidthToModuleWidth": 0.327,
+      "gateClearWidthToModuleWidth": 0.273
+    }
+  },
+  "footprint": {
+    "widthTiles": 4,
+    "depthTiles": 3,
+    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[0,2],[1,2],[2,2],[3,2]]
+  },
+  "geometry": {
+    "overallWidth": 5.20,
+    "overallDepth": 3.15,
+    "baseHeight": 0.24,
+    "frontY": -1.575,
+    "backY": 1.575,
+
+    "kioskWidth": 1.70,
+    "kioskDepth": 1.35,
+    "kioskHeight": 1.82,
+    "kioskCenterX": -1.63,
+    "kioskCenterY": -0.52,
+    "counterHeight": 1.02,
+    "canopyOverhang": 0.18,
+
+    "gateCenterX": 0.72,
+    "gateCenterY": -0.78,
+    "gateClearWidth": 1.42,
+    "gateColumnWidth": 0.34,
+    "gateColumnDepth": 0.38,
+    "gateColumnHeight": 2.62,
+    "archTopZ": 3.25,
+    "archBeamHeight": 0.34,
+    "archSignWidth": 1.10,
+    "archSignHeight": 0.42,
+
+    "turnstileCount": 2,
+    "turnstileWidth": 0.54,
+    "turnstileDepth": 0.40,
+    "turnstileHeight": 0.86,
+
+    "queueLaneWidth": 0.94,
+    "queueDepth": 2.35,
+    "queueRightX": 2.42,
+    "queueDividerX": 1.48,
+    "railingHeight": 0.82,
+    "railingRadius": 0.034,
+
+    "stairWidth": 1.42,
+    "stairDepth": 0.82,
+    "stairSteps": 3
+  },
+  "materials": {
+    "skeletonBase": {"name":"EntrySkeletonBase","rgba":[0.30,0.32,0.34,1.0],"roughness":0.72,"metallic":0.06},
+    "skeletonStructure": {"name":"EntrySkeletonStructure","rgba":[0.72,0.69,0.60,1.0],"roughness":0.58,"metallic":0.10},
+    "skeletonKiosk": {"name":"EntrySkeletonKiosk","rgba":[0.05,0.25,0.48,1.0],"roughness":0.55,"metallic":0.08},
+    "skeletonRail": {"name":"EntrySkeletonRail","rgba":[0.37,0.42,0.48,1.0],"roughness":0.42,"metallic":0.38},
+    "skeletonGate": {"name":"EntrySkeletonGate","rgba":[0.76,0.45,0.08,1.0],"roughness":0.52,"metallic":0.08}
+  },
+  "skeletonNotes": {
+    "status": "mathematical_blockout_v1",
+    "terrainIncluded": false,
+    "designIntent": "Reusable ticket booth + controlled queue + gate module shared by park attractions. The skeleton deliberately inherits the Ferris wheel loading-platform width, stair width and railing height so it reads as part of the same physical system without competing with the landmark scale.",
+    "notFinalArt": true,
+    "nextGate": "Preflight the mathematical blockout, then render SOUTH proxy for human proportion review before adding decorative styling."
+  }
+}
