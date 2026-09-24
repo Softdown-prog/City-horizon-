@@ -180,6 +180,9 @@ Assim, é possível começar com o desenho procedural e pintar uma peça especí
 que o próximo `prototype` a substitua. `--overwrite-parts` força a reconstrução de
 todas as peças; use somente quando quiser descartar esses refinamentos.
 Em bibliotecas antigas sem manifesto, os PNGs existentes são preservados por segurança.
+Essa proteção cobre novas execuções no mesmo diretório. Se a pasta estiver sob `out/`,
+uma limpeza dessa pasta ainda apagará os retoques: arte aprovada precisará de uma
+biblioteca de fontes versionada, fora dos artefatos temporários.
 
 ## Metadata de saída
 
