@@ -201,6 +201,44 @@ de caminhada. Para levá-lo à animação, redesenhar cabeça, cabelo, torso,
 braços e pernas em camadas articuláveis, com rig próprio e revisão de `idle`,
 `walk A` e `walk B` em 128 px antes da integração ao runtime.
 
+### Estudo articulável do mesmo personagem
+
+`art/concepts/visitor_male_01_south_master.png` é o master RGBA de 512 px do
+conceito acima. O módulo `character/concept_rig.py` o separa de modo
+determinístico em 15 partes coloridas e uma sombra independente. A partição
+reconstrói exatamente o master antes de qualquer pose; a definição gerada
+registra o SHA-256 do master, e os frames exportados registram os hashes das
+partes. Nenhuma chamada a geração de imagem é feita para animar o personagem.
+
+```bash
+ch-visitor-forge-2d build-concept-rig \
+  --master tools/visitor_forge_2d/art/concepts/visitor_male_01_south_master.png \
+  --asset-root out/visitor_forge_2d/concept_parts \
+  --definition-output out/visitor_forge_2d/concept_rig.json
+
+ch-visitor-forge-2d prototype \
+  --definition out/visitor_forge_2d/concept_rig.json \
+  --pose tools/visitor_forge_2d/poses/concept/south_idle.json \
+  --pose tools/visitor_forge_2d/poses/concept/south_walk_a.json \
+  --pose tools/visitor_forge_2d/poses/concept/south_walk_b.json \
+  --asset-root out/visitor_forge_2d/concept_parts \
+  --concept tools/visitor_forge_2d/art/concepts/visitor_male_01_south_concept.png \
+  --output out/visitor_forge_2d/concept_rig_review
+```
+
+É possível acrescentar `--background CAMINHO/PARA/TERRENO.png`. A captura
+inicial dos três frames em terreno está em
+`art/concepts/visitor_male_01_south_rig_preview.png`. Os três pés ficam na
+linha 115 do canvas de 128 px; o anchor da definição é [64, 116]. O movimento
+é curto e conserva rosto, cor e roupa. As peças geradas ficam em `out/`; edite
+o master ou crie uma biblioteca autorada própria para refinamentos duráveis.
+
+**Limite do estudo:** o recorte de uma imagem chapada não contém a anatomia
+escondida atrás de roupas e membros. Ele pode criar frestas ao aumentar o
+movimento. O estudo só vale para SOUTH e passos curtos; ainda pede retoque
+artístico das juntas em todas as poses e teste no mapa, junto a construções,
+antes de qualquer promoção ao runtime.
+
 ### Refinamento manual sem perda de trabalho
 
 Cada biblioteca gerada registra os hashes em `generated_parts.json`. Uma nova execução
@@ -288,6 +326,6 @@ O núcleo genérico também poderá ser reaproveitado por funcionários, vendedo
 
 **Estado atual:** núcleo procedural V0.1 + candidato visual SOUTH implementados. A ferramenta constrói partes 2D, compõe `idle`, `walk A`, `walk B`, preserva peças pintadas e produz comparações em escala real. Ainda é um gate artístico; nada foi promovido ao runtime.
 
-**Próxima tarefa:** desenhar uma biblioteca articulável SOUTH com a linguagem do
-conceito visual e comparar as três poses em terreno no tamanho real. Congelar o
-estilo V1 somente após essa revisão visual.
+**Próxima tarefa:** retocar as juntas e a roupa do estudo articulável SOUTH,
+revisar as três poses no mapa próximo a construções e aprovar a silhueta no
+tamanho real. Congelar o estilo V1 somente após essa revisão visual.

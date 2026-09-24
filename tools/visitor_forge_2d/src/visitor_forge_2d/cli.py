@@ -13,6 +13,7 @@ from .character import (
     validate_v1_character,
 )
 from .character.review import frame_measurements, gameplay_review
+from .character.concept_rig import build_concept_rig
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -56,6 +57,12 @@ def command_build_assets(args: argparse.Namespace) -> int:
         "preservedParts": manifest["preservedOverrides"],
     }
     print(json.dumps(summary, indent=2))
+    return 0
+
+
+def command_build_concept_rig(args: argparse.Namespace) -> int:
+    result = build_concept_rig(args.master, args.asset_root, args.definition_output)
+    print(json.dumps({"status": "ok", **result}, indent=2))
     return 0
 
 
@@ -188,7 +195,8 @@ def command_prototype(args: argparse.Namespace) -> int:
 
     summary = {
         "status": "ok",
-        "styleContract": STYLE_CONTRACT,
+        "styleContract": (STYLE_CONTRACT if definition.forge_contract_version == "CH_VISITOR_FORGE_2D_V1"
+                          else definition.forge_contract_version),
         "generatedParts": [str(path) for path in generated],
         "partManifest": str(manifest_path),
         "preservedParts": manifest["preservedOverrides"],
@@ -227,6 +235,14 @@ def build_parser() -> argparse.ArgumentParser:
     build_assets.add_argument("--asset-root", required=True)
     build_assets.add_argument("--overwrite-parts", action="store_true", help="Replace even manually edited source PNGs")
     build_assets.set_defaults(func=command_build_assets)
+
+    concept_rig = subparsers.add_parser(
+        "build-concept-rig", help="derive the experimental SOUTH cutout rig from a 512px concept master",
+    )
+    concept_rig.add_argument("--master", required=True)
+    concept_rig.add_argument("--asset-root", required=True)
+    concept_rig.add_argument("--definition-output", required=True)
+    concept_rig.set_defaults(func=command_build_concept_rig)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)
