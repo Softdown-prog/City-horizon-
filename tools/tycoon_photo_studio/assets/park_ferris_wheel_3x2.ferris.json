@@ -4,6 +4,15 @@
   "assetType": "animated_attraction",
   "styleContract": "CH_TYCOON_MINIATURE_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "renderPipeline": {
+    "contract": "CH_RENDER_PIPELINES_V1",
+    "class": "large_asset_1024",
+    "preset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+    "sourceResolution": [2048, 2048],
+    "finalResolution": [1024, 1024],
+    "reason": "Large landmark attraction with thin dual rims, spokes, cross-members, railings and cabins that lose definition in the compact 256 pipeline.",
+    "escalation": "Use large_asset_2048 only if MapForge/gameplay review proves 1024 insufficient."
+  },
   "footprint": {
     "widthTiles": 6,
     "depthTiles": 5,
@@ -91,6 +100,6 @@
     "terrainIncluded": false,
     "designIntent": "Large landmark Ferris wheel with visibly separated parallel full-diameter rims, larger passenger cabins suspended between them, paired front/rear spokes and stronger alternating rim cross-members. Preserve the approved loading platform, stairs, protective rails, overlay split and City Horizon 2D readability.",
     "referencePolicy": "Use real Ferris-wheel structural logic and classic Tycoon-scale readability without copying a proprietary attraction design.",
-    "nextGate": "Run CH Blender preflight, then render one SOUTH proxy and validate rim separation, cabin scale and landmark presence before MapForge scale review."
+    "nextGate": "Render through large_asset_1024, then validate sharpness, lighting, rim separation, cabin scale and landmark presence in MapForge before any escalation to large_asset_2048."
   }
 }
