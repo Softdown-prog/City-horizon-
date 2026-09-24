@@ -1453,8 +1453,11 @@ int main() {
     }
     MobileAnimationCatalog mobile_animations;
     const bool approved_animations_loaded = mobile_animations.load_from_directory(asset_root / "assets/definitions/animations");
+    bool preview_animations_loaded = false;
+#if defined(CH_VISITOR_FORGE_PREVIEW)
     // Visitor Forge remains a review candidate: only the F8 test selects this set.
-    const bool preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/visitor_forge_2d/runtime_preview");
+    preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/visitor_forge_2d/runtime_preview");
+#endif
     if (!approved_animations_loaded && !preview_animations_loaded) {
         std::cerr << "No valid mobile animation sets were loaded; directional static sprites remain available.\n";
     }
@@ -3041,17 +3044,13 @@ int main() {
                     case SDL_SCANCODE_F7:
                         send_mixamo_se_test();
                         break;
-                    case SDL_SCANCODE_F8:
-                        pedestrian_visual_index = (pedestrian_visual_index + 1) % 4;
-                        if (pedestrian_visual_index == 3 &&
-                            mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr) {
-                            status = "VISITOR FORGE PREVIEW: DEFINITION NOT FOUND";
-                            pedestrian_visual_index = 0;
-                            break;
-                        }
+                    case SDL_SCANCODE_F8: {
+                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 : 4;
+                        pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
                         pedestrians.configure_visual_test(pedestrian_visual_preset(0.80F));
                         status = std::string("PEDESTRIAN LOOK: ") + std::string(pedestrian_visual_label());
                         break;
+                    }
                     case SDL_SCANCODE_COMMA:
                         if (debug_visible) {
                             camera.rotation = rotate_camera_counter_clockwise(camera.rotation);

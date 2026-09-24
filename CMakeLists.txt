@@ -437,3 +437,21 @@ add_custom_command(TARGET city_builder POST_BUILD
         "${CMAKE_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:city_builder>/assets"
 )
+
+# Explicit local visual review only. Keep these source previews out of normal
+# builds and out of the approved runtime assets directory.
+option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" OFF)
+if(CH_VISITOR_FORGE_PREVIEW)
+    target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
+    add_custom_command(TARGET city_builder POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview"
+            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
+            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/frames_preview"
+            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
+    )
+endif()

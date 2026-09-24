@@ -311,6 +311,17 @@ de fixar o tamanho de exibição ou promover qualquer sprite.
 
 ### Prévia em movimento na engine
 
+Para montar a versão de teste, configure o build com
+`-DCH_VISITOR_FORGE_PREVIEW=ON` e compile o target `city_builder` normalmente.
+O build copia a definição e os 12 PNGs de prévia para junto do executável,
+onde `SDL_GetBasePath()` procura os recursos. A opção começa desligada; um
+build normal não embala esses arquivos. Por exemplo:
+
+```bash
+cmake -S . -B build -DCH_VISITOR_FORGE_PREVIEW=ON
+cmake --build build --target city_builder --config Release
+```
+
 O catálogo de prévia em `runtime_preview/visitor_male_01.json` referencia os
 12 PNGs de `art/concepts/frames_preview/`, sem copiar ou classificar esses
 sprites em `assets/`. A engine carrega esse catálogo adicionalmente às
