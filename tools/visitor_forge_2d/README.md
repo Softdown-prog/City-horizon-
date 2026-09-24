@@ -297,6 +297,11 @@ artefato `MapForge-Ice-Cream-Inactive-vs-Active`, ID `10781869942`.
 O arquivo PNG extraído tem SHA-256 no JSON de revisão. A comparação
 versionada fica em `art/concepts/map_review/south_97_vs_56.png`; outro painel
 mostra as quatro direções com corpo de 56 px sobre o mesmo ponto da loja.
+Uma segunda comparação `art/concepts/map_review/ferris_97_vs_56.png` usa a
+[captura da roda-gigante do MapForge, run 35932996026](https://github.com/Softdown-prog/City-horizon-/actions/runs/35932996026),
+artefato `MapForge2-Deterministic-Asset-Capture` (ID `10782236410`). A escala
+menor também fica mais plausível diante dessa atração; é uma checagem visual,
+não um contrato de tamanho para toda construção.
 
 **56 px é uma hipótese de exibição**, cerca de 0,577 vez a altura do corpo
 original, para essa captura e esse enquadramento. Ela aproxima a figura da
