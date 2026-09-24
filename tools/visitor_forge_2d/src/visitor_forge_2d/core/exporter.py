@@ -32,6 +32,7 @@ def export_frame(
     output_dir: str | Path,
     *,
     stem: str | None = None,
+    source_parts: dict | None = None,
 ) -> tuple[Path, Path]:
     """Export one gameplay PNG and its machine-readable frame metadata."""
     if image.size != definition.canvas.working_size:
@@ -63,5 +64,7 @@ def export_frame(
         "forgeContractVersion": definition.forge_contract_version or FORGE_CONTRACT_VERSION,
         "runtimePromotion": False,
     }
+    if source_parts is not None:
+        metadata["sourceParts"] = source_parts
     json_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return png_path, json_path

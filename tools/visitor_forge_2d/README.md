@@ -184,6 +184,30 @@ Essa proteção cobre novas execuções no mesmo diretório. Se a pasta estiver 
 uma limpeza dessa pasta ainda apagará os retoques: arte aprovada precisará de uma
 biblioteca de fontes versionada, fora dos artefatos temporários.
 
+Para iniciar essa biblioteca, use `--art-root` em `prototype` ou `render`:
+
+```bash
+ch-visitor-forge-2d prototype \
+  --definition tools/visitor_forge_2d/definitions/visitor_male_01.south.json \
+  --pose tools/visitor_forge_2d/poses/south_idle.json \
+  --pose tools/visitor_forge_2d/poses/south_walk_a.json \
+  --pose tools/visitor_forge_2d/poses/south_walk_b.json \
+  --asset-root out/visitor_forge_2d/assets \
+  --art-root tools/visitor_forge_2d/art \
+  --background assets/terrain/grass_isometric_01.png \
+  --output out/visitor_forge_2d/visitor_male_01
+```
+
+Uma peça pintada pode ser guardada, por exemplo, em
+`art/visitor_male_01/south/torso.png`, com o mesmo caminho relativo da peça
+gerada. A arte versionada tem prioridade sem alterar a cópia gerada em `out/`.
+Ela precisa ser RGBA, ter as mesmas dimensões e alpha visível. O resumo do
+comando registra `authoredLayers` para deixar claro quais camadas foram
+substituídas. Cada JSON exportado registra `sourceParts` com origem, caminho
+relativo e SHA-256 da peça efetivamente usada. Uma peça invalidada causa erro em vez de cair silenciosamente
+na versão procedural. Não incluir um `art-root` na receita de produção até a
+arte correspondente passar pela revisão visual em tamanho real.
+
 ## Metadata de saída
 
 Cada frame exportado inclui PNG e JSON com, no mínimo:
@@ -199,6 +223,7 @@ Cada frame exportado inclui PNG e JSON com, no mínimo:
 - `colorMode`;
 - `downscaleFilter`;
 - `forgeContractVersion`.
+- `sourceParts` (proveniência da arte procedural e autorada quando exportada pelo CLI).
 
 A engine continua consumindo apenas PNG RGBA + metadata; ela não deve depender de como o personagem foi produzido.
 

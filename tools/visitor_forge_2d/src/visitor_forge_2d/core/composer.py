@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Iterable
@@ -98,18 +99,44 @@ class LayerComposer:
     mascots, animals, animated signs or other layered 2D assets.
     """
 
-    def __init__(self, asset_root: str | Path) -> None:
+    def __init__(self, asset_root: str | Path, art_root: str | Path | None = None) -> None:
         self.asset_root = Path(asset_root)
+        self.art_root = Path(art_root) if art_root is not None else None
+        if self.art_root is not None and not self.art_root.is_dir():
+            raise FileNotFoundError(f"Authored art root not found: {self.art_root}")
+        self.authored_layers: set[str] = set()
+        self.source_provenance: dict[str, dict[str, str]] = {}
+
+    @staticmethod
+    def _source_inside(root: Path, relative: str) -> Path:
+        source = (root / relative).resolve()
+        root = root.resolve()
+        if root != source and root not in source.parents:
+            raise ValueError(f"Layer path escapes source root: {relative}")
+        return source
 
     def _load_layer(self, layer: LayerSpec, definition: CharacterDefinition) -> Image.Image:
-        source = (self.asset_root / layer.source).resolve()
-        root = self.asset_root.resolve()
-        if root != source and root not in source.parents:
-            raise ValueError(f"Layer path escapes asset root: {layer.source}")
+        generated = self._source_inside(self.asset_root, layer.source)
+        if not generated.is_file():
+            raise FileNotFoundError(f"Generated layer source not found: {generated}")
+        source = self._source_inside(self.art_root, layer.source) if self.art_root is not None else generated
         if not source.is_file():
-            raise FileNotFoundError(f"Layer source not found: {source}")
-
-        image = Image.open(source).convert("RGBA")
+            source = generated
+        origin = "authored" if source != generated else "generated"
+        with Image.open(source) as part:
+            part.load()
+            if source != generated:
+                with Image.open(generated) as base:
+                    if part.mode != "RGBA" or part.size != base.size or part.getchannel("A").getbbox() is None:
+                        raise ValueError(f"Authored layer must be RGBA with the generated size and visible alpha: {source}")
+                self.authored_layers.add(layer.layer_id)
+            image = part.convert("RGBA")
+        origin_root = self.art_root if origin == "authored" else self.asset_root
+        self.source_provenance[layer.layer_id] = {
+            "origin": origin,
+            "path": source.relative_to(origin_root.resolve()).as_posix(),
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
         if layer.palette_slot:
             color_value = definition.palette.get(layer.palette_slot)
             if color_value is None:
@@ -187,6 +214,8 @@ class LayerComposer:
             )
 
         size = definition.canvas.working_size
+        self.authored_layers.clear()
+        self.source_provenance.clear()
         result = Image.new("RGBA", size, (0, 0, 0, 0))
         joint_frames = self._joint_frames(definition, pose)
         part_by_layer = {part.layer_id: part for part in definition.parts}

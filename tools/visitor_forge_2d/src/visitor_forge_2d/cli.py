@@ -63,33 +63,41 @@ def _compose_and_export(
     pose_paths: list[str],
     asset_root: str,
     output: str,
-) -> tuple[list[Image.Image], list[Path]]:
+    art_root: str | None = None,
+) -> tuple[list[Image.Image], list[Path], list[str]]:
     definition = load_character_definition(definition_path)
     poses = _load_poses(pose_paths)
     validate_v1_character(definition, poses)
 
-    composer = LayerComposer(asset_root)
+    composer = LayerComposer(asset_root, art_root=art_root)
     output_dir = Path(output)
     working_frames: list[Image.Image] = []
     produced: list[Path] = []
+    authored_layers: set[str] = set()
 
     for pose in poses:
         image = composer.compose(definition, pose)
+        authored_layers.update(composer.authored_layers)
         working_frames.append(image)
-        png_path, json_path = export_frame(image, definition, pose, output_dir)
+        png_path, json_path = export_frame(
+            image, definition, pose, output_dir,
+            source_parts=composer.source_provenance.copy(),
+        )
         produced.extend([png_path, json_path])
 
-    return working_frames, produced
+    return working_frames, produced, sorted(authored_layers)
 
 
 def command_render(args: argparse.Namespace) -> int:
-    _, produced = _compose_and_export(
+    _, produced, authored_layers = _compose_and_export(
         args.definition,
         args.pose,
         args.asset_root,
         args.output,
+        getattr(args, "art_root", None),
     )
-    print(json.dumps({"status": "ok", "outputs": [str(path) for path in produced]}, indent=2))
+    print(json.dumps({"status": "ok", "outputs": [str(path) for path in produced],
+                      "authoredLayers": authored_layers}, indent=2))
     return 0
 
 
@@ -110,11 +118,12 @@ def _horizontal_sheet(images: list[Image.Image], *, gap: int = 12) -> Image.Imag
 def command_prototype(args: argparse.Namespace) -> int:
     generated = generate_v1_south_assets(args.asset_root, overwrite=getattr(args, "overwrite_parts", False))
     manifest_path, manifest = _part_manifest(generated)
-    working_frames, produced = _compose_and_export(
+    working_frames, produced, authored_layers = _compose_and_export(
         args.definition,
         args.pose,
         args.asset_root,
         args.output,
+        getattr(args, "art_root", None),
     )
 
     output_dir = Path(args.output)
@@ -157,6 +166,8 @@ def command_prototype(args: argparse.Namespace) -> int:
         "generatedParts": [str(path) for path in generated],
         "partManifest": str(manifest_path),
         "preservedParts": manifest["preservedOverrides"],
+        "authoredLayers": authored_layers,
+        "artRoot": getattr(args, "art_root", None),
         "outputs": [str(path) for path in produced],
         "reviewStrip": str(review_path),
         "gameplayStrip": str(gameplay_path),
@@ -193,6 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--definition", required=True)
     render.add_argument("--pose", action="append", required=True)
     render.add_argument("--asset-root", required=True)
+    render.add_argument("--art-root", help="Optional versioned RGBA part overrides")
     render.add_argument("--output", required=True)
     render.set_defaults(func=command_render)
 
@@ -203,6 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
     prototype.add_argument("--definition", required=True)
     prototype.add_argument("--pose", action="append", required=True)
     prototype.add_argument("--asset-root", required=True)
+    prototype.add_argument("--art-root", help="Optional versioned RGBA part overrides")
     prototype.add_argument("--overwrite-parts", action="store_true", help="Replace even manually edited source PNGs")
     prototype.add_argument("--output", required=True)
     prototype.add_argument("--background", help="Optional terrain PNG for a native-size review strip")

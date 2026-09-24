@@ -3,6 +3,7 @@
 import unittest
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -10,7 +11,7 @@ import tempfile
 
 from PIL import Image
 
-from visitor_forge_2d.core import LayerComposer
+from visitor_forge_2d.core import LayerComposer, export_frame
 from visitor_forge_2d.cli import command_prototype
 from visitor_forge_2d.character import generate_v1_south_assets, validate_v1_character
 from visitor_forge_2d.core import load_character_definition, load_pose
@@ -76,6 +77,41 @@ class AlphaTransformTests(unittest.TestCase):
 
             generate_v1_south_assets(root, overwrite=True)
             self.assertNotEqual(part.read_bytes(), manual_bytes)
+
+    def test_versioned_art_override_changes_render_without_touching_generated_part(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            generated = root / "generated"
+            authored = root / "art"
+            generate_v1_south_assets(generated)
+            source = generated / "visitor_male_01/south/torso.png"
+            override = authored / "visitor_male_01/south/torso.png"
+            override.parent.mkdir(parents=True)
+            with Image.open(source) as image:
+                part = image.copy()
+            part.putpixel((70, 74), (10, 10, 10, 255))
+            part.save(override)
+            source_bytes = source.read_bytes()
+            definition = load_character_definition(ROOT / "definitions/visitor_male_01.south.json")
+            pose = load_pose(ROOT / "poses/south_idle.json")
+            plain = LayerComposer(generated).compose(definition, pose)
+            composer = LayerComposer(generated, art_root=authored)
+            painted = composer.compose(definition, pose)
+            self.assertNotEqual(plain.tobytes(), painted.tobytes())
+            self.assertIn("torso", composer.authored_layers)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            record = composer.source_provenance["torso"]
+            self.assertEqual(record["origin"], "authored")
+            self.assertEqual(record["sha256"], hashlib.sha256(override.read_bytes()).hexdigest())
+            _, metadata_path = export_frame(painted, definition, pose, root / "output",
+                                            source_parts=composer.source_provenance.copy())
+            metadata = json.loads(metadata_path.read_text())
+            self.assertEqual(metadata["sourceParts"]["torso"], record)
+
+            # A separately drawn layer must preserve the rig's canvas.
+            Image.new("RGBA", (10, 10), (255, 255, 255, 255)).save(override)
+            with self.assertRaisesRegex(ValueError, "Authored layer must be RGBA"):
+                composer.compose(definition, pose)
 
 
 if __name__ == "__main__":
