@@ -11,40 +11,93 @@ permissions:
   actions: read
   contents: write
 
+env:
+  FERRIS_RUN_ID: "35947979891"
+  FERRIS_ARTIFACT: "CH-Blender-Agent-35947979891-1"
+  FERRIS_APPROVED_PROXY_SHA: "5c57e70a352d50776733b7fba7520256868018abf55fadc470f809c1e400637a"
+
 jobs:
   promote-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Download approved CH Blender artifact
+      - name: Download approved large-asset CH Blender artifact
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ferris-artifact"
-          gh run download 35722495875 \
+          gh run download "$FERRIS_RUN_ID" \
             --repo "${{ github.repository }}" \
-            --name "CH-Blender-Agent-35722495875-1" \
+            --name "$FERRIS_ARTIFACT" \
             --dir "$RUNNER_TEMP/ferris-artifact"
 
-      - name: Promote runtime-only park asset
+      - name: Locate and validate final 1024 runtime package
         shell: bash
         run: |
           set -euo pipefail
-          src="$RUNNER_TEMP/ferris-artifact/attraction.park_ferris_wheel.final.v2/runtime"
+          mapfile -t manifests < <(find "$RUNNER_TEMP/ferris-artifact" -type f -path '*/runtime/attraction.park_ferris_wheel.01_runtime_manifest.json' -print)
+          if [ "${#manifests[@]}" -ne 1 ]; then
+            printf 'Expected exactly one Ferris runtime manifest, found %s\n' "${#manifests[@]}" >&2
+            printf '%s\n' "${manifests[@]:-}" >&2
+            exit 1
+          fi
+          src="$(dirname "${manifests[0]}")"
+          printf '%s' "$src" > "$RUNNER_TEMP/ferris-runtime-dir.txt"
+
+          for file in \
+            attraction.park_ferris_wheel.01_runtime_manifest.json \
+            attraction.park_ferris_wheel.01_4dir_animation.png \
+            attraction.park_ferris_wheel.01_south_animation.png \
+            attraction.park_ferris_wheel.01_east_animation.png \
+            attraction.park_ferris_wheel.01_west_animation.png \
+            attraction.park_ferris_wheel.01_north_animation.png; do
+            test -f "$src/$file"
+          done
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          src = Path(os.environ["RUNNER_TEMP"]) / "ferris-runtime-dir.txt"
+          runtime_dir = Path(src.read_text(encoding="utf-8"))
+          manifest = json.loads((runtime_dir / "attraction.park_ferris_wheel.01_runtime_manifest.json").read_text(encoding="utf-8"))
+
+          assert manifest["contract"] == "CH_ANIMATED_SPRITE_BAKE_V1"
+          assert manifest["runtimeRepresentation"] == "2D_RGBA_pre_rendered_sprite"
+          assert manifest["transparentCanvas"] is True
+          assert manifest["backgroundIncluded"] is False
+          assert manifest["directionOrder"] == ["south", "east", "west", "north"]
+          assert manifest["frameCount"] == 12
+          assert manifest["fps"] == 8
+          assert manifest["frameResolution"] == [1024, 1024]
+          assert manifest["approvedProxySha256"] == os.environ["FERRIS_APPROVED_PROXY_SHA"]
+          assert manifest["combinedSheet"]["columns"] == 12
+          assert manifest["combinedSheet"]["rows"] == 4
+          for direction in ("south", "east", "west", "north"):
+              view = manifest["directions"][direction]
+              assert view["columns"] == 12
+              assert view["rows"] == 1
+          print("Validated landmark Ferris runtime:", manifest["frameResolution"], "12 frames @ 8 FPS")
+          PY
+
+      - name: Promote runtime sprites and definition
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$(cat "$RUNNER_TEMP/ferris-runtime-dir.txt")"
           dst="assets/city_park/ferris_wheel"
-          test -f "$src/attraction.park_ferris_wheel.01_runtime_manifest.json"
-          test -f "$src/attraction.park_ferris_wheel.01_4dir_animation.png"
           mkdir -p "$dst"
 
-          # Promote only the runtime package. Intermediate source renders,
-          # review boards, shadow/color passes and the .blend stay out of assets/.
+          # Runtime only: source renders, review boards and .blend remain in the
+          # Actions artifact. The game receives the approved 2D RGBA package.
           cp "$src/attraction.park_ferris_wheel.01_4dir_animation.png" "$dst/"
           cp "$src/attraction.park_ferris_wheel.01_south_animation.png" "$dst/"
           cp "$src/attraction.park_ferris_wheel.01_east_animation.png" "$dst/"
@@ -55,33 +108,69 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path("assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_runtime_manifest.json")
-          data = json.loads(p.read_text(encoding="utf-8"))
-          assert data["contract"] == "CH_ANIMATED_SPRITE_BAKE_V1"
-          assert data["transparentCanvas"] is True
-          assert data["backgroundIncluded"] is False
-          assert data["directionOrder"] == ["south", "east", "west", "north"]
-          assert data["frameCount"] == 12
-          assert data["fps"] == 8
-          assert data["frameResolution"] == [256, 256]
-          assert data["approvedProxySha256"] == "ef53a3a04b7877c42e64c82d2d022ab7ece0f67af31db709528f020ca3e56a6b"
+
+          manifest_path = Path("assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_runtime_manifest.json")
+          definition_path = Path("assets/definitions/ferris_wheel_01.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          definition = json.loads(definition_path.read_text(encoding="utf-8"))
+
+          # Scale the 1024 canvas to the new 6x5 isometric footprint using the
+          # visible first-frame width, not the raw transparent canvas. The 0.975
+          # margin reproduces the old 4x3/256 visual density (~2.0 artScale)
+          # while preserving the extra resolution of the landmark render.
+          opaque_width = max(
+              view["firstFrameAlphaBounds"][2] - view["firstFrameAlphaBounds"][0]
+              for view in manifest["directions"].values()
+          )
+          if opaque_width <= 0:
+              raise RuntimeError("Ferris manifest has invalid alpha bounds")
+          target_width_px = (6 + 5) * 64
+          art_scale = round((target_width_px * 0.975) / opaque_width, 4)
+          if not 0.45 <= art_scale <= 1.25:
+              raise RuntimeError(f"Unexpected Ferris 1024 artScale {art_scale} from opaque width {opaque_width}")
+
+          definition["footprint"] = {"width": 6, "height": 5}
+          definition["artScale"] = art_scale
+          definition["animation"] = {
+              "layout": "horizontal",
+              "frameCount": 12,
+              "frameDurationMs": 125,
+              "playback": "loop"
+          }
+          definition["renderClass"] = "large_asset_1024"
+          definition["runtimeManifest"] = "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_runtime_manifest.json"
+          definition["sourceApprovedProxySha256"] = manifest["approvedProxySha256"]
+          definition["productionStatus"] = "runtime_landmark_large1024_approved"
+
+          # Keep the already gameplay-calibrated normalized sprite anchors for
+          # this first promotion. They are resolution independent; MapForge is
+          # the authority for any later directional anchor tuning.
+          definition["spriteAnchors"] = {
+              "0": {"x": 0.25, "y": 0.8125},
+              "1": {"x": 0.25, "y": 0.8125},
+              "2": {"x": 0.25, "y": 0.8125},
+              "3": {"x": 0.25, "y": 0.8125}
+          }
+
+          definition_path.write_text(json.dumps(definition, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          print(f"Ferris definition promoted: footprint=6x5 artScale={art_scale} opaqueWidth={opaque_width}px")
           PY
 
-      - name: Commit promoted runtime to main
+      - name: Commit promoted landmark runtime to main
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/city_park/ferris_wheel
+          git add assets/city_park/ferris_wheel assets/definitions/ferris_wheel_01.json
           if git diff --cached --quiet; then
-            echo "Ferris wheel runtime already promoted; nothing to commit."
+            echo "Ferris wheel landmark runtime already promoted; nothing to commit."
             exit 0
           fi
-          git commit -m "assets: add approved Ferris wheel runtime"
+          git commit -m "assets: promote landmark Ferris wheel 1024 runtime"
 
           # Keep the direct-main workflow fast-forward safe if another agent
-          # advanced main while this short promotion job was running.
+          # advanced main while the artifact was being copied.
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
