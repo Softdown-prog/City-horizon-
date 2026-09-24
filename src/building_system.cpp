@@ -216,11 +216,34 @@ template <typename Number>
     definition.required_population_for_full_revenue =
         json_number<std::uint32_t>(json, "requiredPopulationForFullRevenue").value_or(0);
     definition.service_name = json_string(json, "serviceName").value_or("");
-    definition.default_service_price = json_number<std::int64_t>(json, "defaultServicePrice").value_or(0);
-    definition.minimum_service_price = json_number<std::int64_t>(json, "minimumServicePrice").value_or(
-        definition.default_service_price > 0 ? 1 : 0);
-    definition.maximum_service_price = json_number<std::int64_t>(json, "maximumServicePrice").value_or(
-        definition.default_service_price);
+
+    if (const auto pricing = json_object(json, "servicePricingContract")) {
+        const auto contract = json_string(*pricing, "contract").value_or("");
+        const auto currency = json_string(*pricing, "currency").value_or("");
+        const auto storage_unit = json_string(*pricing, "storageUnit").value_or("");
+        const auto initial = json_number<std::int64_t>(*pricing, "initialPrice");
+        const auto minimum = json_number<std::int64_t>(*pricing, "minimumPrice");
+        const auto maximum = json_number<std::int64_t>(*pricing, "maximumPrice");
+        const auto step = json_number<std::int64_t>(*pricing, "priceStep");
+        if (contract != "CH_SERVICE_PRICE_V1" || currency != "USD" || storage_unit != "cent" ||
+            !initial || !minimum || !maximum || !step || *initial <= 0 || *minimum <= 0 ||
+            *maximum < *minimum || *step <= 0 || *initial < *minimum || *initial > *maximum ||
+            ((*initial - *minimum) % *step) != 0 || ((*maximum - *minimum) % *step) != 0) {
+            return std::nullopt;
+        }
+        definition.default_service_price = ch::ServicePrice{*initial, 100, *step};
+        definition.minimum_service_price = ch::ServicePrice{*minimum, 100, *step};
+        definition.maximum_service_price = ch::ServicePrice{*maximum, 100, *step};
+    } else {
+        const std::int64_t default_price = json_number<std::int64_t>(json, "defaultServicePrice").value_or(0);
+        const std::int64_t minimum_price = json_number<std::int64_t>(json, "minimumServicePrice").value_or(
+            default_price > 0 ? 1 : 0);
+        const std::int64_t maximum_price = json_number<std::int64_t>(json, "maximumServicePrice").value_or(default_price);
+        definition.default_service_price = ch::ServicePrice{default_price, 1, 1};
+        definition.minimum_service_price = ch::ServicePrice{minimum_price, 1, 1};
+        definition.maximum_service_price = ch::ServicePrice{maximum_price, 1, 1};
+    }
+
     definition.base_service_customers_per_month =
         json_number<std::uint32_t>(json, "baseServiceCustomersPerMonth").value_or(0);
     definition.service_population_for_full_demand =
@@ -424,9 +447,7 @@ template <typename Number>
         definition.maximum_service_price < definition.minimum_service_price ||
         (definition.default_service_price > 0 &&
             (definition.service_name.empty() || definition.default_service_price < definition.minimum_service_price ||
-             definition.default_service_price > definition.maximum_service_price ||
-             definition.base_service_customers_per_month == 0 ||
-             definition.service_population_for_full_demand == 0)) ||
+             definition.default_service_price > definition.maximum_service_price)) ||
         definition.art_scale <= 0.0F) {
         return std::nullopt;
     }
@@ -865,11 +886,16 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
         instance.rotation = BuildingRotation::r0;
     }
     if (definition.default_service_price > 0) {
-        if (instance.service_price <= 0) instance.service_price = definition.default_service_price;
-        instance.service_price = std::clamp(instance.service_price, definition.minimum_service_price,
-                                            definition.maximum_service_price);
+        const std::int64_t serialized_price = instance.service_price > 0
+            ? static_cast<std::int64_t>(instance.service_price)
+            : static_cast<std::int64_t>(definition.default_service_price);
+        const std::int64_t clamped = std::clamp(
+            serialized_price,
+            static_cast<std::int64_t>(definition.minimum_service_price),
+            static_cast<std::int64_t>(definition.maximum_service_price));
+        instance.service_price = definition.default_service_price.with_minor_units(clamped);
     } else {
-        instance.service_price = 0;
+        instance.service_price = ch::ServicePrice{};
     }
     instances_.push_back(instance);
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
@@ -952,7 +978,9 @@ bool BuildingManager::end_activity(const std::uint64_t instance_id) {
 
 bool BuildingManager::set_service_price(const std::uint64_t instance_id, const BuildingDefinition& definition,
                                         const std::int64_t service_price) {
-    if (definition.default_service_price <= 0 || definition.maximum_service_price < definition.minimum_service_price) {
+    const std::int64_t minimum = definition.minimum_service_price;
+    const std::int64_t maximum = definition.maximum_service_price;
+    if (definition.default_service_price <= 0 || maximum < minimum) {
         return false;
     }
     const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
@@ -961,7 +989,17 @@ bool BuildingManager::set_service_price(const std::uint64_t instance_id, const B
     if (found == instances_.end() || found->definition_id != definition.id) {
         return false;
     }
-    found->service_price = std::clamp(service_price, definition.minimum_service_price, definition.maximum_service_price);
+
+    const std::int64_t current = found->service_price;
+    const std::int64_t step = std::max<std::int64_t>(1, definition.default_service_price.step_minor_units);
+    std::int64_t target = service_price;
+    // Existing UI actions request current +/- 1. For minor-unit contracts,
+    // translate that intent to the definition's configured click step.
+    if (step > 1 && service_price == current + 1) target = current + step;
+    else if (step > 1 && service_price == current - 1) target = current - step;
+
+    target = std::clamp(target, minimum, maximum);
+    found->service_price = definition.default_service_price.with_minor_units(target);
     return true;
 }
 
