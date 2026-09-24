@@ -169,8 +169,35 @@ Esses strips existem para comparar as três poses sem precisar integrar nada ao 
 Os nomes dos strips usam `characterId` e direção da definição. O comando rejeita
 IDs de pose repetidos antes da exportação, evitando sobrescrever um frame.
 O strip ampliado usa a mesma redução com alpha premultiplicado dos PNGs de gameplay.
-Para revisar no terreno do jogo, acrescente `--background assets/terrain/grass_isometric_01.png`.
+Para revisar sobre terreno, acrescente `--background CAMINHO/PARA/TERRENO.png`.
 O fundo é só visualização e nunca entra no PNG RGBA exportado.
+
+### Comparação com conceito visual SOUTH
+
+Há um estudo visual de `south_idle` em
+`art/concepts/visitor_male_01_south_concept.png`, com RGBA 128x128 e pés na
+linha do anchor 116. A pose em 3/4, a separação dos braços e os sapatos têm
+melhor leitura que a V4 procedural na escala de jogo. Gere a comparação:
+
+```bash
+ch-visitor-forge-2d prototype \
+  --definition tools/visitor_forge_2d/definitions/visitor_male_01.south.json \
+  --pose tools/visitor_forge_2d/poses/south_idle.json \
+  --pose tools/visitor_forge_2d/poses/south_walk_a.json \
+  --pose tools/visitor_forge_2d/poses/south_walk_b.json \
+  --asset-root out/visitor_forge_2d/assets \
+  --concept tools/visitor_forge_2d/art/concepts/visitor_male_01_south_concept.png \
+  --output out/visitor_forge_2d/review
+```
+
+O arquivo `visitor_male_01_south_concept_comparison.png` mostra à esquerda o
+`south_idle` procedural e à direita o conceito, ambos no canvas real de 128 px.
+O resumo inclui caminho, SHA-256 e bounds do conceito. É possível acrescentar
+`--background` para comparar sobre um terreno do jogo. O PNG do conceito é um
+alvo artístico estático, não uma fonte de peças para `--art-root`, nem um frame
+de caminhada. Para levá-lo à animação, redesenhar cabeça, cabelo, torso,
+braços e pernas em camadas articuláveis, com rig próprio e revisão de `idle`,
+`walk A` e `walk B` em 128 px antes da integração ao runtime.
 
 ### Refinamento manual sem perda de trabalho
 
@@ -194,7 +221,7 @@ ch-visitor-forge-2d prototype \
   --pose tools/visitor_forge_2d/poses/south_walk_b.json \
   --asset-root out/visitor_forge_2d/assets \
   --art-root tools/visitor_forge_2d/art \
-  --background assets/terrain/grass_isometric_01.png \
+  --background CAMINHO/PARA/TERRENO.png \
   --output out/visitor_forge_2d/visitor_male_01
 ```
 
@@ -259,4 +286,6 @@ O núcleo genérico também poderá ser reaproveitado por funcionários, vendedo
 
 **Estado atual:** núcleo procedural V0.1 + candidato visual SOUTH implementados. A ferramenta constrói partes 2D, compõe `idle`, `walk A`, `walk B`, preserva peças pintadas e produz comparações em escala real. Ainda é um gate artístico; nada foi promovido ao runtime.
 
-**Próxima tarefa:** executar e revisar o primeiro strip produzido pelo pipeline real, ajustar proporções/silhueta/3/4 até o visitante chegar ao padrão visual desejado e somente depois congelar o estilo V1.
+**Próxima tarefa:** desenhar uma biblioteca articulável SOUTH com a linguagem do
+conceito visual e comparar as três poses em terreno no tamanho real. Congelar o
+estilo V1 somente após essa revisão visual.

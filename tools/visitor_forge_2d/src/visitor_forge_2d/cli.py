@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -153,6 +154,31 @@ def command_prototype(args: argparse.Namespace) -> int:
     in_world_path = output_dir / f"{strip_name}_in_world_review.png"
     gameplay_review(gameplay_frames, background).save(in_world_path, format="PNG", optimize=False)
 
+    concept_review = None
+    concept_source = None
+    if getattr(args, "concept", None):
+        idle_index = next((index for index, path in enumerate(args.pose)
+                           if load_pose(path).pose_id == "south_idle"), None)
+        if idle_index is None:
+            raise ValueError("SOUTH concept comparison requires a south_idle pose")
+        concept_path = Path(args.concept)
+        with Image.open(concept_path) as source:
+            source.load()
+            if source.mode != "RGBA" or source.size != definition.canvas.output_size:
+                raise ValueError("Concept must be an RGBA PNG at the definition's output size")
+            concept = source.copy()
+        if concept.getchannel("A").getbbox() is None:
+            raise ValueError("Concept must contain a visible character")
+        concept_review = output_dir / f"{strip_name}_concept_comparison.png"
+        gameplay_review([gameplay_frames[idle_index], concept], background).save(
+            concept_review, format="PNG", optimize=False,
+        )
+        concept_source = {
+            "path": str(concept_path),
+            "sha256": hashlib.sha256(concept_path.read_bytes()).hexdigest(),
+            "bounds": list(concept.getchannel("A").getbbox()),
+        }
+
     measurements = frame_measurements(
         gameplay_frames,
         (definition.canvas.anchor.x, definition.canvas.anchor.y),
@@ -173,6 +199,8 @@ def command_prototype(args: argparse.Namespace) -> int:
         "gameplayStrip": str(gameplay_path),
         "inWorldReview": str(in_world_path),
         "reviewMeasurements": str(metrics_path),
+        "conceptComparison": str(concept_review) if concept_review else None,
+        "conceptSource": concept_source,
         "runtimePromotion": False,
         "nextGate": "visual review at gameplay scale before EAST/WEST/NORTH",
     }
@@ -219,6 +247,7 @@ def build_parser() -> argparse.ArgumentParser:
     prototype.add_argument("--overwrite-parts", action="store_true", help="Replace even manually edited source PNGs")
     prototype.add_argument("--output", required=True)
     prototype.add_argument("--background", help="Optional terrain PNG for a native-size review strip")
+    prototype.add_argument("--concept", help="Optional 128px RGBA SOUTH concept for idle comparison; never exported as an animated frame")
     prototype.set_defaults(func=command_prototype)
 
     return parser
