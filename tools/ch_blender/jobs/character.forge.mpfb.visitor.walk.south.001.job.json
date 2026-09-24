@@ -1,0 +1,13 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "character.forge.mpfb.visitor.walk.south.001",
+  "operation": "blender_script",
+  "script": "tools/character_forge/mpfb_create_system_asset_visitor_walk_south.py",
+  "outputDir": "out/ch_blender_agent/character.forge.mpfb.visitor.walk.south.001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/character.forge.mpfb.visitor.walk.south.001/visitor_male_south_idle.png",
+    "out/ch_blender_agent/character.forge.mpfb.visitor.walk.south.001/visitor_male_south_walk_a.png",
+    "out/ch_blender_agent/character.forge.mpfb.visitor.walk.south.001/visitor_male_south_walk_b.png",
+    "out/ch_blender_agent/character.forge.mpfb.visitor.walk.south.001/visitor_male_south_walk.json"
+  ]
+}
