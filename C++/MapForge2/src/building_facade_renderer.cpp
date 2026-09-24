@@ -11,12 +11,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace ch::studio {
 namespace {
 
 struct Point3 { float x = 0.0F; float y = 0.0F; float z = 0.0F; };
 constexpr std::array<BuildingView, 4> kViews = {BuildingView::South, BuildingView::East, BuildingView::West, BuildingView::North};
+constexpr float kPi = 3.14159265358979323846F;
 
 Point3 rotatePoint(const Point3 p, const BuildingView view) {
     switch (view) {
@@ -96,6 +98,36 @@ QPolygonF faceRect(const Point3 a, const Point3 b, const float t0, const float t
                    const float z0, const float z1, const BuildingView view, const QSize canvas) {
     return {projectPoint(lerpPoint(a, b, t0, z0), view, canvas), projectPoint(lerpPoint(a, b, t1, z0), view, canvas),
             projectPoint(lerpPoint(a, b, t1, z1), view, canvas), projectPoint(lerpPoint(a, b, t0, z1), view, canvas)};
+}
+
+QPolygonF archedFace(const Point3 a, const Point3 b, const float center, const float half_width,
+                     const float z0, const float spring_z, const float arch_height,
+                     const BuildingView view, const QSize canvas) {
+    const float left = center - half_width;
+    const float right = center + half_width;
+    QPolygonF polygon;
+    polygon << projectPoint(lerpPoint(a, b, left, z0), view, canvas)
+            << projectPoint(lerpPoint(a, b, left, spring_z), view, canvas);
+    constexpr int kSegments = 18;
+    for (int i = 0; i <= kSegments; ++i) {
+        const float angle = kPi - kPi * static_cast<float>(i) / static_cast<float>(kSegments);
+        const float t = center + std::cos(angle) * half_width;
+        const float z = spring_z + std::sin(angle) * arch_height;
+        polygon << projectPoint(lerpPoint(a, b, t, z), view, canvas);
+    }
+    polygon << projectPoint(lerpPoint(a, b, right, z0), view, canvas);
+    return polygon;
+}
+
+QPolygonF starPolygon(const QPointF center, const qreal outer_radius, const qreal inner_radius) {
+    QPolygonF polygon;
+    for (int i = 0; i < 10; ++i) {
+        const qreal radius = i % 2 == 0 ? outer_radius : inner_radius;
+        const qreal angle = -static_cast<qreal>(kPi) * 0.5 + static_cast<qreal>(i) * static_cast<qreal>(kPi) / 5.0;
+        polygon << QPointF(center.x() + std::cos(angle) * radius,
+                           center.y() + std::sin(angle) * radius);
+    }
+    return polygon;
 }
 
 void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec& spec,
@@ -311,6 +343,158 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             const QPointF root = projectPoint(lerpPoint(a, b, t, z1), view, canvas);
             painter.drawLine(root, QPointF(root.x(), root.y() - 4.0));
         }
+    } else if (module.kind == BuildingFacadeModuleKind::TicketWindow) {
+        const float z0 = base_z + floor_h * 0.20F;
+        const float z1 = base_z + floor_h * 0.68F;
+        const float inset_t = std::min(0.020F, width * 0.08F);
+        const float inset_z = floor_h * 0.035F;
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.52F), 1.05));
+        painter.setBrush(scaledColor(spec.trim_color, 0.92F));
+        painter.drawPolygon(faceRect(a, b, t0, t1, z0, z1, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.30F), 0.90));
+        painter.setBrush(scaledColor(spec.wall_color, 0.24F));
+        painter.drawPolygon(faceRect(a, b, t0 + inset_t, t1 - inset_t,
+                                     z0 + inset_z, z1 - inset_z, view, canvas));
+        const float jamb = std::min(0.018F, width * 0.07F);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(scaledColor(spec.glass_color, 0.90F));
+        painter.drawPolygon(faceRect(a, b, t0 + inset_t, t0 + inset_t + jamb,
+                                     z0 + inset_z, z1 - inset_z, view, canvas));
+        painter.drawPolygon(faceRect(a, b, t1 - inset_t - jamb, t1 - inset_t,
+                                     z0 + inset_z, z1 - inset_z, view, canvas));
+        const float counter_z0 = z0 - floor_h * 0.055F;
+        const float counter_z1 = z0 + floor_h * 0.025F;
+        painter.setPen(QPen(scaledColor(spec.door_color, 0.52F), 1.0));
+        painter.setBrush(scaledColor(spec.door_color, 1.04F));
+        painter.drawPolygon(faceRect(a, b, t0 - 0.018F, t1 + 0.018F,
+                                     counter_z0, counter_z1, view, canvas));
+    } else if (module.kind == BuildingFacadeModuleKind::ArchedPassage) {
+        const float half = width * 0.5F;
+        const float z0 = base_z + floor_h * 0.08F;
+        const float outer_spring = base_z + floor_h * 0.55F;
+        const float outer_arch = floor_h * 0.24F;
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F), 1.15));
+        painter.setBrush(scaledColor(spec.trim_color, 0.98F));
+        painter.drawPolygon(archedFace(a, b, center, half, z0, outer_spring, outer_arch, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.22F), 1.0));
+        painter.setBrush(scaledColor(spec.wall_color, 0.20F));
+        painter.drawPolygon(archedFace(a, b, center, half * 0.72F,
+                                       z0 + floor_h * 0.01F,
+                                       base_z + floor_h * 0.53F,
+                                       floor_h * 0.18F, view, canvas));
+    } else if (module.kind == BuildingFacadeModuleKind::StripedAwning) {
+        const float z = base_z + floor_h * 0.73F;
+        const Point3 n = outwardNormal(edge);
+        constexpr int kStripes = 5;
+        painter.setPen(Qt::NoPen);
+        for (int stripe = 0; stripe < kStripes; ++stripe) {
+            const float s0 = t0 + (t1 - t0) * static_cast<float>(stripe) / static_cast<float>(kStripes);
+            const float s1 = t0 + (t1 - t0) * static_cast<float>(stripe + 1) / static_cast<float>(kStripes);
+            const Point3 i0 = lerpPoint(a, b, s0, z);
+            const Point3 i1 = lerpPoint(a, b, s1, z);
+            const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
+            const Point3 o1{i1.x + n.x * 0.28F, i1.y + n.y * 0.28F, z - floor_h * 0.095F};
+            painter.setBrush(stripe % 2 == 0 ? spec.accent_color : spec.trim_color);
+            painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
+                                          projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
+        }
+        const Point3 i0 = lerpPoint(a, b, t0, z), i1 = lerpPoint(a, b, t1, z);
+        const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
+        const Point3 o1{i1.x + n.x * 0.28F, i1.y + n.y * 0.28F, z - floor_h * 0.095F};
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.48F), 1.0));
+        painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
+                                      projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
+    } else if (module.kind == BuildingFacadeModuleKind::CurvedPediment) {
+        const float z_base = base_z + floor_h * 0.76F;
+        const float z_shoulder = base_z + floor_h * 0.93F;
+        const float z_peak = base_z + floor_h * 1.16F;
+        QPolygonF plaque{
+            projectPoint(lerpPoint(a, b, t0, z_base), view, canvas),
+            projectPoint(lerpPoint(a, b, t1, z_base), view, canvas),
+            projectPoint(lerpPoint(a, b, t1, z_shoulder), view, canvas),
+            projectPoint(lerpPoint(a, b, center + width * 0.27F, z_shoulder), view, canvas),
+            projectPoint(lerpPoint(a, b, center + width * 0.18F, z_peak - floor_h * 0.06F), view, canvas),
+            projectPoint(lerpPoint(a, b, center, z_peak), view, canvas),
+            projectPoint(lerpPoint(a, b, center - width * 0.18F, z_peak - floor_h * 0.06F), view, canvas),
+            projectPoint(lerpPoint(a, b, center - width * 0.27F, z_shoulder), view, canvas),
+            projectPoint(lerpPoint(a, b, t0, z_shoulder), view, canvas),
+        };
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.48F), 1.1));
+        painter.setBrush(spec.trim_color);
+        painter.drawPolygon(plaque);
+
+        const float inner_t0 = t0 + width * 0.09F;
+        const float inner_t1 = t1 - width * 0.09F;
+        const float inner_peak = z_peak - floor_h * 0.055F;
+        QPolygonF inset{
+            projectPoint(lerpPoint(a, b, inner_t0, z_base + floor_h * 0.055F), view, canvas),
+            projectPoint(lerpPoint(a, b, inner_t1, z_base + floor_h * 0.055F), view, canvas),
+            projectPoint(lerpPoint(a, b, inner_t1, z_shoulder - floor_h * 0.015F), view, canvas),
+            projectPoint(lerpPoint(a, b, center + width * 0.14F, inner_peak - floor_h * 0.04F), view, canvas),
+            projectPoint(lerpPoint(a, b, center, inner_peak), view, canvas),
+            projectPoint(lerpPoint(a, b, center - width * 0.14F, inner_peak - floor_h * 0.04F), view, canvas),
+            projectPoint(lerpPoint(a, b, inner_t0, z_shoulder - floor_h * 0.015F), view, canvas),
+        };
+        painter.setPen(QPen(scaledColor(spec.glass_color, 0.58F), 0.85));
+        painter.setBrush(scaledColor(spec.glass_color, 0.76F));
+        painter.drawPolygon(inset);
+        const QPointF star_center = projectPoint(lerpPoint(a, b, center, base_z + floor_h * 1.01F), view, canvas);
+        painter.setPen(QPen(scaledColor(spec.ornament_color, 0.62F), 0.75));
+        painter.setBrush(spec.ornament_color);
+        painter.drawPolygon(starPolygon(star_center, 7.0, 3.0));
+    } else if (module.kind == BuildingFacadeModuleKind::CornerQuoins) {
+        const QColor stone = blendColor(scaledColor(spec.wall_color, 0.78F), spec.door_color, 0.12F);
+        const QColor stone_light = blendColor(scaledColor(spec.wall_color, 0.92F), spec.trim_color, 0.18F);
+        constexpr int kRows = 4;
+        for (int row = 0; row < kRows; ++row) {
+            const float z0 = base_z + floor_h * (0.12F + static_cast<float>(row) * 0.17F);
+            const float z1 = z0 + floor_h * 0.11F;
+            const QColor left_fill = row % 2 == 0 ? stone_light : stone;
+            const QColor right_fill = row % 2 == 0 ? stone : stone_light;
+            painter.setPen(QPen(scaledColor(stone, 0.66F), 0.75));
+            painter.setBrush(left_fill);
+            painter.drawPolygon(faceRect(a, b, 0.005F, 0.085F, z0, z1, view, canvas));
+            painter.setBrush(right_fill);
+            painter.drawPolygon(faceRect(a, b, 0.915F, 0.995F, z0, z1, view, canvas));
+        }
+    } else if (module.kind == BuildingFacadeModuleKind::EaveTrim) {
+        const float z = static_cast<float>(BuildingComposer::effectiveWallHeightPx(spec)) - 1.2F;
+        const Point3 n = outwardNormal(edge);
+        const Point3 p0 = lerpPoint(a, b, t0, z);
+        const Point3 p1 = lerpPoint(a, b, t1, z);
+        const Point3 o0{p0.x + n.x * 0.025F, p0.y + n.y * 0.025F, z};
+        const Point3 o1{p1.x + n.x * 0.025F, p1.y + n.y * 0.025F, z};
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(scaledColor(spec.secondary_accent_color, 0.72F), 4.4,
+                            Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+        painter.drawLine(projectPoint(o0, view, canvas), projectPoint(o1, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.secondary_accent_color, 1.05F), 1.35,
+                            Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+        painter.drawLine(projectPoint({o0.x, o0.y, z + 1.3F}, view, canvas),
+                         projectPoint({o1.x, o1.y, z + 1.3F}, view, canvas));
+    } else if (module.kind == BuildingFacadeModuleKind::RoofFlag) {
+        const float wall_h = static_cast<float>(BuildingComposer::effectiveWallHeightPx(spec));
+        const float roof_h = static_cast<float>(std::max(8, spec.roof_height_px));
+        const float base_height = spec.roof_style == BuildingRoofStyle::Pyramid
+            ? wall_h + roof_h : wall_h + roof_h * 0.78F;
+        const QPointF pole_base = projectPoint({0.0F, 0.0F, base_height + 1.0F}, view, canvas);
+        const QPointF pole_top = projectPoint({0.0F, 0.0F, base_height + 31.0F}, view, canvas);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(scaledColor(spec.ornament_color, 0.78F), 2.4, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(pole_base, pole_top);
+        painter.setPen(QPen(scaledColor(spec.ornament_color, 0.62F), 0.8));
+        painter.setBrush(spec.ornament_color);
+        painter.drawEllipse(pole_top, 3.2, 3.2);
+        QPolygonF flag{
+            QPointF(pole_top.x() + 1.0, pole_top.y() + 3.0),
+            QPointF(pole_top.x() + 20.0, pole_top.y() + 5.0),
+            QPointF(pole_top.x() + 30.0, pole_top.y() + 10.0),
+            QPointF(pole_top.x() + 22.0, pole_top.y() + 15.0),
+            QPointF(pole_top.x() + 8.0, pole_top.y() + 13.0),
+            QPointF(pole_top.x() + 1.0, pole_top.y() + 11.0),
+        };
+        painter.drawPolygon(flag);
     }
     painter.restore();
 }
@@ -421,8 +605,16 @@ QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, cons
     drawLocalizedAmbientOcclusion(painter, spec, corners, visible_edges, near_index, view, canvas);
     drawFloorBands(painter, spec, corners, visible_edges, view, canvas);
     if (spec.facade_editor_enabled) {
+        bool roof_flag_drawn = false;
         for (const auto& module : spec.facade_modules) {
             const int edge = edgeIndex(module.edge);
+            if (module.kind == BuildingFacadeModuleKind::RoofFlag) {
+                if (!roof_flag_drawn) {
+                    drawModule(painter, spec, module, corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
+                    roof_flag_drawn = true;
+                }
+                continue;
+            }
             if (edge == visible_edges[0] || edge == visible_edges[1])
                 drawModule(painter, spec, module, corners[edge], corners[(edge + 1) % 4], edge, view, canvas);
         }
