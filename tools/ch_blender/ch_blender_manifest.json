@@ -20,6 +20,25 @@
     "style": "CH_STYLIZED_PRERENDER_V1",
     "bake": "TYCOON_ASSET_BAKE_V1"
   },
+  "renderPipelines": {
+    "contract": "CH_RENDER_PIPELINES_V1",
+    "manifest": "tools/tycoon_photo_studio/render_pipelines/ch_render_pipelines_v1.json",
+    "default": "compact_256",
+    "classes": {
+      "compact_256": {
+        "preset": "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json",
+        "finalResolution": [256, 256]
+      },
+      "large_asset_1024": {
+        "preset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+        "finalResolution": [1024, 1024]
+      },
+      "large_asset_2048": {
+        "preset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_2048.json",
+        "finalResolution": [2048, 2048]
+      }
+    }
+  },
   "agentInterface": {
     "contract": "CH_BLENDER_AGENT_JOB_V1",
     "reportContract": "CH_BLENDER_AGENT_REPORT_V1",
@@ -27,11 +46,7 @@
     "worker": "tools/ch_blender/agent_worker.py",
     "machineReadable": true,
     "interactiveUiRequired": false,
-    "operations": [
-      "guarded_blender_script",
-      "canonical_bake",
-      "blender_script"
-    ]
+    "operations": ["guarded_blender_script", "canonical_bake", "blender_script"]
   },
   "internalBuild": {
     "contract": "CH_BLENDER_SOURCE_BUILD_V1",
@@ -48,10 +63,7 @@
     "revision": 1,
     "githubAction": ".github/actions/setup-ch-blender/action.yml",
     "sharedAcrossWorkflows": true,
-    "invalidateWhen": [
-      "upstream.tag changes",
-      "cache.revision changes"
-    ]
+    "invalidateWhen": ["upstream.tag changes", "cache.revision changes"]
   },
   "policy": {
     "vendorFullUpstreamSource": false,

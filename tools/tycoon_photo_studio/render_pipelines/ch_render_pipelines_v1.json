@@ -1,0 +1,44 @@
+{
+  "contract": "CH_RENDER_PIPELINES_V1",
+  "defaultPipeline": "compact_256",
+  "pipelines": {
+    "compact_256": {
+      "purpose": "Default runtime art for normal buildings, props, scenery and most attractions.",
+      "studioPreset": "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json",
+      "sourceResolution": [1024, 1024],
+      "finalResolution": [256, 256],
+      "selectionRule": "Use unless the asset is a large landmark or fine structural detail visibly degrades at gameplay scale."
+    },
+    "large_asset": {
+      "purpose": "Large landmarks, tall buildings, major attractions and assets with thin structural detail.",
+      "defaultPreset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+      "presets": {
+        "1024": {
+          "studioPreset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+          "sourceResolution": [2048, 2048],
+          "finalResolution": [1024, 1024]
+        },
+        "2048": {
+          "studioPreset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_2048.json",
+          "sourceResolution": [4096, 4096],
+          "finalResolution": [2048, 2048]
+        }
+      },
+      "selectionRule": "Use 1024 first. Escalate to 2048 only when map-scale inspection proves 1024 is insufficient or the runtime asset genuinely needs that pixel area."
+    }
+  },
+  "sharedContracts": {
+    "camera": "CH_CAMERA_V1",
+    "studio": "CH_TYCOON_STUDIO_V1",
+    "style": "CH_STYLIZED_PRERENDER_V1",
+    "bake": "TYCOON_ASSET_BAKE_V1"
+  },
+  "policy": {
+    "sameCameraAndLightingAcrossPipelines": true,
+    "transparentRGBA": true,
+    "fourCanonicalDirections": true,
+    "largePipelineIsNotAutomatic": true,
+    "mapForgeReviewRequiredForLargeAssets": true,
+    "doNotUpscaleCompactOutput": true
+  }
+}
