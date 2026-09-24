@@ -183,9 +183,11 @@ int main(int argc, char** argv) {
     };
     if (!writeAsset(output_dir, "building_composer_facade_floor_gate", facade_gate)) return 7;
 
-    // Park ticket booth: authored entirely as a reusable Building Composer recipe.
-    // No standalone renderer and no Blender source are involved. The same 2x2
-    // structure is rotated by the Composer for all four game directions.
+    // Park ticket booth reference: static 2D architecture authored entirely in
+    // Building Composer. In the canonical South review the ticket counter lives
+    // on the left visible face (South edge), while the entrance arch and ornate
+    // blue pediment live on the right visible face (East edge), matching the
+    // supplied reference instead of flattening both functions onto one wall.
     ch::studio::BuildingComposerSpec ticket_booth = residence;
     ticket_booth.footprint_width_tiles = 2;
     ticket_booth.footprint_depth_tiles = 2;
@@ -226,10 +228,15 @@ int main(int argc, char** argv) {
         {Kind::CornerQuoins, Edge::East, 0, 0.50F, 0.90F, true},
         {Kind::CornerQuoins, Edge::North, 0, 0.50F, 0.90F, true},
         {Kind::CornerQuoins, Edge::West, 0, 0.50F, 0.90F, true},
-        {Kind::TicketWindow, Edge::South, 0, 0.23F, 0.34F, true},
-        {Kind::StripedAwning, Edge::South, 0, 0.23F, 0.40F, true},
-        {Kind::ArchedPassage, Edge::South, 0, 0.72F, 0.42F, true},
-        {Kind::CurvedPediment, Edge::South, 0, 0.72F, 0.36F, true},
+
+        // Left visible facade in the canonical South view.
+        {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.38F, true},
+        {Kind::StripedAwning, Edge::South, 0, 0.50F, 0.46F, true},
+
+        // Right/front facade in the canonical South view.
+        {Kind::ArchedPassage, Edge::East, 0, 0.52F, 0.48F, true},
+        {Kind::CurvedPediment, Edge::East, 0, 0.52F, 0.46F, true},
+
         {Kind::EaveTrim, Edge::South, 0, 0.50F, 0.96F, true},
         {Kind::EaveTrim, Edge::East, 0, 0.50F, 0.96F, true},
         {Kind::EaveTrim, Edge::North, 0, 0.50F, 0.96F, true},
