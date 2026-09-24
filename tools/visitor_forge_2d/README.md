@@ -282,6 +282,12 @@ também parecem caminhar para sudeste. Ajustar apenas os ângulos das juntas nã
 muda essa orientação. Tentativas de gerar um novo master frontal alteraram o
 rosto, as proporções e o acabamento; não substituíram os PNGs versionados.
 
+Um estudo posterior está em `art/concepts/south_front_candidate_v1/`: traz
+master frontal, `idle/walk A/walk B` e comparações no tamanho real e a 56 px.
+Ele pode ser escolhido separadamente no teste F8 quando o build habilita
+`CH_VISITOR_FORGE_PREVIEW=ON`. Ainda é candidato para revisão, não substitui
+o SOUTH atual e precisa ser comparado com o personagem original em movimento.
+
 Um novo desenho SOUTH precisa manter o mesmo personagem, paleta, textura e
 silhueta na escala de jogo; rosto e peito devem ler como frente, sem apontar
 para EAST. Ao corrigir SOUTH, revisar juntos `idle`, `walk_a` e `walk_b` para

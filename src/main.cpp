@@ -1683,6 +1683,7 @@ int main() {
             case 1: return "citizen_female_light_blue";
             case 2: return "citizen_female_dark_coral";
             case 3: return "visitor_male_01_forge_preview";
+            case 4: return "visitor_male_01_south_front_candidate";
             default: return "worker_cleaner_female";
         }
     };
@@ -1691,11 +1692,12 @@ int main() {
             case 1: return "CITIZEN LIGHT BLUE";
             case 2: return "CITIZEN DARK CORAL";
             case 3: return "VISITOR FORGE PREVIEW";
+            case 4: return "VISITOR SOUTH FRONT CANDIDATE";
             default: return "CLEANER";
         }
     };
     const auto pedestrian_visual_preset = [&](const float speed) {
-        if (pedestrian_visual_index == 3) {
+        if (pedestrian_visual_index >= 3) {
             // 128 px canvas, 97 px body: 97 * (56 / 97) = 56 px at zoom 1.
             // The shared foot pivot is [64, 116] in every direction and pose.
             return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 56.0F / 97.0F,
@@ -1714,7 +1716,7 @@ int main() {
         }();
         const PedestrianVisualDefinition preset = pedestrian_visual_preset(speed);
         const char* preset_name = mixamo_gait_preset_index == 0 ? "A 0.50" : mixamo_gait_preset_index == 1 ? "B 0.65" : "C 0.80";
-        const bool visitor_preview = pedestrian_visual_index == 3;
+        const bool visitor_preview = pedestrian_visual_index >= 3;
         const int duration_ms = visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
         constexpr int kRequiredSidewalkTiles = 6;
@@ -3045,7 +3047,8 @@ int main() {
                         send_mixamo_se_test();
                         break;
                     case SDL_SCANCODE_F8: {
-                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 : 4;
+                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
+                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 : 5;
                         pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
                         pedestrians.configure_visual_test(pedestrian_visual_preset(0.80F));
                         status = std::string("PEDESTRIAN LOOK: ") + std::string(pedestrian_visual_label());
