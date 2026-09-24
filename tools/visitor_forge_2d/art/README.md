@@ -17,3 +17,6 @@ fontes persistentes.
 articulável de `build-concept-rig`. As peças derivadas desse estudo vão para
 `out/` e podem ser reconstruídas. Não confunda o master e seus previews com
 camadas autoradas em `art/visitor_male_01/south/` ou com arte aprovada no jogo.
+Os masters `east`, `north` e `west` fazem parte da mesma identidade; o comando
+`review-concept-directions` gera os 12 frames e um manifesto de proveniência.
+`concepts/frames_preview/` contém apenas cópias para revisão visual.

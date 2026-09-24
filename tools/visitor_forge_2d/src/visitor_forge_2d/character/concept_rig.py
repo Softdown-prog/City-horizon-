@@ -1,4 +1,4 @@
-"""Reproducible SOUTH cutout study from the approved character concept.
+"""Reproducible directional cutout study from one character's concept masters.
 
 This is a narrow, character-specific segmentation recipe. It never invents
 unseen surfaces; the walking gate must reveal whether a joint needs repainting.
@@ -38,6 +38,20 @@ JOINTS = [
     ("ankle_right", "knee_right", (283, 409)),
 ]
 
+# Screen-space shoulder/elbow placements are measured on each 512px master.
+# Keeping them per view avoids deforming a side-view arm around the SOUTH rig.
+VIEW_ARM_JOINTS = {
+    "east": {"shoulder_left": (222, 187), "elbow_left": (218, 230),
+             "wrist_left": (221, 277), "shoulder_right": (286, 190),
+             "elbow_right": (298, 230), "wrist_right": (301, 261)},
+    "north": {"shoulder_left": (215, 184), "elbow_left": (196, 228),
+              "wrist_left": (195, 277), "shoulder_right": (297, 184),
+              "elbow_right": (316, 228), "wrist_right": (317, 277)},
+    "west": {"shoulder_left": (223, 190), "elbow_left": (212, 229),
+             "wrist_left": (213, 261), "shoulder_right": (287, 187),
+             "elbow_right": (296, 230), "wrist_right": (293, 278)},
+}
+
 JOINT_FOR_PART = {
     "head": "head", "hair": "head", "torso": "spine",
     "upper_arm_left": "shoulder_left", "lower_arm_left": "elbow_left",
@@ -57,23 +71,30 @@ Z_INDEX = {
 }
 
 
-def _part_at(x: int, y: int, rgb: tuple[int, int, int]) -> str:
+def _part_at(x: int, y: int, rgb: tuple[int, int, int], direction: str) -> str:
     r, g, b = rgb
-    if y < 163 and x >= 218:
+    if y < 174 and r > g * 1.08 and r > b * 1.2:
         return "hair" if (y < 96 or (r < 172 and g < 135 and b < 115)) else "head"
 
     # The shirt edge turns inward around the elbows. Assign each visible
     # source pixel once, so the unposed cutout reconstructs the source exactly.
-    left_edge = 222 if y < 195 else 212 if y < 220 else 211
-    right_edge = 292 if y < 210 else 296 if y < 246 else 299
+    if direction == "east":
+        left_edge = 238 if y < 241 else 236
+        right_edge = 283 if y < 241 else 289
+    elif direction == "west":
+        left_edge = 223 if y < 241 else 220
+        right_edge = 276 if y < 241 else 274
+    elif direction == "north":
+        left_edge, right_edge = 220, 292
+    else:
+        left_edge = 222 if y < 195 else 212 if y < 220 else 211
+        right_edge = 292 if y < 210 else 296 if y < 246 else 299
     if y < 314 and x < left_edge:
         return ("upper_arm_left" if y < 223 else
                 "lower_arm_left" if y < 281 else "hand_left")
     if y < 303 and x >= right_edge:
         return ("upper_arm_right" if y < 221 else
                 "lower_arm_right" if y < 267 else "hand_right")
-    if y < 168 and x >= 218:
-        return "head"
     if y < 281:
         return "torso"
 
@@ -85,8 +106,10 @@ def _part_at(x: int, y: int, rgb: tuple[int, int, int]) -> str:
 
 
 def build_concept_rig(master_path: str | Path, asset_root: str | Path,
-                      definition_path: str | Path) -> dict:
+                      definition_path: str | Path, direction: str = "south") -> dict:
     """Split one immutable 512px master into compositable RGBA parts."""
+    if direction not in {"south", "east", "north", "west"}:
+        raise ValueError(f"Unsupported concept direction: {direction}")
     master_path = Path(master_path)
     master_sha256 = hashlib.sha256(master_path.read_bytes()).hexdigest()
     with Image.open(master_path) as file:
@@ -104,7 +127,7 @@ def build_concept_rig(master_path: str | Path, asset_root: str | Path,
         for x in range(master.width):
             rgba = pixels[x, y]
             if rgba[3]:
-                targets[_part_at(x, y, rgba[:3])][x, y] = rgba
+                targets[_part_at(x, y, rgba[:3], direction)][x, y] = rgba
 
     # The masks form a lossless partition before posing. This catches gaps
     # introduced by later edits to the classifier or master.
@@ -121,7 +144,7 @@ def build_concept_rig(master_path: str | Path, asset_root: str | Path,
     shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(6))
     shadow = Image.new("RGBA", shadow_mask.size, (23, 25, 19, 0))
     shadow.putalpha(shadow_mask)
-    shadow_relative = "visitor_male_01/south_concept/ground_shadow.png"
+    shadow_relative = f"visitor_male_01/{direction}_concept/ground_shadow.png"
     shadow_path = root / shadow_relative
     shadow_path.parent.mkdir(parents=True, exist_ok=True)
     shadow.save(shadow_path, format="PNG", optimize=False)
@@ -133,7 +156,7 @@ def build_concept_rig(master_path: str | Path, asset_root: str | Path,
         box = image.getchannel("A").getbbox()
         if box is None:
             raise ValueError(f"Empty concept rig part: {name}")
-        relative = f"visitor_male_01/south_concept/{name}.png"
+        relative = f"visitor_male_01/{direction}_concept/{name}.png"
         destination = root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         image.crop(box).save(destination, format="PNG", optimize=False)
@@ -143,17 +166,18 @@ def build_concept_rig(master_path: str | Path, asset_root: str | Path,
                        "zIndex": Z_INDEX[name]})
 
     definition = {
-        "forgeContractVersion": "CH_VISITOR_FORGE_2D_SOUTH_CUTOUT_STUDY_V1",
-        "characterId": "visitor_male_01", "direction": "south",
+        "forgeContractVersion": "CH_VISITOR_FORGE_2D_DIRECTIONAL_CUTOUT_STUDY_V1",
+        "characterId": "visitor_male_01", "direction": direction,
         "canvas": {"workingSize": [512, 512], "outputSize": [128, 128],
                    "anchor": [64, 116]},
         "palette": {},
-        "joints": [{"id": name, "position": list(position), **({"parent": parent} if parent else {})}
+        "joints": [{"id": name, "position": list(VIEW_ARM_JOINTS.get(direction, {}).get(name, position)),
+                    **({"parent": parent} if parent else {})}
                    for name, parent, position in JOINTS],
         "layers": layers,
         "parts": [{"id": name, "layer": name, "joint": JOINT_FOR_PART[name]}
                   for name in PARTS],
-        "visualStyle": {"source": "concept_cutout_study",
+        "visualStyle": {"source": "concept_cutout_study", "direction": direction,
                         "master": str(master_path), "masterSha256": master_sha256,
                         "runtimePromotion": False},
     }

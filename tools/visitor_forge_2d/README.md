@@ -235,9 +235,44 @@ o master ou crie uma biblioteca autorada própria para refinamentos duráveis.
 
 **Limite do estudo:** o recorte de uma imagem chapada não contém a anatomia
 escondida atrás de roupas e membros. Ele pode criar frestas ao aumentar o
-movimento. O estudo só vale para SOUTH e passos curtos; ainda pede retoque
-artístico das juntas em todas as poses e teste no mapa, junto a construções,
-antes de qualquer promoção ao runtime.
+movimento. As vistas e passos curtos ainda pedem retoque artístico das juntas
+e teste no mapa, junto a construções, antes de qualquer promoção ao runtime.
+
+### Quatro direções do mesmo visitante
+
+Os quatro masters RGBA de 512 px em `art/concepts/visitor_male_01_*_master.png`
+definem SOUTH, EAST, NORTH e WEST do `visitor_male_01`. O SOUTH anterior foi
+preservado; EAST e WEST são desenhos laterais próprios com a luz fixa, não
+espelhos do SOUTH. Todas as vistas usam o mesmo canvas, anchor, personagem,
+paleta visual e passos curtos. As vistas novas foram desenhadas a partir do
+personagem canônico, mas são estudos de arte: sem uma fonte 3D não há como
+recuperar automaticamente as superfícies ocultas com precisão garantida.
+
+Um comando recompõe 16 camadas por direção (15 do corpo e sombra), gera
+`idle`, `walk A`, `walk B` e entrega o painel de 12 frames, as métricas e os
+hashes de origem:
+
+```bash
+ch-visitor-forge-2d review-concept-directions \
+  --tool-root tools/visitor_forge_2d \
+  --asset-root out/visitor_forge_2d/directional_assets \
+  --output out/visitor_forge_2d/directional_review
+```
+
+`--background CAMINHO/PARA/TERRENO.png` acrescenta somente o terreno no
+preview. O painel tem as linhas SOUTH, EAST, NORTH e WEST, e as colunas
+`idle`, `walk A`, `walk B`. A captura inicial está em
+`art/concepts/visitor_male_01_directional_walk_preview.png`; PNGs individuais
+de revisão estão em `art/concepts/frames_preview/`. A execução atual mantém
+o último pixel opaco do corpo na linha 115 em todos os 12 frames, com anchor
+[64, 116]. Cada JSON de frame guarda direção e hash das partes; o manifesto
+`visitor_male_01_directional_review.json` guarda hash do master por direção e
+`artApproved: false`.
+
+Os PNGs versionados são **prévia**, não catálogo de sprites do runtime. Antes
+de classificar esse conjunto, verificar as vistas no mapa, retocar as juntas
+visíveis durante a caminhada e confirmar que EAST/WEST têm leitura direcional
+distinta perto dos elementos da cidade.
 
 ### Refinamento manual sem perda de trabalho
 
@@ -296,7 +331,8 @@ A engine continua consumindo apenas PNG RGBA + metadata; ela não deve depender 
 
 ## Gate de qualidade
 
-Antes de qualquer expansão para EAST/WEST/NORTH ou visitantes femininos, o conjunto SOUTH deve ser validado em três níveis:
+Antes de aprovar EAST/WEST/NORTH ou novos visitantes para uso no jogo, o
+conjunto deve ser validado em três níveis:
 
 1. visual grande para inspecionar forma e juntas;
 2. visual em 128x128/tamanho real de gameplay;
@@ -308,13 +344,12 @@ silhueta, roupa, perspectiva ou qualidade de arte.
 
 ## Próximos passos artísticos
 
-O protótipo atual ainda não atinge a referência: a pose SOUTH permanece frontal e
-as massas da roupa/membros parecem recortes rígidos em escala real. Antes de multiplicar
-personagens, desenhar e aprovar **uma** biblioteca de peças para um visitante em 3/4,
-incluindo roupa, cabelo e rosto em planos claros. O procedural deve controlar rig,
-proporção, paleta e variações pequenas; mudanças reais de figurino e silhueta pedem
-peças desenhadas próprias. Depois, criar bibliotecas específicas para EAST/WEST/NORTH
-com o mesmo anchor e um preview sobre o mapa. Não derivar essas vistas espelhando SOUTH.
+O gerador procedural V4 continua aquém do desenho de referência. O estudo do
+mesmo personagem nas quatro direções fornece uma base melhor de silhueta,
+roupa e rosto. Retocar as articulações descobertas pelo movimento, comparar
+em tamanho real no mapa e então transformar os masters em bibliotecas de peças
+autoradas. O procedural pode controlar rig, paleta e variações pequenas; novas
+roupas e silhuetas exigirão desenhos próprios.
 
 ## Integração futura
 
@@ -324,8 +359,10 @@ O núcleo genérico também poderá ser reaproveitado por funcionários, vendedo
 
 ## Status
 
-**Estado atual:** núcleo procedural V0.1 + candidato visual SOUTH implementados. A ferramenta constrói partes 2D, compõe `idle`, `walk A`, `walk B`, preserva peças pintadas e produz comparações em escala real. Ainda é um gate artístico; nada foi promovido ao runtime.
+**Estado atual:** núcleo procedural V0.1 e estudo do mesmo visitante em quatro
+direções, com três frames por direção e comparação em escala real. Ainda é um
+gate artístico; nada foi promovido ao runtime.
 
-**Próxima tarefa:** retocar as juntas e a roupa do estudo articulável SOUTH,
-revisar as três poses no mapa próximo a construções e aprovar a silhueta no
-tamanho real. Congelar o estilo V1 somente após essa revisão visual.
+**Próxima tarefa:** revisar os 12 frames em uma captura real do mapa próxima a
+construções, retocar as juntas que apresentarem frestas e aprovar cada
+direção. Congelar o estilo V1 somente após essa revisão visual.

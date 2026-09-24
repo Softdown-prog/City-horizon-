@@ -61,7 +61,8 @@ def command_build_assets(args: argparse.Namespace) -> int:
 
 
 def command_build_concept_rig(args: argparse.Namespace) -> int:
-    result = build_concept_rig(args.master, args.asset_root, args.definition_output)
+    result = build_concept_rig(args.master, args.asset_root, args.definition_output,
+                               direction=args.direction)
     print(json.dumps({"status": "ok", **result}, indent=2))
     return 0
 
@@ -164,10 +165,11 @@ def command_prototype(args: argparse.Namespace) -> int:
     concept_review = None
     concept_source = None
     if getattr(args, "concept", None):
+        idle_id = f"{definition.direction}_idle"
         idle_index = next((index for index, path in enumerate(args.pose)
-                           if load_pose(path).pose_id == "south_idle"), None)
+                           if load_pose(path).pose_id == idle_id), None)
         if idle_index is None:
-            raise ValueError("SOUTH concept comparison requires a south_idle pose")
+            raise ValueError(f"Concept comparison requires a {idle_id} pose")
         concept_path = Path(args.concept)
         with Image.open(concept_path) as source:
             source.load()
@@ -216,6 +218,66 @@ def command_prototype(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_review_concept_directions(args: argparse.Namespace) -> int:
+    """Build and review four views of one fixed character without runtime promotion."""
+    tool_root = Path(args.tool_root)
+    asset_root = Path(args.asset_root)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    background = None
+    if args.background:
+        with Image.open(args.background) as source:
+            background = source.convert("RGBA")
+
+    direction_order = ("south", "east", "north", "west")
+    panels = []
+    manifest = {"contract": "CH_VISITOR_2D_DIRECTIONAL_REVIEW_V1",
+                "characterId": "visitor_male_01", "directions": {},
+                "artApproved": False, "runtimePromotion": False}
+    for direction in direction_order:
+        master = tool_root / "art" / "concepts" / f"visitor_male_01_{direction}_master.png"
+        folder = output / direction
+        definition_path = folder / "definition.json"
+        rig = build_concept_rig(master, asset_root, definition_path, direction)
+        poses = [tool_root / "poses" / "concept" / f"{direction}_{name}.json"
+                 for name in ("idle", "walk_a", "walk_b")]
+        definition = load_character_definition(definition_path)
+        validate_v1_character(definition, _load_poses([str(path) for path in poses]))
+        _, produced, _ = _compose_and_export(
+            str(definition_path), [str(path) for path in poses], str(asset_root), str(folder),
+        )
+        frames = []
+        for name in ("idle", "walk_a", "walk_b"):
+            with Image.open(folder / f"visitor_male_01_{direction}_{name}.png") as frame:
+                frames.append(frame.convert("RGBA"))
+        measurements = frame_measurements(frames, (64, 116))
+        panel = gameplay_review(frames, background)
+        panel_path = folder / f"visitor_male_01_{direction}_in_world_review.png"
+        panel.save(panel_path, format="PNG", optimize=False)
+        panels.append(panel)
+        manifest["directions"][direction] = {
+            "masterSha256": rig["masterSha256"],
+            "definition": str(definition_path),
+            "frames": [str(path) for path in produced],
+            "reviewPanel": str(panel_path),
+            "measurements": measurements,
+        }
+
+    board = Image.new("RGBA", (panels[0].width, sum(p.height for p in panels)))
+    cursor = 0
+    for panel in panels:
+        board.alpha_composite(panel, (0, cursor))
+        cursor += panel.height
+    board_path = output / "visitor_male_01_four_directions_walk_review.png"
+    board.save(board_path, format="PNG", optimize=False)
+    manifest_path = output / "visitor_male_01_directional_review.json"
+    manifest["board"] = str(board_path)
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"status": "ok", "board": str(board_path),
+                      "manifest": str(manifest_path), "runtimePromotion": False}, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ch-visitor-forge-2d",
@@ -237,9 +299,10 @@ def build_parser() -> argparse.ArgumentParser:
     build_assets.set_defaults(func=command_build_assets)
 
     concept_rig = subparsers.add_parser(
-        "build-concept-rig", help="derive the experimental SOUTH cutout rig from a 512px concept master",
+        "build-concept-rig", help="derive one experimental directional cutout rig from a 512px concept master",
     )
     concept_rig.add_argument("--master", required=True)
+    concept_rig.add_argument("--direction", choices=("south", "east", "north", "west"), default="south")
     concept_rig.add_argument("--asset-root", required=True)
     concept_rig.add_argument("--definition-output", required=True)
     concept_rig.set_defaults(func=command_build_concept_rig)
@@ -265,6 +328,15 @@ def build_parser() -> argparse.ArgumentParser:
     prototype.add_argument("--background", help="Optional terrain PNG for a native-size review strip")
     prototype.add_argument("--concept", help="Optional 128px RGBA SOUTH concept for idle comparison; never exported as an animated frame")
     prototype.set_defaults(func=command_prototype)
+
+    directional_review = subparsers.add_parser(
+        "review-concept-directions", help="build one character's 4 views and 12-frame gameplay board",
+    )
+    directional_review.add_argument("--tool-root", required=True)
+    directional_review.add_argument("--asset-root", required=True)
+    directional_review.add_argument("--output", required=True)
+    directional_review.add_argument("--background", help="Optional terrain PNG for the review board")
+    directional_review.set_defaults(func=command_review_concept_directions)
 
     return parser
 

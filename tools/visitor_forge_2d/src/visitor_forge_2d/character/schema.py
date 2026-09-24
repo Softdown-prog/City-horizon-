@@ -24,6 +24,7 @@ REQUIRED_V1_PARTS = {
 }
 
 REQUIRED_V1_POSES = {"south_idle", "south_walk_a", "south_walk_b"}
+CONCEPT_RIG_CONTRACT = "CH_VISITOR_FORGE_2D_DIRECTIONAL_CUTOUT_STUDY_V1"
 
 
 def validate_v1_character(
@@ -35,7 +36,9 @@ def validate_v1_character(
     This does not certify art quality. It certifies only that the files respect
     the production contract needed to compare the three SOUTH frames fairly.
     """
-    if definition.direction != "south":
+    is_concept_rig = definition.forge_contract_version == CONCEPT_RIG_CONTRACT
+    expected_direction = definition.direction if is_concept_rig else "south"
+    if not is_concept_rig and definition.direction != "south":
         raise ValueError("Visitor Forge 2D V1 accepts SOUTH only")
 
     part_ids = {part.part_id for part in definition.parts}
@@ -46,13 +49,15 @@ def validate_v1_character(
     pose_ids = {pose.pose_id for pose in poses}
     if len(pose_ids) != len(poses):
         raise ValueError("Duplicate pose ID would overwrite an exported frame")
-    missing_poses = sorted(REQUIRED_V1_POSES - pose_ids)
+    required_poses = ({f"{expected_direction}_{name}" for name in ("idle", "walk_a", "walk_b")}
+                      if is_concept_rig else REQUIRED_V1_POSES)
+    missing_poses = sorted(required_poses - pose_ids)
     if missing_poses:
         raise ValueError(f"V1 character is missing required poses: {missing_poses}")
 
     for pose in poses:
-        if pose.direction != "south":
-            raise ValueError(f"V1 pose {pose.pose_id} is not SOUTH")
+        if pose.direction != expected_direction:
+            raise ValueError(f"V1 pose {pose.pose_id} is not {expected_direction.upper()}")
 
     # The anchor belongs to the character definition, not to a pose. Frames
     # therefore cannot accidentally move the gameplay anchor through metadata.
