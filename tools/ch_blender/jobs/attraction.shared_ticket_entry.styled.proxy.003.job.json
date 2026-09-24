@@ -1,0 +1,17 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.shared_ticket_entry.styled.proxy.003",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_attraction_entry_styled_guarded.py",
+  "qualityStage": "proxy",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/park_attraction_entry.shared_ticket_gate.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json",
+    "--output",
+    "out/ch_blender_agent/attraction.shared_ticket_entry.styled.v3"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.shared_ticket_entry.styled.v3"
+}
