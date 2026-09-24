@@ -1,5 +1,5 @@
 {
-  "id": "CH_TYCOON_STUDIO_HQ_REVIEW_V1",
+  "id": "CH_TYCOON_STUDIO_V1",
   "visualContract": "CH_STYLIZED_PRERENDER_V1",
   "camera": {
     "contract": "CH_CAMERA_V1",
@@ -94,5 +94,6 @@
     "selectiveEffectsRequireExplicitMaterialIdentityWhenAvailable": true
   },
   "reviewOnly": true,
+  "reviewAlias": "CH_TYCOON_STUDIO_HQ_REVIEW_V1",
   "reviewPurpose": "Ferris wheel sharpness and lighting comparison without changing the production studio contract."
 }
