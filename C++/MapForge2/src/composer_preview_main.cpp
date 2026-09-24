@@ -192,14 +192,14 @@ int main(int argc, char** argv) {
     ticket_booth.footprint_width_tiles = 2;
     ticket_booth.footprint_depth_tiles = 2;
     ticket_booth.floor_count = 1;
-    ticket_booth.floor_height_px = 84;
-    ticket_booth.wall_height_px = 84;
+    ticket_booth.floor_height_px = 86;
+    ticket_booth.wall_height_px = 86;
     ticket_booth.floor_bands_enabled = false;
     ticket_booth.roof_style = ch::studio::BuildingRoofStyle::Pyramid;
-    ticket_booth.roof_height_px = 48;
-    ticket_booth.roof_pitch_degrees = 42.0F;
-    ticket_booth.roof_overhang = 0.12F;
-    ticket_booth.roof_fascia_thickness_px = 3.2F;
+    ticket_booth.roof_height_px = 52;
+    ticket_booth.roof_pitch_degrees = 43.0F;
+    ticket_booth.roof_overhang = 0.14F;
+    ticket_booth.roof_fascia_thickness_px = 3.4F;
     ticket_booth.roof_chimney = false;
     ticket_booth.wall_color = QColor("#e8dbbe");
     ticket_booth.roof_color = QColor("#c73f31");
@@ -211,10 +211,10 @@ int main(int argc, char** argv) {
     ticket_booth.ornament_color = QColor("#e3a630");
     ticket_booth.wall_material = ch::studio::BuildingWallMaterial::Plaster;
     ticket_booth.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
-    ticket_booth.material_strength = 0.50F;
-    ticket_booth.material_scale = 0.85F;
-    ticket_booth.material_variation = 0.25F;
-    ticket_booth.material_contrast = 0.48F;
+    ticket_booth.material_strength = 0.54F;
+    ticket_booth.material_scale = 0.80F;
+    ticket_booth.material_variation = 0.24F;
+    ticket_booth.material_contrast = 0.50F;
     ticket_booth.material_seed = 149;
     ticket_booth.windows = false;
     ticket_booth.south_door = false;
@@ -229,13 +229,23 @@ int main(int argc, char** argv) {
         {Kind::CornerQuoins, Edge::North, 0, 0.50F, 0.90F, true},
         {Kind::CornerQuoins, Edge::West, 0, 0.50F, 0.90F, true},
 
+        // Small red corbels just below the green eave. These use the generic
+        // plaque module at narrow widths instead of introducing booth-only code.
+        {Kind::Sign, Edge::South, 0, 0.14F, 0.075F, true},
+        {Kind::Sign, Edge::South, 0, 0.50F, 0.075F, true},
+        {Kind::Sign, Edge::South, 0, 0.86F, 0.075F, true},
+        {Kind::Sign, Edge::East, 0, 0.14F, 0.075F, true},
+        {Kind::Sign, Edge::East, 0, 0.86F, 0.075F, true},
+
         // Left visible facade in the canonical South view.
-        {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.38F, true},
-        {Kind::StripedAwning, Edge::South, 0, 0.50F, 0.46F, true},
+        {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.40F, true},
+        {Kind::StripedAwning, Edge::South, 0, 0.50F, 0.48F, true},
 
         // Right/front facade in the canonical South view.
-        {Kind::ArchedPassage, Edge::East, 0, 0.52F, 0.48F, true},
-        {Kind::CurvedPediment, Edge::East, 0, 0.52F, 0.46F, true},
+        {Kind::ArchedPassage, Edge::East, 0, 0.52F, 0.50F, true},
+        {Kind::CurvedPediment, Edge::East, 0, 0.52F, 0.48F, true},
+        // Narrow red plaque reads as the reference keystone above the arch.
+        {Kind::Sign, Edge::East, 0, 0.52F, 0.10F, true},
 
         {Kind::EaveTrim, Edge::South, 0, 0.50F, 0.96F, true},
         {Kind::EaveTrim, Edge::East, 0, 0.50F, 0.96F, true},
