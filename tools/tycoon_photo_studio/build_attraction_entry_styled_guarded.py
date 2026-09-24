@@ -57,7 +57,7 @@ def main():
     root["runtimeRepresentation"] = "2D_RGBA_pre_rendered_sprite"
     root["proceduralContract"] = recipe["contract"]
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
-    root["designStage"] = "themed_style_pass_v2"
+    root["designStage"] = "themed_style_pass_v3"
     root["sharedAttractionEntrance"] = True
 
     authored = skeleton.build_skeleton(root, recipe, mats)
