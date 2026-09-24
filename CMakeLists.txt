@@ -443,7 +443,9 @@ add_custom_command(TARGET city_builder POST_BUILD
 option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" OFF)
 if(CH_VISITOR_FORGE_PREVIEW)
     target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
-    add_custom_command(TARGET city_builder POST_BUILD
+    # A preview PNG can change without recompiling C++; refresh the packaged
+    # frames on every explicit city_builder build during visual iteration.
+    add_custom_target(visitor_forge_preview_copy
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
@@ -453,5 +455,7 @@ if(CH_VISITOR_FORGE_PREVIEW)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/frames_preview"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
+        COMMENT "Refreshing Visitor Forge review frames beside city_builder"
     )
+    add_dependencies(city_builder visitor_forge_preview_copy)
 endif()

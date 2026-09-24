@@ -315,7 +315,9 @@ Para montar a versão de teste, configure o build com
 `-DCH_VISITOR_FORGE_PREVIEW=ON` e compile o target `city_builder` normalmente.
 O build copia a definição e os 12 PNGs de prévia para junto do executável,
 onde `SDL_GetBasePath()` procura os recursos. A opção começa desligada; um
-build normal não embala esses arquivos. Por exemplo:
+build normal não embala esses arquivos. Depois de editar um frame, execute
+novamente o build de `city_builder` para atualizar a cópia mesmo sem mudança
+no C++. Por exemplo:
 
 ```bash
 cmake -S . -B build -DCH_VISITOR_FORGE_PREVIEW=ON
