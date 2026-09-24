@@ -78,8 +78,6 @@ namespace {
     return level_def.maintenance_per_month;
 }
 
-
-
 }  // namespace
 
 std::uint32_t CityEconomy::commercial_demand_percent(const BuildingDefinition& definition,
@@ -97,16 +95,21 @@ std::uint32_t CityEconomy::commercial_demand_percent(const BuildingDefinition& d
 std::uint32_t CityEconomy::service_price_demand_percent(const BuildingDefinition& definition,
                                                          const std::int64_t service_price) {
     if (definition.default_service_price <= 0 || service_price <= 0) return 0;
-    const std::int64_t price = std::clamp(service_price, definition.minimum_service_price,
-                                          definition.maximum_service_price);
+    const std::int64_t minimum = definition.minimum_service_price;
+    const std::int64_t maximum = definition.maximum_service_price;
+    const std::int64_t price = std::clamp(service_price, minimum, maximum);
     const std::int64_t reference = definition.default_service_price;
+    const std::int64_t units_per_dollar = std::max<std::int64_t>(1, definition.default_service_price.units_per_dollar);
     if (price <= reference) {
-        const std::int64_t bonus = (reference - price) * 20;
+        // The original curve awards +20 demand points per $1 discount. Scale
+        // the price delta back to dollars so cent-based products keep the same
+        // elasticity instead of treating a 25-cent change like $25.
+        const std::int64_t bonus = (reference - price) * 20 / units_per_dollar;
         return static_cast<std::uint32_t>(std::clamp<std::int64_t>(100 + bonus, 0, 160));
     }
 
-    // Above the reference price demand follows an inverse-square curve. This makes
-    // extreme prices visibly unattractive instead of becoming a revenue exploit.
+    // Above the reference price demand follows an inverse-square curve. The
+    // ratio is unitless, so it works identically for dollars and cents.
     const std::uint64_t numerator = static_cast<std::uint64_t>(reference) *
                                     static_cast<std::uint64_t>(reference) * 100U;
     const std::uint64_t denominator = static_cast<std::uint64_t>(price) *
@@ -119,15 +122,26 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
                                                               const std::uint32_t current_population,
                                                               const FarmingSystem* farming) {
     ServicePricingEstimate estimate;
-    if (definition.default_service_price <= 0 || definition.base_service_customers_per_month == 0 ||
+    if (definition.default_service_price <= 0) {
+        return estimate;
+    }
+
+    const std::int64_t minimum = definition.minimum_service_price;
+    const std::int64_t maximum = definition.maximum_service_price;
+    const std::int64_t requested_price = instance.service_price > 0
+        ? static_cast<std::int64_t>(instance.service_price)
+        : static_cast<std::int64_t>(definition.default_service_price);
+    const std::int64_t price = std::clamp(requested_price, minimum, maximum);
+    estimate.price_demand_percent = service_price_demand_percent(definition, price);
+
+    // A shop may expose its player-controlled price before customer-volume
+    // balancing is configured. In that state the UI still shows price demand,
+    // while customer count and revenue remain zero rather than inventing data.
+    if (definition.base_service_customers_per_month == 0 ||
         definition.service_population_for_full_demand == 0) {
         return estimate;
     }
 
-    const std::int64_t price = std::clamp(
-        instance.service_price > 0 ? instance.service_price : definition.default_service_price,
-        definition.minimum_service_price, definition.maximum_service_price);
-    estimate.price_demand_percent = service_price_demand_percent(definition, price);
     estimate.population_demand_percent = static_cast<std::uint32_t>(std::min<std::uint64_t>(
         100U, static_cast<std::uint64_t>(current_population) * 100U /
                   definition.service_population_for_full_demand));
@@ -138,7 +152,8 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
     // an agricultural production-and-sale loop, not ingredients required by shops.
     estimate.supply_percent = 100;
     estimate.customers_per_month = estimate.customers_before_supply;
-    estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price;
+    const std::int64_t units_per_dollar = std::max<std::int64_t>(1, definition.default_service_price.units_per_dollar);
+    estimate.revenue_per_month = static_cast<std::int64_t>(estimate.customers_per_month) * price / units_per_dollar;
     (void)farming;
     return estimate;
 }
