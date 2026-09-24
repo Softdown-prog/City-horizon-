@@ -183,7 +183,7 @@ def _arm_segment(
     curve: int,
     cuff: bool = False,
 ) -> Image.Image:
-    """Soft arm segment with a curved centerline and hidden joint overlap."""
+    """Soft arm segment with narrow overlap caps instead of ball joints."""
     width, height = size
     top_center = width // 2
     bottom_center = top_center + curve
@@ -198,41 +198,41 @@ def _arm_segment(
     def mask(draw: ImageDraw.ImageDraw) -> None:
         draw.polygon(
             [
-                (top_center - top_width // 2, 5),
-                (top_center + top_width // 2, 5),
+                (top_center - top_width // 2, 7),
+                (top_center + top_width // 2, 7),
                 (mid_center + mid_width // 2, mid_y),
-                (bottom_center + bottom_width // 2, height - 8),
-                (bottom_center - bottom_width // 2, height - 8),
+                (bottom_center + bottom_width // 2, height - 9),
+                (bottom_center - bottom_width // 2, height - 9),
                 (mid_center - mid_width // 2, mid_y),
             ],
             fill=255,
         )
         draw.ellipse(
-            (top_center - top_width // 2, 0, top_center + top_width // 2, top_width),
+            (top_center - top_width // 2, 1, top_center + top_width // 2, 20),
             fill=255,
         )
         draw.ellipse(
             (
                 bottom_center - bottom_width // 2,
-                height - bottom_width - 4,
+                height - 19,
                 bottom_center + bottom_width // 2,
-                height - 2,
+                height - 3,
             ),
             fill=255,
         )
 
     def details(draw: ImageDraw.ImageDraw) -> None:
         highlight_x = top_center + (top_width // 4 if side == "right" else -top_width // 4)
-        draw.line((highlight_x, 10, bottom_center, height - 12), fill=(255, 255, 255, 16), width=2)
+        draw.line((highlight_x, 11, bottom_center, height - 13), fill=(255, 255, 255, 16), width=2)
         if cuff:
             draw.line(
                 (
                     bottom_center - bottom_width // 2 + 3,
-                    height - 14,
+                    height - 15,
                     bottom_center + bottom_width // 2 - 3,
-                    height - 14,
+                    height - 15,
                 ),
-                fill=(88, 88, 88, 62),
+                fill=(88, 88, 88, 58),
                 width=2,
             )
 
@@ -257,59 +257,62 @@ def _hand(side: str) -> Image.Image:
 
 
 def _upper_leg(side: str) -> Image.Image:
-    """Hip-to-knee mass that tapers like trousers instead of a straight tube."""
+    """Hip-to-knee trouser mass with a narrow, non-circular knee exit."""
     near = 1 if side == "right" else 0
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
         left = 11 - near
         right = 47 + near
-        draw.rounded_rectangle((left, 1, right, 32), radius=15, fill=255)
+        draw.rounded_rectangle((left, 1, right, 25), radius=12, fill=255)
         draw.polygon(
             [
-                (left + 1, 18),
-                (right - 1, 18),
-                (right - 4, 58),
-                (right - 9, 79),
-                (left + 9, 79),
-                (left + 4, 58),
+                (left + 1, 14),
+                (right - 1, 14),
+                (right - 4, 49),
+                (right - 8, 68),
+                (right - 11, 81),
+                (left + 11, 81),
+                (left + 8, 68),
+                (left + 4, 49),
             ],
             fill=255,
         )
-        draw.ellipse((left + 7, 64, right - 7, 82), fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
         x = 20 if side == "left" else 38
-        draw.line((x, 13, x, 62), fill=(255, 255, 255, 14), width=2)
-        draw.line((18, 64, 40, 64), fill=(80, 80, 80, 20), width=2)
+        draw.line((x, 13, x, 61), fill=(255, 255, 255, 14), width=2)
+        draw.line((20, 66, 38, 66), fill=(80, 80, 80, 16), width=2)
 
     return _painted_part((58, 84), mask, paint_details=details, edge_blur=0.45)
 
 
 def _lower_leg(side: str) -> Image.Image:
-    """Calf shape with subdued knee and ankle transitions."""
+    """Calf taper with a compact knee overlap and a clean ankle exit."""
     near = 1 if side == "right" else 0
 
     def mask(draw: ImageDraw.ImageDraw) -> None:
-        left = 11 - near
-        right = 45 + near
-        draw.rounded_rectangle((left, 0, right, 27), radius=13, fill=255)
+        left = 12 - near
+        right = 44 + near
+        draw.rounded_rectangle((left, 1, right, 18), radius=8, fill=255)
         draw.polygon(
             [
-                (left + 2, 17),
-                (right - 2, 17),
-                (right - 5, 54),
-                (right - 9, 75),
-                (left + 9, 75),
-                (left + 5, 54),
+                (left + 1, 10),
+                (right - 1, 10),
+                (right - 3, 39),
+                (right - 6, 58),
+                (right - 10, 76),
+                (left + 10, 76),
+                (left + 6, 58),
+                (left + 3, 39),
             ],
             fill=255,
         )
-        draw.ellipse((left + 6, 63, right - 6, 78), fill=255)
+        draw.ellipse((left + 7, 65, right - 7, 79), fill=255)
 
     def details(draw: ImageDraw.ImageDraw) -> None:
-        x = 19 if side == "left" else 37
-        draw.line((x, 12, x, 60), fill=(255, 255, 255, 14), width=2)
-        draw.line((18, 27, 39, 28), fill=(82, 82, 82, 18), width=2)
+        x = 19 if side == "left" else 36
+        draw.line((x, 11, x, 58), fill=(255, 255, 255, 13), width=2)
+        draw.line((19, 27, 37, 28), fill=(82, 82, 82, 14), width=2)
 
     return _painted_part((56, 80), mask, paint_details=details, edge_blur=0.45)
 
