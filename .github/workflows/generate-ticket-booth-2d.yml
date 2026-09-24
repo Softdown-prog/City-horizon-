@@ -1,73 +1,90 @@
-name: Generate Visitor Forge 2D Ticket Booth
+name: Generate Building Composer 2D Ticket Booth
 
 on:
   push:
     branches:
       - main
     paths:
-      - "tools/visitor_forge_2d/**"
+      - "C++/MapForge2/src/building_composer.h"
+      - "C++/MapForge2/src/building_facade_renderer.cpp"
+      - "C++/MapForge2/src/building_roof_editor_renderer.cpp"
+      - "C++/MapForge2/src/composer_preview_main.cpp"
+      - "C++/MapForge2/CMakeLists.txt"
       - ".github/workflows/generate-ticket-booth-2d.yml"
   workflow_dispatch:
 
 jobs:
-  render-prototype:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  render-ticket-booth:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python for Qt installer
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install Visitor Forge 2D
-        run: python -m pip install --quiet -e tools/visitor_forge_2d
-
-      - name: Generate SOUTH structure with Visitor Forge 2D
+      - name: Install Qt 6.8.3
+        shell: pwsh
         run: |
-          python -m visitor_forge_2d.structure.ticket_booth \
-            --output out/visitor_forge_2d/ticket_booth
+          python -m pip install --upgrade aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Validate Visitor Forge 2D structure package
-        shell: python
+      - name: Configure Building Composer preview
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/ticket-booth -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build Building Composer preview
+        shell: pwsh
+        run: cmake --build build/ticket-booth --config Release --target MapForge2ComposerPreview --parallel
+
+      - name: Render ticket booth through Building Composer
+        shell: pwsh
         run: |
-          import hashlib
-          import json
-          from pathlib import Path
-          from PIL import Image
+          New-Item -ItemType Directory -Force -Path out/building_composer | Out-Null
+          $env:QT_QPA_PLATFORM="offscreen"
+          build/ticket-booth/Release/MapForge2ComposerPreview.exe out/building_composer
 
-          root = Path("out/visitor_forge_2d/ticket_booth")
-          sprite = root / "park_ticket_booth_01_south.png"
-          review = root / "park_ticket_booth_01_south_review.png"
-          manifest_path = root / "park_ticket_booth_01_manifest.json"
-          for path in (sprite, review, manifest_path):
-              if not path.is_file():
-                  raise SystemExit(f"missing expected output: {path}")
+      - name: Validate ticket booth package
+        shell: pwsh
+        run: |
+          $review = "out/building_composer/building_composer_ticket_booth_review.png"
+          $sheet = "out/building_composer/building_composer_ticket_booth_4view.png"
+          $manifestPath = "out/building_composer/building_composer_ticket_booth_manifest.json"
+          foreach ($path in @($review, $sheet, $manifestPath)) {
+            if (-not (Test-Path $path)) { throw "Missing expected Building Composer output: $path" }
+          }
 
-          image = Image.open(sprite).convert("RGBA")
-          if image.size != (256, 256):
-              raise SystemExit(f"unexpected sprite size: {image.size}")
-          alpha = image.getchannel("A")
-          if alpha.getbbox() is None or alpha.getextrema()[0] != 0:
-              raise SystemExit("sprite must contain visible art on a transparent canvas")
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.geometry.roofStyle -ne "pyramid") { throw "Ticket booth must use the Pyramid roof profile." }
+          if ($manifest.geometry.floorCount -ne 1) { throw "Ticket booth must remain a single-storey structure." }
+          if (-not $manifest.facadeEditor.enabled) { throw "Ticket booth must be authored through the facade editor module system." }
 
-          data = json.loads(manifest_path.read_text(encoding="utf-8"))
-          assert data["contract"] == "CH_LAYERED_STRUCTURE_2D_V1"
-          assert data["status"] == "south_visual_gate"
-          assert data["generator"] == "tools/visitor_forge_2d"
-          assert data["direction"] == "south"
-          assert data["projection"] == "isometric_2_to_1"
-          assert data["footprint"] == {"widthTiles": 2, "depthTiles": 2}
-          assert data["groundIncluded"] is False
-          assert data["runtimeApproved"] is False
-          assert data["spriteSha256"] == hashlib.sha256(sprite.read_bytes()).hexdigest()
+          $moduleIds = @($manifest.facadeEditor.placements | ForEach-Object { $_.moduleId })
+          $required = @(
+            "window.ticket_counter.v1",
+            "passage.arch_open.v1",
+            "awning.striped_canvas.v1",
+            "pediment.curved_medallion.v1",
+            "trim.corner_quoins.v1",
+            "roof.eave_trim.v1",
+            "roof.flag_finial.v1"
+          )
+          foreach ($moduleId in $required) {
+            if ($moduleIds -notcontains $moduleId) { throw "Missing reusable Building Composer module: $moduleId" }
+          }
 
-      - name: Upload review artifact
+      - name: Upload ticket booth review
         uses: actions/upload-artifact@v4
         with:
-          name: Visitor-Forge-2D-Ticket-Booth-${{ github.run_id }}
-          path: out/visitor_forge_2d/ticket_booth
+          name: Building-Composer-Ticket-Booth-${{ github.run_id }}
+          path: |
+            out/building_composer/building_composer_ticket_booth_review.png
+            out/building_composer/building_composer_ticket_booth_4view.png
+            out/building_composer/building_composer_ticket_booth_manifest.json
           if-no-files-found: error
           retention-days: 14
