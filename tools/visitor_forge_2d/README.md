@@ -291,6 +291,13 @@ poses próprias alternam pé de apoio e balanço dos braços, preservando a linh
 o candidato não substitui o SOUTH atual até observar o contato e calibrar a
 velocidade no jogo.
 
+As outras três direções da mesma opção F8 agora usam o estudo
+`art/concepts/directional_gait_candidate_v1/`. Ele exporta dois passos por
+direção, deforma suavemente os masters originais só abaixo da cintura e mantém
+o idle e o anchor existentes. O comando `render-directional-gait` e a receita
+JSON estão documentados nessa pasta, junto ao painel das quatro direções em
+escala de jogo. EAST/NORTH/WEST também aguardam teste caminhando no motor.
+
 Um novo desenho SOUTH precisa manter o mesmo personagem, paleta, textura e
 silhueta na escala de jogo; rosto e peito devem ler como frente, sem apontar
 para EAST. Ao corrigir SOUTH, revisar juntos `idle`, `walk_a` e `walk_b` para
@@ -364,6 +371,9 @@ caminhar na borda da calçada. Pressione F7 de novo para comparar velocidades
 de 0,50, 0,65 e 0,80 tile/s; F8 volta ao visual inicial depois do candidato.
 Para rever NORTH, SOUTH e WEST, marque início e fim em ruas com F3 e F4,
 respectivamente, e inicie o percurso com F6; a direção vem da rota existente.
+Na quinta opção F8, o SOUTH frontal e os novos passos EAST/NORTH/WEST ficam
+reunidos no mesmo visitante de revisão; F8 define 0,30 tile/s para esse
+visitante, enquanto F7 muda o valor conforme os presets de teste.
 
 O frame é 128×128, a altura ocupada pelo corpo é 97 px, e a escala da
 prévia é `56/97` em zoom 1. O pivô dos pés fica em `[64,116]` em todas as

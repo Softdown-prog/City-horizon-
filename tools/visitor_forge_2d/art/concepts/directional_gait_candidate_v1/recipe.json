@@ -1,0 +1,21 @@
+{
+  "contract": "CH_VISITOR_DIRECTIONAL_GAIT_STUDY_V1",
+  "frameDurationMs": 220,
+  "workingCanvasSize": [512, 512],
+  "outputSize": [128, 128],
+  "anchor": [64, 116],
+  "directions": {
+    "east": {
+      "walk_a": {"left": [20, 8], "right": [-15, -14]},
+      "walk_b": {"left": [-15, -14], "right": [20, 8]}
+    },
+    "north": {
+      "walk_a": {"left": [-16, 8], "right": [8, -16]},
+      "walk_b": {"left": [-8, -16], "right": [16, 4]}
+    },
+    "west": {
+      "walk_a": {"left": [-20, 20], "right": [15, -14]},
+      "walk_b": {"left": [15, -14], "right": [-20, 4]}
+    }
+  }
+}

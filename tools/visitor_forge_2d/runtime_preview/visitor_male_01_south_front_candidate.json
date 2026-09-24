@@ -1,6 +1,6 @@
 {
   "id": "visitor_male_01_south_front_candidate",
-  "status": "south_appearance_approved_walk_pending_runtime_review",
+  "status": "south_appearance_approved_four_direction_gait_pending_runtime_review",
   "clips": [
     {
       "id": "idle_south",
@@ -40,8 +40,8 @@
       "fps": 4.545454545454546,
       "loop": true,
       "frames": [
-        "tools/visitor_forge_2d/art/concepts/frames_preview/east_walk_a.png",
-        "tools/visitor_forge_2d/art/concepts/frames_preview/east_walk_b.png"
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/east_walk_a.png",
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/east_walk_b.png"
       ]
     },
     {
@@ -61,8 +61,8 @@
       "fps": 4.545454545454546,
       "loop": true,
       "frames": [
-        "tools/visitor_forge_2d/art/concepts/frames_preview/north_walk_a.png",
-        "tools/visitor_forge_2d/art/concepts/frames_preview/north_walk_b.png"
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/north_walk_a.png",
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/north_walk_b.png"
       ]
     },
     {
@@ -82,8 +82,8 @@
       "fps": 4.545454545454546,
       "loop": true,
       "frames": [
-        "tools/visitor_forge_2d/art/concepts/frames_preview/west_walk_a.png",
-        "tools/visitor_forge_2d/art/concepts/frames_preview/west_walk_b.png"
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/west_walk_a.png",
+        "tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/west_walk_b.png"
       ]
     }
   ]

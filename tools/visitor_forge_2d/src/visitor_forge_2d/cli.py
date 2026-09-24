@@ -14,6 +14,7 @@ from .character import (
 )
 from .character.review import frame_measurements, gameplay_review, map_scale_review
 from .character.concept_rig import build_concept_rig
+from .character.gait_warp import render_directional_gait
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -64,6 +65,13 @@ def command_build_concept_rig(args: argparse.Namespace) -> int:
     result = build_concept_rig(args.master, args.asset_root, args.definition_output,
                                direction=args.direction)
     print(json.dumps({"status": "ok", **result}, indent=2))
+    return 0
+
+
+def command_render_directional_gait(args: argparse.Namespace) -> int:
+    result = render_directional_gait(Path(args.tool_root), Path(args.recipe),
+                                     Path(args.output))
+    print(json.dumps({"status": "ok", "output": args.output, **result}, indent=2))
     return 0
 
 
@@ -329,6 +337,15 @@ def build_parser() -> argparse.ArgumentParser:
     concept_rig.add_argument("--asset-root", required=True)
     concept_rig.add_argument("--definition-output", required=True)
     concept_rig.set_defaults(func=command_build_concept_rig)
+
+    gait = subparsers.add_parser(
+        "render-directional-gait",
+        help="render short EAST/NORTH/WEST walk frames from intact 512px masters",
+    )
+    gait.add_argument("--tool-root", required=True)
+    gait.add_argument("--recipe", required=True)
+    gait.add_argument("--output", required=True)
+    gait.set_defaults(func=command_render_directional_gait)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)

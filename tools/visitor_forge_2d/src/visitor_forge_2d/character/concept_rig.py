@@ -71,6 +71,16 @@ Z_INDEX = {
 }
 
 
+def concept_ground_shadow() -> Image.Image:
+    """The fixed contact shadow shared by the cutout and intact-master studies."""
+    shadow_mask = Image.new("L", (116, 32))
+    ImageDraw.Draw(shadow_mask).ellipse((5, 7, 110, 24), fill=95)
+    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(6))
+    shadow = Image.new("RGBA", shadow_mask.size, (23, 25, 19, 0))
+    shadow.putalpha(shadow_mask)
+    return shadow
+
+
 def _part_at(x: int, y: int, rgb: tuple[int, int, int], direction: str) -> str:
     r, g, b = rgb
     if y < 174 and r > g * 1.08 and r > b * 1.2:
@@ -139,11 +149,7 @@ def build_concept_rig(master_path: str | Path, asset_root: str | Path,
         raise ValueError("Concept rig partition does not reconstruct its master")
 
     root = Path(asset_root)
-    shadow_mask = Image.new("L", (116, 32))
-    ImageDraw.Draw(shadow_mask).ellipse((5, 7, 110, 24), fill=95)
-    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(6))
-    shadow = Image.new("RGBA", shadow_mask.size, (23, 25, 19, 0))
-    shadow.putalpha(shadow_mask)
+    shadow = concept_ground_shadow()
     shadow_relative = f"visitor_male_01/{direction}_concept/ground_shadow.png"
     shadow_path = root / shadow_relative
     shadow_path.parent.mkdir(parents=True, exist_ok=True)

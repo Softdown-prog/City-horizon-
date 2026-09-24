@@ -1,0 +1,161 @@
+{
+  "contract": "CH_VISITOR_DIRECTIONAL_GAIT_STUDY_V1",
+  "recipeSha256": "30d56c0adf6e45613995915460c5a5a760d72d52827235f75563047a0e2174a6",
+  "anchor": [
+    64,
+    116
+  ],
+  "directions": {
+    "east": {
+      "masterSha256": "60974e74c77c458398eac3e8618b69b776aee5619f327b990915467221edc075",
+      "measurements": {
+        "contract": "CH_VISITOR_2D_REVIEW_MEASUREMENTS_V1",
+        "canvasSize": [
+          128,
+          128
+        ],
+        "bodyBounds": [
+          [
+            50,
+            19,
+            79,
+            116
+          ],
+          [
+            50,
+            19,
+            77,
+            116
+          ],
+          [
+            48,
+            19,
+            83,
+            116
+          ]
+        ],
+        "footRows": [
+          115,
+          115,
+          115
+        ],
+        "footRowRangePx": 0,
+        "anchor": [
+          64,
+          116
+        ],
+        "footOffsetFromAnchorPx": [
+          -1,
+          -1,
+          -1
+        ],
+        "changedSilhouetteFractionFromIdle": [
+          0.0932,
+          0.0916
+        ],
+        "artApproved": false
+      }
+    },
+    "north": {
+      "masterSha256": "b916de1c45db3848e51696cc630f8eccc278beaf088c6fca47924ddf2c5436b0",
+      "measurements": {
+        "contract": "CH_VISITOR_2D_REVIEW_MEASUREMENTS_V1",
+        "canvasSize": [
+          128,
+          128
+        ],
+        "bodyBounds": [
+          [
+            43,
+            19,
+            85,
+            116
+          ],
+          [
+            43,
+            19,
+            85,
+            116
+          ],
+          [
+            43,
+            19,
+            86,
+            116
+          ]
+        ],
+        "footRows": [
+          115,
+          115,
+          115
+        ],
+        "footRowRangePx": 0,
+        "anchor": [
+          64,
+          116
+        ],
+        "footOffsetFromAnchorPx": [
+          -1,
+          -1,
+          -1
+        ],
+        "changedSilhouetteFractionFromIdle": [
+          0.1015,
+          0.0914
+        ],
+        "artApproved": false
+      }
+    },
+    "west": {
+      "masterSha256": "9e5c7c17acdaaf9d3afa0603b25a3fccda0b2d738fba07217c860d761e39306b",
+      "measurements": {
+        "contract": "CH_VISITOR_2D_REVIEW_MEASUREMENTS_V1",
+        "canvasSize": [
+          128,
+          128
+        ],
+        "bodyBounds": [
+          [
+            50,
+            19,
+            78,
+            116
+          ],
+          [
+            46,
+            19,
+            82,
+            116
+          ],
+          [
+            52,
+            19,
+            77,
+            116
+          ]
+        ],
+        "footRows": [
+          115,
+          115,
+          115
+        ],
+        "footRowRangePx": 0,
+        "anchor": [
+          64,
+          116
+        ],
+        "footOffsetFromAnchorPx": [
+          -1,
+          -1,
+          -1
+        ],
+        "changedSilhouetteFractionFromIdle": [
+          0.1112,
+          0.1056
+        ],
+        "artApproved": false
+      }
+    }
+  },
+  "runtimePromotion": false
+}

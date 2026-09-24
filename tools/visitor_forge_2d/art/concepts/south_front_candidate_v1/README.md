@@ -45,13 +45,15 @@ ch-visitor-forge-2d prototype \
 ```
 
 A opção local `CH_VISITOR_FORGE_PREVIEW=ON` inclui este estudo como quinta
-aparência F8, depois da prévia atual do Visitor Forge. Para realmente ver
+aparência F8, depois da prévia atual do Visitor Forge. Nesta mesma aparência,
+EAST/NORTH/WEST já usam os novos passos da receita vizinha
+`../directional_gait_candidate_v1/`. Para realmente ver
 SOUTH andando, marque início com F3 e destino numa rua ao longo de +Y com
 F4; F6 envia o visitante pelo caminho. F7 sempre usa seis tiles ao longo
 de +X e portanto mostra EAST. A trajetória SOUTH aparece diagonal na tela
 isométrica; a correção aqui é a direção **do corpo**, não a projeção do mapa.
 Ao selecionar a candidata via F8, a prévia F6 inicia em 0,30 tile/s para
-acompanhar o passo curto (440 ms por ciclo); o ajuste de velocidade F7 ainda
+acompanhar os passos curtos (440 ms por ciclo); o ajuste de velocidade F7 ainda
 permite outros valores e pode exigir nova calibração visual. Se ela atravessar
 um trajeto a velocidade diferente, reavaliar a cadência junto com a rota.
 
