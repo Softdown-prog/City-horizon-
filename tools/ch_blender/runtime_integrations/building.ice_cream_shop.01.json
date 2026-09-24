@@ -1,0 +1,32 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_INTEGRATION_V1",
+  "assetId": "building.ice_cream_shop.01",
+  "definitionId": "ice_cream_shop_01",
+  "displayName": "Sorveteria",
+  "fileStem": "ice_cream_shop",
+  "destination": "assets/buildings/ice_cream_shop",
+  "definitionPath": "assets/definitions/ice_cream_shop_01.json",
+  "static": {
+    "sourceCommit": "b62d61e94e1828b7268afe9f2f9986f00f9568b5",
+    "sourceWorkflowRun": 35938008873,
+    "sourceArtifactId": 10784398293,
+    "sourceArtifactName": "CH-Blender-Agent-35938008873-1",
+    "sourceDir": "building.ice_cream_shop.01.final",
+    "approvedProxySha256": "688cc86ec243b0db741a831e1b0dccdcca8b039d8ecce2b8d7c7a2ee278c7e4e"
+  },
+  "activityOverlay": {
+    "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
+    "sourceCommit": "8073b3a30cc8dcc5317d00c1897c9cf4e00d5b56",
+    "sourceWorkflowRun": 35938018823,
+    "sourceArtifactId": 10784607433,
+    "sourceArtifactName": "CH-Blender-Agent-35938018823-1",
+    "sourceDir": "building.ice_cream_shop.01.activity.final",
+    "approvedProxySha256": "fdf05021b41ad10566b34b57956c3a49f024f8630c41778e7f664b82ff4ea051",
+    "frameCount": 8,
+    "fps": 4,
+    "layout": "horizontal",
+    "playback": "loop"
+  },
+  "economyPolicy": "preserve_zero_until_design_approval",
+  "resourceInputs": []
+}
