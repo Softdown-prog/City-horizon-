@@ -3,24 +3,26 @@
   "direction": "south",
   "frameDurationMs": 220,
   "joints": {
-    "shoulder_left": {"rotationDegrees": -2.5},
-    "shoulder_right": {"rotationDegrees": 2.5},
-    "elbow_left": {"rotationDegrees": -1.5},
-    "elbow_right": {"rotationDegrees": 1.5},
+    "spine": {"rotationDegrees": 0.7},
+    "neck": {"rotationDegrees": -0.35},
+    "shoulder_left": {"rotationDegrees": -1.8},
+    "shoulder_right": {"rotationDegrees": 1.8},
+    "elbow_left": {"rotationDegrees": -0.9},
+    "elbow_right": {"rotationDegrees": 0.9},
 
     "hip_left": {
-      "rotationDegrees": 3.0,
-      "translation": [2.0, 2.0],
-      "scale": [1.01, 1.02]
+      "rotationDegrees": 1.6,
+      "translation": [1.0, 3.0],
+      "scale": [1.015, 1.025]
     },
     "hip_right": {
-      "rotationDegrees": -3.0,
-      "translation": [-2.0, -1.0],
-      "scale": [0.98, 0.97]
+      "rotationDegrees": -1.6,
+      "translation": [-1.0, -2.0],
+      "scale": [0.975, 0.965]
     },
-    "knee_left": {"rotationDegrees": -2.5},
-    "knee_right": {"rotationDegrees": 1.5},
-    "ankle_left": {"rotationDegrees": -1.0},
-    "ankle_right": {"rotationDegrees": 1.0}
+    "knee_left": {"rotationDegrees": -1.2},
+    "knee_right": {"rotationDegrees": 0.8},
+    "ankle_left": {"rotationDegrees": -0.5},
+    "ankle_right": {"rotationDegrees": 0.4}
   }
 }
