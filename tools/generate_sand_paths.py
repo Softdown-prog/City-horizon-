@@ -16,6 +16,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter
 
 from ground_tile_worker import DEFAULT_MAX_EDGE_ERROR, edge_error, fill_transparent_edge, harmonize_edges
+from tile_geometry import diamond_mask
 
 W, H, SS = 128, 64, 4
 NW, NH = W * SS, H * SS
@@ -36,9 +37,7 @@ NAMES = (
 
 
 def display_diamond() -> Image.Image:
-    alpha = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(alpha).polygon(((W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)), fill=255)
-    return alpha
+    return diamond_mask()
 
 
 def load_source(path: Path) -> Image.Image:

@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = REPO_ROOT / "tools/ch_blender/ch_blender_manifest.json"
 BUILD_SCENE = REPO_ROOT / "tools/tycoon_photo_studio/build_scene.py"
 POSTPROCESS = REPO_ROOT / "tools/tycoon_photo_studio/postprocess.py"
+VALIDATE_PACKAGE = REPO_ROOT / "tools/tycoon_photo_studio/validate_package.py"
 DEFAULT_STUDIO = REPO_ROOT / "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
 DEFAULT_PREFLIGHT_PROFILE = REPO_ROOT / "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json"
 
@@ -39,6 +41,7 @@ EXIT = {
     "BLENDER_FAILED": 20,
     "POSTPROCESS_FAILED": 21,
     "EXPECTED_OUTPUT_MISSING": 22,
+    "PACKAGE_INVALID": 23,
 }
 
 
@@ -197,11 +200,13 @@ def _validate_job(job: dict[str, Any]) -> None:
         _quality_stage(job)
 
 
-def _output_hashes(root: Path) -> list[dict[str, Any]]:
+def _output_hashes(root: Path, started_ns: int) -> list[dict[str, Any]]:
     outputs: list[dict[str, Any]] = []
     if not root.exists():
         return outputs
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        if path.stat().st_mtime_ns < started_ns:
+            continue
         outputs.append(
             {
                 "path": path.relative_to(REPO_ROOT).as_posix(),
@@ -212,7 +217,7 @@ def _output_hashes(root: Path) -> list[dict[str, Any]]:
     return outputs
 
 
-def _canonical_bake(job: dict[str, Any], blender_exe: Path):
+def _canonical_bake(job: dict[str, Any], blender_exe: Path, started_ns: int):
     asset_config = _repo_path(str(job.get("assetConfig", "")))
     studio_preset = _repo_path(
         str(job.get("studioPreset") or DEFAULT_STUDIO.relative_to(REPO_ROOT))
@@ -266,14 +271,41 @@ def _canonical_bake(job: dict[str, Any], blender_exe: Path):
             ],
             error_code="POSTPROCESS_FAILED",
         )
+        asset_id = _load_json(asset_config).get("assetId")
+        if not isinstance(asset_id, str) or not asset_id:
+            raise WorkerError("JOB_INVALID", "assetConfig must contain assetId")
+        manifest_path = final_dir / f"{asset_id}_manifest.json"
+        if not manifest_path.is_file() or manifest_path.stat().st_mtime_ns < started_ns:
+            raise WorkerError("PACKAGE_INVALID", "Postprocess did not produce a fresh package manifest",
+                              {"path": str(manifest_path)})
+        manifest = _load_json(manifest_path)
+        package_files = list(manifest.get("files", {}).values())
+        for view in manifest.get("views", []):
+            package_files.extend(view[key] for key in ("file", "colorPass", "shadowPass", "maskPass") if key in view)
+        package_files.append(manifest.get("atlas", {}).get("file"))
+        stale = [name for name in package_files if not isinstance(name, str) or
+                 not (path := (final_dir / name).resolve()).is_relative_to(final_dir) or
+                 not path.is_file() or path.stat().st_mtime_ns < started_ns]
+        if stale:
+            raise WorkerError("PACKAGE_INVALID", "Package contains missing or stale files", {"files": stale})
+        _run([
+            sys.executable, str(VALIDATE_PACKAGE),
+            "--manifest", str(manifest_path),
+            "--asset-config", str(asset_config),
+            "--studio-preset", str(studio_preset),
+        ], error_code="PACKAGE_INVALID")
     return output_root, inputs, None
 
 
-def _validate_expected_outputs(job: dict[str, Any], defaults: list[str] | None = None) -> None:
-    expected = job.get("expectedOutputs", defaults or [])
-    if not isinstance(expected, list) or not all(isinstance(item, str) for item in expected):
+def _validate_expected_outputs(job: dict[str, Any], started_ns: int,
+                               defaults: list[str] | None = None) -> None:
+    declared = job.get("expectedOutputs", [])
+    if not isinstance(declared, list) or not all(isinstance(item, str) for item in declared):
         raise WorkerError("JOB_INVALID", "expectedOutputs must be an array of repository-relative paths")
-    missing = [item for item in expected if not _repo_path(item, must_exist=False).exists()]
+    expected = list(dict.fromkeys([*(defaults or []), *declared]))
+    missing = [item for item in expected if
+               not (path := _repo_path(item, must_exist=False)).is_file()
+               or path.stat().st_mtime_ns < started_ns]
     if missing:
         raise WorkerError(
             "EXPECTED_OUTPUT_MISSING",
@@ -282,7 +314,7 @@ def _validate_expected_outputs(job: dict[str, Any], defaults: list[str] | None =
         )
 
 
-def _blender_script(job: dict[str, Any], blender_exe: Path):
+def _blender_script(job: dict[str, Any], blender_exe: Path, started_ns: int):
     script = _repo_path(str(job.get("script", "")))
     output_root = _repo_path(
         str(job.get("outputDir", f"out/ch_blender_agent/{job['jobId']}")),
@@ -310,13 +342,13 @@ def _blender_script(job: dict[str, Any], blender_exe: Path):
         "CH_AGENT_OUTPUT_DIR": str(output_root),
     }
     _run(command, error_code="BLENDER_FAILED", env=env)
-    _validate_expected_outputs(job)
+    _validate_expected_outputs(job, started_ns)
     return output_root, [
         {"path": script.relative_to(REPO_ROOT).as_posix(), "sha256": _sha256(script)}
     ], None
 
 
-def _guarded_blender_script(job: dict[str, Any], blender_exe: Path):
+def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: int):
     stage = _quality_stage(job)
     script = _repo_path(str(job.get("script", "")))
     profile = _repo_path(
@@ -383,7 +415,7 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path):
             f"{rel_root}/proxy_approval.json",
             f"{rel_root}/studio_metadata.json",
         ])
-    _validate_expected_outputs(job, defaults)
+    _validate_expected_outputs(job, started_ns, defaults)
 
     preflight = _load_json(output_root / "preflight_report.json")
     if preflight.get("contract") != "CH_SCENE_PREFLIGHT_V1" or preflight.get("status") != "pass":
@@ -401,15 +433,26 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path):
     }
     if stage == "proxy":
         proxy = _load_json(output_root / "proxy_report.json")
-        if proxy.get("contract") != "CH_PROXY_RENDER_V1":
+        actual_sha = _sha256(output_root / "proxy_south.png")
+        if (proxy.get("contract") != "CH_PROXY_RENDER_V1" or
+                proxy.get("status") != "ok" or proxy.get("direction") != "south" or
+                proxy.get("sha256") != actual_sha or
+                proxy.get("assetId") != preflight.get("assetId")):
             raise WorkerError(
                 "BLENDER_FAILED",
-                "Guarded builder proxy report contract mismatch.",
-                {"actual": proxy.get("contract")},
+                "Guarded builder proxy report does not match the generated PNG and preflight.",
+                {"report": proxy, "actualSha256": actual_sha},
             )
         quality["proxySha256"] = proxy.get("sha256")
         quality["proxyDirection"] = proxy.get("direction")
     elif stage == "final":
+        approval_record = _load_json(output_root / "proxy_approval.json")
+        if (approval_record.get("contract") != "CH_PROXY_APPROVAL_V1" or
+                approval_record.get("reviewed") is not True or
+                approval_record.get("proxySha256") != approval_sha or
+                approval_record.get("assetId") != preflight.get("assetId")):
+            raise WorkerError("QUALITY_GATE_REQUIRED", "Final output approval does not match the reviewed proxy SHA and asset",
+                              {"approval": approval_record, "assetId": preflight.get("assetId")})
         quality["approvedProxySha256"] = approval_sha
         quality["proxyReviewed"] = True
 
@@ -424,13 +467,14 @@ def run_job(job_path: Path, blender_exe: Path) -> dict[str, Any]:
     job = _load_json(job_path)
     _validate_job(job)
     identity = blender_identity(blender_exe)
+    started_ns = time.time_ns()
 
     if job["operation"] == "canonical_bake":
-        output_root, inputs, quality = _canonical_bake(job, blender_exe)
+        output_root, inputs, quality = _canonical_bake(job, blender_exe, started_ns)
     elif job["operation"] == "guarded_blender_script":
-        output_root, inputs, quality = _guarded_blender_script(job, blender_exe)
+        output_root, inputs, quality = _guarded_blender_script(job, blender_exe, started_ns)
     else:
-        output_root, inputs, quality = _blender_script(job, blender_exe)
+        output_root, inputs, quality = _blender_script(job, blender_exe, started_ns)
 
     report = {
         "contract": REPORT_CONTRACT,
@@ -446,7 +490,7 @@ def run_job(job_path: Path, blender_exe: Path) -> dict[str, Any]:
         },
         "inputs": inputs,
         "outputRoot": output_root.relative_to(REPO_ROOT).as_posix(),
-        "outputs": _output_hashes(output_root),
+        "outputs": _output_hashes(output_root, started_ns),
     }
     if quality is not None:
         report["qualityGate"] = quality

@@ -8,9 +8,9 @@ the same intake instead of rebuilding one-off cleanup scripts.
 
 Pipeline:
 1. normalize arbitrary PNG/JPG input to the canonical 128x64 diamond;
-2. optionally replace a baked visual border/bevel with nearby interior texture;
-3. optionally decontaminate obvious dark/saturated edge outliers using nearby valid material samples;
-4. fill anti-aliased transparent edge texels from nearby interior texture;
+2. fill transparent texels from nearby interior texture before sampling the edge;
+3. optionally replace a baked visual border/bevel with nearby interior texture;
+4. optionally decontaminate obvious dark/saturated edge outliers using nearby valid material samples;
 5. harden the diamond alpha so connected tiles cannot reveal grass hairlines;
 6. match only the exact opposite-edge samples needed for seamless repetition;
 7. render a grid-free repeated preview and write JSON metrics.
@@ -28,18 +28,13 @@ import json
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from normalize_atomic_path_tile import normalize
+from tile_geometry import diamond_mask
 
 W, H = 128, 64
 DEFAULT_MAX_EDGE_ERROR = 6.0
-
-
-def diamond_mask() -> Image.Image:
-    alpha = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(alpha).polygon(((W // 2, 0), (W - 1, H // 2), (W // 2, H - 1), (0, H // 2)), fill=255)
-    return alpha
 
 
 def strip_edge_band(source: Image.Image, band_pixels: int) -> Image.Image:
@@ -255,7 +250,19 @@ def repeated_preview(tile: Image.Image, path: Path) -> None:
     canvas.save(path)
 
 
-def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float, strip_edge_pixels: int = 0, decontaminate_edge_pixels: int = 0) -> dict:
+def count_near_black_pixels(tile: Image.Image) -> int:
+    """Count opaque black residue inside the tile, independent of edge averages."""
+    image = tile.convert("RGBA")
+    pixels = image.load()
+    return sum(
+        pixels[x, y][3] >= 240 and max(pixels[x, y][:3]) < 48
+        for y in range(image.height) for x in range(image.width)
+    )
+
+
+def prepare(source_path: Path, output_path: Path, preview_path: Path, report_path: Path, max_edge_error: float, strip_edge_pixels: int = 0, decontaminate_edge_pixels: int = 0, max_dark_pixels: int | None = None) -> dict:
+    if max_dark_pixels is not None and max_dark_pixels < 0:
+        raise ValueError("max_dark_pixels must be non-negative")
     with tempfile.TemporaryDirectory() as tmp:
         normalized_path = Path(tmp) / "normalized.png"
         with Image.open(source_path) as original:
@@ -266,17 +273,22 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
             normalize(source_path, normalized_path)
 
         normalized = Image.open(normalized_path).convert("RGBA")
-        flattened = strip_edge_band(normalized, strip_edge_pixels)
+        # The reference can have transparent gaps inside the canonical diamond.
+        # Fill them while source alpha still tells us which texels are valid;
+        # stripping first would copy invisible black RGB and make it opaque.
+        filled = fill_transparent_edge(normalized)
+        flattened = strip_edge_band(filled, strip_edge_pixels)
         decontaminated, replaced = decontaminate_edge_outliers(flattened, decontaminate_edge_pixels)
-        prepared = harmonize_edges(fill_transparent_edge(decontaminated))
+        prepared = harmonize_edges(decontaminated)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     prepared.save(output_path)
     repeated_preview(prepared, preview_path)
     error = edge_error(prepared)
+    dark_pixels = count_near_black_pixels(prepared)
     report = {
         "schema": "CITY_HORIZON_GROUND_TILE_WORKER_V1",
-        "ok": error <= max_edge_error,
+        "ok": error <= max_edge_error and (max_dark_pixels is None or dark_pixels <= max_dark_pixels),
         "source": str(source_path),
         "output": str(output_path),
         "preview": str(preview_path),
@@ -289,11 +301,16 @@ def prepare(source_path: Path, output_path: Path, preview_path: Path, report_pat
         "edgeHarmonization": "exact-border-only",
         "edgeError": round(error, 4),
         "maxEdgeError": max_edge_error,
+        "nearBlackPixels": dark_pixels,
+        "maxNearBlackPixels": max_dark_pixels,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if not report["ok"]:
-        raise SystemExit(f"ground tile seam gate failed: edge_error={error:.2f} > {max_edge_error:.2f}")
+        raise SystemExit(
+            f"ground tile gate failed: edge_error={error:.2f} (max {max_edge_error:.2f}), "
+            f"near_black_pixels={dark_pixels} (max {max_dark_pixels})"
+        )
     print(
         f"PASS ground tile prepared: {output_path} edge_error={error:.2f} "
         f"strip_edge={strip_edge_pixels} decontaminated={replaced}"
@@ -310,6 +327,7 @@ def main() -> None:
     parser.add_argument("--max-edge-error", type=float, default=DEFAULT_MAX_EDGE_ERROR)
     parser.add_argument("--strip-edge-band", type=int, default=0, help="Replace this many boundary pixels with interior texture to remove a baked rim/bevel.")
     parser.add_argument("--decontaminate-edge-band", type=int, default=0, help="Replace obvious dark/saturated outlier pixels within this many boundary pixels using valid interior material samples.")
+    parser.add_argument("--max-dark-pixels", type=int, default=None, help="Optional maximum opaque near-black pixels; use 0 for light materials such as sand.")
     args = parser.parse_args()
     prepare(
         args.source,
@@ -319,6 +337,7 @@ def main() -> None:
         args.max_edge_error,
         args.strip_edge_band,
         args.decontaminate_edge_band,
+        args.max_dark_pixels,
     )
 
 

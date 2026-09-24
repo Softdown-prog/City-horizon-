@@ -187,6 +187,9 @@ Do not add independent Blender download/cache blocks to new workflows.
 - do not silently move camera or lights per direction;
 - do not auto-promote art because CI is green;
 - record output hashes from the worker report;
+- declared outputs and package files must be generated in the current job; reused files from an earlier output directory are rejected;
+- a canonical postprocessed bake must pass `validate_package.py` before the job succeeds;
+- the SOUTH proxy report SHA must match its PNG, and the final approval record must match the reviewed SHA and asset ID;
 - use unique job IDs for concurrent agent sessions;
 - keep official 4.2.3 available as the baseline until the internal CH Blender build passes equivalence gates;
 - do not change Cycles/render internals merely to solve an asset-specific art problem;
@@ -194,6 +197,6 @@ Do not add independent Blender download/cache blocks to new workflows.
 
 ## Exit codes
 
-The CLI exposes the exact map through `print-contract`. Stable categories include invalid job/contract, Blender missing/version mismatch, quality-gate approval required, Blender execution failure, postprocess failure and expected-output failure.
+The CLI exposes the exact map through `print-contract`. Stable categories include invalid job/contract, Blender missing/version mismatch, quality-gate approval required, Blender execution failure, postprocess failure, expected-output failure and `PACKAGE_INVALID` (23).
 
 An agent should stop on a non-zero code, inspect the JSON `error.code`, make one targeted correction, and rerun the same job contract rather than improvising a parallel pipeline.

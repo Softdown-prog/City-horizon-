@@ -7,11 +7,16 @@ on:
     paths:
       - "assets/terrain/dirt_isometric_01.png"
       - "tools/generate_dirt_paths.py"
+      - "tools/ground_tile_worker.py"
+      - "tools/normalize_atomic_path_tile.py"
+      - "tools/tile_geometry.py"
+      - "tools/validate_path_tiles.py"
+      - "tools/validate_ground_tiles.py"
+      - "assets/terrain/ground_tile_contract.json"
       - ".github/workflows/generate-dirt-autotile.yml"
 
 permissions:
-  contents: write
-  actions: read
+  contents: read
 
 concurrency:
   group: generate-dirt-autotile
@@ -35,39 +40,25 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --upgrade pillow
 
-      - name: Download approved dirt source
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: 35670104713
-          name: City-Horizon-Atomic-Path-MapForge-Test
-          path: out/approved_dirt_source
-
-      - name: Restore approved runtime dirt tile
-        shell: bash
+      - name: Prepare candidate from versioned dirt source
         run: |
-          set -euo pipefail
-          SOURCE="$(find out/approved_dirt_source -type f -name 'normalized_atomic_path_128x64.png' -print -quit)"
-          test -n "$SOURCE"
-          cp "$SOURCE" assets/terrain/dirt_isometric_01.png
-          python - <<'PY'
-          from PIL import Image
-          path = 'assets/terrain/dirt_isometric_01.png'
-          with Image.open(path) as im:
-              im.load()
-              if im.mode != 'RGBA':
-                  raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
-              if im.size != (128, 64):
-                  raise SystemExit(f'{path}: expected 128x64, got {im.size}')
-          print('PASS approved dirt source restored: 128x64 RGBA')
-          PY
+          python tools/ground_tile_worker.py \
+            assets/terrain/dirt_isometric_01.png \
+            out/dirt_isometric_candidate.png \
+            --preview out/dirt_repeated_preview.png \
+            --report out/dirt_ground_tile_report.json
+
+      - name: Validate candidate geometry
+        run: |
+          python tools/validate_ground_tiles.py \
+            --profile atomic-path \
+            --file out/dirt_isometric_candidate.png
 
       - name: Generate 16-mask dirt family
         run: |
           python tools/generate_dirt_paths.py \
-            --source assets/terrain/dirt_isometric_01.png \
-            --output-dir assets/terrain/paths/dirt_01 \
+            --source out/dirt_isometric_candidate.png \
+            --output-dir out/dirt_path_candidate \
             --preview out/dirt_path_autotile_preview.png
 
       - name: Validate generated tiles
@@ -76,13 +67,13 @@ jobs:
           from pathlib import Path
           from PIL import Image
 
-          source = Path('assets/terrain/dirt_isometric_01.png')
+          source = Path('out/dirt_isometric_candidate.png')
           with Image.open(source) as im:
               im.load()
               if im.mode != 'RGBA' or im.size != (128, 64):
                   raise SystemExit(f'{source}: expected 128x64 RGBA, got {im.size} {im.mode}')
 
-          root = Path('assets/terrain/paths/dirt_01')
+          root = Path('out/dirt_path_candidate')
           files = sorted(root.glob('dirt_path_*.png'))
           if len(files) != 16:
               raise SystemExit(f'expected 16 dirt autotile PNGs, found {len(files)}')
@@ -103,27 +94,25 @@ jobs:
           print('PASS source=128x64 RGBA masks=16')
           PY
 
+      - name: Validate all sixteen tiles and connected seams
+        run: |
+          python tools/validate_path_tiles.py \
+            --directory out/dirt_path_candidate \
+            --prefix dirt_path \
+            --report out/dirt_path_family_report.json
+
       - name: Upload autotile preview
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Dirt-Autotile-Preview
           path: |
             out/dirt_path_autotile_preview.png
+            out/dirt_path_family_report.json
+            out/dirt_repeated_preview.png
+            out/dirt_ground_tile_report.json
+            out/dirt_isometric_candidate.png
             assets/terrain/dirt_isometric_01.png
-            assets/terrain/paths/dirt_01/*.png
-          if-no-files-found: error
+            out/dirt_path_candidate/*.png
+          if-no-files-found: warn
           retention-days: 14
-
-      - name: Commit generated runtime tiles
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/terrain/dirt_isometric_01.png assets/terrain/paths/dirt_01
-          if git diff --cached --quiet; then
-            echo "Dirt runtime tile and autotile family already up to date."
-            exit 0
-          fi
-          git commit -m "asset: regenerate approved dirt autotile family"
-          git pull --rebase origin main
-          git push origin HEAD:main

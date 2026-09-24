@@ -18,6 +18,7 @@ import argparse
 from pathlib import Path
 
 from PIL import Image, ImageChops
+from tile_geometry import diamond_mask
 
 TARGET_W = 128
 TARGET_H = 64
@@ -43,17 +44,7 @@ def _content_bbox(img: Image.Image):
 
 
 def _diamond_mask() -> Image.Image:
-    mask = Image.new("L", (TARGET_W, TARGET_H), 0)
-    px = mask.load()
-    cx = (TARGET_W - 1) / 2.0
-    cy = (TARGET_H - 1) / 2.0
-    rx = TARGET_W / 2.0
-    ry = TARGET_H / 2.0
-    for y in range(TARGET_H):
-        for x in range(TARGET_W):
-            if abs((x - cx) / rx) + abs((y - cy) / ry) <= 1.0:
-                px[x, y] = 255
-    return mask
+    return diamond_mask()
 
 
 def normalize(source: Path, output: Path) -> None:

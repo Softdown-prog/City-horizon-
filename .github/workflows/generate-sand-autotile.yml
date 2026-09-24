@@ -7,14 +7,16 @@ on:
     paths:
       - "Converter/file_00000000a974820eafcd5ead28332854.png"
       - "tools/ground_tile_worker.py"
+      - "tools/normalize_atomic_path_tile.py"
+      - "tools/tile_geometry.py"
       - "tools/generate_sand_paths.py"
+      - "tools/validate_path_tiles.py"
       - "tools/validate_ground_tiles.py"
       - "assets/terrain/ground_tile_contract.json"
       - ".github/workflows/generate-sand-autotile.yml"
 
 permissions:
-  contents: write
-  actions: read
+  contents: read
 
 concurrency:
   group: generate-sand-autotile
@@ -42,17 +44,18 @@ jobs:
         run: |
           python tools/ground_tile_worker.py \
             Converter/file_00000000a974820eafcd5ead28332854.png \
-            assets/terrain/sand_isometric_01.png \
+            out/sand_isometric_candidate.png \
             --strip-edge-band 12 \
             --decontaminate-edge-band 14 \
+            --max-dark-pixels 0 \
             --preview out/sand_repeated_preview.png \
             --report out/sand_ground_tile_report.json
 
       - name: Generate 16-mask sand family
         run: |
           python tools/generate_sand_paths.py \
-            --source assets/terrain/sand_isometric_01.png \
-            --output-dir assets/terrain/paths/sand_01 \
+            --source out/sand_isometric_candidate.png \
+            --output-dir out/sand_path_candidate \
             --preview out/sand_path_autotile_preview.png
 
       - name: Validate generated tiles
@@ -62,7 +65,7 @@ jobs:
           from pathlib import Path
           from PIL import Image
 
-          source = Path('assets/terrain/sand_isometric_01.png')
+          source = Path('out/sand_isometric_candidate.png')
           with Image.open(source) as im:
               im.load()
               if im.mode != 'RGBA' or im.size != (128, 64):
@@ -75,8 +78,10 @@ jobs:
               raise SystemExit(f"sand worker used unexpected edge harmonization: {report}")
           if report.get('decontaminateEdgePixels') != 14:
               raise SystemExit(f"sand edge decontamination was not enabled: {report}")
+          if report.get('nearBlackPixels') != 0:
+              raise SystemExit(f"sand still has black residue: {report['nearBlackPixels']}")
 
-          root = Path('assets/terrain/paths/sand_01')
+          root = Path('out/sand_path_candidate')
           files = sorted(root.glob('sand_path_*.png'))
           if len(files) != 16:
               raise SystemExit(f'expected 16 sand autotile PNGs, found {len(files)}')
@@ -102,11 +107,19 @@ jobs:
         run: |
           python tools/validate_ground_tiles.py \
             --profile atomic-path \
-            --file assets/terrain/sand_isometric_01.png \
-            --directory assets/terrain/paths/sand_01 \
+            --file out/sand_isometric_candidate.png \
+            --directory out/sand_path_candidate \
             --debug
 
+      - name: Validate all sixteen tiles and connected seams
+        run: |
+          python tools/validate_path_tiles.py \
+            --directory out/sand_path_candidate \
+            --prefix sand_path --max-dark-pixels 0 \
+            --report out/sand_path_family_report.json
+
       - name: Upload sand previews
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Sand-Autotile-Preview
@@ -114,21 +127,8 @@ jobs:
             out/sand_repeated_preview.png
             out/sand_path_autotile_preview.png
             out/sand_ground_tile_report.json
-            assets/terrain/sand_isometric_01.png
-            assets/terrain/paths/sand_01/*.png
-          if-no-files-found: error
+            out/sand_path_family_report.json
+            out/sand_isometric_candidate.png
+            out/sand_path_candidate/*.png
+          if-no-files-found: warn
           retention-days: 14
-
-      - name: Commit generated runtime tiles
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/terrain/sand_isometric_01.png assets/terrain/paths/sand_01
-          if git diff --cached --quiet; then
-            echo "Sand runtime tile and autotile family already up to date."
-            exit 0
-          fi
-          git commit -m "asset: add approved sand autotile family"
-          git pull --rebase origin main
-          git push origin HEAD:main
