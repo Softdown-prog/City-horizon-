@@ -19,7 +19,7 @@ permissions:
 jobs:
   run-agent-jobs:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
     env:
       PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
       LIBGL_ALWAYS_SOFTWARE: "1"
