@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from PIL import Image, ImageChops, ImageOps
 
+from visitor_forge_2d.core.exporter import alpha_safe_resize
+
 
 def frame_measurements(frames: list[Image.Image], anchor: tuple[float, float]) -> dict:
     """Measure opaque body geometry, ignoring the separate translucent shadow."""
@@ -71,3 +73,59 @@ def gameplay_review(frames: list[Image.Image], background: Image.Image | None = 
         panel.alpha_composite(frame.convert("RGBA"), ((panel_size[0] - width) // 2, 16))
         result.alpha_composite(panel, (index * panel_size[0], 0))
     return result
+
+
+def map_scale_review(
+    frame: Image.Image,
+    capture: Image.Image,
+    crop: tuple[int, int, int, int],
+    foot: tuple[int, int],
+    display_height: int,
+    anchor: tuple[int, int] = (64, 116),
+) -> tuple[Image.Image, dict]:
+    """Compare source and proposed display sizes on the same unscaled map crop.
+
+    This is diagnostic. The source frame, its PNG metadata and the runtime are
+    untouched; both panels place the same foot anchor on the same map pixel.
+    """
+    rgba = frame.convert("RGBA")
+    if rgba.size != (128, 128):
+        raise ValueError("Map scale review expects a 128x128 visitor frame")
+    left, top, right, bottom = crop
+    if not (0 <= left < right <= capture.width and 0 <= top < bottom <= capture.height):
+        raise ValueError("Map crop must lie within the capture")
+    if not (left <= foot[0] < right and top <= foot[1] < bottom):
+        raise ValueError("Foot position must lie inside the crop")
+    if display_height <= 0:
+        raise ValueError("Candidate display height must be positive")
+
+    body = rgba.getchannel("A").point(lambda value: 255 if value >= 180 else 0).getbbox()
+    if body is None:
+        raise ValueError("Visitor frame has no opaque body")
+    source_height = body[3] - body[1]
+    scale = display_height / source_height
+    panel_size = (right - left, bottom - top)
+    backdrop = capture.convert("RGBA").crop(crop)
+    board = Image.new("RGBA", (panel_size[0] * 2, panel_size[1]))
+    for index, ratio in enumerate((1.0, scale)):
+        resized = (rgba if index == 0 else
+                   alpha_safe_resize(rgba, tuple(max(1, round(dimension * ratio))
+                                                 for dimension in rgba.size)))
+        origin = (round(foot[0] - left - anchor[0] * ratio),
+                  round(foot[1] - top - anchor[1] * ratio))
+        panel = backdrop.copy()
+        panel.alpha_composite(resized, origin)
+        board.alpha_composite(panel, (index * panel_size[0], 0))
+
+    return board, {
+        "contract": "CH_VISITOR_2D_MAP_SCALE_REVIEW_V1",
+        "sourceBodyHeightPx": source_height,
+        "candidateBodyHeightPx": display_height,
+        "candidateScale": round(scale, 4),
+        "captureCrop": list(crop),
+        "footInCapture": list(foot),
+        "sourceAnchor": list(anchor),
+        "panelSize": list(panel_size),
+        "artApproved": False,
+        "runtimePromotion": False,
+    }

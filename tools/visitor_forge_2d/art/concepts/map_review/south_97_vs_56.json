@@ -1,0 +1,28 @@
+{
+  "contract": "CH_VISITOR_2D_MAP_SCALE_REVIEW_V1",
+  "sourceBodyHeightPx": 97,
+  "candidateBodyHeightPx": 56,
+  "candidateScale": 0.5773,
+  "captureCrop": [
+    260,
+    310,
+    640,
+    690
+  ],
+  "footInCapture": [
+    450,
+    604
+  ],
+  "sourceAnchor": [
+    64,
+    116
+  ],
+  "panelSize": [
+    380,
+    380
+  ],
+  "artApproved": false,
+  "runtimePromotion": false,
+  "frameSha256": "00a0145cd8d926b374adcce3ff10d3735b1c3bbb698a000d5367d8bcb6ee8b0d",
+  "captureSha256": "08dbf1ed91ec5812fbb94235f2a288f131d4e1f1f31bbd6f7a6a59aca8073c4c"
+}

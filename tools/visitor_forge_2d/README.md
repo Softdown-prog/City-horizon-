@@ -274,6 +274,36 @@ de classificar esse conjunto, verificar as vistas no mapa, retocar as juntas
 visíveis durante a caminhada e confirmar que EAST/WEST têm leitura direcional
 distinta perto dos elementos da cidade.
 
+### Escala no mapa real
+
+Uma captura do MapForge com a loja de sorvete mostrou que o corpo de 97 px
+ocupado pelo sprite dentro do PNG de 128x128 fica grande diante da porta.
+`review-map-scale` sobrepõe o **mesmo frame e mesmo ponto dos pés** a duas cópias
+da captura: tamanho de origem à esquerda e altura candidata à direita. O
+comando não muda os PNGs fonte, o JSON dos frames nem o runtime.
+
+```bash
+ch-visitor-forge-2d review-map-scale \
+  --frame tools/visitor_forge_2d/art/concepts/frames_preview/south_idle.png \
+  --capture out/visitor_forge_2d/map_context/mapforge_ice_cream_inactive_vs_active.png \
+  --crop 260 310 640 690 --foot 450 604 \
+  --display-height 56 \
+  --output out/visitor_forge_2d/map_context/south_scale_review.png
+```
+
+A captura usada veio do [workflow MapForge Ice Cream Comparison, run
+35934307091](https://github.com/Softdown-prog/City-horizon-/actions/runs/35934307091),
+artefato `MapForge-Ice-Cream-Inactive-vs-Active`, ID `10781869942`.
+O arquivo PNG extraído tem SHA-256 no JSON de revisão. A comparação
+versionada fica em `art/concepts/map_review/south_97_vs_56.png`; outro painel
+mostra as quatro direções com corpo de 56 px sobre o mesmo ponto da loja.
+
+**56 px é uma hipótese de exibição**, cerca de 0,577 vez a altura do corpo
+original, para essa captura e esse enquadramento. Ela aproxima a figura da
+altura visual da porta e ainda permite ler as quatro direções. Confirmar a
+escala na engine com calçadas, perspectiva/oclusão e outros edifícios antes
+de fixar o tamanho de exibição ou promover qualquer sprite.
+
 ### Refinamento manual sem perda de trabalho
 
 Cada biblioteca gerada registra os hashes em `generated_parts.json`. Uma nova execução
@@ -363,6 +393,6 @@ O núcleo genérico também poderá ser reaproveitado por funcionários, vendedo
 direções, com três frames por direção e comparação em escala real. Ainda é um
 gate artístico; nada foi promovido ao runtime.
 
-**Próxima tarefa:** revisar os 12 frames em uma captura real do mapa próxima a
-construções, retocar as juntas que apresentarem frestas e aprovar cada
-direção. Congelar o estilo V1 somente após essa revisão visual.
+**Próxima tarefa:** testar a escala candidata e os 12 frames na engine, sobre
+calçadas e perto de edifícios de tamanhos diferentes; retocar as juntas que
+apresentarem frestas. Congelar o estilo V1 somente após essa revisão visual.

@@ -12,7 +12,7 @@ from .character import (
     generate_v1_south_assets,
     validate_v1_character,
 )
-from .character.review import frame_measurements, gameplay_review
+from .character.review import frame_measurements, gameplay_review, map_scale_review
 from .character.concept_rig import build_concept_rig
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
@@ -278,6 +278,29 @@ def command_review_concept_directions(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_review_map_scale(args: argparse.Namespace) -> int:
+    frame_path, capture_path = Path(args.frame), Path(args.capture)
+    with Image.open(frame_path) as source:
+        if source.mode != "RGBA":
+            raise ValueError("Visitor frame must be RGBA")
+        frame = source.copy()
+    with Image.open(capture_path) as source:
+        capture = source.convert("RGBA")
+    board, metrics = map_scale_review(
+        frame, capture, tuple(args.crop), tuple(args.foot), args.display_height,
+    )
+    destination = Path(args.output)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    board.save(destination, format="PNG", optimize=False)
+    metrics["frameSha256"] = hashlib.sha256(frame_path.read_bytes()).hexdigest()
+    metrics["captureSha256"] = hashlib.sha256(capture_path.read_bytes()).hexdigest()
+    metadata = destination.with_suffix(".json")
+    metadata.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"status": "ok", "comparison": str(destination),
+                      "metrics": str(metadata), "runtimePromotion": False}, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ch-visitor-forge-2d",
@@ -337,6 +360,17 @@ def build_parser() -> argparse.ArgumentParser:
     directional_review.add_argument("--output", required=True)
     directional_review.add_argument("--background", help="Optional terrain PNG for the review board")
     directional_review.set_defaults(func=command_review_concept_directions)
+
+    map_scale = subparsers.add_parser(
+        "review-map-scale", help="compare native and candidate visitor sizes on one real map crop",
+    )
+    map_scale.add_argument("--frame", required=True, help="128x128 visitor RGBA frame")
+    map_scale.add_argument("--capture", required=True, help="MapForge or engine screenshot")
+    map_scale.add_argument("--crop", type=int, nargs=4, required=True, metavar=("X0", "Y0", "X1", "Y1"))
+    map_scale.add_argument("--foot", type=int, nargs=2, required=True, metavar=("X", "Y"))
+    map_scale.add_argument("--display-height", type=int, required=True, help="Candidate body height in map pixels")
+    map_scale.add_argument("--output", required=True, help="Review PNG path; JSON metadata saved alongside")
+    map_scale.set_defaults(func=command_review_map_scale)
 
     return parser
 
