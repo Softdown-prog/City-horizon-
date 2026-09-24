@@ -89,6 +89,13 @@ Expected building outputs normally include:
 
 A successful workflow is not visual approval. Inspect the artifact at gameplay scale.
 
+`validate_package.py` checks the actual RGBA dimensions and alpha bounds of
+the four direction PNGs, color passes and optional masks against the manifest,
+including atlas crop/pivot metadata. The studio's `finalResolution` is a
+minimum: larger footprints can produce larger frames via the baker's dynamic
+resolution calculation. Package validation accepts those larger frames, but
+still requires visual approval before promotion to `assets/`.
+
 ## Optional color-customization masks
 
 Buildings/props that benefit from player recoloring may opt into `CH_COLOR_MASK_V1`.

@@ -164,6 +164,9 @@ O comando `prototype` produz também:
 - `visitor_male_01_south_gameplay_strip.png`.
 
 Esses strips existem para comparar as três poses sem precisar integrar nada ao jogo.
+Os nomes dos strips usam `characterId` e direção da definição. O comando rejeita
+IDs de pose repetidos antes da exportação, evitando sobrescrever um frame.
+O strip ampliado usa a mesma redução com alpha premultiplicado dos PNGs de gameplay.
 
 ## Metadata de saída
 

@@ -11,7 +11,7 @@ from .character import (
     generate_v1_south_assets,
     validate_v1_character,
 )
-from .core import LayerComposer, export_frame, load_character_definition, load_pose
+from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
 def _load_poses(paths: list[str]) -> list:
@@ -110,22 +110,21 @@ def command_prototype(args: argparse.Namespace) -> int:
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    review_frames = [
-        frame.resize((256, 256), Image.Resampling.LANCZOS)
-        for frame in working_frames
-    ]
+    review_frames = [alpha_safe_resize(frame, (256, 256)) for frame in working_frames]
     review_sheet = _horizontal_sheet(review_frames, gap=16)
-    review_path = output_dir / "visitor_male_01_south_review_strip.png"
+    definition = load_character_definition(args.definition)
+    strip_name = f"{definition.character_id}_{definition.direction}"
+    review_path = output_dir / f"{strip_name}_review_strip.png"
     review_sheet.save(review_path, format="PNG", optimize=False)
 
-    definition = load_character_definition(args.definition)
     gameplay_frames: list[Image.Image] = []
     for pose_path in args.pose:
         pose = load_pose(pose_path)
         frame_path = output_dir / f"{definition.character_id}_{pose.pose_id}.png"
-        gameplay_frames.append(Image.open(frame_path).convert("RGBA"))
+        with Image.open(frame_path) as frame:
+            gameplay_frames.append(frame.convert("RGBA"))
     gameplay_sheet = _horizontal_sheet(gameplay_frames, gap=8)
-    gameplay_path = output_dir / "visitor_male_01_south_gameplay_strip.png"
+    gameplay_path = output_dir / f"{strip_name}_gameplay_strip.png"
     gameplay_sheet.save(gameplay_path, format="PNG", optimize=False)
 
     summary = {

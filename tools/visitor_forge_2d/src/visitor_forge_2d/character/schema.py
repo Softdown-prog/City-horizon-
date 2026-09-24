@@ -44,6 +44,8 @@ def validate_v1_character(
         raise ValueError(f"V1 character is missing required parts: {missing_parts}")
 
     pose_ids = {pose.pose_id for pose in poses}
+    if len(pose_ids) != len(poses):
+        raise ValueError("Duplicate pose ID would overwrite an exported frame")
     missing_poses = sorted(REQUIRED_V1_POSES - pose_ids)
     if missing_poses:
         raise ValueError(f"V1 character is missing required poses: {missing_poses}")

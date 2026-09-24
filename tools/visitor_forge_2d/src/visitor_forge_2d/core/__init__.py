@@ -1,5 +1,5 @@
 from .composer import LayerComposer
-from .exporter import export_frame
+from .exporter import alpha_safe_resize, export_frame
 from .io import load_character_definition, load_pose
 from .model import (
     CanvasSpec,
@@ -22,6 +22,7 @@ __all__ = [
     "PartSpec",
     "PoseSpec",
     "Vec2",
+    "alpha_safe_resize",
     "export_frame",
     "load_character_definition",
     "load_pose",

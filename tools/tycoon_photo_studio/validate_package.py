@@ -41,6 +41,18 @@ def validate_png(path: Path):
         image.verify()
 
 
+def checked_rgba(path: Path, expected_size, *, allow_empty=False):
+    """Read the actual exported pixels instead of trusting manifest geometry."""
+    validate_png(path)
+    with Image.open(path) as image:
+        require(image.mode == "RGBA", f"Production PNG must be RGBA: {path} ({image.mode})")
+        require(list(image.size) == expected_size, f"PNG size differs from manifest: {path} ({image.size} != {expected_size})")
+        bounds = image.getchannel("A").getbbox()
+        if not allow_empty:
+            require(bounds is not None, f"Empty alpha in production PNG: {path}")
+        return list(bounds) if bounds is not None else None
+
+
 def rgba_digest(path: Path) -> str:
     with Image.open(path) as image:
         rgba = image.convert("RGBA")
@@ -78,7 +90,12 @@ def main():
     require(manifest.get("directionCount") == 4, "Direction count must be four")
     require(manifest.get("directionOrder") == EXPECTED_ORDER, "Canonical direction order changed")
     require(manifest.get("footprint") == asset.get("footprint"), "Footprint differs from asset source")
-    require(manifest.get("finalFrameResolution") == studio["render"]["finalResolution"], "Final resolution differs from studio preset")
+    frame_size = manifest.get("finalFrameResolution")
+    minimum_size = studio["render"]["finalResolution"]
+    require(isinstance(frame_size, list) and len(frame_size) == 2 and
+            all(type(value) is int and value > 0 for value in frame_size), "Invalid final frame resolution")
+    require(all(actual >= minimum for actual, minimum in zip(frame_size, minimum_size)),
+            "Final resolution is smaller than the studio preset minimum")
     require(manifest.get("paletteColorCount") == studio["postProcess"]["paletteColors"], "Palette size differs from studio preset")
     require(
         manifest.get("candidatePostProcess", {}).get("variantId") == studio["postProcess"]["candidateVariant"],
@@ -99,12 +116,18 @@ def main():
     for view in views:
         direction = view["direction"]
         file_path = base / view["file"]
-        validate_png(file_path)
-        validate_png(base / view["colorPass"])
-        validate_png(base / view["shadowPass"])
         bounds = view.get("spriteAlphaBounds")
         require(isinstance(bounds, list) and len(bounds) == 4, f"Missing alpha bounds for {direction}")
-        require(bounds[2] > bounds[0] and bounds[3] > bounds[1], f"Empty alpha bounds for {direction}: {bounds}")
+        actual_bounds = checked_rgba(file_path, frame_size)
+        require(bounds == actual_bounds, f"Sprite alpha bounds differ from PNG for {direction}: {bounds} != {actual_bounds}")
+        color_bounds = checked_rgba(base / view["colorPass"], frame_size)
+        require(view.get("objectAlphaBounds") == color_bounds,
+                f"Object alpha bounds differ from color pass for {direction}")
+        checked_rgba(base / view["shadowPass"], frame_size, allow_empty=True)
+        if "maskPass" in view:
+            mask_bounds = checked_rgba(base / view["maskPass"], frame_size)
+            require(view.get("maskAlphaBounds") == mask_bounds,
+                    f"Mask alpha bounds differ from PNG for {direction}")
         alpha_bounds.append(tuple(bounds))
         visual_digests.append(rgba_digest(file_path))
 
@@ -119,14 +142,27 @@ def main():
 
     atlas_frames = manifest.get("atlas", {}).get("frames", [])
     require([frame.get("direction") for frame in atlas_frames] == EXPECTED_ORDER, "Atlas direction order changed")
-    for frame in atlas_frames:
+    for frame, view in zip(atlas_frames, views):
         require(frame.get("w", 0) > 0 and frame.get("h", 0) > 0, f"Invalid atlas frame: {frame}")
         require("pivotX" in frame and "pivotY" in frame, f"Atlas frame missing trimmed pivot: {frame}")
+        left, top, right, bottom = view["spriteAlphaBounds"]
+        require(frame.get("sourceBounds") == [left, top, right, bottom] and
+                [frame["w"], frame["h"]] == [right - left, bottom - top],
+                f"Atlas crop differs from sprite bounds for {view['direction']}")
+        require(frame["pivotX"] == view["pivot"]["x"] - left and
+                frame["pivotY"] == view["pivot"]["y"] - top,
+                f"Trimmed atlas pivot differs from shared pivot for {view['direction']}")
 
     files = manifest.get("files", {})
     for key in ("south", "east", "west", "north", "spriteSheet", "atlas", "reviewSheet", "styleMatrix", "context4Dir"):
         require(key in files, f"Manifest files node is missing {key}")
         validate_png(base / files[key])
+    for view in views:
+        require(files[view["direction"]] == view["file"],
+                f"Direction file mapping differs from view record for {view['direction']}")
+    with Image.open(base / files["spriteSheet"]) as sheet:
+        require(sheet.size == (frame_size[0] * 4, frame_size[1]),
+                "Fixed four-view sheet dimensions differ from final frame resolution")
 
     if args.golden_fingerprint:
         golden = load_json(args.golden_fingerprint)

@@ -10,7 +10,7 @@ from visitor_forge_2d import FORGE_CONTRACT_VERSION
 from .model import CharacterDefinition, PoseSpec
 
 
-def _alpha_safe_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+def alpha_safe_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     """Resize RGBA through Pillow's premultiplied-alpha mode when available.
 
     The Visitor Forge treats halo prevention as part of the export contract, not
@@ -46,7 +46,7 @@ def export_frame(
     png_path = destination / f"{name}.png"
     json_path = destination / f"{name}.json"
 
-    final_image = _alpha_safe_resize(image, definition.canvas.output_size)
+    final_image = alpha_safe_resize(image, definition.canvas.output_size)
     final_image.save(png_path, format="PNG", optimize=False)
 
     metadata = {
