@@ -180,12 +180,7 @@ def setup_camera_and_light(human: bpy.types.Object) -> bpy.types.Camera:
 
 
 def make_neutral_idle_pose() -> dict:
-    """Small FK correction from MakeHuman's A-pose toward a relaxed idle.
-
-    The arms stay clear of the torso for clean deformation, but are much closer
-    to the body than the raw MPFB basemesh. This is intentionally conservative;
-    walk poses will only be authored after visual approval of this idle.
-    """
+    """Small FK correction from MakeHuman's A-pose toward a relaxed idle."""
     deg = math.radians
     rotations = {
         "clavicle.L": [0.0, 0.0, deg(-4.0)],
@@ -204,6 +199,26 @@ def make_neutral_idle_pose() -> dict:
         "original_spine_length": 0.0,
         "original_shoulder_width": 0.0,
     }
+
+
+def apply_idle_pose(RigService, rig: bpy.types.Object, idle_pose: dict) -> None:
+    """Apply MPFB FK pose with the armature active in POSE mode.
+
+    RigService uses bpy.ops.pose internally, so headless Blender needs an
+    explicit active-object/mode context before calling it.
+    """
+    if bpy.context.object is not None and bpy.context.object.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        RigService.set_pose_from_dict(rig, idle_pose, from_rest_pose=True)
+    finally:
+        if bpy.context.object is not None and bpy.context.object.mode == "POSE":
+            bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.context.view_layer.update()
 
 
 def main() -> None:
@@ -245,11 +260,10 @@ def main() -> None:
     }
 
     # Add the canonical MakeHuman FK rig and use MPFB's own pose loader instead
-    # of hand-editing mesh vertices. This is the foundation for later walking.
+    # of hand-editing mesh vertices. This becomes the foundation for walking.
     rig = HumanService.add_builtin_rig(human, "default_no_toes")
     idle_pose = make_neutral_idle_pose()
-    RigService.set_pose_from_dict(rig, idle_pose, from_rest_pose=True)
-    bpy.context.view_layer.update()
+    apply_idle_pose(RigService, rig, idle_pose)
 
     mat = bpy.data.materials.new("CHVisitorSkinProbe")
     mat.diffuse_color = (0.56, 0.33, 0.20, 1.0)
