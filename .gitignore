@@ -27,3 +27,7 @@ __pycache__/
 
 # Blender backup files
 *.blend1
+
+# Blender Sprite Factory generated artifacts
+/tools/blender_sprite_factory/output/
+/tools/blender_sprite_factory/scenes/
