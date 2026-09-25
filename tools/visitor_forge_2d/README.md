@@ -2,6 +2,10 @@
 
 Ferramenta dedicada para gerar visitantes 2D estilizados para o City Horizon.
 
+**Para continuar o visitante atual em outro chat:** leia primeiro
+[`docs/OPERACAO_VISUAL.md`](docs/OPERACAO_VISUAL.md). Ela identifica as fontes
+corretas, o catálogo de teste, os comandos de geração e o gate visual.
+
 ## Objetivo
 
 O Visitor Forge 2D existe para produzir personagens pequenos, legíveis e consistentes para o mapa isométrico do jogo sem depender de um render 3D realista como arte final.

@@ -15,6 +15,7 @@ from .character import (
 from .character.review import frame_measurements, gameplay_review, map_scale_review
 from .character.concept_rig import build_concept_rig
 from .character.gait_warp import render_directional_gait
+from .character.preview_audit import audit_preview
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -73,6 +74,12 @@ def command_render_directional_gait(args: argparse.Namespace) -> int:
                                      Path(args.output))
     print(json.dumps({"status": "ok", "output": args.output, **result}, indent=2))
     return 0
+
+
+def command_audit_preview(args: argparse.Namespace) -> int:
+    result = audit_preview(Path(args.manifest), Path(args.repo_root))
+    print(json.dumps(result, indent=2))
+    return 0 if result["status"] == "ok" else 1
 
 
 def _compose_and_export(
@@ -346,6 +353,13 @@ def build_parser() -> argparse.ArgumentParser:
     gait.add_argument("--recipe", required=True)
     gait.add_argument("--output", required=True)
     gait.set_defaults(func=command_render_directional_gait)
+
+    audit = subparsers.add_parser(
+        "audit-preview", help="check a four-direction preview manifest and its twelve PNGs",
+    )
+    audit.add_argument("--manifest", required=True, help="Preview catalogue JSON")
+    audit.add_argument("--repo-root", default=".", help="Repository root for paths inside the catalogue")
+    audit.set_defaults(func=command_audit_preview)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)
