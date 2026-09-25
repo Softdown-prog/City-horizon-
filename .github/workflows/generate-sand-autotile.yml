@@ -13,11 +13,12 @@ on:
       - "tools/generate_sand_paths.py"
       - "tools/validate_path_tiles.py"
       - "tools/validate_ground_tiles.py"
+      - "tools/tiles/approvals/sand_v1.json"
       - "assets/terrain/ground_tile_contract.json"
       - ".github/workflows/generate-sand-autotile.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: generate-sand-autotile
@@ -119,6 +120,38 @@ jobs:
             --prefix sand_path --max-dark-pixels 0 \
             --report out/sand_path_family_report.json
 
+      - name: Verify visual approval hashes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          approval = json.loads(Path('tools/tiles/approvals/sand_v1.json').read_text(encoding='utf-8'))
+          if approval.get('status') != 'approved' or approval.get('asset') != 'sand':
+              raise SystemExit('sand approval record is not active')
+
+          def sha256(path: Path) -> str:
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          base = Path('out/sand_isometric_candidate.png')
+          actual_base = sha256(base)
+          expected_base = approval['base']['sha256']
+          if actual_base != expected_base:
+              raise SystemExit(f'base candidate hash differs from approved visual: {actual_base} != {expected_base}')
+
+          family = approval['family']
+          directory = Path('out/sand_path_candidate')
+          actual_names = {p.name for p in directory.glob('sand_path_*.png')}
+          if actual_names != set(family):
+              raise SystemExit(f'family filenames differ from approved set: {sorted(actual_names)}')
+          for name, expected in family.items():
+              actual = sha256(directory / name)
+              if actual != expected:
+                  raise SystemExit(f'{name} differs from approved visual: {actual} != {expected}')
+          print('PASS exact visual approval hashes: sand v1 base + 16 masks')
+          PY
+
       - name: Upload sand previews
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,3 +166,21 @@ jobs:
             out/sand_path_candidate/*.png
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Promote exact approved sand v1
+        run: |
+          set -euo pipefail
+          mkdir -p assets/terrain/paths/sand_01
+          cp out/sand_isometric_candidate.png assets/terrain/sand_isometric_01.png
+          cp out/sand_path_candidate/*.png assets/terrain/paths/sand_01/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/terrain/sand_isometric_01.png assets/terrain/paths/sand_01
+          if git diff --cached --quiet; then
+            echo "Approved sand v1 is already canonical."
+            exit 0
+          fi
+          git commit -m "asset: promote approved sand v1"
+          git pull --rebase origin main
+          git push origin HEAD:main
