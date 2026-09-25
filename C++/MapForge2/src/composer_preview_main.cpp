@@ -192,13 +192,15 @@ int main(int argc, char** argv) {
     ticket_booth.footprint_width_tiles = 2;
     ticket_booth.footprint_depth_tiles = 2;
     ticket_booth.floor_count = 1;
-    ticket_booth.floor_height_px = 86;
-    ticket_booth.wall_height_px = 86;
+    // Keep the body compact so the roof and entrance silhouette dominate, as in
+    // the approved reference, instead of reading as a tall narrow tower.
+    ticket_booth.floor_height_px = 80;
+    ticket_booth.wall_height_px = 80;
     ticket_booth.floor_bands_enabled = false;
     ticket_booth.roof_style = ch::studio::BuildingRoofStyle::Pyramid;
-    ticket_booth.roof_height_px = 52;
-    ticket_booth.roof_pitch_degrees = 43.0F;
-    ticket_booth.roof_overhang = 0.14F;
+    ticket_booth.roof_height_px = 50;
+    ticket_booth.roof_pitch_degrees = 41.5F;
+    ticket_booth.roof_overhang = 0.15F;
     ticket_booth.roof_fascia_thickness_px = 3.4F;
     ticket_booth.roof_chimney = false;
     ticket_booth.wall_color = QColor("#e8dbbe");
@@ -211,10 +213,12 @@ int main(int argc, char** argv) {
     ticket_booth.ornament_color = QColor("#e3a630");
     ticket_booth.wall_material = ch::studio::BuildingWallMaterial::Plaster;
     ticket_booth.roof_material = ch::studio::BuildingRoofMaterial::CeramicTile;
-    ticket_booth.material_strength = 0.54F;
-    ticket_booth.material_scale = 0.80F;
-    ticket_booth.material_variation = 0.24F;
-    ticket_booth.material_contrast = 0.50F;
+    // Coarser, lighter ceramic courses avoid the dense wireframe read while
+    // keeping an authored tile pattern on the pyramid roof.
+    ticket_booth.material_strength = 0.48F;
+    ticket_booth.material_scale = 1.15F;
+    ticket_booth.material_variation = 0.18F;
+    ticket_booth.material_contrast = 0.38F;
     ticket_booth.material_seed = 149;
     ticket_booth.windows = false;
     ticket_booth.south_door = false;
@@ -245,14 +249,16 @@ int main(int argc, char** argv) {
         {Kind::Sign, Edge::West, 0, 0.86F, 0.075F, true},
 
         // Left visible facade in the canonical South view.
-        {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.40F, true},
-        {Kind::StripedAwning, Edge::South, 0, 0.50F, 0.48F, true},
+        {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.42F, true},
+        {Kind::StripedAwning, Edge::South, 0, 0.50F, 0.50F, true},
 
         // Right/front facade in the canonical South view.
-        {Kind::ArchedPassage, Edge::East, 0, 0.52F, 0.50F, true},
-        {Kind::CurvedPediment, Edge::East, 0, 0.52F, 0.48F, true},
+        {Kind::ArchedPassage, Edge::East, 0, 0.52F, 0.48F, true},
+        // The reference pediment is decorative rather than a full-width facade,
+        // so keep it narrower than the arch assembly below it.
+        {Kind::CurvedPediment, Edge::East, 0, 0.52F, 0.42F, true},
         // Narrow red plaque reads as the reference keystone above the arch.
-        {Kind::Sign, Edge::East, 0, 0.52F, 0.10F, true},
+        {Kind::Sign, Edge::East, 0, 0.52F, 0.09F, true},
 
         {Kind::EaveTrim, Edge::South, 0, 0.50F, 0.96F, true},
         {Kind::EaveTrim, Edge::East, 0, 0.50F, 0.96F, true},
