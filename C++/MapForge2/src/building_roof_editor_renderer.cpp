@@ -125,8 +125,6 @@ QColor tonalColor(const TonalRamp& ramp, const TonalLevel level) {
 }
 
 TonalLevel wallTonalLevel(const int edge) {
-    // Fixed world-light quantization: west catches the light, east is in
-    // structural shadow, while north/south remain the neutral mid tone.
     switch (edge) {
         case 3: return TonalLevel::Light;
         case 1: return TonalLevel::Shadow;
@@ -481,30 +479,55 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawLine(row[0], row[1]);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::CeramicTile) {
-        const float nominal_course = std::max(5.0F, 7.5F * scale);
+        // Ceramic tiles are authored as independent course cells. No seam is
+        // allowed to span multiple courses, which removes the radial/wireframe
+        // read on pyramid and hip roofs while keeping a clear tiled silhouette.
+        const float nominal_course = std::max(6.0F, 8.8F * scale);
         const int courses = std::max(2, static_cast<int>(std::round(slope_length / nominal_course)));
         for (int row_index = 1; row_index <= courses; ++row_index) {
             const float v0 = static_cast<float>(row_index - 1) / static_cast<float>(courses);
             const float v1 = static_cast<float>(row_index) / static_cast<float>(courses);
             const auto previous_row = roofRowEndpoints(polygon, v0);
             const auto current_row = roofRowEndpoints(polygon, v1);
-            painter.setPen(QPen(dark, 0.74 + 0.26 * contrast));
-            painter.drawLine(current_row[0], current_row[1]);
-
             const float row_width = std::max(8.0F, screenDistance(current_row[0], current_row[1]));
-            const int tiles = std::max(2, static_cast<int>(std::round(row_width / std::max(8.0F, 12.5F * scale))));
-            const float stagger = (row_index + face_index) % 2 == 0 ? 0.5F : 0.0F;
-            for (int tile = 1; tile < tiles; ++tile) {
-                const float u = (static_cast<float>(tile) + stagger) / static_cast<float>(tiles);
-                if (u >= 0.98F) continue;
-                const QPointF seam_top = roofRowPoint(previous_row, u);
-                const QPointF seam_bottom = roofRowPoint(current_row, u);
-                painter.drawLine(lerpScreen(seam_top, seam_bottom, 0.48F), seam_bottom);
+            const int tiles = std::max(2, static_cast<int>(std::round(row_width / std::max(10.0F, 14.0F * scale))));
+            const float stagger = (row_index + face_index) % 2 == 0 ? -0.5F : 0.0F;
+
+            for (int tile = 0; tile <= tiles; ++tile) {
+                const float raw_u0 = (static_cast<float>(tile) + stagger) / static_cast<float>(tiles);
+                const float raw_u1 = (static_cast<float>(tile + 1) + stagger) / static_cast<float>(tiles);
+                const float u0 = std::clamp(raw_u0, 0.0F, 1.0F);
+                const float u1 = std::clamp(raw_u1, 0.0F, 1.0F);
+                if (u1 - u0 < 0.018F) continue;
+
+                const QPointF top0 = roofRowPoint(previous_row, u0);
+                const QPointF top1 = roofRowPoint(previous_row, u1);
+                const QPointF bottom0 = roofRowPoint(current_row, u0);
+                const QPointF bottom1 = roofRowPoint(current_row, u1);
+                const QColor tile_fill = (tile + row_index + face_index) % 3 == 0
+                    ? alphaColor(light, 12 + static_cast<int>(22.0F * variation))
+                    : alphaColor(mid, 9 + static_cast<int>(18.0F * variation));
+
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(tile_fill);
+                painter.drawPolygon(QPolygonF{top0, top1, bottom1, bottom0});
+
+                painter.setBrush(Qt::NoBrush);
+                painter.setPen(QPen(dark, 0.60 + 0.18 * contrast));
+                painter.drawLine(bottom0, bottom1);
+
+                // Side joints only occupy the lower part of the current tile.
+                // They never connect to the next course and therefore cannot
+                // become long diagonal guide lines across the roof face.
+                if (tile < tiles && u1 < 0.985F) {
+                    const QPointF joint_start = lerpScreen(top1, bottom1, 0.64F);
+                    painter.drawLine(joint_start, bottom1);
+                }
             }
 
-            painter.setPen(QPen(alphaColor(light, 28 + static_cast<int>(24.0F * strength)), 0.48));
-            const auto highlight_row = roofRowEndpoints(polygon, std::max(0.0F, v1 - 0.012F));
-            painter.drawLine(highlight_row[0], highlight_row[1]);
+            const auto highlight_row = roofRowEndpoints(polygon, std::max(0.0F, v1 - 0.010F));
+            painter.setPen(QPen(alphaColor(light, 20 + static_cast<int>(20.0F * strength)), 0.40));
+            painter.drawLine(roofRowPoint(highlight_row, 0.03F), roofRowPoint(highlight_row, 0.97F));
         }
     } else if (spec.roof_material == BuildingRoofMaterial::AsphaltShingle) {
         const float nominal_course = std::max(6.0F, 9.0F * scale);
@@ -758,7 +781,7 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
                 ridge1 = { roof_half_w, 0.0F, wall_h + roof_h};
             } else {
                 ridge0 = {0.0F, -roof_half_d, wall_h + roof_h};
-                ridge1 = {0.0F,  roof_half_d, wall_h + roof_h};
+                ridge1 = {0.0F,  ridge_y, wall_h + roof_h};
             }
         }
 
