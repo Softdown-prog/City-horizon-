@@ -5,3 +5,22 @@
 /setup-downloads/
 __pycache__/
 *.pyc
+
+# Local/generated test output
+/Testing/Temporary/
+/Tiles_test/
+/work/
+/outputs/*_review.png
+
+# CMake/compiler generated files
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/build-*/
+/out/
+/.vs/
+*.obj
+*.o
+*.pdb
+*.ilk
