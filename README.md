@@ -228,6 +228,7 @@ Complex attractions such as carousels, Ferris wheels and roller coasters can use
 - [`docs/ASSET_PIPELINE.md`](docs/ASSET_PIPELINE.md) — detailed visual production pipeline
 - [`assets/README.md`](assets/README.md) — runtime asset policy
 - [`tools/tycoon_photo_studio/README.md`](tools/tycoon_photo_studio/README.md) — Blender/bake implementation
+- [`tools/visitor_forge_2d/README.md`](tools/visitor_forge_2d/README.md) — procedural 2D visitors and small prop shape recipes
 - [`C++/MapForge2/CH_ASSET_PROJECT_EDITOR_V1.md`](C++/MapForge2/CH_ASSET_PROJECT_EDITOR_V1.md) — Asset Editor state and intent
 - [`C++/MapForge2/CH_CAMERA_CONTRACT_V1.md`](C++/MapForge2/CH_CAMERA_CONTRACT_V1.md) — camera contract
 

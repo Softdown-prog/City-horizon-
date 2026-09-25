@@ -6,6 +6,10 @@ Ferramenta dedicada para gerar visitantes 2D estilizados para o City Horizon.
 [`docs/OPERACAO_VISUAL.md`](docs/OPERACAO_VISUAL.md). Ela identifica as fontes
 corretas, o catálogo de teste, os comandos de geração e o gate visual.
 
+**Para desenhar pequenos objetos 2D sem rig de personagem:** use
+[`docs/DESENHO_2D.md`](docs/DESENHO_2D.md) e o comando `draw-recipe`.
+Há uma receita versionada de placa de parque em `examples/park_wayfinding_sign.json`.
+
 ## Objetivo
 
 O Visitor Forge 2D existe para produzir personagens pequenos, legíveis e consistentes para o mapa isométrico do jogo sem depender de um render 3D realista como arte final.

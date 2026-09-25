@@ -16,6 +16,7 @@ from .character.review import frame_measurements, gameplay_review, map_scale_rev
 from .character.concept_rig import build_concept_rig
 from .character.gait_warp import render_directional_gait
 from .character.preview_audit import audit_preview
+from .core.shape_recipe import export_shape_recipe
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -80,6 +81,12 @@ def command_audit_preview(args: argparse.Namespace) -> int:
     result = audit_preview(Path(args.manifest), Path(args.repo_root))
     print(json.dumps(result, indent=2))
     return 0 if result["status"] == "ok" else 1
+
+
+def command_draw_recipe(args: argparse.Namespace) -> int:
+    result = export_shape_recipe(Path(args.recipe), Path(args.output))
+    print(json.dumps({"status": "ok", **result}, indent=2))
+    return 0
 
 
 def _compose_and_export(
@@ -360,6 +367,11 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--manifest", required=True, help="Preview catalogue JSON")
     audit.add_argument("--repo-root", default=".", help="Repository root for paths inside the catalogue")
     audit.set_defaults(func=command_audit_preview)
+
+    draw = subparsers.add_parser("draw-recipe", help="draw a layered 2D prop from a JSON shape recipe")
+    draw.add_argument("--recipe", required=True, help="CH_2D_SHAPE_RECIPE_V1 JSON file")
+    draw.add_argument("--output", required=True, help="Output directory for PNG and metadata")
+    draw.set_defaults(func=command_draw_recipe)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)
