@@ -24,3 +24,6 @@ __pycache__/
 *.o
 *.pdb
 *.ilk
+
+# Blender backup files
+*.blend1
