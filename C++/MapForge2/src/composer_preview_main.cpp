@@ -229,13 +229,20 @@ int main(int argc, char** argv) {
         {Kind::CornerQuoins, Edge::North, 0, 0.50F, 0.90F, true},
         {Kind::CornerQuoins, Edge::West, 0, 0.50F, 0.90F, true},
 
-        // Small red corbels just below the green eave. These use the generic
-        // plaque module at narrow widths instead of introducing booth-only code.
+        // Small red corbels continue around the entire building. Keeping them on
+        // every edge prevents the canonical rotations from exposing undecorated
+        // rear eaves while preserving one physical 2D procedural structure.
         {Kind::Sign, Edge::South, 0, 0.14F, 0.075F, true},
         {Kind::Sign, Edge::South, 0, 0.50F, 0.075F, true},
         {Kind::Sign, Edge::South, 0, 0.86F, 0.075F, true},
         {Kind::Sign, Edge::East, 0, 0.14F, 0.075F, true},
         {Kind::Sign, Edge::East, 0, 0.86F, 0.075F, true},
+        {Kind::Sign, Edge::North, 0, 0.14F, 0.075F, true},
+        {Kind::Sign, Edge::North, 0, 0.50F, 0.075F, true},
+        {Kind::Sign, Edge::North, 0, 0.86F, 0.075F, true},
+        {Kind::Sign, Edge::West, 0, 0.14F, 0.075F, true},
+        {Kind::Sign, Edge::West, 0, 0.50F, 0.075F, true},
+        {Kind::Sign, Edge::West, 0, 0.86F, 0.075F, true},
 
         // Left visible facade in the canonical South view.
         {Kind::TicketWindow, Edge::South, 0, 0.50F, 0.40F, true},
