@@ -1,4 +1,5 @@
 name: Generate Sand Autotile
+# Verification trigger: exercise the current candidate-only tile pipeline.
 
 on:
   workflow_dispatch:
