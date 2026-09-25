@@ -7,6 +7,7 @@
 #include <QFont>
 #include <QJsonArray>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPolygonF>
 
 #include <algorithm>
@@ -382,8 +383,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.setBrush(scaledColor(spec.trim_color, 0.98F));
         painter.drawPolygon(outer);
 
-        // Generic segmented stone ring. Each wedge follows both the outer and
-        // inner arch, so the module reads as masonry instead of a flat vector rim.
         constexpr int kArchBlocks = 9;
         for (int block = 0; block < kArchBlocks; ++block) {
             const float a0 = kPi - kPi * static_cast<float>(block) / static_cast<float>(kArchBlocks);
@@ -409,7 +408,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawPolygon(wedge);
         }
 
-        // Add matching vertical jamb blocks below the spring line.
         constexpr int kJambRows = 4;
         for (int row = 0; row < kJambRows; ++row) {
             const float rz0 = z0 + (outer_spring - z0) * static_cast<float>(row) / static_cast<float>(kJambRows);
@@ -423,9 +421,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawPolygon(faceRect(a, b, center + inner_half, center + half, rz0, rz1, view, canvas));
         }
 
-        // A passage is actual negative space in the sprite, not a black painted
-        // doorway. Clearing the inner arch lets the map/ground behind the
-        // building remain visible through the opening in every rotated view.
         painter.setCompositionMode(QPainter::CompositionMode_Clear);
         painter.setPen(Qt::NoPen);
         painter.setBrush(Qt::transparent);
@@ -446,20 +441,25 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             const Point3 i1 = lerpPoint(a, b, s1, z);
             const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
             const Point3 o1{i1.x + n.x * 0.28F, i1.y + n.y * 0.28F, z - floor_h * 0.095F};
-            painter.setBrush(stripe % 2 == 0 ? spec.accent_color : spec.trim_color);
+            const QColor stripe_color = stripe % 2 == 0 ? spec.accent_color : spec.trim_color;
+            painter.setBrush(stripe_color);
             painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
                                           projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
 
-            // Rounded scallop centered under each stripe. Screen-space ellipses
-            // keep the tiny canvas edge legible at gameplay scale while the
-            // canopy itself remains projected from the isometric face.
-            const float sm = (s0 + s1) * 0.5F;
-            const Point3 mid = lerpPoint(a, b, sm, z - floor_h * 0.095F);
-            const Point3 lip{mid.x + n.x * 0.28F, mid.y + n.y * 0.28F, mid.z - floor_h * 0.025F};
-            const QPointF scallop = projectPoint(lip, view, canvas);
-            painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F, 160), 0.55));
-            painter.setBrush(stripe % 2 == 0 ? spec.accent_color : spec.trim_color);
-            painter.drawEllipse(scallop, 4.2, 3.2);
+            // The valance is a filled curved strip, not a row of detached circles.
+            // Adjacent quadratic segments share their endpoints, producing one
+            // continuous scalloped silhouette while retaining the stripe colors.
+            const QPointF front0 = projectPoint(o0, view, canvas);
+            const QPointF front1 = projectPoint(o1, view, canvas);
+            const QPointF mid = (front0 + front1) * 0.5;
+            QPainterPath valance;
+            valance.moveTo(front0);
+            valance.lineTo(front1);
+            valance.quadTo(mid + QPointF(0.0, 5.0), front0);
+            valance.closeSubpath();
+            painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F, 145), 0.48));
+            painter.setBrush(stripe_color);
+            painter.drawPath(valance);
             painter.setPen(Qt::NoPen);
         }
         const Point3 i0 = lerpPoint(a, b, t0, z), i1 = lerpPoint(a, b, t1, z);
@@ -470,17 +470,29 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
                                       projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
     } else if (module.kind == BuildingFacadeModuleKind::CurvedPediment) {
-        const float z_base = base_z + floor_h * 0.76F;
-        const float z_shoulder = base_z + floor_h * 0.93F;
-        const float z_peak = base_z + floor_h * 1.16F;
+        // Keep the ornament seated on the facade rather than floating over the
+        // roof plane. The base trim also gives the plaque a clear architectural
+        // support that survives all four canonical rotations.
+        const float z_base = base_z + floor_h * 0.72F;
+        const float z_shoulder = base_z + floor_h * 0.89F;
+        const float z_peak = base_z + floor_h * 1.10F;
+        const float support_z0 = z_base - floor_h * 0.055F;
+        const float support_z1 = z_base + floor_h * 0.012F;
+        painter.setPen(QPen(scaledColor(spec.trim_color, 0.48F), 0.95));
+        painter.setBrush(scaledColor(spec.trim_color, 0.92F));
+        painter.drawPolygon(faceRect(a, b,
+                                     std::max(0.02F, t0 - width * 0.045F),
+                                     std::min(0.98F, t1 + width * 0.045F),
+                                     support_z0, support_z1, view, canvas));
+
         QPolygonF plaque{
             projectPoint(lerpPoint(a, b, t0, z_base), view, canvas),
             projectPoint(lerpPoint(a, b, t1, z_base), view, canvas),
             projectPoint(lerpPoint(a, b, t1, z_shoulder), view, canvas),
             projectPoint(lerpPoint(a, b, center + width * 0.27F, z_shoulder), view, canvas),
-            projectPoint(lerpPoint(a, b, center + width * 0.18F, z_peak - floor_h * 0.06F), view, canvas),
+            projectPoint(lerpPoint(a, b, center + width * 0.18F, z_peak - floor_h * 0.055F), view, canvas),
             projectPoint(lerpPoint(a, b, center, z_peak), view, canvas),
-            projectPoint(lerpPoint(a, b, center - width * 0.18F, z_peak - floor_h * 0.06F), view, canvas),
+            projectPoint(lerpPoint(a, b, center - width * 0.18F, z_peak - floor_h * 0.055F), view, canvas),
             projectPoint(lerpPoint(a, b, center - width * 0.27F, z_shoulder), view, canvas),
             projectPoint(lerpPoint(a, b, t0, z_shoulder), view, canvas),
         };
@@ -490,29 +502,27 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
 
         const float inner_t0 = t0 + width * 0.09F;
         const float inner_t1 = t1 - width * 0.09F;
-        const float inner_peak = z_peak - floor_h * 0.055F;
+        const float inner_peak = z_peak - floor_h * 0.050F;
         QPolygonF inset{
-            projectPoint(lerpPoint(a, b, inner_t0, z_base + floor_h * 0.055F), view, canvas),
-            projectPoint(lerpPoint(a, b, inner_t1, z_base + floor_h * 0.055F), view, canvas),
+            projectPoint(lerpPoint(a, b, inner_t0, z_base + floor_h * 0.050F), view, canvas),
+            projectPoint(lerpPoint(a, b, inner_t1, z_base + floor_h * 0.050F), view, canvas),
             projectPoint(lerpPoint(a, b, inner_t1, z_shoulder - floor_h * 0.015F), view, canvas),
-            projectPoint(lerpPoint(a, b, center + width * 0.14F, inner_peak - floor_h * 0.04F), view, canvas),
+            projectPoint(lerpPoint(a, b, center + width * 0.14F, inner_peak - floor_h * 0.038F), view, canvas),
             projectPoint(lerpPoint(a, b, center, inner_peak), view, canvas),
-            projectPoint(lerpPoint(a, b, center - width * 0.14F, inner_peak - floor_h * 0.04F), view, canvas),
+            projectPoint(lerpPoint(a, b, center - width * 0.14F, inner_peak - floor_h * 0.038F), view, canvas),
             projectPoint(lerpPoint(a, b, inner_t0, z_shoulder - floor_h * 0.015F), view, canvas),
         };
         painter.setPen(QPen(scaledColor(spec.glass_color, 0.58F), 0.85));
         painter.setBrush(scaledColor(spec.glass_color, 0.76F));
         painter.drawPolygon(inset);
-        const QPointF star_center = projectPoint(lerpPoint(a, b, center, base_z + floor_h * 1.01F), view, canvas);
+        const QPointF star_center = projectPoint(lerpPoint(a, b, center, base_z + floor_h * 0.965F), view, canvas);
         painter.setPen(QPen(scaledColor(spec.ornament_color, 0.62F), 0.75));
         painter.setBrush(spec.ornament_color);
         painter.drawPolygon(starPolygon(star_center, 7.0, 3.0));
 
-        // Three reusable finials reproduce the classic entrance silhouette:
-        // two shoulder spheres and one slightly larger central crown sphere.
         const std::array<std::pair<float, float>, 3> finials = {{
             {center - width * 0.34F, z_shoulder + floor_h * 0.025F},
-            {center, z_peak + floor_h * 0.035F},
+            {center, z_peak + floor_h * 0.030F},
             {center + width * 0.34F, z_shoulder + floor_h * 0.025F},
         }};
         for (int i = 0; i < static_cast<int>(finials.size()); ++i) {
@@ -525,7 +535,7 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawPolygon(faceRect(a, b, ft - base_half, ft + base_half,
                                          fz - base_h, fz, view, canvas));
             const QPointF sphere = projectPoint(lerpPoint(a, b, ft, fz + floor_h * 0.035F), view, canvas);
-            const qreal radius = i == 1 ? 5.4 : 4.7;
+            const qreal radius = i == 1 ? 5.2 : 4.6;
             painter.setPen(QPen(scaledColor(spec.trim_color, 0.62F), 0.75));
             painter.setBrush(blendColor(spec.trim_color, QColor("#fffaf0"), 0.30F));
             painter.drawEllipse(sphere, radius, radius);
