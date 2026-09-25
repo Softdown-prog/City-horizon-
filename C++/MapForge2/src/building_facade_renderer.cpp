@@ -360,12 +360,33 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
                                      z0 + inset_z, z1 - inset_z, view, canvas));
         painter.drawPolygon(faceRect(a, b, t1 - inset_t - jamb, t1 - inset_t,
                                      z0 + inset_z, z1 - inset_z, view, canvas));
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.30F, 115), 1.65));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0 + inset_t, z1 - inset_z), view, canvas),
+                         projectPoint(lerpPoint(a, b, t1 - inset_t, z1 - inset_z), view, canvas));
         const float counter_z0 = z0 - floor_h * 0.055F;
         const float counter_z1 = z0 + floor_h * 0.025F;
         painter.setPen(QPen(scaledColor(spec.door_color, 0.52F), 1.0));
         painter.setBrush(scaledColor(spec.door_color, 1.04F));
         painter.drawPolygon(faceRect(a, b, t0 - 0.018F, t1 + 0.018F,
                                      counter_z0, counter_z1, view, canvas));
+        // A shallow projecting sill gives the counter a usable top surface.
+        const Point3 n = outwardNormal(edge);
+        const Point3 back0 = lerpPoint(a, b, t0 - 0.018F, counter_z1);
+        const Point3 back1 = lerpPoint(a, b, t1 + 0.018F, counter_z1);
+        const Point3 front0{back0.x + n.x * 0.065F, back0.y + n.y * 0.065F, counter_z1};
+        const Point3 front1{back1.x + n.x * 0.065F, back1.y + n.y * 0.065F, counter_z1};
+        painter.setPen(QPen(scaledColor(spec.door_color, 0.62F, 160), 0.65));
+        painter.setBrush(blendColor(spec.door_color, spec.trim_color, 0.19F));
+        painter.drawPolygon(QPolygonF{projectPoint(back0, view, canvas),
+                                      projectPoint(back1, view, canvas),
+                                      projectPoint(front1, view, canvas),
+                                      projectPoint(front0, view, canvas)});
+        painter.setPen(QPen(scaledColor(spec.door_color, 0.49F, 135), 0.75));
+        painter.setBrush(scaledColor(spec.trim_color, 0.96F));
+        painter.drawPolygon(faceRect(a, b, center - width * 0.042F,
+                                     center + width * 0.042F,
+                                     counter_z0 + floor_h * 0.012F,
+                                     counter_z1 - floor_h * 0.006F, view, canvas));
     } else if (module.kind == BuildingFacadeModuleKind::ArchedPassage) {
         const float half = width * 0.5F;
         const float z0 = base_z + floor_h * 0.08F;
@@ -433,6 +454,9 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const float z = base_z + floor_h * 0.73F;
         const Point3 n = outwardNormal(edge);
         constexpr int kStripes = 5;
+        painter.setPen(QPen(scaledColor(spec.wall_color, 0.34F, 78), 2.0));
+        painter.drawLine(projectPoint(lerpPoint(a, b, t0, z - floor_h * 0.115F), view, canvas),
+                         projectPoint(lerpPoint(a, b, t1, z - floor_h * 0.115F), view, canvas));
         painter.setPen(Qt::NoPen);
         for (int stripe = 0; stripe < kStripes; ++stripe) {
             const float s0 = t0 + (t1 - t0) * static_cast<float>(stripe) / static_cast<float>(kStripes);
@@ -465,6 +489,15 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const Point3 i0 = lerpPoint(a, b, t0, z), i1 = lerpPoint(a, b, t1, z);
         const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
         const Point3 o1{i1.x + n.x * 0.28F, i1.y + n.y * 0.28F, z - floor_h * 0.095F};
+        // The darker front lip closes the canvas thickness without drawing
+        // noisy seams between its five stripes at gameplay scale.
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(scaledColor(spec.accent_color, 0.48F, 150));
+        painter.drawPolygon(QPolygonF{
+            projectPoint(o0, view, canvas), projectPoint(o1, view, canvas),
+            projectPoint({o1.x, o1.y, o1.z - 2.0F}, view, canvas),
+            projectPoint({o0.x, o0.y, o0.z - 2.0F}, view, canvas),
+        });
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.48F), 1.0));
         painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
@@ -496,6 +529,11 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             projectPoint(lerpPoint(a, b, center - width * 0.27F, z_shoulder), view, canvas),
             projectPoint(lerpPoint(a, b, t0, z_shoulder), view, canvas),
         };
+        QPolygonF plaque_shadow = plaque;
+        plaque_shadow.translate(0.0, 2.1);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(scaledColor(spec.roof_color, 0.33F, 105));
+        painter.drawPolygon(plaque_shadow);
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.48F), 1.1));
         painter.setBrush(spec.trim_color);
         painter.drawPolygon(plaque);
@@ -516,9 +554,15 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.setBrush(scaledColor(spec.glass_color, 0.76F));
         painter.drawPolygon(inset);
         const QPointF star_center = projectPoint(lerpPoint(a, b, center, base_z + floor_h * 0.965F), view, canvas);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(scaledColor(spec.ornament_color, 0.45F, 175));
+        painter.drawPolygon(starPolygon(star_center + QPointF(1.0, 1.35), 7.1, 3.1));
         painter.setPen(QPen(scaledColor(spec.ornament_color, 0.62F), 0.75));
         painter.setBrush(spec.ornament_color);
         painter.drawPolygon(starPolygon(star_center, 7.0, 3.0));
+        painter.setPen(QPen(blendColor(spec.ornament_color, spec.trim_color, 0.42F), 0.68));
+        painter.drawLine(star_center + QPointF(-1.2, -4.4),
+                         star_center + QPointF(0.2, -2.4));
 
         const std::array<std::pair<float, float>, 3> finials = {{
             {center - width * 0.34F, z_shoulder + floor_h * 0.025F},
