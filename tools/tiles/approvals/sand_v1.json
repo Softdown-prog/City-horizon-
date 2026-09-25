@@ -1,0 +1,30 @@
+{
+  "schema": "CITY_HORIZON_TILE_APPROVAL_V1",
+  "asset": "sand",
+  "version": "v1",
+  "status": "approved",
+  "approvedFromWorkflowRun": 36077704376,
+  "base": {
+    "path": "out/sand_isometric_candidate.png",
+    "sha256": "4688e2095fcb3ddf611a5126b911e111062ea4acf9540185f30f4f98e8e14e38"
+  },
+  "family": {
+    "sand_path_00_isolated.png": "ece6c4695cf215b29c6b08a35c65b2ebb50b2ed20acef3a7f7efed7e44bc57cf",
+    "sand_path_01_end_n.png": "eee027d38d6dfa8f4043c3a933c694e33406b3fd7a53a74b4c17f28525052014",
+    "sand_path_02_end_e.png": "b80d962ddfe6a6e286bc56b0a4378202e0f1ae01d79bb4453df05fbe5e46f010",
+    "sand_path_03_curve_ne.png": "1fa2a64709f71db94bdba26e83392022ea85fa94baa0f35841d5a99e0631d0b0",
+    "sand_path_04_end_s.png": "213e3445a79ff5afa3549b5e82470d3c7d982d929fa0946f77a3d395e8b6fa67",
+    "sand_path_05_straight_ns.png": "da001e0e65a040a80969cf3c4ed04cb9e1a029c51cca0dcbb82f15dd14aea402",
+    "sand_path_06_curve_es.png": "ccaf4830a923de9847be1cb0eb9b94b155f7beac81a8a9a6d490aaf81ee3a797",
+    "sand_path_07_tee_no_w.png": "5157678e52e0a8a8bed9f5e9b3505a30e58511808625e813372db178b5108150",
+    "sand_path_08_end_w.png": "32a933dc565586855b3940c4675222177f297c131cf6d896be0b7bf3e0f9100f",
+    "sand_path_09_curve_nw.png": "6ee446384b724f7b3249f684b828c5a537839bff947e9c56fa55e1eb46561b3a",
+    "sand_path_10_straight_ew.png": "987b09dd0d30ebfaf9a0ca74c5d3668d2c855fe742be838c1d143842db6912ac",
+    "sand_path_11_tee_no_s.png": "0f6fd180633f3d21f3089e46cfd5c21d1f4d86a84c39b06463ac8454c5c78ef0",
+    "sand_path_12_curve_sw.png": "a0bdd5382aa6a9919ebb8cb7d7fc53c90234ab840cce038925fe179e5e3be55e",
+    "sand_path_13_tee_no_e.png": "61bf1a0c01ede14b90faab86e24451ac22d314d551d83f100a588baef44b8c4c",
+    "sand_path_14_tee_no_n.png": "dd6c75b2de90d8d6a8c823797dea7fd8fb8721012ed752d72b8501a05b8244b5",
+    "sand_path_15_cross.png": "ec8cbf5a496986a9315e093080be397ac1b7ec58abe11a17fe9aca280622b86c"
+  },
+  "note": "Visually approved after black/red edge contamination was removed. Promotion is allowed only when the regenerated candidate exactly matches every approved SHA-256 above."
+}
