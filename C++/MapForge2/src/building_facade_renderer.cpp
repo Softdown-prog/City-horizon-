@@ -138,9 +138,6 @@ void drawLocalizedAmbientOcclusion(QPainter& painter, const BuildingComposerSpec
     const float wall_h = static_cast<float>(BuildingComposer::effectiveWallHeightPx(spec));
     const QColor ao = scaledColor(spec.wall_color, 0.42F);
 
-    // Remove the broader legacy contact bands from the composed body first.
-    // This tiny neutral strip is intentionally material-free: the eave contact
-    // owns this zone and will be repainted immediately below with compact AO.
     painter.save();
     painter.setPen(Qt::NoPen);
     for (const int edge : visible_edges) {
@@ -373,14 +370,58 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const float z0 = base_z + floor_h * 0.08F;
         const float outer_spring = base_z + floor_h * 0.55F;
         const float outer_arch = floor_h * 0.24F;
+        const float inner_half = half * 0.72F;
+        const float inner_spring = base_z + floor_h * 0.53F;
+        const float inner_arch = floor_h * 0.18F;
         const QPolygonF outer = archedFace(a, b, center, half, z0, outer_spring, outer_arch, view, canvas);
-        const QPolygonF opening = archedFace(a, b, center, half * 0.72F,
+        const QPolygonF opening = archedFace(a, b, center, inner_half,
                                              z0 + floor_h * 0.01F,
-                                             base_z + floor_h * 0.53F,
-                                             floor_h * 0.18F, view, canvas);
+                                             inner_spring,
+                                             inner_arch, view, canvas);
         painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F), 1.15));
         painter.setBrush(scaledColor(spec.trim_color, 0.98F));
         painter.drawPolygon(outer);
+
+        // Generic segmented stone ring. Each wedge follows both the outer and
+        // inner arch, so the module reads as masonry instead of a flat vector rim.
+        constexpr int kArchBlocks = 9;
+        for (int block = 0; block < kArchBlocks; ++block) {
+            const float a0 = kPi - kPi * static_cast<float>(block) / static_cast<float>(kArchBlocks);
+            const float a1 = kPi - kPi * static_cast<float>(block + 1) / static_cast<float>(kArchBlocks);
+            const float outer_t0 = center + std::cos(a0) * half;
+            const float outer_t1 = center + std::cos(a1) * half;
+            const float outer_z0 = outer_spring + std::sin(a0) * outer_arch;
+            const float outer_z1 = outer_spring + std::sin(a1) * outer_arch;
+            const float inner_t0 = center + std::cos(a0) * inner_half;
+            const float inner_t1 = center + std::cos(a1) * inner_half;
+            const float inner_z0 = inner_spring + std::sin(a0) * inner_arch;
+            const float inner_z1 = inner_spring + std::sin(a1) * inner_arch;
+            QPolygonF wedge{
+                projectPoint(lerpPoint(a, b, outer_t0, outer_z0), view, canvas),
+                projectPoint(lerpPoint(a, b, outer_t1, outer_z1), view, canvas),
+                projectPoint(lerpPoint(a, b, inner_t1, inner_z1), view, canvas),
+                projectPoint(lerpPoint(a, b, inner_t0, inner_z0), view, canvas),
+            };
+            painter.setPen(QPen(scaledColor(spec.door_color, 0.62F, 145), 0.62));
+            painter.setBrush(block % 2 == 0
+                                 ? blendColor(spec.trim_color, spec.door_color, 0.12F)
+                                 : blendColor(spec.trim_color, spec.wall_color, 0.15F));
+            painter.drawPolygon(wedge);
+        }
+
+        // Add matching vertical jamb blocks below the spring line.
+        constexpr int kJambRows = 4;
+        for (int row = 0; row < kJambRows; ++row) {
+            const float rz0 = z0 + (outer_spring - z0) * static_cast<float>(row) / static_cast<float>(kJambRows);
+            const float rz1 = z0 + (outer_spring - z0) * static_cast<float>(row + 1) / static_cast<float>(kJambRows);
+            const QColor fill = row % 2 == 0
+                ? blendColor(spec.trim_color, spec.door_color, 0.10F)
+                : blendColor(spec.trim_color, spec.wall_color, 0.14F);
+            painter.setPen(QPen(scaledColor(spec.door_color, 0.62F, 140), 0.62));
+            painter.setBrush(fill);
+            painter.drawPolygon(faceRect(a, b, center - half, center - inner_half, rz0, rz1, view, canvas));
+            painter.drawPolygon(faceRect(a, b, center + inner_half, center + half, rz0, rz1, view, canvas));
+        }
 
         // A passage is actual negative space in the sprite, not a black painted
         // doorway. Clearing the inner arch lets the map/ground behind the
@@ -408,6 +449,18 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             painter.setBrush(stripe % 2 == 0 ? spec.accent_color : spec.trim_color);
             painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
                                           projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
+
+            // Rounded scallop centered under each stripe. Screen-space ellipses
+            // keep the tiny canvas edge legible at gameplay scale while the
+            // canopy itself remains projected from the isometric face.
+            const float sm = (s0 + s1) * 0.5F;
+            const Point3 mid = lerpPoint(a, b, sm, z - floor_h * 0.095F);
+            const Point3 lip{mid.x + n.x * 0.28F, mid.y + n.y * 0.28F, mid.z - floor_h * 0.025F};
+            const QPointF scallop = projectPoint(lip, view, canvas);
+            painter.setPen(QPen(scaledColor(spec.trim_color, 0.50F, 160), 0.55));
+            painter.setBrush(stripe % 2 == 0 ? spec.accent_color : spec.trim_color);
+            painter.drawEllipse(scallop, 4.2, 3.2);
+            painter.setPen(Qt::NoPen);
         }
         const Point3 i0 = lerpPoint(a, b, t0, z), i1 = lerpPoint(a, b, t1, z);
         const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
@@ -454,6 +507,29 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.setPen(QPen(scaledColor(spec.ornament_color, 0.62F), 0.75));
         painter.setBrush(spec.ornament_color);
         painter.drawPolygon(starPolygon(star_center, 7.0, 3.0));
+
+        // Three reusable finials reproduce the classic entrance silhouette:
+        // two shoulder spheres and one slightly larger central crown sphere.
+        const std::array<std::pair<float, float>, 3> finials = {{
+            {center - width * 0.34F, z_shoulder + floor_h * 0.025F},
+            {center, z_peak + floor_h * 0.035F},
+            {center + width * 0.34F, z_shoulder + floor_h * 0.025F},
+        }};
+        for (int i = 0; i < static_cast<int>(finials.size()); ++i) {
+            const float ft = finials[i].first;
+            const float fz = finials[i].second;
+            const float base_half = i == 1 ? width * 0.055F : width * 0.045F;
+            const float base_h = floor_h * 0.045F;
+            painter.setPen(QPen(scaledColor(spec.trim_color, 0.58F), 0.65));
+            painter.setBrush(scaledColor(spec.trim_color, 0.94F));
+            painter.drawPolygon(faceRect(a, b, ft - base_half, ft + base_half,
+                                         fz - base_h, fz, view, canvas));
+            const QPointF sphere = projectPoint(lerpPoint(a, b, ft, fz + floor_h * 0.035F), view, canvas);
+            const qreal radius = i == 1 ? 5.4 : 4.7;
+            painter.setPen(QPen(scaledColor(spec.trim_color, 0.62F), 0.75));
+            painter.setBrush(blendColor(spec.trim_color, QColor("#fffaf0"), 0.30F));
+            painter.drawEllipse(sphere, radius, radius);
+        }
     } else if (module.kind == BuildingFacadeModuleKind::CornerQuoins) {
         const QColor stone = blendColor(scaledColor(spec.wall_color, 0.78F), spec.door_color, 0.12F);
         const QColor stone_light = blendColor(scaledColor(spec.wall_color, 0.92F), spec.trim_color, 0.18F);
@@ -577,15 +653,7 @@ void drawAutomaticFloors(QPainter& painter, const BuildingComposerSpec& spec,
 QImage BuildingFacadeRenderer::renderView(const BuildingComposerSpec& spec, const BuildingView view, const QSize canvas) {
     BuildingComposerSpec render_spec = spec;
     render_spec.wall_height_px = BuildingComposer::effectiveWallHeightPx(spec);
-
-    // The production facade path owns the global cast shadow. Disable the
-    // legacy shadow in the roof/body renderer so only one shadow model is ever
-    // composited into exported sprites.
     render_spec.cast_shadow = false;
-
-    // Facade modules are always authored after the body/roof pass. This keeps
-    // the Classic Tycoon material ramp free to repaint the wall surface without
-    // covering doors, windows, signs or awnings, including single-storey legacy presets.
     render_spec.windows = false;
     render_spec.south_door = false;
     render_spec.south_awning = false;
