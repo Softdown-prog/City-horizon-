@@ -4,11 +4,15 @@
 #include "building_lod_validator.h"
 #include "building_roof_editor_renderer.h"
 #include "building_visual_reference_gate.h"
+#include "src/ch_core/contracts.h"
 
 #include <QDir>
 #include <QFile>
+#include <QFont>
 #include <QGuiApplication>
 #include <QJsonDocument>
+#include <QPainter>
+#include <QPolygonF>
 #include <QString>
 
 #include <iostream>
@@ -89,6 +93,129 @@ bool writeVisualReferenceGate(const QString& output_dir) {
     report_file.write(QJsonDocument(Gate::manifest()).toJson(QJsonDocument::Indented));
     report_file.close();
     std::cout << report_path.toStdString() << "\n";
+    return true;
+}
+
+QPointF projectSouthGroundPoint(const float x, const float y, const QSize canvas) {
+    const float half_tile_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
+    const float half_tile_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
+    return {static_cast<float>(canvas.width()) * 0.5F + (x - y) * half_tile_w,
+            static_cast<float>(canvas.height()) - 42.0F + (x + y) * half_tile_h};
+}
+
+void drawNpcScaleSilhouette(QPainter& painter, const QPointF feet, const QString& caption) {
+    constexpr qreal kNpcHeight = 56.0;
+    const QColor silhouette("#26343b");
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor("#0d171b"), 1.0));
+    painter.setBrush(silhouette);
+
+    painter.drawEllipse(QRectF(feet.x() - 6.0, feet.y() - kNpcHeight, 12.0, 12.0));
+    painter.drawRoundedRect(QRectF(feet.x() - 7.0, feet.y() - 44.0, 14.0, 25.0), 3.0, 3.0);
+    painter.drawRoundedRect(QRectF(feet.x() - 10.0, feet.y() - 41.0, 4.0, 22.0), 2.0, 2.0);
+    painter.drawRoundedRect(QRectF(feet.x() + 6.0, feet.y() - 41.0, 4.0, 22.0), 2.0, 2.0);
+    painter.drawRect(QRectF(feet.x() - 6.0, feet.y() - 20.0, 5.0, 20.0));
+    painter.drawRect(QRectF(feet.x() + 1.0, feet.y() - 20.0, 5.0, 20.0));
+
+    const qreal ruler_x = feet.x() + 18.0;
+    painter.setPen(QPen(QColor("#f6e29a"), 1.4));
+    painter.drawLine(QPointF(ruler_x, feet.y() - kNpcHeight), QPointF(ruler_x, feet.y()));
+    painter.drawLine(QPointF(ruler_x - 4.0, feet.y() - kNpcHeight), QPointF(ruler_x + 4.0, feet.y() - kNpcHeight));
+    painter.drawLine(QPointF(ruler_x - 4.0, feet.y()), QPointF(ruler_x + 4.0, feet.y()));
+    painter.setPen(QColor("#f6e29a"));
+    QFont font(QStringLiteral("Arial"));
+    font.setBold(true);
+    font.setPointSize(8);
+    painter.setFont(font);
+    painter.drawText(QRectF(ruler_x + 6.0, feet.y() - 40.0, 74.0, 20.0), Qt::AlignLeft | Qt::AlignVCenter,
+                     QStringLiteral("56 px"));
+
+    painter.setPen(QColor("#e7f0f2"));
+    painter.drawText(QRectF(feet.x() - 78.0, feet.y() + 5.0, 156.0, 20.0), Qt::AlignHCenter | Qt::AlignTop,
+                     caption);
+    painter.restore();
+}
+
+bool writeTicketBoothNpcScaleGate(const QString& output_dir,
+                                  const ch::studio::BuildingComposerSpec& ticket_booth) {
+    using ch::studio::BuildingFacadeRenderer;
+    using ch::studio::BuildingView;
+
+    const QSize view_size(420, 420);
+    const QImage booth = BuildingFacadeRenderer::renderView(ticket_booth, BuildingView::South, view_size);
+    QImage gate(QSize(960, 540), QImage::Format_ARGB32_Premultiplied);
+    gate.fill(QColor("#172025"));
+
+    QPainter painter(&gate);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QFont title_font(QStringLiteral("Arial"));
+    title_font.setBold(true);
+    title_font.setPointSize(12);
+    painter.setFont(title_font);
+    painter.setPen(QColor("#e5eef0"));
+    painter.drawText(QRect(24, 10, gate.width() - 48, 26), Qt::AlignLeft | Qt::AlignVCenter,
+                     QStringLiteral("CITY HORIZON - BILHETERIA 2x2 / GATE DE ESCALA NPC"));
+
+    QFont subtitle_font(QStringLiteral("Arial"));
+    subtitle_font.setPointSize(9);
+    painter.setFont(subtitle_font);
+    painter.setPen(QColor("#aebdc1"));
+    painter.drawText(QRect(24, 35, gate.width() - 48, 20), Qt::AlignLeft | Qt::AlignVCenter,
+                     QStringLiteral("CH_CAMERA_V1 - NPC 56 px - pe ancorado no chao da fachada fisica"));
+
+    const QPoint panel_origins[] = {QPoint(20, 70), QPoint(500, 70)};
+    const QString panel_titles[] = {QStringLiteral("PASSAGEM / ARCO EAST"), QStringLiteral("ATENDIMENTO / BALCAO SOUTH")};
+    const QPointF local_feet[] = {
+        // East facade module is centered at t=0.52. x=1.14 places the NPC just
+        // outside the physical wall instead of over the roof/sprite origin.
+        projectSouthGroundPoint(1.14F, 0.04F, view_size),
+        // South ticket window is centered at t=0.50. y=1.14 is the matching
+        // exterior ground point for a customer standing at the counter.
+        projectSouthGroundPoint(0.0F, 1.14F, view_size),
+    };
+
+    const QPolygonF footprint{
+        projectSouthGroundPoint(-1.0F, -1.0F, view_size),
+        projectSouthGroundPoint(1.0F, -1.0F, view_size),
+        projectSouthGroundPoint(1.0F, 1.0F, view_size),
+        projectSouthGroundPoint(-1.0F, 1.0F, view_size),
+    };
+
+    for (int i = 0; i < 2; ++i) {
+        const QPoint origin = panel_origins[i];
+        painter.fillRect(QRect(origin.x(), origin.y(), view_size.width() + 20, 450), QColor("#6f8f5e"));
+
+        QPolygonF translated_footprint;
+        for (const QPointF point : footprint) translated_footprint << QPointF(origin) + point;
+        painter.setPen(QPen(QColor("#b6a26b"), 1.2));
+        painter.setBrush(QColor("#c8c4b7"));
+        painter.drawPolygon(translated_footprint);
+        painter.drawImage(origin, booth);
+
+        QFont panel_font(QStringLiteral("Arial"));
+        panel_font.setBold(true);
+        panel_font.setPointSize(9);
+        painter.setFont(panel_font);
+        painter.setPen(QColor("#f2f7f8"));
+        painter.drawText(QRect(origin.x() + 10, origin.y() + 8, view_size.width(), 22),
+                         Qt::AlignLeft | Qt::AlignVCenter, panel_titles[i]);
+
+        const QPointF feet = QPointF(origin) + local_feet[i];
+        painter.setPen(QPen(QColor("#f6e29a"), 1.0));
+        painter.setBrush(QColor("#f6e29a"));
+        painter.drawEllipse(feet, 2.5, 2.5);
+        drawNpcScaleSilhouette(painter, feet,
+                               i == 0 ? QStringLiteral("anchor arco") : QStringLiteral("anchor balcao"));
+    }
+    painter.end();
+
+    const QString path = QDir(output_dir).filePath(QStringLiteral("building_composer_ticket_booth_npc_scale.png"));
+    if (!gate.save(path, "PNG")) {
+        std::cerr << "Unable to save ticket booth NPC scale gate.\n";
+        return false;
+    }
+    std::cout << path.toStdString() << "\n";
     return true;
 }
 
@@ -267,6 +394,7 @@ int main(int argc, char** argv) {
         {Kind::RoofFlag, Edge::South, 0, 0.50F, 0.08F, true},
     };
     if (!writeAsset(output_dir, "building_composer_ticket_booth", ticket_booth)) return 8;
+    if (!writeTicketBoothNpcScaleGate(output_dir, ticket_booth)) return 12;
 
     const QString block_gate_path = QDir(output_dir).filePath(QStringLiteral("building_composer_small_block_gate.png"));
     if (!ch::studio::BuildingBlockPreviewRenderer::render(facade_gate, QSize(960, 560), 401).save(block_gate_path, "PNG")) {
