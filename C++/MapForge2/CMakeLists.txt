@@ -79,6 +79,7 @@ add_library(mapforge2_asset_composer STATIC
     src/carousel_part_library.cpp
     src/carousel_part_variants.cpp
     src/carousel_composer.cpp
+    src/procedural_2d_primitives.cpp
     src/building_composer.cpp
     src/building_footprint_model.cpp
     src/building_procedural_variation.cpp
