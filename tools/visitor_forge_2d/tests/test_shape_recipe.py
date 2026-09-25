@@ -3,7 +3,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from visitor_forge_2d.core.shape_recipe import export_shape_recipe, render_shape_recipe
+from visitor_forge_2d.core.shape_recipe import (
+    export_palette_family, export_shape_recipe, render_shape_recipe,
+)
 
 
 def _recipe() -> dict:
@@ -59,3 +61,58 @@ def test_shape_recipe_rejects_invalid_palette_and_geometry() -> None:
         assert False, "invalid box accepted"
     except ValueError as exc:
         assert "x0<x1" in str(exc)
+
+
+def test_palette_family_keeps_recipe_and_seed_reproducible(tmp_path: Path) -> None:
+    recipe = _recipe()
+    recipe["layers"][0]["paletteSlot"] = "panel"
+    recipe_path = tmp_path / "prop.json"
+    authored = json.dumps(recipe)
+    recipe_path.write_text(authored, encoding="utf-8")
+    palette_path = tmp_path / "palette.json"
+    palette_path.write_text(json.dumps({
+        "contract": "CH_2D_PALETTE_V1",
+        "slots": {"panel": {"top": "#BBDDAA", "bottom": "#335544"}},
+        "variants": {"blue": {"panel": {"top": "#5577CC"}},
+                     "red": {"panel": {"top": "#CC5544"}}},
+    }), encoding="utf-8")
+    output = tmp_path / "out"
+    family = export_palette_family(recipe_path, output, palette_path)
+    assert set(family["variants"]) == {"blue", "red"}
+    assert Path(family["review"]).is_file()
+    with Image.open(family["variants"]["blue"]) as blue, Image.open(family["variants"]["red"]) as red:
+        assert blue.getpixel((16, 6)) != red.getpixel((16, 6))
+        assert blue.getpixel((0, 0))[3] == red.getpixel((0, 0))[3] == 0
+    first = export_shape_recipe(recipe_path, output, palette_path=palette_path, seed=42)
+    old_bytes = Path(first["png"]).read_bytes()
+    second = export_shape_recipe(recipe_path, output, palette_path=palette_path, seed=42)
+    assert first == second
+    assert Path(second["png"]).read_bytes() == old_bytes
+    assert recipe_path.read_text(encoding="utf-8") == authored
+    assert json.loads(Path(first["metadata"]).read_text())["palette"]["seed"] == 42
+
+
+def test_palette_rejects_unknown_slot_and_variant(tmp_path: Path) -> None:
+    recipe_path = tmp_path / "prop.json"
+    recipe = _recipe()
+    recipe["layers"][0]["paletteSlot"] = "panel"
+    recipe_path.write_text(json.dumps(recipe), encoding="utf-8")
+    palette_path = tmp_path / "palette.json"
+    palette_path.write_text(json.dumps({"contract": "CH_2D_PALETTE_V1",
+                                        "slots": {"different": {"top": "#FFFFFF"}}}),
+                            encoding="utf-8")
+    try:
+        export_shape_recipe(recipe_path, tmp_path / "out", palette_path=palette_path)
+        assert False, "unknown slot accepted"
+    except ValueError as exc:
+        assert "not used by recipe" in str(exc)
+    palette_path.write_text(json.dumps({"contract": "CH_2D_PALETTE_V1",
+                                        "slots": {"panel": {"top": "#FFFFFF"}},
+                                        "variants": {"blue": {"panel": {"top": "#0000FF"}}}}),
+                            encoding="utf-8")
+    try:
+        export_shape_recipe(recipe_path, tmp_path / "out", palette_path=palette_path,
+                            variant="green")
+        assert False, "unknown variant accepted"
+    except ValueError as exc:
+        assert "Unknown palette variant" in str(exc)

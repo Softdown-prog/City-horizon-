@@ -58,17 +58,46 @@ um desenho chapado. Não use a receita de props para substituir o pipeline de
 tiles conectados, o Building Composer ou a renderização Blender quando essas
 fontes já oferecem geometria/continuidade apropriada.
 
+## Paletas compartilhadas e variantes reproduzíveis
+
+Uma camada pode declarar `"paletteSlot": "panel"` e manter suas cores `fill`
+como aparência padrão. Forneça um JSON `CH_2D_PALETTE_V1` para substituir
+`top`/`bottom` desse slot em várias receitas. A paleta de demonstração fica em
+`examples/park_furniture_palette.json`; a placa possui slots `wood`, `trim` e
+`panel`. Cores da receita são usadas primeiro; `slots` da paleta sobrescrevem
+essas cores, seguidos pelas cores da variante selecionada. Transparência,
+geometria, luz e sombra não mudam entre variantes.
+
+```bash
+PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d draw-recipe \
+  --recipe tools/visitor_forge_2d/examples/park_wayfinding_sign.json \
+  --palette tools/visitor_forge_2d/examples/park_furniture_palette.json \
+  --all-variants --output out/visitor_forge_2d/park_sign_colors
+```
+
+`--all-variants` cria um PNG/JSON para cada variante e um painel conjunto no
+tamanho de jogo; a amostra está em `examples/park_wayfinding_palette_review.png`.
+Use `--variant coastal_blue` para uma cor específica. Ou `--seed 42` para
+escolher sempre a mesma cor de uma lista ordenada de variantes pelo hash do
+`id` e da seed; a variante escolhida e os hashes da receita/paleta ficam no
+JSON de saída. `--seed` e `--variant` são mutuamente exclusivos. Nome de
+variante e seed também entram no nome do PNG para impedir sobrescrita entre
+resultados. Novas variantes adicionadas à paleta podem alterar a escolha
+feita por uma seed antiga: salve o nome escolhido no catálogo do asset.
+
+Para alterar só a cor de uma família, edite a paleta e regenere os PNGs.
+Para mudar a silhueta, edite a receita. Confira as variações no mapa e escolha
+as aprovadas antes de colocá-las em `assets/`.
+
 ## Ferramentas seguintes que têm utilidade concreta
 
-1. **Paletas compartilhadas e variantes com seed**: reutilizar materiais de
-   uma família de props sem deriva de cores; tornar as variações repetíveis.
-2. **Prévia sobre captura real de MapForge** e revisão de halo/anchor pelo
+1. **Prévia sobre captura real de MapForge** e revisão de halo/anchor pelo
    Sprite Workshop existente: avaliar a leitura na rua e ao lado de prédios.
-3. **Desenho de peças orgânicas com pincel/máscara e edição por camada**:
+2. **Desenho de peças orgânicas com pincel/máscara e edição por camada**:
    cabelo, roupa e folhagem precisam de contornos que formas simples não dão.
-4. **Linha do tempo de animação e comparação de poses**: reutilizar a mesma
+3. **Linha do tempo de animação e comparação de poses**: reutilizar a mesma
    receita entre frames e flagrar deslizamento/juntas quando houver movimento.
-5. **Validação de bordas para tiles conectados**: só junto ao pipeline de
+4. **Validação de bordas para tiles conectados**: só junto ao pipeline de
    terreno atual, para detectar emendas antes de classificação.
 
 Comece com um asset pequeno e um painel real antes de ampliar o vocabulário.

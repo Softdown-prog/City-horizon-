@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from copy import deepcopy
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
@@ -13,6 +14,7 @@ from .exporter import alpha_safe_resize
 
 
 CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
+PALETTE_CONTRACT = "CH_2D_PALETTE_V1"
 SCALE = 4
 
 
@@ -174,14 +176,76 @@ def render_shape_recipe(recipe: dict) -> tuple[Image.Image, dict]:
                    "artApproved": False, "runtimePromotion": False}
 
 
-def export_shape_recipe(recipe_path: Path, output_dir: Path) -> dict:
+def _resolve_palette(recipe: dict, palette: dict, variant: str | None,
+                     seed: int | None) -> tuple[dict, str | None]:
+    """Apply only named layer color slots; never mutate the authored recipe."""
+    if not isinstance(palette, dict) or palette.get("contract") != PALETTE_CONTRACT:
+        raise ValueError(f"Palette must declare contract {PALETTE_CONTRACT}")
+    slots = palette.get("slots")
+    variants = palette.get("variants", {})
+    if not isinstance(slots, dict) or not isinstance(variants, dict):
+        raise ValueError("Palette needs a slots object and optional variants object")
+    if any(not isinstance(name, str) or not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for c in name)
+           for name in variants):
+        raise ValueError("Variant names must use lowercase letters, digits, _ or -")
+    if variant is not None and seed is not None:
+        raise ValueError("Choose --variant or --seed, not both")
+    if seed is not None:
+        if type(seed) is not int or seed < 0 or not variants:
+            raise ValueError("Seed must be a nonnegative integer and palette must have variants")
+        names = sorted(variants)
+        digest = hashlib.sha256(f"{recipe['id']}:{seed}".encode()).digest()
+        variant = names[int.from_bytes(digest[:8], "big") % len(names)]
+    if variant is not None and variant not in variants:
+        raise ValueError(f"Unknown palette variant {variant!r}; choose from {sorted(variants)}")
+    selected = variants.get(variant, {})
+    if not isinstance(selected, dict):
+        raise ValueError("Palette variant must be an object of color slots")
+    result = deepcopy(recipe)
+    known_slots = {layer.get("paletteSlot") for layer in result.get("layers", [])
+                   if isinstance(layer, dict) and layer.get("paletteSlot")}
+    for name in (*slots.keys(), *selected.keys()):
+        if name not in known_slots:
+            raise ValueError(f"Palette slot {name!r} is not used by recipe")
+    for index, layer in enumerate(result.get("layers", [])):
+        slot = layer.get("paletteSlot")
+        if slot is None:
+            continue
+        if not isinstance(slot, str) or slot not in slots:
+            raise ValueError(f"layers[{index}].paletteSlot {slot!r} missing in palette")
+        for patch in (slots[slot], selected.get(slot)):
+            if patch is None:
+                continue
+            if not isinstance(patch, dict) or not patch or any(key not in ("top", "bottom") for key in patch):
+                raise ValueError(f"Palette slot {slot!r} needs top and/or bottom colors")
+            for key, color in patch.items():
+                _color(color, f"palette.{slot}.{key}")
+                layer["fill"][key] = color
+    return result, variant
+
+
+def export_shape_recipe(recipe_path: Path, output_dir: Path, *,
+                        palette_path: Path | None = None, variant: str | None = None,
+                        seed: int | None = None) -> dict:
     raw = recipe_path.read_bytes()
     recipe = json.loads(raw)
+    if (variant is not None or seed is not None) and palette_path is None:
+        raise ValueError("--variant and --seed require --palette")
+    palette_metadata = None
+    if palette_path is not None:
+        palette_raw = palette_path.read_bytes()
+        recipe, variant = _resolve_palette(recipe, json.loads(palette_raw), variant, seed)
+        palette_metadata = {"path": str(palette_path),
+                            "sha256": hashlib.sha256(palette_raw).hexdigest(),
+                            "variant": variant, "seed": seed}
     frame, metadata = render_shape_recipe(recipe)
     output_dir.mkdir(parents=True, exist_ok=True)
-    png = output_dir / f"{metadata['id']}.png"
-    report = output_dir / f"{metadata['id']}.json"
-    review = output_dir / f"{metadata['id']}_review.png"
+    suffix = (f"_seed_{seed}_{variant}" if seed is not None else
+              f"_{variant}" if variant is not None else "_base" if palette_path else "")
+    stem = metadata["id"] + suffix
+    png = output_dir / f"{stem}.png"
+    report = output_dir / f"{stem}.json"
+    review = output_dir / f"{stem}_review.png"
     frame.save(png, format="PNG", optimize=False)
     width, height = frame.size
     panel = Image.new("RGBA", (width * 3 + 48, height * 2 + 40), (76, 116, 48, 255))
@@ -192,8 +256,33 @@ def export_shape_recipe(recipe_path: Path, output_dir: Path) -> dict:
     ImageDraw.Draw(panel).text((width + 32, 4), "2x / inspection", fill=(247, 244, 220, 255))
     panel.save(review, format="PNG", optimize=False)
     metadata.update({"recipe": str(recipe_path), "recipeSha256": hashlib.sha256(raw).hexdigest(),
-                     "png": str(png), "review": str(review)})
+                     "png": str(png), "review": str(review), "palette": palette_metadata})
     report.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return {"png": str(png), "metadata": str(report), "review": str(review),
             "artApproved": False,
             "runtimePromotion": False}
+
+
+def export_palette_family(recipe_path: Path, output_dir: Path, palette_path: Path) -> dict:
+    """Export every named colorway and one gameplay-size comparison board."""
+    palette = json.loads(palette_path.read_text(encoding="utf-8"))
+    variants = palette.get("variants", {}) if isinstance(palette, dict) else {}
+    if not isinstance(variants, dict) or not variants:
+        raise ValueError("--all-variants requires a palette with named variants")
+    outputs = [export_shape_recipe(recipe_path, output_dir, palette_path=palette_path,
+                                   variant=name) for name in sorted(variants)]
+    frames = []
+    for result in outputs:
+        with Image.open(result["png"]) as source:
+            frames.append(source.convert("RGBA"))
+    width, height = frames[0].size
+    board = Image.new("RGBA", ((width + 32) * len(frames), height + 44), (76, 116, 48, 255))
+    draw = ImageDraw.Draw(board)
+    for index, (name, frame) in enumerate(zip(sorted(variants), frames)):
+        board.alpha_composite(frame, (index * (width + 32) + 16, 28))
+        draw.text((index * (width + 32) + 12, 8), name.replace("_", " "),
+                  fill=(245, 241, 215, 255))
+    board_path = output_dir / f"{json.loads(recipe_path.read_text(encoding='utf-8'))['id']}_palette_review.png"
+    board.save(board_path, format="PNG", optimize=False)
+    return {"variants": {name: result["png"] for name, result in zip(sorted(variants), outputs)},
+            "review": str(board_path), "artApproved": False, "runtimePromotion": False}

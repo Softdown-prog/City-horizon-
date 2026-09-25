@@ -16,7 +16,7 @@ from .character.review import frame_measurements, gameplay_review, map_scale_rev
 from .character.concept_rig import build_concept_rig
 from .character.gait_warp import render_directional_gait
 from .character.preview_audit import audit_preview
-from .core.shape_recipe import export_shape_recipe
+from .core.shape_recipe import export_palette_family, export_shape_recipe
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -84,7 +84,14 @@ def command_audit_preview(args: argparse.Namespace) -> int:
 
 
 def command_draw_recipe(args: argparse.Namespace) -> int:
-    result = export_shape_recipe(Path(args.recipe), Path(args.output))
+    if args.all_variants:
+        if not args.palette:
+            raise ValueError("--all-variants requires --palette")
+        result = export_palette_family(Path(args.recipe), Path(args.output), Path(args.palette))
+    else:
+        result = export_shape_recipe(Path(args.recipe), Path(args.output),
+                                     palette_path=Path(args.palette) if args.palette else None,
+                                     variant=args.variant, seed=args.seed)
     print(json.dumps({"status": "ok", **result}, indent=2))
     return 0
 
@@ -371,6 +378,11 @@ def build_parser() -> argparse.ArgumentParser:
     draw = subparsers.add_parser("draw-recipe", help="draw a layered 2D prop from a JSON shape recipe")
     draw.add_argument("--recipe", required=True, help="CH_2D_SHAPE_RECIPE_V1 JSON file")
     draw.add_argument("--output", required=True, help="Output directory for PNG and metadata")
+    draw.add_argument("--palette", help="Optional CH_2D_PALETTE_V1 colors shared across recipes")
+    draw_variant = draw.add_mutually_exclusive_group()
+    draw_variant.add_argument("--variant", help="Named palette variant")
+    draw_variant.add_argument("--seed", type=int, help="Deterministically select a palette variant")
+    draw_variant.add_argument("--all-variants", action="store_true", help="Render all colorways and one gameplay-size board")
     draw.set_defaults(func=command_draw_recipe)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")

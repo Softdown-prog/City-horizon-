@@ -11,6 +11,7 @@
     },
     {
       "name": "post_back",
+      "paletteSlot": "wood",
       "fill": {"top": "#B88447", "bottom": "#674127"},
       "shapes": [{"type": "polygon", "points": [[65, 50], [75, 50], [75, 112], [66, 114]]}],
       "shadow": {"offset": [2, 2], "blur": 1, "opacity": 0.35}
@@ -28,11 +29,13 @@
     },
     {
       "name": "painted_border",
+      "paletteSlot": "trim",
       "fill": {"top": "#E6C983", "bottom": "#A87D42"},
       "shapes": [{"type": "polygon", "points": [[23, 29], [98, 25], [103, 31], [103, 67], [98, 71], [24, 75]]}]
     },
     {
       "name": "enamel_face",
+      "paletteSlot": "panel",
       "fill": {"top": "#3C765D", "bottom": "#204939"},
       "shapes": [{"type": "polygon", "points": [[29, 34], [96, 31], [98, 35], [98, 65], [95, 67], [29, 70]]}]
     },
