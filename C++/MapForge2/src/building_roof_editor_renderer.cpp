@@ -479,9 +479,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawLine(row[0], row[1]);
         }
     } else if (spec.roof_material == BuildingRoofMaterial::CeramicTile) {
-        // Ceramic tiles are authored as independent course cells. No seam is
-        // allowed to span multiple courses, which removes the radial/wireframe
-        // read on pyramid and hip roofs while keeping a clear tiled silhouette.
         const float nominal_course = std::max(6.0F, 8.8F * scale);
         const int courses = std::max(2, static_cast<int>(std::round(slope_length / nominal_course)));
         for (int row_index = 1; row_index <= courses; ++row_index) {
@@ -516,9 +513,6 @@ void drawRoofMaterial(QPainter& painter, const BuildingComposerSpec& spec,
                 painter.setPen(QPen(dark, 0.60 + 0.18 * contrast));
                 painter.drawLine(bottom0, bottom1);
 
-                // Side joints only occupy the lower part of the current tile.
-                // They never connect to the next course and therefore cannot
-                // become long diagonal guide lines across the roof face.
                 if (tile < tiles && u1 < 0.985F) {
                     const QPointF joint_start = lerpScreen(top1, bottom1, 0.64F);
                     painter.drawLine(joint_start, bottom1);
@@ -781,7 +775,7 @@ QImage renderAdvancedRoof(const BuildingComposerSpec& spec, const BuildingView v
                 ridge1 = { roof_half_w, 0.0F, wall_h + roof_h};
             } else {
                 ridge0 = {0.0F, -roof_half_d, wall_h + roof_h};
-                ridge1 = {0.0F,  ridge_y, wall_h + roof_h};
+                ridge1 = {0.0F,  roof_half_d, wall_h + roof_h};
             }
         }
 
