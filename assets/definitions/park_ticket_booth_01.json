@@ -12,6 +12,7 @@
   "rotatable": true,
   "requiresRoadAccess": false,
   "requiresRoadOrPathAccess": false,
+  "isParkTicketBooth": true,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
