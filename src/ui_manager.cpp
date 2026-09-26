@@ -35,11 +35,26 @@ FenceManager g_park_fences(ch::contracts::kMapMin, ch::contracts::kMapMax);
 FencePlacementController g_park_fence_placement(g_park_fences);
 bool g_park_fence_tool_active = false;
 std::string g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
+std::optional<UiRect> g_floor_catalog_bounds;
 
 [[nodiscard]] std::string runtime_asset_path(const std::filesystem::path& relative) {
     const char* base_path = SDL_GetBasePath();
     const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
     return (root / relative).string();
+}
+
+[[nodiscard]] std::array<UiBuildItem, 3> floor_catalog_items() {
+    return {{
+        {"dirt_path", "Tile de Terra", "PISO", "$0 / TILE", true,
+         runtime_asset_path("assets/terrain/paths/dirt_01/dirt_path_00_isolated.png"),
+         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
+        {"sand_path", "Tile de Areia", "PISO", "$0 / TILE", true,
+         runtime_asset_path("assets/terrain/paths/sand_01/sand_path_00_isolated.png"),
+         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
+        {"grass", "Tile de Grama", "PISO", "$0 / TILE", true,
+         runtime_asset_path("assets/terrain/grass_isometric_01.png"),
+         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
+    }};
 }
 
 [[nodiscard]] std::string park_fence_thumbnail_path() {
@@ -260,7 +275,61 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
          (!model.selected_building_id.empty() && model.selected_building_id != kParkFenceToolId))) {
         deactivate_park_fence_tool();
     }
-    update_layout_legacy(viewport_width, viewport_height, runtime_ui_model(model));
+
+    GameplayUiModel runtime_model = runtime_ui_model(model);
+    update_layout_legacy(viewport_width, viewport_height, runtime_model);
+    g_floor_catalog_bounds.reset();
+
+    if (runtime_model.overlay == UiOverlay::none && runtime_model.active_tool == UiTool::sidewalks) {
+        // The old three tiny toolbar buttons duplicated the ground catalogue.
+        // PISO now uses the same card language as buildings: preview, price,
+        // footprint and placement requirements in one selectable item.
+        buttons_.erase(
+            std::remove_if(buttons_.begin(), buttons_.end(), [](const UiButton& button) {
+                return button.action == UiAction::select_sidewalk_style;
+            }),
+            buttons_.end());
+
+        const float width = static_cast<float>(std::max(viewport_width, 1));
+        const float height = static_cast<float>(std::max(viewport_height, 1));
+        const float toolbar_y = height - kToolbarHeight - kMargin;
+        const float panel_y = 84.0F;
+        const float maximum_panel_height = std::max(180.0F, toolbar_y - panel_y - 8.0F);
+        const float panel_width = std::min(std::max(340.0F, width - kMargin * 2.0F), 650.0F);
+        const int columns = panel_width >= 560.0F ? 2 : 1;
+        const float desired_panel_height = columns == 2 ? 300.0F : 360.0F;
+        const float panel_height = std::min(maximum_panel_height, desired_panel_height);
+        const UiRect panel = {kMargin, panel_y, panel_width, panel_height};
+        add_panel(panel);
+        g_floor_catalog_bounds = panel;
+
+        add_button({panel.x + panel.width - 29.0F, panel.y + 9.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
+
+        const std::array<UiBuildItem, 3> items = floor_catalog_items();
+        const float card_gap = 8.0F;
+        const float horizontal_padding = 8.0F;
+        const float card_height = columns == 2 ? 108.0F : 88.0F;
+        const float cards_width = panel.width - horizontal_padding * 2.0F;
+        const float card_width = (cards_width - card_gap * static_cast<float>(columns - 1)) /
+                                 static_cast<float>(columns);
+        const float content_top = panel.y + 52.0F;
+
+        for (std::size_t index = 0; index < items.size(); ++index) {
+            const int row = static_cast<int>(index / static_cast<std::size_t>(columns));
+            const int column = static_cast<int>(index % static_cast<std::size_t>(columns));
+            const UiRect card = {
+                panel.x + horizontal_padding + static_cast<float>(column) * (card_width + card_gap),
+                content_top + static_cast<float>(row) * (card_height + card_gap),
+                card_width,
+                card_height,
+            };
+            if (card.y + card.height <= panel.y + panel.height - 8.0F) {
+                add_build_card(card, items[index], items[index].definition_id == runtime_model.sidewalk_style,
+                               UiAction::select_sidewalk_style);
+            }
+        }
+    }
 }
 
 void GameplayUi::handle_mouse_motion(const float mouse_x, const float mouse_y) {
@@ -342,6 +411,18 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
     if (model_.overlay == UiOverlay::none) render_park_fences(renderer);
     render_legacy(renderer);
     if (renderer == nullptr || panels_.empty()) return;
+
+    if (model_.overlay == UiOverlay::none && model_.active_tool == UiTool::sidewalks && g_floor_catalog_bounds) {
+        const UiRect& panel = *g_floor_catalog_bounds;
+        const SDL_FRect title_background = {panel.x + 1.0F, panel.y + 1.0F, panel.width - 38.0F, 45.0F};
+        fill_rect(renderer, title_background, 16, 25, 30, 238);
+        draw_text(renderer, panel.x + 12.0F, panel.y + 10.0F, "CATALOGO DE PISOS", 232, 240, 244);
+        draw_text_fit(renderer, panel.x + 12.0F, panel.y + 27.0F, panel.width - 58.0F,
+                      "3 TILES | PRECO POR TILE | CLIQUE PARA SELECIONAR", 151, 178, 192);
+        SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);
+        SDL_RenderLine(renderer, panel.x + 8.0F, panel.y + 47.0F,
+                       panel.x + panel.width - 8.0F, panel.y + 47.0F);
+    }
 
     const UiRect& hud = panels_.front();
     const float width = static_cast<float>(viewport_width_);
