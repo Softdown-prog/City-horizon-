@@ -448,6 +448,13 @@ void MapRenderer::render_roads(SDL_Renderer* renderer, const RoadManager& roads,
         if (left->tile_y != right->tile_y) return left->tile_y < right->tile_y;
         return left->tile_x < right->tile_x;
     });
+    // Draw the asphalt below the whole connected network first. At fractional
+    // zoom, two antialiased PNG edges can leave a subpixel gap on their shared
+    // side; the matching asphalt underlay keeps terrain from showing through.
+    constexpr SDL_FColor kRoadAsphalt = {52.0F / 255.0F, 57.0F / 255.0F, 60.0F / 255.0F, 1.0F};
+    for (const RoadTile* tile : sorted_tiles) {
+        render_tile_fill(renderer, tile->tile_x, tile->tile_y, camera, viewport_width, viewport_height, kRoadAsphalt);
+    }
     for (const RoadTile* tile : sorted_tiles) {
         const RoadVisual* visual = visuals.get_for_mask(camera_visual_connections(tile->connections, camera.rotation));
         const TextureAsset* texture = visual == nullptr ? nullptr : find_texture(asset_root / visual->texture_path);

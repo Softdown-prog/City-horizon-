@@ -23,6 +23,10 @@ SCALE = 4
 WIDTH = DISPLAY_WIDTH * SCALE
 HEIGHT = DISPLAY_HEIGHT * SCALE
 LANE_WIDTH = 2 * SCALE
+EDGE_OVERLAP = SCALE  # one final pixel across adjoining diamonds
+PADDING = 2 * SCALE  # render beyond each frame before the final crop
+CANVAS_WIDTH = WIDTH + 2 * PADDING
+CANVAS_HEIGHT = HEIGHT + 2 * PADDING
 
 # RoadSystem: N=1, E=2, S=4, W=8. These are the exact shared-side centres
 # derived from main.cpp's world_to_screen() and kTileWidth/kTileHeight.
@@ -85,9 +89,12 @@ def connector_paths(mask: int) -> list[list[tuple[float, float]]]:
 
 
 def diamond_mask() -> Image.Image:
-    mask = Image.new("L", (WIDTH, HEIGHT), 0)
+    mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
     ImageDraw.Draw(mask).polygon(
-        ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2), (WIDTH // 2, HEIGHT), (0, HEIGHT // 2)),
+        ((PADDING + WIDTH // 2, PADDING - EDGE_OVERLAP),
+         (PADDING + WIDTH + EDGE_OVERLAP, PADDING + HEIGHT // 2),
+         (PADDING + WIDTH // 2, PADDING + HEIGHT + EDGE_OVERLAP),
+         (PADDING - EDGE_OVERLAP, PADDING + HEIGHT // 2)),
         fill=255,
     )
     return mask
@@ -142,14 +149,14 @@ def offset_path(path: list[tuple[float, float]], offset: float) -> list[tuple[fl
     return result
 
 
-def path_dashes(path: list[tuple[float, float]], dash=7 * SCALE, gap=5 * SCALE):
+def path_dashes(path: list[tuple[float, float]], dash=7 * SCALE, gap=5 * SCALE, start=0.0):
     distances = path_distances(path)
     total = distances[-1]
     if total == 0:
         return []
 
     segments = []
-    position = 0.0
+    position = start
     while position < total:
         end = min(total, position + dash)
         segments.append((point_at_distance(path, distances, position), point_at_distance(path, distances, end)))
@@ -159,31 +166,42 @@ def path_dashes(path: list[tuple[float, float]], dash=7 * SCALE, gap=5 * SCALE):
 
 def asphalt_texture() -> Image.Image:
     """Clean, stylized asphalt; details must not form a repeating tile pattern."""
-    return Image.new("RGBA", (WIDTH, HEIGHT), (52, 57, 60, 255))
+    return Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (52, 57, 60, 255))
 
 
 def render_tile(mask: int) -> Image.Image:
     alpha = road_mask(mask)
-    image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
-
-    # Deterministic asphalt: no external texture or generated source artwork.
-    asphalt = asphalt_texture()
-    image.paste(asphalt, (0, 0), alpha)
+    # Keep straight RGB at the diamond edge. The padded render and one-pixel
+    # overlap let antialiasing cover the shared side rather than reveal grass.
+    image = asphalt_texture()
+    image.putalpha(alpha)
 
     # Concrete curb/sidewalk lip belongs only to unconnected sides. A shared
     # side stays asphalt so adjacent road sprites join without a white seam.
-    corners = ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2),
-               (WIDTH // 2, HEIGHT), (0, HEIGHT // 2))
+    corners = ((PADDING + WIDTH // 2, PADDING - EDGE_OVERLAP),
+               (PADDING + WIDTH + EDGE_OVERLAP, PADDING + HEIGHT // 2),
+               (PADDING + WIDTH // 2, PADDING + HEIGHT + EDGE_OVERLAP),
+               (PADDING - EDGE_OVERLAP, PADDING + HEIGHT // 2))
     sides = {NORTH: (corners[0], corners[1]),
              EAST: (corners[1], corners[2]),
              SOUTH: (corners[2], corners[3]),
              WEST: (corners[3], corners[0])}
-    curbs = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    curbs = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
     curb_draw = ImageDraw.Draw(curbs)
     for direction, edge in sides.items():
         if not mask & direction:
             curb_draw.line(edge, fill=(164, 157, 140, 255), width=11 * SCALE)
             curb_draw.line(edge, fill=(215, 207, 186, 255), width=4 * SCALE)
+    # Two adjoining sprites meet at a diamond vertex. Their clipped line ends
+    # otherwise leave a dark triangular notch at every tile boundary.
+    incident = ((WEST, NORTH), (NORTH, EAST), (EAST, SOUTH), (SOUTH, WEST))
+    for point, touching in zip(corners, incident):
+        if all(mask & direction for direction in touching):
+            continue
+        for radius, color in ((5.5 * SCALE, (164, 157, 140, 255)),
+                              (2.0 * SCALE, (215, 207, 186, 255))):
+            x, y = point
+            curb_draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
     curbs.putalpha(ImageChops.multiply(curbs.getchannel("A"), alpha))
     image = Image.alpha_composite(image, curbs)
 
@@ -193,7 +211,7 @@ def render_tile(mask: int) -> Image.Image:
     # those repeated borders read as disconnected black pieces of road.  A
     # clean asphalt surface gives adjacent tiles a continuous city-block road
     # first; markings are now only an aid on true straight stretches.
-    markings = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    markings = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(markings)
     active = [bit for bit in (NORTH, EAST, SOUTH, WEST) if mask & bit]
     opposite_straight = (
@@ -205,13 +223,20 @@ def render_tile(mask: int) -> Image.Image:
         # next tile continues it exactly.  Curves, ends and intersections stay
         # unmarked deliberately: they are much clearer than a pile of tiny,
         # conflicting stripes on an isometric 128x64 diamond.
-        for start, end in path_dashes(paths[0], dash=9 * SCALE, gap=7 * SCALE):
-            draw.line((start, end), fill=(235, 185, 47, 230), width=LANE_WIDTH)
+        # A whole number of periods fits between ports. Half a gap at either
+        # end joins the next tile into one continuous dashed lane line.
+        period = path_distances(paths[0])[-1] / 4.0
+        gap = period * 0.45
+        for start, end in path_dashes(paths[0], dash=period - gap, gap=gap, start=gap * 0.5):
+            draw.line(((start[0] + PADDING, start[1] + PADDING),
+                       (end[0] + PADDING, end[1] + PADDING)),
+                      fill=(235, 185, 47, 230), width=LANE_WIDTH)
     # Paint is clipped by the same road geometry; no stripe can leak into grass.
     markings.putalpha(ImageChops.multiply(markings.getchannel("A"), alpha))
     image = Image.alpha_composite(image, markings)
     image.putalpha(alpha)
-    return image.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.Resampling.LANCZOS)
+    full = image.resize((DISPLAY_WIDTH + 4, DISPLAY_HEIGHT + 4), Image.Resampling.LANCZOS)
+    return full.crop((2, 2, 2 + DISPLAY_WIDTH, 2 + DISPLAY_HEIGHT))
 
 
 def world_to_preview(tile_x: int, tile_y: int, origin: tuple[int, int]) -> tuple[int, int]:
@@ -249,6 +274,24 @@ def validate_ports(tiles: dict[int, Image.Image]) -> None:
                     raise RuntimeError(f"mask {mask} does not reach connector {bit}")
 
 
+def validate_straight_seams(tiles: dict[int, Image.Image]) -> None:
+    """Catch a grass-coloured stripe where two straight road diamonds meet."""
+    background = (85, 126, 61, 255)
+    asphalt = (52, 57, 60)
+    cases = (
+        (5, (128, 32), ((144, 72), (176, 88))),
+        (10, (128, 96), ((176, 104), (144, 120))),
+    )
+    for mask, second_origin, samples in cases:
+        composite = Image.new("RGBA", (300, 200), background)
+        composite.alpha_composite(tiles[mask], (64, 64))
+        composite.alpha_composite(tiles[mask], second_origin)
+        for position in samples:
+            pixel = composite.getpixel(position)
+            if max(abs(pixel[channel] - asphalt[channel]) for channel in range(3)) > 3:
+                raise RuntimeError(f"road mask {mask} has a visible seam at {position}: {pixel}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--all", action="store_true", help="generate all sixteen masks")
@@ -270,6 +313,7 @@ def main() -> None:
 
     validate_ports(tiles)
     if TEST_MASKS.issubset(tiles):
+        validate_straight_seams(tiles)
         build_preview(tiles, args.preview)
         print(f"wrote {args.preview}")
 
