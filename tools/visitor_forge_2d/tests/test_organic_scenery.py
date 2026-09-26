@@ -46,6 +46,19 @@ def test_organic_scenery_is_deterministic_and_camera_gated(tmp_path: Path) -> No
         assert review.size == (768, 480)
 
 
+def test_canonical_pine_stays_above_minimum_opaque_height() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    source = project_root / "examples" / "pine_tree_organic_v1.json"
+    recipe = json.loads(source.read_text(encoding="utf-8"))
+    frame, _ = render(recipe)
+    bounds = frame.getchannel("A").getbbox()
+    assert bounds is not None
+    opaque_height = bounds[3] - bounds[1]
+    minimum = int(recipe.get("validation", {}).get("minimumOpaqueHeightPx", 200))
+    assert minimum >= 200
+    assert opaque_height >= minimum, f"canonical pine opaque height {opaque_height}px is below {minimum}px"
+
+
 def test_organic_scenery_rejects_wrong_camera() -> None:
     recipe = _recipe()
     recipe["camera"]["tile"] = [64, 64]
