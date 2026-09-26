@@ -5,6 +5,17 @@
 #include <algorithm>
 #include <cstdlib>
 
+namespace {
+
+[[nodiscard]] int floor_div(const int value, const int divisor) {
+    int quotient = value / divisor;
+    const int remainder = value % divisor;
+    if (remainder < 0) --quotient;
+    return quotient;
+}
+
+}  // namespace
+
 LandManager::LandManager(const int map_min, const int map_max, const int parcel_width, const int parcel_height)
     : map_min_(map_min), map_max_(map_max), parcel_width_(std::max(1, parcel_width)), parcel_height_(std::max(1, parcel_height)) {
     // The central parcel is centered around the world origin, so data-defined
@@ -12,19 +23,66 @@ LandManager::LandManager(const int map_min, const int map_max, const int parcel_
     const int center_origin_x = -(parcel_width_ / 2);
     const int center_origin_y = -(parcel_height_ / 2);
     std::uint32_t next_id = 1;
+
+    const auto append_parcel = [&](const int parcel_x, const int parcel_y) mutable {
+        const bool initial = parcel_x == 0 && parcel_y == 0;
+        const int ring = std::max(std::abs(parcel_x), std::abs(parcel_y));
+        const bool orthogonal_neighbor = std::abs(parcel_x) + std::abs(parcel_y) == 1;
+
+        std::int64_t purchase_cost = 0;
+        if (!initial) {
+            if (ring == 1) {
+                purchase_cost = orthogonal_neighbor ? 5'000 : 10'000;
+            } else {
+                // Expansion gets gradually more expensive as the city pushes
+                // outward, while remaining deterministic for saves/catalog UI.
+                purchase_cost = 10'000 + static_cast<std::int64_t>(ring - 1) * 5'000;
+            }
+        }
+
+        LandParcel parcel{
+            next_id++,
+            center_origin_x + parcel_x * parcel_width_,
+            center_origin_y + parcel_y * parcel_height_,
+            parcel_width_,
+            parcel_height_,
+            purchase_cost,
+            initial,
+        };
+        parcels_.push_back(parcel);
+
+        // Camera/cursor geometry spans the complete world, but this mirror is
+        // never used by placement or economy ownership checks.
+        parcel.owned = true;
+        world_parcels_.push_back(parcel);
+    };
+
+    // Preserve the historical 3x3 id ordering exactly. Existing saves therefore
+    // keep parcel ids 1..9, including the starter parcel at id 5.
     for (int parcel_y = -1; parcel_y <= 1; ++parcel_y) {
         for (int parcel_x = -1; parcel_x <= 1; ++parcel_x) {
-            const bool initial = parcel_x == 0 && parcel_y == 0;
-            const bool orthogonal_neighbor = std::abs(parcel_x) + std::abs(parcel_y) == 1;
-            parcels_.push_back({
-                next_id++,
-                center_origin_x + parcel_x * parcel_width_,
-                center_origin_y + parcel_y * parcel_height_,
-                parcel_width_,
-                parcel_height_,
-                initial ? 0 : (orthogonal_neighbor ? 5'000 : 10'000),
-                initial,
-            });
+            append_parcel(parcel_x, parcel_y);
+        }
+    }
+
+    // Fill every remaining parcel intersecting the logical map.  For the new
+    // 160x160 contract this adds one complete outer ring, producing a 5x5
+    // purchasable world while the 32x32 starter parcel remains unchanged.
+    const int min_parcel_x = floor_div(map_min_ - center_origin_x, parcel_width_);
+    const int max_parcel_x = floor_div(map_max_ - center_origin_x, parcel_width_);
+    const int min_parcel_y = floor_div(map_min_ - center_origin_y, parcel_height_);
+    const int max_parcel_y = floor_div(map_max_ - center_origin_y, parcel_height_);
+    const int max_ring = std::max({
+        std::abs(min_parcel_x), std::abs(max_parcel_x),
+        std::abs(min_parcel_y), std::abs(max_parcel_y),
+    });
+
+    for (int ring = 2; ring <= max_ring; ++ring) {
+        for (int parcel_y = min_parcel_y; parcel_y <= max_parcel_y; ++parcel_y) {
+            for (int parcel_x = min_parcel_x; parcel_x <= max_parcel_x; ++parcel_x) {
+                if (std::max(std::abs(parcel_x), std::abs(parcel_y)) != ring) continue;
+                append_parcel(parcel_x, parcel_y);
+            }
         }
     }
 }
@@ -123,6 +181,10 @@ int LandManager::owned_parcel_count() const {
 
 const std::vector<LandParcel>& LandManager::parcels() const {
     return parcels_;
+}
+
+const std::vector<LandParcel>& LandManager::world_parcels() const {
+    return world_parcels_;
 }
 
 int LandManager::parcel_width() const {
