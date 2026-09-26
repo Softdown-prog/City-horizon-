@@ -90,6 +90,17 @@ struct BuildingFootprint {
     int height = 1;
 };
 
+// Optional collision/occupancy rectangle inside the visual footprint.  Large
+// attractions can keep the full sprite envelope for rendering while reserving
+// only the physical base, leaving approach/boarding space usable by nearby
+// props such as a ticket booth.
+struct BuildingOccupancyFootprint {
+    int offset_x = 0;
+    int offset_y = 0;
+    int width = 1;
+    int height = 1;
+};
+
 // local_x/local_y identify a tile inside the unrotated footprint. facing points
 // from that tile to the adjacent access tile outside the building footprint.
 struct BuildingAccessPoint {
@@ -188,6 +199,13 @@ struct BuildingDefinition {
     std::optional<GridDirection> front_edge;
     int footprint_width = 1;
     int footprint_height = 1;
+    // Zero width/height means occupancy follows the complete visual footprint.
+    // Otherwise this rectangle is expressed in unrotated local tile space and
+    // rotates with the building.
+    int occupancy_footprint_width = 0;
+    int occupancy_footprint_height = 0;
+    int occupancy_footprint_offset_x = 0;
+    int occupancy_footprint_offset_y = 0;
     std::int64_t build_cost = 0;
     std::int64_t maintenance_per_month = 0;
     std::int64_t tax_revenue_per_month = 0;
@@ -293,6 +311,8 @@ struct BuildingInstance {
 [[nodiscard]] BuildingRotation rotate_counter_clockwise(BuildingRotation rotation);
 [[nodiscard]] const char* rotation_label(BuildingRotation rotation);
 [[nodiscard]] BuildingFootprint rotated_footprint(const BuildingDefinition& definition, BuildingRotation rotation);
+[[nodiscard]] BuildingOccupancyFootprint rotated_occupancy_footprint(const BuildingDefinition& definition,
+                                                                      BuildingRotation rotation);
 [[nodiscard]] BuildingAccessPoint rotate_access_point(const BuildingDefinition& definition,
                                                        BuildingAccessPoint access_point,
                                                        BuildingRotation rotation);
