@@ -55,6 +55,7 @@ jobs:
           python tools/audio_asset_worker.py tools/audio_jobs/ui_mouse_click.json
 
       - name: Process loading music
+        if: ${{ hashFiles('Converter/horizonte_de_sal.mp4') != '' }}
         run: |
           python tools/audio_asset_worker.py tools/audio_jobs/loading_horizonte_de_sal.json
 
