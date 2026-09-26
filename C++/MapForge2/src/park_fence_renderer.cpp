@@ -137,14 +137,9 @@ void drawGate(QPainter& painter, const ParkFenceSpec& spec,
     const LocalPoint gate_b{half_gap, 0.0};
     const LocalPoint outer_b{0.50, 0.0};
 
-    // Fixed fence spans stop at the two gate posts. The central opening stays
-    // physically clear so visitors can walk through it.
     drawSpan(painter, spec, outer_a, gate_a, rotation, origin);
     drawSpan(painter, spec, gate_b, outer_b, rotation, origin);
 
-    // The leaves are fully swung inward by roughly 90 degrees. Keeping each
-    // leaf on its own hinge X coordinate preserves a wide, unmistakable
-    // central corridor instead of visually converging toward the middle.
     const qreal leaf_depth = spec.gate_open_depth_world;
     const LocalPoint leaf_a_end{gate_a.x, leaf_depth};
     const LocalPoint leaf_b_end{gate_b.x, leaf_depth};
@@ -166,12 +161,46 @@ void drawGate(QPainter& painter, const ParkFenceSpec& spec,
                          {QColor("#b39a58"), {QColor(70, 55, 27, 210), 0.6}});
 }
 
+void drawTee(QPainter& painter, const ParkFenceSpec& spec,
+             const ParkFenceRotation rotation, const QPointF& origin) {
+    // Canonical tee connects West + East + South; rotation moves the open side.
+    const LocalPoint center{0.0, 0.0};
+    const LocalPoint west{-0.50, 0.0};
+    const LocalPoint east{0.50, 0.0};
+    const LocalPoint south{0.0, 0.50};
+    drawSpan(painter, spec, west, center, rotation, origin);
+    drawSpan(painter, spec, center, east, rotation, origin);
+    drawSpan(painter, spec, center, south, rotation, origin);
+    drawPost(painter, spec, west, rotation, origin);
+    drawPost(painter, spec, center, rotation, origin);
+    drawPost(painter, spec, east, rotation, origin);
+    drawPost(painter, spec, south, rotation, origin);
+}
+
+void drawCross(QPainter& painter, const ParkFenceSpec& spec,
+               const ParkFenceRotation rotation, const QPointF& origin) {
+    const LocalPoint center{0.0, 0.0};
+    const std::array<LocalPoint, 4> ends = {{
+        {-0.50, 0.0},
+        {0.50, 0.0},
+        {0.0, -0.50},
+        {0.0, 0.50},
+    }};
+    for (const LocalPoint end : ends) {
+        drawSpan(painter, spec, center, end, rotation, origin);
+        drawPost(painter, spec, end, rotation, origin);
+    }
+    drawPost(painter, spec, center, rotation, origin);
+}
+
 const char* pieceLabel(const ParkFencePiece piece) {
     switch (piece) {
         case ParkFencePiece::Straight: return "STRAIGHT";
         case ParkFencePiece::Corner: return "CORNER";
         case ParkFencePiece::End: return "END";
         case ParkFencePiece::Gate: return "GATE OPEN";
+        case ParkFencePiece::Tee: return "TEE";
+        case ParkFencePiece::Cross: return "CROSS";
     }
     return "FENCE";
 }
@@ -230,6 +259,12 @@ QImage ParkFenceRenderer::renderPiece(const ParkFenceSpec& spec,
         case ParkFencePiece::Gate:
             drawGate(painter, spec, rotation, origin);
             break;
+        case ParkFencePiece::Tee:
+            drawTee(painter, spec, rotation, origin);
+            break;
+        case ParkFencePiece::Cross:
+            drawCross(painter, spec, rotation, origin);
+            break;
     }
 
     painter.end();
@@ -237,11 +272,13 @@ QImage ParkFenceRenderer::renderPiece(const ParkFenceSpec& spec,
 }
 
 QImage ParkFenceRenderer::renderReviewSheet(const ParkFenceSpec& spec, const QSize& cell) {
-    constexpr std::array<ParkFencePiece, 4> pieces = {
+    constexpr std::array<ParkFencePiece, 6> pieces = {
         ParkFencePiece::Straight,
         ParkFencePiece::Corner,
         ParkFencePiece::End,
         ParkFencePiece::Gate,
+        ParkFencePiece::Tee,
+        ParkFencePiece::Cross,
     };
     constexpr std::array<ParkFenceRotation, 4> rotations = {
         ParkFenceRotation::South,
