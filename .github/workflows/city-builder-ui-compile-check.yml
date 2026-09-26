@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: cmake --build build/ui-capture-check --config Release --target city_builder_ui_capture --parallel
 
-      - name: Render floor catalog visual proof
+      - name: Render UI visual proof
         shell: pwsh
         env:
           SDL_VIDEODRIVER: dummy
@@ -65,7 +65,11 @@ jobs:
             "floor_catalog_idle.png",
             "floor_catalog_hover_sand.png",
             "floor_catalog_pressed_grass.png",
-            "floor_catalog_selected_grass.png"
+            "floor_catalog_selected_grass.png",
+            "settings_idle.png",
+            "settings_hover_apply.png",
+            "settings_master_35.png",
+            "settings_defaults.png"
           )
           foreach ($file in $expected) {
             $path = Join-Path "out/ui-capture" $file
@@ -76,7 +80,7 @@ jobs:
       - name: Upload UI visual proof
         uses: actions/upload-artifact@v4
         with:
-          name: City-Builder-Floor-Catalog-Visual-Proof
+          name: City-Builder-UI-Visual-Proof
           path: out/ui-capture/*.png
           if-no-files-found: error
           retention-days: 14

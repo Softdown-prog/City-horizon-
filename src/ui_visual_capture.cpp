@@ -20,6 +20,13 @@ constexpr int kHeight = 800;
     return found == ui.buttons().end() ? nullptr : &*found;
 }
 
+[[nodiscard]] const UiButton* action_button(const GameplayUi& ui, const UiAction action) {
+    const auto found = std::find_if(ui.buttons().begin(), ui.buttons().end(), [action](const UiButton& button) {
+        return button.action == action;
+    });
+    return found == ui.buttons().end() ? nullptr : &*found;
+}
+
 [[nodiscard]] bool validate_floor_catalog(const GameplayUi& ui, const std::string& selected_style) {
     int floor_cards = 0;
     int active_cards = 0;
@@ -50,6 +57,21 @@ constexpr int kHeight = 800;
     if (floor_cards != 3 || active_cards != 1) {
         std::cerr << "ui capture failed: expected 3 floor cards and exactly 1 selected card\n";
         return false;
+    }
+    return true;
+}
+
+[[nodiscard]] bool validate_settings_controls(const GameplayUi& ui) {
+    if (ui.panels().size() < 3) {
+        std::cerr << "ui capture failed: settings overlay panel is missing\n";
+        return false;
+    }
+    for (const UiAction action : {UiAction::settings_reset, UiAction::settings_cancel, UiAction::settings_apply}) {
+        const UiButton* button = action_button(ui, action);
+        if (button == nullptr || !button->enabled) {
+            std::cerr << "ui capture failed: settings action button is missing or disabled\n";
+            return false;
+        }
     }
     return true;
 }
@@ -125,9 +147,27 @@ GameplayUiModel capture_model() {
     return model;
 }
 
+GameplayUiModel settings_capture_model() {
+    GameplayUiModel model = capture_model();
+    model.status.clear();
+    model.active_tool = UiTool::none;
+    model.overlay = UiOverlay::settings;
+    model.master_volume_percent = 78;
+    model.effects_volume_percent = 64;
+    return model;
+}
+
 [[nodiscard]] std::pair<float, float> card_center(const UiButton& button) {
     return {button.bounds.x + button.bounds.width * 0.5F,
             button.bounds.y + button.bounds.height * 0.5F};
+}
+
+[[nodiscard]] std::optional<UiRect> settings_master_slider(const GameplayUi& ui) {
+    if (ui.panels().size() < 3) return std::nullopt;
+    const UiRect& panel = ui.panels().back();
+    const float meter_x = panel.x + std::clamp(panel.width * 0.10F, 28.0F, 54.0F);
+    const float meter_width = panel.width - (meter_x - panel.x) * 2.0F;
+    return UiRect{meter_x, panel.y + 157.0F, meter_width, 20.0F};
 }
 
 }  // namespace
@@ -162,55 +202,39 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    const auto fail = [&]() {
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroySurface(canvas);
+        SDL_Quit();
+        return 1;
+    };
+
     GameplayUi ui;
     GameplayUiModel model = capture_model();
     ui.update_layout(kWidth, kHeight, model);
 
-    if (!validate_floor_catalog(ui, "dirt_path")) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
-    }
+    if (!validate_floor_catalog(ui, "dirt_path")) return fail();
 
     ui.handle_mouse_motion(1000.0F, 500.0F);
-    if (!save_capture(ui, renderer, output_dir / "floor_catalog_idle.png", 2)) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
-    }
+    if (!save_capture(ui, renderer, output_dir / "floor_catalog_idle.png", 2)) return fail();
 
     const UiButton* sand = floor_card(ui, "sand_path");
-    if (sand == nullptr) return 1;
+    if (sand == nullptr) return fail();
     const auto [sand_x, sand_y] = card_center(*sand);
     ui.handle_mouse_motion(sand_x, sand_y);
-    if (!save_capture(ui, renderer, output_dir / "floor_catalog_hover_sand.png", 12)) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
-    }
+    if (!save_capture(ui, renderer, output_dir / "floor_catalog_hover_sand.png", 12)) return fail();
 
     const UiButton* grass = floor_card(ui, "grass");
-    if (grass == nullptr) return 1;
+    if (grass == nullptr) return fail();
     const auto [grass_x, grass_y] = card_center(*grass);
     ui.handle_mouse_motion(grass_x, grass_y);
     const UiInputResult press = ui.handle_mouse_button_down(grass_x, grass_y, true);
     if (!press.consumed || !press.action || press.action->action != UiAction::select_sidewalk_style ||
         press.action->payload != "grass") {
         std::cerr << "ui capture failed: grass card did not dispatch select_sidewalk_style\n";
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
+        return fail();
     }
-    if (!save_capture(ui, renderer, output_dir / "floor_catalog_pressed_grass.png", 8)) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
-    }
+    if (!save_capture(ui, renderer, output_dir / "floor_catalog_pressed_grass.png", 8)) return fail();
     ui.handle_mouse_button_up(grass_x, grass_y);
 
     model.sidewalk_style = "grass";
@@ -218,11 +242,68 @@ int main(int argc, char** argv) {
     ui.handle_mouse_motion(1000.0F, 500.0F);
     if (!validate_floor_catalog(ui, "grass") ||
         !save_capture(ui, renderer, output_dir / "floor_catalog_selected_grass.png", 10)) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroySurface(canvas);
-        SDL_Quit();
-        return 1;
+        return fail();
     }
+
+    GameplayUiModel settings_model = settings_capture_model();
+    ui.update_layout(kWidth, kHeight, settings_model);
+    ui.handle_mouse_motion(1000.0F, 500.0F);
+    if (!validate_settings_controls(ui) ||
+        !save_capture(ui, renderer, output_dir / "settings_idle.png", 2)) {
+        return fail();
+    }
+
+    const UiButton* apply = action_button(ui, UiAction::settings_apply);
+    if (apply == nullptr) return fail();
+    const auto [apply_x, apply_y] = card_center(*apply);
+    ui.handle_mouse_motion(apply_x, apply_y);
+    if (!save_capture(ui, renderer, output_dir / "settings_hover_apply.png", 2)) return fail();
+
+    const std::optional<UiRect> master_slider = settings_master_slider(ui);
+    if (!master_slider) return fail();
+    const float master_35_x = master_slider->x + master_slider->width * 0.35F;
+    const float master_y = master_slider->y + master_slider->height * 0.5F;
+    const UiInputResult master_press = ui.handle_mouse_button_down(master_35_x, master_y, true);
+    if (!master_press.consumed || master_press.action) {
+        std::cerr << "ui capture failed: master slider did not consume drag input cleanly\n";
+        return fail();
+    }
+    ui.handle_mouse_button_up(master_35_x, master_y);
+    if (!save_capture(ui, renderer, output_dir / "settings_master_35.png", 2)) return fail();
+
+    apply = action_button(ui, UiAction::settings_apply);
+    if (apply == nullptr) return fail();
+    const auto [apply_after_x, apply_after_y] = card_center(*apply);
+    const UiInputResult apply_after_drag = ui.handle_mouse_button_down(apply_after_x, apply_after_y, true);
+    if (!apply_after_drag.consumed || !apply_after_drag.action ||
+        apply_after_drag.action->action != UiAction::settings_apply ||
+        apply_after_drag.action->payload != "35:64") {
+        std::cerr << "ui capture failed: settings apply payload after drag was not 35:64\n";
+        return fail();
+    }
+    ui.handle_mouse_button_up(apply_after_x, apply_after_y);
+
+    const UiButton* reset = action_button(ui, UiAction::settings_reset);
+    if (reset == nullptr) return fail();
+    const auto [reset_x, reset_y] = card_center(*reset);
+    const UiInputResult reset_press = ui.handle_mouse_button_down(reset_x, reset_y, true);
+    if (!reset_press.consumed || !reset_press.action || reset_press.action->action != UiAction::settings_reset) {
+        std::cerr << "ui capture failed: settings reset did not dispatch settings_reset\n";
+        return fail();
+    }
+    ui.handle_mouse_button_up(reset_x, reset_y);
+    if (!save_capture(ui, renderer, output_dir / "settings_defaults.png", 2)) return fail();
+
+    apply = action_button(ui, UiAction::settings_apply);
+    if (apply == nullptr) return fail();
+    const auto [defaults_apply_x, defaults_apply_y] = card_center(*apply);
+    const UiInputResult defaults_apply = ui.handle_mouse_button_down(defaults_apply_x, defaults_apply_y, true);
+    if (!defaults_apply.consumed || !defaults_apply.action ||
+        defaults_apply.action->action != UiAction::settings_apply || defaults_apply.action->payload != "100:100") {
+        std::cerr << "ui capture failed: settings defaults did not produce 100:100 apply payload\n";
+        return fail();
+    }
+    ui.handle_mouse_button_up(defaults_apply_x, defaults_apply_y);
 
     ui.release_renderer_resources();
     SDL_DestroyRenderer(renderer);
