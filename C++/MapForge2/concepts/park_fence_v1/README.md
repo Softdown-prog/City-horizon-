@@ -47,6 +47,14 @@ This means the player does not manually rotate each fence segment. Extending a r
 
 Dragging may place a run of grid vertices. The current deterministic route follows X first and then Y, so an L-shaped drag produces its corner from topology rather than from an explicitly selected corner asset.
 
+### Live drag preview
+
+`src/fence_placement_controller.h/.cpp` owns the transient mouse-drag route without mutating the permanent fence network. While the player is still dragging, it resolves the **virtual** connection mask for every new route node and every already-placed neighbouring node that would be affected by the new fence.
+
+The preview can therefore change an existing endpoint into a straight piece, corner, Tee or Cross **before mouse release**. On release, only missing nodes are committed through `FenceManager`; the permanent topology refresh then resolves the same result. Cancelling the drag discards the transient route without altering the map.
+
+An open gate remains a secondary operation on a valid straight run. `place_open_gate()` changes the node state while preserving the automatic direction selected from topology.
+
 ## Gameplay contract
 
 The fence does not create a mandatory park boundary and does not define ownership of the enclosed area. It is a freely placeable delimiting/decorative object, comparable to general-purpose fences in classic tycoon builders.
@@ -61,10 +69,12 @@ Procedural art:
 - `C++/MapForge2/src/park_fence_renderer.cpp`
 - `C++/MapForge2/src/park_fence_preview_main.cpp`
 
-Runtime topology:
+Runtime topology and drag interaction:
 
 - `src/fence_system.h`
 - `src/fence_system.cpp`
+- `src/fence_placement_controller.h`
+- `src/fence_placement_controller.cpp`
 - shared topology bits: `src/tile_topology.h`
 
 The renderer deliberately consumes `procedural_2d_primitives` so future agents can vary posts, rails, picket spacing, colors, height, gate width, and ornament without redrawing individual PNGs.
