@@ -39,7 +39,8 @@
     ],
     "Notification": [
       "ui/bong_001.ogg"
-    ]
+    ],
+    "FerrisWheelRunning": []
   },
   "music": {
     "Loading": "music/loading_horizonte_de_sal.ogg"

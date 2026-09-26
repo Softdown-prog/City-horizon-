@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'Converter/*.mp3'
+      - '!Converter/reflections_under_the_wheel.mp3'
       - 'Converter/*.mp4'
       - 'tools/audio_asset_worker.py'
       - 'tools/audio_jobs/*.json'
@@ -42,6 +43,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: Extract Ferris wheel audio to MP3
+        run: |
+          ffmpeg -hide_banner -loglevel error -y \
+            -i Converter/reflections_under_the_wheel.mp4 \
+            -map 0:a:0 -vn -c:a libmp3lame -q:a 2 \
+            Converter/reflections_under_the_wheel.mp3
+
       - name: Process UI mouse click
         run: |
           python tools/audio_asset_worker.py tools/audio_jobs/ui_mouse_click.json
@@ -50,27 +58,42 @@ jobs:
         run: |
           python tools/audio_asset_worker.py tools/audio_jobs/loading_horizonte_de_sal.json
 
+      - name: Process Ferris wheel running audio
+        run: |
+          python tools/audio_asset_worker.py tools/audio_jobs/ferris_wheel_running.json
+
       - name: Validate runtime audio and catalog
         run: |
+          test -f Converter/reflections_under_the_wheel.mp3
           test -f assets/audio/ui/mouse_click_002.ogg
           test -f assets/audio/music/loading_horizonte_de_sal.ogg
+          test -f assets/audio/attractions/ferris_wheel_running.ogg
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 Converter/reflections_under_the_wheel.mp3
           ffprobe -v error -select_streams a:0 \
             -show_entries stream=codec_name,sample_rate,channels \
             -of default=noprint_wrappers=1 assets/audio/ui/mouse_click_002.ogg
           ffprobe -v error -select_streams a:0 \
             -show_entries stream=codec_name,sample_rate,channels \
             -of default=noprint_wrappers=1 assets/audio/music/loading_horizonte_de_sal.ogg
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 assets/audio/attractions/ferris_wheel_running.ogg
           python - <<'PY'
           import json
           from pathlib import Path
           catalog = json.loads(Path('assets/audio/audio_catalog.json').read_text(encoding='utf-8'))
           click = 'ui/mouse_click_002.ogg'
           music = 'music/loading_horizonte_de_sal.ogg'
+          ferris = 'attractions/ferris_wheel_running.ogg'
           if click not in catalog['events']['UiClick']:
               raise SystemExit('UiClick catalog entry missing converted mouse click')
           if catalog.get('music', {}).get('Loading') != music:
               raise SystemExit('Loading music catalog entry missing converted track')
-          print('PASS audio catalog contains UI click and loading music')
+          if catalog.get('events', {}).get('FerrisWheelRunning') != [ferris]:
+              raise SystemExit('FerrisWheelRunning catalog entry missing converted attraction loop')
+          print('PASS audio catalog contains UI click, loading music and Ferris wheel running loop')
           PY
 
       - name: Commit converted runtime audio
@@ -78,11 +101,16 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/audio/ui/mouse_click_002.ogg assets/audio/music/loading_horizonte_de_sal.ogg assets/audio/audio_catalog.json
+          git add \
+            Converter/reflections_under_the_wheel.mp3 \
+            assets/audio/ui/mouse_click_002.ogg \
+            assets/audio/music/loading_horizonte_de_sal.ogg \
+            assets/audio/attractions/ferris_wheel_running.ogg \
+            assets/audio/audio_catalog.json
           if git diff --cached --quiet; then
             echo "Runtime audio already up to date."
             exit 0
           fi
-          git commit -m "audio: integrate UI click and loading music"
+          git commit -m "audio: extract Ferris wheel running loop"
           git pull --rebase origin main
           git push origin HEAD:main
