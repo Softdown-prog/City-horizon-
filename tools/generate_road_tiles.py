@@ -1,7 +1,7 @@
 """Deterministic road-tile authoring for the SDL isometric renderer.
 
 The renderer uses a 128x64 (2:1) diamond with its world point at the top
-vertex. RoadManager's N/E/S/W neighbours share the four *sides* below, not the
+vertex. RoadManager's N/E/S/W neighbours share the four sides below, not the
 four vertices. This tool is the single source of truth for that geometry.
 
 By default it creates five visual-validation masks. The shipped runtime set is
@@ -25,6 +25,7 @@ HEIGHT = DISPLAY_HEIGHT * SCALE
 LANE_WIDTH = 2 * SCALE
 EDGE_OVERLAP = SCALE  # one final pixel across adjoining diamonds
 PADDING = 2 * SCALE  # render beyond each frame before the final crop
+CURB_JOIN_OVERLAP = 3 * SCALE  # overlap curb ends only where another road continues
 CANVAS_WIDTH = WIDTH + 2 * PADDING
 CANVAS_HEIGHT = HEIGHT + 2 * PADDING
 
@@ -77,8 +78,6 @@ def connector_paths(mask: int) -> list[list[tuple[float, float]]]:
     if pair in (frozenset((NORTH, SOUTH)), frozenset((EAST, WEST))):
         return [[PORTS[first], PORTS[second]]]
 
-    # Rounded right-angle turns. The control points are on the inside of each
-    # isometric corner and do not alter either connector endpoint.
     controls = {
         frozenset((NORTH, EAST)): (104 * SCALE, 32 * SCALE),
         frozenset((EAST, SOUTH)): (64 * SCALE, 56 * SCALE),
@@ -101,9 +100,8 @@ def diamond_mask() -> Image.Image:
 
 
 def road_mask(mask: int) -> Image.Image:
-    # A road owns the entire logical diamond: adjacent road tiles therefore meet
-    # on their shared side with no grass seam.  Alpha is transparent only
-    # outside that diamond; ROAD_WIDTH describes the internal traffic corridor.
+    # A road owns the entire logical diamond. Adjacent road tiles therefore
+    # meet on their shared side with no grass seam.
     del mask
     return diamond_mask()
 
@@ -121,32 +119,6 @@ def point_at_distance(path: list[tuple[float, float]], distances: list[float], d
             span = max(0.0001, distances[index + 1] - distances[index])
             return lerp(path[index], path[index + 1], (distance - distances[index]) / span)
     return path[-1]
-
-
-def trim_path_tail(path: list[tuple[float, float]], trim: float) -> list[tuple[float, float]]:
-    """Keep a path's port end while reserving visual space at its far end."""
-    distances = path_distances(path)
-    target_length = max(0.0, distances[-1] - trim)
-    if target_length <= 0.0:
-        return [path[0]]
-    result = [point for point, distance in zip(path, distances) if distance < target_length]
-    result.append(point_at_distance(path, distances, target_length))
-    return result
-
-
-def offset_path(path: list[tuple[float, float]], offset: float) -> list[tuple[float, float]]:
-    """Offset a sampled centre path by a screen-space normal."""
-    if len(path) < 2:
-        return path
-    result = []
-    for index, point in enumerate(path):
-        before = path[max(0, index - 1)]
-        after = path[min(len(path) - 1, index + 1)]
-        dx = after[0] - before[0]
-        dy = after[1] - before[1]
-        length = max(0.0001, math.hypot(dx, dy))
-        result.append((point[0] - dy * offset / length, point[1] + dx * offset / length))
-    return result
 
 
 def path_dashes(path: list[tuple[float, float]], dash=7 * SCALE, gap=5 * SCALE, start=0.0):
@@ -169,48 +141,71 @@ def asphalt_texture() -> Image.Image:
     return Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (52, 57, 60, 255))
 
 
+def extend_edge(edge: tuple[tuple[float, float], tuple[float, float]],
+                extend_start: bool, extend_end: bool) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Overlap curb strokes at a connected vertex without drawing a round joint."""
+    start, end = edge
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = max(0.0001, math.hypot(dx, dy))
+    unit_x = dx / length
+    unit_y = dy / length
+    start_x, start_y = start
+    end_x, end_y = end
+    if extend_start:
+        start_x -= unit_x * CURB_JOIN_OVERLAP
+        start_y -= unit_y * CURB_JOIN_OVERLAP
+    if extend_end:
+        end_x += unit_x * CURB_JOIN_OVERLAP
+        end_y += unit_y * CURB_JOIN_OVERLAP
+    return (start_x, start_y), (end_x, end_y)
+
+
 def render_tile(mask: int) -> Image.Image:
     alpha = road_mask(mask)
-    # Keep straight RGB at the diamond edge. The padded render and one-pixel
-    # overlap let antialiasing cover the shared side rather than reveal grass.
     image = asphalt_texture()
     image.putalpha(alpha)
 
-    # Concrete curb/sidewalk lip belongs only to unconnected sides. A shared
-    # side stays asphalt so adjacent road sprites join without a white seam.
     corners = ((PADDING + WIDTH // 2, PADDING - EDGE_OVERLAP),
                (PADDING + WIDTH + EDGE_OVERLAP, PADDING + HEIGHT // 2),
                (PADDING + WIDTH // 2, PADDING + HEIGHT + EDGE_OVERLAP),
                (PADDING - EDGE_OVERLAP, PADDING + HEIGHT // 2))
-    sides = {NORTH: (corners[0], corners[1]),
-             EAST: (corners[1], corners[2]),
-             SOUTH: (corners[2], corners[3]),
-             WEST: (corners[3], corners[0])}
+    top, right, bottom, left = corners
+    side_info = {
+        NORTH: ((top, right), WEST, EAST),
+        EAST: ((right, bottom), NORTH, SOUTH),
+        SOUTH: ((bottom, left), EAST, WEST),
+        WEST: ((left, top), SOUTH, NORTH),
+    }
+
     curbs = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
     curb_draw = ImageDraw.Draw(curbs)
-    for direction, edge in sides.items():
-        if not mask & direction:
-            curb_draw.line(edge, fill=(164, 157, 140, 255), width=11 * SCALE)
-            curb_draw.line(edge, fill=(215, 207, 186, 255), width=4 * SCALE)
-    # Two adjoining sprites meet at a diamond vertex. Their clipped line ends
-    # otherwise leave a dark triangular notch at every tile boundary.
+    for direction, (edge, start_neighbor, end_neighbor) in side_info.items():
+        if mask & direction:
+            continue
+        # If the road continues through the vertex, extend this curb slightly
+        # along its own edge. Adjacent tiles then overlap cleanly instead of
+        # ending in a visible round bump or a one-pixel notch.
+        joined_edge = extend_edge(edge, bool(mask & start_neighbor), bool(mask & end_neighbor))
+        curb_draw.line(joined_edge, fill=(164, 157, 140, 255), width=11 * SCALE)
+        curb_draw.line(joined_edge, fill=(215, 207, 186, 255), width=4 * SCALE)
+
+    # A cap is needed only for a true outer corner where both touching sides
+    # are closed. If either side is a road connection, a cap would create the
+    # repeated bright bump that makes contiguous tiles look separated.
     incident = ((WEST, NORTH), (NORTH, EAST), (EAST, SOUTH), (SOUTH, WEST))
     for point, touching in zip(corners, incident):
-        if all(mask & direction for direction in touching):
+        if any(mask & direction for direction in touching):
             continue
         for radius, color in ((5.5 * SCALE, (164, 157, 140, 255)),
                               (2.0 * SCALE, (215, 207, 186, 255))):
             x, y = point
             curb_draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
+
     curbs.putalpha(ImageChops.multiply(curbs.getchannel("A"), alpha))
     image = Image.alpha_composite(image, curbs)
 
     paths = connector_paths(mask)
-    # Roads own the complete diamond.  Earlier versions drew a second, narrow
-    # "corridor" plus white borders inside every tile.  At turns and junctions
-    # those repeated borders read as disconnected black pieces of road.  A
-    # clean asphalt surface gives adjacent tiles a continuous city-block road
-    # first; markings are now only an aid on true straight stretches.
     markings = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(markings)
     active = [bit for bit in (NORTH, EAST, SOUTH, WEST) if mask & bit]
@@ -219,19 +214,13 @@ def render_tile(mask: int) -> Image.Image:
         and frozenset(active) in (frozenset((NORTH, SOUTH)), frozenset((EAST, WEST)))
     )
     if opposite_straight:
-        # The dashed centre line crosses the real shared-side centres, so the
-        # next tile continues it exactly.  Curves, ends and intersections stay
-        # unmarked deliberately: they are much clearer than a pile of tiny,
-        # conflicting stripes on an isometric 128x64 diamond.
-        # A whole number of periods fits between ports. Half a gap at either
-        # end joins the next tile into one continuous dashed lane line.
         period = path_distances(paths[0])[-1] / 4.0
         gap = period * 0.45
         for start, end in path_dashes(paths[0], dash=period - gap, gap=gap, start=gap * 0.5):
             draw.line(((start[0] + PADDING, start[1] + PADDING),
                        (end[0] + PADDING, end[1] + PADDING)),
                       fill=(235, 185, 47, 230), width=LANE_WIDTH)
-    # Paint is clipped by the same road geometry; no stripe can leak into grass.
+
     markings.putalpha(ImageChops.multiply(markings.getchannel("A"), alpha))
     image = Image.alpha_composite(image, markings)
     image.putalpha(alpha)
@@ -249,22 +238,16 @@ def build_preview(tiles: dict[int, Image.Image], output: Path) -> None:
     """An exact renderer-space straight continuity check, not an atlas mockup."""
     preview = Image.new("RGBA", (900, 420), (85, 126, 61, 255))
     origin = (300, 60)
-    # Four contiguous N/S straight tiles and four E/W straight tiles. They use
-    # the same position formula as main.cpp and expose any actual geometry gap.
     for coordinate in ((0, 0), (0, -1), (0, -2), (0, -3)):
         preview.alpha_composite(tiles[5], world_to_preview(*coordinate, origin))
     for coordinate in ((3, 0), (4, 0), (5, 0), (6, 0)):
         preview.alpha_composite(tiles[10], world_to_preview(*coordinate, origin))
-
-    # Individual topology samples, intentionally separated from the continuity
-    # test until the whole 16-tile set is approved.
     for mask, coordinate in ((3, (1, 4)), (7, (3, 4)), (15, (5, 4))):
         preview.alpha_composite(tiles[mask], world_to_preview(*coordinate, origin))
     preview.save(output)
 
 
 def validate_ports(tiles: dict[int, Image.Image]) -> None:
-    # Road alpha must reach the true connector centre for every active mask.
     for mask, image in tiles.items():
         alpha = image.getchannel("A")
         for bit, (x, y) in PORTS.items():
