@@ -209,6 +209,18 @@ template <typename Number>
     definition.grass_only = json_bool(json, "grassOnly").value_or(false);
     definition.footprint_width = json_number<int>(*footprint, "width").value_or(0);
     definition.footprint_height = json_number<int>(*footprint, "height").value_or(0);
+    if (const auto occupancy = json_object(json, "occupancyFootprint")) {
+        definition.occupancy_footprint_width = json_number<int>(*occupancy, "width").value_or(0);
+        definition.occupancy_footprint_height = json_number<int>(*occupancy, "height").value_or(0);
+        definition.occupancy_footprint_offset_x = json_number<int>(*occupancy, "offsetX").value_or(0);
+        definition.occupancy_footprint_offset_y = json_number<int>(*occupancy, "offsetY").value_or(0);
+        if (definition.occupancy_footprint_width <= 0 || definition.occupancy_footprint_height <= 0 ||
+            definition.occupancy_footprint_offset_x < 0 || definition.occupancy_footprint_offset_y < 0 ||
+            definition.occupancy_footprint_offset_x + definition.occupancy_footprint_width > definition.footprint_width ||
+            definition.occupancy_footprint_offset_y + definition.occupancy_footprint_height > definition.footprint_height) {
+            return std::nullopt;
+        }
+    }
     definition.build_cost = json_number<std::int64_t>(json, "buildCost").value_or(0);
     definition.maintenance_per_month = json_number<std::int64_t>(json, "maintenancePerMonth").value_or(0);
     definition.tax_revenue_per_month = json_number<std::int64_t>(json, "taxRevenuePerMonth").value_or(0);
@@ -659,6 +671,29 @@ BuildingFootprint rotated_footprint(const BuildingDefinition& definition, const 
         : BuildingFootprint{definition.footprint_width, definition.footprint_height};
 }
 
+BuildingOccupancyFootprint rotated_occupancy_footprint(const BuildingDefinition& definition,
+                                                        const BuildingRotation rotation) {
+    int frame_width = definition.footprint_width;
+    int frame_height = definition.footprint_height;
+    BuildingOccupancyFootprint result;
+    result.offset_x = definition.occupancy_footprint_width > 0 ? definition.occupancy_footprint_offset_x : 0;
+    result.offset_y = definition.occupancy_footprint_height > 0 ? definition.occupancy_footprint_offset_y : 0;
+    result.width = definition.occupancy_footprint_width > 0 ? definition.occupancy_footprint_width : definition.footprint_width;
+    result.height = definition.occupancy_footprint_height > 0 ? definition.occupancy_footprint_height : definition.footprint_height;
+
+    if (!definition.rotatable) return result;
+    for (std::uint8_t turn = 0; turn < static_cast<std::uint8_t>(rotation); ++turn) {
+        const int previous_offset_x = result.offset_x;
+        const int previous_width = result.width;
+        result.offset_x = frame_height - (result.offset_y + result.height);
+        result.offset_y = previous_offset_x;
+        result.width = result.height;
+        result.height = previous_width;
+        std::swap(frame_width, frame_height);
+    }
+    return result;
+}
+
 BuildingAccessPoint rotate_access_point(const BuildingDefinition& definition, BuildingAccessPoint access_point,
                                         const BuildingRotation rotation) {
     if (!definition.rotatable) {
@@ -815,11 +850,11 @@ PlacementFailure BuildingManager::validate(const BuildingDefinition& definition,
         }
     }
 
-    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    const BuildingOccupancyFootprint footprint = rotated_occupancy_footprint(definition, rotation);
     for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
         for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
-            const int checked_x = tile_x + offset_x;
-            const int checked_y = tile_y + offset_y;
+            const int checked_x = tile_x + footprint.offset_x + offset_x;
+            const int checked_y = tile_y + footprint.offset_y + offset_y;
             if (!is_inside_map(checked_x, checked_y)) {
                 return PlacementFailure::outside_map;
             }
@@ -847,10 +882,11 @@ std::optional<std::uint64_t> BuildingManager::place(const BuildingDefinition& de
     instance.service_price = definition.default_service_price;
     instances_.push_back(instance);
 
-    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+    const BuildingOccupancyFootprint footprint = rotated_occupancy_footprint(definition, instance.rotation);
     for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
         for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
-            occupancy_[tile_key(tile_x + offset_x, tile_y + offset_y)] = instance.instance_id;
+            occupancy_[tile_key(tile_x + footprint.offset_x + offset_x,
+                                tile_y + footprint.offset_y + offset_y)] = instance.instance_id;
         }
     }
     return instance.instance_id;
@@ -861,10 +897,11 @@ bool BuildingManager::remove_instance(const BuildingDefinition& definition, cons
         return instance.instance_id == instance_id;
     });
     if (found == instances_.end() || found->definition_id != definition.id) return false;
-    const BuildingFootprint footprint = rotated_footprint(definition, found->rotation);
+    const BuildingOccupancyFootprint footprint = rotated_occupancy_footprint(definition, found->rotation);
     for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
         for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
-            occupancy_.erase(tile_key(found->tile_x + offset_x, found->tile_y + offset_y));
+            occupancy_.erase(tile_key(found->tile_x + footprint.offset_x + offset_x,
+                                      found->tile_y + footprint.offset_y + offset_y));
         }
     }
     instances_.erase(found);
@@ -899,10 +936,11 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
         instance.service_price = ch::ServicePrice{};
     }
     instances_.push_back(instance);
-    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+    const BuildingOccupancyFootprint footprint = rotated_occupancy_footprint(definition, instance.rotation);
     for (int offset_y = 0; offset_y < footprint.height; ++offset_y) {
         for (int offset_x = 0; offset_x < footprint.width; ++offset_x) {
-            occupancy_[tile_key(instance.tile_x + offset_x, instance.tile_y + offset_y)] = instance.instance_id;
+            occupancy_[tile_key(instance.tile_x + footprint.offset_x + offset_x,
+                                instance.tile_y + footprint.offset_y + offset_y)] = instance.instance_id;
         }
     }
     next_instance_id_ = std::max(next_instance_id_, instance.instance_id + 1U);
