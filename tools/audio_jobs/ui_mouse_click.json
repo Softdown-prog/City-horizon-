@@ -3,5 +3,5 @@
   "output": "assets/audio/ui/mouse_click_002.ogg",
   "catalog": "assets/audio/audio_catalog.json",
   "event": "UiClick",
-  "mode": "append"
+  "mode": "replace"
 }

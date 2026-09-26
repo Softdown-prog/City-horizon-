@@ -1370,6 +1370,26 @@ int main() {
     AudioManager audio;
     (void)audio.initialize(asset_root / "assets/audio");
     (void)audio.play_loading_music();
+    // A mouse press owns its click sound. Action handlers may still report an
+    // error or a distinct world effect, but not another generic UI click.
+    bool mouse_click_event = false;
+    const auto play_sound = [&](SoundEvent sound) {
+        if (mouse_click_event) {
+            switch (sound) {
+                case SoundEvent::ui_click:
+                case SoundEvent::ui_select:
+                case SoundEvent::ui_back:
+                case SoundEvent::ui_open_panel:
+                case SoundEvent::ui_close_panel:
+                case SoundEvent::ui_confirm:
+                case SoundEvent::ui_toggle:
+                case SoundEvent::ui_scroll:
+                    return false;
+                default: break;
+            }
+        }
+        return audio.play(sound);
+    };
 
     TextureCache textures;
     const auto show_loading = [&](const float progress, const char* stage) {
@@ -1787,13 +1807,13 @@ int main() {
         build_panel_open = true;
         selected_instance_id.reset();
         status = "BUILDINGS PANEL OPEN";
-        (void)audio.play(SoundEvent::ui_open_panel);
+        (void)play_sound(SoundEvent::ui_open_panel);
     };
     const auto begin_build_placement = [&](const std::string& definition_id) {
         const BuildingDefinition* definition = catalog.find(definition_id);
         if (definition == nullptr) {
             status = "UNKNOWN BUILDING DEFINITION";
-            (void)audio.play(SoundEvent::ui_error);
+            (void)play_sound(SoundEvent::ui_error);
             return;
         }
         clear_map_modes();
@@ -1802,7 +1822,7 @@ int main() {
         placement_rotation = BuildingRotation::r0;
         selected_instance_id.reset();
         status = "BUILD MODE: " + definition->name;
-        (void)audio.play(SoundEvent::ui_confirm);
+        (void)play_sound(SoundEvent::ui_confirm);
     };
     const auto begin_road_mode = [&]() {
         clear_map_modes();
@@ -1810,7 +1830,7 @@ int main() {
         road_mode = true;
         selected_instance_id.reset();
         status = "ROAD MODE: DRAG TO DRAW";
-        (void)audio.play(SoundEvent::ui_select);
+        (void)play_sound(SoundEvent::ui_select);
     };
     const auto begin_remove_mode = [&]() {
         clear_map_modes();
@@ -1819,7 +1839,7 @@ int main() {
         road_removal_mode = true;
         selected_instance_id.reset();
         status = "DEMOLISH MODE: CLICK A BUILDING, SIDEWALK OR ROAD";
-        (void)audio.play(SoundEvent::ui_select);
+        (void)play_sound(SoundEvent::ui_select);
     };
     const auto begin_land_mode = [&]() {
         clear_map_modes();
@@ -1827,7 +1847,7 @@ int main() {
         land_mode = true;
         selected_instance_id.reset();
         status = "LAND MODE: SELECT A NEIGHBORING PARCEL";
-        (void)audio.play(SoundEvent::ui_open_panel);
+        (void)play_sound(SoundEvent::ui_open_panel);
     };
     const auto begin_terrain_paint = [&](const std::string& style) {
         clear_map_modes();
@@ -1835,11 +1855,11 @@ int main() {
         terrain_paint_style = style;
         selected_instance_id.reset();
         status = style == "sand" ? "SAND: CLICK OWNED EMPTY GROUND" : "GRASS: CLICK OWNED EMPTY GROUND";
-        (void)audio.play(SoundEvent::ui_select);
+        (void)play_sound(SoundEvent::ui_select);
     };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
-        status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)audio.play(SoundEvent::ui_select);
+        status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
     };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
@@ -1847,7 +1867,7 @@ int main() {
         decoration_mode = true;
         selected_instance_id.reset();
         status = "DECORATION: SELECT AN ITEM";
-        (void)audio.play(SoundEvent::ui_select);
+        (void)play_sound(SoundEvent::ui_select);
     };
     const auto open_agriculture_panel = [&]() {
         clear_map_modes();
@@ -1856,7 +1876,7 @@ int main() {
         agriculture_panel_open = true;
         selected_instance_id.reset();
         status = "AGRICULTURE: SELECT SOIL OR TOMATO";
-        (void)audio.play(SoundEvent::ui_open_panel);
+        (void)play_sound(SoundEvent::ui_open_panel);
     };
     const auto select_farming_item = [&](const std::string& id) {
         const bool sell_resource = id.starts_with("sell_resource:") &&
@@ -1864,16 +1884,16 @@ int main() {
         const bool vehicle_purchase = id.starts_with("purchase_vehicle:") &&
             service_vehicle_catalog.find(id.substr(std::string("purchase_vehicle:").size())) != nullptr;
         if (id != "prepared_soil_01" && id != "harvest_tool" && id != "prepare_soil_tool" && !sell_resource && !vehicle_purchase && crop_catalog.find(id) == nullptr) {
-            status = "UNKNOWN FARMING ITEM"; (void)audio.play(SoundEvent::ui_error); return;
+            status = "UNKNOWN FARMING ITEM"; (void)play_sound(SoundEvent::ui_error); return;
         }
         if (sell_resource) {
             const AgriculturalResourceDefinition* resource = resource_catalog.find(id.substr(std::string("sell_resource:").size()));
             const int quantity = farming.inventory_count(resource->id);
-            if (quantity <= 0) { status = resource->display_name + ": NO STOCK TO SELL"; (void)audio.play(SoundEvent::ui_error); return; }
+            if (quantity <= 0) { status = resource->display_name + ": NO STOCK TO SELL"; (void)play_sound(SoundEvent::ui_error); return; }
             const std::int64_t revenue = static_cast<std::int64_t>(quantity) * resource->base_sell_price;
             if (farming.try_remove_resource(resource->id, quantity)) economy.earn_agricultural_sale(revenue, simulation_clock.date());
             status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);
-            (void)audio.play(SoundEvent::ui_confirm); return;
+            (void)play_sound(SoundEvent::ui_confirm); return;
         }
         clear_map_modes();
         build_panel_open = false;
@@ -1885,14 +1905,14 @@ int main() {
             (id == "harvest_tool" ? "AGRICULTURE: DRAG TO HARVEST READY CROPS" :
             (id == "prepare_soil_tool" ? "AGRICULTURE: DRAG AREA TO PREPARE" :
             (vehicle_purchase ? "AGRICULTURE: CLICK EMPTY OWNED TILE FOR TRACTOR HOME" : "AGRICULTURE: PLANT " + crop_catalog.find(id)->display_name)));
-        (void)audio.play(SoundEvent::ui_confirm);
+        (void)play_sound(SoundEvent::ui_confirm);
     };
     const auto rotate_placement = [&](const bool clockwise) {
         if (const BuildingDefinition* placement = catalog.find(placement_definition_id);
             placement != nullptr && placement->rotatable) {
             placement_rotation = placement->next_supported_rotation(placement_rotation, clockwise);
             status = "BUILD ROTATION: " + std::string(rotation_label(placement_rotation));
-            (void)audio.play(SoundEvent::ui_click);
+            (void)play_sound(SoundEvent::ui_click);
         }
     };
     const auto save_current_city = [&]() {
@@ -1900,7 +1920,7 @@ int main() {
                                                              sidewalks, farming, lands, population, &service_vehicles, &mission_manager,
                                                              &terrain_paint);
         status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
-        (void)audio.play(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+        (void)play_sound(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
         return result.success;
     };
     const auto load_current_city = [&](const bool keep_paused) {
@@ -1931,10 +1951,10 @@ int main() {
             }
             last_simulation_ticks = SDL_GetTicks();
             simulation_scheduler.reset();
-            (void)audio.play(SoundEvent::ui_confirm);
+            (void)play_sound(SoundEvent::ui_confirm);
         } else {
             status = "LOAD FAILED: " + result.message;
-            (void)audio.play(SoundEvent::ui_error);
+            (void)play_sound(SoundEvent::ui_error);
         }
         return result.success;
     };
@@ -1964,43 +1984,43 @@ int main() {
                     active_overlay = UiOverlay::none;
                     if (simulation_clock.speed() == SimulationSpeed::paused) simulation_clock.toggle_pause();
                     status = "SIMULATION RESUMED";
-                    (void)audio.play(SoundEvent::ui_close_panel);
+                    (void)play_sound(SoundEvent::ui_close_panel);
                 } else {
                     if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.toggle_pause();
                     active_overlay = UiOverlay::pause;
                     status = "GAME PAUSED";
-                    (void)audio.play(SoundEvent::ui_open_panel);
+                    (void)play_sound(SoundEvent::ui_open_panel);
                 }
                 break;
             case UiAction::resume_game:
                 active_overlay = UiOverlay::none;
                 if (simulation_clock.speed() == SimulationSpeed::paused) simulation_clock.toggle_pause();
                 status = "SIMULATION RESUMED";
-                (void)audio.play(SoundEvent::ui_close_panel);
+                (void)play_sound(SoundEvent::ui_close_panel);
                 break;
             case UiAction::open_administration:
                 active_overlay = UiOverlay::administration;
                 status = "ADMINISTRATION OPEN";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::open_reports:
                 active_overlay = UiOverlay::reports;
                 status = "REPORTS OPEN";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::open_settings:
                 settings_return_overlay = active_overlay == UiOverlay::pause || active_overlay == UiOverlay::main_menu
                     ? active_overlay : UiOverlay::none;
                 active_overlay = UiOverlay::settings;
                 status = "SETTINGS OPEN";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::open_main_menu:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
                 startup_main_menu = false;
                 active_overlay = UiOverlay::main_menu;
                 status = "MAIN MENU OPEN";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::start_new_city:
                 clear_map_modes();
@@ -2012,12 +2032,12 @@ int main() {
                 last_simulation_ticks = SDL_GetTicks();
                 simulation_scheduler.reset();
                 status = "NEW CITY STARTED";
-                (void)audio.play(SoundEvent::ui_confirm);
+                (void)play_sound(SoundEvent::ui_confirm);
                 break;
             case UiAction::continue_saved_city:
                 if (!std::filesystem::exists(save_path)) {
                     status = "NO SAVE AVAILABLE";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 if (load_current_city(false)) {
@@ -2034,7 +2054,7 @@ int main() {
                 save_load_return_overlay = active_overlay == UiOverlay::main_menu ? UiOverlay::main_menu : UiOverlay::pause;
                 active_overlay = UiOverlay::save_load;
                 status = std::filesystem::exists(save_path) ? "SAVE SLOT READY" : "SAVE SLOT EMPTY";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::save_game:
                 (void)save_current_city();
@@ -2046,51 +2066,51 @@ int main() {
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
                 active_overlay = UiOverlay::pause;
                 status = "GAME PAUSED";
-                (void)audio.play(SoundEvent::ui_back);
+                (void)play_sound(SoundEvent::ui_back);
                 break;
             case UiAction::back_from_save_load:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
                 active_overlay = save_load_return_overlay;
                 status = active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "GAME PAUSED";
-                (void)audio.play(SoundEvent::ui_back);
+                (void)play_sound(SoundEvent::ui_back);
                 break;
             case UiAction::open_quit_confirm:
                 if (simulation_clock.speed() != SimulationSpeed::paused) simulation_clock.set_speed(SimulationSpeed::paused);
                 quit_return_overlay = active_overlay == UiOverlay::main_menu ? UiOverlay::main_menu : UiOverlay::pause;
                 active_overlay = UiOverlay::quit_confirm;
                 status = "CONFIRM EXIT";
-                (void)audio.play(SoundEvent::ui_open_panel);
+                (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::cancel_quit:
                 active_overlay = quit_return_overlay;
                 status = active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "GAME PAUSED";
-                (void)audio.play(SoundEvent::ui_back);
+                (void)play_sound(SoundEvent::ui_back);
                 break;
             case UiAction::quit_game:
                 status = "EXITING CITY HORIZON";
-                (void)audio.play(SoundEvent::ui_confirm);
+                (void)play_sound(SoundEvent::ui_confirm);
                 running = false;
                 break;
             case UiAction::close_modal:
                 active_overlay = UiOverlay::none;
                 status = "PANEL CLOSED";
-                (void)audio.play(SoundEvent::ui_close_panel);
+                (void)play_sound(SoundEvent::ui_close_panel);
                 break;
             case UiAction::settings_cancel:
                 active_overlay = settings_return_overlay;
                 status = active_overlay == UiOverlay::pause ? "GAME PAUSED" :
                     (active_overlay == UiOverlay::main_menu ? "MAIN MENU OPEN" : "PANEL CLOSED");
-                (void)audio.play(SoundEvent::ui_close_panel);
+                (void)play_sound(SoundEvent::ui_close_panel);
                 break;
             case UiAction::settings_reset:
                 status = "SETTINGS DEFAULTS READY TO APPLY";
-                (void)audio.play(SoundEvent::ui_click);
+                (void)play_sound(SoundEvent::ui_click);
                 break;
             case UiAction::settings_apply: {
                 const std::size_t separator = action.payload.find(':');
                 if (separator == std::string::npos) {
                     status = "INVALID SETTINGS PAYLOAD";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 const int master_percent = std::clamp(std::stoi(action.payload.substr(0, separator)), 0, 100);
@@ -2102,21 +2122,21 @@ int main() {
                 active_overlay = settings_return_overlay;
                 status = active_overlay == UiOverlay::pause ? "SETTINGS APPLIED - GAME PAUSED" :
                     (active_overlay == UiOverlay::main_menu ? "SETTINGS APPLIED - MAIN MENU" : "SETTINGS APPLIED");
-                (void)audio.play(SoundEvent::ui_confirm);
+                (void)play_sound(SoundEvent::ui_confirm);
                 break;
             }
             case UiAction::decrease_service_price:
             case UiAction::increase_service_price: {
                 if (!selected_instance_id) {
                     status = "NO BUILDING SELECTED";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id);
                 const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);
                 if (instance == nullptr || definition == nullptr || definition->default_service_price <= 0) {
                     status = "BUILDING HAS NO CUSTOMER PRICE";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 const std::int64_t delta = action.action == UiAction::increase_service_price ? 1 : -1;
@@ -2125,10 +2145,10 @@ int main() {
                     economy.rebuild_monthly_summary(buildings, catalog, population, &farming);
                     status = definition->name + ": PRECO AO CLIENTE " +
                         format_money(updated == nullptr ? instance->service_price : updated->service_price);
-                    (void)audio.play(SoundEvent::ui_click);
+                    (void)play_sound(SoundEvent::ui_click);
                 } else {
                     status = "SERVICE PRICE CHANGE FAILED";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 }
                 break;
             }
@@ -2136,21 +2156,21 @@ int main() {
             case UiAction::set_roof_color: {
                 if (!selected_instance_id) {
                     status = "NO BUILDING SELECTED";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id);
                 const BuildingDefinition* definition = instance == nullptr ? nullptr : catalog.find(instance->definition_id);
                 if (instance == nullptr || definition == nullptr || !definition->supports_color_mask(instance->rotation)) {
                     status = "BUILDING HAS NO COLOR MASK";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 const std::size_t first = action.payload.find(':');
                 const std::size_t second = first == std::string::npos ? std::string::npos : action.payload.find(':', first + 1);
                 if (first == std::string::npos || second == std::string::npos) {
                     status = "INVALID COLOR";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                     break;
                 }
                 try {
@@ -2163,26 +2183,26 @@ int main() {
                         : buildings.set_roof_color_customization(instance->instance_id, tint);
                     status = changed ? definition->name + (action.action == UiAction::set_wall_color ? ": WALL COLOR" : ": ROOF COLOR")
                                      : "COLOR CHANGE FAILED";
-                    (void)audio.play(changed ? SoundEvent::ui_click : SoundEvent::ui_error);
+                    (void)play_sound(changed ? SoundEvent::ui_click : SoundEvent::ui_error);
                 } catch (...) {
                     status = "INVALID COLOR";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 }
                 break;
             }
             case UiAction::reset_building_colors:
                 if (selected_instance_id && buildings.clear_color_customization(*selected_instance_id)) {
                     status = "ORIGINAL BUILDING COLORS RESTORED";
-                    (void)audio.play(SoundEvent::ui_click);
+                    (void)play_sound(SoundEvent::ui_click);
                 } else {
                     status = "COLOR RESET FAILED";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 }
                 break;
             case UiAction::close_selection:
                 selected_instance_id.reset();
                 status = "INFO PANEL CLOSED";
-                (void)audio.play(SoundEvent::ui_close_panel);
+                (void)play_sound(SoundEvent::ui_close_panel);
                 break;
             case UiAction::none: break;
         }
@@ -2516,6 +2536,7 @@ int main() {
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            mouse_click_event = false;
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
@@ -2547,12 +2568,11 @@ int main() {
                     camera.pan_velocity_y = 0.0F;
                     continue;
                 }
+                mouse_click_event = event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT;
+                if (mouse_click_event) (void)audio.play(SoundEvent::ui_click);
                 const UiInputResult ui_input = gameplay_ui.handle_mouse_button_down(
                     event.button.x, event.button.y, event.button.button == SDL_BUTTON_LEFT);
                 if (ui_input.consumed) {
-                    // A physical click has a stable sound even for controls
-                    // (such as category tabs) that do not emit an action.
-                    if (event.button.button == SDL_BUTTON_LEFT) (void)audio.play(SoundEvent::ui_click);
                     if (ui_input.action) {
                         apply_ui_action(*ui_input.action);
                     }
@@ -2564,22 +2584,22 @@ int main() {
                 if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
                     land_mode = false;
                     status = "LAND MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && !terrain_paint_style.empty()) {
                     terrain_paint_style.clear();
                     status = "TERRAIN PAINT CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && road_mode) {
                     road_dragging = false;
                     road_mode = false;
                     road_removal_mode = false;
                     status = "ROAD MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && sidewalk_mode) {
                     sidewalk_mode = false;
                     sidewalk_dragging = false;
                     status = "SIDEWALK MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && agriculture_mode) {
                     agriculture_mode = false;
                     agriculture_panel_open = false;
@@ -2587,15 +2607,15 @@ int main() {
                     harvest_dragging = false;
                     preparation_dragging = false;
                     status = "AGRICULTURE MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && decoration_mode) {
                     decoration_mode = false;
                     status = "DECORATION MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && !placement_definition_id.empty()) {
                     placement_definition_id.clear();
                     status = "BUILD MODE CANCELLED";
-                    (void)audio.play(SoundEvent::ui_back);
+                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
                     if (!terrain_paint_style.empty()) {
                         const int x = raw_clicked_tile.first, y = raw_clicked_tile.second;
@@ -2608,7 +2628,7 @@ int main() {
                             occupancy.sidewalk || occupancy.farm || !paintable ||
                             (terrain_paint_style == "sand" && paintable_sand == nullptr)) {
                             status = "TERRAIN REQUIRES EMPTY OWNED GRASS OR SAND";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else {
                             const std::string path = terrain_paint_style == "sand"
                                 ? "assets/terrain/sand_isometric_01.png" : "";
@@ -2619,29 +2639,29 @@ int main() {
                             if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, terrain_paint_style});
                             else saved->style = terrain_paint_style;
                             status = terrain_paint_style == "sand" ? "SAND PAINTED" : "GRASS PAINTED";
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                         }
                     } else if (land_mode) {
                         const LandParcel* parcel = lands.parcel_at(clicked_tile.first, clicked_tile.second);
                         if (parcel == nullptr) {
                             status = "NO PARCEL AT THIS TILE";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else if (parcel->owned) {
                             status = "PARCEL ALREADY OWNED";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else if (!lands.can_purchase_parcel(parcel->id)) {
                             status = "PARCEL MUST TOUCH OWNED LAND";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else if (!economy.can_afford(parcel->purchase_cost)) {
                             status = "NOT ENOUGH FUNDS FOR LAND";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else if (lands.purchase_parcel(parcel->id, economy, simulation_clock.date())) {
                             status = "LAND PURCHASED: PARCEL " + std::to_string(parcel->id) + " - " +
                                 format_money(parcel->purchase_cost);
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                         } else {
                             status = "LAND PURCHASE FAILED";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         }
                     } else if (road_mode && road_removal_mode) {
                         const BuildingInstance* building = buildings.instance_at(clicked_tile.first, clicked_tile.second);
@@ -2652,19 +2672,19 @@ int main() {
                             power.rebuild(buildings, catalog);
                             selected_instance_id.reset();
                             status = "BUILDING DEMOLISHED";
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                             if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
                                 status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
                             }
                         } else if (sidewalks.remove_tile(clicked_tile.first, clicked_tile.second)) {
                             status = "SIDEWALK REMOVED";
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                         } else if (roads.remove_tile(clicked_tile.first, clicked_tile.second)) {
                             status = "ROAD REMOVED";
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                         } else {
                             status = "NO BUILDING, SIDEWALK OR ROAD ON THIS TILE";
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         }
                     } else if (sidewalk_mode) {
                         sidewalk_dragging = true;
@@ -2693,7 +2713,7 @@ int main() {
                                                              static_cast<float>(clicked_tile.first), static_cast<float>(clicked_tile.second)}, service_vehicle_catalog)) {
                                 status = vehicle->display_name + " PURCHASED";
                                 farming_selection_id.clear();
-                                (void)audio.play(SoundEvent::ui_confirm);
+                                (void)play_sound(SoundEvent::ui_confirm);
                             }
                             continue;
                         }
@@ -2703,34 +2723,34 @@ int main() {
                             const int harvested = farming.harvest(clicked_tile.first, clicked_tile.second, crop_catalog, simulation_clock.date());
                             status = harvested > 0 ? crop->display_name + " HARVESTED: +" + std::to_string(harvested) :
                                 (crop != nullptr && farming.available_storage_for(*crop) < crop->harvest_yield ? "ARMAZENAMENTO INSUFICIENTE" : "HARVEST FAILED");
-                            (void)audio.play(harvested > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                            (void)play_sound(harvested > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
                         } else if (!lands.is_tile_owned(clicked_tile.first, clicked_tile.second)) {
-                            status = "AGRICULTURE REQUIRES OWNED LAND"; (void)audio.play(SoundEvent::ui_error);
+                            status = "AGRICULTURE REQUIRES OWNED LAND"; (void)play_sound(SoundEvent::ui_error);
                         } else if (farming_selection_id == "prepared_soil_01") {
                             if (roads.is_road(clicked_tile.first, clicked_tile.second) || sidewalks.is_sidewalk(clicked_tile.first, clicked_tile.second) ||
                                 buildings.is_occupied(clicked_tile.first, clicked_tile.second) || farming.is_occupied(clicked_tile.first, clicked_tile.second)) {
-                                status = "SOIL BLOCKED BY OCCUPIED TILE"; (void)audio.play(SoundEvent::ui_error);
+                                status = "SOIL BLOCKED BY OCCUPIED TILE"; (void)play_sound(SoundEvent::ui_error);
                             } else if (farming.prepare_soil(clicked_tile.first, clicked_tile.second)) {
-                                status = "PREPARED SOIL PLACED"; (void)audio.play(SoundEvent::ui_confirm);
+                                status = "PREPARED SOIL PLACED"; (void)play_sound(SoundEvent::ui_confirm);
                             }
                         } else if (const CropDefinition* crop = crop_catalog.find(farming_selection_id)) {
                             const auto infrastructure = agricultural_infrastructure();
                             if (!infrastructure.barn && !infrastructure.silo) {
                                 status = "CONSTRUA CELEIRO E SILO PARA LIBERAR O PLANTIO";
-                                (void)audio.play(SoundEvent::ui_error);
+                                (void)play_sound(SoundEvent::ui_error);
                             } else if (!infrastructure.barn) {
                                 status = "CONSTRUA UM CELEIRO PARA INICIAR A AGRICULTURA";
-                                (void)audio.play(SoundEvent::ui_error);
+                                (void)play_sound(SoundEvent::ui_error);
                             } else if (!infrastructure.silo) {
                                 status = "CONSTRUA UM SILO PARA INICIAR A AGRICULTURA";
-                                (void)audio.play(SoundEvent::ui_error);
+                                (void)play_sound(SoundEvent::ui_error);
                             } else if (farming.plant(clicked_tile.first, clicked_tile.second, *crop, simulation_clock.date())) {
-                                status = crop->display_name + " PLANTED"; (void)audio.play(SoundEvent::ui_confirm);
+                                status = crop->display_name + " PLANTED"; (void)play_sound(SoundEvent::ui_confirm);
                             } else {
-                                status = "CROP REQUIRES PREPARED SOIL"; (void)audio.play(SoundEvent::ui_error);
+                                status = "CROP REQUIRES PREPARED SOIL"; (void)play_sound(SoundEvent::ui_error);
                             }
                         } else {
-                            status = "SELECT SOIL OR A CROP"; (void)audio.play(SoundEvent::ui_error);
+                            status = "SELECT SOIL OR A CROP"; (void)play_sound(SoundEvent::ui_error);
                         }
                     } else if (road_mode) {
                         road_dragging = true;
@@ -2744,7 +2764,7 @@ int main() {
                         } else {
                             selected_instance_id = clicked->instance_id;
                             // Selection and its information panel are one action: one feedback sound only.
-                            (void)audio.play(SoundEvent::ui_select);
+                            (void)play_sound(SoundEvent::ui_select);
                         }
                         status = clicked == nullptr ? "NO BUILDING ON THIS TILE" : "BUILDING SELECTED";
                     } else if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
@@ -2753,7 +2773,7 @@ int main() {
                             buildings, roads, lands, sidewalks, farming, economy, power, active_map_doc ? &*active_map_doc : nullptr);
                         if (!validation.valid()) {
                             status = placement_validation_text(validation);
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         } else if (const auto instance_id = buildings.place(*placement, clicked_tile.first, clicked_tile.second, placement_rotation)) {
                             (void)economy.spend_for_building(placement->build_cost, simulation_clock.date(), *instance_id);
                             population.rebuild_capacity(buildings, catalog);
@@ -2763,7 +2783,7 @@ int main() {
                             if (power.power_available() < 0) {
                                 status += " | POWER DEFICIT " + std::to_string(-power.power_available());
                             }
-                            (void)audio.play(SoundEvent::building_place);
+                            (void)play_sound(SoundEvent::building_place);
                             if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
                                 status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
                             }
@@ -2820,7 +2840,7 @@ int main() {
                     }
                     status = storage_full ? "ARMAZENAMENTO INSUFICIENTE" :
                         (harvested_tiles == 0 ? "NO READY CROPS IN SELECTION" : "HARVESTED " + std::to_string(harvested_tiles) + " TILE(S): +" + std::to_string(total_yield));
-                    (void)audio.play(harvested_tiles > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+                    (void)play_sound(harvested_tiles > 0 ? SoundEvent::ui_confirm : SoundEvent::ui_error);
                     harvest_dragging = false;
                     continue;
                 }
@@ -2842,10 +2862,10 @@ int main() {
                     }
                     if (prepared_count > 0) {
                         status = "TERRA PREPARADA: " + std::to_string(prepared_count) + " TILE(S)";
-                        (void)audio.play(SoundEvent::ui_confirm);
+                        (void)play_sound(SoundEvent::ui_confirm);
                     } else {
                         status = "NO VALID TILES FOR SOIL PREPARATION";
-                        (void)audio.play(SoundEvent::ui_error);
+                        (void)play_sound(SoundEvent::ui_error);
                     }
                     preparation_dragging = false;
                     continue;
@@ -2855,13 +2875,13 @@ int main() {
                     const auto infrastructure = agricultural_infrastructure();
                     if (crop == nullptr) {
                         status = "SELECT A CROP TO PLANT";
-                        (void)audio.play(SoundEvent::ui_error);
+                        (void)play_sound(SoundEvent::ui_error);
                     } else if (!infrastructure.barn || !infrastructure.silo) {
                         status = !infrastructure.barn && !infrastructure.silo
                             ? "CONSTRUA CELEIRO E SILO PARA LIBERAR O PLANTIO"
                             : (!infrastructure.barn ? "CONSTRUA UM CELEIRO PARA INICIAR A AGRICULTURA"
                                                     : "CONSTRUA UM SILO PARA INICIAR A AGRICULTURA");
-                        (void)audio.play(SoundEvent::ui_error);
+                        (void)play_sound(SoundEvent::ui_error);
                     } else {
                         const int min_x = std::min(planting_drag_start.x, released_tile.first);
                         const int max_x = std::max(planting_drag_start.x, released_tile.first);
@@ -2878,7 +2898,7 @@ int main() {
                         status = planted == 0 ? "CROP REQUIRES PREPARED SOIL" :
                             crop->display_name + " PLANTED: " + std::to_string(planted) + " TILE(S)" +
                             (skipped == 0 ? "" : " | " + std::to_string(skipped) + " SKIPPED");
-                        (void)audio.play(planted == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                        (void)play_sound(planted == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     }
                     planting_dragging = false;
                     continue;
@@ -2899,7 +2919,7 @@ int main() {
                     status = placed == 0 ? "FLOOR BLOCKED BY ROAD, BUILDING OR TILE" :
                         "FLOOR PLACED: " + std::to_string(placed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " SKIPPED");
-                    (void)audio.play(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                    (void)play_sound(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;
                     continue;
                 }
@@ -2909,15 +2929,15 @@ int main() {
                 const std::vector<TileCoordinate> segment = roads.line_between(road_drag_start, {released_tile.first, released_tile.second});
                 if (!road_segment_is_on_owned_land(segment, lands)) {
                     status = "ROAD REQUIRES OWNED LAND";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 } else if (!road_segment_is_valid(segment, roads, buildings) || std::any_of(segment.begin(), segment.end(), [&farming](const TileCoordinate& tile) {
                     return farming.is_occupied(tile.x, tile.y);
                 })) {
                     status = "ROAD BLOCKED BY ROAD, BUILDING OR MAP LIMIT";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 } else if (!economy.try_spend(static_cast<std::int64_t>(segment.size()) * kRoadCostPerTile)) {
                     status = "NOT ENOUGH FUNDS FOR ROAD";
-                    (void)audio.play(SoundEvent::ui_error);
+                    (void)play_sound(SoundEvent::ui_error);
                 } else {
                     const int placed = roads.place_segment(segment);
                     status = placed == 0 ? "ROAD ALREADY EXISTS" : "ROAD PLACED: " + std::to_string(placed) + " TILE(S), " +
@@ -2940,7 +2960,7 @@ int main() {
                         } else {
                             active_overlay = UiOverlay::none;
                             status = "PANEL CLOSED";
-                            (void)audio.play(SoundEvent::ui_close_panel);
+                            (void)play_sound(SoundEvent::ui_close_panel);
                         }
                     }
                     // Modal screens own keyboard focus.  Their future widgets
@@ -2952,55 +2972,55 @@ int main() {
                     case SDL_SCANCODE_K:
                         if (service_vehicles.cancel_active_task(service_vehicle_catalog, vehicle_traversable)) {
                             status = "FARM TASK CANCELLED: TRACTOR RETURNING";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         }
                         break;
                     case SDL_SCANCODE_ESCAPE:
                         if (!placement_definition_id.empty()) {
                             placement_definition_id.clear();
                             status = "BUILD MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (build_panel_open) {
                             build_panel_open = false;
                             status = "BUILDINGS PANEL CLOSED";
-                            (void)audio.play(SoundEvent::ui_close_panel);
+                            (void)play_sound(SoundEvent::ui_close_panel);
                         } else if (land_mode) {
                             land_mode = false;
                             status = "LAND MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (!terrain_paint_style.empty()) {
                             terrain_paint_style.clear();
                             status = "TERRAIN PAINT CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (road_mode) {
                             road_dragging = false;
                             road_mode = false;
                             road_removal_mode = false;
                             status = "ROAD MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (sidewalk_mode) {
                             sidewalk_dragging = false;
                             sidewalk_mode = false;
                             status = "SIDEWALK MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (agriculture_mode) {
                             agriculture_mode = false;
                             agriculture_panel_open = false;
                             farming_selection_id.clear();
                             status = "AGRICULTURE MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (decoration_mode) {
                             decoration_mode = false;
                             status = "DECORATION MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (!placement_definition_id.empty()) {
                             placement_definition_id.clear();
                             status = "BUILD MODE CANCELLED";
-                            (void)audio.play(SoundEvent::ui_back);
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (selected_instance_id) {
                             selected_instance_id.reset();
                             status = "INFO PANEL CLOSED";
-                            (void)audio.play(SoundEvent::ui_close_panel);
+                            (void)play_sound(SoundEvent::ui_close_panel);
                         } else {
                             apply_ui_action({UiAction::toggle_pause, {}});
                         }
@@ -3076,10 +3096,10 @@ int main() {
                             last_simulation_ticks = SDL_GetTicks();
                             simulation_scheduler.reset();
                             status = "ISOMETRIC CALIBRATION LOADED - F1 THEN CLICK A BUILDING";
-                            (void)audio.play(SoundEvent::ui_confirm);
+                            (void)play_sound(SoundEvent::ui_confirm);
                         } else {
                             status = "CALIBRATION LOAD FAILED: " + result.message;
-                            (void)audio.play(SoundEvent::ui_error);
+                            (void)play_sound(SoundEvent::ui_error);
                         }
                         break;
                     }
@@ -3170,6 +3190,7 @@ int main() {
                 }
             }
         }
+        mouse_click_event = false;
 
         const Uint64 current_simulation_ticks = SDL_GetTicks();
         const double elapsed_seconds = static_cast<double>(current_simulation_ticks - last_simulation_ticks) / 1000.0;
@@ -3261,11 +3282,11 @@ int main() {
                 (net_pop_change >= 0 ? "+" : "") + std::to_string(net_pop_change);
             if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
                 status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
-                (void)audio.play(SoundEvent::ui_confirm);
+                (void)play_sound(SoundEvent::ui_confirm);
             }
             if (mission_manager.check_and_auto_complete_city_water(economy, buildings, catalog, population)) {
                 status = "AGUA PARA A CIDADE CONCLUIDA! Estacao Municipal de Captacao Reativada!";
-                (void)audio.play(SoundEvent::ui_confirm);
+                (void)play_sound(SoundEvent::ui_confirm);
             }
         }
 

@@ -11,6 +11,11 @@ eventos lógicos (por exemplo, `BuildingPlace`), nunca caminhos de arquivos.
 
 O campo `music.Loading` usa uma faixa OGG em uma pista independente com volume
 de música. Ela começa durante o carregamento e termina ao fim do arquivo; a
-tela de carregamento pode terminar antes da faixa. `UiClick` usa o clique novo
-`ui/mouse_click_002.ogg` em cliques esquerdos consumidos pela interface.
-Outros eventos de painel preservam seus efeitos próprios.
+tela de carregamento pode terminar antes da faixa.
+
+`UiClick` tem uma única fonte canônica: o MP3 em `Converter/` convertido para
+`ui/mouse_click_002.ogg`. O jogo toca esse efeito uma vez ao pressionar o botão
+esquerdo ou direito do mouse, tanto na interface quanto no mapa. O mesmo gesto
+não toca outro efeito genérico de seleção, confirmação, abertura ou fechamento
+de painel. Erros e efeitos próprios do mundo, como a construção de um prédio,
+continuam distintos. Ações de teclado preservam seus próprios sons.
