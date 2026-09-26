@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries three compatibility fixes without duplicating the runtime loop:
+// carries four compatibility fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -11,9 +11,13 @@
 //    is_tile_owned()/is_area_owned(), so locked land remains locked until bought.
 // 3. Pedestrian lane navigation is wrapped by the Park fence barrier graph, so
 //    closed fence segments block crossings while open gates remain walkable.
+// 4. Runtime SaveManager is replaced by its Park-fence-aware drop-in wrapper,
+//    preserving the existing city JSON while persisting the fence network next
+//    to the same save slot.
 
 #include "land_system.h"
 #include "park_fence_runtime.h"
+#include "park_fence_save_manager.h"
 
 // main_runtime_impl.cpp has two geometry-only parcels() reads: one for camera
 // clamping and one for cursor roaming.  Redirect those reads to the complete
@@ -21,10 +25,11 @@
 // not rewritten by this compatibility macro.
 #define parcels() world_parcels()
 
-// The runtime currently constructs PedestrianLaneNavigationNetwork inline at
-// its call sites. Redirect that exact type to the fence-aware drop-in wrapper
-// without changing road topology or vehicle routing.
+// These headers are already included above, so the substitutions apply only to
+// runtime call sites/declarations inside main_runtime_impl.cpp, never to the
+// canonical class declarations themselves.
 #define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
+#define SaveManager ParkFenceSaveManager
 
 // `play_sound` is a local lambda inside the implementation.  A function-like
 // macro is used here only around its call sites; its declaration is untouched.
@@ -40,5 +45,6 @@
 #include "main_runtime_impl.cpp"
 
 #undef play_sound
+#undef SaveManager
 #undef PedestrianLaneNavigationNetwork
 #undef parcels
