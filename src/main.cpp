@@ -1568,7 +1568,8 @@ int main() {
         }
     }
     std::optional<ch::MapDocument> active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
-    if (!active_map_doc) active_map_doc = ch::MapDocument::create_empty("City", kMapMax - kMapMin + 1, kMapMax - kMapMin + 1);
+    // An empty document keeps grass implicit and can receive painted tiles.
+    if (!active_map_doc) active_map_doc.emplace("{}");
     if (active_map_doc.has_value()) {
         for (const auto& tile : active_map_doc->terrain_tiles()) {
             const TextureAsset* loaded_tex = !tile.texture.empty() && std::filesystem::is_regular_file(asset_root / tile.texture)
@@ -1897,7 +1898,7 @@ int main() {
                                                              &service_vehicles, &mission_manager, &terrain_paint);
         if (result.success) {
             active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
-            if (!active_map_doc) active_map_doc = ch::MapDocument::create_empty("City", kMapMax - kMapMin + 1, kMapMax - kMapMin + 1);
+            if (!active_map_doc) active_map_doc.emplace("{}");
             for (const TerrainPaintTile& tile : terrain_paint) {
                 if (!active_map_doc || !lands.is_tile_owned(tile.tile_x, tile.tile_y)) continue;
                 const std::string path = tile.style == "sand" ? "assets/terrain/sand_isometric_01.png" : "";
