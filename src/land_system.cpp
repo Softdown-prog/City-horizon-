@@ -24,7 +24,7 @@ LandManager::LandManager(const int map_min, const int map_max, const int parcel_
     const int center_origin_y = -(parcel_height_ / 2);
     std::uint32_t next_id = 1;
 
-    const auto append_parcel = [&](const int parcel_x, const int parcel_y) mutable {
+    const auto append_parcel = [&](const int parcel_x, const int parcel_y) {
         const bool initial = parcel_x == 0 && parcel_y == 0;
         const int ring = std::max(std::abs(parcel_x), std::abs(parcel_y));
         const bool orthogonal_neighbor = std::abs(parcel_x) + std::abs(parcel_y) == 1;
