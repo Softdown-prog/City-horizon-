@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'tools/tycoon_photo_studio/build_loading_splash_hybrid_base.py'
+      - 'tools/tycoon_photo_studio/run_loading_splash_hybrid_base.py'
       - 'tools/tycoon_photo_studio/finish_loading_splash_paintover.py'
       - 'tools/tycoon_photo_studio/assets/loading_splash_hybrid_city_04.art.json'
       - '.github/workflows/render-loading-splash-hybrid.yml'
@@ -35,8 +36,8 @@ jobs:
       - name: Render 3D foundation
         run: |
           mkdir -p out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
-          "$CH_BLENDER_EXE" --background \
-            --python tools/tycoon_photo_studio/build_loading_splash_hybrid_base.py -- \
+          "$CH_BLENDER_EXE" --background --python-exit-code 1 \
+            --python tools/tycoon_photo_studio/run_loading_splash_hybrid_base.py -- \
             --recipe tools/tycoon_photo_studio/assets/loading_splash_hybrid_city_04.art.json \
             --output out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
 
