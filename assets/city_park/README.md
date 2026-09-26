@@ -15,14 +15,18 @@ A roda-gigante usa envelope visual 6×5 e ocupação física central 4×3 com of
 
 Novos brinquedos do City Park que precisarem de bilheteria próxima devem seguir o mesmo princípio: o `occupancyFootprint` deve representar somente a base física que realmente não pode receber outra construção, e deve rotacionar junto com o brinquedo. Não aumente a colisão apenas para cobrir transparência, sombra ou o volume aéreo do sprite.
 
-## Bilheteria e preço das atrações
+## Bilheteria, inauguração e preço das atrações
 
-A bilheteria é o controle de preço do brinquedo com ingresso mais próximo. O vínculo usa o `footprint` visual da bilheteria e da atração e aceita contato direto, sobreposição apenas do envelope visual liberado pelo `occupancyFootprint` ou até um tile vazio de separação. Isso permite posicioná-la ao lado da entrada/escadas da roda-gigante sem exigir rua ou caminho.
+O contrato do City Park segue a lógica de tycoon: **construir o brinquedo não o inaugura automaticamente**. Uma atração com ingresso declara `requiresTicketBooth: true` e nasce fechada/inoperante. Para inaugurar e operar, o jogador precisa construir uma bilheteria com `isParkTicketBooth: true` próxima da atração.
 
-Ao clicar na bilheteria, o painel normal de preço ao cliente fica disponível. Alterar esse valor sincroniza o preço da atração compatível mais próxima. A atração continua sendo a entidade que gera a receita; a bilheteria não cria uma segunda cobrança nem duplica o faturamento. Quando existe uma bilheteria vinculada, ela é a fonte autoritativa do preço. Sem bilheteria próxima, o preço continua podendo ser configurado diretamente na atração.
+O vínculo usa a ocupação física real das duas construções e aceita contato direto ou até um tile vazio de separação. Isso permite posicionar a bilheteria ao lado da entrada/escadas da roda-gigante sem exigir rua ou caminho. Cada bilheteria atende uma única atração e cada atração recebe uma única bilheteria. Quando existem várias opções no alcance, o vínculo escolhe a atração livre mais próxima e usa a instância mais antiga como desempate determinístico.
 
-Para os próximos brinquedos, o contrato atual considera compatível qualquer definição de categoria `service`, com preço de serviço habilitado e sprite em `assets/city_park/`. Se mais de uma atração estiver no alcance, vence a de menor distância; em empate, a instância mais antiga. Se mais de uma bilheteria resolver para a mesma atração, a bilheteria colocada primeiro é autoritativa e as demais espelham o preço dela.
+Enquanto não houver bilheteria vinculada, o brinquedo permanece fechado: não inicia atividade e não gera clientes nem receita de ingresso. Ao construir uma bilheteria válida perto dele, o brinquedo passa a `operational` e fica inaugurado. Se a bilheteria for demolida, a atração volta a fechar imediatamente e qualquer atividade temporária é encerrada.
 
-Esse vínculo de preço não implementa embarque de visitantes. A simulação de filas, embarque e acionamento da animação durante o passeio continua sendo uma etapa de gameplay separada.
+Ao clicar na bilheteria, o painel normal de preço ao cliente controla o ingresso do brinquedo vinculado. A bilheteria é a fonte autoritativa desse valor; a atração continua sendo a entidade que recebe os clientes e gera a receita. A bilheteria não cria uma segunda cobrança nem duplica o faturamento.
+
+Para os próximos brinquedos pagos, declare `requiresTicketBooth: true`, mantenha um preço de serviço válido e configure um `occupancyFootprint` coerente com a base física. A bilheteria padrão declara `isParkTicketBooth: true`. Os intervalos e passos de preço entre bilheteria e atração devem ser compatíveis.
+
+Este contrato cobre requisito de inauguração, vínculo, operação e preço. A simulação completa de visitantes formando fila, entrando fisicamente na atração e desembarcando continua sendo uma etapa de gameplay separada.
 
 Mantenha câmera isométrica, escala, RGBA transparente, pivôs consistentes e empacotamento compatível com a engine ao promover novos assets para esta pasta.
