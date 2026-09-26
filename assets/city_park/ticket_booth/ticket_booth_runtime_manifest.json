@@ -1,0 +1,42 @@
+{
+  "contract": "CH_CITY_PARK_STATIC_ASSET_V1",
+  "assetId": "building.park_ticket_booth.01",
+  "displayName": "Bilheteria do parque",
+  "category": "city_park",
+  "subtype": "ticket_booth",
+  "format": "PNG_RGBA",
+  "frameSize": [192, 192],
+  "transparentBackground": true,
+  "directionOrder": ["south", "east", "west", "north"],
+  "footprint": {
+    "widthTiles": 2,
+    "depthTiles": 2
+  },
+  "views": {
+    "south": {
+      "file": "ticket_booth_south.png",
+      "sha256": "917e66638db10669e01f2a169523d8225a1cfde17b5b2b90937cf323b62d4e5d"
+    },
+    "east": {
+      "file": "ticket_booth_east.png",
+      "sha256": "6a1326ccc7b0de15708a771dc627ee1ff82c50d27232f091b852de50d3b3db0c"
+    },
+    "west": {
+      "file": "ticket_booth_west.png",
+      "sha256": "9112462826103f8989cb54878764c69b080441a2f6d5b2cfd348783320ce0620"
+    },
+    "north": {
+      "file": "ticket_booth_north.png",
+      "sha256": "65ad88bcebf1586dbf6d14da6dcd4ac29fb60bd8eee4ae841f99a973609329f2"
+    }
+  },
+  "facadeIdentity": {
+    "south": ["ticket_window", "striped_awning"],
+    "east": ["arched_passage", "curved_pediment"],
+    "north": [],
+    "west": []
+  },
+  "runtimeRepresentation": "2D_RGBA_static_four_direction_sprite",
+  "source": "Building Composer ticket booth visual approved in chat",
+  "status": "asset_ready_not_runtime_registered"
+}

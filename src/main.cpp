@@ -1022,6 +1022,9 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
 }
 
 [[nodiscard]] const char* category_label(std::string_view category) {
+    if (category == "city_park") {
+        return "CITY PARK";
+    }
     if (category == "commercial") {
         return "COMERCIO";
     }
@@ -1043,6 +1046,10 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
     return "OUTRO";
 }
 
+[[nodiscard]] bool is_city_park_asset(const BuildingDefinition& definition) {
+    return definition.texture_path.rfind("assets/city_park/", 0) == 0;
+}
+
 // Some waterfront assets are authored as `decor` because they do not affect
 // city simulation.  They are nevertheless player-built structures (rather
 // than small landscape props), so the construction catalogue must expose
@@ -1050,6 +1057,9 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
 // the simulation category would incorrectly make a pier or lighthouse behave
 // like a civic/commercial building.
 [[nodiscard]] bool belongs_in_construction_catalog(const BuildingDefinition& definition) {
+    if (is_city_park_asset(definition)) {
+        return true;
+    }
     if (definition.category != "decor") {
         return true;
     }
@@ -1069,6 +1079,7 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
 }
 
 [[nodiscard]] const char* construction_catalog_label(const BuildingDefinition& definition) {
+    if (is_city_park_asset(definition)) return "CITY PARK";
     return definition.category == "decor" ? "ESTRUTURA" : category_label(definition.category);
 }
 
@@ -1304,7 +1315,7 @@ void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& ec
             const float panel_x = static_cast<float>(viewport_width) - 270.0F;
             draw_panel(renderer, panel_x, 12.0F, 258.0F, 176.0F);
             draw_text(renderer, panel_x + 10.0F, 22.0F, definition->name);
-            draw_text(renderer, panel_x + 10.0F, 40.0F, category_label(definition->category));
+            draw_text(renderer, panel_x + 10.0F, 40.0F, construction_catalog_label(*definition));
             draw_text(renderer, panel_x + 10.0F, 58.0F, "COST: " + format_money(definition->build_cost));
             draw_text(renderer, panel_x + 10.0F, 76.0F, "MONTHLY TAX: " + format_money(definition->tax_revenue_per_month));
             draw_text(renderer, panel_x + 10.0F, 94.0F, "MONTHLY MAINT: " + format_money(definition->maintenance_per_month));
@@ -2256,7 +2267,8 @@ int main() {
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;
-            if (definition.category == "agriculture" || !belongs_in_construction_catalog(definition)) continue;
+            if ((definition.category == "agriculture" && !is_city_park_asset(definition)) ||
+                !belongs_in_construction_catalog(definition)) continue;
             model.build_items.push_back({definition.id, definition.name, construction_catalog_label(definition),
                                          format_money(definition.build_cost), true,
                                          catalog_thumbnail_path(asset_root, definition),
@@ -2337,7 +2349,7 @@ int main() {
                         *definition, *instance, population.current_population(), &farming);
                     model.selected_building = UiSelectedBuilding{
                         definition->name,
-                        std::string(category_label(definition->category)),
+                        std::string(construction_catalog_label(*definition)),
                         format_money(definition->build_cost),
                         format_money(lvl_def.tax_revenue_per_month),
                         format_money(lvl_def.maintenance_per_month),

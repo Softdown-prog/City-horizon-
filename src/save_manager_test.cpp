@@ -66,11 +66,21 @@ int main(const int argc, char** argv) {
     const BuildingDefinition* mini_market = catalog.find("mini_market_01");
     const BuildingDefinition* house = catalog.find("house_suburban_01");
     const BuildingDefinition* ferris = catalog.find("ferris_wheel_01");
+    const BuildingDefinition* ticket_booth = catalog.find("park_ticket_booth_01");
     if (!require(cafe != nullptr, "cafe definition exists") ||
         !require(mini_market != nullptr, "mini market definition exists") ||
         !require(house != nullptr, "house definition exists") ||
         !require(ferris != nullptr && ferris->animation && ferris->animation->playback == "activity_loop",
-                 "ferris wheel uses activity gated animation")) {
+                 "ferris wheel uses activity gated animation") ||
+        !require(ticket_booth != nullptr && ticket_booth->player_buildable && ticket_booth->rotatable &&
+                 ticket_booth->footprint_width == 2 && ticket_booth->footprint_height == 2 &&
+                 ticket_booth->requires_road_or_path_access && !ticket_booth->animation &&
+                 ticket_booth->category == "city_park" &&
+                 ticket_booth->texture_path_for(BuildingRotation::r0).find("ticket_booth_south.png") != std::string::npos &&
+                 ticket_booth->texture_path_for(BuildingRotation::r90).find("ticket_booth_west.png") != std::string::npos &&
+                 ticket_booth->texture_path_for(BuildingRotation::r180).find("ticket_booth_north.png") != std::string::npos &&
+                 ticket_booth->texture_path_for(BuildingRotation::r270).find("ticket_booth_east.png") != std::string::npos,
+                 "park ticket booth loads with four directions and path access")) {
         return 1;
     }
 

@@ -1,0 +1,29 @@
+{
+  "id": "park_ticket_booth_01",
+  "name": "Bilheteria do parque",
+  "category": "city_park",
+  "texture": "assets/city_park/ticket_booth/ticket_booth_south.png",
+  "sprites": {
+    "0": "assets/city_park/ticket_booth/ticket_booth_south.png",
+    "1": "assets/city_park/ticket_booth/ticket_booth_west.png",
+    "2": "assets/city_park/ticket_booth/ticket_booth_north.png",
+    "3": "assets/city_park/ticket_booth/ticket_booth_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_static_four_direction",
+  "runtimeManifest": "assets/city_park/ticket_booth/ticket_booth_runtime_manifest.json"
+}
