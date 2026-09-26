@@ -1,0 +1,84 @@
+{
+  "contract": "CITY_HORIZON_LOADING_HERO_V1",
+  "assetId": "ui.loading_hero_city_park.01",
+  "assetType": "ui_loading_background",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "footprint": {
+    "widthTiles": 28,
+    "depthTiles": 20
+  },
+  "presentation": {
+    "aspectRatio": "16:9",
+    "proxyResolution": [1280, 720],
+    "finalResolution": [2560, 1440],
+    "worldColor": [0.62, 0.76, 0.82, 1.0],
+    "safeAreas": {
+      "titleNormalized": [0.05, 0.07, 0.42, 0.31],
+      "progressNormalized": [0.17, 0.86, 0.83, 0.95]
+    },
+    "rules": [
+      "loading presentation only; do not reinterpret this framing as a gameplay camera change",
+      "keep the upper-left title area visually quiet",
+      "keep the lower progress-bar band free of essential landmarks",
+      "no gameplay grid, HUD or baked loading text in the background PNG",
+      "the Ferris wheel is the focal landmark and stays on the right half of the composition"
+    ]
+  },
+  "sources": {
+    "ferrisWheel": "tools/tycoon_photo_studio/assets/park_ferris_wheel_3x2.ferris.json",
+    "ticketEntry": "tools/tycoon_photo_studio/assets/park_attraction_entry.shared_ticket_gate.json"
+  },
+  "composition": {
+    "ground": {"width": 72.0, "depth": 48.0},
+    "road": {"x": -8.0, "width": 9.5, "sidewalkWidth": 1.45},
+    "park": {"x": 12.0, "y": 2.0, "width": 23.0, "depth": 22.0},
+    "pond": {"x": 19.0, "y": -5.7, "radius": 3.0, "yScale": 0.68},
+    "ferrisLocation": [13.5, 5.3, 0.15],
+    "ticketEntryLocation": [9.6, -6.1, 0.15],
+    "commercialBuildings": [
+      {
+        "source": "tools/tycoon_photo_studio/assets/commercial_coffee_shop_2x2_01.commercial.json",
+        "location": [-18.0, 9.5, 0.15],
+        "rotationDegrees": 0.0
+      },
+      {
+        "source": "tools/tycoon_photo_studio/assets/commercial_bakery_2x2_01.commercial.json",
+        "location": [-18.3, -1.7, 0.15],
+        "rotationDegrees": 0.0
+      },
+      {
+        "source": "tools/tycoon_photo_studio/assets/commercial_ice_cream_shop_2x2_01.commercial.json",
+        "location": [-18.0, -12.4, 0.15],
+        "rotationDegrees": 0.0
+      }
+    ],
+    "backgroundMassing": [
+      {"location": [-27.0, 17.0, 0.15], "width": 5.8, "depth": 5.0, "height": 3.2},
+      {"location": [-17.5, 18.0, 0.15], "width": 6.6, "depth": 5.2, "height": 4.1},
+      {"location": [-2.0, 18.6, 0.15], "width": 7.4, "depth": 5.3, "height": 4.8},
+      {"location": [8.5, 18.5, 0.15], "width": 6.8, "depth": 5.0, "height": 3.7},
+      {"location": [27.0, 14.8, 0.15], "width": 6.5, "depth": 5.0, "height": 4.2}
+    ],
+    "trees": [
+      [1.6, 9.8, 1.10], [2.6, 3.2, 0.96], [2.7, -4.2, 1.04], [5.0, -9.1, 0.90],
+      [22.7, 9.7, 1.10], [24.0, 3.1, 0.95], [23.4, -8.8, 1.08], [29.0, 6.0, 1.00],
+      [-1.4, 15.2, 0.92], [-29.2, -7.8, 1.06]
+    ],
+    "lamps": [
+      [2.0, -1.8], [6.2, -1.8], [10.5, -1.8], [14.8, -1.8], [19.0, -1.8], [23.0, -1.8]
+    ]
+  },
+  "designIntent": {
+    "summary": "A deterministic City Horizon loading-screen diorama assembled from the project's own CH Blender systems, with a right-side City Park landmark and a quieter upper-left title field.",
+    "readOrder": [
+      "Ferris wheel",
+      "park entry and paths",
+      "road and sidewalks",
+      "current small commercial buildings",
+      "trees and pond",
+      "background low-rise city massing"
+    ],
+    "approvalGate": "preflight -> 16:9 proxy -> human visual review -> final 2560x1440 PNG -> optional runtime promotion"
+  }
+}
