@@ -1097,9 +1097,11 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         const SDL_FRect preview = {panel_x + 12.0F, 116.0F, 78.0F, 68.0F};
         SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &preview);
         if (const UiThumbnail* thumbnail = thumbnail_for(renderer, item.thumbnail_path)) {
-            const float scale = std::min(preview.w / thumbnail->width, preview.h / thumbnail->height);
-            const SDL_FRect destination = {preview.x + (preview.w - thumbnail->width * scale) * 0.5F, preview.y + (preview.h - thumbnail->height * scale) * 0.5F, thumbnail->width * scale, thumbnail->height * scale};
-            SDL_RenderTexture(renderer, thumbnail->texture, nullptr, &destination);
+            const float frame_width = thumbnail->width / static_cast<float>(std::max(1, item.thumbnail_frame_count));
+            const float scale = std::min(preview.w / frame_width, preview.h / thumbnail->height);
+            const SDL_FRect destination = {preview.x + (preview.w - frame_width * scale) * 0.5F, preview.y + (preview.h - thumbnail->height * scale) * 0.5F, frame_width * scale, thumbnail->height * scale};
+            const SDL_FRect source = {0.0F, 0.0F, frame_width, thumbnail->height};
+            SDL_RenderTexture(renderer, thumbnail->texture, &source, &destination);
         } else { SDL_SetRenderDrawColor(renderer, 74, 112, 127, SDL_ALPHA_OPAQUE); SDL_RenderRect(renderer, &preview); }
         draw_text_fit(renderer, panel_x + 102.0F, 96.0F, 212.0F, item.name, 236, 244, 248);
         draw_text_fit(renderer, panel_x + 102.0F, 113.0F, 212.0F, item.category, 164, 193, 205);

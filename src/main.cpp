@@ -2358,6 +2358,8 @@ int main() {
                         static_cast<int>(instance->roof_tint.g),
                         static_cast<int>(instance->roof_tint.b),
                     };
+                    model.selected_building->thumbnail_frame_count =
+                        definition->animation ? std::max(1, definition->animation->frame_count) : 1;
                 }
             }
         }

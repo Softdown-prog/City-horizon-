@@ -159,6 +159,7 @@ struct UiSelectedBuilding {
     int roof_tint_r = 255;
     int roof_tint_g = 255;
     int roof_tint_b = 255;
+    int thumbnail_frame_count = 1;
 };
 
 struct UiLandDetails {

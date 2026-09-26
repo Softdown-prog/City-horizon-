@@ -438,8 +438,8 @@ add_custom_command(TARGET city_builder POST_BUILD
         "$<TARGET_FILE_DIR:city_builder>/assets"
 )
 
-# Explicit local visual review only. Keep these source previews out of normal
-# builds and out of the approved runtime assets directory.
+# Package the visual candidate for the explicit F7/F8 review. Keep its files
+# in tools/visitor_forge_2d rather than classifying them as approved assets.
 option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" ON)
 if(CH_VISITOR_FORGE_PREVIEW)
     target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
