@@ -1,9 +1,9 @@
 name: City Builder Focused Compile Check
 
 # Focused validation for runtime/UI changes before local test builds.
-# Besides compiling the real runtime, render deterministic screenshots from the
-# production GameplayUi code so visual regressions can be reviewed before a
-# local Windows build.
+# Compile the real runtime from the repository root, then configure a separate
+# capture build that exercises the production GameplayUi without changing the
+# root project's CMAKE_SOURCE_DIR assumptions.
 on:
   workflow_dispatch:
   push:
@@ -36,17 +36,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure City Builder and UI capture
+      - name: Configure real City Builder
         shell: pwsh
-        run: cmake -S tools/ui_capture -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
+        run: cmake -S . -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
 
-      - name: Build City Builder
+      - name: Build real City Builder
         shell: pwsh
         run: cmake --build build/city-builder-check --config Release --target city_builder --parallel
 
+      - name: Configure UI visual capture
+        shell: pwsh
+        run: cmake -S tools/ui_capture -B build/ui-capture-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF -DCH_VISITOR_FORGE_PREVIEW=OFF
+
       - name: Build UI visual capture
         shell: pwsh
-        run: cmake --build build/city-builder-check --config Release --target city_builder_ui_capture --parallel
+        run: cmake --build build/ui-capture-check --config Release --target city_builder_ui_capture --parallel
 
       - name: Render floor catalog visual proof
         shell: pwsh
@@ -54,7 +58,7 @@ jobs:
           SDL_VIDEODRIVER: dummy
         run: |
           New-Item -ItemType Directory -Force -Path out/ui-capture | Out-Null
-          & "build/city-builder-check/Release/city_builder_ui_capture.exe" "out/ui-capture"
+          & "build/ui-capture-check/Release/city_builder_ui_capture.exe" "out/ui-capture"
           if ($LASTEXITCODE -ne 0) { throw "city_builder_ui_capture failed" }
 
           $expected = @(
