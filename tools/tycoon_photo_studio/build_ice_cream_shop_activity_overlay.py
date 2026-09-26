@@ -188,6 +188,30 @@ def set_base_visible(base_objects, visible):
             obj.visible_camera = visible
 
 
+def use_base_as_holdout(base_objects):
+    """Occlude activity on hidden faces without baking the building twice.
+
+    The old overlay hid all base geometry. That made rear and far-side window
+    glows visible through the roof and walls once composited over the sprite.
+    A transparent-film holdout preserves only effects in front of the visible
+    building surfaces for each camera direction.
+    """
+    material = bpy.data.materials.new("IceCreamActivityBaseHoldout")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    nodes.clear()
+    output = nodes.new("ShaderNodeOutputMaterial")
+    holdout = nodes.new("ShaderNodeHoldout")
+    material.node_tree.links.new(holdout.outputs[0], output.inputs["Surface"])
+
+    for obj in base_objects:
+        if obj.type != "MESH":
+            continue
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+    set_base_visible(base_objects, True)
+
+
 def set_overlay_visible(overlay_objects, visible):
     for obj in overlay_objects:
         obj.hide_render = not visible
@@ -259,6 +283,8 @@ def main():
     bs.validate_footprint_scale(asset, base_objects)
     calibrated_scale = bs.calibrate_ortho_scale(scene, base_objects, safety_margin=0.12)
     overlay = add_overlay_geometry(asset, recipe, root)
+    if not scene.render.film_transparent:
+        raise RuntimeError("ICE_CREAM_ACTIVITY_HOLDOUT_REQUIRES_TRANSPARENT_FILM")
 
     set_overlay_visible(overlay["all"], True)
 
@@ -267,13 +293,13 @@ def main():
         set_spinner_frame(overlay["animated"], 1)
         set_base_visible(base_objects, True)
         render(scene, output / "proxy_south_active.png")
-        set_base_visible(base_objects, False)
+        use_base_as_holdout(base_objects)
         render(scene, output / "proxy_south_overlay.png")
         write_report(output, "proxy", asset, scene, calibrated_scale)
         print("[ice_cream_activity] SOUTH proxy rendered")
         return
 
-    set_base_visible(base_objects, False)
+    use_base_as_holdout(base_objects)
     direction_records = []
     for direction in bs.DIRECTIONS:
         bs.set_direction(root, direction)
