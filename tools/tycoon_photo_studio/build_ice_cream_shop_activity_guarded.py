@@ -92,6 +92,7 @@ def main() -> None:
         shutil.copyfile(source, target)
         _write_json(output / "proxy_report.json", {
             "contract": "CH_PROXY_RENDER_V1",
+            "status": "ok",
             "assetId": activity.ASSET_ID,
             "direction": "south",
             "sha256": _sha256(target),
@@ -109,8 +110,8 @@ def main() -> None:
         _write_json(output / "proxy_approval.json", {
             "contract": "CH_PROXY_APPROVAL_V1",
             "assetId": activity.ASSET_ID,
-            "proxyReviewed": True,
-            "approvedProxySha256": approval_sha,
+            "reviewed": True,
+            "proxySha256": approval_sha,
         })
 
 

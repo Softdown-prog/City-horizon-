@@ -91,11 +91,13 @@ def add_overlay_geometry(asset, recipe, root):
     door_h = float(facade["doorHeight"])
     door_x = width / 2.0 - door_w / 2.0 - 0.34
 
-    glow = warm_material("IceCreamActivityWarmGlow", [1.0, 0.56, 0.16, 1.0], 3.0, 0.28)
-    soft_glow = warm_material("IceCreamActivitySoftGlow", [1.0, 0.76, 0.34, 1.0], 2.2, 0.34)
-    backing = warm_material("IceCreamActivitySpinnerBacking", [0.98, 0.87, 0.67, 1.0], 1.15, 0.48)
-    spinner = warm_material("IceCreamActivitySpinner", [1.0, 0.66, 0.12, 1.0], 1.6, 0.40)
-    stripe = warm_material("IceCreamActivitySpinnerStripe", [0.96, 0.30, 0.47, 1.0], 1.5, 0.42)
+    # At gameplay scale the original emission values clipped the windows and
+    # sign to white blocks. Keep warmth and motion without washing out glass.
+    glow = warm_material("IceCreamActivityWarmGlow", [0.92, 0.54, 0.25, 1.0], 0.42, 0.28)
+    soft_glow = warm_material("IceCreamActivitySoftGlow", [0.90, 0.68, 0.38, 1.0], 0.28, 0.34)
+    backing = warm_material("IceCreamActivitySpinnerBacking", [0.85, 0.75, 0.58, 1.0], 0.0, 0.48)
+    spinner = warm_material("IceCreamActivitySpinner", [0.94, 0.60, 0.18, 1.0], 0.0, 0.40)
+    stripe = warm_material("IceCreamActivitySpinnerStripe", [0.90, 0.27, 0.40, 1.0], 0.0, 0.42)
 
     static_overlay = []
     active_glow = []
