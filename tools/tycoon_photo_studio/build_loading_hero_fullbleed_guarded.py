@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import bpy
 from bpy_extras.object_utils import world_to_camera_view
+from mathutils import Vector
 
 import build_loading_hero_guarded as hero
 
@@ -34,7 +35,7 @@ def _fit_exact(scene, authored, margin=0.045):
     for _ in range(4):
         bpy.context.view_layer.update()
         projected = [
-            world_to_camera_view(scene, camera, obj.matrix_world @ corner)
+            world_to_camera_view(scene, camera, obj.matrix_world @ Vector(corner))
             for obj in authored
             for corner in obj.bound_box
         ]
