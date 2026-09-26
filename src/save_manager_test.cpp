@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -121,9 +122,12 @@ int main(const int argc, char** argv) {
     missions.complete_mission("clean_energy");
 
     SaveManager saves;
-    if (!require(saves.save(save_file, economy, clock, buildings, roads, sidewalks, farming, lands, population, nullptr, &missions).success, "small city saves")) {
+    std::vector<TerrainPaintTile> terrain_paint = {{-2, -3, "sand"}, {-1, -3, "grass"}};
+    if (!require(saves.save(save_file, economy, clock, buildings, roads, sidewalks, farming, lands, population,
+                            nullptr, &missions, &terrain_paint).success, "small city saves")) {
         return 1;
     }
+    terrain_paint.clear();
 
     // Destroy every runtime state before loading, proving the load is a true reconstruction.
     buildings.clear();
@@ -136,8 +140,11 @@ int main(const int argc, char** argv) {
     PopulationSystem loaded_population;
     MissionManager loaded_missions;
     loaded_missions.register_mission("clean_energy", "Energia Limpa");
-    const SaveOperationResult loaded = saves.load(save_file, catalog, economy, clock, buildings, roads, sidewalks, farming, lands, loaded_population, nullptr, nullptr, &loaded_missions);
+    const SaveOperationResult loaded = saves.load(save_file, catalog, economy, clock, buildings, roads, sidewalks, farming, lands,
+                                                   loaded_population, nullptr, nullptr, &loaded_missions, &terrain_paint);
     if (!require(loaded.success, "saved city loads") ||
+        !require(terrain_paint.size() == 2 && terrain_paint[0].style == "sand" && terrain_paint[1].style == "grass",
+                 "painted terrain round trip") ||
         !require(economy.funds() == 35'799 && economy.last_property_tax_year() == 2, "funds and fiscal marker round trip") ||
         !require(clock.date().day == 12 && clock.date().month == 5 && clock.date().year == 2 &&
                  clock.speed() == SimulationSpeed::paused, "clock round trip") ||

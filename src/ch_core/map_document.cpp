@@ -54,6 +54,7 @@ std::string resolve_legacy_terrain_definition(const std::string& texture_path) {
     if (texture_path.empty()) return "unresolved_legacy_terrain";
     static const std::unordered_map<std::string, std::string> kLegacyTable = {
         {"assets/terrain/grass_isometric_01.png", "grass"},
+        {"assets/terrain/sand_isometric_01.png", "sand_center"},
         {"assets/terrain/coast_adjusted/coast_sand_center_01.png", "sand_center"},
         {"assets/terrain/coast_adjusted/coast_sand_wet_01.png", "sand_wet"},
         {"assets/terrain/coast_adjusted/coast_shallow_transition.png", "ocean_shallow"},
@@ -230,7 +231,20 @@ void MapDocument::set_terrain_definition_at(int tile_x, int tile_y, const std::s
     }
 }
 
+void MapDocument::paint_terrain_at(int tile_x, int tile_y, const std::string& terrain_def_id, const std::string& texture_path) {
+    const uint64_t key = pack_key(tile_x, tile_y);
+    const auto it = terrain_index_.find(key);
+    if (it != terrain_index_.end()) {
+        cached_terrain_[it->second].terrain_definition = terrain_def_id;
+        cached_terrain_[it->second].texture = texture_path;
+    } else {
+        terrain_index_[key] = cached_terrain_.size();
+        cached_terrain_.push_back({tile_x, tile_y, texture_path, terrain_def_id});
+    }
+}
+
 MapDocument MapDocument::create_empty(const std::string& name, int width, int height) {
+    (void)name;
     MapDocument doc("{}");
     doc.cached_terrain_.reserve(width * height);
     for (int y = -height / 2; y < height / 2; ++y) {

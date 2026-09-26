@@ -3,6 +3,13 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include <vector>
+
+struct TerrainPaintTile {
+    int tile_x = 0;
+    int tile_y = 0;
+    std::string style; // grass or sand
+};
 
 class BuildingCatalog;
 class BuildingManager;
@@ -32,7 +39,7 @@ class MissionManager;
 // file format, version checks and user-data paths remain centralized here.
 class SaveManager {
 public:
-    static constexpr int kSaveVersion = 10;
+    static constexpr int kSaveVersion = 11;
 
     [[nodiscard]] static std::filesystem::path default_save_path();
     // Reserved path for a later timer-driven autosave; no automatic writes yet.
@@ -44,7 +51,8 @@ public:
                                            const SidewalkManager& sidewalks, const FarmingSystem& farming,
                                            const LandManager& lands, const PopulationSystem& population,
                                            const ServiceVehicleManager* vehicles = nullptr,
-                                           const MissionManager* missions = nullptr) const;
+                                           const MissionManager* missions = nullptr,
+                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr) const;
     [[nodiscard]] SaveOperationResult load(const std::filesystem::path& path,
                                            const BuildingCatalog& catalog, CityEconomy& economy,
                                            SimulationClock& clock, BuildingManager& buildings,
@@ -52,5 +60,6 @@ public:
                                            LandManager& lands, PopulationSystem& population,
                                            const ServiceVehicleCatalog* vehicle_catalog = nullptr,
                                            ServiceVehicleManager* vehicles = nullptr,
-                                           MissionManager* missions = nullptr) const;
+                                           MissionManager* missions = nullptr,
+                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr) const;
 };

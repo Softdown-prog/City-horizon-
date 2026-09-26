@@ -305,10 +305,18 @@ void MapRenderer::render_world_terrain_and_water(
                 scenario_terrain_textures[key] = tex;
             }
         }
+        // Old scenario JSON references an untracked coast_adjusted directory.
+        // Preserve its semantic sand cells with the shipped 128x64 tile.
+        if (!scenario_terrain_textures.contains(key) &&
+            (tile.terrain_definition == "sand" || tile.terrain_definition == "sand_center" ||
+             tile.terrain_definition == "sand_wet")) {
+            if (const TextureAsset* sand = find_texture("assets/terrain/sand_isometric_01.png"))
+                scenario_terrain_textures[key] = sand;
+        }
 
         // Runtime water identity is semantic, never derived from a filename or pixels.
-        const bool shallow = tile.terrain_definition == "water_shallow";
-        const bool deep = tile.terrain_definition == "water_deep";
+        const bool shallow = tile.terrain_definition == "water_shallow" || tile.terrain_definition == "ocean_shallow";
+        const bool deep = tile.terrain_definition == "water_deep" || tile.terrain_definition == "ocean_deep";
         const bool is_water = shallow || deep;
 
         if (is_water) {

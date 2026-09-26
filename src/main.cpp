@@ -1372,6 +1372,7 @@ int main() {
     // This authored RGBA grass tile is versioned and its opaque bounds match
     // kGrassOpaque*. The old *_clean path was never packaged in GitHub builds.
     const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01.png");
+    const TextureAsset* paintable_sand = textures.load(renderer, asset_root / "assets/terrain/sand_isometric_01.png");
 
     RoadVisualCatalog road_visuals;
     (void)road_visuals.load_from_file(asset_root / "assets/definitions/road_visual_catalog.json");
@@ -1566,10 +1567,12 @@ int main() {
             initial_city_path = scenarios_root / selected_path;
         }
     }
-    const std::optional<ch::MapDocument> active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
+    std::optional<ch::MapDocument> active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
+    if (!active_map_doc) active_map_doc = ch::MapDocument::create_empty("City", kMapMax - kMapMin + 1, kMapMax - kMapMin + 1);
     if (active_map_doc.has_value()) {
         for (const auto& tile : active_map_doc->terrain_tiles()) {
-            const TextureAsset* loaded_tex = textures.load(renderer, asset_root / tile.texture);
+            const TextureAsset* loaded_tex = !tile.texture.empty() && std::filesystem::is_regular_file(asset_root / tile.texture)
+                ? textures.load(renderer, asset_root / tile.texture) : nullptr;
             const std::uint64_t key = ch::tile_key(tile.tile_x, tile.tile_y);
             scenario_terrain_textures[key] = loaded_tex;
             scenario_terrain_paths[key] = tile.terrain_definition;
@@ -1634,6 +1637,8 @@ int main() {
     bool planting_dragging = false;
     bool camera_dragging = false;
     bool land_mode = false;
+    std::string terrain_paint_style;
+    std::vector<TerrainPaintTile> terrain_paint;
     bool sidewalk_mode = false;
     bool decoration_mode = false;
     bool agriculture_mode = false;
@@ -1758,6 +1763,7 @@ int main() {
         preparation_dragging = false;
         planting_dragging = false;
         land_mode = false;
+        terrain_paint_style.clear();
         sidewalk_mode = false;
         agriculture_mode = false;
         agriculture_panel_open = false;
@@ -1810,6 +1816,14 @@ int main() {
         selected_instance_id.reset();
         status = "LAND MODE: SELECT A NEIGHBORING PARCEL";
         (void)audio.play(SoundEvent::ui_open_panel);
+    };
+    const auto begin_terrain_paint = [&](const std::string& style) {
+        clear_map_modes();
+        build_panel_open = false;
+        terrain_paint_style = style;
+        selected_instance_id.reset();
+        status = style == "sand" ? "SAND: CLICK OWNED EMPTY GROUND" : "GRASS: CLICK OWNED EMPTY GROUND";
+        (void)audio.play(SoundEvent::ui_select);
     };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
@@ -1871,7 +1885,8 @@ int main() {
     };
     const auto save_current_city = [&]() {
         const SaveOperationResult result = save_manager.save(save_path, economy, simulation_clock, buildings, roads,
-                                                             sidewalks, farming, lands, population, &service_vehicles, &mission_manager);
+                                                             sidewalks, farming, lands, population, &service_vehicles, &mission_manager,
+                                                             &terrain_paint);
         status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
         (void)audio.play(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
         return result.success;
@@ -1879,8 +1894,16 @@ int main() {
     const auto load_current_city = [&](const bool keep_paused) {
         const SaveOperationResult result = save_manager.load(save_path, catalog, economy, simulation_clock, buildings, roads,
                                                              sidewalks, farming, lands, population, &service_vehicle_catalog,
-                                                             &service_vehicles, &mission_manager);
+                                                             &service_vehicles, &mission_manager, &terrain_paint);
         if (result.success) {
+            active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
+            if (!active_map_doc) active_map_doc = ch::MapDocument::create_empty("City", kMapMax - kMapMin + 1, kMapMax - kMapMin + 1);
+            for (const TerrainPaintTile& tile : terrain_paint) {
+                if (!active_map_doc || !lands.is_tile_owned(tile.tile_x, tile.tile_y)) continue;
+                const std::string path = tile.style == "sand" ? "assets/terrain/sand_isometric_01.png" : "";
+                active_map_doc->paint_terrain_at(tile.tile_x, tile.tile_y,
+                                                 tile.style == "sand" ? "sand_center" : "grass", path);
+            }
             power.rebuild(buildings, catalog);
             status = "LOAD COMPLETE: " + result.message;
             if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
@@ -1910,6 +1933,8 @@ int main() {
             case UiAction::activate_roads: begin_road_mode(); break;
             case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
             case UiAction::activate_land: begin_land_mode(); break;
+            case UiAction::paint_grass: begin_terrain_paint("grass"); break;
+            case UiAction::paint_sand: begin_terrain_paint("sand"); break;
             case UiAction::activate_remove: begin_remove_mode(); break;
             case UiAction::open_agriculture_panel: open_agriculture_panel(); break;
             case UiAction::select_farming_item: select_farming_item(action.payload); break;
@@ -2168,6 +2193,7 @@ int main() {
             case SimulationSpeed::speed3: model.speed = "RUNNING"; break;
         }
         model.status = status;
+        model.terrain_paint_style = terrain_paint_style;
         model.overlay = active_overlay;
         model.administration_services = "ROAD / POWER / FARMING";
         model.administration_alerts = status.empty() ? "NO ACTIVE ALERTS" : status;
@@ -2213,7 +2239,7 @@ int main() {
         model.active_tool = UiTool::none;
         if (decoration_mode) {
             model.active_tool = UiTool::decoration;
-        } else if (land_mode) {
+        } else if (land_mode || !terrain_paint_style.empty()) {
             model.active_tool = UiTool::land;
         } else if (sidewalk_mode) {
             model.active_tool = UiTool::sidewalks;
@@ -2519,6 +2545,10 @@ int main() {
                     land_mode = false;
                     status = "LAND MODE CANCELLED";
                     (void)audio.play(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && !terrain_paint_style.empty()) {
+                    terrain_paint_style.clear();
+                    status = "TERRAIN PAINT CANCELLED";
+                    (void)audio.play(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && road_mode) {
                     road_dragging = false;
                     road_mode = false;
@@ -2547,7 +2577,31 @@ int main() {
                     status = "BUILD MODE CANCELLED";
                     (void)audio.play(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
-                    if (land_mode) {
+                    if (!terrain_paint_style.empty()) {
+                        const int x = raw_clicked_tile.first, y = raw_clicked_tile.second;
+                        const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, x, y);
+                        const auto existing = active_map_doc->get_terrain_at(x, y);
+                        const std::string existing_style = existing ? existing->terrain_definition : "grass";
+                        const bool paintable = existing_style == "grass" || existing_style == "sand" ||
+                            existing_style == "sand_center" || existing_style == "sand_wet";
+                        if (!lands.is_tile_owned(x, y) || occupancy.building || occupancy.road ||
+                            occupancy.sidewalk || occupancy.farm || !paintable ||
+                            (terrain_paint_style == "sand" && paintable_sand == nullptr)) {
+                            status = "TERRAIN REQUIRES EMPTY OWNED GRASS OR SAND";
+                            (void)audio.play(SoundEvent::ui_error);
+                        } else {
+                            const std::string path = terrain_paint_style == "sand"
+                                ? "assets/terrain/sand_isometric_01.png" : "";
+                            active_map_doc->paint_terrain_at(x, y,
+                                                             terrain_paint_style == "sand" ? "sand_center" : "grass", path);
+                            const auto saved = std::find_if(terrain_paint.begin(), terrain_paint.end(),
+                                [x, y](const TerrainPaintTile& tile) { return tile.tile_x == x && tile.tile_y == y; });
+                            if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, terrain_paint_style});
+                            else saved->style = terrain_paint_style;
+                            status = terrain_paint_style == "sand" ? "SAND PAINTED" : "GRASS PAINTED";
+                            (void)audio.play(SoundEvent::ui_confirm);
+                        }
+                    } else if (land_mode) {
                         const LandParcel* parcel = lands.parcel_at(clicked_tile.first, clicked_tile.second);
                         if (parcel == nullptr) {
                             status = "NO PARCEL AT THIS TILE";
@@ -2894,6 +2948,10 @@ int main() {
                             land_mode = false;
                             status = "LAND MODE CANCELLED";
                             (void)audio.play(SoundEvent::ui_back);
+                        } else if (!terrain_paint_style.empty()) {
+                            terrain_paint_style.clear();
+                            status = "TERRAIN PAINT CANCELLED";
+                            (void)audio.play(SoundEvent::ui_back);
                         } else if (road_mode) {
                             road_dragging = false;
                             road_mode = false;
@@ -3226,7 +3284,9 @@ int main() {
             ch::MapRenderer::render_world_terrain_and_water(
                 renderer,
                 *active_map_doc,
-                [&textures](const std::filesystem::path& p) { return textures.find(p); },
+                [&textures, &asset_root](const std::filesystem::path& p) {
+                    return textures.find(p.is_absolute() ? p : asset_root / p);
+                },
                 asset_root,
                 cs,
                 static_cast<float>(viewport_width),

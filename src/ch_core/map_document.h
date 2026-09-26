@@ -49,6 +49,8 @@ public:
 
     void set_terrain_texture_at(int tile_x, int tile_y, const std::string& texture_path);
     void set_terrain_definition_at(int tile_x, int tile_y, const std::string& terrain_def_id, const std::string& texture_path = "");
+    // Gameplay brush: an empty texture means the implicit grass tile.
+    void paint_terrain_at(int tile_x, int tile_y, const std::string& terrain_def_id, const std::string& texture_path);
 
     [[nodiscard]] static std::optional<MapDocument> load_from_file(const std::string& filepath);
     static MapDocument create_empty(const std::string& name = "Untitled City", int width = 32, int height = 32);
