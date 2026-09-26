@@ -60,13 +60,13 @@ def _build_fullbleed(args):
     # proof because a loading background is supposed to continue off screen.
     ground = bpy.data.objects.get("HeroGround")
     if ground is not None:
-        ground.scale.x *= 3.6
-        ground.scale.y *= 3.6
+        ground.scale.x *= 18.0
+        ground.scale.y *= 18.0
 
     for name in ("HeroRoad", "HeroSidewalkWest", "HeroSidewalkEast"):
         obj = bpy.data.objects.get(name)
         if obj is not None:
-            obj.scale.y *= 3.2
+            obj.scale.y *= 6.0
 
     focal = []
     for obj in ctx["authored"]:
@@ -81,6 +81,9 @@ def _build_fullbleed(args):
     if not focal:
         raise RuntimeError("CH_LOADING_HERO_NO_FOCAL_CONTENT")
 
+    # Keep the frozen CH camera direction and lens language, but bias the 16:9
+    # presentation slightly downward so the title field has breathing room.
+    scene.camera.data.shift_y = 0.10
     ctx["authored"] = focal
     _fit_exact(scene, focal)
     return ctx
