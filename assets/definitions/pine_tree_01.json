@@ -2,7 +2,7 @@
   "id": "pine_tree_01",
   "name": "Pinheiro",
   "category": "decor",
-  "texture": "assets/decorations/trees/pine_tree_01.png",
+  "texture": "assets/tree/pine_tree_01.png",
   "rotatable": false,
   "requiresRoadAccess": false,
   "requiresRoadOrPathAccess": false,
@@ -23,6 +23,6 @@
   },
   "playerBuildable": true,
   "productionStatus": "runtime_deterministic_2d",
-  "sourceRecipe": "tools/visitor_forge_2d/examples/pine_tree_v1.json",
-  "artContract": "CH_2D_SHAPE_RECIPE_V1"
+  "sourceRecipe": "tools/visitor_forge_2d/examples/pine_tree_organic_v1.json",
+  "artContract": "CH_2D_ORGANIC_SCENERY_V1"
 }
