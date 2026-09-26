@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
-#include <filesystem>
-
+// Legacy mission data types are kept only so old saves and call sites continue
+// to compile while missions are no longer part of the active game loop.
 struct MissionDefinition {
     std::string id;
     std::string display_name;
@@ -42,8 +43,9 @@ class CityEconomy;
 class PopulationSystem;
 class PowerSystem;
 
-// Minimal mission contract required to manage mission registration, completion status,
-// JSON configuration loading, and save/load restoration for City Horizon missions.
+// Compatibility shell. Mission progression, unlocks and mission transactions
+// are intentionally disabled. The API remains temporarily so SaveManager and
+// older runtime call sites can migrate without destabilising unrelated systems.
 class MissionManager {
 public:
     MissionManager();
@@ -57,15 +59,11 @@ public:
     bool complete_mission(std::string_view mission_id);
     void reset();
 
-    // Idempotent auto-completion evaluation for "clean_energy". Returns true ONLY on the exact
-    // instant the mission is completed and transaction executed (never twice).
     bool check_and_auto_complete_clean_energy(CityEconomy& economy, BuildingManager& buildings,
                                               const BuildingCatalog& catalog,
                                               const PopulationSystem& population, PowerSystem& power,
                                               const CleanEnergyRequirements& reqs = {});
 
-    // Idempotent auto-completion evaluation for "city_water". Returns true ONLY on the exact
-    // instant the mission is completed and transaction executed (never twice).
     bool check_and_auto_complete_city_water(CityEconomy& economy, BuildingManager& buildings,
                                             const BuildingCatalog& catalog,
                                             const PopulationSystem& population,
@@ -74,8 +72,4 @@ public:
     [[nodiscard]] std::vector<std::string> completed_mission_ids() const;
     void restore_completed_missions(const std::vector<std::string>& mission_ids);
     [[nodiscard]] const std::unordered_map<std::string, MissionDefinition>& definitions() const;
-
-private:
-    std::unordered_map<std::string, MissionDefinition> definitions_;
-    std::unordered_map<std::string, bool> completion_status_;
 };

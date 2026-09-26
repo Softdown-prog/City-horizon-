@@ -83,7 +83,7 @@ enum class UiAction : std::uint8_t {
     upgrade_building,
 };
 
-// These are presentation states only.  Simulation, finance and audio remain
+// These are presentation states only. Simulation, finance and audio remain
 // owned by their existing systems and are supplied through GameplayUiModel.
 enum class UiOverlay : std::uint8_t {
     none,
@@ -135,6 +135,7 @@ struct UiSelectedBuilding {
     std::string commercial_demand;
     std::string thumbnail_path;
     std::string road_access_requirement;
+    // Deprecated compatibility fields. Active UI strips energy values.
     std::string energy_consumption;
     std::string energy_production;
     std::string residential_capacity;
@@ -182,12 +183,13 @@ struct GameplayUiModel {
     std::string monthly_balance;
     std::string population;
     std::string residential_capacity;
+    // Deprecated compatibility fields. Active UI no longer exposes energy.
     std::string power_demand;
     std::string power_capacity;
     std::string speed;
     std::string status;
     UiOverlay overlay = UiOverlay::none;
-    // Live values used by the Administration screen.  Keeping them in the
+    // Live values used by the Administration screen. Keeping them in the
     // view model makes the art panel safe to bind without giving UI code
     // authority over the city simulation.
     std::string administration_services;
@@ -276,6 +278,11 @@ private:
     void render_build_card(SDL_Renderer* renderer, const UiButton& button) const;
     [[nodiscard]] static UiButtonState state_for(const UiButton& button, float mouse_x, float mouse_y,
                                                   bool pressed);
+
+    // Internal names used by the compatibility implementation. Public entry
+    // points sanitize removed energy presentation before delegating here.
+    void update_layout_legacy(int viewport_width, int viewport_height, const GameplayUiModel& model);
+    void render_legacy(SDL_Renderer* renderer) const;
 
     GameplayUiModel model_;
     std::vector<UiButton> buttons_;
