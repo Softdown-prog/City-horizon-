@@ -1,6 +1,7 @@
 {
   "contract": "CH_LOADING_SPLASH_ART_V1",
   "artId": "ui.loading_splash.city_dream.03",
+  "revision": 2,
   "seed": 26092603,
   "presentation": {
     "aspectRatio": "16:9",
