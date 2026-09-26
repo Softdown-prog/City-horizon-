@@ -1,0 +1,28 @@
+name: City Builder UI Compile Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/ui_manager.cpp"
+      - "src/ui_manager.h"
+      - "src/ui_manager_legacy_impl.inl"
+      - "CMakeLists.txt"
+      - ".github/workflows/city-builder-ui-compile-check.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure City Builder
+        shell: pwsh
+        run: cmake -S . -B build/city-builder-ui-check -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=OFF
+
+      - name: Build City Builder
+        shell: pwsh
+        run: cmake --build build/city-builder-ui-check --config Release --target city_builder --parallel
