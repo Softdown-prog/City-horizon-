@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ch {
@@ -191,6 +192,11 @@ struct BuildingDefinition {
     // edge while still occupying their own grass tile. This is independent
     // from the stricter building entrance road contract above.
     bool requires_road_or_path_access = false;
+    // City Park ticketing contract. A ticketed attraction stays closed until a
+    // nearby ticket booth is paired with it. Booths and attractions are linked
+    // one-to-one from their physical placement, not by road adjacency.
+    bool requires_ticket_booth = false;
+    bool is_park_ticket_booth = false;
     bool grass_only = false;
     RoadAccessMode road_access_mode = RoadAccessMode::any_perimeter;
     // Lets code distinguish absent legacy data from an explicit
@@ -371,8 +377,11 @@ public:
     [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id);
     std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
+    [[nodiscard]] std::optional<std::uint64_t> linked_attraction_for_ticket_booth(std::uint64_t booth_instance_id) const;
+    [[nodiscard]] std::optional<std::uint64_t> linked_ticket_booth_for_attraction(std::uint64_t attraction_instance_id) const;
 
 private:
+    void refresh_ticket_booth_links();
     [[nodiscard]] bool is_inside_map(int tile_x, int tile_y) const;
     [[nodiscard]] int tile_key(int tile_x, int tile_y) const;
 
@@ -381,4 +390,8 @@ private:
     std::uint64_t next_instance_id_ = 1;
     std::vector<BuildingInstance> instances_;
     std::unordered_map<int, std::uint64_t> occupancy_;
+    std::unordered_set<std::uint64_t> ticket_required_instances_;
+    std::unordered_set<std::uint64_t> ticket_booth_instances_;
+    std::unordered_map<std::uint64_t, std::uint64_t> ticket_booth_to_attraction_;
+    std::unordered_map<std::uint64_t, std::uint64_t> attraction_to_ticket_booth_;
 };
