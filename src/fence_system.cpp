@@ -1,5 +1,6 @@
 #include "fence_system.h"
 
+#include <algorithm>
 #include <bit>
 
 namespace {
@@ -47,6 +48,13 @@ namespace {
     return fallback;
 }
 
+[[nodiscard]] constexpr bool adjacent_vertices(const FenceVertex a, const FenceVertex b) {
+    const int dx = a.x - b.x;
+    const int dy = a.y - b.y;
+    return (dx == 0 && (dy == 1 || dy == -1)) ||
+           (dy == 0 && (dx == 1 || dx == -1));
+}
+
 }  // namespace
 
 FenceVisualState resolve_fence_visual(const FenceConnection connections,
@@ -59,21 +67,13 @@ FenceVisualState resolve_fence_visual(const FenceConnection connections,
         return {FenceVisualType::gate, straight_rotation(mask, orientation_hint), mask};
     }
 
-    if (neighbors == 0) {
-        return {FenceVisualType::isolated, orientation_hint, mask};
-    }
-    if (neighbors == 1) {
-        return {FenceVisualType::end, end_rotation(mask, orientation_hint), mask};
-    }
+    if (neighbors == 0) return {FenceVisualType::isolated, orientation_hint, mask};
+    if (neighbors == 1) return {FenceVisualType::end, end_rotation(mask, orientation_hint), mask};
     if (neighbors == 2) {
-        if (is_opposite_pair(mask)) {
-            return {FenceVisualType::straight, straight_rotation(mask, orientation_hint), mask};
-        }
+        if (is_opposite_pair(mask)) return {FenceVisualType::straight, straight_rotation(mask, orientation_hint), mask};
         return {FenceVisualType::corner, corner_rotation(mask, orientation_hint), mask};
     }
-    if (neighbors == 3) {
-        return {FenceVisualType::tee, tee_rotation(mask, orientation_hint), mask};
-    }
+    if (neighbors == 3) return {FenceVisualType::tee, tee_rotation(mask, orientation_hint), mask};
     return {FenceVisualType::cross, orientation_hint, mask};
 }
 
@@ -145,6 +145,13 @@ bool FenceManager::remove_node(const int vertex_x, const int vertex_y) {
     const auto found = node_indices_.find(vertex_key(vertex_x, vertex_y));
     if (found == node_indices_.end()) return false;
 
+    const FenceVertex removed{vertex_x, vertex_y};
+    for (const CardinalDirection direction : kCardinalDirections) {
+        const TileOffset offset = direction_offset(direction);
+        const FenceVertex neighbour{vertex_x + offset.x, vertex_y + offset.y};
+        open_gate_segments_.erase(segment_key(removed, neighbour));
+    }
+
     const std::size_t index = found->second;
     const std::size_t last = nodes_.size() - 1;
     if (index != last) {
@@ -160,6 +167,71 @@ bool FenceManager::remove_node(const int vertex_x, const int vertex_y) {
 void FenceManager::clear() {
     nodes_.clear();
     node_indices_.clear();
+    open_gate_segments_.clear();
+}
+
+bool FenceManager::has_segment(const FenceVertex from, const FenceVertex to) const {
+    if (!adjacent_vertices(from, to) || !has_fence(from.x, from.y) || !has_fence(to.x, to.y)) return false;
+    const FenceNode* node = node_at(from.x, from.y);
+    if (node == nullptr) return false;
+    if (to.x == from.x + 1) return has_connection(node->connections, CardinalDirection::east);
+    if (to.x == from.x - 1) return has_connection(node->connections, CardinalDirection::west);
+    if (to.y == from.y + 1) return has_connection(node->connections, CardinalDirection::south);
+    return has_connection(node->connections, CardinalDirection::north);
+}
+
+bool FenceManager::set_open_gate(const FenceVertex from, const FenceVertex to, const bool enabled) {
+    if (!has_segment(from, to)) return false;
+    const std::uint64_t key = segment_key(from, to);
+    if (enabled) open_gate_segments_.insert(key);
+    else open_gate_segments_.erase(key);
+    return true;
+}
+
+bool FenceManager::is_open_gate(const FenceVertex from, const FenceVertex to) const {
+    return has_segment(from, to) && open_gate_segments_.contains(segment_key(from, to));
+}
+
+std::vector<FenceSegment> FenceManager::segments() const {
+    std::vector<FenceSegment> result;
+    result.reserve(nodes_.size() * 2U);
+    for (const FenceNode& node : nodes_) {
+        const FenceVertex from{node.vertex_x, node.vertex_y};
+        if (has_connection(node.connections, CardinalDirection::east)) {
+            const FenceVertex to{node.vertex_x + 1, node.vertex_y};
+            result.push_back({from, to, is_open_gate(from, to)});
+        }
+        if (has_connection(node.connections, CardinalDirection::south)) {
+            const FenceVertex to{node.vertex_x, node.vertex_y + 1};
+            result.push_back({from, to, is_open_gate(from, to)});
+        }
+    }
+    return result;
+}
+
+bool FenceManager::blocks_tile_crossing(const int tile_x, const int tile_y,
+                                        const CardinalDirection direction) const {
+    FenceVertex from{};
+    FenceVertex to{};
+    switch (direction) {
+        case CardinalDirection::north:
+            from = {tile_x, tile_y};
+            to = {tile_x + 1, tile_y};
+            break;
+        case CardinalDirection::east:
+            from = {tile_x + 1, tile_y};
+            to = {tile_x + 1, tile_y + 1};
+            break;
+        case CardinalDirection::south:
+            from = {tile_x, tile_y + 1};
+            to = {tile_x + 1, tile_y + 1};
+            break;
+        case CardinalDirection::west:
+            from = {tile_x, tile_y};
+            to = {tile_x, tile_y + 1};
+            break;
+    }
+    return has_segment(from, to) && !is_open_gate(from, to);
 }
 
 bool FenceManager::set_gate(const int vertex_x, const int vertex_y, const bool enabled) {
@@ -190,6 +262,14 @@ int FenceManager::vertex_key(const int vertex_x, const int vertex_y) const {
     return (vertex_y - map_min_) * span + (vertex_x - map_min_);
 }
 
+std::uint64_t FenceManager::segment_key(const FenceVertex from, const FenceVertex to) const {
+    const auto from_key = static_cast<std::uint32_t>(vertex_key(from.x, from.y));
+    const auto to_key = static_cast<std::uint32_t>(vertex_key(to.x, to.y));
+    const std::uint32_t low = std::min(from_key, to_key);
+    const std::uint32_t high = std::max(from_key, to_key);
+    return (static_cast<std::uint64_t>(low) << 32U) | high;
+}
+
 void FenceManager::refresh_connections_around(const int vertex_x, const int vertex_y) {
     refresh_connections(vertex_x, vertex_y);
     for (const CardinalDirection direction : kCardinalDirections) {
@@ -210,8 +290,4 @@ void FenceManager::refresh_connections(const int vertex_x, const int vertex_y) {
         }
     }
     nodes_[found->second].connections = mask;
-
-    // A former straight gate that becomes a corner/junction remains stored as
-    // a gate request, but resolve_fence_visual deliberately falls back to the
-    // topology piece until the node is straight again.
 }
