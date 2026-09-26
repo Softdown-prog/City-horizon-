@@ -25,6 +25,16 @@ A `park_tree_broadleaf_02` é o primeiro exemplar de referência de vegetação 
 
 Novos prédios, assets de farm, decoração, vegetação, pedra, água, props, ruas, calçadas e demais elementos do mapa devem ser recriados e promovidos por esse pipeline, em vez de reutilizar os pacotes visuais antigos.
 
+## Registro de construções no runtime
+
+O footprint lógico e o sprite precisam usar o mesmo ponto de chão. O runtime ancora construções no canto projetado mais próximo da câmera do footprint; já os bakes `CH_RUNTIME_BUILDING_V1` podem registrar no manifesto o pivot do `projected world origin`, que fica no centro lógico do footprint. Esses dois pivots não devem ser copiados como se fossem equivalentes.
+
+Para um prédio 2×2 no contrato 128×64, o canto de chão usado pelo runtime fica 64 px abaixo do world origin na vista canônica. Portanto, ao promover um bake 2×2 cujo manifesto fornece o pivot do world origin, o `spriteAnchors.y` deve incluir esse deslocamento antes de ser normalizado pela altura do frame. O mesmo cálculo deve ser refeito para footprints diferentes; não reutilizar um número fixo de outro asset.
+
+A ordem de revisão/bake `south, east, west, north` também não é a ordem numérica de rotação do runtime. `BuildingRotation` gira no sentido horário a partir de South: `r0 = south`, `r90 = west`, `r180 = north`, `r270 = east`. As definições devem mapear os PNGs nomeados para esses quatro índices explicitamente; nunca interpretar a ordem do sprite sheet de revisão como ordem de `BuildingRotation`.
+
+Esse contrato é parte da lógica de colocação: uma construção visualmente deslocada pode parecer estar sobre uma rua mesmo quando o footprint lógico foi corretamente recusado/aceito. Antes de promover um prédio, o contorno de footprint, o sprite e a borda de acesso à rua precisam coincidir nas quatro rotações.
+
 ## Estado temporário do runtime
 
 A grama canônica permanece como asset legado de terreno:
