@@ -1283,10 +1283,10 @@ void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& ec
 
     if (road_mode) {
         draw_panel(renderer, 12.0F, mode_panel_y, 420.0F, 58.0F);
-        draw_text(renderer, 22.0F, mode_panel_y + 10.0F, road_removal_mode ? "ROAD REMOVE: LCLICK A ROAD TILE" :
+        draw_text(renderer, 22.0F, mode_panel_y + 10.0F, road_removal_mode ? "DEMOLIR: CLIQUE OU ARRASTE UMA AREA" :
                                                          "ROAD MODE: $100/TILE, DRAG LMB TO DRAW");
         draw_text(renderer, 22.0F, mode_panel_y + 28.0F, road_preview_valid ? "VALID - RIGHT/ESC CANCEL" :
-                      (road_removal_mode ? "INVALID - NO ROAD ON TILE" : (!road_preview_on_owned_land ? "INVALID - LAND NOT OWNED" : "INVALID - ROAD, BUILDING OR MAP LIMIT")),
+                      (road_removal_mode ? "INVALID - NADA PARA REMOVER" : (!road_preview_on_owned_land ? "INVALID - LAND NOT OWNED" : "INVALID - ROAD, BUILDING OR MAP LIMIT")),
                   road_preview_valid ? 135 : 255, road_preview_valid ? 230 : 125, 125);
     }
 
@@ -1403,7 +1403,6 @@ int main() {
     // This authored RGBA grass tile is versioned and its opaque bounds match
     // kGrassOpaque*. The old *_clean path was never packaged in GitHub builds.
     const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01.png");
-    const TextureAsset* paintable_sand = textures.load(renderer, asset_root / "assets/terrain/sand_isometric_01.png");
 
     RoadVisualCatalog road_visuals;
     (void)road_visuals.load_from_file(asset_root / "assets/definitions/road_visual_catalog.json");
@@ -1663,12 +1662,12 @@ int main() {
     bool road_removal_mode = false;
     bool road_dragging = false;
     bool sidewalk_dragging = false;
+    bool demolition_dragging = false;
     bool harvest_dragging = false;
     bool preparation_dragging = false;
     bool planting_dragging = false;
     bool camera_dragging = false;
     bool land_mode = false;
-    std::string terrain_paint_style;
     std::vector<TerrainPaintTile> terrain_paint;
     bool sidewalk_mode = false;
     std::string sidewalk_style = "dirt_path";
@@ -1679,6 +1678,7 @@ int main() {
     bool build_panel_open = false;
     TileCoordinate road_drag_start;
     TileCoordinate sidewalk_drag_start;
+    TileCoordinate demolition_drag_start;
     TileCoordinate harvest_drag_start;
     TileCoordinate preparation_drag_start;
     TileCoordinate planting_drag_start;
@@ -1791,11 +1791,11 @@ int main() {
         road_removal_mode = false;
         road_dragging = false;
         sidewalk_dragging = false;
+        demolition_dragging = false;
         harvest_dragging = false;
         preparation_dragging = false;
         planting_dragging = false;
         land_mode = false;
-        terrain_paint_style.clear();
         sidewalk_mode = false;
         agriculture_mode = false;
         agriculture_panel_open = false;
@@ -1856,17 +1856,27 @@ int main() {
         status = "LAND MODE: SELECT A NEIGHBORING PARCEL";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
-    const auto begin_terrain_paint = [&](const std::string& style) {
-        clear_map_modes();
-        build_panel_open = false;
-        terrain_paint_style = style;
-        selected_instance_id.reset();
-        status = style == "sand" ? "SAND: CLICK OWNED EMPTY GROUND" : "GRASS: CLICK OWNED EMPTY GROUND";
-        (void)play_sound(SoundEvent::ui_select);
-    };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
         status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
+    };
+    const auto editable_ground = [&](const int x, const int y) {
+        if (!active_map_doc) return false;
+        const auto tile = active_map_doc->get_terrain_at(x, y);
+        const std::string style = tile ? tile->terrain_definition : "grass";
+        return style == "grass" || style == "sand" || style == "sand_center" ||
+               style == "sand_wet" || style == "ground_dirt_path";
+    };
+    const auto restore_grass = [&](const int x, const int y) {
+        if (!active_map_doc) return false;
+        const auto tile = active_map_doc->get_terrain_at(x, y);
+        if (!tile || tile->terrain_definition == "grass" || !editable_ground(x, y)) return false;
+        active_map_doc->paint_terrain_at(x, y, "grass", "");
+        const auto saved = std::find_if(terrain_paint.begin(), terrain_paint.end(),
+            [x, y](const TerrainPaintTile& entry) { return entry.tile_x == x && entry.tile_y == y; });
+        if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, "grass"});
+        else saved->style = "grass";
+        return true;
     };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
@@ -1972,14 +1982,14 @@ int main() {
             case UiAction::activate_roads: begin_road_mode(); break;
             case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
             case UiAction::select_sidewalk_style:
-                if (action.payload == "dirt_path" || action.payload == "sand_path") {
+                if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "grass") {
                     sidewalk_style = action.payload;
                     begin_sidewalk_mode();
                 }
                 break;
             case UiAction::activate_land: begin_land_mode(); break;
-            case UiAction::paint_grass: begin_terrain_paint("grass"); break;
-            case UiAction::paint_sand: begin_terrain_paint("sand"); break;
+            case UiAction::paint_grass: sidewalk_style = "grass"; begin_sidewalk_mode(); break;
+            case UiAction::paint_sand: sidewalk_style = "sand_path"; begin_sidewalk_mode(); break;
             case UiAction::activate_remove: begin_remove_mode(); break;
             case UiAction::open_agriculture_panel: open_agriculture_panel(); break;
             case UiAction::select_farming_item: select_farming_item(action.payload); break;
@@ -2239,7 +2249,6 @@ int main() {
             case SimulationSpeed::speed3: model.speed = "RUNNING"; break;
         }
         model.status = status;
-        model.terrain_paint_style = terrain_paint_style;
         model.sidewalk_style = sidewalk_style;
         model.overlay = active_overlay;
         model.administration_services = "ROAD / POWER / FARMING";
@@ -2286,7 +2295,7 @@ int main() {
         model.active_tool = UiTool::none;
         if (decoration_mode) {
             model.active_tool = UiTool::decoration;
-        } else if (land_mode || !terrain_paint_style.empty()) {
+        } else if (land_mode) {
             model.active_tool = UiTool::land;
         } else if (sidewalk_mode) {
             model.active_tool = UiTool::sidewalks;
@@ -2592,17 +2601,15 @@ int main() {
                 }
                 const auto raw_clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-                const auto clicked_tile = land_mode ? raw_clicked_tile : nearest_owned_tile(raw_clicked_tile, lands);
+                const auto clicked_tile = (land_mode || road_removal_mode || sidewalk_mode) ? raw_clicked_tile :
+                    nearest_owned_tile(raw_clicked_tile, lands);
                 if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
                     land_mode = false;
                     status = "LAND MODE CANCELLED";
                     (void)play_sound(SoundEvent::ui_back);
-                } else if (event.button.button == SDL_BUTTON_RIGHT && !terrain_paint_style.empty()) {
-                    terrain_paint_style.clear();
-                    status = "TERRAIN PAINT CANCELLED";
-                    (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && road_mode) {
                     road_dragging = false;
+                    demolition_dragging = false;
                     road_mode = false;
                     road_removal_mode = false;
                     status = "ROAD MODE CANCELLED";
@@ -2629,31 +2636,7 @@ int main() {
                     status = "BUILD MODE CANCELLED";
                     (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
-                    if (!terrain_paint_style.empty()) {
-                        const int x = raw_clicked_tile.first, y = raw_clicked_tile.second;
-                        const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, x, y);
-                        const auto existing = active_map_doc->get_terrain_at(x, y);
-                        const std::string existing_style = existing ? existing->terrain_definition : "grass";
-                        const bool paintable = existing_style == "grass" || existing_style == "sand" ||
-                            existing_style == "sand_center" || existing_style == "sand_wet";
-                        if (!lands.is_tile_owned(x, y) || occupancy.building || occupancy.road ||
-                            occupancy.sidewalk || occupancy.farm || !paintable ||
-                            (terrain_paint_style == "sand" && paintable_sand == nullptr)) {
-                            status = "TERRAIN REQUIRES EMPTY OWNED GRASS OR SAND";
-                            (void)play_sound(SoundEvent::ui_error);
-                        } else {
-                            const std::string path = terrain_paint_style == "sand"
-                                ? "assets/terrain/sand_isometric_01.png" : "";
-                            active_map_doc->paint_terrain_at(x, y,
-                                                             terrain_paint_style == "sand" ? "sand_center" : "grass", path);
-                            const auto saved = std::find_if(terrain_paint.begin(), terrain_paint.end(),
-                                [x, y](const TerrainPaintTile& tile) { return tile.tile_x == x && tile.tile_y == y; });
-                            if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, terrain_paint_style});
-                            else saved->style = terrain_paint_style;
-                            status = terrain_paint_style == "sand" ? "SAND PAINTED" : "GRASS PAINTED";
-                            (void)play_sound(SoundEvent::ui_confirm);
-                        }
-                    } else if (land_mode) {
+                    if (land_mode) {
                         const LandParcel* parcel = lands.parcel_at(clicked_tile.first, clicked_tile.second);
                         if (parcel == nullptr) {
                             status = "NO PARCEL AT THIS TILE";
@@ -2676,28 +2659,8 @@ int main() {
                             (void)play_sound(SoundEvent::ui_error);
                         }
                     } else if (road_mode && road_removal_mode) {
-                        const BuildingInstance* building = buildings.instance_at(clicked_tile.first, clicked_tile.second);
-                        const BuildingDefinition* definition = building == nullptr ? nullptr : catalog.find(building->definition_id);
-                        if (building != nullptr && definition != nullptr && buildings.remove_instance(*definition, building->instance_id)) {
-                            rebuild_agricultural_storage();
-                            population.rebuild_capacity(buildings, catalog);
-                            power.rebuild(buildings, catalog);
-                            selected_instance_id.reset();
-                            status = "BUILDING DEMOLISHED";
-                            (void)play_sound(SoundEvent::ui_confirm);
-                            if (mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power)) {
-                                status = "MISSAO ENERGIA LIMPA CONCLUIDA! Hidreletrica Reativada!";
-                            }
-                        } else if (sidewalks.remove_tile(clicked_tile.first, clicked_tile.second)) {
-                            status = "SIDEWALK REMOVED";
-                            (void)play_sound(SoundEvent::ui_confirm);
-                        } else if (roads.remove_tile(clicked_tile.first, clicked_tile.second)) {
-                            status = "ROAD REMOVED";
-                            (void)play_sound(SoundEvent::ui_confirm);
-                        } else {
-                            status = "NO BUILDING, SIDEWALK OR ROAD ON THIS TILE";
-                            (void)play_sound(SoundEvent::ui_error);
-                        }
+                        demolition_dragging = true;
+                        demolition_drag_start = {clicked_tile.first, clicked_tile.second};
                     } else if (sidewalk_mode) {
                         sidewalk_dragging = true;
                         sidewalk_drag_start = {clicked_tile.first, clicked_tile.second};
@@ -2817,6 +2780,7 @@ int main() {
                     // drawing through UI coordinates.
                     road_dragging = false;
                     sidewalk_dragging = false;
+                    demolition_dragging = false;
                     harvest_dragging = false;
                     preparation_dragging = false;
                     planting_dragging = false;
@@ -2827,6 +2791,42 @@ int main() {
                 }
                 const auto released_tile = screen_to_tile(event.button.x, event.button.y, camera,
                                                           static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                if (road_mode && road_removal_mode && demolition_dragging) {
+                    const int min_x = std::max(kMapMin, std::min(demolition_drag_start.x, released_tile.first));
+                    const int max_x = std::min(kMapMax, std::max(demolition_drag_start.x, released_tile.first));
+                    const int min_y = std::max(kMapMin, std::min(demolition_drag_start.y, released_tile.second));
+                    const int max_y = std::min(kMapMax, std::max(demolition_drag_start.y, released_tile.second));
+                    int removed_buildings = 0, removed_floors = 0, removed_roads = 0, restored_ground = 0;
+                    for (int y = min_y; y <= max_y; ++y) {
+                        for (int x = min_x; x <= max_x; ++x) {
+                            if (!lands.is_tile_owned(x, y) || farming.is_occupied(x, y)) continue;
+                            const BuildingInstance* building = buildings.instance_at(x, y);
+                            const BuildingDefinition* definition = building ? catalog.find(building->definition_id) : nullptr;
+                            if (definition && buildings.remove_instance(*definition, building->instance_id)) {
+                                ++removed_buildings;
+                            }
+                            if (sidewalks.remove_tile(x, y)) ++removed_floors;
+                            if (roads.remove_tile(x, y)) ++removed_roads;
+                            if (restore_grass(x, y)) ++restored_ground;
+                        }
+                    }
+                    if (removed_buildings > 0) {
+                        rebuild_agricultural_storage();
+                        population.rebuild_capacity(buildings, catalog);
+                        power.rebuild(buildings, catalog);
+                        selected_instance_id.reset();
+                        (void)mission_manager.check_and_auto_complete_clean_energy(economy, buildings, catalog, population, power);
+                    }
+                    const int removed = removed_buildings + removed_floors + removed_roads + restored_ground;
+                    status = removed == 0 ? "NENHUM ITEM REMOVIVEL NA AREA" :
+                        "DEMOLIDOS: " + std::to_string(removed) + " ITENS (" +
+                        std::to_string(removed_buildings) + " CONSTRUCOES, " +
+                        std::to_string(removed_roads) + " RUAS, " + std::to_string(removed_floors) +
+                        " PISOS, " + std::to_string(restored_ground) + " SOLOS)";
+                    (void)play_sound(removed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                    demolition_dragging = false;
+                    continue;
+                }
                 if (agriculture_mode && harvest_dragging) {
                     int harvested_tiles = 0;
                     int total_yield = 0;
@@ -2919,22 +2919,30 @@ int main() {
                     continue;
                 }
                 if (sidewalk_mode && sidewalk_dragging) {
-                    int placed = 0;
-                    int blocked = 0;
-                    for (const TileCoordinate& tile : roads.line_between(sidewalk_drag_start, {released_tile.first, released_tile.second})) {
+                    int changed = 0, blocked = 0;
+                    for (const TileCoordinate& tile : roads.line_between(sidewalk_drag_start,
+                                                                           {released_tile.first, released_tile.second})) {
                         const SidewalkPlacementFailure failure = sidewalks.validate_placement(tile.x, tile.y, roads, buildings);
-                        if (!lands.is_tile_owned(tile.x, tile.y) || failure != SidewalkPlacementFailure::none || farming.is_occupied(tile.x, tile.y)) {
+                        if (!lands.is_tile_owned(tile.x, tile.y) || !editable_ground(tile.x, tile.y) ||
+                            (failure != SidewalkPlacementFailure::none &&
+                             failure != SidewalkPlacementFailure::sidewalk_occupied) ||
+                            farming.is_occupied(tile.x, tile.y)) {
                             ++blocked;
                             continue;
                         }
-                        if (sidewalks.place_tile(tile.x, tile.y, sidewalk_style)) {
-                            ++placed;
+                        bool changed_tile = false;
+                        if (sidewalk_style == "grass") {
+                            changed_tile = sidewalks.remove_tile(tile.x, tile.y);
+                        } else {
+                            changed_tile = sidewalks.paint_tile(tile.x, tile.y, sidewalk_style);
                         }
+                        if (restore_grass(tile.x, tile.y)) changed_tile = true;
+                        if (changed_tile) ++changed;
                     }
-                    status = placed == 0 ? "FLOOR BLOCKED BY ROAD, BUILDING OR TILE" :
-                        "FLOOR PLACED: " + std::to_string(placed) + " TILE(S)" +
-                        (blocked == 0 ? "" : " | " + std::to_string(blocked) + " SKIPPED");
-                    (void)play_sound(placed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
+                    status = changed == 0 ? "NENHUM PISO ALTERADO" :
+                        "PISO ALTERADO: " + std::to_string(changed) + " TILE(S)" +
+                        (blocked == 0 ? "" : " | " + std::to_string(blocked) + " BLOQUEADOS");
+                    (void)play_sound(changed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;
                     continue;
                 }
@@ -3003,12 +3011,9 @@ int main() {
                             land_mode = false;
                             status = "LAND MODE CANCELLED";
                             (void)play_sound(SoundEvent::ui_back);
-                        } else if (!terrain_paint_style.empty()) {
-                            terrain_paint_style.clear();
-                            status = "TERRAIN PAINT CANCELLED";
-                            (void)play_sound(SoundEvent::ui_back);
                         } else if (road_mode) {
                             road_dragging = false;
+                            demolition_dragging = false;
                             road_mode = false;
                             road_removal_mode = false;
                             status = "ROAD MODE CANCELLED";
@@ -3309,7 +3314,8 @@ int main() {
         float mouse_y = 0.0F;
         SDL_GetMouseState(&mouse_x, &mouse_y);
         const auto raw_mouse_tile = screen_to_tile(mouse_x, mouse_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-        const auto mouse_tile = land_mode ? raw_mouse_tile : nearest_owned_tile(raw_mouse_tile, lands);
+        const auto mouse_tile = (land_mode || road_removal_mode || sidewalk_mode) ? raw_mouse_tile :
+            nearest_owned_tile(raw_mouse_tile, lands);
         const BuildingInstance* hovered_instance = buildings.instance_at(mouse_tile.first, mouse_tile.second);
         const BuildingDefinition* placement_definition = placement_definition_id.empty() ? nullptr : catalog.find(placement_definition_id);
         const BuildingPlacementValidation placement_validation = placement_definition == nullptr
@@ -3325,8 +3331,14 @@ int main() {
                                  {mouse_tile.first, mouse_tile.second})
             : std::vector<TileCoordinate>{};
         const bool road_preview_on_owned_land = road_mode && !road_removal_mode && road_segment_is_on_owned_land(road_preview, lands);
+        const bool removable_ground = active_map_doc && editable_ground(mouse_tile.first, mouse_tile.second) &&
+            active_map_doc->get_terrain_at(mouse_tile.first, mouse_tile.second).has_value() &&
+            active_map_doc->get_terrain_at(mouse_tile.first, mouse_tile.second)->terrain_definition != "grass";
         const bool road_preview_valid = road_mode && (road_removal_mode
-            ? roads.is_road(mouse_tile.first, mouse_tile.second)
+            ? (lands.is_tile_owned(mouse_tile.first, mouse_tile.second) &&
+               (roads.is_road(mouse_tile.first, mouse_tile.second) ||
+                sidewalks.is_sidewalk(mouse_tile.first, mouse_tile.second) ||
+                buildings.is_occupied(mouse_tile.first, mouse_tile.second) || removable_ground))
             : road_segment_is_valid(road_preview, roads, buildings) &&
               road_preview_on_owned_land &&
               economy.can_afford(static_cast<std::int64_t>(road_preview.size()) * kRoadCostPerTile));
@@ -3368,8 +3380,24 @@ int main() {
                 ? (road_removal_mode ? SDL_FColor{0.94F, 0.68F, 0.20F, 0.72F} : SDL_FColor{0.34F, 0.78F, 0.52F, 0.62F})
                 : SDL_FColor{0.92F, 0.25F, 0.22F, 0.62F};
             if (road_removal_mode) {
-                render_road_tile(renderer, mouse_tile.first, mouse_tile.second, camera, static_cast<float>(viewport_width),
-                                 static_cast<float>(viewport_height), preview_color);
+                const int min_x = std::max(kMapMin, std::min(demolition_dragging ? demolition_drag_start.x : mouse_tile.first,
+                                                             mouse_tile.first));
+                const int max_x = std::min(kMapMax, std::max(demolition_dragging ? demolition_drag_start.x : mouse_tile.first,
+                                                             mouse_tile.first));
+                const int min_y = std::max(kMapMin, std::min(demolition_dragging ? demolition_drag_start.y : mouse_tile.second,
+                                                             mouse_tile.second));
+                const int max_y = std::min(kMapMax, std::max(demolition_dragging ? demolition_drag_start.y : mouse_tile.second,
+                                                             mouse_tile.second));
+                SDL_SetRenderDrawColor(renderer, road_preview_valid ? 240 : 235,
+                                       road_preview_valid ? 174 : 70, road_preview_valid ? 66 : 66, SDL_ALPHA_OPAQUE);
+                for (int x = min_x; x <= max_x; ++x) {
+                    render_tile_outline(renderer, x, min_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                    if (max_y != min_y) render_tile_outline(renderer, x, max_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                }
+                for (int y = min_y + 1; y < max_y; ++y) {
+                    render_tile_outline(renderer, min_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                    if (max_x != min_x) render_tile_outline(renderer, max_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                }
             } else {
                 for (const TileCoordinate& tile : road_preview) {
                     render_road_tile(renderer, tile.x, tile.y, camera, static_cast<float>(viewport_width),
@@ -3379,8 +3407,9 @@ int main() {
         }
         if (sidewalk_mode) {
             for (const TileCoordinate& tile : sidewalk_preview) {
-                const bool valid = lands.is_tile_owned(tile.x, tile.y) &&
-                    sidewalks.validate_placement(tile.x, tile.y, roads, buildings) == SidewalkPlacementFailure::none &&
+                const SidewalkPlacementFailure failure = sidewalks.validate_placement(tile.x, tile.y, roads, buildings);
+                const bool valid = lands.is_tile_owned(tile.x, tile.y) && editable_ground(tile.x, tile.y) &&
+                    (failure == SidewalkPlacementFailure::none || failure == SidewalkPlacementFailure::sidewalk_occupied) &&
                     !farming.is_occupied(tile.x, tile.y);
                 SDL_SetRenderDrawColor(renderer, valid ? 112 : 245, valid ? 232 : 82, 96, SDL_ALPHA_OPAQUE);
                 render_tile_outline(renderer, tile.x, tile.y, camera,

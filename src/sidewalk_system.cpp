@@ -30,6 +30,16 @@ bool SidewalkManager::place_tile(int x, int y, std::string style_id) {
     refresh_connections_around(x, y);
     return true;
 }
+bool SidewalkManager::paint_tile(int x, int y, std::string style_id) {
+    if (!inside(x, y)) return false;
+    const auto found = indices_.find(key(x, y));
+    if (found == indices_.end()) return place_tile(x, y, std::move(style_id));
+    SidewalkTile& tile = tiles_[found->second];
+    if (tile.style_id == style_id) return false;
+    tile.style_id = std::move(style_id);
+    refresh_connections_around(x, y);
+    return true;
+}
 bool SidewalkManager::remove_tile(int x, int y) {
     const auto found = indices_.find(key(x, y));
     if (found == indices_.end()) return false;
@@ -59,7 +69,9 @@ void SidewalkManager::refresh_connections(const int x, const int y) {
     TileConnectionMask mask = 0;
     for (const CardinalDirection direction : kCardinalDirections) {
         const TileOffset offset = direction_offset(direction);
-        if (is_sidewalk(x + offset.x, y + offset.y)) mask = static_cast<TileConnectionMask>(mask | connection_bit(direction));
+        const SidewalkTile* neighbour = tile_at(x + offset.x, y + offset.y);
+        if (neighbour != nullptr && neighbour->style_id == tiles_[found->second].style_id)
+            mask = static_cast<TileConnectionMask>(mask | connection_bit(direction));
     }
     tiles_[found->second].connections = mask;
 }

@@ -573,24 +573,15 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     add_button({kMargin + 4.0F + tool_width * 5.0F, tool_y, tool_width - 6.0F, tool_height}, "AGRICULTURA", UiAction::open_agriculture_panel, true, model.active_tool == UiTool::agriculture);
     add_button({kMargin + 4.0F + tool_width * 6.0F, tool_y, tool_width - 6.0F, tool_height}, "DECORACAO", UiAction::activate_decoration, true, model.active_tool == UiTool::decoration);
 
-    if (model.active_tool == UiTool::land) {
-        const float button_y = toolbar_y + 39.0F;
-        const float button_width = (context_width - 24.0F) / 3.0F;
-        add_button({context_x + 6.0F, button_y, button_width, 28.0F}, "LOTES", UiAction::activate_land,
-                   true, model.terrain_paint_style.empty());
-        add_button({context_x + 12.0F + button_width, button_y, button_width, 28.0F}, "GRAMA", UiAction::paint_grass,
-                   true, model.terrain_paint_style == "grass");
-        add_button({context_x + 18.0F + button_width * 2.0F, button_y, button_width, 28.0F}, "AREIA", UiAction::paint_sand,
-                   true, model.terrain_paint_style == "sand");
-    }
-
     if (model.active_tool == UiTool::sidewalks) {
         const float button_y = toolbar_y + 39.0F;
-        const float button_width = (context_width - 18.0F) / 2.0F;
+        const float button_width = (context_width - 24.0F) / 3.0F;
         add_button({context_x + 6.0F, button_y, button_width, 28.0F}, "TERRA", UiAction::select_sidewalk_style,
                    true, model.sidewalk_style == "dirt_path", "dirt_path");
         add_button({context_x + 12.0F + button_width, button_y, button_width, 28.0F}, "AREIA", UiAction::select_sidewalk_style,
                    true, model.sidewalk_style == "sand_path", "sand_path");
+        add_button({context_x + 18.0F + button_width * 2.0F, button_y, button_width, 28.0F}, "GRAMA", UiAction::select_sidewalk_style,
+                   true, model.sidewalk_style == "grass", "grass");
     }
 
     if (model.active_tool != UiTool::none) {
@@ -1045,10 +1036,9 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                     (model_.build_panel_open ? "SELECIONE UM ITEM PARA POSICIONAR" : "ESCOLHA UMA CONSTRUCAO");
                 break;
             case UiTool::roads: title = "MODO ESTRADAS"; description = "CLIQUE E ARRASTE PARA CONSTRUIR"; break;
-            case UiTool::sidewalks: title = "MODO PISO"; description = "ESCOLHA CAMINHO DE TERRA OU AREIA"; break;
-            case UiTool::land: title = "MODO TERRENO"; description = model_.terrain_paint_style.empty()
-                ? "LOTES: COMPRE TERRENO VIZINHO" : "GRAMA/AREIA: CLIQUE EM SOLO PROPRIO"; break;
-            case UiTool::remove: title = "MODO DEMOLIR"; description = "CLIQUE EM PREDIO, CALCADA OU ESTRADA"; break;
+            case UiTool::sidewalks: title = "MODO PISO"; description = "ARRASTE TERRA, AREIA OU GRAMA"; break;
+            case UiTool::land: title = "COMPRAR LOTES"; description = "CLIQUE EM UM LOTE VIZINHO"; break;
+            case UiTool::remove: title = "MODO DEMOLIR"; description = "ARRASTE PARA REMOVER UMA AREA"; break;
             case UiTool::agriculture: title = "MODO AGRICULTURA"; description = "PREPARE O SOLO OU PLANTE UMA CULTURA"; break;
             case UiTool::decoration: title = "MODO DECORACAO"; description = "EM BREVE"; break;
             case UiTool::none: break;

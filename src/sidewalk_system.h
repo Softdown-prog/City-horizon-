@@ -29,6 +29,8 @@ public:
     [[nodiscard]] SidewalkPlacementFailure validate_placement(int tile_x, int tile_y, const RoadManager& roads,
                                                                const BuildingManager& buildings) const;
     [[nodiscard]] bool place_tile(int tile_x, int tile_y, std::string style_id);
+    // Repaint an existing floor cell without removing it or losing its neighbours.
+    [[nodiscard]] bool paint_tile(int tile_x, int tile_y, std::string style_id);
     [[nodiscard]] bool remove_tile(int tile_x, int tile_y);
     void clear();
     [[nodiscard]] const std::vector<SidewalkTile>& tiles() const;

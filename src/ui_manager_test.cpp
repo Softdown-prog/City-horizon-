@@ -163,8 +163,19 @@ int main() {
                 cement_path_click.action->action == UiAction::activate_sidewalks,
             "cement path mode button");
 
+    for (const std::string& style : {"dirt_path", "sand_path", "grass"}) {
+        const auto floor_style = std::find_if(ui.buttons().begin(), ui.buttons().end(), [&style](const UiButton& button) {
+            return button.action == UiAction::select_sidewalk_style && button.payload == style;
+        });
+        require(floor_style != ui.buttons().end(), "all ground styles appear under floor");
+    }
+
     model.active_tool = UiTool::land;
     ui.update_layout(1280, 800, model);
+    const bool terrain_has_paint = std::any_of(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::paint_grass || button.action == UiAction::paint_sand;
+    });
+    require(!terrain_has_paint, "terrain panel is reserved for parcel purchase");
     const auto land_button = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
         return button.action == UiAction::activate_land;
     });

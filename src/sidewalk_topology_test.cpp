@@ -46,6 +46,22 @@ int main() {
         assert(dirt.connection_mask(0, 0) == expected);
     }
 
+    // Repainting connects only matching materials and refreshes both sides of
+    // the seam, without leaving the old auto-tile mask behind.
+    SidewalkManager repaint{-4, 4};
+    assert(repaint.paint_tile(0, 0, "dirt_path"));
+    assert(repaint.paint_tile(1, 0, "dirt_path"));
+    assert(repaint.connection_mask(0, 0) == tile_connection_east);
+    assert(repaint.paint_tile(1, 0, "sand_path"));
+    assert(repaint.connection_mask(0, 0) == 0);
+    assert(repaint.connection_mask(1, 0) == 0);
+    assert(repaint.paint_tile(2, 0, "sand_path"));
+    assert(repaint.connection_mask(1, 0) == tile_connection_east);
+    assert(!repaint.paint_tile(1, 0, "sand_path"));
+    assert(repaint.paint_tile(0, 0, "sand_path"));
+    assert(repaint.connection_mask(1, 0) == (tile_connection_west | tile_connection_east));
+    assert(!repaint.paint_tile(5, 0, "sand_path"));
+
     assert(roads.place_tile(0, 0));
     assert(roads.place_tile(0, 1));
     assert(roads.is_drivable(0, 0));
