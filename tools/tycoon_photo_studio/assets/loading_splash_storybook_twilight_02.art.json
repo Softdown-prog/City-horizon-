@@ -1,0 +1,39 @@
+{
+  "contract": "CH_LOADING_SPLASH_ART_V1",
+  "artId": "ui.loading_splash.storybook_twilight.02",
+  "seed": 260926,
+  "camera": {
+    "mode": "freeform_perspective_loading_only",
+    "lensMm": 46.0
+  },
+  "presentation": {
+    "aspectRatio": "16:9",
+    "proxyResolution": [1280, 720],
+    "finalResolution": [2560, 1440],
+    "titleSafeAreaNormalized": [0.04, 0.05, 0.36, 0.30],
+    "progressSafeAreaNormalized": [0.18, 0.88, 0.82, 0.96]
+  },
+  "artDirection": {
+    "target": "commercial game key art / loading splash, not a low-poly scene test",
+    "summary": "A warm storybook city festival at twilight. The camera is cinematic and almost frontal, with a glowing oversized Ferris wheel, theatrical buildings, curved boulevard, foreground foliage, practical lights, bunting, skyline depth and a small hot-air balloon. The image should read like promotional game illustration rather than gameplay.",
+    "requiredQualities": [
+      "clear hero focal point",
+      "foreground, midground and background depth",
+      "warm-versus-cool lighting",
+      "glowing practical lights and Ferris wheel",
+      "varied architectural silhouettes",
+      "cropped foreground framing",
+      "poster-like composition",
+      "clean upper-left logo field",
+      "no gameplay HUD or grid"
+    ],
+    "rejectIf": [
+      "looks like a MapForge screenshot",
+      "looks like a plain low-poly blockout",
+      "reads as isolated assets placed on a stage",
+      "large empty green areas dominate the frame",
+      "lighting is flat or neutral",
+      "all buildings are simple rectangular boxes with no silhouette variation"
+    ]
+  }
+}
