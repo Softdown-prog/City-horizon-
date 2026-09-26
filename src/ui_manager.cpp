@@ -1,15 +1,55 @@
 #include "ui_manager.h"
 
+#include "fence_placement_controller.h"
+#include "fence_system.h"
+#include "src/ch_core/contracts.h"
+#include "src/runtime_view_state.h"
+
+#include <array>
+#include <cmath>
+#include <filesystem>
+#include <string_view>
+
 // Keep the established UI implementation intact while removing energy from the
-// public gameplay surface. The compatibility names let older layout/render
-// code continue to serve unrelated panels without exposing the retired system.
+// public gameplay surface. Compatibility names also let the Park fence tool
+// intercept only the input it owns without duplicating the existing UI code.
 #define update_layout update_layout_legacy
+#define handle_mouse_motion handle_mouse_motion_legacy
+#define handle_mouse_button_down handle_mouse_button_down_legacy
+#define handle_mouse_button_up handle_mouse_button_up_legacy
 #define render render_legacy
 #include "ui_manager_legacy_impl.inl"
 #undef render
+#undef handle_mouse_button_up
+#undef handle_mouse_button_down
+#undef handle_mouse_motion
 #undef update_layout
 
 namespace {
+
+constexpr std::string_view kParkCategory = "PARK";
+constexpr std::string_view kLegacyParkCategory = "CITY PARK";
+constexpr std::string_view kParkFenceToolId = "park_fence_classic_iron_v1";
+
+FenceManager g_park_fences(ch::contracts::kMapMin, ch::contracts::kMapMax);
+FencePlacementController g_park_fence_placement(g_park_fences);
+bool g_park_fence_tool_active = false;
+std::string g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
+
+[[nodiscard]] std::string runtime_asset_path(const std::filesystem::path& relative) {
+    const char* base_path = SDL_GetBasePath();
+    const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
+    return (root / relative).string();
+}
+
+[[nodiscard]] std::string park_fence_thumbnail_path() {
+    return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");
+}
+
+void deactivate_park_fence_tool() {
+    g_park_fence_placement.cancel_drag();
+    g_park_fence_tool_active = false;
+}
 
 bool contains_energy_term(const std::string& value) {
     return value.find("ENERGIA") != std::string::npos ||
@@ -33,7 +73,7 @@ std::string remove_energy_segments(const std::string& value, const std::string& 
     return result;
 }
 
-GameplayUiModel energy_free_ui_model(GameplayUiModel model) {
+GameplayUiModel runtime_ui_model(GameplayUiModel model) {
     model.power_demand.clear();
     model.power_capacity.clear();
     model.administration_services = remove_energy_segments(model.administration_services, " / ");
@@ -41,13 +81,36 @@ GameplayUiModel energy_free_ui_model(GameplayUiModel model) {
     if (model.selected_building) {
         model.selected_building->energy_consumption.clear();
         model.selected_building->energy_production.clear();
+        if (model.selected_building->category == kLegacyParkCategory) {
+            model.selected_building->category = std::string(kParkCategory);
+        }
     }
 
     for (UiBuildItem& item : model.build_items) {
         item.requirements = remove_energy_segments(item.requirements, " | ");
+        if (item.category == kLegacyParkCategory) item.category = std::string(kParkCategory);
     }
     for (UiBuildItem& item : model.decor_items) {
         item.requirements = remove_energy_segments(item.requirements, " | ");
+        if (item.category == kLegacyParkCategory) item.category = std::string(kParkCategory);
+    }
+
+    const bool already_has_fence = std::any_of(
+        model.build_items.begin(), model.build_items.end(), [](const UiBuildItem& item) {
+            return item.definition_id == kParkFenceToolId;
+        });
+    if (!already_has_fence) {
+        model.build_items.push_back({
+            std::string(kParkFenceToolId),
+            "Grade Classica do Parque",
+            std::string(kParkCategory),
+            "SEM CUSTO",
+            true,
+            park_fence_thumbnail_path(),
+            "BORDA DO GRID",
+            "CLIQUE E ARRASTE | CONEXAO AUTOMATICA",
+            1,
+        });
     }
 
     model.debug_lines.erase(
@@ -58,7 +121,126 @@ GameplayUiModel energy_free_ui_model(GameplayUiModel model) {
     const std::size_t deficit = model.status.find(" | POWER DEFICIT");
     if (deficit != std::string::npos) model.status.erase(deficit);
 
+    if (g_park_fence_tool_active) {
+        model.selected_building_id = std::string(kParkFenceToolId);
+        model.placement_preview_path = park_fence_thumbnail_path();
+        model.placement_preview_frame_count = 1;
+        model.placement_rotatable = false;
+        model.placement_rotation_label = "AUTO";
+        model.status = g_park_fence_status;
+    }
+
     return model;
+}
+
+[[nodiscard]] std::optional<FenceVertex> nearest_fence_vertex(const float screen_x, const float screen_y) {
+    const ch::runtime_view::ViewSnapshot& view = ch::runtime_view::snapshot();
+    if (!view.valid) return std::nullopt;
+
+    const ch::GridCoord tile = ch::screen_to_tile_coord(
+        screen_x, screen_y, view.camera, view.viewport_width, view.viewport_height);
+    const std::array<FenceVertex, 4> candidates = {{
+        {tile.x, tile.y},
+        {tile.x + 1, tile.y},
+        {tile.x, tile.y + 1},
+        {tile.x + 1, tile.y + 1},
+    }};
+
+    std::optional<FenceVertex> nearest;
+    float nearest_distance = 0.0F;
+    for (const FenceVertex vertex : candidates) {
+        if (!g_park_fences.is_inside_vertex_grid(vertex.x, vertex.y)) continue;
+        const ch::ScreenPoint projected = ch::world_to_screen_point(
+            static_cast<float>(vertex.x), static_cast<float>(vertex.y),
+            view.camera, view.viewport_width, view.viewport_height);
+        const float dx = projected.x - screen_x;
+        const float dy = projected.y - screen_y;
+        const float distance = dx * dx + dy * dy;
+        if (!nearest || distance < nearest_distance) {
+            nearest = vertex;
+            nearest_distance = distance;
+        }
+    }
+    return nearest;
+}
+
+void set_fence_draw_color(SDL_Renderer* renderer, const bool preview, const bool highlight) {
+    if (preview) {
+        SDL_SetRenderDrawColor(renderer, highlight ? 132 : 96, highlight ? 232 : 205,
+                               highlight ? 156 : 124, 225);
+    } else {
+        SDL_SetRenderDrawColor(renderer, highlight ? 63 : 37, highlight ? 118 : 78,
+                               highlight ? 78 : 55, 245);
+    }
+}
+
+void draw_fence_post(SDL_Renderer* renderer, const FenceVertex vertex,
+                     const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+    const ch::ScreenPoint ground = ch::world_to_screen_point(
+        static_cast<float>(vertex.x), static_cast<float>(vertex.y),
+        view.camera, view.viewport_width, view.viewport_height);
+    const float height = 31.0F * view.camera.zoom;
+    const float half_width = std::max(1.0F, 1.4F * view.camera.zoom);
+    set_fence_draw_color(renderer, preview, false);
+    SDL_RenderLine(renderer, ground.x - half_width, ground.y, ground.x - half_width, ground.y - height);
+    SDL_RenderLine(renderer, ground.x, ground.y, ground.x, ground.y - height);
+    SDL_RenderLine(renderer, ground.x + half_width, ground.y, ground.x + half_width, ground.y - height);
+    set_fence_draw_color(renderer, preview, true);
+    SDL_RenderLine(renderer, ground.x - half_width, ground.y - height, ground.x + half_width, ground.y - height);
+}
+
+void draw_fence_segment(SDL_Renderer* renderer, const FenceVertex from, const FenceVertex to,
+                        const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+    const ch::ScreenPoint a = ch::world_to_screen_point(
+        static_cast<float>(from.x), static_cast<float>(from.y),
+        view.camera, view.viewport_width, view.viewport_height);
+    const ch::ScreenPoint b = ch::world_to_screen_point(
+        static_cast<float>(to.x), static_cast<float>(to.y),
+        view.camera, view.viewport_width, view.viewport_height);
+    const float lower = 10.0F * view.camera.zoom;
+    const float upper = 22.0F * view.camera.zoom;
+    const float thickness = std::max(1.0F, view.camera.zoom);
+
+    set_fence_draw_color(renderer, preview, false);
+    for (const float y_offset : {lower, upper}) {
+        SDL_RenderLine(renderer, a.x, a.y - y_offset, b.x, b.y - y_offset);
+        SDL_RenderLine(renderer, a.x, a.y - y_offset - thickness, b.x, b.y - y_offset - thickness);
+    }
+    set_fence_draw_color(renderer, preview, true);
+    SDL_RenderLine(renderer, a.x, a.y - upper - thickness, b.x, b.y - upper - thickness);
+}
+
+void render_fence_connections(SDL_Renderer* renderer, const FenceVertex vertex,
+                              const FenceConnection connections,
+                              const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+    if (has_connection(connections, CardinalDirection::east)) {
+        draw_fence_segment(renderer, vertex, {vertex.x + 1, vertex.y}, view, preview);
+    }
+    if (has_connection(connections, CardinalDirection::south)) {
+        draw_fence_segment(renderer, vertex, {vertex.x, vertex.y + 1}, view, preview);
+    }
+}
+
+void render_park_fences(SDL_Renderer* renderer) {
+    if (renderer == nullptr) return;
+    const ch::runtime_view::ViewSnapshot& view = ch::runtime_view::snapshot();
+    if (!view.valid) return;
+
+    for (const FenceNode& node : g_park_fences.nodes()) {
+        render_fence_connections(renderer, {node.vertex_x, node.vertex_y}, node.connections, view, false);
+    }
+    for (const FenceNode& node : g_park_fences.nodes()) {
+        draw_fence_post(renderer, {node.vertex_x, node.vertex_y}, view, false);
+    }
+
+    if (!g_park_fence_tool_active || !g_park_fence_placement.dragging()) return;
+    const std::vector<FencePlacementPreviewNode> preview = g_park_fence_placement.preview_nodes();
+    for (const FencePlacementPreviewNode& node : preview) {
+        render_fence_connections(renderer, node.vertex, node.state.connections, view, true);
+    }
+    for (const FencePlacementPreviewNode& node : preview) {
+        draw_fence_post(renderer, node.vertex, view, true);
+    }
 }
 
 void fill_rect(SDL_Renderer* renderer, const SDL_FRect& rect,
@@ -72,10 +254,92 @@ void fill_rect(SDL_Renderer* renderer, const SDL_FRect& rect,
 
 void GameplayUi::update_layout(const int viewport_width, const int viewport_height,
                                const GameplayUiModel& model) {
-    update_layout_legacy(viewport_width, viewport_height, energy_free_ui_model(model));
+    if (g_park_fence_tool_active &&
+        (!model.build_panel_open || model.overlay != UiOverlay::none ||
+         model.active_tool != UiTool::buildings ||
+         (!model.selected_building_id.empty() && model.selected_building_id != kParkFenceToolId))) {
+        deactivate_park_fence_tool();
+    }
+    update_layout_legacy(viewport_width, viewport_height, runtime_ui_model(model));
+}
+
+void GameplayUi::handle_mouse_motion(const float mouse_x, const float mouse_y) {
+    handle_mouse_motion_legacy(mouse_x, mouse_y);
+    if (!g_park_fence_tool_active || !g_park_fence_placement.dragging() ||
+        consumes_point(mouse_x, mouse_y)) {
+        return;
+    }
+    if (const std::optional<FenceVertex> vertex = nearest_fence_vertex(mouse_x, mouse_y)) {
+        g_park_fence_placement.update_drag(*vertex);
+    }
+}
+
+UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const float mouse_y,
+                                                   const bool primary_button) {
+    UiInputResult result = handle_mouse_button_down_legacy(mouse_x, mouse_y, primary_button);
+
+    if (result.consumed) {
+        if (result.action && result.action->action == UiAction::select_building &&
+            result.action->payload == kParkFenceToolId) {
+            g_park_fence_tool_active = true;
+            g_park_fence_placement.cancel_drag();
+            g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
+            result.action.reset();
+        } else if (result.action && result.action->action != UiAction::none) {
+            deactivate_park_fence_tool();
+        }
+        if (g_park_fence_tool_active && build_category_filter_ != kParkCategory) {
+            deactivate_park_fence_tool();
+        }
+        return result;
+    }
+
+    if (!g_park_fence_tool_active || model_.overlay != UiOverlay::none) return result;
+
+    result.consumed = true;
+    result.action.reset();
+    if (!primary_button) {
+        deactivate_park_fence_tool();
+        g_park_fence_status = "GRADE DO PARQUE CANCELADA";
+        return result;
+    }
+
+    const std::optional<FenceVertex> vertex = nearest_fence_vertex(mouse_x, mouse_y);
+    if (!vertex) {
+        g_park_fence_status = "GRADE DO PARQUE: FORA DO MAPA";
+        return result;
+    }
+
+    g_park_fence_placement.begin_drag(*vertex);
+    g_park_fence_status = "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR";
+    return result;
+}
+
+void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y) {
+    const bool released_over_ui = consumes_point(mouse_x, mouse_y);
+    handle_mouse_button_up_legacy(mouse_x, mouse_y);
+
+    if (!g_park_fence_tool_active || !g_park_fence_placement.dragging()) return;
+    if (released_over_ui) {
+        g_park_fence_placement.cancel_drag();
+        g_park_fence_status = "GRADE DO PARQUE: ARRASTE CANCELADO SOBRE A INTERFACE";
+        return;
+    }
+
+    if (const std::optional<FenceVertex> vertex = nearest_fence_vertex(mouse_x, mouse_y)) {
+        g_park_fence_placement.update_drag(*vertex);
+        const int placed = g_park_fence_placement.commit_drag();
+        g_park_fence_status = placed > 0
+            ? "GRADE DO PARQUE CONSTRUIDA: " + std::to_string(placed) + " PONTO(S) | CONTINUE ARRASTANDO"
+            : "GRADE DO PARQUE: TRECHO JA EXISTE";
+    } else {
+        g_park_fence_placement.cancel_drag();
+        g_park_fence_status = "GRADE DO PARQUE: FORA DO MAPA";
+    }
 }
 
 void GameplayUi::render(SDL_Renderer* renderer) const {
+    if (model_.overlay == UiOverlay::none) render_park_fences(renderer);
     render_legacy(renderer);
     if (renderer == nullptr || panels_.empty()) return;
 
