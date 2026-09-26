@@ -5,6 +5,8 @@
 #include "farming_system.h"
 
 #include <algorithm>
+#include <string_view>
+#include <unordered_set>
 
 CityEconomy::CityEconomy(const std::int64_t initial_funds)
     : funds_(initial_funds) {}
@@ -66,6 +68,104 @@ int CityEconomy::last_property_tax_year() const {
 }
 
 namespace {
+
+constexpr std::string_view kParkTicketBoothId = "park_ticket_booth_01";
+constexpr int kParkTicketBoothLinkRangeTiles = 1;
+
+[[nodiscard]] bool is_park_ticket_booth(const BuildingDefinition& definition) {
+    return definition.id == kParkTicketBoothId;
+}
+
+[[nodiscard]] bool is_ticketed_park_attraction(const BuildingDefinition& definition) {
+    return !is_park_ticket_booth(definition) && definition.category == "service" &&
+        definition.default_service_price > 0 &&
+        definition.texture_path.find("assets/city_park/") != std::string::npos;
+}
+
+[[nodiscard]] int footprint_axis_gap(const int a_start, const int a_size,
+                                     const int b_start, const int b_size) {
+    const int a_end = a_start + a_size;
+    const int b_end = b_start + b_size;
+    if (a_end <= b_start) return b_start - a_end;
+    if (b_end <= a_start) return a_start - b_end;
+    return 0;
+}
+
+[[nodiscard]] int footprint_gap(const BuildingInstance& a, const BuildingDefinition& a_definition,
+                                const BuildingInstance& b, const BuildingDefinition& b_definition) {
+    const BuildingFootprint a_footprint = rotated_footprint(a_definition, a.rotation);
+    const BuildingFootprint b_footprint = rotated_footprint(b_definition, b.rotation);
+    return footprint_axis_gap(a.tile_x, a_footprint.width, b.tile_x, b_footprint.width) +
+           footprint_axis_gap(a.tile_y, a_footprint.height, b.tile_y, b_footprint.height);
+}
+
+struct ParkTicketTarget {
+    const BuildingInstance* instance = nullptr;
+    const BuildingDefinition* definition = nullptr;
+    int distance = 0;
+};
+
+[[nodiscard]] ParkTicketTarget nearest_ticketed_park_attraction(const BuildingInstance& booth,
+                                                                 const BuildingDefinition& booth_definition,
+                                                                 const BuildingManager& buildings,
+                                                                 const BuildingCatalog& catalog) {
+    ParkTicketTarget best;
+    bool found = false;
+    for (const BuildingInstance& candidate : buildings.instances()) {
+        if (candidate.instance_id == booth.instance_id) continue;
+        const BuildingDefinition* candidate_definition = catalog.find(candidate.definition_id);
+        if (candidate_definition == nullptr || !is_ticketed_park_attraction(*candidate_definition)) continue;
+
+        const int distance = footprint_gap(booth, booth_definition, candidate, *candidate_definition);
+        if (distance > kParkTicketBoothLinkRangeTiles) continue;
+        if (!found || distance < best.distance ||
+            (distance == best.distance && candidate.instance_id < best.instance->instance_id)) {
+            best = {&candidate, candidate_definition, distance};
+            found = true;
+        }
+    }
+    return best;
+}
+
+// A park ticket booth is the authoritative price control for the nearest
+// ticketed City Park attraction. The visual footprint is used for proximity so
+// the booth can sit beside the ride entrance/stairs even when a large sprite
+// uses a smaller physical occupancy footprint. One empty tile of separation is
+// tolerated. If multiple booths resolve to the same ride, the earliest placed
+// booth is authoritative and later booths mirror that ride price.
+void synchronize_park_ticket_booth_prices(BuildingManager& buildings, const BuildingCatalog& catalog) {
+    std::unordered_set<std::uint64_t> claimed_attractions;
+    for (const BuildingInstance& booth_snapshot : buildings.instances()) {
+        const BuildingDefinition* booth_definition = catalog.find(booth_snapshot.definition_id);
+        if (booth_definition == nullptr || !is_park_ticket_booth(*booth_definition)) continue;
+
+        const ParkTicketTarget target = nearest_ticketed_park_attraction(
+            booth_snapshot, *booth_definition, buildings, catalog);
+        if (target.instance == nullptr || target.definition == nullptr) continue;
+
+        const BuildingInstance* current_target = buildings.find_by_id(target.instance->instance_id);
+        if (current_target == nullptr) continue;
+        if (claimed_attractions.contains(target.instance->instance_id)) {
+            (void)buildings.set_service_price(
+                booth_snapshot.instance_id, *booth_definition, current_target->service_price);
+            continue;
+        }
+        claimed_attractions.insert(target.instance->instance_id);
+
+        const std::int64_t desired_price = booth_snapshot.service_price > 0
+            ? static_cast<std::int64_t>(booth_snapshot.service_price)
+            : static_cast<std::int64_t>(current_target->service_price);
+        if (desired_price <= 0) continue;
+
+        (void)buildings.set_service_price(
+            target.instance->instance_id, *target.definition, desired_price);
+        current_target = buildings.find_by_id(target.instance->instance_id);
+        if (current_target != nullptr) {
+            (void)buildings.set_service_price(
+                booth_snapshot.instance_id, *booth_definition, current_target->service_price);
+        }
+    }
+}
 
 [[nodiscard]] std::int64_t monthly_tax_revenue_for(const BuildingDefinition& definition,
                                                     const BuildingLevelDefinition& level_def,
@@ -160,6 +260,10 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
 
 void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                           const PopulationSystem& population, const FarmingSystem* farming) {
+    // Pricing is normally a pure economy read. Park booths are the exception:
+    // changing a booth price in the existing building panel must immediately
+    // update the nearby ride before the summary is recomputed.
+    synchronize_park_ticket_booth_prices(const_cast<BuildingManager&>(buildings), catalog);
     monthly_summary_ = {};
     (void)farming;
     for (const BuildingInstance& instance : buildings.instances()) {
@@ -169,9 +273,11 @@ void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, cons
         }
         const auto& level_def = instance.current_level_definition(*definition);
         monthly_summary_.revenue += monthly_tax_revenue_for(*definition, level_def, population);
-        const ServicePricingEstimate service = service_pricing_estimate(
-            *definition, instance, population.current_population());
-        monthly_summary_.revenue += service.revenue_per_month;
+        if (!is_park_ticket_booth(*definition)) {
+            const ServicePricingEstimate service = service_pricing_estimate(
+                *definition, instance, population.current_population());
+            monthly_summary_.revenue += service.revenue_per_month;
+        }
         monthly_summary_.expenses += monthly_expense_for(level_def);
     }
     monthly_summary_.balance = monthly_summary_.revenue - monthly_summary_.expenses;
@@ -180,6 +286,7 @@ void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, cons
 void CityEconomy::on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                   const PopulationSystem& population, const GameDate& closing_date,
                                   const ServiceVehicleCatalog* vehicle_catalog, const ServiceVehicleManager* vehicles, FarmingSystem* farming) {
+    synchronize_park_ticket_booth_prices(const_cast<BuildingManager&>(buildings), catalog);
     monthly_summary_ = {};
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
@@ -188,8 +295,11 @@ void CityEconomy::on_month_closed(const BuildingManager& buildings, const Buildi
         }
         const auto& level_def = instance.current_level_definition(*definition);
         const std::int64_t tax_revenue = monthly_tax_revenue_for(*definition, level_def, population);
-        const ServicePricingEstimate service = service_pricing_estimate(
-            *definition, instance, population.current_population(), farming);
+        ServicePricingEstimate service;
+        if (!is_park_ticket_booth(*definition)) {
+            service = service_pricing_estimate(
+                *definition, instance, population.current_population(), farming);
+        }
         monthly_summary_.revenue += tax_revenue + service.revenue_per_month;
         const std::int64_t expense = monthly_expense_for(level_def);
         monthly_summary_.expenses += expense;
