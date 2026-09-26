@@ -42,6 +42,18 @@
   "requiredPopulationForFullRevenue": 0,
   "powerConsumption": 0,
   "artScale": 1.0,
+  "serviceName": "Café",
+  "servicePricingContract": {
+    "contract": "CH_SERVICE_PRICE_V1",
+    "currency": "USD",
+    "storageUnit": "cent",
+    "initialPrice": 300,
+    "minimumPrice": 50,
+    "maximumPrice": 2000,
+    "priceStep": 25
+  },
+  "baseServiceCustomersPerMonth": 100,
+  "servicePopulationForFullDemand": 60,
   "playerBuildable": true,
   "productionStatus": "runtime_buildable",
   "colorMask": {

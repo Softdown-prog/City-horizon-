@@ -92,14 +92,18 @@ TileConnectionMask camera_visual_connections(const TileConnectionMask connection
 }
 
 std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMask connections) {
-    // CH_MASK_V1 cement_path is a single, perspective-locked ground tile.
-    // Its material is independent of the sidewalk's simulation semantics, so
-    // connected cells may share the same visual without creating a new road.
-    if (style_id == "cement_path") {
-        return "assets/terrain/paths/grass_to_concrete_path_01_concrete_path.png";
+    // Old saves may refer to concrete styles whose sprites were never shipped.
+    // Keep those walkable cells visible until approved concrete art is promoted.
+    if (style_id == "cement_path" || style_id == "concrete_01") {
+        return dirt_path_sprite(connections);
     }
     if (style_id == "dirt_path") {
         return dirt_path_sprite(connections);
+    }
+    if (style_id == "sand_path") {
+        std::string filename = dirt_path_sprite(connections).substr(std::string("assets/terrain/paths/dirt_01/").size());
+        filename.replace(0, 4, "sand");
+        return "assets/terrain/paths/sand_01/" + filename;
     }
     const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
     const int mask = static_cast<int>(connections);

@@ -43,6 +43,7 @@ enum class UiAction : std::uint8_t {
     select_building,
     activate_roads,
     activate_sidewalks,
+    select_sidewalk_style,
     activate_land,
     paint_grass,
     paint_sand,
@@ -210,6 +211,7 @@ struct GameplayUiModel {
     std::optional<UiSelectedBuilding> selected_building;
     std::optional<UiLandDetails> land_details;
     std::string terrain_paint_style;
+    std::string sidewalk_style = "dirt_path";
     bool debug_visible = false;
     std::vector<std::string> debug_lines;
 };

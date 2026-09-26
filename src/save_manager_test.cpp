@@ -67,11 +67,17 @@ int main(const int argc, char** argv) {
     const BuildingDefinition* house = catalog.find("house_suburban_01");
     const BuildingDefinition* ferris = catalog.find("ferris_wheel_01");
     const BuildingDefinition* ticket_booth = catalog.find("park_ticket_booth_01");
+    const BuildingDefinition* coffee_shop = catalog.find("coffee_shop_01");
     if (!require(cafe != nullptr, "cafe definition exists") ||
         !require(mini_market != nullptr, "mini market definition exists") ||
         !require(house != nullptr, "house definition exists") ||
         !require(ferris != nullptr && ferris->animation && ferris->animation->playback == "activity_loop",
                  "ferris wheel uses activity gated animation") ||
+        !require(coffee_shop != nullptr && coffee_shop->service_name == "Café" &&
+                 coffee_shop->default_service_price.minor_units == 300 &&
+                 coffee_shop->default_service_price.units_per_dollar == 100 &&
+                 coffee_shop->default_service_price.step_minor_units == 25,
+                 "coffee shop exposes configurable service pricing") ||
         !require(ticket_booth != nullptr && ticket_booth->player_buildable && ticket_booth->rotatable &&
                  ticket_booth->footprint_width == 2 && ticket_booth->footprint_height == 2 &&
                  ticket_booth->requires_road_or_path_access && !ticket_booth->animation &&

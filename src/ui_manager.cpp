@@ -584,6 +584,15 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                    true, model.terrain_paint_style == "sand");
     }
 
+    if (model.active_tool == UiTool::sidewalks) {
+        const float button_y = toolbar_y + 39.0F;
+        const float button_width = (context_width - 18.0F) / 2.0F;
+        add_button({context_x + 6.0F, button_y, button_width, 28.0F}, "TERRA", UiAction::select_sidewalk_style,
+                   true, model.sidewalk_style == "dirt_path", "dirt_path");
+        add_button({context_x + 12.0F + button_width, button_y, button_width, 28.0F}, "AREIA", UiAction::select_sidewalk_style,
+                   true, model.sidewalk_style == "sand_path", "sand_path");
+    }
+
     if (model.placement_rotatable && model.active_tool == UiTool::buildings) {
         constexpr float rotation_gap = 6.0F;
         const float rotation_width = std::max(72.0F, (context_width - 18.0F - rotation_gap) * 0.5F);
@@ -1019,7 +1028,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                     (model_.build_panel_open ? "SELECIONE UM ITEM PARA POSICIONAR" : "ESCOLHA UMA CONSTRUCAO");
                 break;
             case UiTool::roads: title = "MODO ESTRADAS"; description = "CLIQUE E ARRASTE PARA CONSTRUIR"; break;
-            case UiTool::sidewalks: title = "MODO CALCADAS"; description = "CLIQUE OU ARRASTE EM TERRENO PROPRIO"; break;
+            case UiTool::sidewalks: title = "MODO PISO"; description = "ESCOLHA CAMINHO DE TERRA OU AREIA"; break;
             case UiTool::land: title = "MODO TERRENO"; description = model_.terrain_paint_style.empty()
                 ? "LOTES: COMPRE TERRENO VIZINHO" : "GRAMA/AREIA: CLIQUE EM SOLO PROPRIO"; break;
             case UiTool::remove: title = "MODO DEMOLIR"; description = "CLIQUE EM PREDIO, CALCADA OU ESTRADA"; break;
