@@ -1,7 +1,7 @@
 {
   "id": "ferris_wheel_01",
   "name": "Roda-gigante",
-  "category": "service",
+  "category": "city_park",
   "texture": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
   "sprites": {
     "0": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
