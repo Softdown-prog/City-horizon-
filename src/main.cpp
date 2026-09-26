@@ -2791,6 +2791,9 @@ int main() {
                     }
                 }
             } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                // Releasing a drag belongs to the same mouse gesture. Keep
+                // its result/error effects, but do not add generic UI audio.
+                mouse_click_event = event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT;
                 if (event.button.button == SDL_BUTTON_MIDDLE) {
                     camera_dragging = false;
                     continue;
