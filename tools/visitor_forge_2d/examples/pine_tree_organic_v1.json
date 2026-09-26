@@ -13,25 +13,25 @@
     "worldHeightScreenVertical": true
   },
   "palette": {
-    "ground_shadow": "#17271F",
+    "ground_shadow": "#1B2B22",
     "trunk_top": "#A96C43",
     "trunk_bottom": "#5E3826",
     "trunk_light": "#D29661",
-    "back_top": "#183D2E",
-    "back_bottom": "#0B281F",
-    "mid_top": "#396D4C",
-    "mid_bottom": "#174432",
-    "front_top": "#4F865D",
-    "front_bottom": "#245940",
-    "highlight": "#8DB36F",
-    "occlusion": "#0B3025"
+    "back_top": "#244F39",
+    "back_bottom": "#12372A",
+    "mid_top": "#477A54",
+    "mid_bottom": "#24533B",
+    "front_top": "#5A8D62",
+    "front_bottom": "#32694A",
+    "highlight": "#8FAF72",
+    "occlusion": "#173F31"
   },
   "raster": {
-    "shadowDabs": 420,
-    "highlightDabs": 340,
-    "needleStrokes": 760,
-    "finalGrain": 920,
-    "finalNeedles": 440
+    "shadowDabs": 250,
+    "highlightDabs": 220,
+    "needleStrokes": 420,
+    "finalGrain": 260,
+    "finalNeedles": 220
   },
   "tiers": [
     {"y": 22,  "span": 15, "thickness": 16, "skew": 1},
