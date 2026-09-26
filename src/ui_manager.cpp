@@ -1,18 +1,17 @@
 #include "ui_manager.h"
 
-#include "fence_placement_controller.h"
-#include "fence_system.h"
-#include "src/ch_core/contracts.h"
+#include "park_fence_runtime.h"
 #include "src/runtime_view_state.h"
 
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <string_view>
 
 // Keep the established UI implementation intact while removing energy from the
-// public gameplay surface. Compatibility names also let the Park fence tool
-// intercept only the input it owns without duplicating the existing UI code.
+// public gameplay surface. Compatibility names also let the Park fence tools
+// intercept only the input they own without duplicating the existing UI code.
 #define update_layout update_layout_legacy
 #define handle_mouse_motion handle_mouse_motion_legacy
 #define handle_mouse_button_down handle_mouse_button_down_legacy
@@ -30,10 +29,12 @@ namespace {
 constexpr std::string_view kParkCategory = "PARK";
 constexpr std::string_view kLegacyParkCategory = "CITY PARK";
 constexpr std::string_view kParkFenceToolId = "park_fence_classic_iron_v1";
+constexpr std::string_view kParkGateToolId = "park_gate_classic_iron_v1";
 
-FenceManager g_park_fences(ch::contracts::kMapMin, ch::contracts::kMapMax);
-FencePlacementController g_park_fence_placement(g_park_fences);
+FenceManager& g_park_fences = park_fence_runtime::fences();
+FencePlacementController& g_park_fence_placement = park_fence_runtime::placement();
 bool g_park_fence_tool_active = false;
+bool g_park_gate_tool_active = false;
 std::string g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
 std::optional<UiRect> g_floor_catalog_bounds;
 
@@ -61,9 +62,10 @@ std::optional<UiRect> g_floor_catalog_bounds;
     return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");
 }
 
-void deactivate_park_fence_tool() {
+void deactivate_park_fence_tools() {
     g_park_fence_placement.cancel_drag();
     g_park_fence_tool_active = false;
+    g_park_gate_tool_active = false;
 }
 
 bool contains_energy_term(const std::string& value) {
@@ -110,11 +112,12 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
         if (item.category == kLegacyParkCategory) item.category = std::string(kParkCategory);
     }
 
-    const bool already_has_fence = std::any_of(
-        model.build_items.begin(), model.build_items.end(), [](const UiBuildItem& item) {
-            return item.definition_id == kParkFenceToolId;
+    const auto has_item = [&model](const std::string_view id) {
+        return std::any_of(model.build_items.begin(), model.build_items.end(), [id](const UiBuildItem& item) {
+            return item.definition_id == id;
         });
-    if (!already_has_fence) {
+    };
+    if (!has_item(kParkFenceToolId)) {
         model.build_items.push_back({
             std::string(kParkFenceToolId),
             "Grade Classica do Parque",
@@ -127,6 +130,19 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
             1,
         });
     }
+    if (!has_item(kParkGateToolId)) {
+        model.build_items.push_back({
+            std::string(kParkGateToolId),
+            "Portao Aberto do Parque",
+            std::string(kParkCategory),
+            "SEM CUSTO",
+            true,
+            park_fence_thumbnail_path(),
+            "1 TRECHO",
+            "APLIQUE SOBRE UMA CERCA | PASSAGEM LIVRE",
+            1,
+        });
+    }
 
     model.debug_lines.erase(
         std::remove_if(model.debug_lines.begin(), model.debug_lines.end(),
@@ -136,12 +152,12 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
     const std::size_t deficit = model.status.find(" | POWER DEFICIT");
     if (deficit != std::string::npos) model.status.erase(deficit);
 
-    if (g_park_fence_tool_active) {
-        model.selected_building_id = std::string(kParkFenceToolId);
+    if (g_park_fence_tool_active || g_park_gate_tool_active) {
+        model.selected_building_id = std::string(g_park_gate_tool_active ? kParkGateToolId : kParkFenceToolId);
         model.placement_preview_path = park_fence_thumbnail_path();
         model.placement_preview_frame_count = 1;
         model.placement_rotatable = false;
-        model.placement_rotation_label = "AUTO";
+        model.placement_rotation_label = g_park_gate_tool_active ? "PORTAO ABERTO" : "AUTO";
         model.status = g_park_fence_status;
     }
 
@@ -177,6 +193,46 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
         }
     }
     return nearest;
+}
+
+[[nodiscard]] float point_segment_distance_squared(const float px, const float py,
+                                                   const ch::ScreenPoint a,
+                                                   const ch::ScreenPoint b) {
+    const float vx = b.x - a.x;
+    const float vy = b.y - a.y;
+    const float length_squared = vx * vx + vy * vy;
+    if (length_squared <= 0.0001F) {
+        const float dx = px - a.x;
+        const float dy = py - a.y;
+        return dx * dx + dy * dy;
+    }
+    const float t = std::clamp(((px - a.x) * vx + (py - a.y) * vy) / length_squared, 0.0F, 1.0F);
+    const float dx = px - (a.x + vx * t);
+    const float dy = py - (a.y + vy * t);
+    return dx * dx + dy * dy;
+}
+
+[[nodiscard]] std::optional<FenceSegment> nearest_fence_segment(const float screen_x, const float screen_y) {
+    const ch::runtime_view::ViewSnapshot& view = ch::runtime_view::snapshot();
+    if (!view.valid) return std::nullopt;
+
+    std::optional<FenceSegment> nearest;
+    float nearest_distance = std::numeric_limits<float>::max();
+    const float maximum_distance = std::max(14.0F, 20.0F * view.camera.zoom);
+    for (const FenceSegment& segment : g_park_fences.segments()) {
+        const ch::ScreenPoint a = ch::world_to_screen_point(
+            static_cast<float>(segment.from.x), static_cast<float>(segment.from.y),
+            view.camera, view.viewport_width, view.viewport_height);
+        const ch::ScreenPoint b = ch::world_to_screen_point(
+            static_cast<float>(segment.to.x), static_cast<float>(segment.to.y),
+            view.camera, view.viewport_width, view.viewport_height);
+        const float distance = point_segment_distance_squared(screen_x, screen_y, a, b);
+        if (distance < nearest_distance) {
+            nearest_distance = distance;
+            nearest = segment;
+        }
+    }
+    return nearest && nearest_distance <= maximum_distance * maximum_distance ? nearest : std::nullopt;
 }
 
 void set_fence_draw_color(SDL_Renderer* renderer, const bool preview, const bool highlight) {
@@ -225,6 +281,41 @@ void draw_fence_segment(SDL_Renderer* renderer, const FenceVertex from, const Fe
     SDL_RenderLine(renderer, a.x, a.y - upper - thickness, b.x, b.y - upper - thickness);
 }
 
+void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
+                            const ch::runtime_view::ViewSnapshot& view) {
+    const ch::ScreenPoint a = ch::world_to_screen_point(
+        static_cast<float>(segment.from.x), static_cast<float>(segment.from.y),
+        view.camera, view.viewport_width, view.viewport_height);
+    const ch::ScreenPoint b = ch::world_to_screen_point(
+        static_cast<float>(segment.to.x), static_cast<float>(segment.to.y),
+        view.camera, view.viewport_width, view.viewport_height);
+    const float vx = b.x - a.x;
+    const float vy = b.y - a.y;
+    const float length = std::max(1.0F, std::sqrt(vx * vx + vy * vy));
+    const float nx = -vy / length;
+    const float ny = vx / length;
+    const ch::ScreenPoint left{a.x + vx * 0.28F, a.y + vy * 0.28F};
+    const ch::ScreenPoint right{a.x + vx * 0.72F, a.y + vy * 0.72F};
+    const float lower = 10.0F * view.camera.zoom;
+    const float upper = 22.0F * view.camera.zoom;
+    const float leaf_depth = 15.0F * view.camera.zoom;
+
+    set_fence_draw_color(renderer, false, false);
+    for (const float y_offset : {lower, upper}) {
+        SDL_RenderLine(renderer, a.x, a.y - y_offset, left.x, left.y - y_offset);
+        SDL_RenderLine(renderer, right.x, right.y - y_offset, b.x, b.y - y_offset);
+        SDL_RenderLine(renderer, left.x, left.y - y_offset,
+                       left.x + nx * leaf_depth, left.y + ny * leaf_depth - y_offset);
+        SDL_RenderLine(renderer, right.x, right.y - y_offset,
+                       right.x + nx * leaf_depth, right.y + ny * leaf_depth - y_offset);
+    }
+    set_fence_draw_color(renderer, false, true);
+    SDL_RenderLine(renderer, left.x, left.y - upper,
+                   left.x + nx * leaf_depth, left.y + ny * leaf_depth - upper);
+    SDL_RenderLine(renderer, right.x, right.y - upper,
+                   right.x + nx * leaf_depth, right.y + ny * leaf_depth - upper);
+}
+
 void render_fence_connections(SDL_Renderer* renderer, const FenceVertex vertex,
                               const FenceConnection connections,
                               const ch::runtime_view::ViewSnapshot& view, const bool preview) {
@@ -241,8 +332,9 @@ void render_park_fences(SDL_Renderer* renderer) {
     const ch::runtime_view::ViewSnapshot& view = ch::runtime_view::snapshot();
     if (!view.valid) return;
 
-    for (const FenceNode& node : g_park_fences.nodes()) {
-        render_fence_connections(renderer, {node.vertex_x, node.vertex_y}, node.connections, view, false);
+    for (const FenceSegment& segment : g_park_fences.segments()) {
+        if (segment.open_gate) draw_open_gate_segment(renderer, segment, view);
+        else draw_fence_segment(renderer, segment.from, segment.to, view, false);
     }
     for (const FenceNode& node : g_park_fences.nodes()) {
         draw_fence_post(renderer, {node.vertex_x, node.vertex_y}, view, false);
@@ -269,11 +361,13 @@ void fill_rect(SDL_Renderer* renderer, const SDL_FRect& rect,
 
 void GameplayUi::update_layout(const int viewport_width, const int viewport_height,
                                const GameplayUiModel& model) {
-    if (g_park_fence_tool_active &&
+    const bool park_tool_active = g_park_fence_tool_active || g_park_gate_tool_active;
+    const bool model_has_other_selection = !model.selected_building_id.empty() &&
+        model.selected_building_id != kParkFenceToolId && model.selected_building_id != kParkGateToolId;
+    if (park_tool_active &&
         (!model.build_panel_open || model.overlay != UiOverlay::none ||
-         model.active_tool != UiTool::buildings ||
-         (!model.selected_building_id.empty() && model.selected_building_id != kParkFenceToolId))) {
-        deactivate_park_fence_tool();
+         model.active_tool != UiTool::buildings || model_has_other_selection)) {
+        deactivate_park_fence_tools();
     }
 
     GameplayUiModel runtime_model = runtime_ui_model(model);
@@ -415,8 +509,6 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
             card_y += card_height + card_gap;
         }
     } else if (runtime_model.overlay == UiOverlay::none && runtime_model.active_tool == UiTool::sidewalks) {
-        // PISO uses the same card language as buildings, but in the same narrow
-        // corner drawer used by the other gameplay catalogues.
         buttons_.erase(
             std::remove_if(buttons_.begin(), buttons_.end(), [](const UiButton& button) {
                 return button.action == UiAction::select_sidewalk_style;
@@ -460,25 +552,47 @@ UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const fl
         if (result.action && result.action->action == UiAction::select_building &&
             result.action->payload == kParkFenceToolId) {
             g_park_fence_tool_active = true;
+            g_park_gate_tool_active = false;
             g_park_fence_placement.cancel_drag();
             g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
             result.action.reset();
+        } else if (result.action && result.action->action == UiAction::select_building &&
+                   result.action->payload == kParkGateToolId) {
+            g_park_fence_tool_active = false;
+            g_park_gate_tool_active = true;
+            g_park_fence_placement.cancel_drag();
+            g_park_fence_status = "PORTAO ABERTO: CLIQUE SOBRE UM TRECHO DE CERCA";
+            result.action.reset();
         } else if (result.action && result.action->action != UiAction::none) {
-            deactivate_park_fence_tool();
+            deactivate_park_fence_tools();
         }
-        if (g_park_fence_tool_active && build_category_filter_ != kParkCategory) {
-            deactivate_park_fence_tool();
+        if ((g_park_fence_tool_active || g_park_gate_tool_active) && build_category_filter_ != kParkCategory) {
+            deactivate_park_fence_tools();
         }
         return result;
     }
 
-    if (!g_park_fence_tool_active || model_.overlay != UiOverlay::none) return result;
+    if ((!g_park_fence_tool_active && !g_park_gate_tool_active) || model_.overlay != UiOverlay::none) return result;
 
     result.consumed = true;
     result.action.reset();
     if (!primary_button) {
-        deactivate_park_fence_tool();
-        g_park_fence_status = "GRADE DO PARQUE CANCELADA";
+        deactivate_park_fence_tools();
+        g_park_fence_status = "FERRAMENTA DE CERCA CANCELADA";
+        return result;
+    }
+
+    if (g_park_gate_tool_active) {
+        const std::optional<FenceSegment> segment = nearest_fence_segment(mouse_x, mouse_y);
+        if (!segment) {
+            g_park_fence_status = "PORTAO ABERTO: CLIQUE MAIS PERTO DE UMA CERCA";
+        } else if (segment->open_gate) {
+            g_park_fence_status = "PORTAO ABERTO: ESTE TRECHO JA E UMA PASSAGEM";
+        } else if (g_park_fence_placement.place_open_gate(segment->from, segment->to)) {
+            g_park_fence_status = "PORTAO ABERTO ADICIONADO | VISITANTES PODEM ATRAVESSAR";
+        } else {
+            g_park_fence_status = "PORTAO ABERTO: TRECHO INVALIDO";
+        }
         return result;
     }
 
@@ -539,8 +653,6 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
     const float administration_x = std::max(kMargin + 120.0F, settings_x - 112.0F);
     const float pause_x = std::max(kMargin, administration_x - 124.0F);
 
-    // Redraw the normal top HUD as three stats. This removes both the energy
-    // number and the lightning icon without disturbing the existing controls.
     if (model_.overlay == UiOverlay::none) {
         const float stats_left = hud.x + 2.0F;
         const float stats_right = std::max(stats_left, pause_x);
@@ -588,9 +700,6 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         }
     }
 
-    // Legacy modal layouts still reserve the old row. Paint only that retired
-    // row back to the card background so Administration/Reports contain no
-    // energy label or value.
     if (model_.overlay == UiOverlay::administration && overlay_bounds_) {
         const UiRect& panel = *overlay_bounds_;
         const float padding = std::clamp(panel.width * 0.055F, 24.0F, 40.0F);
