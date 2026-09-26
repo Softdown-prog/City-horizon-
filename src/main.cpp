@@ -18,14 +18,18 @@
 //    price edit on a ticketed ride is mirrored into its linked booth before the
 //    economy refresh, keeping the booth authoritative without making the ride
 //    panel appear frozen.
-// 6. Ferris-wheel activity drives one continuous audio loop: the sound begins
-//    with activity and stops only when no Ferris wheel remains active.
+// 6. Ferris-wheel audio is frame-synchronized with both ride activity and the
+//    canonical visible viewport. An active wheel is audible only while its
+//    logical footprint intersects the current camera view.
 
 #include "audio_manager.h"
 #include "building_system.h"
 #include "land_system.h"
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
+#include "src/runtime_view_state.h"
+
+#include <algorithm>
 
 namespace ch {
 
@@ -70,37 +74,57 @@ namespace ch {
         static_cast<std::int64_t>(edited->service_price));
 }
 
-// Keep the Ferris-wheel loop tied to BuildingInstance::activity_count rather
-// than to the F11 test key itself.  This preserves the same audio behavior when
-// activity later comes from real visitor boarding.  The helper runs immediately
-// before the canonical begin/end call and returns the untouched instance id.
-[[nodiscard]] inline std::uint64_t ch_prepare_ferris_wheel_activity_audio(
-    AudioManager& audio, const BuildingManager& buildings,
-    const std::uint64_t instance_id, const bool starting) {
-    const BuildingInstance* target = buildings.find_by_id(instance_id);
-    if (target == nullptr || target->definition_id != "ferris_wheel_01") {
-        return instance_id;
-    }
+// Audio visibility follows the same canonical camera snapshot populated by the
+// projection layer.  No independent audio camera or distance heuristic exists.
+// The footprint is projected as the same isometric diamond used by the world;
+// when that projected envelope no longer intersects the viewport, the ride is
+// considered outside the visible set and must be silent.
+[[nodiscard]] inline bool ch_ferris_wheel_visible_in_current_view(
+    const BuildingInstance& instance, const BuildingDefinition& definition) {
+    const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
+    if (!view.valid) return false;
 
-    bool should_loop = starting;
-    if (!starting) {
-        // end_activity() is about to remove exactly one activity source. Keep
-        // the loop if this instance will still be active afterwards.
-        should_loop = target->activity_count > 1U;
-        if (!should_loop) {
-            for (const BuildingInstance& other : buildings.instances()) {
-                if (other.instance_id != instance_id &&
-                    other.definition_id == "ferris_wheel_01" &&
-                    other.activity_active()) {
-                    should_loop = true;
-                    break;
-                }
-            }
+    const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
+    const float x0 = static_cast<float>(instance.tile_x);
+    const float y0 = static_cast<float>(instance.tile_y);
+    const float x1 = x0 + static_cast<float>(footprint.width);
+    const float y1 = y0 + static_cast<float>(footprint.height);
+
+    const ch::ScreenPoint top = ch::world_to_screen_point(x0, y0, view.camera,
+                                                          view.viewport_width, view.viewport_height);
+    const ch::ScreenPoint right = ch::world_to_screen_point(x1, y0, view.camera,
+                                                            view.viewport_width, view.viewport_height);
+    const ch::ScreenPoint bottom = ch::world_to_screen_point(x1, y1, view.camera,
+                                                             view.viewport_width, view.viewport_height);
+    const ch::ScreenPoint left = ch::world_to_screen_point(x0, y1, view.camera,
+                                                           view.viewport_width, view.viewport_height);
+
+    const float min_x = std::min(std::min(top.x, right.x), std::min(bottom.x, left.x));
+    const float max_x = std::max(std::max(top.x, right.x), std::max(bottom.x, left.x));
+    const float min_y = std::min(std::min(top.y, right.y), std::min(bottom.y, left.y));
+    const float max_y = std::max(std::max(top.y, right.y), std::max(bottom.y, left.y));
+
+    return max_x > 0.0F && min_x < view.viewport_width &&
+           max_y > 0.0F && min_y < view.viewport_height;
+}
+
+[[nodiscard]] inline bool ch_ferris_wheel_should_be_audible(
+    const BuildingManager& buildings, const BuildingCatalog& catalog) {
+    for (const BuildingInstance& instance : buildings.instances()) {
+        if (instance.definition_id != "ferris_wheel_01" || !instance.activity_active()) continue;
+        const BuildingDefinition* definition = catalog.find(instance.definition_id);
+        if (definition != nullptr && ch_ferris_wheel_visible_in_current_view(instance, *definition)) {
+            return true;
         }
     }
+    return false;
+}
 
-    (void)audio.set_looping(SoundEvent::ferris_wheel_running, should_loop);
-    return instance_id;
+inline void ch_sync_ferris_wheel_audio_visibility(
+    AudioManager& audio, const BuildingManager& buildings, const BuildingCatalog& catalog) {
+    (void)audio.set_looping(
+        SoundEvent::ferris_wheel_running,
+        ch_ferris_wheel_should_be_audible(buildings, catalog));
 }
 
 // main_runtime_impl.cpp has two geometry-only parcels() reads: one for camera
@@ -122,12 +146,16 @@ namespace ch {
     set_service_price((instance_id), (definition), (service_price)) && \
     ch_sync_service_price_after_ui_edit(buildings, catalog, (instance_id), (definition))
 
-// Building activity calls stay canonical; only their instance-id argument is
-// passed through the Ferris-wheel audio synchronizer.
-#define begin_activity(instance_id) \
-    begin_activity(ch_prepare_ferris_wheel_activity_audio(audio, buildings, (instance_id), true))
-#define end_activity(instance_id) \
-    end_activity(ch_prepare_ferris_wheel_activity_audio(audio, buildings, (instance_id), false))
+// `mobile_render_entities()` is evaluated in the normal frame path immediately
+// before world entities are rendered (and may also be queried by debug UI).
+// Wrapping its call gives the audio loop a frame-level visibility gate without
+// duplicating or forking the canonical runtime loop.  The inner call is not
+// recursively expanded while this macro is active.
+#define mobile_render_entities() \
+    ([&]() { \
+        ch_sync_ferris_wheel_audio_visibility(audio, buildings, catalog); \
+        return mobile_render_entities(); \
+    }())
 
 // `play_sound` is a local lambda inside the implementation.  A function-like
 // macro is used here only around its call sites; its declaration is untouched.
@@ -143,8 +171,7 @@ namespace ch {
 #include "main_runtime_impl.cpp"
 
 #undef play_sound
-#undef end_activity
-#undef begin_activity
+#undef mobile_render_entities
 #undef set_service_price
 #undef SaveManager
 #undef PedestrianLaneNavigationNetwork
