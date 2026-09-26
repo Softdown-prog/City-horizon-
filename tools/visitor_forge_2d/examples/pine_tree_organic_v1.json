@@ -4,6 +4,9 @@
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 73021,
+  "validation": {
+    "minimumOpaqueHeightPx": 220
+  },
   "camera": {
     "contract": "CH_CAMERA_V1",
     "projection": "orthographic_dimetric",
