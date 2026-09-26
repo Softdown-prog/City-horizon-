@@ -5,8 +5,8 @@ on:
   push:
     paths:
       - "tools/visitor_forge_2d/examples/flower_bed_01.json"
-      - "tools/visitor_forge_2d/src/visitor_forge_2d/core/shape_recipe.py"
-      - "tools/visitor_forge_2d/src/visitor_forge_2d/cli.py"
+      - "tools/visitor_forge_2d/src/visitor_forge_2d/core/flower_bed_scenery.py"
+      - "tools/visitor_forge_2d/tests/test_flower_bed_scenery.py"
       - "tools/visitor_forge_2d/pyproject.toml"
       - ".github/workflows/render-flower-bed-visitor-forge.yml"
 
@@ -25,53 +25,19 @@ jobs:
       - name: Install Visitor Forge 2D
         run: python -m pip install pytest -e tools/visitor_forge_2d
 
-      - name: Test shape recipe renderer
-        run: python -m pytest tools/visitor_forge_2d/tests/test_shape_recipe.py -q
+      - name: Test flower bed renderer
+        run: python -m pytest tools/visitor_forge_2d/tests/test_flower_bed_scenery.py -q
 
-      - name: Render procedural flower bed
+      - name: Render procedural raster flower bed
         run: |
-          python -m visitor_forge_2d draw-recipe \
+          python -m visitor_forge_2d.core.flower_bed_scenery \
             --recipe tools/visitor_forge_2d/examples/flower_bed_01.json \
             --output out/flower_bed
-
-      - name: Render CH_CAMERA_V1 placement review
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import json
-          from PIL import Image, ImageDraw
-
-          recipe = json.loads(Path("tools/visitor_forge_2d/examples/flower_bed_01.json").read_text())
-          frame = Image.open("out/flower_bed/flower_bed_01.png").convert("RGBA")
-          anchor = recipe["anchor"]
-
-          board = Image.new("RGBA", (768, 480), (46, 77, 55, 255))
-          draw = ImageDraw.Draw(board)
-          gx, gy = 384, 290
-          hw, hh = 64, 32
-
-          for x in range(-3, 4):
-              for y in range(-3, 4):
-                  cx = gx + (x - y) * hw
-                  cy = gy + (x + y) * hh
-                  poly = [(cx, cy-hh), (cx+hw, cy), (cx, cy+hh), (cx-hw, cy)]
-                  fill = (76, 119, 66, 255) if (x+y) % 2 == 0 else (71, 113, 64, 255)
-                  draw.polygon(poly, fill=fill, outline=(105, 148, 93, 205))
-
-          draw.polygon([(gx,gy-hh),(gx+hw,gy),(gx,gy+hh),(gx-hw,gy)],
-                       fill=(82,132,72,255), outline=(174,207,145,255))
-          board.alpha_composite(frame, (round(gx-anchor[0]), round(gy-anchor[1])))
-          draw.ellipse((gx-3, gy-3, gx+3, gy+3), fill=(255,224,132,255))
-          draw.text((18,16), "CH_CAMERA_V1 / 30deg elevation / 45deg yaw / 128x64",
-                    fill=(247,244,220,255))
-          draw.text((18,36), "flower bed procedural 2D / 1x1 decoration / gameplay 1x",
-                    fill=(220,232,205,255))
-          board.save("out/flower_bed/flower_bed_01_isometric_review.png")
-          PY
 
       - name: Validate outputs
         run: |
           test -s out/flower_bed/flower_bed_01.png
+          test -s out/flower_bed/flower_bed_01.json
           test -s out/flower_bed/flower_bed_01_review.png
           test -s out/flower_bed/flower_bed_01_isometric_review.png
 
