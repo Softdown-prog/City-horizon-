@@ -46,7 +46,7 @@
   "maximumServicePrice": 15,
   "baseServiceCustomersPerMonth": 75,
   "servicePopulationForFullDemand": 60,
-  "artScale": 1.0,
+  "artScale": 0.21875,
   "animation": {
     "layout": "horizontal",
     "frameCount": 5,
