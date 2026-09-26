@@ -127,6 +127,10 @@ int FencePlacementController::commit_drag() {
     return placed;
 }
 
+bool FencePlacementController::place_open_gate(const FenceVertex from, const FenceVertex to) {
+    return fences_.set_open_gate(from, to, true);
+}
+
 bool FencePlacementController::place_open_gate(const FenceVertex vertex) {
     return fences_.set_gate(vertex.x, vertex.y, true);
 }
