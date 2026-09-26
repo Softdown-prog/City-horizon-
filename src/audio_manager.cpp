@@ -77,6 +77,16 @@ constexpr std::array<std::string_view, static_cast<std::size_t>(SoundEvent::coun
     return values;
 }
 
+[[nodiscard]] std::string string_for_key(const std::string_view json, const std::string_view key) {
+    const std::size_t key_position = json.find('"' + std::string(key) + '"');
+    if (key_position == std::string_view::npos) return {};
+    const std::size_t colon = json.find(':', key_position + key.size());
+    const std::size_t first_quote = colon == std::string_view::npos ? colon : json.find('"', colon + 1);
+    const std::size_t last_quote = first_quote == std::string_view::npos ? first_quote : json.find('"', first_quote + 1);
+    if (last_quote == std::string_view::npos) return {};
+    return std::string(json.substr(first_quote + 1, last_quote - first_quote - 1));
+}
+
 [[nodiscard]] bool number_for_key(const std::string& json, const std::string_view key, float& value) {
     const std::size_t key_position = json.find('"' + std::string(key) + '"');
     if (key_position == std::string::npos) {
@@ -122,6 +132,24 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
         std::cerr << "Audio disabled: could not open the default playback device: " << SDL_GetError() << '\n';
         shutdown();
         return false;
+    }
+
+    const std::string catalog = read_text_file(audio_directory / "audio_catalog.json");
+    const std::string loading_path = string_for_key(object_for_key(catalog, "music"), "Loading");
+    if (!loading_path.empty()) {
+        const std::filesystem::path full_path = audio_directory / loading_path;
+        if (std::filesystem::is_regular_file(full_path)) {
+            loading_music_ = MIX_LoadAudio(mixer_, full_path.string().c_str(), true);
+            if (loading_music_ != nullptr) {
+                music_track_ = MIX_CreateTrack(mixer_);
+                if (music_track_ == nullptr) {
+                    MIX_DestroyAudio(loading_music_);
+                    loading_music_ = nullptr;
+                }
+            }
+        }
+        if (loading_music_ == nullptr || music_track_ == nullptr)
+            std::cerr << "Loading music unavailable: " << full_path << ": " << SDL_GetError() << '\n';
     }
 
     std::unordered_map<std::string, MIX_Audio*> decoded_cache;
@@ -174,6 +202,14 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
 
 void AudioManager::shutdown() {
     available_ = false;
+    if (music_track_ != nullptr) {
+        MIX_DestroyTrack(music_track_);
+        music_track_ = nullptr;
+    }
+    if (loading_music_ != nullptr) {
+        MIX_DestroyAudio(loading_music_);
+        loading_music_ = nullptr;
+    }
     for (MIX_Track* track : tracks_) {
         MIX_DestroyTrack(track);
     }
@@ -227,6 +263,16 @@ bool AudioManager::play(const SoundEvent event) {
     if (!MIX_SetTrackAudio(available_track, effects_[index][static_cast<std::size_t>(variation)]) ||
         !MIX_PlayTrack(available_track, 0)) {
         std::cerr << "Audio event could not play: " << kEventNames[index] << "\nSDL error: " << SDL_GetError() << '\n';
+        return false;
+    }
+    return true;
+}
+
+bool AudioManager::play_loading_music() {
+    if (!available_ || music_track_ == nullptr || loading_music_ == nullptr) return false;
+    if (MIX_TrackPlaying(music_track_)) return true;
+    if (!MIX_SetTrackAudio(music_track_, loading_music_) || !MIX_PlayTrack(music_track_, 0)) {
+        std::cerr << "Loading music could not play: " << SDL_GetError() << '\n';
         return false;
     }
     return true;
@@ -290,5 +336,8 @@ void AudioManager::apply_volume_settings() {
         if (!MIX_SetTrackGain(track, volume_settings_.effects)) {
             std::cerr << "Could not apply effects volume: " << SDL_GetError() << '\n';
         }
+    }
+    if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {
+        std::cerr << "Could not apply music volume: " << SDL_GetError() << '\n';
     }
 }

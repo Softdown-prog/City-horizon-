@@ -4,8 +4,8 @@ The renderer uses a 128x64 (2:1) diamond with its world point at the top
 vertex. RoadManager's N/E/S/W neighbours share the four *sides* below, not the
 four vertices. This tool is the single source of truth for that geometry.
 
-By default it creates only the five visual-validation masks requested during
-the migration. Run with --all once their presentation has been approved.
+By default it creates five visual-validation masks. The shipped runtime set is
+generated with --all --runtime-names --output-dir assets/roads/premium_01.
 """
 
 from __future__ import annotations
@@ -170,6 +170,23 @@ def render_tile(mask: int) -> Image.Image:
     asphalt = asphalt_texture()
     image.paste(asphalt, (0, 0), alpha)
 
+    # Concrete curb/sidewalk lip belongs only to unconnected sides. A shared
+    # side stays asphalt so adjacent road sprites join without a white seam.
+    corners = ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2),
+               (WIDTH // 2, HEIGHT), (0, HEIGHT // 2))
+    sides = {NORTH: (corners[0], corners[1]),
+             EAST: (corners[1], corners[2]),
+             SOUTH: (corners[2], corners[3]),
+             WEST: (corners[3], corners[0])}
+    curbs = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    curb_draw = ImageDraw.Draw(curbs)
+    for direction, edge in sides.items():
+        if not mask & direction:
+            curb_draw.line(edge, fill=(164, 157, 140, 255), width=11 * SCALE)
+            curb_draw.line(edge, fill=(215, 207, 186, 255), width=4 * SCALE)
+    curbs.putalpha(ImageChops.multiply(curbs.getchannel("A"), alpha))
+    image = Image.alpha_composite(image, curbs)
+
     paths = connector_paths(mask)
     # Roads own the complete diamond.  Earlier versions drew a second, narrow
     # "corridor" plus white borders inside every tile.  At turns and junctions
@@ -237,6 +254,7 @@ def main() -> None:
     parser.add_argument("--all", action="store_true", help="generate all sixteen masks")
     parser.add_argument("--output-dir", type=Path, default=Path("assets/roads"))
     parser.add_argument("--preview", type=Path, default=Path("work/road_geometry_preview.png"))
+    parser.add_argument("--runtime-names", action="store_true", help="write road_00.png ... road_15.png for RoadVisualCatalog")
     args = parser.parse_args()
 
     masks = range(16) if args.all else sorted(TEST_MASKS)
@@ -245,9 +263,10 @@ def main() -> None:
     tiles: dict[int, Image.Image] = {}
     for mask in masks:
         tile = render_tile(mask)
-        tile.save(args.output_dir / FILENAMES[mask])
+        filename = f"road_{mask:02}.png" if args.runtime_names else FILENAMES[mask]
+        tile.save(args.output_dir / filename)
         tiles[mask] = tile
-        print(f"wrote {args.output_dir / FILENAMES[mask]}")
+        print(f"wrote {args.output_dir / filename}")
 
     validate_ports(tiles)
     if TEST_MASKS.issubset(tiles):

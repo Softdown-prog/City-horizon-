@@ -1,7 +1,7 @@
 {
   "id": "raspadinha_vendor_01",
   "name": "Carrinho de Raspadinha",
-  "category": "decor",
+  "category": "commercial",
   "texture": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_south.png",
   "sprites": {
     "0": "assets/props/raspadinha_vendor/raspadinha_vendor_anim_south.png",
@@ -40,6 +40,12 @@
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 0,
+  "serviceName": "Raspadinha",
+  "defaultServicePrice": 3,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 15,
+  "baseServiceCustomersPerMonth": 75,
+  "servicePopulationForFullDemand": 60,
   "artScale": 1.0,
   "animation": {
     "layout": "horizontal",

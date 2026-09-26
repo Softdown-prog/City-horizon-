@@ -440,7 +440,7 @@ add_custom_command(TARGET city_builder POST_BUILD
 
 # Explicit local visual review only. Keep these source previews out of normal
 # builds and out of the approved runtime assets directory.
-option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" OFF)
+option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" ON)
 if(CH_VISITOR_FORGE_PREVIEW)
     target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
     # A preview PNG can change without recompiling C++; refresh the packaged

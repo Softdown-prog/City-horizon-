@@ -114,6 +114,7 @@ struct UiBuildItem {
     std::string thumbnail_path;
     std::string footprint;
     std::string requirements;
+    int thumbnail_frame_count = 1;
 };
 
 struct UiSelectedBuilding {
@@ -221,6 +222,7 @@ struct UiButton {
     std::string requirements;
     std::string thumbnail_path;
     bool build_card = false;
+    int thumbnail_frame_count = 1;
     bool color_swatch = false;
     Uint8 swatch_r = 255;
     Uint8 swatch_g = 255;

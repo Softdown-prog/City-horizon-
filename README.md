@@ -216,6 +216,15 @@ If a commit that only changes `tools/ch_blender/jobs/` starts MapForge Windows, 
 
 ## Current production priority
 
+### Feedback da build de setembro de 2026
+
+- O terreno de grama inicial usa `assets/terrain/grass_isometric_01.png`; o antigo caminho `_clean` não existe no pacote. As 16 ruas em `assets/roads/premium_01/` são geradas com `python tools/generate_road_tiles.py --all --runtime-names --output-dir assets/roads/premium_01 --preview work/road_geometry_preview.png`. Examine a continuidade e a escala no executável Windows antes da aprovação visual final.
+- `assets/definitions/road_visual_catalog.json` mapeia todos os 16 estados de conexão. O teste `road_visual_catalog_test` valida caminhos e assinaturas PNG.
+- O catálogo de áudio inclui música de carregamento e o novo `UiClick`. A faixa toca uma vez a partir da inicialização do áudio; a tela de carregamento é rápida, portanto ela pode continuar durante o início da partida.
+- O teste visual do visitante (`F7`) começa com o candidato das quatro direções quando ele está no pacote. `F8` troca o visual. O preview é copiado com `CH_VISITOR_FORGE_PREVIEW=ON` (padrão para configuração nova; caches antigos precisam de `-DCH_VISITOR_FORGE_PREVIEW=ON`). Trace seis tiles retos de rua na direção +X antes de pressionar `F7`. Isso ainda é um teste, não uma simulação automática de visitantes.
+- Raspadinha agora é comércio com preço editável; roda gigante tem preço e pode ser colocada sem rua/caminho adjacente. A demanda de serviço ainda depende da população e não equivale a visitantes entrando fisicamente na atração.
+- Pendentes de revisão jogável: paleta de terreno/areia além da grama de base; alinhamento visual das fachadas com a rua; embarque e parada da roda gigante; overlay da sorveteria. Rotação de construções (`Z/X` ou `ESQ/DIR`) e preços da padaria já existem; validar no modo de posicionamento/seleção.
+
 Build a small coherent playable city before chasing large content breadth.
 
 Prefer using already-valid grass, roads/paths and approved buildings/props to assemble a small map. Add sidewalks, basic urban decoration, a few buildings and simple gameplay before tackling water, complex attractions or large simulation systems.

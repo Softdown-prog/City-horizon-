@@ -4,7 +4,6 @@
   "effectsVolume": 0.8,
   "events": {
     "UiClick": [
-      "ui/click_001.ogg",
       "ui/mouse_click_002.ogg"
     ],
     "UiSelect": [

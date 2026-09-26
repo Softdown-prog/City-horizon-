@@ -29,7 +29,7 @@
   },
   "rotatable": true,
   "requiresRoadAccess": false,
-  "requiresRoadOrPathAccess": true,
+  "requiresRoadOrPathAccess": false,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
@@ -40,6 +40,12 @@
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 0,
+  "serviceName": "Ingresso da roda-gigante",
+  "defaultServicePrice": 8,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 40,
+  "baseServiceCustomersPerMonth": 90,
+  "servicePopulationForFullDemand": 60,
   "artScale": 0.6703,
   "animation": {
     "layout": "horizontal",

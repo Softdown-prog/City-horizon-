@@ -1475,7 +1475,8 @@ void GameplayUi::add_button(UiRect bounds, std::string label, UiAction action, b
 void GameplayUi::add_build_card(UiRect bounds, const UiBuildItem& item, bool active, UiAction action) {
     UiButton card; card.bounds = bounds; card.label = item.name; card.action = action; card.payload = item.definition_id;
     card.enabled = item.enabled; card.active = active; card.detail = item.category + "  |  " + item.build_cost + "  |  " + item.footprint;
-    card.requirements = item.requirements; card.thumbnail_path = item.thumbnail_path; card.build_card = true; buttons_.push_back(std::move(card));
+    card.requirements = item.requirements; card.thumbnail_path = item.thumbnail_path; card.build_card = true;
+    card.thumbnail_frame_count = item.thumbnail_frame_count; buttons_.push_back(std::move(card));
 }
 
 void GameplayUi::add_panel(UiRect bounds) { panels_.push_back(bounds); }
@@ -1556,11 +1557,13 @@ void GameplayUi::render_build_card(SDL_Renderer* renderer, const UiButton& butto
     SDL_SetRenderDrawColor(renderer, 48, 86, 105, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &preview);
     if (const UiThumbnail* thumbnail = thumbnail_for(renderer, button.thumbnail_path)) {
-        const float scale = std::min(preview.w / thumbnail->width, preview.h / thumbnail->height);
-        const SDL_FRect destination = {preview.x + (preview.w - thumbnail->width * scale) * 0.5F,
+        const float frame_width = thumbnail->width / static_cast<float>(std::max(1, button.thumbnail_frame_count));
+        const float scale = std::min(preview.w / frame_width, preview.h / thumbnail->height);
+        const SDL_FRect destination = {preview.x + (preview.w - frame_width * scale) * 0.5F,
                                        preview.y + (preview.h - thumbnail->height * scale) * 0.5F,
-                                       thumbnail->width * scale, thumbnail->height * scale};
-        SDL_RenderTexture(renderer, thumbnail->texture, nullptr, &destination);
+                                       frame_width * scale, thumbnail->height * scale};
+        const SDL_FRect source = {0.0F, 0.0F, frame_width, thumbnail->height};
+        SDL_RenderTexture(renderer, thumbnail->texture, &source, &destination);
     } else if (button.thumbnail_path.empty()) {
         draw_text(renderer, preview.x + preview.w * 0.5F - 4.0F, preview.y + preview.h * 0.5F - 4.0F,
                   "$", 182, 210, 111);

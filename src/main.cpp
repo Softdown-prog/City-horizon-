@@ -1078,7 +1078,8 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
                                             (definition.id + ".png");
     // The catalog deliberately prefers its fixed-canvas thumbnail. The world
     // sprite remains a fallback for third-party or unfinished definitions.
-    return std::filesystem::exists(dedicated)
+    // The old bakery card was a different building. Show the installed sprite.
+    return definition.id != "bakery_01" && std::filesystem::exists(dedicated)
         ? dedicated.string()
         : (asset_root / definition.texture_path_for(BuildingRotation::r0)).string();
 }
@@ -1357,6 +1358,7 @@ int main() {
     const std::filesystem::path asset_root = runtime_root();
     AudioManager audio;
     (void)audio.initialize(asset_root / "assets/audio");
+    (void)audio.play_loading_music();
 
     TextureCache textures;
     const auto show_loading = [&](const float progress, const char* stage) {
@@ -1367,7 +1369,9 @@ int main() {
         SDL_RenderPresent(renderer);
     };
     show_loading(0.08F, "INICIALIZANDO RENDER E AUDIO");
-    const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01_clean.png");
+    // This authored RGBA grass tile is versioned and its opaque bounds match
+    // kGrassOpaque*. The old *_clean path was never packaged in GitHub builds.
+    const TextureAsset* grass = textures.load(renderer, asset_root / "assets/terrain/grass_isometric_01.png");
 
     RoadVisualCatalog road_visuals;
     (void)road_visuals.load_from_file(asset_root / "assets/definitions/road_visual_catalog.json");
@@ -1677,7 +1681,9 @@ int main() {
     // Every preset keeps the approved 175 ms canonical cycle. Only world
     // velocity varies for runtime foot-skating calibration of the new skin.
     int mixamo_gait_preset_index = 2;
-    int pedestrian_visual_index = 0;
+    // Start the explicit F7 test with the character the player is reviewing.
+    // Other looks remain available through F8; no NPC is spawned automatically.
+    int pedestrian_visual_index = mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 0 : 4;
     const auto pedestrian_visual_id = [&]() -> std::string_view {
         switch (pedestrian_visual_index) {
             case 1: return "citizen_female_light_blue";
@@ -2229,6 +2235,8 @@ int main() {
                                          catalog_thumbnail_path(asset_root, definition),
                                          catalog_footprint_label(definition),
                                          catalog_requirements_label(definition)});
+            model.build_items.back().thumbnail_frame_count =
+                definition.animation ? std::max(1, definition.animation->frame_count) : 1;
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;

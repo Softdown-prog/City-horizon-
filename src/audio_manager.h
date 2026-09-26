@@ -29,8 +29,8 @@ enum class SoundEvent : std::size_t {
 struct AudioVolumeSettings {
     float master = 1.0F;
     float effects = 1.0F;
-    // Reserved channels: they are deliberately not played in this first pass.
     float music = 1.0F;
+    // Ambience has no runtime source yet.
     float ambience = 1.0F;
 };
 
@@ -48,6 +48,8 @@ public:
 
     // Returns false when audio is unavailable or that event has no loaded variation.
     [[nodiscard]] bool play(SoundEvent event);
+    // Starts the music declared under music.Loading in audio_catalog.json.
+    [[nodiscard]] bool play_loading_music();
 
     void set_volume_settings(AudioVolumeSettings settings);
     [[nodiscard]] const AudioVolumeSettings& volume_settings() const;
@@ -66,6 +68,8 @@ private:
     std::array<int, kEventCount> last_variation_{};
     std::vector<MIX_Audio*> cached_audio_;
     std::vector<MIX_Track*> tracks_;
+    MIX_Audio* loading_music_ = nullptr;
+    MIX_Track* music_track_ = nullptr;
     AudioVolumeSettings volume_settings_;
     bool mixer_initialized_ = false;
     bool available_ = false;
