@@ -5,8 +5,6 @@
 #include "farming_system.h"
 
 #include <algorithm>
-#include <string_view>
-#include <unordered_set>
 
 CityEconomy::CityEconomy(const std::int64_t initial_funds)
     : funds_(initial_funds) {}
@@ -69,100 +67,40 @@ int CityEconomy::last_property_tax_year() const {
 
 namespace {
 
-constexpr std::string_view kParkTicketBoothId = "park_ticket_booth_01";
-constexpr int kParkTicketBoothLinkRangeTiles = 1;
-
 [[nodiscard]] bool is_park_ticket_booth(const BuildingDefinition& definition) {
-    return definition.id == kParkTicketBoothId;
+    return definition.is_park_ticket_booth;
 }
 
-[[nodiscard]] bool is_ticketed_park_attraction(const BuildingDefinition& definition) {
-    return !is_park_ticket_booth(definition) && definition.category == "service" &&
-        definition.default_service_price > 0 &&
-        definition.texture_path.find("assets/city_park/") != std::string::npos;
-}
-
-[[nodiscard]] int footprint_axis_gap(const int a_start, const int a_size,
-                                     const int b_start, const int b_size) {
-    const int a_end = a_start + a_size;
-    const int b_end = b_start + b_size;
-    if (a_end <= b_start) return b_start - a_end;
-    if (b_end <= a_start) return a_start - b_end;
-    return 0;
-}
-
-[[nodiscard]] int footprint_gap(const BuildingInstance& a, const BuildingDefinition& a_definition,
-                                const BuildingInstance& b, const BuildingDefinition& b_definition) {
-    const BuildingFootprint a_footprint = rotated_footprint(a_definition, a.rotation);
-    const BuildingFootprint b_footprint = rotated_footprint(b_definition, b.rotation);
-    return footprint_axis_gap(a.tile_x, a_footprint.width, b.tile_x, b_footprint.width) +
-           footprint_axis_gap(a.tile_y, a_footprint.height, b.tile_y, b_footprint.height);
-}
-
-struct ParkTicketTarget {
-    const BuildingInstance* instance = nullptr;
-    const BuildingDefinition* definition = nullptr;
-    int distance = 0;
-};
-
-[[nodiscard]] ParkTicketTarget nearest_ticketed_park_attraction(const BuildingInstance& booth,
-                                                                 const BuildingDefinition& booth_definition,
-                                                                 const BuildingManager& buildings,
-                                                                 const BuildingCatalog& catalog) {
-    ParkTicketTarget best;
-    bool found = false;
-    for (const BuildingInstance& candidate : buildings.instances()) {
-        if (candidate.instance_id == booth.instance_id) continue;
-        const BuildingDefinition* candidate_definition = catalog.find(candidate.definition_id);
-        if (candidate_definition == nullptr || !is_ticketed_park_attraction(*candidate_definition)) continue;
-
-        const int distance = footprint_gap(booth, booth_definition, candidate, *candidate_definition);
-        if (distance > kParkTicketBoothLinkRangeTiles) continue;
-        if (!found || distance < best.distance ||
-            (distance == best.distance && candidate.instance_id < best.instance->instance_id)) {
-            best = {&candidate, candidate_definition, distance};
-            found = true;
-        }
-    }
-    return best;
-}
-
-// A park ticket booth is the authoritative price control for the nearest
-// ticketed City Park attraction. The visual footprint is used for proximity so
-// the booth can sit beside the ride entrance/stairs even when a large sprite
-// uses a smaller physical occupancy footprint. One empty tile of separation is
-// tolerated. If multiple booths resolve to the same ride, the earliest placed
-// booth is authoritative and later booths mirror that ride price.
+// BuildingManager owns the spatial one-to-one pairing. The economy layer only
+// mirrors the booth's configured ticket price into the ride that was actually
+// inaugurated by that booth, so placement and pricing can never resolve two
+// different attractions.
 void synchronize_park_ticket_booth_prices(BuildingManager& buildings, const BuildingCatalog& catalog) {
-    std::unordered_set<std::uint64_t> claimed_attractions;
     for (const BuildingInstance& booth_snapshot : buildings.instances()) {
         const BuildingDefinition* booth_definition = catalog.find(booth_snapshot.definition_id);
-        if (booth_definition == nullptr || !is_park_ticket_booth(*booth_definition)) continue;
+        if (booth_definition == nullptr || !booth_definition->is_park_ticket_booth) continue;
 
-        const ParkTicketTarget target = nearest_ticketed_park_attraction(
-            booth_snapshot, *booth_definition, buildings, catalog);
-        if (target.instance == nullptr || target.definition == nullptr) continue;
+        const std::optional<std::uint64_t> target_id =
+            buildings.linked_attraction_for_ticket_booth(booth_snapshot.instance_id);
+        if (!target_id) continue;
 
-        const BuildingInstance* current_target = buildings.find_by_id(target.instance->instance_id);
-        if (current_target == nullptr) continue;
-        if (claimed_attractions.contains(target.instance->instance_id)) {
-            (void)buildings.set_service_price(
-                booth_snapshot.instance_id, *booth_definition, current_target->service_price);
-            continue;
-        }
-        claimed_attractions.insert(target.instance->instance_id);
+        const BuildingInstance* target = buildings.find_by_id(*target_id);
+        const BuildingDefinition* target_definition =
+            target == nullptr ? nullptr : catalog.find(target->definition_id);
+        if (target == nullptr || target_definition == nullptr || !target_definition->requires_ticket_booth) continue;
 
         const std::int64_t desired_price = booth_snapshot.service_price > 0
             ? static_cast<std::int64_t>(booth_snapshot.service_price)
-            : static_cast<std::int64_t>(current_target->service_price);
+            : static_cast<std::int64_t>(target->service_price);
         if (desired_price <= 0) continue;
 
-        (void)buildings.set_service_price(
-            target.instance->instance_id, *target.definition, desired_price);
-        current_target = buildings.find_by_id(target.instance->instance_id);
-        if (current_target != nullptr) {
+        (void)buildings.set_service_price(target->instance_id, *target_definition, desired_price);
+        target = buildings.find_by_id(*target_id);
+        if (target != nullptr) {
+            // Mirror the clamped ride value back to the booth so both panels
+            // display the same authoritative ticket price.
             (void)buildings.set_service_price(
-                booth_snapshot.instance_id, *booth_definition, current_target->service_price);
+                booth_snapshot.instance_id, *booth_definition, target->service_price);
         }
     }
 }
@@ -222,7 +160,7 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
                                                               const std::uint32_t current_population,
                                                               const FarmingSystem* farming) {
     ServicePricingEstimate estimate;
-    if (definition.default_service_price <= 0) {
+    if (definition.default_service_price <= 0 || !instance.operational) {
         return estimate;
     }
 
@@ -260,9 +198,8 @@ ServicePricingEstimate CityEconomy::service_pricing_estimate(const BuildingDefin
 
 void CityEconomy::rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                           const PopulationSystem& population, const FarmingSystem* farming) {
-    // Pricing is normally a pure economy read. Park booths are the exception:
-    // changing a booth price in the existing building panel must immediately
-    // update the nearby ride before the summary is recomputed.
+    // Changing the linked booth price updates the ride immediately before the
+    // summary is recomputed. The ride, not the booth, remains the revenue source.
     synchronize_park_ticket_booth_prices(const_cast<BuildingManager&>(buildings), catalog);
     monthly_summary_ = {};
     (void)farming;
