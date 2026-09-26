@@ -206,6 +206,8 @@ template <typename Number>
     definition.texture_path = json_string(json, "texture").value_or("");
     definition.requires_road_access = json_bool(json, "requiresRoadAccess").value_or(false);
     definition.requires_road_or_path_access = json_bool(json, "requiresRoadOrPathAccess").value_or(false);
+    definition.requires_ticket_booth = json_bool(json, "requiresTicketBooth").value_or(false);
+    definition.is_park_ticket_booth = json_bool(json, "isParkTicketBooth").value_or(false);
     definition.grass_only = json_bool(json, "grassOnly").value_or(false);
     definition.footprint_width = json_number<int>(*footprint, "width").value_or(0);
     definition.footprint_height = json_number<int>(*footprint, "height").value_or(0);
@@ -461,6 +463,8 @@ template <typename Number>
         (definition.default_service_price > 0 &&
             (definition.service_name.empty() || definition.default_service_price < definition.minimum_service_price ||
              definition.default_service_price > definition.maximum_service_price)) ||
+        (definition.requires_ticket_booth && definition.is_park_ticket_booth) ||
+        (definition.requires_ticket_booth && definition.default_service_price <= 0) ||
         definition.art_scale <= 0.0F) {
         return std::nullopt;
     }
@@ -878,7 +882,8 @@ std::optional<std::uint64_t> BuildingManager::place(const BuildingDefinition& de
     instance.tile_x = tile_x;
     instance.tile_y = tile_y;
     instance.rotation = definition.rotatable ? rotation : BuildingRotation::r0;
-    instance.operational = !definition.preplaced || definition.unlock_requirement.empty();
+    instance.operational = (!definition.preplaced || definition.unlock_requirement.empty()) &&
+                           !definition.requires_ticket_booth;
     instance.service_price = definition.default_service_price;
     instances_.push_back(instance);
 
@@ -889,6 +894,9 @@ std::optional<std::uint64_t> BuildingManager::place(const BuildingDefinition& de
                                 tile_y + footprint.offset_y + offset_y)] = instance.instance_id;
         }
     }
+    if (definition.requires_ticket_booth) ticket_required_instances_.insert(instance.instance_id);
+    if (definition.is_park_ticket_booth) ticket_booth_instances_.insert(instance.instance_id);
+    refresh_ticket_booth_links();
     return instance.instance_id;
 }
 
@@ -904,7 +912,12 @@ bool BuildingManager::remove_instance(const BuildingDefinition& definition, cons
                                       found->tile_y + footprint.offset_y + offset_y));
         }
     }
+    ticket_required_instances_.erase(instance_id);
+    ticket_booth_instances_.erase(instance_id);
+    ticket_booth_to_attraction_.erase(instance_id);
+    attraction_to_ticket_booth_.erase(instance_id);
     instances_.erase(found);
+    refresh_ticket_booth_links();
     return true;
 }
 
@@ -922,6 +935,11 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
     instance.activity_count = 0;
     if (!definition.rotatable) {
         instance.rotation = BuildingRotation::r0;
+    }
+    if (definition.requires_ticket_booth) {
+        // Ticket links are derived from current placement after load; never
+        // trust a serialized operational flag to bypass the required booth.
+        instance.operational = false;
     }
     if (definition.default_service_price > 0) {
         const std::int64_t serialized_price = instance.service_price > 0
@@ -943,13 +961,20 @@ bool BuildingManager::restore_instance(const BuildingDefinition& definition, con
                                 instance.tile_y + footprint.offset_y + offset_y)] = instance.instance_id;
         }
     }
+    if (definition.requires_ticket_booth) ticket_required_instances_.insert(instance.instance_id);
+    if (definition.is_park_ticket_booth) ticket_booth_instances_.insert(instance.instance_id);
     next_instance_id_ = std::max(next_instance_id_, instance.instance_id + 1U);
+    refresh_ticket_booth_links();
     return true;
 }
 
 void BuildingManager::clear() {
     instances_.clear();
     occupancy_.clear();
+    ticket_required_instances_.clear();
+    ticket_booth_instances_.clear();
+    ticket_booth_to_attraction_.clear();
+    attraction_to_ticket_booth_.clear();
     next_instance_id_ = 1;
 }
 
@@ -984,6 +1009,110 @@ const std::vector<BuildingInstance>& BuildingManager::instances() const {
     return instances_;
 }
 
+std::optional<std::uint64_t> BuildingManager::linked_attraction_for_ticket_booth(
+    const std::uint64_t booth_instance_id) const {
+    const auto linked = ticket_booth_to_attraction_.find(booth_instance_id);
+    return linked == ticket_booth_to_attraction_.end()
+        ? std::nullopt
+        : std::optional<std::uint64_t>(linked->second);
+}
+
+std::optional<std::uint64_t> BuildingManager::linked_ticket_booth_for_attraction(
+    const std::uint64_t attraction_instance_id) const {
+    const auto linked = attraction_to_ticket_booth_.find(attraction_instance_id);
+    return linked == attraction_to_ticket_booth_.end()
+        ? std::nullopt
+        : std::optional<std::uint64_t>(linked->second);
+}
+
+void BuildingManager::refresh_ticket_booth_links() {
+    ticket_booth_to_attraction_.clear();
+    attraction_to_ticket_booth_.clear();
+
+    // Build physical occupancy bounds directly from the canonical occupancy
+    // map. This keeps linking aligned with large attractions that intentionally
+    // use a smaller occupancyFootprint than their visual sprite envelope.
+    struct Bounds {
+        int min_x = std::numeric_limits<int>::max();
+        int min_y = std::numeric_limits<int>::max();
+        int max_x = std::numeric_limits<int>::min();
+        int max_y = std::numeric_limits<int>::min();
+        bool valid = false;
+    };
+    std::unordered_map<std::uint64_t, Bounds> bounds_by_instance;
+    const int span = map_max_ - map_min_ + 1;
+    for (const auto& [key, instance_id] : occupancy_) {
+        const int local_y = key / span;
+        const int local_x = key % span;
+        const int x = map_min_ + local_x;
+        const int y = map_min_ + local_y;
+        Bounds& bounds = bounds_by_instance[instance_id];
+        bounds.min_x = std::min(bounds.min_x, x);
+        bounds.min_y = std::min(bounds.min_y, y);
+        bounds.max_x = std::max(bounds.max_x, x);
+        bounds.max_y = std::max(bounds.max_y, y);
+        bounds.valid = true;
+    }
+
+    const auto axis_gap = [](const int a_min, const int a_max, const int b_min, const int b_max) {
+        if (a_max < b_min) return std::max(0, b_min - a_max - 1);
+        if (b_max < a_min) return std::max(0, a_min - b_max - 1);
+        return 0;
+    };
+    const auto distance_between = [&](const std::uint64_t first, const std::uint64_t second) {
+        const auto a = bounds_by_instance.find(first);
+        const auto b = bounds_by_instance.find(second);
+        if (a == bounds_by_instance.end() || b == bounds_by_instance.end() ||
+            !a->second.valid || !b->second.valid) {
+            return std::numeric_limits<int>::max();
+        }
+        return axis_gap(a->second.min_x, a->second.max_x, b->second.min_x, b->second.max_x) +
+               axis_gap(a->second.min_y, a->second.max_y, b->second.min_y, b->second.max_y);
+    };
+
+    // A ticketed ride is closed by default. Rebuilding the links after every
+    // place/remove/load makes a booth a real inauguration requirement instead
+    // of a cosmetic price panel. Closing a ride also clears transient activity.
+    for (BuildingInstance& instance : instances_) {
+        if (!ticket_required_instances_.contains(instance.instance_id)) continue;
+        instance.operational = false;
+        instance.activity_count = 0;
+    }
+
+    constexpr int kTicketBoothLinkRangeTiles = 1;
+    for (const BuildingInstance& booth_snapshot : instances_) {
+        if (!ticket_booth_instances_.contains(booth_snapshot.instance_id)) continue;
+
+        BuildingInstance* best_attraction = nullptr;
+        int best_distance = std::numeric_limits<int>::max();
+        for (BuildingInstance& attraction : instances_) {
+            if (!ticket_required_instances_.contains(attraction.instance_id) ||
+                attraction_to_ticket_booth_.contains(attraction.instance_id)) {
+                continue;
+            }
+            const int distance = distance_between(booth_snapshot.instance_id, attraction.instance_id);
+            if (distance > kTicketBoothLinkRangeTiles) continue;
+            if (best_attraction == nullptr || distance < best_distance ||
+                (distance == best_distance && attraction.instance_id < best_attraction->instance_id)) {
+                best_attraction = &attraction;
+                best_distance = distance;
+            }
+        }
+        if (best_attraction == nullptr) continue;
+
+        ticket_booth_to_attraction_[booth_snapshot.instance_id] = best_attraction->instance_id;
+        attraction_to_ticket_booth_[best_attraction->instance_id] = booth_snapshot.instance_id;
+        best_attraction->operational = true;
+        if (booth_snapshot.service_price > 0) {
+            // The booth is the authoritative ticket-price control. Preserve the
+            // attraction's own currency scale/step while copying the configured
+            // minor-unit amount; the economy layer performs definition clamping.
+            best_attraction->service_price =
+                best_attraction->service_price.with_minor_units(booth_snapshot.service_price.minor_units);
+        }
+    }
+}
+
 bool BuildingManager::set_operational(const std::uint64_t instance_id, const bool operational) {
     const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
         return instance.instance_id == instance_id;
@@ -991,7 +1120,12 @@ bool BuildingManager::set_operational(const std::uint64_t instance_id, const boo
     if (found == instances_.end()) {
         return false;
     }
+    if (operational && ticket_required_instances_.contains(instance_id) &&
+        !attraction_to_ticket_booth_.contains(instance_id)) {
+        return false;
+    }
     found->operational = operational;
+    if (!operational) found->activity_count = 0;
     return true;
 }
 
@@ -999,7 +1133,7 @@ bool BuildingManager::begin_activity(const std::uint64_t instance_id) {
     const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](BuildingInstance& instance) {
         return instance.instance_id == instance_id;
     });
-    if (found == instances_.end()) return false;
+    if (found == instances_.end() || !found->operational) return false;
     if (found->activity_count < std::numeric_limits<std::uint32_t>::max()) {
         ++found->activity_count;
     }
@@ -1091,7 +1225,12 @@ std::size_t BuildingManager::set_operational_by_definition(const std::string_vie
     std::size_t count = 0;
     for (BuildingInstance& instance : instances_) {
         if (instance.definition_id == definition_id) {
+            if (operational && ticket_required_instances_.contains(instance.instance_id) &&
+                !attraction_to_ticket_booth_.contains(instance.instance_id)) {
+                continue;
+            }
             instance.operational = operational;
+            if (!operational) instance.activity_count = 0;
             count++;
         }
     }
