@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'tools/tycoon_photo_studio/build_loading_splash_illustration_2d.py'
+      - 'tools/tycoon_photo_studio/build_loading_splash_illustration_2d_cli.py'
       - 'tools/tycoon_photo_studio/assets/loading_splash_city_dream_03.art.json'
       - '.github/workflows/render-loading-splash-2d.yml'
 
@@ -28,7 +29,7 @@ jobs:
 
       - name: Render 2D splash proxy
         run: |
-          python tools/tycoon_photo_studio/build_loading_splash_illustration_2d.py \
+          python tools/tycoon_photo_studio/build_loading_splash_illustration_2d_cli.py \
             --recipe tools/tycoon_photo_studio/assets/loading_splash_city_dream_03.art.json \
             --output out/loading_splash_2d/ui.loading_splash.city_dream.03
 
