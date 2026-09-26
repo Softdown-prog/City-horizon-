@@ -1,0 +1,31 @@
+{
+  "contract": "CH_LOADING_SPLASH_ART_V1",
+  "artId": "ui.loading_splash.hybrid_city.04",
+  "seed": 26092604,
+  "presentation": {
+    "aspectRatio": "16:9",
+    "proxyResolution": [1280, 720],
+    "finalResolution": [2560, 1440],
+    "titleSafeAreaNormalized": [0.04, 0.05, 0.40, 0.28],
+    "progressSafeAreaNormalized": [0.18, 0.90, 0.82, 0.97]
+  },
+  "camera": {
+    "location": [-22.0, -31.0, 22.0],
+    "target": [0.5, 7.5, 4.7],
+    "lensMm": 44.0
+  },
+  "artDirection": {
+    "summary": "Hybrid commercial loading key art. Build a cinematic stylized city in 3D for perspective, lighting and depth, then deliberately repaint and finish it in 2D so the final result reads as game illustration rather than a Blender render.",
+    "visualStory": "A lively growing city at blue-hour sunset: river and bridge in the foreground, a curving boulevard pulling the eye into colorful mixed-use blocks, a civic tower, construction crane, trees, small citizens and a park district with a ferris wheel. The city may contain invented architecture and exaggerated scale.",
+    "rules": [
+      "3D is only the structural foundation; final image must receive a visible 2D art-finishing pass",
+      "do not obey gameplay camera, grid, footprints or current runtime asset inventory",
+      "avoid flat wall-of-buildings composition and avoid blockout / asset-showcase framing",
+      "use foreground, midground and skyline depth",
+      "prefer cinematic diagonals and curved perspective flow",
+      "allow invented buildings, attractions and city infrastructure",
+      "preserve upper-left breathing room for logo treatment",
+      "do not bake logo, loading text or progress bar into the illustration"
+    ]
+  }
+}
