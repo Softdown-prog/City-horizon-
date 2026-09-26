@@ -11,6 +11,8 @@ enum class ParkFencePiece {
     Corner,
     End,
     Gate,
+    Tee,
+    Cross,
 };
 
 enum class ParkFenceRotation {
