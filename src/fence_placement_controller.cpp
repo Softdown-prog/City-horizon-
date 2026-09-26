@@ -1,15 +1,15 @@
 #include "fence_placement_controller.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <unordered_set>
 
 namespace {
 
-[[nodiscard]] std::int64_t preview_key(const FenceVertex vertex) {
-    return (static_cast<std::int64_t>(vertex.x) << 32) ^
-           static_cast<std::uint32_t>(vertex.y);
+[[nodiscard]] std::uint64_t preview_key(const FenceVertex vertex) {
+    const auto x = static_cast<std::uint64_t>(static_cast<std::uint32_t>(vertex.x));
+    const auto y = static_cast<std::uint64_t>(static_cast<std::uint32_t>(vertex.y));
+    return (x << 32U) | y;
 }
 
 [[nodiscard]] FenceVertex offset_vertex(const FenceVertex vertex,
@@ -89,7 +89,7 @@ std::vector<FencePlacementPreviewNode> FencePlacementController::preview_nodes()
     // change topology during this preview.
     std::vector<FenceVertex> candidates;
     candidates.reserve(preview_route_.size() * 5U);
-    std::unordered_set<std::int64_t> seen;
+    std::unordered_set<std::uint64_t> seen;
 
     auto add_candidate = [&](const FenceVertex vertex) {
         if (!fences_.is_inside_vertex_grid(vertex.x, vertex.y)) return;
