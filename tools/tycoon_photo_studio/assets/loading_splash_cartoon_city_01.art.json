@@ -1,0 +1,27 @@
+{
+  "contract": "CH_LOADING_SPLASH_ART_V1",
+  "artId": "ui.loading_splash.cartoon_city.01",
+  "seed": 2609,
+  "camera": {
+    "mode": "freeform_perspective_loading_only",
+    "lensMm": 52.0
+  },
+  "presentation": {
+    "aspectRatio": "16:9",
+    "proxyResolution": [1280, 720],
+    "finalResolution": [2560, 1440],
+    "titleSafeAreaNormalized": [0.04, 0.05, 0.42, 0.32],
+    "progressSafeAreaNormalized": [0.18, 0.88, 0.82, 0.96]
+  },
+  "artDirection": {
+    "summary": "Original colorful City Horizon key art: exaggerated perspective city, oversized Ferris wheel, curving road, water, layered trees, dramatic warm/cool lighting, clouds and hot-air balloons. It is poster-like loading art rather than a gameplay scene.",
+    "rules": [
+      "do not obey gameplay grid, footprints or CH_CAMERA_V1",
+      "do not limit visible objects to current runtime assets",
+      "prefer exaggerated silhouette, depth and color over map accuracy",
+      "keep upper-left region usable for the City Horizon logo",
+      "keep the bottom loading-progress band free of irreplaceable focal detail",
+      "do not bake the game logo or loading text into the illustration"
+    ]
+  }
+}
