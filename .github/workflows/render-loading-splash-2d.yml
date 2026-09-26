@@ -1,0 +1,41 @@
+name: Render Loading Splash 2D
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/tycoon_photo_studio/build_loading_splash_illustration_2d.py'
+      - 'tools/tycoon_photo_studio/assets/loading_splash_city_dream_03.art.json'
+      - '.github/workflows/render-loading-splash-2d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Render 2D splash proxy
+        run: |
+          python tools/tycoon_photo_studio/build_loading_splash_illustration_2d.py \
+            --recipe tools/tycoon_photo_studio/assets/loading_splash_city_dream_03.art.json \
+            --output out/loading_splash_2d/ui.loading_splash.city_dream.03
+
+      - name: Upload proxy
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Loading-Splash-2D-${{ github.run_number }}
+          path: out/loading_splash_2d/ui.loading_splash.city_dream.03
+          retention-days: 14
+          if-no-files-found: error
