@@ -14,31 +14,34 @@
   },
   "palette": {
     "ground_shadow": "#17271F",
-    "trunk_top": "#B87948",
-    "trunk_bottom": "#6E4128",
-    "trunk_light": "#DCA066",
-    "back_top": "#204C3A",
-    "back_bottom": "#0C3027",
-    "mid_top": "#497F5B",
-    "mid_bottom": "#1F503C",
-    "front_top": "#60986B",
-    "front_bottom": "#2B654A",
-    "highlight": "#A8CA84",
-    "occlusion": "#0D3A2D"
+    "trunk_top": "#A96C43",
+    "trunk_bottom": "#5E3826",
+    "trunk_light": "#D29661",
+    "back_top": "#183D2E",
+    "back_bottom": "#0B281F",
+    "mid_top": "#396D4C",
+    "mid_bottom": "#174432",
+    "front_top": "#4F865D",
+    "front_bottom": "#245940",
+    "highlight": "#8DB36F",
+    "occlusion": "#0B3025"
   },
   "raster": {
-    "shadowDabs": 330,
-    "highlightDabs": 280,
-    "needleStrokes": 420
+    "shadowDabs": 420,
+    "highlightDabs": 340,
+    "needleStrokes": 760,
+    "finalGrain": 920,
+    "finalNeedles": 440
   },
   "tiers": [
-    {"y": 24,  "span": 18, "thickness": 18, "skew": 1},
-    {"y": 42,  "span": 28, "thickness": 21, "skew": -1},
-    {"y": 63,  "span": 39, "thickness": 24, "skew": 1},
-    {"y": 86,  "span": 50, "thickness": 27, "skew": -2},
-    {"y": 112, "span": 62, "thickness": 30, "skew": 1},
-    {"y": 140, "span": 73, "thickness": 32, "skew": -1},
-    {"y": 170, "span": 82, "thickness": 34, "skew": 1},
-    {"y": 198, "span": 88, "thickness": 34, "skew": -1}
+    {"y": 22,  "span": 15, "thickness": 16, "skew": 1},
+    {"y": 39,  "span": 24, "thickness": 19, "skew": -1},
+    {"y": 59,  "span": 33, "thickness": 21, "skew": 1},
+    {"y": 81,  "span": 42, "thickness": 23, "skew": -2},
+    {"y": 106, "span": 51, "thickness": 25, "skew": 1},
+    {"y": 133, "span": 60, "thickness": 27, "skew": -1},
+    {"y": 162, "span": 68, "thickness": 28, "skew": 1},
+    {"y": 191, "span": 74, "thickness": 29, "skew": -1},
+    {"y": 210, "span": 77, "thickness": 24, "skew": 0}
   ]
 }
