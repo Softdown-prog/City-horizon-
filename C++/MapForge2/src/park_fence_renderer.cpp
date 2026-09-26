@@ -142,11 +142,12 @@ void drawGate(QPainter& painter, const ParkFenceSpec& spec,
     drawSpan(painter, spec, outer_a, gate_a, rotation, origin);
     drawSpan(painter, spec, gate_b, outer_b, rotation, origin);
 
-    // Two short leaves are shown swung inward, away from the passage line,
-    // instead of drawing a closed span across the visitor route.
+    // The leaves are fully swung inward by roughly 90 degrees. Keeping each
+    // leaf on its own hinge X coordinate preserves a wide, unmistakable
+    // central corridor instead of visually converging toward the middle.
     const qreal leaf_depth = spec.gate_open_depth_world;
-    const LocalPoint leaf_a_end{-0.02, leaf_depth};
-    const LocalPoint leaf_b_end{0.02, leaf_depth};
+    const LocalPoint leaf_a_end{gate_a.x, leaf_depth};
+    const LocalPoint leaf_b_end{gate_b.x, leaf_depth};
     drawSpan(painter, spec, gate_a, leaf_a_end, rotation, origin, 0.83);
     drawSpan(painter, spec, gate_b, leaf_b_end, rotation, origin, 0.83);
 
