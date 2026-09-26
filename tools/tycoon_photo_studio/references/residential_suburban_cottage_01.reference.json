@@ -1,0 +1,16 @@
+{
+  "contract": "CH_VISUAL_REFERENCE_DESCRIPTOR_V1",
+  "id": "residential_suburban_cottage_01_reference",
+  "source": "user_supplied_chat_image",
+  "sourceSha256": "8692f69658a4c4c939f65103d16ff44f13a03828c34e6e0bca332ac60f10c85b",
+  "sourceSize": [1536, 1536],
+  "usage": "art_direction_only",
+  "notes": [
+    "Use as a broad visual reference for a new original City Horizon residential asset; do not trace or reconstruct the image literally.",
+    "Primary read: cream/white suburban cottage, dominant charcoal pitched roof, two front dormers, compact front portico, chimney, dark window frames and warm interior glow.",
+    "Secondary read: tidy low hedges and flower beds contained inside the private lot.",
+    "Do not bake the public sidewalk, curb or road-edge slab from the reference into the building asset; those remain runtime terrain/path systems.",
+    "Do not bake the large foreground tree into the canonical house silhouette; trees remain separate placeable vegetation assets.",
+    "Keep the house compact, slightly squat and readable as a tycoon miniature rather than an architectural visualization."
+  ]
+}

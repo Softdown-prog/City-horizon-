@@ -1,0 +1,342 @@
+{
+  "contract": "CITY_HORIZON_HOUSE_V1",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "assetId": "residential_suburban_cottage_3x3_01",
+  "assetType": "residential_building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "referenceDescriptor": "tools/tycoon_photo_studio/references/residential_suburban_cottage_01.reference.json",
+  "designIntent": {
+    "summary": "Original compact suburban cottage inspired by the supplied reference: cream siding, dominant charcoal roof, two south dormers, warm windows, a small gabled entry portico and restrained private landscaping.",
+    "silhouette": "broad dark roof with two dormer peaks, one small porch gable and an offset chimney",
+    "readOrder": [
+      "charcoal_roof",
+      "paired_dormers",
+      "entry_portico",
+      "warm_windows",
+      "chimney",
+      "garden_border"
+    ],
+    "detailLevel": "medium",
+    "rules": [
+      "silhouette must read before siding or garden detail",
+      "roof must remain the dominant visual mass",
+      "windows and door are slightly oversized for gameplay readability",
+      "landscaping stays below the window sill and cannot hide the entrance",
+      "no public sidewalk, curb or road slab is baked into the building",
+      "no large tree is baked into the house sprite",
+      "all authored building parts rotate with AssetRoot",
+      "geometry is an original interpretation, not a literal reconstruction of the reference"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 3
+  },
+  "mass": {
+    "foundationWidth": 6.52,
+    "foundationDepth": 5.52,
+    "foundationHeight": 0.24,
+    "bodyWidth": 6.18,
+    "bodyDepth": 5.18,
+    "wallHeight": 2.5,
+    "wallBaseZ": 0.24
+  },
+  "roof": {
+    "width": 6.62,
+    "depth": 5.7,
+    "eaveZ": 2.76,
+    "ridgeZ": 4.2,
+    "fasciaHeight": 0.14,
+    "ridgeDirection": "x",
+    "tileRows": 7
+  },
+  "dormers": {
+    "count": 2,
+    "centersX": [
+      -1.48,
+      1.38
+    ],
+    "centerY": -2.02,
+    "bodyWidth": 1.18,
+    "bodyDepth": 0.92,
+    "bodyHeight": 0.92,
+    "bodyCenterZ": 3.18,
+    "roofEaveZ": 3.6,
+    "roofRidgeZ": 4.05,
+    "roofDepth": 1.12
+  },
+  "entry": {
+    "centerX": -0.24,
+    "frontY": -2.72,
+    "doorWidth": 0.96,
+    "doorHeight": 1.88,
+    "porticoWidth": 2.12,
+    "porticoDepth": 1.18,
+    "porticoEaveZ": 2.22,
+    "porticoRidgeZ": 2.78,
+    "columnSpacing": 1.46
+  },
+  "chimney": {
+    "x": -1.92,
+    "y": 1.12,
+    "width": 0.58,
+    "depth": 0.58,
+    "bodyHeight": 1.62,
+    "bodyCenterZ": 3.72,
+    "capWidth": 0.78,
+    "capDepth": 0.78,
+    "capHeight": 0.16
+  },
+  "windows": {
+    "frontCentersX": [
+      -2.02,
+      1.82
+    ],
+    "frontCenterZ": 1.42,
+    "frontWidth": 1.16,
+    "frontHeight": 1.22,
+    "sideCenterY": 0.54,
+    "sideCenterZ": 1.43,
+    "sideWidth": 1.12,
+    "sideHeight": 1.18,
+    "dormerWidth": 0.58,
+    "dormerHeight": 0.7
+  },
+  "landscaping": {
+    "enabled": true,
+    "shrubRadius": 0.28,
+    "frontShrubs": [
+      [
+        -2.42,
+        -3.03
+      ],
+      [
+        0.86,
+        -3.02
+      ],
+      [
+        2.34,
+        -2.98
+      ]
+    ],
+    "sideShrubs": [
+      [
+        3.32,
+        -1.18
+      ],
+      [
+        3.3,
+        0.02
+      ],
+      [
+        3.24,
+        1.25
+      ]
+    ],
+    "flowerBeds": [
+      [
+        -1.55,
+        -3.0
+      ],
+      [
+        1.62,
+        -2.96
+      ]
+    ],
+    "privatePathWidth": 1.1,
+    "privatePathDepth": 0.72
+  },
+  "materials": {
+    "wall": {
+      "name": "CottageWarmCreamSiding",
+      "rgba": [
+        0.9,
+        0.86,
+        0.76,
+        1.0
+      ],
+      "recipe": "plaster",
+      "roughness": 0.84,
+      "seed": 11,
+      "strength": 0.12
+    },
+    "roof": {
+      "name": "CottageCharcoalRoof",
+      "rgba": [
+        0.105,
+        0.115,
+        0.135,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 13,
+      "strength": 0.03
+    },
+    "roofEdge": {
+      "name": "CottageRoofEdge",
+      "rgba": [
+        0.18,
+        0.19,
+        0.21,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.74,
+      "seed": 17,
+      "strength": 0.02
+    },
+    "trim": {
+      "name": "CottageLightTrim",
+      "rgba": [
+        0.96,
+        0.92,
+        0.84,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.8,
+      "seed": 19,
+      "strength": 0.02
+    },
+    "foundation": {
+      "name": "CottageStoneBase",
+      "rgba": [
+        0.44,
+        0.43,
+        0.42,
+        1.0
+      ],
+      "recipe": "stone",
+      "roughness": 0.92,
+      "seed": 23,
+      "strength": 0.18
+    },
+    "frame": {
+      "name": "CottageDarkFrame",
+      "rgba": [
+        0.055,
+        0.06,
+        0.07,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.68,
+      "seed": 29,
+      "strength": 0.02
+    },
+    "glass": {
+      "name": "CottageWarmGlass",
+      "rgba": [
+        0.95,
+        0.49,
+        0.09,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.22,
+      "seed": 31,
+      "strength": 0.02
+    },
+    "door": {
+      "name": "CottageDarkDoor",
+      "rgba": [
+        0.075,
+        0.07,
+        0.065,
+        1.0
+      ],
+      "recipe": "timber",
+      "roughness": 0.74,
+      "seed": 37,
+      "strength": 0.12
+    },
+    "path": {
+      "name": "CottagePrivatePath",
+      "rgba": [
+        0.76,
+        0.72,
+        0.66,
+        1.0
+      ],
+      "recipe": "concrete",
+      "roughness": 0.93,
+      "seed": 41,
+      "strength": 0.1
+    },
+    "green": {
+      "name": "CottageGardenGreen",
+      "rgba": [
+        0.18,
+        0.43,
+        0.1,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.82,
+      "seed": 43,
+      "strength": 0.02
+    },
+    "greenLight": {
+      "name": "CottageGardenLightGreen",
+      "rgba": [
+        0.36,
+        0.62,
+        0.16,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.82,
+      "seed": 47,
+      "strength": 0.02
+    },
+    "flower": {
+      "name": "CottageFlowerWhite",
+      "rgba": [
+        0.94,
+        0.91,
+        0.76,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.78,
+      "seed": 53,
+      "strength": 0.02
+    },
+    "flowerCenter": {
+      "name": "CottageFlowerCenter",
+      "rgba": [
+        0.96,
+        0.62,
+        0.08,
+        1.0
+      ],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 59,
+      "strength": 0.02
+    }
+  },
+  "buildingPostProcess": {
+    "profile": "residential_cottage_game_first_v1",
+    "intent": "preserve_roof_silhouette_and_warm_window_readability",
+    "paletteColors": 144,
+    "paletteDither": false,
+    "posterizeBitsPerChannel": 7,
+    "contrastMultiplier": 1.03,
+    "saturationMultiplier": 1.02,
+    "outlineAlpha": 48,
+    "internalEdgeAlpha": 12,
+    "internalEdgeThreshold": 102,
+    "roofStructuralRows": true,
+    "roofRowSpacingPx": 8,
+    "roofRowDarken": 0.94,
+    "glassReflectionStrength": 0.12,
+    "surfacePolicy": {
+      "preferLargeColorBlocks": true,
+      "avoidArchitecturalMaterialDrama": true,
+      "roofIsPrimarySilhouette": true,
+      "warmWindowsAreSecondaryRead": true
+    }
+  }
+}
