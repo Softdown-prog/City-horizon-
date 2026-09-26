@@ -280,8 +280,12 @@ private:
                                                   bool pressed);
 
     // Internal names used by the compatibility implementation. Public entry
-    // points sanitize removed energy presentation before delegating here.
+    // points sanitize removed energy presentation and add runtime tools before
+    // delegating to the established layout/input implementation.
     void update_layout_legacy(int viewport_width, int viewport_height, const GameplayUiModel& model);
+    void handle_mouse_motion_legacy(float mouse_x, float mouse_y);
+    [[nodiscard]] UiInputResult handle_mouse_button_down_legacy(float mouse_x, float mouse_y, bool primary_button);
+    void handle_mouse_button_up_legacy(float mouse_x, float mouse_y);
     void render_legacy(SDL_Renderer* renderer) const;
 
     GameplayUiModel model_;
