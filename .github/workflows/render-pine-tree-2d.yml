@@ -1,0 +1,51 @@
+name: Render Procedural Pine Tree 2D
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'C++/MapForge2/src/pine_tree_renderer.h'
+      - 'C++/MapForge2/src/pine_tree_renderer.cpp'
+      - 'C++/MapForge2/src/pine_tree_preview_main.cpp'
+      - 'C++/MapForge2/src/procedural_2d_primitives.h'
+      - 'C++/MapForge2/src/procedural_2d_primitives.cpp'
+      - '.github/workflows/render-pine-tree-2d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev pkg-config
+
+      - name: Build focused pine preview
+        run: |
+          mkdir -p out/pine_tree_2d
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic \
+            $(pkg-config --cflags Qt6Core Qt6Gui) \
+            C++/MapForge2/src/procedural_2d_primitives.cpp \
+            C++/MapForge2/src/pine_tree_renderer.cpp \
+            C++/MapForge2/src/pine_tree_preview_main.cpp \
+            -o /tmp/ch-pine-preview \
+            $(pkg-config --libs Qt6Core Qt6Gui)
+
+      - name: Render preview
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: /tmp/ch-pine-preview out/pine_tree_2d
+
+      - name: Upload preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Procedural-Pine-2D-${{ github.run_number }}
+          path: out/pine_tree_2d
+          retention-days: 14
+          if-no-files-found: error
