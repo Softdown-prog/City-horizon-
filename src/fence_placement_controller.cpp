@@ -91,7 +91,7 @@ std::vector<FencePlacementPreviewNode> FencePlacementController::preview_nodes()
     candidates.reserve(preview_route_.size() * 5U);
     std::unordered_set<std::int64_t> seen;
 
-    const auto add_candidate = [&](const FenceVertex vertex) mutable {
+    auto add_candidate = [&](const FenceVertex vertex) {
         if (!fences_.is_inside_vertex_grid(vertex.x, vertex.y)) return;
         if (seen.insert(preview_key(vertex)).second) candidates.push_back(vertex);
     };
