@@ -30,6 +30,7 @@
   "rotatable": true,
   "requiresRoadAccess": false,
   "requiresRoadOrPathAccess": false,
+  "requiresTicketBooth": true,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
