@@ -51,7 +51,7 @@
     "layout": "horizontal",
     "frameCount": 12,
     "frameDurationMs": 125,
-    "playback": "loop"
+    "playback": "activity_loop"
   },
   "playerBuildable": true,
   "productionStatus": "runtime_landmark_large1024_approved",

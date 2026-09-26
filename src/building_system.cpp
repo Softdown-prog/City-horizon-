@@ -295,7 +295,8 @@ template <typename Number>
                 std::max(1, json_number<int>(*anim, "frameDurationMs").value_or(120));
             parsed_animation.layout = json_string(*anim, "layout").value_or("horizontal");
             parsed_animation.playback = json_string(*anim, "playback").value_or("loop");
-            if (parsed_animation.playback != "loop" && parsed_animation.playback != "ambient_once") {
+            if (parsed_animation.playback != "loop" && parsed_animation.playback != "ambient_once" &&
+                parsed_animation.playback != "activity_loop") {
                 return std::nullopt;
             }
             parsed_animation.idle_frame = std::clamp(

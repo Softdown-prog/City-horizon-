@@ -2406,7 +2406,7 @@ int main() {
                 "POPULATION: " + std::to_string(population.current_population()) + " / " +
                     std::to_string(population.residential_capacity()),
                 "ENERGY: " + std::to_string(power.power_demand()) + " / " + std::to_string(power.power_capacity()),
-                "F2 NETWORK | F3 START | F4 GOAL | F6 PEDESTRIAN | F7 WALK | F8 PEDESTRIAN LOOK | F5 SAVE | F9 LOAD | F10 CALIBRATION",
+                "F2 NETWORK | F3 START | F4 GOAL | F6 PEDESTRIAN | F7 WALK | F8 LOOK | F11 ACTIVITY | F5 SAVE | F9 LOAD | F10 CALIBRATION",
             };
             if (selected_instance_id) {
                 if (const BuildingInstance* instance = buildings.find_by_id(*selected_instance_id)) {
@@ -3014,15 +3014,18 @@ int main() {
                     case SDL_SCANCODE_F9:
                         (void)load_current_city(false);
                         break;
-                    case SDL_SCANCODE_F8: {
+                    case SDL_SCANCODE_F11: {
                         if (!selected_instance_id) {
                             status = "ACTIVITY TEST: SELECT A BUILDING FIRST";
                             break;
                         }
                         const BuildingInstance* selected = buildings.find_by_id(*selected_instance_id);
                         const BuildingDefinition* definition = selected == nullptr ? nullptr : catalog.find(selected->definition_id);
-                        if (selected == nullptr || definition == nullptr || !definition->activity_overlay || !definition->activity_overlay->enabled) {
-                            status = "ACTIVITY TEST: SELECT A BUILDING WITH OVERLAY";
+                        const bool overlay = definition != nullptr && definition->activity_overlay && definition->activity_overlay->enabled;
+                        const bool attraction = definition != nullptr && definition->animation &&
+                            definition->animation->playback == "activity_loop";
+                        if (selected == nullptr || (!overlay && !attraction)) {
+                            status = "ACTIVITY TEST: SELECT AN ATTRACTION OR OVERLAY BUILDING";
                             break;
                         }
                         const bool was_active = selected->activity_active();
@@ -3035,7 +3038,7 @@ int main() {
                         } else {
                             (void)buildings.begin_activity(*selected_instance_id);
                         }
-                        status = std::string("ICE CREAM ACTIVITY TEST: ") + (was_active ? "OFF" : "ON");
+                        status = definition->name + std::string(" ACTIVITY TEST: ") + (was_active ? "OFF" : "ON");
                         break;
                     }
                     case SDL_SCANCODE_F10: {

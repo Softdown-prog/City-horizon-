@@ -541,6 +541,9 @@ void MapRenderer::render_building(SDL_Renderer* renderer, const BuildingDefiniti
                     frame_index = action_start + action_index;
                 }
             }
+        } else if (animation.playback == "activity_loop") {
+            frame_index = instance.activity_active()
+                ? static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count) : 0;
         } else {
             // Legacy behaviour: every multi-frame building keeps looping exactly
             // as before unless its data explicitly opts into ambient_once.

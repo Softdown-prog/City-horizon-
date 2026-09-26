@@ -132,6 +132,7 @@ struct BuildingAnimationDefinition {
     // "loop" preserves the legacy continuous animation contract.
     // "ambient_once" holds an idle frame, plays one action sequence, then
     // returns to idle before the next deterministic ambient cycle.
+    // "activity_loop" holds frame 0 until the runtime reports activity.
     std::string playback = "loop";
     int idle_frame = 0;
     int action_start_frame = 1;

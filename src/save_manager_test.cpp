@@ -65,9 +65,12 @@ int main(const int argc, char** argv) {
     const BuildingDefinition* cafe = catalog.find("cafe_01");
     const BuildingDefinition* mini_market = catalog.find("mini_market_01");
     const BuildingDefinition* house = catalog.find("house_suburban_01");
+    const BuildingDefinition* ferris = catalog.find("ferris_wheel_01");
     if (!require(cafe != nullptr, "cafe definition exists") ||
         !require(mini_market != nullptr, "mini market definition exists") ||
-        !require(house != nullptr, "house definition exists")) {
+        !require(house != nullptr, "house definition exists") ||
+        !require(ferris != nullptr && ferris->animation && ferris->animation->playback == "activity_loop",
+                 "ferris wheel uses activity gated animation")) {
         return 1;
     }
 
