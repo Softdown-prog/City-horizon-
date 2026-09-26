@@ -11,7 +11,7 @@
 // affected node would have if the preview were committed.
 struct FencePlacementPreviewNode {
     FenceVertex vertex{};
-    FenceVisualState visual{};
+    FenceVisualState state{};
     bool already_placed = false;
 };
 
@@ -39,8 +39,9 @@ public:
     // apart from the topology refresh performed by FenceManager.
     int commit_drag();
 
-    // Gates are a deliberate secondary operation on a straight run. The gate
-    // keeps the same automatic orientation selected from its neighbours.
+    // Segment-level open gate used by gameplay. The older single-node overload
+    // remains for compatibility with early fence prototypes.
+    [[nodiscard]] bool place_open_gate(FenceVertex from, FenceVertex to);
     [[nodiscard]] bool place_open_gate(FenceVertex vertex);
 
 private:
