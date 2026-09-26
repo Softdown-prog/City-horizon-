@@ -1,0 +1,17 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "ui.loading_splash.city_dream.proxy.003",
+  "operation": "blender_script",
+  "script": "tools/tycoon_photo_studio/build_loading_splash_illustration_2d.py",
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/loading_splash_city_dream_03.art.json",
+    "--output",
+    "out/ch_blender_agent/ui.loading_splash.city_dream.03"
+  ],
+  "expectedOutputs": [
+    "out/ch_blender_agent/ui.loading_splash.city_dream.03/loading_splash_proxy.png",
+    "out/ch_blender_agent/ui.loading_splash.city_dream.03/loading_splash_report.json"
+  ],
+  "outputDir": "out/ch_blender_agent/ui.loading_splash.city_dream.03"
+}
