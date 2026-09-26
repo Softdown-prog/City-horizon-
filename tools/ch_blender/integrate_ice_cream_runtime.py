@@ -173,7 +173,14 @@ def package_runtime(cfg: dict) -> None:
             },
         },
     }
-    (ROOT / cfg["definitionPath"]).write_text(json.dumps(definition, indent=2) + "\n", encoding="utf-8")
+    definition_path = ROOT / cfg["definitionPath"]
+    if definition_path.is_file():
+        # Keep gameplay and economy fields authored after the original art import.
+        current = json.loads(definition_path.read_text(encoding="utf-8"))
+        for key in ("texture", "sprites", "spriteAnchors", "colorMask", "activityOverlay"):
+            current[key] = definition[key]
+        definition = current
+    definition_path.write_text(json.dumps(definition, indent=2) + "\n", encoding="utf-8")
 
     package = {
         "contract": "CH_RUNTIME_BUILDING_V1",

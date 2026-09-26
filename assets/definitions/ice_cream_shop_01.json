@@ -53,7 +53,7 @@
     "demandIsAuthoritativeLimit": true
   },
   "powerConsumption": 0,
-  "artScale": 1.0,
+  "artScale": 1,
   "playerBuildable": true,
   "productionStatus": "runtime_buildable",
   "resourceInputs": [],
@@ -74,7 +74,7 @@
   },
   "activityOverlay": {
     "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
-    "enabled": false,
+    "enabled": true,
     "sprites": {
       "0": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_south.png",
       "1": "assets/buildings/ice_cream_shop/ice_cream_shop_activity_west.png",

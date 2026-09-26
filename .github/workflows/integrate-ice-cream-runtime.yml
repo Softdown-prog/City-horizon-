@@ -38,8 +38,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out/ice_runtime/static out/ice_runtime/activity
-          gh run download 35938008873 -n CH-Blender-Agent-35938008873-1 -D out/ice_runtime/static
-          gh run download 35938018823 -n CH-Blender-Agent-35938018823-1 -D out/ice_runtime/activity
+          sources="$(python -c 'import json; c=json.load(open("tools/ch_blender/runtime_integrations/building.ice_cream_shop.01.json")); print(c["static"]["sourceWorkflowRun"], c["static"]["sourceArtifactName"], c["activityOverlay"]["sourceWorkflowRun"], c["activityOverlay"]["sourceArtifactName"])')"
+          read -r static_run static_name activity_run activity_name <<< "$sources"
+          gh run download "$static_run" -n "$static_name" -D out/ice_runtime/static
+          gh run download "$activity_run" -n "$activity_name" -D out/ice_runtime/activity
 
       - name: Canonical post-process static building
         run: |
