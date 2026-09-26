@@ -23,7 +23,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Visitor Forge 2D
-        run: python -m pip install -e tools/visitor_forge_2d
+        run: python -m pip install pytest -e tools/visitor_forge_2d
 
       - name: Test shape recipe renderer
         run: python -m pytest tools/visitor_forge_2d/tests/test_shape_recipe.py -q
