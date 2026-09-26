@@ -15,6 +15,29 @@ brushes, feathered branch clusters, irregular foliage masses, broad 2D light
 and deliberate front/back depth. Keeping that logic in Visitor Forge avoids
 turning every tree recipe into hundreds of hand-authored triangles.
 
+## Dense raster foliage pass
+
+Organic scenery is still authored procedurally, but the final look is no longer
+limited to clean vector-like masks. The renderer now builds a denser crown from
+branch clusters plus irregular clumps, fuses nearby foliage masses at working
+resolution and applies deterministic raster paint inside the authored masks.
+
+The recipe can expose a `raster` object with three density controls:
+
+- `shadowDabs` — small occlusion/color dabs inside the crown;
+- `highlightDabs` — light paint variation on front foliage;
+- `needleStrokes` — short directional strokes that break flat fills at 1x.
+
+These passes are generated from the same integer seed, so repeated builds remain
+byte-stable for the same renderer, recipe and Pillow version. They are not
+external textures and do not use image generation. Work happens at 4x; final
+RGBA is reduced through alpha-safe Lanczos filtering so the sprite gains a
+raster-painted finish without introducing a background-removal step.
+
+Use crown filling to remove large accidental holes, not to turn the tree into a
+solid triangular cone. The final silhouette should preserve irregular branch
+breaks while reading as one dense organism at gameplay scale.
+
 ## Camera gate
 
 Gameplay scenery must declare `CH_CAMERA_V1` and the canonical `[128, 64]`
