@@ -11,7 +11,7 @@
   },
   "rotatable": true,
   "requiresRoadAccess": false,
-  "requiresRoadOrPathAccess": true,
+  "requiresRoadOrPathAccess": false,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "footprint": {
