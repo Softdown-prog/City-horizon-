@@ -38,6 +38,15 @@ bool g_park_gate_tool_active = false;
 std::string g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
 std::optional<UiRect> g_floor_catalog_bounds;
 
+struct CatalogCardInteractionFx {
+    float hover = 0.0F;
+    float press = 0.0F;
+    Uint64 last_tick = 0;
+    Uint64 last_seen_tick = 0;
+};
+
+std::unordered_map<std::string, CatalogCardInteractionFx> g_catalog_card_fx;
+
 [[nodiscard]] std::string runtime_asset_path(const std::filesystem::path& relative) {
     const char* base_path = SDL_GetBasePath();
     const std::filesystem::path root = base_path == nullptr ? std::filesystem::path(".") : std::filesystem::path(base_path);
@@ -357,6 +366,123 @@ void fill_rect(SDL_Renderer* renderer, const SDL_FRect& rect,
     SDL_RenderFillRect(renderer, &rect);
 }
 
+[[nodiscard]] float animate_toward(const float current, const float target,
+                                   const float response, const float delta_seconds) {
+    const float blend = 1.0F - std::exp(-response * delta_seconds);
+    return current + (target - current) * blend;
+}
+
+[[nodiscard]] std::string catalog_card_fx_key(const UiButton& button) {
+    return std::to_string(static_cast<int>(button.action)) + ":" + button.payload;
+}
+
+void render_catalog_card_interaction_fx(SDL_Renderer* renderer,
+                                        const std::vector<UiButton>& buttons) {
+    if (renderer == nullptr) return;
+
+    const Uint64 now = SDL_GetTicks();
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    for (const UiButton& button : buttons) {
+        if (!button.build_card) continue;
+
+        CatalogCardInteractionFx& fx = g_catalog_card_fx[catalog_card_fx_key(button)];
+        const float delta_seconds = fx.last_tick == 0
+            ? (1.0F / 60.0F)
+            : std::clamp(static_cast<float>(now - fx.last_tick) / 1000.0F, 0.0F, 0.05F);
+        fx.last_tick = now;
+        fx.last_seen_tick = now;
+
+        const bool pointer_over = button.enabled &&
+            (button.state == UiButtonState::hover || button.state == UiButtonState::pressed);
+        const bool pointer_pressed = button.enabled && button.state == UiButtonState::pressed;
+        fx.hover = animate_toward(fx.hover, pointer_over ? 1.0F : 0.0F, 18.0F, delta_seconds);
+        fx.press = animate_toward(fx.press, pointer_pressed ? 1.0F : 0.0F, 28.0F, delta_seconds);
+
+        if (!button.enabled) continue;
+
+        const float hover = std::clamp(fx.hover, 0.0F, 1.0F);
+        const float press = std::clamp(fx.press, 0.0F, 1.0F);
+        const float selected = button.active ? 1.0F : 0.0F;
+        const float selected_pulse = selected > 0.0F
+            ? 0.5F + 0.5F * std::sin(static_cast<float>(now) * 0.006F)
+            : 0.0F;
+
+        if (hover > 0.01F) {
+            const Uint8 glow_alpha = static_cast<Uint8>(std::clamp(28.0F + hover * 82.0F, 0.0F, 255.0F));
+            const SDL_FRect outer = {
+                button.bounds.x - 1.0F,
+                button.bounds.y - 1.0F,
+                button.bounds.width + 2.0F,
+                button.bounds.height + 2.0F,
+            };
+            SDL_SetRenderDrawColor(renderer, 105, 213, 235, glow_alpha);
+            SDL_RenderRect(renderer, &outer);
+
+            const Uint8 edge_alpha = static_cast<Uint8>(std::clamp(24.0F + hover * 64.0F, 0.0F, 255.0F));
+            SDL_SetRenderDrawColor(renderer, 225, 249, 255, edge_alpha);
+            SDL_RenderLine(renderer,
+                           button.bounds.x + 4.0F, button.bounds.y + 2.0F,
+                           button.bounds.x + button.bounds.width - 4.0F, button.bounds.y + 2.0F);
+            SDL_RenderLine(renderer,
+                           button.bounds.x + 2.0F, button.bounds.y + 4.0F,
+                           button.bounds.x + 2.0F, button.bounds.y + button.bounds.height - 4.0F);
+
+            const float sweep_width = std::max(1.0F, button.bounds.width - 12.0F);
+            const float sweep_phase = std::fmod(static_cast<float>(now) * 0.00115F, 1.0F);
+            const float sweep_x = button.bounds.x + 6.0F + sweep_width * sweep_phase;
+            const Uint8 sweep_alpha = static_cast<Uint8>(std::clamp(hover * 44.0F, 0.0F, 255.0F));
+            SDL_SetRenderDrawColor(renderer, 235, 252, 255, sweep_alpha);
+            SDL_RenderLine(renderer,
+                           sweep_x, button.bounds.y + 6.0F,
+                           sweep_x, button.bounds.y + button.bounds.height - 6.0F);
+        }
+
+        if (selected > 0.0F) {
+            const Uint8 selected_alpha = static_cast<Uint8>(
+                std::clamp(138.0F + selected_pulse * 58.0F, 0.0F, 255.0F));
+            const SDL_FRect selected_outer = {
+                button.bounds.x - 2.0F,
+                button.bounds.y - 2.0F,
+                button.bounds.width + 4.0F,
+                button.bounds.height + 4.0F,
+            };
+            SDL_SetRenderDrawColor(renderer, 72, 214, 248, selected_alpha);
+            SDL_RenderRect(renderer, &selected_outer);
+            SDL_SetRenderDrawColor(renderer, 168, 241, 255,
+                                   static_cast<Uint8>(95.0F + selected_pulse * 50.0F));
+            SDL_RenderLine(renderer,
+                           button.bounds.x + 3.0F, button.bounds.y + 1.0F,
+                           button.bounds.x + button.bounds.width - 3.0F, button.bounds.y + 1.0F);
+        }
+
+        if (press > 0.01F) {
+            const SDL_FRect pressed_overlay = {
+                button.bounds.x + 2.0F,
+                button.bounds.y + 2.0F,
+                std::max(0.0F, button.bounds.width - 4.0F),
+                std::max(0.0F, button.bounds.height - 4.0F),
+            };
+            SDL_SetRenderDrawColor(renderer, 3, 13, 19,
+                                   static_cast<Uint8>(std::clamp(press * 34.0F, 0.0F, 255.0F)));
+            SDL_RenderFillRect(renderer, &pressed_overlay);
+            SDL_SetRenderDrawColor(renderer, 185, 238, 250,
+                                   static_cast<Uint8>(std::clamp(press * 82.0F, 0.0F, 255.0F)));
+            SDL_RenderLine(renderer,
+                           button.bounds.x + 4.0F,
+                           button.bounds.y + button.bounds.height - 3.0F,
+                           button.bounds.x + button.bounds.width - 4.0F,
+                           button.bounds.y + button.bounds.height - 3.0F);
+        }
+    }
+
+    for (auto it = g_catalog_card_fx.begin(); it != g_catalog_card_fx.end();) {
+        const bool stale = it->second.last_seen_tick != 0 && now > it->second.last_seen_tick + 5000;
+        if (stale) it = g_catalog_card_fx.erase(it);
+        else ++it;
+    }
+}
+
 }  // namespace
 
 void GameplayUi::update_layout(const int viewport_width, const int viewport_height,
@@ -633,6 +759,9 @@ void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y
 void GameplayUi::render(SDL_Renderer* renderer) const {
     if (model_.overlay == UiOverlay::none) render_park_fences(renderer);
     render_legacy(renderer);
+    if (renderer != nullptr && model_.overlay == UiOverlay::none) {
+        render_catalog_card_interaction_fx(renderer, buttons_);
+    }
     if (renderer == nullptr || panels_.empty()) return;
 
     if (model_.overlay == UiOverlay::none && model_.active_tool == UiTool::sidewalks && g_floor_catalog_bounds) {
