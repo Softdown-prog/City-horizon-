@@ -108,6 +108,8 @@ add_executable(city_builder
     src/building_system.cpp
     src/economy_system.cpp
     src/farming_system.cpp
+    src/fence_system.cpp
+    src/fence_placement_controller.cpp
     src/land_system.cpp
     src/mission_system.cpp
     src/mobile_animation.cpp
