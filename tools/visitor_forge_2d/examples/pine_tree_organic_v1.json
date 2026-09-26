@@ -1,0 +1,39 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "pine_tree_v1",
+  "canvas": [192, 256],
+  "anchor": [96, 239],
+  "seed": 73021,
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "worldHeightScreenVertical": true
+  },
+  "palette": {
+    "ground_shadow": "#17271F",
+    "trunk_top": "#B87948",
+    "trunk_bottom": "#6E4128",
+    "trunk_light": "#DCA066",
+    "back_top": "#245540",
+    "back_bottom": "#10342B",
+    "mid_top": "#4E855F",
+    "mid_bottom": "#235440",
+    "front_top": "#67A071",
+    "front_bottom": "#326A50",
+    "highlight": "#ADD18A",
+    "occlusion": "#123B30"
+  },
+  "tiers": [
+    {"y": 27,  "span": 18, "thickness": 16, "skew": 1},
+    {"y": 46,  "span": 27, "thickness": 18, "skew": -1},
+    {"y": 68,  "span": 37, "thickness": 20, "skew": 1},
+    {"y": 92,  "span": 48, "thickness": 23, "skew": -2},
+    {"y": 119, "span": 59, "thickness": 25, "skew": 1},
+    {"y": 148, "span": 70, "thickness": 27, "skew": -1},
+    {"y": 178, "span": 79, "thickness": 29, "skew": 1},
+    {"y": 202, "span": 84, "thickness": 27, "skew": -1}
+  ]
+}
