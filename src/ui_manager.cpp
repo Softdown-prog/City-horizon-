@@ -280,54 +280,163 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
     update_layout_legacy(viewport_width, viewport_height, runtime_model);
     g_floor_catalog_bounds.reset();
 
-    if (runtime_model.overlay == UiOverlay::none && runtime_model.active_tool == UiTool::sidewalks) {
-        // The old three tiny toolbar buttons duplicated the ground catalogue.
-        // PISO now uses the same card language as buildings: preview, price,
-        // footprint and placement requirements in one selectable item.
+    const float width = static_cast<float>(std::max(viewport_width, 1));
+    const float height = static_cast<float>(std::max(viewport_height, 1));
+    const float toolbar_y = height - kToolbarHeight - kMargin;
+    const float drawer_x = 6.0F;
+    const float drawer_y = 84.0F;
+    const float drawer_width = std::min(std::max(330.0F, width * 0.29F), 390.0F);
+    const float drawer_height = std::max(180.0F, toolbar_y - drawer_y - 8.0F);
+
+    const auto erase_legacy_catalog = [&]() {
+        if (!build_panel_bounds_) return;
+        const UiRect old = *build_panel_bounds_;
+        panels_.erase(
+            std::remove_if(panels_.begin(), panels_.end(), [&](const UiRect& panel) {
+                return std::fabs(panel.x - old.x) < 0.1F && std::fabs(panel.y - old.y) < 0.1F &&
+                       std::fabs(panel.width - old.width) < 0.1F && std::fabs(panel.height - old.height) < 0.1F;
+            }),
+            panels_.end());
+        buttons_.erase(
+            std::remove_if(buttons_.begin(), buttons_.end(), [&](const UiButton& button) {
+                const float center_x = button.bounds.x + button.bounds.width * 0.5F;
+                const float center_y = button.bounds.y + button.bounds.height * 0.5F;
+                return old.contains(center_x, center_y);
+            }),
+            buttons_.end());
+        build_panel_bounds_.reset();
+        placement_preview_bounds_.reset();
+    };
+
+    if (runtime_model.overlay == UiOverlay::none && runtime_model.build_panel_open) {
+        erase_legacy_catalog();
+
+        const UiRect panel = {drawer_x, drawer_y, drawer_width, drawer_height};
+        add_panel(panel);
+        build_panel_bounds_ = panel;
+        add_button({panel.x + panel.width - 29.0F, panel.y + 9.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
+
+        std::vector<std::string> categories;
+        for (const UiBuildItem& item : runtime_model.build_items) {
+            if (std::find(categories.begin(), categories.end(), item.category) == categories.end()) {
+                categories.push_back(item.category);
+            }
+        }
+        if (build_category_filter_ != "TODOS" &&
+            std::find(categories.begin(), categories.end(), build_category_filter_) == categories.end()) {
+            build_category_filter_ = "TODOS";
+            build_scroll_offset_ = 0.0F;
+        }
+
+        std::vector<std::string> tab_labels = {"TODOS"};
+        tab_labels.insert(tab_labels.end(), categories.begin(), categories.end());
+        constexpr int tab_columns = 2;
+        constexpr float tab_gap = 4.0F;
+        constexpr float tab_height = 26.0F;
+        const float tab_width = (panel.width - 16.0F - tab_gap) / 2.0F;
+        const float tabs_y = panel.y + 43.0F;
+        const int tab_rows = std::max(1, static_cast<int>((tab_labels.size() + 1U) / 2U));
+        for (std::size_t index = 0; index < tab_labels.size(); ++index) {
+            const int row = static_cast<int>(index) / tab_columns;
+            const int column = static_cast<int>(index) % tab_columns;
+            const std::string& category = tab_labels[index];
+            add_button({panel.x + 8.0F + static_cast<float>(column) * (tab_width + tab_gap),
+                        tabs_y + static_cast<float>(row) * (tab_height + tab_gap),
+                        tab_width, tab_height},
+                       category, UiAction::none, true, category == build_category_filter_,
+                       "build_category:" + category);
+        }
+
+        build_panel_header_height_ = 49.0F + static_cast<float>(tab_rows) * (tab_height + tab_gap);
+        constexpr float preview_height = 72.0F;
+        placement_preview_bounds_ = {panel.x + 8.0F, panel.y + build_panel_header_height_ + 2.0F,
+                                     panel.width - 16.0F, preview_height};
+        const float arrows_y = placement_preview_bounds_->y + preview_height + 5.0F;
+        const bool can_rotate = !runtime_model.selected_building_id.empty() && runtime_model.placement_rotatable;
+        add_button({panel.x + 48.0F, arrows_y, 82.0F, 28.0F}, "< ESQ", UiAction::rotate_left, can_rotate);
+        add_button({panel.x + panel.width - 130.0F, arrows_y, 82.0F, 28.0F}, "DIR >", UiAction::rotate_right, can_rotate);
+        build_panel_header_height_ += preview_height + 38.0F;
+
+        std::vector<const UiBuildItem*> filtered_items;
+        for (const UiBuildItem& item : runtime_model.build_items) {
+            if (build_category_filter_ == "TODOS" || item.category == build_category_filter_) {
+                filtered_items.push_back(&item);
+            }
+        }
+
+        constexpr float card_height = 90.0F;
+        constexpr float card_gap = 6.0F;
+        const float content_top = panel.y + build_panel_header_height_;
+        const float visible_height = std::max(1.0F, panel.height - build_panel_header_height_ - 8.0F);
+        const float content_height = static_cast<float>(filtered_items.size()) * (card_height + card_gap);
+        build_scroll_max_ = std::max(0.0F, content_height - visible_height);
+        build_scroll_offset_ = std::clamp(build_scroll_offset_, 0.0F, build_scroll_max_);
+
+        float card_y = content_top - build_scroll_offset_;
+        for (const UiBuildItem* item : filtered_items) {
+            const UiRect card = {panel.x + 8.0F, card_y, panel.width - 16.0F, card_height};
+            if (card.y >= content_top && card.y + card.height <= panel.y + panel.height - 7.0F) {
+                add_build_card(card, *item, item->definition_id == runtime_model.selected_building_id,
+                               UiAction::select_building);
+            }
+            card_y += card_height + card_gap;
+        }
+    } else if (runtime_model.overlay == UiOverlay::none &&
+               (runtime_model.farming_panel_open || runtime_model.active_tool == UiTool::decoration)) {
+        erase_legacy_catalog();
+
+        const UiRect panel = {drawer_x, drawer_y, drawer_width, drawer_height};
+        add_panel(panel);
+        build_panel_bounds_ = panel;
+        add_button({panel.x + panel.width - 29.0F, panel.y + 9.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
+
+        const bool farming = runtime_model.farming_panel_open;
+        build_panel_header_height_ = farming ? 60.0F : 42.0F;
+        const std::vector<UiBuildItem>& items = farming ? runtime_model.farming_items : runtime_model.decor_items;
+        const UiAction action = farming ? UiAction::select_farming_item : UiAction::select_building;
+        const std::string& selected = farming ? runtime_model.selected_farming_id : runtime_model.selected_building_id;
+
+        constexpr float card_height = 90.0F;
+        constexpr float card_gap = 6.0F;
+        const float content_top = panel.y + build_panel_header_height_;
+        const float visible_height = std::max(1.0F, panel.height - build_panel_header_height_ - 8.0F);
+        const float content_height = static_cast<float>(items.size()) * (card_height + card_gap);
+        build_scroll_max_ = std::max(0.0F, content_height - visible_height);
+        build_scroll_offset_ = std::clamp(build_scroll_offset_, 0.0F, build_scroll_max_);
+
+        float card_y = content_top - build_scroll_offset_;
+        for (const UiBuildItem& item : items) {
+            const UiRect card = {panel.x + 8.0F, card_y, panel.width - 16.0F, card_height};
+            if (card.y >= content_top && card.y + card.height <= panel.y + panel.height - 7.0F) {
+                add_build_card(card, item, item.definition_id == selected, action);
+            }
+            card_y += card_height + card_gap;
+        }
+    } else if (runtime_model.overlay == UiOverlay::none && runtime_model.active_tool == UiTool::sidewalks) {
+        // PISO uses the same card language as buildings, but in the same narrow
+        // corner drawer used by the other gameplay catalogues.
         buttons_.erase(
             std::remove_if(buttons_.begin(), buttons_.end(), [](const UiButton& button) {
                 return button.action == UiAction::select_sidewalk_style;
             }),
             buttons_.end());
 
-        const float width = static_cast<float>(std::max(viewport_width, 1));
-        const float height = static_cast<float>(std::max(viewport_height, 1));
-        const float toolbar_y = height - kToolbarHeight - kMargin;
-        const float panel_y = 84.0F;
-        const float maximum_panel_height = std::max(180.0F, toolbar_y - panel_y - 8.0F);
-        const float panel_width = std::min(std::max(340.0F, width - kMargin * 2.0F), 650.0F);
-        const int columns = panel_width >= 560.0F ? 2 : 1;
-        const float desired_panel_height = columns == 2 ? 300.0F : 360.0F;
-        const float panel_height = std::min(maximum_panel_height, desired_panel_height);
-        const UiRect panel = {kMargin, panel_y, panel_width, panel_height};
+        const float desired_height = 52.0F + 3.0F * 90.0F + 2.0F * 6.0F + 9.0F;
+        const UiRect panel = {drawer_x, drawer_y, drawer_width, std::min(drawer_height, desired_height)};
         add_panel(panel);
         g_floor_catalog_bounds = panel;
-
         add_button({panel.x + panel.width - 29.0F, panel.y + 9.0F, 19.0F, 19.0F},
                    "X", UiAction::close_tool_panel);
 
         const std::array<UiBuildItem, 3> items = floor_catalog_items();
-        const float card_gap = 8.0F;
-        const float horizontal_padding = 8.0F;
-        const float card_height = columns == 2 ? 108.0F : 88.0F;
-        const float cards_width = panel.width - horizontal_padding * 2.0F;
-        const float card_width = (cards_width - card_gap * static_cast<float>(columns - 1)) /
-                                 static_cast<float>(columns);
-        const float content_top = panel.y + 52.0F;
-
-        for (std::size_t index = 0; index < items.size(); ++index) {
-            const int row = static_cast<int>(index / static_cast<std::size_t>(columns));
-            const int column = static_cast<int>(index % static_cast<std::size_t>(columns));
-            const UiRect card = {
-                panel.x + horizontal_padding + static_cast<float>(column) * (card_width + card_gap),
-                content_top + static_cast<float>(row) * (card_height + card_gap),
-                card_width,
-                card_height,
-            };
-            if (card.y + card.height <= panel.y + panel.height - 8.0F) {
-                add_build_card(card, items[index], items[index].definition_id == runtime_model.sidewalk_style,
-                               UiAction::select_sidewalk_style);
-            }
+        float card_y = panel.y + 52.0F;
+        for (const UiBuildItem& item : items) {
+            const UiRect card = {panel.x + 8.0F, card_y, panel.width - 16.0F, 90.0F};
+            add_build_card(card, item, item.definition_id == runtime_model.sidewalk_style,
+                           UiAction::select_sidewalk_style);
+            card_y += 96.0F;
         }
     }
 }
