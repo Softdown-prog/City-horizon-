@@ -42,7 +42,7 @@
     "offsetX": 1,
     "offsetY": 1
   },
-  "buildCost": 0,
+  "buildCost": 25000,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 0,
