@@ -12,4 +12,5 @@ eventos lógicos (por exemplo, `BuildingPlace`), nunca caminhos de arquivos.
 O campo `music.Loading` usa uma faixa OGG em uma pista independente com volume
 de música. Ela começa durante o carregamento e termina ao fim do arquivo; a
 tela de carregamento pode terminar antes da faixa. `UiClick` usa o clique novo
-`ui/mouse_click_002.ogg`. Outros eventos de painel preservam seus efeitos próprios.
+`ui/mouse_click_002.ogg` em cliques esquerdos consumidos pela interface.
+Outros eventos de painel preservam seus efeitos próprios.

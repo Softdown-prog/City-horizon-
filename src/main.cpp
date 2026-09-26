@@ -2502,6 +2502,9 @@ int main() {
                 const UiInputResult ui_input = gameplay_ui.handle_mouse_button_down(
                     event.button.x, event.button.y, event.button.button == SDL_BUTTON_LEFT);
                 if (ui_input.consumed) {
+                    // A physical click has a stable sound even for controls
+                    // (such as category tabs) that do not emit an action.
+                    if (event.button.button == SDL_BUTTON_LEFT) (void)audio.play(SoundEvent::ui_click);
                     if (ui_input.action) {
                         apply_ui_action(*ui_input.action);
                     }
