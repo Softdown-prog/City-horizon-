@@ -1809,6 +1809,13 @@ int main() {
         status = "BUILDINGS PANEL OPEN";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
+    const auto close_tool_panel = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        selected_instance_id.reset();
+        status = "TOOL PANEL CLOSED";
+        (void)play_sound(SoundEvent::ui_close_panel);
+    };
     const auto begin_build_placement = [&](const std::string& definition_id) {
         const BuildingDefinition* definition = catalog.find(definition_id);
         if (definition == nullptr) {
@@ -1979,6 +1986,7 @@ int main() {
             case UiAction::activate_decoration: begin_decoration_mode(); break;
             case UiAction::rotate_left: rotate_placement(false); break;
             case UiAction::rotate_right: rotate_placement(true); break;
+            case UiAction::close_tool_panel: close_tool_panel(); break;
             case UiAction::toggle_pause:
                 if (active_overlay == UiOverlay::pause) {
                     active_overlay = UiOverlay::none;
@@ -2291,6 +2299,10 @@ int main() {
         }
         if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
             model.placement_rotatable = placement->rotatable;
+            const BuildingRotation visual_rotation = camera_visual_rotation(*placement, placement_rotation, camera.rotation);
+            model.placement_preview_path = (asset_root / placement->texture_path_for(visual_rotation)).string();
+            model.placement_preview_frame_count = placement->animation ? std::max(1, placement->animation->frame_count) : 1;
+            model.placement_rotation_label = rotation_label(placement_rotation);
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;

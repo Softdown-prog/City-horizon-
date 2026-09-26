@@ -69,6 +69,13 @@ int main() {
     require(house_item_click.consumed && house_item_click.action && house_item_click.action->action == UiAction::select_building &&
                 house_item_click.action->payload == "house_suburban_01", "residential catalog item click");
 
+    ui.update_layout(960, 500, model);
+    const auto compact_card = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::select_building && button.payload == "cafe_01";
+    });
+    require(compact_card != ui.buttons().end(), "compact window retains a selectable catalog item");
+    ui.update_layout(1280, 800, model);
+
     model.build_items.front().enabled = false;
     ui.update_layout(1280, 800, model);
     const auto disabled_cafe_card = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
@@ -82,11 +89,31 @@ int main() {
 
     model.placement_rotatable = true;
     ui.update_layout(1280, 800, model);
-    bool has_rotate = false;
-    for (const UiButton& button : ui.buttons()) {
-        has_rotate = has_rotate || button.action == UiAction::rotate_left || button.action == UiAction::rotate_right;
-    }
-    require(!has_rotate, "rotation buttons are removed from UI");
+    const auto left_arrow = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::rotate_left;
+    });
+    require(left_arrow != ui.buttons().end() && !left_arrow->enabled,
+            "preview arrows wait for a selected building");
+    model.selected_building_id = "cafe_01";
+    model.placement_rotation_label = "R0";
+    ui.update_layout(1280, 800, model);
+    const auto enabled_arrow = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::rotate_right;
+    });
+    require(enabled_arrow != ui.buttons().end() && enabled_arrow->enabled,
+            "selected building enables preview rotation");
+    const UiInputResult rotation_click = ui.handle_mouse_button_down(enabled_arrow->bounds.x + 4.0F,
+                                                                       enabled_arrow->bounds.y + 4.0F, true);
+    require(rotation_click.action && rotation_click.action->action == UiAction::rotate_right,
+            "preview arrow dispatches placement rotation");
+    const auto panel_close = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::close_tool_panel && button.bounds.y < 200.0F;
+    });
+    require(panel_close != ui.buttons().end(), "build panel has a close control");
+    const UiInputResult panel_close_click = ui.handle_mouse_button_down(panel_close->bounds.x + 4.0F,
+                                                                           panel_close->bounds.y + 4.0F, true);
+    require(panel_close_click.action && panel_close_click.action->action == UiAction::close_tool_panel,
+            "build panel close dispatches cancellation");
 
     model.selected_building = UiSelectedBuilding{"Cafeteria", "Commercial", "$2.500", "$220", "$80", "+$140", "R0", "ROAD CONNECTED", "7", "10%"};
     ui.update_layout(1280, 800, model);
@@ -98,11 +125,9 @@ int main() {
     require(close_click.consumed && close_click.action && close_click.action->action == UiAction::close_selection,
             "contextual panel close button");
 
-    model.selected_building->road_access_requirement = "REQUIRED";
-    model.selected_building->local_supply =
-        "Tomate 2/MES, Milho 2/MES, Cafe 2/MES, Trigo 2/MES, Cana 2/MES, Fruta 2/MES, "
-        "Vegetais 2/MES, Graos 2/MES, Feijao 2/MES, Arroz 2/MES, Cevada 2/MES, Aveia 2/MES, "
-        "Batata 2/MES, Cacau 2/MES, Uva 2/MES, Laranja 2/MES | ABASTECIDO +$40";
+    model.selected_building->road_access_requirement =
+        "RUA CONECTADA AO MAPA E ACESSO GARANTIDO PELA ENTRADA PRINCIPAL DO EDIFICIO";
+    model.selected_building->has_service_pricing = true;
     ui.update_layout(1280, 800, model);
     const auto expanded_context_panel = std::find_if(ui.panels().begin(), ui.panels().end(), [](const UiRect& panel) {
         return panel.width == 330.0F && panel.y == 84.0F;
@@ -111,8 +136,13 @@ int main() {
             "long building details expand contextual panel instead of clipping");
     model.selected_building.reset();
 
+    model.build_panel_open = false;
     model.active_tool = UiTool::roads;
     ui.update_layout(1280, 800, model);
+    const auto road_close = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
+        return button.action == UiAction::close_tool_panel;
+    });
+    require(road_close != ui.buttons().end(), "road tool has a close control");
     const auto road_button = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
         return button.action == UiAction::activate_roads;
     });

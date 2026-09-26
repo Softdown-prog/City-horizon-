@@ -53,6 +53,7 @@ enum class UiAction : std::uint8_t {
     activate_decoration,
     rotate_left,
     rotate_right,
+    close_tool_panel,
     toggle_pause,
     resume_game,
     open_administration,
@@ -204,6 +205,9 @@ struct GameplayUiModel {
     std::string farming_stock;
     std::string farming_tile_status;
     bool placement_rotatable = false;
+    std::string placement_preview_path;
+    std::string placement_rotation_label;
+    int placement_preview_frame_count = 1;
     std::string selected_building_id;
     bool paused = false;
     std::vector<UiBuildItem> build_items;
@@ -280,6 +284,7 @@ private:
     float mouse_y_ = -1.0F;
     bool primary_pressed_ = false;
     std::optional<UiRect> build_panel_bounds_;
+    std::optional<UiRect> placement_preview_bounds_;
     std::optional<UiRect> overlay_bounds_;
     std::optional<UiRect> settings_master_slider_bounds_;
     std::optional<UiRect> settings_effects_slider_bounds_;

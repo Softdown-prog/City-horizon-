@@ -534,7 +534,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     }
     viewport_width_ = std::max(viewport_width, 1);
     viewport_height_ = std::max(viewport_height, 1);
-    buttons_.clear(); panels_.clear(); build_panel_bounds_.reset(); overlay_bounds_.reset();
+    buttons_.clear(); panels_.clear(); build_panel_bounds_.reset(); placement_preview_bounds_.reset(); overlay_bounds_.reset();
     settings_master_slider_bounds_.reset();
     settings_effects_slider_bounds_.reset();
     if (entering_settings) {
@@ -593,12 +593,9 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                    true, model.sidewalk_style == "sand_path", "sand_path");
     }
 
-    if (model.placement_rotatable && model.active_tool == UiTool::buildings) {
-        constexpr float rotation_gap = 6.0F;
-        const float rotation_width = std::max(72.0F, (context_width - 18.0F - rotation_gap) * 0.5F);
-        const float rotation_y = toolbar_y + 39.0F;
-        add_button({context_x + 6.0F, rotation_y, rotation_width, 28.0F}, "ESQ", UiAction::rotate_left);
-        add_button({context_x + 12.0F + rotation_width, rotation_y, rotation_width, 28.0F}, "DIR", UiAction::rotate_right);
+    if (model.active_tool != UiTool::none) {
+        add_button({context_x + context_width - 25.0F, toolbar_y + 7.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
     }
 
     if (model.build_panel_open) {
@@ -609,6 +606,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         const UiRect panel_bounds = {kMargin, panel_y, panel_width, panel_height};
         add_panel(panel_bounds);
         build_panel_bounds_ = panel_bounds;
+        add_button({panel_bounds.x + panel_bounds.width - 29.0F, panel_y + 9.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
 
         std::vector<std::string> categories;
         for (const UiBuildItem& item : model.build_items) {
@@ -645,12 +644,27 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
                        category, UiAction::none, true, category == build_category_filter_, "build_category:" + category);
         }
 
+        const bool compact_panel = panel_height < 380.0F;
+        const float preview_height = compact_panel ? 56.0F :
+            std::clamp(panel_height - build_panel_header_height_ - 175.0F, 80.0F, 140.0F);
+        placement_preview_bounds_ = {panel_bounds.x + 8.0F, panel_y + build_panel_header_height_ + 2.0F,
+                                     panel_width - 16.0F, preview_height};
+        const float arrows_y = placement_preview_bounds_->y + preview_height + 6.0F;
+        const float arrow_width = std::min(84.0F, (panel_width - 64.0F) * 0.25F);
+        const float center_x = panel_bounds.x + panel_width * 0.5F;
+        const bool can_rotate = !model.selected_building_id.empty() && model.placement_rotatable;
+        add_button({center_x - arrow_width - 60.0F, arrows_y, arrow_width, 29.0F},
+                   "< ESQ", UiAction::rotate_left, can_rotate);
+        add_button({center_x + 60.0F, arrows_y, arrow_width, 29.0F},
+                   "DIR >", UiAction::rotate_right, can_rotate);
+        build_panel_header_height_ += preview_height + (compact_panel ? 37.0F : 45.0F);
+
         std::vector<const UiBuildItem*> filtered_items;
         for (const UiBuildItem& item : model.build_items) {
             if (build_category_filter_ == "TODOS" || item.category == build_category_filter_) filtered_items.push_back(&item);
         }
 
-        constexpr float card_height = 108.0F;
+        const float card_height = compact_panel ? 84.0F : 108.0F;
         constexpr float card_gap = 8.0F;
         constexpr float horizontal_padding = 8.0F;
         const int columns = panel_width >= 620.0F ? 2 : 1;
@@ -687,6 +701,8 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
         const UiRect panel_bounds = {kMargin, panel_y, panel_width, panel_height};
         add_panel(panel_bounds);
         build_panel_bounds_ = panel_bounds;
+        add_button({panel_bounds.x + panel_bounds.width - 29.0F, panel_y + 9.0F, 19.0F, 19.0F},
+                   "X", UiAction::close_tool_panel);
         const float visible_height = panel_height - header_height - 8.0F;
         const std::vector<UiBuildItem>& panel_items = model.farming_panel_open ? model.farming_items : model.decor_items;
         const UiAction panel_action = model.farming_panel_open ? UiAction::select_farming_item : UiAction::select_building;
@@ -998,7 +1014,8 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         if (button.build_card || is_primary_tool_action(button.action) ||
             (button.action == UiAction::none && button.payload.rfind("build_category:", 0) == 0)) return false;
         const UiButtonState state = !button.enabled ? UiButtonState::disabled : (button.active ? UiButtonState::pressed : button.state);
-        const bool is_close = button.action == UiAction::close_modal || button.action == UiAction::close_selection;
+        const bool is_close = button.action == UiAction::close_modal || button.action == UiAction::close_selection ||
+                              button.action == UiAction::close_tool_panel;
         const bool is_back = button.action == UiAction::open_administration && model_.overlay == UiOverlay::reports;
         const UiThumbnail* atlas = thumbnail_for(renderer, is_close || is_back ? ui_goals_controls_atlas_path() : ui_button_state_atlas_path());
         if (atlas == nullptr) return false;
@@ -1036,8 +1053,11 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             case UiTool::decoration: title = "MODO DECORACAO"; description = "EM BREVE"; break;
             case UiTool::none: break;
         }
-        draw_text_fit(renderer, context_x + 6.0F, toolbar.y + 11.0F, context_width - 12.0F, title, 219, 232, 238);
-        draw_text_fit(renderer, context_x + 6.0F, toolbar.y + 27.0F, context_width - 12.0F, description, 162, 187, 199);
+        draw_text_fit(renderer, context_x + 6.0F, toolbar.y + 11.0F,
+                      context_width - (model_.active_tool == UiTool::none ? 12.0F : 38.0F),
+                      title, 219, 232, 238);
+        draw_text_fit(renderer, context_x + 6.0F, toolbar.y + 27.0F, context_width - 12.0F,
+                      description, 162, 187, 199);
     }
     if (!panels_.empty()) {
         const UiRect& hud = panels_.front();
@@ -1071,6 +1091,34 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             draw_text_fit(renderer, panel.x + 12.0F, panel.y + 26.0F, panel.width - 24.0F,
                           std::to_string(filtered_count) + " DE " + std::to_string(model_.build_items.size()) +
                           " ITENS  |  " + build_category_filter_, 151, 178, 192);
+            if (placement_preview_bounds_) {
+                const UiRect& bounds = *placement_preview_bounds_;
+                const SDL_FRect stage = {bounds.x, bounds.y, bounds.width, bounds.height};
+                SDL_SetRenderDrawColor(renderer, 10, 29, 41, SDL_ALPHA_OPAQUE);
+                SDL_RenderFillRect(renderer, &stage);
+                SDL_SetRenderDrawColor(renderer, 62, 105, 125, SDL_ALPHA_OPAQUE);
+                SDL_RenderRect(renderer, &stage);
+                if (const UiThumbnail* sprite = thumbnail_for(renderer, model_.placement_preview_path)) {
+                    const float frame_width = sprite->width / static_cast<float>(std::max(1, model_.placement_preview_frame_count));
+                    const float available_width = std::min(bounds.width - 24.0F, 230.0F);
+                    const float scale = std::min(available_width / frame_width, (bounds.height - 22.0F) / sprite->height);
+                    const SDL_FRect source = {0.0F, 0.0F, frame_width, sprite->height};
+                    const SDL_FRect destination = {bounds.x + (bounds.width - frame_width * scale) * 0.5F,
+                                                   bounds.y + (bounds.height - sprite->height * scale) * 0.5F,
+                                                   frame_width * scale, sprite->height * scale};
+                    SDL_RenderTexture(renderer, sprite->texture, &source, &destination);
+                } else if (model_.selected_building_id.empty()) {
+                    draw_text_centered(renderer, bounds, bounds.y + bounds.height * 0.5F - 6.0F,
+                                       "SELECIONE UMA CONSTRUCAO", 151, 178, 192);
+                } else {
+                    draw_text_centered(renderer, bounds, bounds.y + bounds.height * 0.5F - 6.0F,
+                                       "PREVIA INDISPONIVEL", 151, 178, 192);
+                }
+                const std::string direction = model_.selected_building_id.empty() ? "PREVIA" :
+                    (model_.placement_rotatable ? model_.placement_rotation_label : "FIXA");
+                draw_text_centered(renderer, bounds, bounds.y + bounds.height + 15.0F,
+                                   direction, 172, 207, 219);
+            }
             SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);
             const float separator_y = panel.y + build_panel_header_height_ - 5.0F;
             SDL_RenderLine(renderer, panel.x + 8.0F, separator_y, panel.x + panel.width - 8.0F, separator_y);
@@ -1205,7 +1253,8 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
     }
     for (const UiButton& button : buttons_) {
         if (button.build_card) continue;
-        if (button.action == UiAction::close_selection || button.action == UiAction::close_modal) continue;
+        if (button.action == UiAction::close_selection || button.action == UiAction::close_modal ||
+            button.action == UiAction::close_tool_panel) continue;
         if (const char* icon_name = icon_name_for(button.action)) {
             const bool primary_tool = is_primary_tool_action(button.action);
             const SDL_FRect icon_bounds = primary_tool
