@@ -20,33 +20,34 @@
     "trunk_top": "#A96C43",
     "trunk_bottom": "#5E3826",
     "trunk_light": "#D29661",
-    "back_top": "#214A36",
-    "back_bottom": "#103126",
-    "mid_top": "#447651",
-    "mid_bottom": "#22503A",
-    "front_top": "#58895F",
-    "front_bottom": "#2F6547",
-    "highlight": "#91B376",
-    "occlusion": "#153A2D"
+    "back_top": "#204833",
+    "back_bottom": "#0E2E23",
+    "mid_top": "#42734E",
+    "mid_bottom": "#214E38",
+    "front_top": "#58885E",
+    "front_bottom": "#2E6346",
+    "highlight": "#93B779",
+    "occlusion": "#14382B"
   },
   "raster": {
-    "shadowDabs": 310,
-    "highlightDabs": 260,
-    "needleStrokes": 560,
-    "finalGrain": 320,
-    "finalNeedles": 300
+    "shadowDabs": 340,
+    "highlightDabs": 280,
+    "needleStrokes": 620,
+    "finalGrain": 330,
+    "finalNeedles": 330
   },
   "tiers": [
-    {"y": 20,  "span": 14, "thickness": 16, "skew": 1},
-    {"y": 34,  "span": 22, "thickness": 18, "skew": -2},
-    {"y": 49,  "span": 30, "thickness": 20, "skew": 1},
-    {"y": 65,  "span": 37, "thickness": 22, "skew": 0},
-    {"y": 83,  "span": 45, "thickness": 24, "skew": -2},
-    {"y": 103, "span": 52, "thickness": 26, "skew": 2},
-    {"y": 126, "span": 59, "thickness": 28, "skew": -1},
-    {"y": 151, "span": 66, "thickness": 30, "skew": 2},
-    {"y": 177, "span": 72, "thickness": 31, "skew": -2},
-    {"y": 201, "span": 77, "thickness": 30, "skew": 1},
-    {"y": 216, "span": 80, "thickness": 23, "skew": 0}
+    {"y": 20,  "span": 14, "thickness": 16, "skew": 2},
+    {"y": 33,  "span": 23, "thickness": 19, "skew": -3},
+    {"y": 48,  "span": 29, "thickness": 20, "skew": 1},
+    {"y": 64,  "span": 40, "thickness": 24, "skew": -1},
+    {"y": 82,  "span": 44, "thickness": 24, "skew": 3},
+    {"y": 101, "span": 56, "thickness": 28, "skew": -3},
+    {"y": 123, "span": 52, "thickness": 27, "skew": 1},
+    {"y": 145, "span": 67, "thickness": 30, "skew": 3},
+    {"y": 169, "span": 63, "thickness": 29, "skew": -4},
+    {"y": 190, "span": 76, "thickness": 31, "skew": 1},
+    {"y": 207, "span": 71, "thickness": 27, "skew": -2},
+    {"y": 219, "span": 82, "thickness": 22, "skew": 2}
   ]
 }
