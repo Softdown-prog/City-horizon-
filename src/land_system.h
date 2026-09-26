@@ -37,6 +37,11 @@ public:
     [[nodiscard]] int owned_parcel_count() const;
     [[nodiscard]] const std::vector<LandParcel>& parcels() const;
 
+    // Geometry-only view of the whole generated world.  Every entry is marked
+    // owned in this view on purpose so camera/cursor helpers can roam the map,
+    // while is_tile_owned()/is_area_owned() continue to enforce purchases.
+    [[nodiscard]] const std::vector<LandParcel>& world_parcels() const;
+
     [[nodiscard]] int parcel_width() const;
     [[nodiscard]] int parcel_height() const;
 
@@ -49,4 +54,5 @@ private:
     int parcel_width_ = 32;
     int parcel_height_ = 32;
     std::vector<LandParcel> parcels_;
+    std::vector<LandParcel> world_parcels_;
 };
