@@ -80,6 +80,7 @@ add_library(mapforge2_asset_composer STATIC
     src/carousel_part_variants.cpp
     src/carousel_composer.cpp
     src/procedural_2d_primitives.cpp
+    src/park_fence_renderer.cpp
     src/building_composer.cpp
     src/building_footprint_model.cpp
     src/building_procedural_variation.cpp
@@ -183,6 +184,11 @@ add_executable(MapForge2AnimationPreview
 )
 target_link_libraries(MapForge2AnimationPreview PRIVATE mapforge2_asset_composer Qt6::Gui)
 
+add_executable(MapForge2ParkFencePreview
+    src/park_fence_preview_main.cpp
+)
+target_link_libraries(MapForge2ParkFencePreview PRIVATE mapforge2_asset_composer Qt6::Gui)
+
 add_executable(MapForge2UiPausePreview
     src/ui_pause_preview_main.cpp
 )
@@ -219,6 +225,7 @@ if(MSVC)
     target_compile_options(CityHorizonSpriteWorkshop PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2ParkFencePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2UiPausePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2MapCapture PRIVATE /W4 /permissive- /utf-8)
@@ -236,6 +243,7 @@ else()
     target_compile_options(CityHorizonSpriteWorkshop PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2ParkFencePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2UiPausePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2MapCapture PRIVATE -Wall -Wextra -Wpedantic)
