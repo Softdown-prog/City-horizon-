@@ -2,7 +2,7 @@
   "contract": "CH_BLENDER_AGENT_JOB_V1",
   "jobId": "ui.loading_hero_city_park.preflight.001",
   "operation": "guarded_blender_script",
-  "script": "tools/tycoon_photo_studio/build_loading_hero_guarded.py",
+  "script": "tools/tycoon_photo_studio/build_loading_hero_framed_guarded.py",
   "qualityStage": "preflight",
   "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
   "args": [
