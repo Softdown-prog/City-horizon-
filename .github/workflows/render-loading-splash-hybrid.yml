@@ -1,0 +1,56 @@
+name: Render Loading Splash Hybrid
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/tycoon_photo_studio/build_loading_splash_hybrid_base.py'
+      - 'tools/tycoon_photo_studio/finish_loading_splash_paintover.py'
+      - 'tools/tycoon_photo_studio/assets/loading_splash_hybrid_city_04.art.json'
+      - '.github/workflows/render-loading-splash-hybrid.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install 2D finishing dependencies
+        run: python -m pip install --upgrade pillow
+
+      - name: Setup frozen CH Blender
+        uses: ./.github/actions/setup-ch-blender
+        with:
+          install-system-deps: 'true'
+
+      - name: Render 3D foundation
+        run: |
+          mkdir -p out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
+          "$CH_BLENDER_EXE" --background \
+            --python tools/tycoon_photo_studio/build_loading_splash_hybrid_base.py -- \
+            --recipe tools/tycoon_photo_studio/assets/loading_splash_hybrid_city_04.art.json \
+            --output out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
+
+      - name: Apply 2D paintover and finishing
+        run: |
+          python tools/tycoon_photo_studio/finish_loading_splash_paintover.py \
+            --recipe tools/tycoon_photo_studio/assets/loading_splash_hybrid_city_04.art.json \
+            --input out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04/loading_splash_base.png \
+            --output out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
+
+      - name: Upload hybrid review
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Loading-Splash-Hybrid-${{ github.run_number }}
+          path: out/loading_splash_hybrid/ui.loading_splash.hybrid_city.04
+          retention-days: 14
+          if-no-files-found: error
