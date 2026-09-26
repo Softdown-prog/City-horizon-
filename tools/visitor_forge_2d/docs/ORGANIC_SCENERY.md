@@ -22,21 +22,46 @@ limited to clean vector-like masks. The renderer now builds a denser crown from
 branch clusters plus irregular clumps, fuses nearby foliage masses at working
 resolution and applies deterministic raster paint inside the authored masks.
 
-The recipe can expose a `raster` object with three density controls:
+The recipe can expose a `raster` object with five density controls:
 
 - `shadowDabs` — small occlusion/color dabs inside the crown;
 - `highlightDabs` — light paint variation on front foliage;
-- `needleStrokes` — short directional strokes that break flat fills at 1x.
+- `needleStrokes` — directional high-resolution strokes before downsample;
+- `finalGrain` — final-scale raster speckle after supersampling;
+- `finalNeedles` — final-scale pointed strokes that keep foliage readable at 1x.
 
 These passes are generated from the same integer seed, so repeated builds remain
 byte-stable for the same renderer, recipe and Pillow version. They are not
 external textures and do not use image generation. Work happens at 4x; final
-RGBA is reduced through alpha-safe Lanczos filtering so the sprite gains a
-raster-painted finish without introducing a background-removal step.
+RGBA is reduced through alpha-safe Lanczos filtering and then receives the
+final-scale raster pass. This avoids the vector-clean look while keeping the
+asset deterministic and background-free.
 
 Use crown filling to remove large accidental holes, not to turn the tree into a
 solid triangular cone. The final silhouette should preserve irregular branch
 breaks while reading as one dense organism at gameplay scale.
+
+## Classic tycoon conifer reference target
+
+The current pine study uses classic pre-rendered tycoon vegetation as a visual
+reference for density, raster richness and gameplay readability. The goal is to
+capture those structural qualities without copying any source sprite.
+
+Target traits:
+
+- dense overlapping primary and secondary boughs rather than flat shelf tiers;
+- a dark interior crown with brighter upper-left branch surfaces;
+- many small pointed needle clusters at the silhouette edge;
+- a tall tapered conifer shape with a narrow, mostly hidden trunk;
+- controlled negative space: some branch gaps remain, but no large empty bands;
+- visible raster texture at gameplay size instead of broad clean vector fills;
+- foliage depth that still reads correctly under `CH_CAMERA_V1`.
+
+The renderer therefore favors multiple branch fans per tier, interstitial
+partial whorls, narrow central fill masses and a final-scale raster texture
+pass. This reference direction is specifically for organic scenery; it should
+not change the general game camera or the procedural contracts used by other
+asset families.
 
 ## Camera gate
 
