@@ -1,7 +1,9 @@
 name: City Builder Focused Compile Check
 
 # Focused validation for runtime/UI changes before local test builds.
-# Keep this path-scoped so ordinary art/content commits do not spend build minutes.
+# Besides compiling the real runtime, render deterministic screenshots from the
+# production GameplayUi code so visual regressions can be reviewed before a
+# local Windows build.
 on:
   workflow_dispatch:
   push:
@@ -22,6 +24,8 @@ on:
       - "src/ui_manager.cpp"
       - "src/ui_manager.h"
       - "src/ui_manager_legacy_impl.inl"
+      - "src/ui_visual_capture.cpp"
+      - "tools/ui_capture/**"
       - "CMakeLists.txt"
       - ".github/workflows/city-builder-ui-compile-check.yml"
 
@@ -32,10 +36,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure City Builder
+      - name: Configure City Builder and UI capture
         shell: pwsh
-        run: cmake -S . -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
+        run: cmake -S tools/ui_capture -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
 
       - name: Build City Builder
         shell: pwsh
         run: cmake --build build/city-builder-check --config Release --target city_builder --parallel
+
+      - name: Build UI visual capture
+        shell: pwsh
+        run: cmake --build build/city-builder-check --config Release --target city_builder_ui_capture --parallel
+
+      - name: Render floor catalog visual proof
+        shell: pwsh
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: |
+          New-Item -ItemType Directory -Force -Path out/ui-capture | Out-Null
+          & "build/city-builder-check/Release/city_builder_ui_capture.exe" "out/ui-capture"
+          if ($LASTEXITCODE -ne 0) { throw "city_builder_ui_capture failed" }
+
+          $expected = @(
+            "floor_catalog_idle.png",
+            "floor_catalog_hover_sand.png",
+            "floor_catalog_pressed_grass.png",
+            "floor_catalog_selected_grass.png"
+          )
+          foreach ($file in $expected) {
+            $path = Join-Path "out/ui-capture" $file
+            if (-not (Test-Path $path)) { throw "Missing UI capture: $file" }
+            if ((Get-Item $path).Length -le 1024) { throw "UI capture is unexpectedly small: $file" }
+          }
+
+      - name: Upload UI visual proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Builder-Floor-Catalog-Visual-Proof
+          path: out/ui-capture/*.png
+          if-no-files-found: error
+          retention-days: 14
