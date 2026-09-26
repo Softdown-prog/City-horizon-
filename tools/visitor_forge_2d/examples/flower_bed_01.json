@@ -1,0 +1,171 @@
+{
+  "contract": "CH_2D_SHAPE_RECIPE_V1",
+  "id": "flower_bed_01",
+  "canvas": [160, 112],
+  "anchor": [80, 90],
+  "layers": [
+    {
+      "name": "ground_shadow",
+      "fill": {"top": "#1C2A22", "bottom": "#1C2A22", "opacity": 0.42},
+      "shapes": [{"type": "ellipse", "box": [22, 72, 138, 94]}]
+    },
+    {
+      "name": "planter_wall",
+      "fill": {"top": "#9D9584", "bottom": "#6B6459"},
+      "shapes": [{"type": "polygon", "points": [[22,55],[80,83],[138,55],[138,63],[80,92],[22,63]]}],
+      "shadow": {"offset": [2,3], "blur": 2.2, "opacity": 0.38, "color": "#172019"}
+    },
+    {
+      "name": "rim_top",
+      "fill": {"top": "#D9D1BE", "bottom": "#9E9687"},
+      "shapes": [{"type": "polygon", "points": [[22,55],[80,29],[138,55],[80,83]]}]
+    },
+    {
+      "name": "soil",
+      "fill": {"top": "#79523A", "bottom": "#3F2B22"},
+      "shapes": [{"type": "polygon", "points": [[32,55],[80,34],[128,55],[80,77]]}],
+      "shadow": {"offset": [0,1], "blur": 0.6, "opacity": 0.18, "color": "#241A16"}
+    },
+    {
+      "name": "soil_specks",
+      "fill": {"top": "#3D2B22", "bottom": "#2E211B", "opacity": 0.55},
+      "shapes": [
+        {"type":"ellipse","box":[49,51,53,53]}, {"type":"ellipse","box":[67,44,70,46]},
+        {"type":"ellipse","box":[88,43,92,45]}, {"type":"ellipse","box":[107,51,110,53]},
+        {"type":"ellipse","box":[58,60,62,62]}, {"type":"ellipse","box":[78,66,81,68]},
+        {"type":"ellipse","box":[99,61,103,63]}, {"type":"ellipse","box":[116,56,118,58]},
+        {"type":"ellipse","box":[41,57,43,59]}, {"type":"ellipse","box":[91,52,93,54]}
+      ]
+    },
+    {
+      "name": "foliage_dark",
+      "fill": {"top": "#2E6C43", "bottom": "#174A2C"},
+      "shapes": [
+        {"type":"ellipse","box":[46,50,53,55]},{"type":"ellipse","box":[51,49,58,54]},
+        {"type":"ellipse","box":[63,45,70,50]},{"type":"ellipse","box":[68,44,75,49]},
+        {"type":"ellipse","box":[80,44,87,49]},{"type":"ellipse","box":[85,43,92,48]},
+        {"type":"ellipse","box":[98,49,105,54]},{"type":"ellipse","box":[103,48,110,53]},
+        {"type":"ellipse","box":[37,59,44,64]},{"type":"ellipse","box":[42,58,49,63]},
+        {"type":"ellipse","box":[55,58,62,63]},{"type":"ellipse","box":[60,57,67,62]},
+        {"type":"ellipse","box":[73,55,80,60]},{"type":"ellipse","box":[78,54,85,59]},
+        {"type":"ellipse","box":[91,58,98,63]},{"type":"ellipse","box":[96,57,103,62]},
+        {"type":"ellipse","box":[111,59,118,64]},{"type":"ellipse","box":[116,58,123,63]},
+        {"type":"ellipse","box":[49,67,56,72]},{"type":"ellipse","box":[54,66,61,71]},
+        {"type":"ellipse","box":[68,67,75,72]},{"type":"ellipse","box":[73,66,80,71]},
+        {"type":"ellipse","box":[88,66,95,71]},{"type":"ellipse","box":[93,65,100,70]},
+        {"type":"ellipse","box":[105,67,112,72]},{"type":"ellipse","box":[110,66,117,71]},
+        {"type":"ellipse","box":[30,57,40,63]},{"type":"ellipse","box":[43,61,53,67]},
+        {"type":"ellipse","box":[61,57,71,63]},{"type":"ellipse","box":[80,59,90,65]},
+        {"type":"ellipse","box":[98,59,108,65]},{"type":"ellipse","box":[119,57,129,63]},
+        {"type":"ellipse","box":[64,47,74,53]},{"type":"ellipse","box":[90,46,100,52]},
+        {"type":"ellipse","box":[75,57,85,63]}
+      ]
+    },
+    {
+      "name": "foliage_light",
+      "fill": {"top": "#5B9C58", "bottom": "#2F7746"},
+      "shapes": [
+        {"type":"ellipse","box":[48,49,53,52]},{"type":"ellipse","box":[52,50,56,53]},
+        {"type":"ellipse","box":[65,44,70,47]},{"type":"ellipse","box":[69,45,73,48]},
+        {"type":"ellipse","box":[82,43,87,46]},{"type":"ellipse","box":[86,44,90,47]},
+        {"type":"ellipse","box":[100,48,105,51]},{"type":"ellipse","box":[104,49,108,52]},
+        {"type":"ellipse","box":[39,58,44,61]},{"type":"ellipse","box":[43,59,47,62]},
+        {"type":"ellipse","box":[57,57,62,60]},{"type":"ellipse","box":[61,58,65,61]},
+        {"type":"ellipse","box":[75,54,80,57]},{"type":"ellipse","box":[79,55,83,58]},
+        {"type":"ellipse","box":[93,57,98,60]},{"type":"ellipse","box":[97,58,101,61]},
+        {"type":"ellipse","box":[113,58,118,61]},{"type":"ellipse","box":[117,59,121,62]},
+        {"type":"ellipse","box":[51,66,56,69]},{"type":"ellipse","box":[55,67,59,70]},
+        {"type":"ellipse","box":[70,66,75,69]},{"type":"ellipse","box":[74,67,78,70]},
+        {"type":"ellipse","box":[90,65,95,68]},{"type":"ellipse","box":[94,66,98,69]},
+        {"type":"ellipse","box":[107,66,112,69]},{"type":"ellipse","box":[111,67,115,70]},
+        {"type":"ellipse","box":[32,57,37,60]},{"type":"ellipse","box":[45,60,50,63]},
+        {"type":"ellipse","box":[63,56,68,59]},{"type":"ellipse","box":[82,58,87,61]},
+        {"type":"ellipse","box":[100,58,105,61]},{"type":"ellipse","box":[121,56,126,59]},
+        {"type":"ellipse","box":[66,46,71,49]},{"type":"ellipse","box":[92,45,97,48]},
+        {"type":"ellipse","box":[77,56,82,59]}
+      ]
+    },
+    {
+      "name": "stems",
+      "fill": {"top": "#477A45", "bottom": "#28572F"},
+      "shapes": [
+        {"type":"line","points":[[52,55],[52,49]],"width":1.2},{"type":"line","points":[[69,50],[69,44]],"width":1.2},
+        {"type":"line","points":[[86,49],[86,43]],"width":1.2},{"type":"line","points":[[104,54],[104,48]],"width":1.2},
+        {"type":"line","points":[[43,64],[43,58]],"width":1.2},{"type":"line","points":[[61,63],[61,57]],"width":1.2},
+        {"type":"line","points":[[79,60],[79,54]],"width":1.2},{"type":"line","points":[[97,63],[97,57]],"width":1.2},
+        {"type":"line","points":[[117,64],[117,58]],"width":1.2},{"type":"line","points":[[55,72],[55,66]],"width":1.2},
+        {"type":"line","points":[[74,72],[74,66]],"width":1.2},{"type":"line","points":[[94,71],[94,65]],"width":1.2},
+        {"type":"line","points":[[111,72],[111,66]],"width":1.2}
+      ]
+    },
+    {
+      "name": "petals_pink",
+      "fill": {"top": "#F58FB8", "bottom": "#C64F83"},
+      "shadow": {"offset":[0.8,1.0],"blur":0.45,"opacity":0.2,"color":"#15301F"},
+      "shapes": [
+        {"type":"ellipse","box":[50,43,54,47]},{"type":"ellipse","box":[53,45,57,49]},{"type":"ellipse","box":[52,48,56,52]},{"type":"ellipse","box":[48,48,52,52]},{"type":"ellipse","box":[47,45,51,49]},
+        {"type":"ellipse","box":[77,48,81,52]},{"type":"ellipse","box":[80,50,84,54]},{"type":"ellipse","box":[79,53,83,57]},{"type":"ellipse","box":[75,53,79,57]},{"type":"ellipse","box":[74,50,78,54]},
+        {"type":"ellipse","box":[109,60,113,64]},{"type":"ellipse","box":[112,62,116,66]},{"type":"ellipse","box":[111,65,115,69]},{"type":"ellipse","box":[107,65,111,69]},{"type":"ellipse","box":[106,62,110,66]}
+      ]
+    },
+    {
+      "name": "petals_yellow",
+      "fill": {"top": "#FFD76C", "bottom": "#D69A2E"},
+      "shadow": {"offset":[0.8,1.0],"blur":0.45,"opacity":0.2,"color":"#15301F"},
+      "shapes": [
+        {"type":"ellipse","box":[67,38,71,42]},{"type":"ellipse","box":[70,40,74,44]},{"type":"ellipse","box":[69,43,73,47]},{"type":"ellipse","box":[65,43,69,47]},{"type":"ellipse","box":[64,40,68,44]},
+        {"type":"ellipse","box":[41,52,45,56]},{"type":"ellipse","box":[44,54,48,58]},{"type":"ellipse","box":[43,57,47,61]},{"type":"ellipse","box":[39,57,43,61]},{"type":"ellipse","box":[38,54,42,58]},
+        {"type":"ellipse","box":[115,52,119,56]},{"type":"ellipse","box":[118,54,122,58]},{"type":"ellipse","box":[117,57,121,61]},{"type":"ellipse","box":[113,57,117,61]},{"type":"ellipse","box":[112,54,116,58]}
+      ]
+    },
+    {
+      "name": "petals_purple",
+      "fill": {"top": "#B89AF3", "bottom": "#7357B7"},
+      "shadow": {"offset":[0.8,1.0],"blur":0.45,"opacity":0.2,"color":"#15301F"},
+      "shapes": [
+        {"type":"ellipse","box":[84,37,88,41]},{"type":"ellipse","box":[87,39,91,43]},{"type":"ellipse","box":[86,42,90,46]},{"type":"ellipse","box":[82,42,86,46]},{"type":"ellipse","box":[81,39,85,43]},
+        {"type":"ellipse","box":[59,51,63,55]},{"type":"ellipse","box":[62,53,66,57]},{"type":"ellipse","box":[61,56,65,60]},{"type":"ellipse","box":[57,56,61,60]},{"type":"ellipse","box":[56,53,60,57]},
+        {"type":"ellipse","box":[92,59,96,63]},{"type":"ellipse","box":[95,61,99,65]},{"type":"ellipse","box":[94,64,98,68]},{"type":"ellipse","box":[90,64,94,68]},{"type":"ellipse","box":[89,61,93,65]}
+      ]
+    },
+    {
+      "name": "petals_white",
+      "fill": {"top": "#F5F0DA", "bottom": "#CFC6A8"},
+      "shadow": {"offset":[0.8,1.0],"blur":0.45,"opacity":0.2,"color":"#15301F"},
+      "shapes": [
+        {"type":"ellipse","box":[102,42,106,46]},{"type":"ellipse","box":[105,44,109,48]},{"type":"ellipse","box":[104,47,108,51]},{"type":"ellipse","box":[100,47,104,51]},{"type":"ellipse","box":[99,44,103,48]},
+        {"type":"ellipse","box":[53,60,57,64]},{"type":"ellipse","box":[56,62,60,66]},{"type":"ellipse","box":[55,65,59,69]},{"type":"ellipse","box":[51,65,55,69]},{"type":"ellipse","box":[50,62,54,66]}
+      ]
+    },
+    {
+      "name": "petals_red",
+      "fill": {"top": "#F06E63", "bottom": "#B53B38"},
+      "shadow": {"offset":[0.8,1.0],"blur":0.45,"opacity":0.2,"color":"#15301F"},
+      "shapes": [
+        {"type":"ellipse","box":[95,51,99,55]},{"type":"ellipse","box":[98,53,102,57]},{"type":"ellipse","box":[97,56,101,60]},{"type":"ellipse","box":[93,56,97,60]},{"type":"ellipse","box":[92,53,96,57]},
+        {"type":"ellipse","box":[72,60,76,64]},{"type":"ellipse","box":[75,62,79,66]},{"type":"ellipse","box":[74,65,78,69]},{"type":"ellipse","box":[70,65,74,69]},{"type":"ellipse","box":[69,62,73,66]}
+      ]
+    },
+    {
+      "name": "flower_centers",
+      "fill": {"top": "#FFE28A", "bottom": "#B8752D"},
+      "shapes": [
+        {"type":"ellipse","box":[50.5,46.5,53.5,49.5]},{"type":"ellipse","box":[67.5,41.5,70.5,44.5]},
+        {"type":"ellipse","box":[84.5,40.5,87.5,43.5]},{"type":"ellipse","box":[102.5,45.5,105.5,48.5]},
+        {"type":"ellipse","box":[41.5,55.5,44.5,58.5]},{"type":"ellipse","box":[59.5,54.5,62.5,57.5]},
+        {"type":"ellipse","box":[77.5,51.5,80.5,54.5]},{"type":"ellipse","box":[95.5,54.5,98.5,57.5]},
+        {"type":"ellipse","box":[115.5,55.5,118.5,58.5]},{"type":"ellipse","box":[53.5,63.5,56.5,66.5]},
+        {"type":"ellipse","box":[72.5,63.5,75.5,66.5]},{"type":"ellipse","box":[92.5,62.5,95.5,65.5]},
+        {"type":"ellipse","box":[109.5,63.5,112.5,66.5]}
+      ]
+    },
+    {
+      "name": "rim_highlight",
+      "fill": {"top": "#EEE7D6", "bottom": "#C8BFAE", "opacity": 0.75},
+      "shapes": [
+        {"type":"line","points":[[24,55],[80,30]],"width":1.3},
+        {"type":"line","points":[[80,30],[136,55]],"width":1.3}
+      ]
+    }
+  ]
+}
