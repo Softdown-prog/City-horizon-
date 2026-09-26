@@ -116,3 +116,59 @@ def test_palette_rejects_unknown_slot_and_variant(tmp_path: Path) -> None:
         assert False, "unknown variant accepted"
     except ValueError as exc:
         assert "Unknown palette variant" in str(exc)
+
+
+def test_pieslice_renders_wedge_and_rejects_degenerate() -> None:
+    """Pieslice fills a wedge region and rejects start == end."""
+    recipe = {
+        "contract": "CH_2D_SHAPE_RECIPE_V1",
+        "id": "test_pie",
+        "canvas": [32, 32],
+        "anchor": [16, 30],
+        "layers": [
+            {
+                "name": "wedge",
+                "fill": {"top": "#AABBCC"},
+                # A right-angle wedge in the top-right quadrant (0..90 degrees).
+                "shapes": [{"type": "pieslice", "box": [4, 4, 28, 28], "start": 0, "end": 90}],
+            }
+        ],
+    }
+    frame, metadata = render_shape_recipe(recipe)
+    # The wedge covers the bottom-right area of the bounding ellipse (Pillow
+    # measures clockwise from 3-o'clock, so 0..90 is the lower-right quadrant).
+    assert frame.mode == "RGBA" and frame.size == (32, 32)
+    # At least one pixel inside the wedge region must be opaque.
+    assert frame.getpixel((24, 20))[3] > 200, "expected wedge pixels to be opaque"
+    # Top-left corner stays transparent (outside the wedge and the ellipse).
+    assert frame.getpixel((0, 0))[3] == 0
+
+    # start == end is a no-op wedge and must be rejected.
+    bad = dict(recipe)
+    bad["layers"] = [
+        {
+            "name": "bad_wedge",
+            "fill": {"top": "#AABBCC"},
+            "shapes": [{"type": "pieslice", "box": [4, 4, 28, 28], "start": 45, "end": 45}],
+        }
+    ]
+    try:
+        render_shape_recipe(bad)
+        assert False, "degenerate pieslice accepted"
+    except ValueError as exc:
+        assert "start != end" in str(exc)
+
+    # Unknown shape type must name pieslice in its error message.
+    unknown = dict(recipe)
+    unknown["layers"] = [
+        {
+            "name": "unknown_type",
+            "fill": {"top": "#AABBCC"},
+            "shapes": [{"type": "hexagon", "box": [4, 4, 28, 28]}],
+        }
+    ]
+    try:
+        render_shape_recipe(unknown)
+        assert False, "unknown shape type accepted"
+    except ValueError as exc:
+        assert "pieslice" in str(exc)

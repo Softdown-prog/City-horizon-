@@ -1,0 +1,43 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "park_tree_broadleaf_organic_01",
+  "canvas": [192, 256],
+  "anchor": [96, 239],
+  "seed": 41983,
+  "crownStyle": "broadleaf",
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "worldHeightScreenVertical": true
+  },
+  "palette": {
+    "ground_shadow": "#1A2620",
+    "trunk_top": "#8B5C30",
+    "trunk_bottom": "#4A2E16",
+    "trunk_light": "#B87848",
+    "back_top": "#2C5C34",
+    "back_bottom": "#163520",
+    "mid_top": "#4B8050",
+    "mid_bottom": "#2A5538",
+    "front_top": "#62A066",
+    "front_bottom": "#3A6E46",
+    "highlight": "#9DC87A",
+    "occlusion": "#183C28"
+  },
+  "raster": {
+    "shadowDabs": 220,
+    "highlightDabs": 200,
+    "needleStrokes": 280,
+    "finalGrain": 320,
+    "finalNeedles": 180
+  },
+  "tiers": [
+    {"y": 58,  "span": 38, "thickness": 34, "skew": 2,  "lobes": 22},
+    {"y": 95,  "span": 56, "thickness": 44, "skew": -3, "lobes": 20},
+    {"y": 138, "span": 66, "thickness": 48, "skew": 1,  "lobes": 20},
+    {"y": 178, "span": 62, "thickness": 42, "skew": -2, "lobes": 18}
+  ]
+}

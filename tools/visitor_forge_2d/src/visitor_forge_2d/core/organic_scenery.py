@@ -105,6 +105,83 @@ def _crown_masks(recipe,rng,W,H):
     back=back.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.04*WORK_SCALE))
     return back,core,mid,front
 
+
+def _crown_masks_broadleaf(recipe, rng, W, H):
+    """Build a rounded deciduous canopy from layered irregular blobs.
+
+    Broadleaf trees have a wide, roughly spherical crown rather than a spire.
+    The algorithm places three depth layers (back / mid / front) of overlapping
+    organic blobs whose size, position and slight vertical offset vary with each
+    tier entry in the recipe.  The same raster-texture passes used for conifers
+    are reused unchanged on the output masks, so a single colour palette can
+    describe both species.
+
+    Recipe tier fields for broadleaf:
+      y          -- vertical centre of this cluster (canvas pixels)
+      span       -- half-width of the cluster (canvas pixels)
+      thickness  -- vertical radius of the cluster (canvas pixels)
+      skew       -- horizontal shift of the cluster centre (canvas pixels, optional)
+      lobes      -- polygon vertex count for _irregular_blob; higher = rounder
+                    (optional, default 20)
+
+    A recipe may also set crownCx (canvas x of the trunk centre, default 96).
+    """
+    tiers = recipe['tiers']
+    cx = float(recipe.get('crownCx', 96))
+    back  = Image.new('L', (W, H))
+    mid   = Image.new('L', (W, H))
+    front = Image.new('L', (W, H))
+    core  = Image.new('L', (W, H))
+
+    for t in tiers:
+        y     = float(t['y'])
+        span  = float(t['span'])
+        thick = float(t['thickness'])
+        skew  = float(t.get('skew', 0))
+        lobes = int(t.get('lobes', 20))
+        tcx   = cx + skew
+
+        # Core: dense centre mass feeds the shadow depth channel.
+        _irregular_blob(core, rng, tcx, y, span * .52, thick * .62, lobes, 255, jitter=.14)
+
+        # Back layer: slightly raised to simulate rear canopy depth.
+        for _ in range(rng.randint(2, 4)):
+            ox = rng.uniform(-span * .38, span * .38)
+            oy = rng.uniform(-thick * .30, 0)
+            _irregular_blob(back, rng,
+                            tcx + ox, y + oy,
+                            max(5.0, span * rng.uniform(.42, .68)),
+                            max(3.5, thick * rng.uniform(.38, .58)),
+                            lobes, 255, jitter=.18)
+
+        # Mid layer: the main visible foliage mass.
+        for _ in range(rng.randint(3, 6)):
+            ox = rng.uniform(-span * .55, span * .55)
+            oy = rng.uniform(-thick * .18, thick * .22)
+            _irregular_blob(mid, rng,
+                            tcx + ox, y + oy,
+                            max(6.0, span * rng.uniform(.48, .76)),
+                            max(4.0, thick * rng.uniform(.42, .62)),
+                            lobes, 255, jitter=.20)
+
+        # Front layer: protruding clusters at the outer silhouette.
+        for _ in range(rng.randint(2, 4)):
+            ox = rng.uniform(-span * .68, span * .68)
+            oy = rng.uniform(0, thick * .38)
+            _irregular_blob(front, rng,
+                            tcx + ox, y + oy,
+                            max(4.5, span * rng.uniform(.32, .54)),
+                            max(3.0, thick * rng.uniform(.30, .48)),
+                            lobes, 255, jitter=.22)
+
+    # Gentle blur merges blob edges; MaxFilter preserves silhouette fullness.
+    core  = core.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(.06 * WORK_SCALE))
+    back  = back.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.05 * WORK_SCALE))
+    mid   = mid.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.04 * WORK_SCALE))
+    front = front.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.04 * WORK_SCALE))
+    return back, core, mid, front
+
+
 def _scatter_texture(layer,rng,mask,color,count,alpha_range=(12,36),size_range=(.45,1.7),elongate=2.0):
     bbox=mask.getbbox()
     if not bbox: return
@@ -161,7 +238,13 @@ def render(recipe):
     bark=Image.new('RGBA',(W,H)); bd=ImageDraw.Draw(bark,'RGBA'); tc=_hex(pal.get('trunk_light','#DCA066'))
     for xo,y0,y1 in [(-4,166,231),(1,147,220),(5,188,232)]: bd.line(((96+xo)*WORK_SCALE,y0*WORK_SCALE,(95+xo)*WORK_SCALE,y1*WORK_SCALE),fill=(*tc,76),width=2*WORK_SCALE)
     work.alpha_composite(bark)
-    back,core,mid,front=_crown_masks(recipe,rng,W,H)
+    crown_style = recipe.get('crownStyle', 'conifer')
+    if crown_style == 'broadleaf':
+        back, core, mid, front = _crown_masks_broadleaf(recipe, rng, W, H)
+    elif crown_style == 'conifer':
+        back, core, mid, front = _crown_masks(recipe, rng, W, H)
+    else:
+        raise ValueError(f"Unknown crownStyle {crown_style!r}; choose 'conifer' or 'broadleaf'")
     _composite(work,back,pal['back_top'],pal['back_bottom'],right_shade=.25,highlight=(.32,.21,.42,.05))
     _composite(work,core,pal['mid_bottom'],pal['back_bottom'],right_shade=.22,highlight=(.31,.27,.50,.05))
     _composite(work,mid,pal['mid_top'],pal['mid_bottom'],right_shade=.19,highlight=(.29,.30,.50,.10))
@@ -183,17 +266,17 @@ def render(recipe):
     frame=_alpha_safe_resize(work,tuple(canvas))
     frame=_final_raster_pass(frame,rng,pal,recipe)
     bounds=frame.getchannel('A').getbbox()
-    return frame,{'contract':CONTRACT,'id':recipe['id'],'canvas':canvas,'anchor':anchor,'bounds':list(bounds),'seed':seed,'camera':recipe['camera'],'raster':recipe.get('raster',{}),'runtimePromotion':False,'artApproved':False}
+    return frame,{'contract':CONTRACT,'id':recipe['id'],'canvas':canvas,'anchor':anchor,'bounds':list(bounds),'seed':seed,'crownStyle':crown_style,'camera':recipe['camera'],'raster':recipe.get('raster',{}),'runtimePromotion':False,'artApproved':False}
 
 def review_board(frame):
     w,h=frame.size; board=Image.new('RGBA',(w*3+48,h*2+40),(76,116,48,255)); board.alpha_composite(frame,(16,20+h//2)); board.alpha_composite(frame.resize((w*2,h*2),Image.Resampling.NEAREST),(w+32,20)); d=ImageDraw.Draw(board); d.text((16,4),'1x / gameplay',fill=(247,244,220,255)); d.text((w+32,4),'2x / inspection',fill=(247,244,220,255)); return board
 
-def isometric_board(frame,anchor):
+def isometric_board(frame,anchor,label='CH_CAMERA_V1 / 30deg / 45deg yaw / 128x64'):
     board=Image.new('RGBA',(768,480),(46,77,55,255)); d=ImageDraw.Draw(board); gx,gy=384,314; hw,hh=64,32
     for x in range(-3,4):
         for y in range(-3,4):
             cx=gx+(x-y)*hw; cy=gy+(x+y)*hh; poly=[(cx,cy-hh),(cx+hw,cy),(cx,cy+hh),(cx-hw,cy)]; fill=(76,119,66,255) if (x+y)%2==0 else (71,113,64,255); d.polygon(poly,fill=fill,outline=(105,148,93,205))
-    d.polygon([(gx,gy-hh),(gx+hw,gy),(gx,gy+hh),(gx-hw,gy)],fill=(82,132,72,255),outline=(174,207,145,255)); board.alpha_composite(frame,(round(gx-anchor[0]),round(gy-anchor[1]))); d.ellipse((gx-3,gy-3,gx+3,gy+3),fill=(255,224,132,255)); d.text((18,16),'CH_CAMERA_V1 / 30deg elevation / 45deg yaw / 128x64',fill=(247,244,220,255)); d.text((18,36),'reference-inspired dense conifer raster / gameplay 1x',fill=(220,232,205,255)); return board
+    d.polygon([(gx,gy-hh),(gx+hw,gy),(gx,gy+hh),(gx-hw,gy)],fill=(82,132,72,255),outline=(174,207,145,255)); board.alpha_composite(frame,(round(gx-anchor[0]),round(gy-anchor[1]))); d.ellipse((gx-3,gy-3,gx+3,gy+3),fill=(255,224,132,255)); d.text((18,16),label,fill=(247,244,220,255)); d.text((18,36),'CH_2D_ORGANIC_SCENERY_V1 / gameplay 1x',fill=(220,232,205,255)); return board
 
 def export(recipe_path,output_dir):
     raw=recipe_path.read_bytes(); recipe=json.loads(raw); frame,meta=render(recipe); output_dir.mkdir(parents=True,exist_ok=True); stem=recipe['id']; png=output_dir/f'{stem}.png'; review=output_dir/f'{stem}_review.png'; iso=output_dir/f'{stem}_isometric_review.png'; report=output_dir/f'{stem}.json'; frame.save(png); review_board(frame).save(review); isometric_board(frame,meta['anchor']).save(iso); meta.update({'recipe':str(recipe_path),'recipeSha256':hashlib.sha256(raw).hexdigest(),'png':str(png),'review':str(review),'isometricReview':str(iso)}); report.write_text(json.dumps(meta,indent=2)+'\n'); return {'png':str(png),'review':str(review),'isometricReview':str(iso),'metadata':str(report)}

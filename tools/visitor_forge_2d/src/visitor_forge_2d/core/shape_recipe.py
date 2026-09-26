@@ -90,8 +90,20 @@ def _draw_shape(mask: Image.Image, shape: dict, label: str) -> None:
                       for t in (n / 32 for n in range(33))]
         draw.line([(round(x * SCALE), round(y * SCALE)) for x, y in coords],
                   fill=fill, width=max(1, round(width * SCALE)), joint="curve")
+    elif shape_type == "pieslice":
+        # Filled wedge: box defines the bounding ellipse, start/end are angles
+        # in degrees measured clockwise from the 3-o'clock position (Pillow
+        # convention).  Useful for clock-face signs, pie-chart decorations and
+        # fan-shaped prop elements.
+        start = _number(shape.get("start", 0), label + ".start")
+        end = _number(shape.get("end", 90), label + ".end")
+        if start == end:
+            raise ValueError(f"{label} pieslice requires start != end")
+        draw.pieslice(_box(shape.get("box"), label + ".box"), start=start, end=end, fill=fill)
     else:
-        raise ValueError(f"{label}.type must be ellipse, rounded_rect, polygon, line or quadratic")
+        raise ValueError(
+            f"{label}.type must be ellipse, rounded_rect, polygon, line, quadratic or pieslice"
+        )
 
 
 def _surface(size: tuple[int, int], mask: Image.Image, fill: dict, label: str) -> Image.Image:

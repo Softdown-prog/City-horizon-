@@ -67,3 +67,45 @@ def test_organic_scenery_rejects_wrong_camera() -> None:
         assert False, "noncanonical camera tile accepted"
     except ValueError as exc:
         assert "128x64" in str(exc)
+
+
+def test_broadleaf_crown_is_deterministic_and_differs_from_conifer(tmp_path: Path) -> None:
+    """crownStyle:broadleaf must render, be deterministic, and produce a distinct
+    silhouette from the same recipe rendered as a conifer."""
+    recipe = _recipe()
+    recipe["crownStyle"] = "broadleaf"
+
+    first, meta_first = render(recipe)
+    second, _ = render(recipe)
+    assert first.tobytes() == second.tobytes(), "broadleaf render is not deterministic"
+    assert first.mode == "RGBA" and first.size == (192, 256)
+    assert meta_first["crownStyle"] == "broadleaf"
+
+    # The conifer and broadleaf crowns occupy different regions — pixel counts
+    # in the upper quarter of the canvas differ because conifers are narrow at
+    # the top while broadleaf clusters span more of the width at mid-crown.
+    conifer_recipe = dict(recipe)
+    conifer_recipe["crownStyle"] = "conifer"
+    conifer_frame, conifer_meta = render(conifer_recipe)
+    assert conifer_meta["crownStyle"] == "conifer"
+    assert first.tobytes() != conifer_frame.tobytes(), (
+        "broadleaf and conifer produced identical pixels; crown dispatch is broken"
+    )
+
+    # Export round-trip: isometric review file must be created.
+    source = tmp_path / "broadleaf.json"
+    source.write_text(json.dumps(recipe), encoding="utf-8")
+    result = export(source, tmp_path / "out")
+    with Image.open(result["isometricReview"]) as review:
+        assert review.size == (768, 480)
+
+
+def test_organic_scenery_rejects_unknown_crown_style() -> None:
+    recipe = _recipe()
+    recipe["crownStyle"] = "mushroom"
+    try:
+        render(recipe)
+        assert False, "unknown crownStyle accepted"
+    except ValueError as exc:
+        assert "crownStyle" in str(exc)
+        assert "mushroom" in str(exc)
