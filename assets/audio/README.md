@@ -28,9 +28,21 @@ A fonte audiovisual é `Converter/reflections_under_the_wheel.mp4`. O workflow d
 runtime em `attractions/ferris_wheel_running.ogg`.
 
 O catálogo expõe essa faixa como `FerrisWheelRunning`. Ela usa uma pista de
-efeito contínuo separada das oito pistas de efeitos curtos de UI e acompanha o
-estado de atividade da roda-gigante: inicia quando uma roda-gigante entra em
-atividade/giro e para quando nenhuma roda-gigante permanece ativa.
+efeito contínuo separada das oito pistas de efeitos curtos de UI. O runtime
+mantém duas condições obrigatórias para essa pista: pelo menos uma roda-gigante
+deve estar em atividade/giro e o footprint lógico dessa roda deve intersectar a
+viewport canônica atual. Assim, a faixa começa no mesmo frame em que uma roda
+visível entra em atividade, para no mesmo frame em que a atividade termina e
+também é silenciada quando todas as rodas ativas saem da área visível. Se uma
+roda continuar girando fora da viewport e voltar a ficar visível, a faixa pode
+ser retomada naquele frame.
+
+A checagem de visibilidade reutiliza a câmera/zoom/viewport canônicos registrados
+pela camada de projeção; não existe uma câmera paralela apenas para áudio. Esta
+regra é um culling específico do áudio da atração. Ela não deve ser confundida
+com um gerenciador global de chunks: o renderer geral ainda percorre as entidades
+do mundo e um sistema global de spatial/chunk culling deve ser tratado
+separadamente quando for implementado.
 
 O MP3 é mantido como derivado de áudio puro para inspeção/reuso; o runtime
 continua consumindo OGG/Vorbis.
