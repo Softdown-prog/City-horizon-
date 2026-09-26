@@ -9,8 +9,12 @@ namespace ch::contracts {
 inline constexpr int kTileWidth = 128;
 inline constexpr int kTileHeight = 64;
 inline constexpr double kDiamondRatio = 2.0;
-inline constexpr int kMapMin = -24;
-inline constexpr int kMapMax = 23;
+// The original runtime world was only 48x48 tiles (-24..23).  Keep the city
+// centred on the origin but give it a much larger 160x160 logical world so the
+// player can pan well beyond the starter parcel and progressively buy land in
+// every direction without immediately exposing the map edge.
+inline constexpr int kMapMin = -80;
+inline constexpr int kMapMax = 79;
 
 // Locked Canonical Camera Contract (CH_CAMERA_V1)
 //
