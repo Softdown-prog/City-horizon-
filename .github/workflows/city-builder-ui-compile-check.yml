@@ -1,5 +1,6 @@
 name: City Builder UI Compile Check
 
+# Focused validation for gameplay UI changes before local test builds.
 on:
   workflow_dispatch:
   push:
