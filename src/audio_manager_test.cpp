@@ -19,8 +19,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "The valid audio catalog did not initialize.\n";
         return 1;
     }
-    if (!audio.is_available() || audio.cached_effect_count() != 15U) {
-        std::cerr << "Audio cache did not contain the expected 15 unique OGG effects.\n";
+    if (!audio.is_available() || audio.cached_effect_count() != 16U) {
+        std::cerr << "Audio cache did not contain the expected 16 unique OGG effects.\n";
         return 1;
     }
     if (std::fabs(audio.volume_settings().master - 1.0F) > 0.001F ||
@@ -41,6 +41,15 @@ int main(int argc, char* argv[]) {
             std::cerr << "A cached audio event could not be played.\n";
             return 1;
         }
+    }
+
+    if (!audio.set_looping(SoundEvent::ferris_wheel_running, true)) {
+        std::cerr << "Ferris wheel running audio could not start looping.\n";
+        return 1;
+    }
+    if (!audio.set_looping(SoundEvent::ferris_wheel_running, false)) {
+        std::cerr << "Ferris wheel running audio could not stop.\n";
+        return 1;
     }
 
     audio.shutdown();

@@ -19,7 +19,7 @@ constexpr std::size_t event_index(const SoundEvent event) {
 
 constexpr std::array<std::string_view, static_cast<std::size_t>(SoundEvent::count)> kEventNames = {
     "UiClick", "UiSelect", "UiBack", "UiOpenPanel", "UiClosePanel", "UiConfirm",
-    "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification",
+    "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification", "FerrisWheelRunning",
 };
 
 [[nodiscard]] std::string read_text_file(const std::filesystem::path& path) {
@@ -186,8 +186,12 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
             std::cerr << "Audio track " << index << " could not be created: " << SDL_GetError() << '\n';
         }
     }
+    activity_loop_track_ = MIX_CreateTrack(mixer_);
+    if (activity_loop_track_ == nullptr) {
+        std::cerr << "Continuous activity audio track could not be created: " << SDL_GetError() << '\n';
+    }
 
-    if (cached_audio_.empty() || tracks_.empty()) {
+    if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr) {
         std::cerr << "Audio disabled: no usable cached effects or playback tracks.\n";
         shutdown();
         return false;
@@ -202,6 +206,11 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
 
 void AudioManager::shutdown() {
     available_ = false;
+    looping_event_ = SoundEvent::count;
+    if (activity_loop_track_ != nullptr) {
+        MIX_DestroyTrack(activity_loop_track_);
+        activity_loop_track_ = nullptr;
+    }
     if (music_track_ != nullptr) {
         MIX_DestroyTrack(music_track_);
         music_track_ = nullptr;
@@ -265,6 +274,45 @@ bool AudioManager::play(const SoundEvent event) {
         std::cerr << "Audio event could not play: " << kEventNames[index] << "\nSDL error: " << SDL_GetError() << '\n';
         return false;
     }
+    return true;
+}
+
+bool AudioManager::set_looping(const SoundEvent event, const bool enabled) {
+    if (!available_ || activity_loop_track_ == nullptr) {
+        return false;
+    }
+
+    if (!enabled) {
+        if (MIX_TrackPlaying(activity_loop_track_) && !MIX_StopTrack(activity_loop_track_, 0)) {
+            std::cerr << "Continuous audio event could not stop: " << SDL_GetError() << '\n';
+            return false;
+        }
+        looping_event_ = SoundEvent::count;
+        return true;
+    }
+
+    const std::size_t index = event_index(event);
+    if (index >= kEventCount || effects_[index].empty()) {
+        return false;
+    }
+    if (looping_event_ == event && MIX_TrackPlaying(activity_loop_track_)) {
+        return true;
+    }
+    if (MIX_TrackPlaying(activity_loop_track_) && !MIX_StopTrack(activity_loop_track_, 0)) {
+        std::cerr << "Previous continuous audio event could not stop: " << SDL_GetError() << '\n';
+        return false;
+    }
+    if (!MIX_SetTrackAudio(activity_loop_track_, effects_[index].front()) ||
+        !MIX_PlayTrack(activity_loop_track_, 0) ||
+        !MIX_SetTrackLoops(activity_loop_track_, -1)) {
+        std::cerr << "Continuous audio event could not play: " << kEventNames[index]
+                  << "\nSDL error: " << SDL_GetError() << '\n';
+        (void)MIX_StopTrack(activity_loop_track_, 0);
+        looping_event_ = SoundEvent::count;
+        return false;
+    }
+
+    looping_event_ = event;
     return true;
 }
 
@@ -336,6 +384,9 @@ void AudioManager::apply_volume_settings() {
         if (!MIX_SetTrackGain(track, volume_settings_.effects)) {
             std::cerr << "Could not apply effects volume: " << SDL_GetError() << '\n';
         }
+    }
+    if (activity_loop_track_ != nullptr && !MIX_SetTrackGain(activity_loop_track_, volume_settings_.effects)) {
+        std::cerr << "Could not apply continuous effects volume: " << SDL_GetError() << '\n';
     }
     if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {
         std::cerr << "Could not apply music volume: " << SDL_GetError() << '\n';

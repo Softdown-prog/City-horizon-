@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries five compatibility fixes without duplicating the runtime loop:
+// carries six compatibility fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -18,7 +18,10 @@
 //    price edit on a ticketed ride is mirrored into its linked booth before the
 //    economy refresh, keeping the booth authoritative without making the ride
 //    panel appear frozen.
+// 6. Ferris-wheel activity drives one continuous audio loop: the sound begins
+//    with activity and stops only when no Ferris wheel remains active.
 
+#include "audio_manager.h"
 #include "building_system.h"
 #include "land_system.h"
 #include "park_fence_runtime.h"
@@ -67,6 +70,39 @@ namespace ch {
         static_cast<std::int64_t>(edited->service_price));
 }
 
+// Keep the Ferris-wheel loop tied to BuildingInstance::activity_count rather
+// than to the F11 test key itself.  This preserves the same audio behavior when
+// activity later comes from real visitor boarding.  The helper runs immediately
+// before the canonical begin/end call and returns the untouched instance id.
+[[nodiscard]] inline std::uint64_t ch_prepare_ferris_wheel_activity_audio(
+    AudioManager& audio, const BuildingManager& buildings,
+    const std::uint64_t instance_id, const bool starting) {
+    const BuildingInstance* target = buildings.find_by_id(instance_id);
+    if (target == nullptr || target->definition_id != "ferris_wheel_01") {
+        return instance_id;
+    }
+
+    bool should_loop = starting;
+    if (!starting) {
+        // end_activity() is about to remove exactly one activity source. Keep
+        // the loop if this instance will still be active afterwards.
+        should_loop = target->activity_count > 1U;
+        if (!should_loop) {
+            for (const BuildingInstance& other : buildings.instances()) {
+                if (other.instance_id != instance_id &&
+                    other.definition_id == "ferris_wheel_01" &&
+                    other.activity_active()) {
+                    should_loop = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    (void)audio.set_looping(SoundEvent::ferris_wheel_running, should_loop);
+    return instance_id;
+}
+
 // main_runtime_impl.cpp has two geometry-only parcels() reads: one for camera
 // clamping and one for cursor roaming.  Redirect those reads to the complete
 // world geometry.  land_system.h is included above so its public declaration is
@@ -86,6 +122,13 @@ namespace ch {
     set_service_price((instance_id), (definition), (service_price)) && \
     ch_sync_service_price_after_ui_edit(buildings, catalog, (instance_id), (definition))
 
+// Building activity calls stay canonical; only their instance-id argument is
+// passed through the Ferris-wheel audio synchronizer.
+#define begin_activity(instance_id) \
+    begin_activity(ch_prepare_ferris_wheel_activity_audio(audio, buildings, (instance_id), true))
+#define end_activity(instance_id) \
+    end_activity(ch_prepare_ferris_wheel_activity_audio(audio, buildings, (instance_id), false))
+
 // `play_sound` is a local lambda inside the implementation.  A function-like
 // macro is used here only around its call sites; its declaration is untouched.
 #define play_sound(sound_event) \
@@ -100,6 +143,8 @@ namespace ch {
 #include "main_runtime_impl.cpp"
 
 #undef play_sound
+#undef end_activity
+#undef begin_activity
 #undef set_service_price
 #undef SaveManager
 #undef PedestrianLaneNavigationNetwork

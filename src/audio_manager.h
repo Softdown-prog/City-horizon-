@@ -23,6 +23,7 @@ enum class SoundEvent : std::size_t {
     ui_toggle,
     ui_scroll,
     notification,
+    ferris_wheel_running,
     count,
 };
 
@@ -48,6 +49,8 @@ public:
 
     // Returns false when audio is unavailable or that event has no loaded variation.
     [[nodiscard]] bool play(SoundEvent event);
+    // Starts/stops one continuous gameplay effect on the dedicated loop track.
+    [[nodiscard]] bool set_looping(SoundEvent event, bool enabled);
     // Starts the music declared under music.Loading in audio_catalog.json.
     [[nodiscard]] bool play_loading_music();
 
@@ -68,6 +71,8 @@ private:
     std::array<int, kEventCount> last_variation_{};
     std::vector<MIX_Audio*> cached_audio_;
     std::vector<MIX_Track*> tracks_;
+    MIX_Track* activity_loop_track_ = nullptr;
+    SoundEvent looping_event_ = SoundEvent::count;
     MIX_Audio* loading_music_ = nullptr;
     MIX_Track* music_track_ = nullptr;
     AudioVolumeSettings volume_settings_;
