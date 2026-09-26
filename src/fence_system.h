@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // Fence topology lives on grid vertices rather than terrain-tile occupancy.
@@ -18,6 +19,8 @@ inline constexpr FenceConnection fence_west = tile_connection_west;
 struct FenceVertex {
     int x = 0;
     int y = 0;
+
+    [[nodiscard]] constexpr bool operator==(const FenceVertex&) const = default;
 };
 
 enum class FenceNodeKind : std::uint8_t {
@@ -59,6 +62,12 @@ struct FenceNode {
     FenceRotation orientation_hint = FenceRotation::south;
 };
 
+struct FenceSegment {
+    FenceVertex from{};
+    FenceVertex to{};
+    bool open_gate = false;
+};
+
 class FenceManager {
 public:
     FenceManager(int map_min, int map_max);
@@ -84,9 +93,18 @@ public:
     [[nodiscard]] bool remove_node(int vertex_x, int vertex_y);
     void clear();
 
-    // A gate is a presentation/traffic state on an existing fence node. It is
-    // only resolved as a gate when the node forms a straight two-sided run;
-    // otherwise the normal topology piece wins so junctions never disappear.
+    // Segment-level gates are the authoritative gameplay representation. A
+    // closed fence segment blocks tile-to-tile movement; an open gate keeps the
+    // visible fence endpoints but explicitly opens that one crossing.
+    [[nodiscard]] bool has_segment(FenceVertex from, FenceVertex to) const;
+    [[nodiscard]] bool set_open_gate(FenceVertex from, FenceVertex to, bool enabled = true);
+    [[nodiscard]] bool is_open_gate(FenceVertex from, FenceVertex to) const;
+    [[nodiscard]] std::vector<FenceSegment> segments() const;
+    [[nodiscard]] bool blocks_tile_crossing(int tile_x, int tile_y,
+                                            CardinalDirection direction) const;
+
+    // Legacy node-gate API kept for old callers. New runtime UI uses the
+    // segment-level gate methods above.
     [[nodiscard]] bool set_gate(int vertex_x, int vertex_y, bool enabled = true);
     [[nodiscard]] bool can_resolve_gate(int vertex_x, int vertex_y) const;
 
@@ -94,6 +112,7 @@ public:
 
 private:
     [[nodiscard]] int vertex_key(int vertex_x, int vertex_y) const;
+    [[nodiscard]] std::uint64_t segment_key(FenceVertex from, FenceVertex to) const;
     void refresh_connections_around(int vertex_x, int vertex_y);
     void refresh_connections(int vertex_x, int vertex_y);
 
@@ -101,6 +120,7 @@ private:
     int map_max_;
     std::vector<FenceNode> nodes_;
     std::unordered_map<int, std::size_t> node_indices_;
+    std::unordered_set<std::uint64_t> open_gate_segments_;
 };
 
 [[nodiscard]] FenceVisualState resolve_fence_visual(FenceConnection connections,
