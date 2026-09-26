@@ -1,0 +1,24 @@
+{
+  "contract": "CH_LOADING_SPLASH_ART_V1",
+  "artId": "ui.loading_splash.city_dream.03",
+  "seed": 26092603,
+  "presentation": {
+    "aspectRatio": "16:9",
+    "proxyResolution": [1280, 720],
+    "finalResolution": [2560, 1440],
+    "titleSafeAreaNormalized": [0.04, 0.05, 0.42, 0.30],
+    "progressSafeAreaNormalized": [0.18, 0.90, 0.82, 0.97]
+  },
+  "artDirection": {
+    "summary": "Original 2D illustrated City Horizon key art: a warm dusk city seen as a cinematic poster, with layered skyline, dramatic boulevard perspective, park, water, tiny citizens, lights and an active construction crane. It must read as commercial game illustration rather than a 3D render, gameplay capture or asset showcase.",
+    "rules": [
+      "render as layered 2D illustration, not a 3D model showcase",
+      "no gameplay grid, footprint logic, CH_CAMERA_V1 or current asset inventory constraints",
+      "build depth with foreground, midground, distant skyline and atmospheric haze",
+      "prefer broad painted shapes, soft glows, varied silhouettes and poster composition",
+      "allow invented architecture, construction, parks, water and city life",
+      "leave upper-left breathing room for logo treatment",
+      "do not bake logo or loading text into the art"
+    ]
+  }
+}
