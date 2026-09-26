@@ -62,14 +62,16 @@ constexpr int kHeight = 800;
 }
 
 [[nodiscard]] bool validate_settings_controls(const GameplayUi& ui) {
-    if (ui.panels().size() < 3) {
-        std::cerr << "ui capture failed: settings overlay panel is missing\n";
-        return false;
-    }
     for (const UiAction action : {UiAction::settings_reset, UiAction::settings_cancel, UiAction::settings_apply}) {
         const UiButton* button = action_button(ui, action);
         if (button == nullptr || !button->enabled) {
             std::cerr << "ui capture failed: settings action button is missing or disabled\n";
+            return false;
+        }
+        if (button->bounds.x < 0.0F || button->bounds.y < 0.0F ||
+            button->bounds.x + button->bounds.width > static_cast<float>(kWidth) ||
+            button->bounds.y + button->bounds.height > static_cast<float>(kHeight)) {
+            std::cerr << "ui capture failed: settings action button is outside the viewport\n";
             return false;
         }
     }
@@ -162,12 +164,22 @@ GameplayUiModel settings_capture_model() {
             button.bounds.y + button.bounds.height * 0.5F};
 }
 
-[[nodiscard]] std::optional<UiRect> settings_master_slider(const GameplayUi& ui) {
-    if (ui.panels().size() < 3) return std::nullopt;
-    const UiRect& panel = ui.panels().back();
+[[nodiscard]] UiRect settings_panel_bounds() {
+    const float width = static_cast<float>(kWidth);
+    const float height = static_cast<float>(kHeight);
+    const float panel_width = std::min(620.0F, std::max(360.0F, width - 48.0F));
+    const float panel_height = std::min(470.0F, std::max(390.0F, height - 64.0F));
+    return {(width - panel_width) * 0.5F,
+            (height - panel_height) * 0.5F,
+            panel_width,
+            panel_height};
+}
+
+[[nodiscard]] UiRect settings_master_slider() {
+    const UiRect panel = settings_panel_bounds();
     const float meter_x = panel.x + std::clamp(panel.width * 0.10F, 28.0F, 54.0F);
     const float meter_width = panel.width - (meter_x - panel.x) * 2.0F;
-    return UiRect{meter_x, panel.y + 157.0F, meter_width, 20.0F};
+    return {meter_x, panel.y + 157.0F, meter_width, 20.0F};
 }
 
 }  // namespace
@@ -259,10 +271,9 @@ int main(int argc, char** argv) {
     ui.handle_mouse_motion(apply_x, apply_y);
     if (!save_capture(ui, renderer, output_dir / "settings_hover_apply.png", 2)) return fail();
 
-    const std::optional<UiRect> master_slider = settings_master_slider(ui);
-    if (!master_slider) return fail();
-    const float master_35_x = master_slider->x + master_slider->width * 0.35F;
-    const float master_y = master_slider->y + master_slider->height * 0.5F;
+    const UiRect master_slider = settings_master_slider();
+    const float master_35_x = master_slider.x + master_slider.width * 0.35F;
+    const float master_y = master_slider.y + master_slider.height * 0.5F;
     const UiInputResult master_press = ui.handle_mouse_button_down(master_35_x, master_y, true);
     if (!master_press.consumed || master_press.action) {
         std::cerr << "ui capture failed: master slider did not consume drag input cleanly\n";
