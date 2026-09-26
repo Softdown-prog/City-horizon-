@@ -3084,30 +3084,6 @@ int main() {
                         status = definition->name + std::string(" ACTIVITY TEST: ") + (was_active ? "OFF" : "ON");
                         break;
                     }
-                    case SDL_SCANCODE_F8: {
-                        if (!selected_instance_id) {
-                            status = "ACTIVITY TEST: SELECT A BUILDING FIRST";
-                            break;
-                        }
-                        const BuildingInstance* selected = buildings.find_by_id(*selected_instance_id);
-                        const BuildingDefinition* definition = selected == nullptr ? nullptr : catalog.find(selected->definition_id);
-                        if (selected == nullptr || definition == nullptr || !definition->activity_overlay || !definition->activity_overlay->enabled) {
-                            status = "ACTIVITY TEST: SELECT A BUILDING WITH OVERLAY";
-                            break;
-                        }
-                        const bool was_active = selected->activity_active();
-                        if (was_active) {
-                            while (true) {
-                                const BuildingInstance* current = buildings.find_by_id(*selected_instance_id);
-                                if (current == nullptr || !current->activity_active()) break;
-                                (void)buildings.end_activity(*selected_instance_id);
-                            }
-                        } else {
-                            (void)buildings.begin_activity(*selected_instance_id);
-                        }
-                        status = std::string("ICE CREAM ACTIVITY TEST: ") + (was_active ? "OFF" : "ON");
-                        break;
-                    }
                     case SDL_SCANCODE_F10: {
                         // Developer-only, read-only scenario load.  It never overwrites
                         // the player save and exists solely to vet asset geometry before

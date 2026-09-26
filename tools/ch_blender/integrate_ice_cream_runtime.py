@@ -177,7 +177,7 @@ def package_runtime(cfg: dict) -> None:
     if definition_path.is_file():
         # Keep gameplay and economy fields authored after the original art import.
         current = json.loads(definition_path.read_text(encoding="utf-8"))
-        for key in ("texture", "sprites", "spriteAnchors", "colorMask", "activityOverlay"):
+        for key in ("texture", "sprites", "colorMask", "activityOverlay"):
             current[key] = definition[key]
         definition = current
     definition_path.write_text(json.dumps(definition, indent=2) + "\n", encoding="utf-8")
@@ -312,7 +312,7 @@ void render_building_activity_overlay(SDL_Renderer* renderer, const BuildingDefi
 """ + mobile_anchor
         text = text[:pos] + replacement + text[pos + len(mobile_anchor):]
 
-    if "ICE CREAM ACTIVITY TEST:" not in text:
+    if "case SDL_SCANCODE_F8:" not in text:
         f10_anchor = "                    case SDL_SCANCODE_F10: {"
         f8_case = """                    case SDL_SCANCODE_F8: {
                         if (!selected_instance_id) {
