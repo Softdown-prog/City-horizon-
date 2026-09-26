@@ -17,6 +17,8 @@ on:
       - "src/ch_core/projection.h"
       - "src/building_system.cpp"
       - "src/building_system.h"
+      - "src/land_system.cpp"
+      - "src/land_system.h"
       - "src/ui_manager.cpp"
       - "src/ui_manager.h"
       - "src/ui_manager_legacy_impl.inl"
