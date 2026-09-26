@@ -34,8 +34,8 @@ struct ParkFenceSpec {
     qreal picket_width_px = 2.0;
     qreal picket_spacing_px = 9.0;
     qreal spear_height_px = 4.5;
-    qreal gate_gap_world = 0.34;
-    qreal gate_open_depth_world = 0.24;
+    qreal gate_gap_world = 0.52;
+    qreal gate_open_depth_world = 0.30;
 };
 
 class ParkFenceRenderer final {
