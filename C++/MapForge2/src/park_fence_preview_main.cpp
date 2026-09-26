@@ -22,15 +22,30 @@ int main(int argc, char** argv) {
         ch::studio::ParkFenceRotation rotation;
     };
 
-    constexpr std::array<ExportItem, 8> exports = {{
+    // Runtime export order follows the same canonical direction contract used
+    // by other City Horizon assets: SOUTH, EAST, WEST, NORTH. Every fence
+    // module is generated from the same physical definition; no direction is
+    // hand-painted or mirrored after rendering.
+    constexpr std::array<ExportItem, 16> exports = {{
         {"park_fence_straight_south.png", ch::studio::ParkFencePiece::Straight, ch::studio::ParkFenceRotation::South},
         {"park_fence_straight_east.png", ch::studio::ParkFencePiece::Straight, ch::studio::ParkFenceRotation::East},
+        {"park_fence_straight_west.png", ch::studio::ParkFencePiece::Straight, ch::studio::ParkFenceRotation::West},
+        {"park_fence_straight_north.png", ch::studio::ParkFencePiece::Straight, ch::studio::ParkFenceRotation::North},
+
         {"park_fence_corner_south.png", ch::studio::ParkFencePiece::Corner, ch::studio::ParkFenceRotation::South},
         {"park_fence_corner_east.png", ch::studio::ParkFencePiece::Corner, ch::studio::ParkFenceRotation::East},
+        {"park_fence_corner_west.png", ch::studio::ParkFencePiece::Corner, ch::studio::ParkFenceRotation::West},
+        {"park_fence_corner_north.png", ch::studio::ParkFencePiece::Corner, ch::studio::ParkFenceRotation::North},
+
         {"park_fence_end_south.png", ch::studio::ParkFencePiece::End, ch::studio::ParkFenceRotation::South},
         {"park_fence_end_east.png", ch::studio::ParkFencePiece::End, ch::studio::ParkFenceRotation::East},
+        {"park_fence_end_west.png", ch::studio::ParkFencePiece::End, ch::studio::ParkFenceRotation::West},
+        {"park_fence_end_north.png", ch::studio::ParkFencePiece::End, ch::studio::ParkFenceRotation::North},
+
         {"park_fence_gate_open_south.png", ch::studio::ParkFencePiece::Gate, ch::studio::ParkFenceRotation::South},
         {"park_fence_gate_open_east.png", ch::studio::ParkFencePiece::Gate, ch::studio::ParkFenceRotation::East},
+        {"park_fence_gate_open_west.png", ch::studio::ParkFencePiece::Gate, ch::studio::ParkFenceRotation::West},
+        {"park_fence_gate_open_north.png", ch::studio::ParkFencePiece::Gate, ch::studio::ParkFenceRotation::North},
     }};
 
     for (const auto& item : exports) {
