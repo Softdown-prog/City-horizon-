@@ -317,7 +317,9 @@ def _stone(name, rgba, roughness, metallic, seed, strength):
 
     tex_coord = _n(tree, "ShaderNodeTexCoord", (-800, 0))
     mapping = _n(tree, "ShaderNodeMapping", (-600, 0))
-    mapping.inputs["Scale"].default_value = (3.5 + seed * 0.15, 3.5, 1.0)
+    # seed is clamped to [0, 9] range before scaling to prevent the Voronoi
+    # cell size growing unboundedly with large seeds (bug B-1).
+    mapping.inputs["Scale"].default_value = (3.5 + (seed % 10) * 0.15, 3.5, 1.0)
 
     voronoi = _n(tree, "ShaderNodeTexVoronoi", (-350, 120))
     voronoi.voronoi_dimensions = "3D"

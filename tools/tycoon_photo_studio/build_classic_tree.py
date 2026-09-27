@@ -24,6 +24,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import build_scene as studio_base
+from studio_constants import TILE_PX_W, TILE_PX_H  # noqa: E402 — BL-1: shared constants
 
 
 def parse_args():
@@ -90,9 +91,13 @@ def generate_branch_geometry(asset, materials, authored):
     rng = random.Random(int(spec.get("seed", 1)))
     levels = int(spec.get("levels", 4))
     primary_count = int(spec.get("primaryBranches", 4))
-    branch_factor = int(spec.get("branchFactor", 2))
-    if branch_factor != 2:
-        raise RuntimeError("classic leaf-card tree currently requires branchFactor=2")
+    # B-3: validate before applying default so the guard can actually trigger.
+    if int(spec.get("branchFactor", 2)) != 2:
+        raise RuntimeError(
+            f"classic leaf-card tree requires branchFactor=2, "
+            f"got branchFactor={spec['branchFactor']}"
+        )
+    branch_factor = 2
 
     material = materials[str(spec["material"])]
     origin = Vector(tuple(float(v) for v in spec.get("origin", [0.0, 0.0, 1.72])))
@@ -316,8 +321,11 @@ def main():
     if asset.get("studioPreset") != studio.get("id"):
         raise RuntimeError("Tree source and studio preset do not match")
 
+    # B-2: extract source render resolution from studio preset before calling
+    # configure_scene, which requires it as the second positional argument.
+    src_resolution = tuple(int(v) for v in studio["render"]["srcResolution"])
     studio_base.clear_scene()
-    scene = studio_base.configure_scene(studio, output_dir)
+    scene = studio_base.configure_scene(studio, src_resolution, output_dir)
     authored, branch_count, leaf_count = build_tree(asset)
     root = studio_base.create_asset_root(authored)
 
@@ -362,8 +370,8 @@ def main():
         "projection": studio["camera"]["projection"],
         "yawDegrees": studio["camera"]["yawDegrees"],
         "elevationDegrees": studio["camera"]["elevationDegrees"],
-        "tileWidth": 128,
-        "tileHeight": 64,
+        "tileWidth": TILE_PX_W,
+        "tileHeight": TILE_PX_H,
         "renderResolution": [scene.render.resolution_x, scene.render.resolution_y],
         "finalResolution": studio["render"]["finalResolution"],
         "orthoScale": scene.camera.data.ortho_scale,

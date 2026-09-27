@@ -14,7 +14,8 @@ import math
 import random
 from pathlib import Path
 
-TILE_WORLD = 3.0
+# Canonical scale constant — defined once in studio_constants.py (BL-1).
+from studio_constants import TILE_WORLD  # noqa: E402
 
 
 def _positive(value, name):

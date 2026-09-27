@@ -9,6 +9,7 @@ import random
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
+from .exporter import alpha_safe_resize as _alpha_safe_resize  # VF-3: single source
 
 CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
 CAMERA_CONTRACT = "CH_CAMERA_V1"
@@ -18,14 +19,6 @@ WORK_SCALE = 4
 
 def _hex(value: str) -> tuple[int, int, int]:
     return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
-
-
-def _alpha_safe_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
-    rgba = image.convert("RGBA")
-    try:
-        return rgba.convert("RGBa").resize(size, Image.Resampling.LANCZOS).convert("RGBA")
-    except (ValueError, OSError):
-        return rgba.resize(size, Image.Resampling.LANCZOS)
 
 
 def _irregular_blob(

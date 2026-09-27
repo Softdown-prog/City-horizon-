@@ -44,7 +44,13 @@ try:
         _sys.path.insert(0, _here)
     import tycoon_material_library as _mat_lib
     _MAT_LIB_AVAILABLE = True
-except Exception:
+except Exception as _mat_lib_exc:
+    import sys as _sys_warn
+    print(
+        f"[WARN][build_scene] tycoon_material_library unavailable: {_mat_lib_exc}\n"
+        "  Procedural material recipes will fall back to flat BSDF for this run.",
+        file=_sys_warn.stderr,
+    )
     _mat_lib = None
     _MAT_LIB_AVAILABLE = False
 
@@ -57,13 +63,8 @@ DIRECTIONS = (
     {"id": "north", "quarterTurns": 2, "rotationDegrees": 180.0},
 )
 
-# Canonical scale: number of Blender world-units per isometric tile.
-# One tile = 128 × 64 px at 1.0 zoom.  Calibrate new assets against this.
-BLENDER_UNITS_PER_TILE = 3.0
-
-# Pixel dimensions of one isometric tile at the base game resolution.
-TILE_PX_W = 128
-TILE_PX_H = 64
+# Canonical scale constants — defined once in studio_constants.py (BL-1).
+from studio_constants import BLENDER_UNITS_PER_TILE, TILE_PX_W, TILE_PX_H  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

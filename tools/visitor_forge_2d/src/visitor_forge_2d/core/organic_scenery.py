@@ -3,20 +3,17 @@ from __future__ import annotations
 import argparse, hashlib, json, math, random
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
+from .exporter import alpha_safe_resize as _alpha_safe_resize  # VF-3: single source
 
-CONTRACT='CH_2D_ORGANIC_SCENERY_V1'
-CAMERA_CONTRACT='CH_CAMERA_V1'
-WORK_SCALE=4
+CONTRACT = 'CH_2D_ORGANIC_SCENERY_V1'
+CAMERA_CONTRACT = 'CH_CAMERA_V1'
+WORK_SCALE = 4
 
-def _hex(v): return tuple(int(v[i:i+2],16) for i in (1,3,5))
-def _lerp(a,b,t): return a+(b-a)*t
-def _quad(p0,p1,p2,t):
-    u=1-t
+def _hex(v): return tuple(int(v[i:i+2], 16) for i in (1, 3, 5))
+def _lerp(a, b, t): return a + (b - a) * t
+def _quad(p0, p1, p2, t):
+    u = 1 - t
     return (u*u*p0[0]+2*u*t*p1[0]+t*t*p2[0], u*u*p0[1]+2*u*t*p1[1]+t*t*p2[1])
-def _alpha_safe_resize(im,size):
-    rgba=im.convert('RGBA')
-    try: return rgba.convert('RGBa').resize(size,Image.Resampling.LANCZOS).convert('RGBA')
-    except (ValueError,OSError): return rgba.resize(size,Image.Resampling.LANCZOS)
 
 def _paint(mask, top, bottom, right_shade=0.0, highlight=None):
     w, h = mask.size
@@ -210,26 +207,36 @@ def _final_raster_pass(frame,rng,pal,recipe):
     cfg=recipe.get('raster',{})
     grain=int(cfg.get('finalGrain',620)); needles=int(cfg.get('finalNeedles',300))
     
-    grain_coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if px[x,y] > 170]
-    if grain_coords:
+    # VF-4: generate pixel coordinates directly rather than building a full
+    # candidate list (up to W×H items) and calling rng.choice() per stroke.
+    # Direct randint sampling is O(k) instead of O(W×H + k×n).
+    bx0, by0, bx1, by1 = bbox
+    bw, bh = max(1, bx1 - bx0), max(1, by1 - by0)
+    if bw > 0 and bh > 0:
         for _ in range(grain):
-            x, y = rng.choice(grain_coords)
-            if rng.random()<.58:
-                c=dark; a=rng.randint(12,28)
+            x = bx0 + rng.randint(0, bw - 1)
+            y = by0 + rng.randint(0, bh - 1)
+            if px[x, y] <= 170:
+                continue
+            if rng.random() < .58:
+                c = dark; a = rng.randint(12, 28)
             else:
-                c=light; a=rng.randint(9,24)
-            if rng.random()<.72:
-                draw.point((x,y),fill=(*c,a))
+                c = light; a = rng.randint(9, 24)
+            if rng.random() < .72:
+                draw.point((x, y), fill=(*c, a))
             else:
-                draw.line((x,y,x-rng.choice([1,2]),y+rng.choice([0,1])),fill=(*c,a),width=1)
-                
-    needle_coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if px[x,y] > 190]
-    if needle_coords:
+                draw.line((x, y, x - rng.choice([1, 2]), y + rng.choice([0, 1])), fill=(*c, a), width=1)
+
         for _ in range(needles):
-            x, y = rng.choice(needle_coords)
-            length=rng.choice([2,2,3,3,4]); c=light if rng.random()<.58 else dark; a=rng.randint(18,48)
-            draw.line((x,y,x-length,y+rng.choice([0,0,1])),fill=(*c,a),width=1)
-            
+            x = bx0 + rng.randint(0, bw - 1)
+            y = by0 + rng.randint(0, bh - 1)
+            if px[x, y] <= 190:
+                continue
+            length = rng.choice([2, 2, 3, 3, 4])
+            c = light if rng.random() < .58 else dark
+            a = rng.randint(18, 48)
+            draw.line((x, y, x - length, y + rng.choice([0, 0, 1])), fill=(*c, a), width=1)
+
     return out.filter(ImageFilter.UnsharpMask(radius=.65,percent=115,threshold=3))
 
 def _draw_trunk_and_bark(work, recipe, pal, W, H):
