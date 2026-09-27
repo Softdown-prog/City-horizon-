@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -100,11 +101,11 @@ private:
                                                           const TraversableTile& traversable) const;
     void begin_return(ServiceVehicleInstance& vehicle, const ServiceVehicleCatalog& catalog,
                       const TraversableTile& traversable);
-    [[nodiscard]] static std::string tile_key(int x, int y);
+    [[nodiscard]] static std::uint64_t tile_key(int x, int y);
     [[nodiscard]] static std::string_view animation_state(ServiceVehicleState state);
     std::vector<ServiceVehicleInstance> instances_;
     std::vector<ServiceVehicleTask> tasks_;
-    std::unordered_set<std::string> reserved_tiles_;
+    std::unordered_set<std::uint64_t> reserved_tiles_;
     std::vector<TileCoordinate> completed_tiles_;
     unsigned int next_task_number_ = 1;
 };
