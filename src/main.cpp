@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries ten compatibility/runtime fixes without duplicating the runtime loop:
+// carries eleven compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -34,6 +34,9 @@
 // 10. A pedestrian that finishes a route on an activity-building entrance is
 //     hidden for a short interior visit while the building activity counter is
 //     held. This is the first CH_VISITOR_MVP_V1 enter/leave vertical slice.
+// 11. Building visits use the live pedestrian surface graph and a two-tile
+//     front-door approach. The final visible hop is always toward the authored
+//     front door; side/back entry and off-surface shortcuts are rejected.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -164,14 +167,16 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 
 // `mobile_render_entities()` is evaluated in the normal frame path immediately
 // before world entities are rendered (and may also be queried by debug UI).
-// Synchronize activity-building visits before collecting render data, then
-// remove only pedestrians currently inside a building. The inner call is not
-// recursively expanded while this macro is active.
+// The visit bridge consumes the exact same road/path/floor surface contract as
+// normal pedestrian routing. It may start autonomous visits only while the
+// production automatic-pedestrian mode is active.
 #define mobile_render_entities() \
     ([&]() { \
         ch_sync_ferris_wheel_audio_visibility(audio, buildings, catalog); \
+        const PedestrianSurfaceNavigationNetwork ch_visit_surfaces{roads, sidewalks}; \
         ch::building_visit_runtime::sync( \
-            pedestrians, buildings, catalog, simulation_clock.speed() != SimulationSpeed::paused); \
+            pedestrians, buildings, catalog, ch_visit_surfaces, \
+            simulation_clock.speed() != SimulationSpeed::paused, automatic_pedestrian); \
         auto ch_mobile_entities = mobile_render_entities(); \
         ch::building_visit_runtime::filter_inside_pedestrians(ch_mobile_entities, pedestrians); \
         return ch_mobile_entities; \
