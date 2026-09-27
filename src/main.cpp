@@ -241,6 +241,50 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
     return best;
 }
 
+class ChRuntimeSelectableGameplayUi : public ChRuntimeGameplayUi {
+public:
+    using ChRuntimeGameplayUi::ChRuntimeGameplayUi;
+
+    void bind_selection_context(const PedestrianSystem* pedestrians,
+                                const Camera* camera,
+                                const int viewport_width,
+                                const int viewport_height,
+                                std::optional<std::uint64_t>* selected_pedestrian_id,
+                                const bool world_selection_enabled) {
+        pedestrians_ = pedestrians;
+        camera_ = camera;
+        viewport_width_ = viewport_width;
+        viewport_height_ = viewport_height;
+        selected_pedestrian_id_ = selected_pedestrian_id;
+        world_selection_enabled_ = world_selection_enabled;
+    }
+
+    [[nodiscard]] UiInputResult handle_mouse_button_down(const float mouse_x,
+                                                         const float mouse_y,
+                                                         const bool primary_button) {
+        UiInputResult result = ChRuntimeGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
+        if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||
+            camera_ == nullptr || selected_pedestrian_id_ == nullptr) {
+            return result;
+        }
+        const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(
+            *pedestrians_, mouse_x, mouse_y, *camera_,
+            static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));
+        if (!picked) return result;
+        *selected_pedestrian_id_ = *picked;
+        result.consumed = true;
+        return result;
+    }
+
+private:
+    const PedestrianSystem* pedestrians_ = nullptr;
+    const Camera* camera_ = nullptr;
+    int viewport_width_ = 1;
+    int viewport_height_ = 1;
+    std::optional<std::uint64_t>* selected_pedestrian_id_ = nullptr;
+    bool world_selection_enabled_ = false;
+};
+
 #define parcels() world_parcels()
 #define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
 #define SaveManager ParkFenceSaveManager
@@ -306,16 +350,23 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
     }())
 
 #define MapRenderer RuntimeMapRenderer
-#define GameplayUi ChRuntimeGameplayUi
+#define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
     ([&]() { \
         auto ch_ui_model = (model); \
         ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \
+        gameplay_ui.bind_selection_context( \
+            &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \
+            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
+            !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
+#define selected_instance_id selected_instance_id; std::optional<std::uint64_t> selected_pedestrian_id
+
 #include "main_runtime_impl.cpp"
 
+#undef selected_instance_id
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
