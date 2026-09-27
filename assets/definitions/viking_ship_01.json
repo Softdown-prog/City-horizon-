@@ -28,12 +28,27 @@
     "offsetX": 0,
     "offsetY": 0
   },
-  "rideCapacity": 20,
-  "rideQueueContract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
-  "passengerOverlayContract": "CH_VIKING_PASSENGER_OVERLAY_V1",
-  "passengerActor": "ch_actor_green_01",
-  "passengerPaletteMode": "stable_per_visitor",
-  "seatAssignment": "queue_order_next_free_slot",
+  "amusementRide": {
+    "contract": "CH_AMUSEMENT_RIDE_V1",
+    "capacity": 20,
+    "queue": {
+      "contract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
+      "enabled": true,
+      "boardingPolicy": "fifo",
+      "dispatchPolicy": "full_or_timeout",
+      "boardingTimeoutMs": 2500
+    },
+    "cycle": {
+      "durationMs": 3000
+    },
+    "passengers": {
+      "seatCount": 20,
+      "overlayContract": "CH_RIDE_PASSENGER_OVERLAY_V1",
+      "actorSource": "ch_actor_green_01",
+      "paletteMode": "stable_per_visitor",
+      "seatAssignment": "queue_order_next_free_slot"
+    }
+  },
   "buildCost": 25000,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
@@ -50,7 +65,7 @@
   "artScale": 0.5362,
   "playerBuildable": true,
   "productionStatus": "runtime_static_four_direction_passenger_swing_proxy_pending_review",
-  "rideRuntimeStatus": "logical_queue_capacity_20_seat_assignment_integrated",
+  "rideRuntimeStatus": "data_driven_amusement_ride_v1",
   "renderClass": "large_asset_1280",
   "runtimeManifest": "assets/city_park/viking_ship/viking_ship_runtime_manifest.json",
   "sourceProxySha256": "a7ed11db4d928119de739fb09d8d2b6e30c66025a373a4b8bb74004989a72de2"
