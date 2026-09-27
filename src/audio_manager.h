@@ -24,6 +24,8 @@ enum class SoundEvent : std::size_t {
     ui_scroll,
     notification,
     ferris_wheel_running,
+    weather_rain,
+    weather_thunder,
     count,
 };
 
@@ -31,7 +33,6 @@ struct AudioVolumeSettings {
     float master = 1.0F;
     float effects = 1.0F;
     float music = 1.0F;
-    // Ambience has no runtime source yet.
     float ambience = 1.0F;
 };
 
@@ -49,8 +50,10 @@ public:
 
     // Returns false when audio is unavailable or that event has no loaded variation.
     [[nodiscard]] bool play(SoundEvent event);
-    // Starts/stops one continuous gameplay effect on the dedicated loop track.
+    // Starts/stops one continuous gameplay effect on the dedicated activity loop track.
     [[nodiscard]] bool set_looping(SoundEvent event, bool enabled);
+    // Starts/stops continuous weather/environment ambience independently from attraction loops.
+    [[nodiscard]] bool set_ambience_loop(SoundEvent event, bool enabled);
     // Starts the music declared under music.Loading in audio_catalog.json.
     [[nodiscard]] bool play_loading_music();
 
@@ -73,6 +76,8 @@ private:
     std::vector<MIX_Track*> tracks_;
     MIX_Track* activity_loop_track_ = nullptr;
     SoundEvent looping_event_ = SoundEvent::count;
+    MIX_Track* ambience_loop_track_ = nullptr;
+    SoundEvent ambience_looping_event_ = SoundEvent::count;
     MIX_Audio* loading_music_ = nullptr;
     MIX_Track* music_track_ = nullptr;
     AudioVolumeSettings volume_settings_;
