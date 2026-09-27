@@ -10,27 +10,18 @@
     "3": "assets/buildings/bakery/bakery_east.png"
   },
   "spriteAnchors": {
-    "0": {
-      "x": 0.5,
-      "y": 0.84027778
-    },
-    "1": {
-      "x": 0.5,
-      "y": 0.84027778
-    },
-    "2": {
-      "x": 0.5,
-      "y": 0.84027778
-    },
-    "3": {
-      "x": 0.5,
-      "y": 0.84027778
-    }
+    "0": { "x": 0.5, "y": 0.84027778 },
+    "1": { "x": 0.5, "y": 0.84027778 },
+    "2": { "x": 0.5, "y": 0.84027778 },
+    "3": { "x": 0.5, "y": 0.84027778 }
   },
   "rotatable": true,
   "requiresRoadAccess": true,
   "roadAccessMode": "front_edge",
   "frontEdge": "south",
+  "accessPoints": [
+    { "x": 1, "y": 1, "facing": "south" }
+  ],
   "footprint": {
     "width": 2,
     "height": 2
