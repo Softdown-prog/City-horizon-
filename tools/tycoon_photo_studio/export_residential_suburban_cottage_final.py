@@ -36,6 +36,7 @@ def parse_args():
     p.add_argument("--mask-config", default=DEFAULT_MASK)
     p.add_argument("--studio-preset", required=True)
     p.add_argument("--output", required=True)
+    p.add_argument("--stage", choices=("final",), default="final")
     p.add_argument("--approval-proxy-sha", required=True)
     p.add_argument("--preflight-profile", default=None)
     p.add_argument("--save-blend", default=None)
