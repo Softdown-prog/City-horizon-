@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-enum class PedestrianState { idle, walking };
+enum class PedestrianState { idle, walking, visiting };
 
 struct PedestrianVisualDefinition {
     std::string animation_set_id;
@@ -47,6 +47,10 @@ public:
 
     [[nodiscard]] bool send_pedestrian(NavigationTile start, NavigationTile destination,
                                        const NavigationNetwork& network);
+    // Building visits protect an idle pedestrian from the ordinary autonomous
+    // route scheduler while the actor is hidden inside. Presentation continues
+    // to resolve this state through the normal idle directional clips.
+    [[nodiscard]] bool set_visiting(std::uint64_t pedestrian_id, bool visiting);
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);
