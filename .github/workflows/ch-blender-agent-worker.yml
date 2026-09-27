@@ -145,6 +145,12 @@ jobs:
           done < "${{ steps.jobs.outputs.jobs-file }}"
           exit "$failed"
 
+      - name: Build animation preview GIFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/animation_preview/make_gif.py --discover-root out/ch_blender_agent
+
       - name: Upload agent outputs and machine reports
         if: always()
         uses: actions/upload-artifact@v4
