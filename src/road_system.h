@@ -14,6 +14,14 @@ struct TileCoordinate {
 
 inline constexpr std::int64_t kRoadCostPerTile = 100;
 
+// The initial owned parcel is the canonical 32x32 block centered at the origin
+// (-16..15). Immigration connects through one authored logical gateway on its
+// west edge, so players never need to buy locked outer parcels just to reach the
+// world boundary. The gateway itself is not a prebuilt road and occupies no
+// construction space until the player deliberately connects to it.
+inline constexpr int kExternalRoadGatewayX = -16;
+inline constexpr int kExternalRoadGatewayY = 0;
+
 // A road owns only its logical grid tile. Its final artwork is selected later
 // from this connectivity mask; it is never inferred from a PNG bounding box.
 using RoadConnection = TileConnectionMask;
@@ -65,8 +73,9 @@ public:
     [[nodiscard]] RoadVisualType visual_type(int tile_x, int tile_y) const;
     [[nodiscard]] std::vector<TileCoordinate> line_between(TileCoordinate start, TileCoordinate end) const;
 
-    // The first immigration gate: at least one authored road must physically
-    // touch a map edge to represent a connection with the outside world.
+    // Immigration gateway. A road on the west edge of the starter parcel only
+    // counts when it continues east into the owned city, preventing an isolated
+    // one-tile road from opening immigration accidentally.
     [[nodiscard]] bool has_world_connection() const;
 
     // Building overlap is intentionally validated by the placement layer;
