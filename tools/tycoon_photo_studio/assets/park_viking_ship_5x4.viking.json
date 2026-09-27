@@ -6,33 +6,50 @@
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "referencePolicy": {
     "purpose": "Use the supplied amusement-park Viking swing ride only as structural/compositional reference.",
-    "exclude": ["ticket_booth", "reference_signage", "surrounding_park_scenery"],
-    "designIntent": "A colorful amusement-park attraction, not a historical reconstruction: brown detailed longship, predominantly iron/steel ride structure, strong red/white/black accents, and visual compatibility with attraction.park_ferris_wheel.01."
+    "exclude": [
+      "ticket_booth",
+      "reference_signage",
+      "surrounding_park_scenery"
+    ],
+    "designIntent": "A colorful, imposing amusement-park attraction rather than a historical reconstruction: taller square steel support frames, a deeper Viking longship, predominantly black/grey iron structure, strong red/white accents and visual compatibility with attraction.park_ferris_wheel.01."
   },
   "footprint": {
     "widthTiles": 5,
     "depthTiles": 4,
-    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3]]
+    "occupiedCells": [
+      [0,0],[1,0],[2,0],[3,0],[4,0],
+      [0,1],[1,1],[2,1],[3,1],[4,1],
+      [0,2],[1,2],[2,2],[3,2],[4,2],
+      [0,3],[1,3],[2,3],[3,3],[4,3]
+    ]
   },
   "geometry": {
     "unitsPerTile": 3.0,
-    "baseWidth": 14.70,
-    "baseDepth": 11.70,
+    "baseWidth": 14.7,
+    "baseDepth": 11.7,
     "baseHeight": 0.34,
-    "deckWidth": 13.80,
-    "deckDepth": 9.20,
+    "deckWidth": 13.8,
+    "deckDepth": 9.2,
     "deckHeight": 0.18,
-    "pivotZ": 5.55,
-    "supportHalfWidth": 5.25,
+    "pivotZ": 7.25,
+    "supportHalfWidth": 5.55,
     "supportHalfDepth": 3.05,
-    "supportRadius": 0.22,
-    "axleRadius": 0.38,
-    "axleDepth": 6.55,
-    "shipLength": 11.55,
-    "shipHalfWidth": 1.52,
-    "shipDeckZ": -1.72,
+    "supportBeamWidth": 0.58,
+    "supportBeamDepth": 0.46,
+    "innerBraceWidth": 0.34,
+    "innerBraceDepth": 0.28,
+    "swingArmWidth": 0.42,
+    "swingArmDepth": 0.32,
+    "boatDrop": 1.65,
+    "boatJointZ": -1.42,
+    "axleRadius": 0.42,
+    "axleDepth": 6.7,
+    "shipLength": 11.8,
+    "shipHalfWidth": 1.6,
+    "shipDeckZ": -1.66,
+    "hullVerticalScale": 1.18,
     "seatRows": 7,
-    "loadingPlatformWidth": 8.10,
+    "loadingPlatformWidth": 8.1,
     "loadingPlatformDepth": 1.72,
     "loadingPlatformHeight": 0.42,
     "stairWidth": 2.45,
@@ -40,7 +57,10 @@
     "stairSteps": 5,
     "railingHeight": 0.88,
     "railingRadius": 0.045,
-    "previewSwingDegrees": 10.0
+    "supportLampCount": 8,
+    "crossLampCount": 9,
+    "boatLampCount": 7,
+    "previewSwingDegrees": 0.0
   },
   "animation": {
     "enabled": false,
@@ -51,27 +71,87 @@
     "frameStart": null,
     "frameEnd": null,
     "fps": null,
-    "note": "Frame count and swing arc will be defined after first visual approval. Static supports/base stay outside SwingPivot; ship, hangers and restraints are descendants of SwingPivot."
+    "note": "Swing frame count, arc and FPS remain intentionally undefined until the taller v2 geometry is visually approved. Static base/supports remain fixed; SwingPivot owns the boat, square hanger arms, restraints and moving ride geometry."
+  },
+  "runtimeLayers": {
+    "contract": "CH_ATTRACTION_MULTI_OVERLAY_V1",
+    "staticBase": {
+      "role": "attraction_static_base",
+      "animated": false,
+      "includes": [
+        "base",
+        "square_support_frames",
+        "loading_platform",
+        "stairs",
+        "railings",
+        "operator_console",
+        "lamp_housings"
+      ]
+    },
+    "motionOverlay": {
+      "role": "attraction_motion_overlay",
+      "animated": true,
+      "activeWhen": "ride_running",
+      "includes": [
+        "SwingPivot",
+        "BoatRoot",
+        "square_swing_arms",
+        "viking_ship",
+        "seats",
+        "restraints"
+      ],
+      "frameCount": null,
+      "fps": null,
+      "note": "Final swing frames are defined only after visual approval."
+    },
+    "idleLightOverlay": {
+      "role": "attraction_idle_light_overlay",
+      "animated": true,
+      "activeWhen": "ride_idle",
+      "disabledWhen": "ride_running",
+      "behavior": "blink",
+      "pattern": "alternating_groups_a_b",
+      "groups": ["A", "B"],
+      "frameCount": null,
+      "fps": null,
+      "note": "Bulb placement is authored now. Blink cadence and overlay frame count are defined after geometry/light-placement approval."
+    }
   },
   "materials": {
     "steelDark": {"name":"VikingSteelBlack","rgba":[0.035,0.045,0.055,1.0],"roughness":0.34,"metallic":0.72},
-    "steelMid": {"name":"VikingSteelMid","rgba":[0.18,0.20,0.22,1.0],"roughness":0.40,"metallic":0.64},
+    "steelMid": {"name":"VikingSteelMid","rgba":[0.18,0.20,0.22,1.0],"roughness":0.4,"metallic":0.64},
     "steelLight": {"name":"VikingSteelCream","rgba":[0.74,0.72,0.66,1.0],"roughness":0.46,"metallic":0.22},
-    "red": {"name":"VikingParkCoralRed","rgba":[0.72,0.12,0.16,1.0],"roughness":0.50,"metallic":0.07},
+    "red": {"name":"VikingParkCoralRed","rgba":[0.72,0.12,0.16,1.0],"roughness":0.5,"metallic":0.07},
     "white": {"name":"VikingParkWarmWhite","rgba":[0.88,0.86,0.78,1.0],"roughness":0.56,"metallic":0.04},
     "gold": {"name":"VikingParkGold","rgba":[0.78,0.45,0.06,1.0],"roughness":0.42,"metallic":0.34},
     "teal": {"name":"VikingParkTeal","rgba":[0.03,0.38,0.42,1.0],"roughness":0.52,"metallic":0.08},
-    "woodDark": {"name":"VikingHullDarkWood","rgba":[0.20,0.075,0.028,1.0],"roughness":0.70,"metallic":0.00},
-    "wood": {"name":"VikingHullWood","rgba":[0.38,0.145,0.045,1.0],"roughness":0.66,"metallic":0.00},
-    "woodLight": {"name":"VikingHullLightWood","rgba":[0.55,0.25,0.075,1.0],"roughness":0.62,"metallic":0.00},
-    "seatRed": {"name":"VikingSeatRed","rgba":[0.55,0.045,0.065,1.0],"roughness":0.60,"metallic":0.02},
-    "platform": {"name":"VikingPlatformSteel","rgba":[0.25,0.27,0.27,1.0],"roughness":0.66,"metallic":0.22}
+    "woodDark": {"name":"VikingHullDarkWood","rgba":[0.2,0.075,0.028,1.0],"roughness":0.7,"metallic":0.0},
+    "wood": {"name":"VikingHullWood","rgba":[0.38,0.145,0.045,1.0],"roughness":0.66,"metallic":0.0},
+    "woodLight": {"name":"VikingHullLightWood","rgba":[0.55,0.25,0.075,1.0],"roughness":0.62,"metallic":0.0},
+    "seatRed": {"name":"VikingSeatRed","rgba":[0.55,0.045,0.065,1.0],"roughness":0.6,"metallic":0.02},
+    "platform": {"name":"VikingPlatformSteel","rgba":[0.25,0.27,0.27,1.0],"roughness":0.66,"metallic":0.22},
+    "lampWarm": {"name":"VikingLampWarm","rgba":[1.0,0.78,0.24,1.0],"roughness":0.24,"metallic":0.02},
+    "lampRed": {"name":"VikingLampRed","rgba":[0.98,0.08,0.06,1.0],"roughness":0.24,"metallic":0.02}
   },
   "prototypeNotes": {
-    "status": "geometry_proxy_v1",
+    "status": "geometry_proxy_v2_imposing_square_steel_idle_lights",
     "ticketBoothIncluded": false,
     "terrainIncluded": false,
     "visualCompatibilityReference": "attraction.park_ferris_wheel.01",
-    "nextGate": "Review SOUTH proxy for silhouette, true amusement-ride read, 5x4 massing, metal-vs-wood balance, loading stairs, color distribution and SwingPivot hierarchy before defining animation frames."
+    "approvedFromV1": [
+      "5x4 footprint",
+      "base proportions",
+      "loading-zone concept",
+      "brown Viking ship plus park-color accents"
+    ],
+    "requestedV2Changes": [
+      "raise attraction height",
+      "thicken structural steel",
+      "replace round structural tubes with square/rectangular beams",
+      "make ship deeper/taller",
+      "increase detail",
+      "prepare idle blinking-light overlay separate from running swing overlay"
+    ],
+    "nextGate": "Review SOUTH proxy for imposing height, square-steel readability, boat depth, swing clearance, detail density and idle bulb placement. Do not define final swing or blink frame counts until this gate is approved."
   }
 }
