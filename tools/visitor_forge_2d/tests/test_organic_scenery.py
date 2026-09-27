@@ -59,6 +59,23 @@ def test_canonical_pine_stays_above_minimum_opaque_height() -> None:
     assert opaque_height >= minimum, f"canonical pine opaque height {opaque_height}px is below {minimum}px"
 
 
+def test_pine_family_has_requested_heights_and_distinct_silhouettes() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    sizes = {}
+    for name in ("pine_small_v1", "pine_tall_v1", "pine_robust_v1"):
+        recipe = json.loads((project_root / "examples" / f"{name}.json").read_text(encoding="utf-8"))
+        frame, metadata = render(recipe)
+        left, top, right, bottom = metadata["bounds"]
+        height = bottom - top
+        limits = recipe["validation"]
+        assert limits["minimumOpaqueHeightPx"] <= height <= limits["maximumOpaqueHeightPx"]
+        assert frame.getpixel(tuple(recipe["anchor"]))[3] > 0
+        sizes[name] = (right - left, height)
+    assert sizes["pine_small_v1"][1] > 100
+    assert sizes["pine_tall_v1"][1] > sizes["pine_robust_v1"][1] > sizes["pine_small_v1"][1]
+    assert sizes["pine_robust_v1"][0] > sizes["pine_tall_v1"][0]
+
+
 def test_organic_scenery_rejects_wrong_camera() -> None:
     recipe = _recipe()
     recipe["camera"]["tile"] = [64, 64]

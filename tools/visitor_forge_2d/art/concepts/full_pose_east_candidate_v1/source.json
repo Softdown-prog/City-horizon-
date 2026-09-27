@@ -1,0 +1,14 @@
+{
+  "originalMaster": "art/concepts/visitor_male_01_east_master.png",
+  "sourceSha256": {
+    "a": "48b163ed66712bf29f77286a749805a598e3bd0aadb92578b9591b37ee18d0ca",
+    "b": "0f14fc3deb6fbc760e501800546361427a433f26743a062629a02f9b24cc0028"
+  },
+  "anchor": [
+    64,
+    116
+  ],
+  "frameDurationMs": 270,
+  "runtimePromotion": false,
+  "status": "visual review pending"
+}

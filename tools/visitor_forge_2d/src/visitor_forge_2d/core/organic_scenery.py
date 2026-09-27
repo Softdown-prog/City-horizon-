@@ -74,7 +74,7 @@ def _branch(mask,rng,root,tip,width,droop,side,density=7,fill=255,tuft_strength=
 
 def _crown_masks(recipe,rng,W,H):
     """Build a dense conifer crown from overlapping branch fans rather than shelves."""
-    tiers=recipe['tiers']; cx=96
+    tiers=recipe['tiers']; cx=float(recipe.get('crownCx',recipe.get('anchor',[96,239])[0]))
     back=Image.new('L',(W,H)); mid=Image.new('L',(W,H)); front=Image.new('L',(W,H)); core=Image.new('L',(W,H))
     for t in tiers:
         y=float(t['y']); span=float(t['span']); thick=float(t['thickness']); skew=float(t.get('skew',0))
@@ -231,12 +231,23 @@ def render(recipe):
     if recipe['camera'].get('tile')!=[128,64]: raise ValueError('CH_CAMERA_V1 review requires 128x64 tile')
     canvas=recipe.get('canvas',[192,256]); anchor=recipe.get('anchor',[96,239]); seed=int(recipe.get('seed',1)); rng=random.Random(seed)
     W,H=canvas[0]*WORK_SCALE,canvas[1]*WORK_SCALE; pal=recipe['palette']; work=Image.new('RGBA',(W,H))
-    sm=Image.new('L',(W,H)); ImageDraw.Draw(sm).ellipse((49*WORK_SCALE,230*WORK_SCALE,143*WORK_SCALE,244*WORK_SCALE),fill=145); sm=sm.filter(ImageFilter.GaussianBlur(2.4*WORK_SCALE))
+    cx=float(recipe.get('crownCx',anchor[0])); base_y=float(anchor[1])
+    trunk_cfg=recipe.get('trunk',{})
+    trunk_top=float(trunk_cfg.get('topY',119))
+    trunk_top_width=float(trunk_cfg.get('topWidth',21))
+    trunk_base_width=float(trunk_cfg.get('baseWidth',14))
+    shadow_cfg=recipe.get('shadow',{})
+    shadow_width=float(shadow_cfg.get('width',94))
+    shadow_height=float(shadow_cfg.get('height',14))
+    shadow_cy=base_y-2
+    sm=Image.new('L',(W,H)); ImageDraw.Draw(sm).ellipse(((cx-shadow_width/2)*WORK_SCALE,(shadow_cy-shadow_height/2)*WORK_SCALE,(cx+shadow_width/2)*WORK_SCALE,(shadow_cy+shadow_height/2)*WORK_SCALE),fill=145); sm=sm.filter(ImageFilter.GaussianBlur(2.4*WORK_SCALE))
     sh=Image.new('RGBA',(W,H),(*_hex(pal['ground_shadow']),0)); sh.putalpha(sm); work.alpha_composite(sh)
-    trunk=Image.new('L',(W,H)); d=ImageDraw.Draw(trunk); d.polygon([(86*WORK_SCALE,119*WORK_SCALE),(107*WORK_SCALE,121*WORK_SCALE),(103*WORK_SCALE,239*WORK_SCALE),(89*WORK_SCALE,239*WORK_SCALE)],fill=255)
+    trunk=Image.new('L',(W,H)); d=ImageDraw.Draw(trunk); d.polygon([((cx-trunk_top_width/2)*WORK_SCALE,trunk_top*WORK_SCALE),((cx+trunk_top_width/2)*WORK_SCALE,(trunk_top+2)*WORK_SCALE),((cx+trunk_base_width/2)*WORK_SCALE,base_y*WORK_SCALE),((cx-trunk_base_width/2)*WORK_SCALE,base_y*WORK_SCALE)],fill=255)
     _composite(work,trunk,pal['trunk_top'],pal['trunk_bottom'],right_shade=.19,highlight=(.41,.48,.28,.12))
     bark=Image.new('RGBA',(W,H)); bd=ImageDraw.Draw(bark,'RGBA'); tc=_hex(pal.get('trunk_light','#DCA066'))
-    for xo,y0,y1 in [(-4,166,231),(1,147,220),(5,188,232)]: bd.line(((96+xo)*WORK_SCALE,y0*WORK_SCALE,(95+xo)*WORK_SCALE,y1*WORK_SCALE),fill=(*tc,76),width=2*WORK_SCALE)
+    trunk_length=base_y-trunk_top
+    for xo,start,end in [(-.28,.39,.93),(.07,.23,.84),(.35,.58,.94)]:
+        bd.line(((cx+xo*trunk_base_width)*WORK_SCALE,(trunk_top+start*trunk_length)*WORK_SCALE,(cx+xo*trunk_base_width-1)*WORK_SCALE,(trunk_top+end*trunk_length)*WORK_SCALE),fill=(*tc,76),width=2*WORK_SCALE)
     work.alpha_composite(bark)
     crown_style = recipe.get('crownStyle', 'conifer')
     if crown_style == 'broadleaf':

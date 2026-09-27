@@ -6,6 +6,9 @@ on:
   push:
     paths:
       - 'tools/visitor_forge_2d/examples/pine_tree_organic_v1.json'
+      - 'tools/visitor_forge_2d/examples/pine_small_v1.json'
+      - 'tools/visitor_forge_2d/examples/pine_tall_v1.json'
+      - 'tools/visitor_forge_2d/examples/pine_robust_v1.json'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py'
       - 'tools/visitor_forge_2d/tests/test_organic_scenery.py'
       - 'tools/visitor_forge_2d/docs/ORGANIC_SCENERY.md'
@@ -35,16 +38,18 @@ jobs:
       - name: Test organic scenery renderer
         run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py
 
-      - name: Render camera-aware organic pine
+      - name: Render camera-aware organic pines
         run: |
-          python -m visitor_forge_2d.core.organic_scenery \
-            --recipe tools/visitor_forge_2d/examples/pine_tree_organic_v1.json \
-            --output out/visitor_forge_2d/pine_tree_v1
+          for name in pine_tree_organic_v1 pine_small_v1 pine_tall_v1 pine_robust_v1; do
+            python -m visitor_forge_2d.core.organic_scenery \
+              --recipe "tools/visitor_forge_2d/examples/$name.json" \
+              --output out/visitor_forge_2d/pine_family
+          done
 
       - name: Upload pine tree review
         uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Pine-Tree-Visitor-Forge-${{ github.run_number }}
-          path: out/visitor_forge_2d/pine_tree_v1
+          path: out/visitor_forge_2d/pine_family
           retention-days: 14
           if-no-files-found: error

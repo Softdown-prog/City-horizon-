@@ -1,8 +1,8 @@
 {
-  "id": "pine_tree_01",
-  "name": "Pinheiro",
+  "id": "flower_bed_01",
+  "name": "Canteiro de flores douradas",
   "category": "decor",
-  "texture": "assets/tree/pine_tree_01.png",
+  "texture": "assets/decor/flower_bed_01.png",
   "rotatable": false,
   "requiresRoadAccess": false,
   "requiresRoadOrPathAccess": false,
@@ -12,18 +12,18 @@
     "width": 1,
     "height": 1
   },
-  "buildCost": 50,
+  "buildCost": 35,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "powerConsumption": 0,
-  "artScale": 0.5,
+  "artScale": 0.65,
   "anchor": {
     "x": 0.5,
-    "y": 0.9483695652
+    "y": 0.85
   },
   "playerBuildable": true,
   "productionStatus": "runtime_generated_2d_rgba",
-  "sourceMaster": "tools/tycoon_photo_studio/art/concepts/nature_2d_generated_v2/sources/pine_master_rgba.png",
+  "sourceMaster": "tools/tycoon_photo_studio/art/concepts/nature_2d_generated_v2/sources/flower_bed_master_rgba.png",
   "exportTool": "tools/tycoon_photo_studio/export_nature_2d_rgba.py",
   "cameraContract": "CH_CAMERA_V1"
 }

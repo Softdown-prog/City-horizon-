@@ -93,3 +93,18 @@ Review all three outputs before runtime promotion:
 
 Generated files under `out/` are review artifacts. Promote a PNG into `assets/`
 only after the gameplay-size and isometric boards are visually approved.
+
+## Three-tree conifer family
+
+`examples/pine_small_v1.json`, `pine_tall_v1.json` and `pine_robust_v1.json`
+author independent branch tiers and deterministic seeds for a short full-crown
+tree, a taller slender tree with exposed trunk, and a broad dense tree. They
+share the existing organic renderer, camera contract and raster passes. Recipes
+may set `crownCx`, `trunk.topY`, `trunk.topWidth`, `trunk.baseWidth`, and
+`shadow.width` / `shadow.height`; omitted values preserve the canonical pine.
+
+The candidate PNGs, 1x/2x boards, map-grid boards and export metadata live in
+`art/concepts/pine_family_v1/`. Opaque bounds are 136, 252 and 220 pixels high,
+respectively (including the soft contact shadow). These are art candidates;
+runtime promotion awaits visual approval. The workflow above now regenerates
+all four pines with Visitor Forge 2D and runs the focused size test.

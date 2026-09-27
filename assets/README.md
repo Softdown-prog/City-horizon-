@@ -51,6 +51,8 @@ O tile de terra foi normalizado para 128×64 RGBA e validado no MapForge pelo wo
 
 O contrato técnico de tile de chão também permanece em `assets/terrain/ground_tile_contract.json`.
 
+O pinheiro e o canteiro dourado da decoração usam PNGs 2D RGBA aprovados para integração no catálogo de construção: `assets/tree/pine_tree_01.png` e `assets/decor/flower_bed_01.png`. As definições 1×1 em `assets/definitions/` guardam escala, âncora e caminho das fontes em `tools/tycoon_photo_studio/art/concepts/nature_2d_generated_v2/`. O estudo procedural original do pinheiro e do canteiro permanece no Visitor Forge 2D; ele não reproduz estes dois PNGs promovidos.
+
 Água/costa, pedra, decoração, farming, construções, props, veículos, parques, ruas, calçadas e demais bibliotecas visuais antigas removidas devem voltar somente pelo pipeline atual e pelo gate de validação correspondente.
 
 ## Regra para novos assets

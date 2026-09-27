@@ -1727,6 +1727,7 @@ int main() {
             case 2: return "citizen_female_dark_coral";
             case 3: return "visitor_male_01_forge_preview";
             case 4: return "visitor_male_01_south_front_candidate";
+            case 5: return "visitor_male_01_full_pose_east_candidate";
             default: return "worker_cleaner_female";
         }
     };
@@ -1736,6 +1737,7 @@ int main() {
             case 2: return "CITIZEN DARK CORAL";
             case 3: return "VISITOR FORGE PREVIEW";
             case 4: return "VISITOR FOUR DIRECTION GAIT";
+            case 5: return "VISITOR FULL POSE EAST";
             default: return "CLEANER";
         }
     };
@@ -1760,7 +1762,7 @@ int main() {
         const PedestrianVisualDefinition preset = pedestrian_visual_preset(speed);
         const char* preset_name = mixamo_gait_preset_index == 0 ? "A 0.50" : mixamo_gait_preset_index == 1 ? "B 0.65" : "C 0.80";
         const bool visitor_preview = pedestrian_visual_index >= 3;
-        const int duration_ms = visitor_preview ? 220 : 175;
+        const int duration_ms = pedestrian_visual_index == 5 ? 270 : visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
         constexpr int kRequiredSidewalkTiles = 6;
         const PedestrianLaneNavigationNetwork network{roads};
@@ -3182,12 +3184,12 @@ int main() {
                         break;
                     case SDL_SCANCODE_F8: {
                         const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
-                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 : 5;
+                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :
+                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 : 6;
                         pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
-                        // Two short walk frames per direction, 220 ms each.
-                        // Keep this opt-in candidate slow enough for the feet
-                        // to read against world movement.
-                        const float preview_speed = pedestrian_visual_index == 4 ? 0.30F : 0.80F;
+                        // Keep review candidates slow enough for each contact
+                        // pose to read against world movement.
+                        const float preview_speed = pedestrian_visual_index >= 4 ? 0.30F : 0.80F;
                         pedestrians.configure_visual_test(pedestrian_visual_preset(preview_speed));
                         status = std::string("PEDESTRIAN LOOK: ") + std::string(pedestrian_visual_label());
                         break;
