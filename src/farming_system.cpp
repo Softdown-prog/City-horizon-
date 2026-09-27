@@ -38,7 +38,9 @@ std::vector<std::string> string_array(const std::string& json, std::string_view 
 }
 
 bool CropCatalog::load_from_directory(const std::filesystem::path& directory) {
-    definitions_.clear(); std::error_code error;
+    definitions_.clear();
+    definition_indices_.clear();
+    std::error_code error;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(directory, error)) {
         if (error || !entry.is_regular_file() || entry.path().extension() != ".json") continue;
         const std::string json = read_file(entry.path()); CropDefinition crop;
@@ -72,13 +74,19 @@ bool CropCatalog::load_from_directory(const std::filesystem::path& directory) {
              crop.overlay_scale > 0.0F && crop.overlay_scale <= 1.0F);
         if (!crop.id.empty() && crop.stage_count() > 0 && declared_stages == crop.stage_count() &&
             crop.growth_days_total > 0 && crop.harvest_yield > 0 && !crop.harvest_resource_id.empty() &&
-            (crop.harvest_behavior == "return_to_prepared_soil" || crop.harvest_behavior == "regrow") && valid_overlay_layout) {
+            (crop.harvest_behavior == "return_to_prepared_soil" || crop.harvest_behavior == "regrow") && valid_overlay_layout &&
+            !definition_indices_.contains(crop.id)) {
+            const std::size_t index = definitions_.size();
             definitions_.push_back(std::move(crop));
+            definition_indices_.emplace(definitions_.back().id, index);
         }
     }
     return !definitions_.empty();
 }
-const CropDefinition* CropCatalog::find(std::string_view id) const { for (const auto& crop : definitions_) if (crop.id == id) return &crop; return nullptr; }
+const CropDefinition* CropCatalog::find(std::string_view id) const {
+    const auto found = definition_indices_.find(std::string(id));
+    return found == definition_indices_.end() ? nullptr : &definitions_[found->second];
+}
 const std::vector<CropDefinition>& CropCatalog::definitions() const { return definitions_; }
 
 FarmingSystem::FarmingSystem(int map_min, int map_max) : min_(map_min), max_(map_max) {}
