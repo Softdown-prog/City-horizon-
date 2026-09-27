@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <optional>
 
 namespace ch {
 
@@ -45,96 +46,65 @@ std::optional<bool> get_json_bool(const std::string_view json, const std::string
     }
     return std::nullopt;
 }
-} // namespace
 
-const TerrainSemanticsCatalog& TerrainSemanticsCatalog::global_instance() {
-    if (!g_has_global) {
-        // Pre-populate built-in default definitions for safety
-        TerrainSemanticsDefinition grass;
-        grass.id = "grass"; grass.surface = "grass"; grass.buildable = true; grass.water = false; grass.pedestrian_traversable = true; grass.navigation_type = "none";
-        g_global_catalog.catalog_["grass"] = grass;
+}  // namespace
 
-        TerrainSemanticsDefinition cement;
-        cement.id = "cement_path"; cement.surface = "sidewalk"; cement.buildable = false; cement.water = false; cement.pedestrian_traversable = true; cement.navigation_type = "pedestrian";
-        g_global_catalog.catalog_["cement_path"] = cement;
+bool TerrainSemanticsCatalog::load_manifest(const std::filesystem::path& manifest_path) {
+    std::ifstream file(manifest_path, std::ios::binary);
+    if (!file) return false;
+    std::ostringstream stream;
+    stream << file.rdbuf();
+    const std::string content = stream.str();
+    if (content.empty()) return false;
 
-        TerrainSemanticsDefinition sand_c;
-        sand_c.id = "sand_center"; sand_c.surface = "sand"; sand_c.buildable = true; sand_c.water = false; sand_c.pedestrian_traversable = true; sand_c.navigation_type = "none";
-        g_global_catalog.catalog_["sand_center"] = sand_c;
+    definitions_.clear();
 
-        TerrainSemanticsDefinition sand_w;
-        sand_w.id = "sand_wet"; sand_w.surface = "sand"; sand_w.buildable = true; sand_w.water = false; sand_w.pedestrian_traversable = true; sand_w.navigation_type = "none";
-        g_global_catalog.catalog_["sand_wet"] = sand_w;
+    const std::string object_token = "\"id\"";
+    std::size_t cursor = 0;
+    while ((cursor = content.find(object_token, cursor)) != std::string::npos) {
+        const auto object_start = content.rfind('{', cursor);
+        if (object_start == std::string::npos) break;
+        const auto object_end = content.find('}', cursor);
+        if (object_end == std::string::npos) break;
 
-        TerrainSemanticsDefinition o_s;
-        o_s.id = "ocean_shallow"; o_s.surface = "water"; o_s.buildable = false; o_s.water = true; o_s.pedestrian_traversable = false; o_s.navigation_type = "water";
-        g_global_catalog.catalog_["ocean_shallow"] = o_s;
-
-        TerrainSemanticsDefinition o_d;
-        o_d.id = "ocean_deep"; o_d.surface = "water"; o_d.buildable = false; o_d.water = true; o_d.pedestrian_traversable = false; o_d.navigation_type = "water";
-        g_global_catalog.catalog_["ocean_deep"] = o_d;
-
-        g_has_global = true;
+        const std::string_view object{content.data() + object_start, object_end - object_start + 1};
+        const auto id = get_json_string(object, "id");
+        if (id && !id->empty()) {
+            TerrainSemanticDefinition definition;
+            definition.id = *id;
+            definition.category = get_json_string(object, "category").value_or("");
+            definition.material = get_json_string(object, "material").value_or("");
+            definition.buildable = get_json_bool(object, "buildable").value_or(false);
+            definition.walkable = get_json_bool(object, "walkable").value_or(false);
+            definition.drivable = get_json_bool(object, "drivable").value_or(false);
+            definitions_[definition.id] = std::move(definition);
+        }
+        cursor = object_end + 1;
     }
-    return g_global_catalog;
+
+    const bool success = !definitions_.empty();
+    if (!success) {
+        std::cerr << "Terrain semantics catalog loaded no definitions from " << manifest_path << '\n';
+    }
+    return success;
 }
 
-void TerrainSemanticsCatalog::set_global_instance(const TerrainSemanticsCatalog& catalog) {
-    g_global_catalog = catalog;
+const TerrainSemanticDefinition* TerrainSemanticsCatalog::find(const std::string_view id) const {
+    const auto found = definitions_.find(std::string(id));
+    return found == definitions_.end() ? nullptr : &found->second;
+}
+
+bool TerrainSemanticsCatalog::has(const std::string_view id) const {
+    return find(id) != nullptr;
+}
+
+void set_global_terrain_semantics_catalog(TerrainSemanticsCatalog catalog) {
+    g_global_catalog = std::move(catalog);
     g_has_global = true;
 }
 
-bool TerrainSemanticsCatalog::load_manifest(const std::filesystem::path& manifest_path) {
-    if (!std::filesystem::exists(manifest_path)) return false;
-
-    try {
-        std::ifstream file(manifest_path, std::ios::in | std::ios::binary);
-        if (!file.is_open()) return false;
-
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        const std::string content = ss.str();
-
-        auto contract_opt = get_json_string(content, "contract");
-        if (!contract_opt || *contract_opt != "CH_TERRAIN_SEMANTICS_V1") return false;
-
-        // Parse definitions block
-        std::vector<std::string> known_ids = {
-            "grass", "cement_path", "sand_center", "sand_wet", "ocean_shallow", "ocean_deep"
-        };
-
-        for (const auto& id : known_ids) {
-            auto pos = content.find("\"" + id + "\"");
-            if (pos != std::string::npos) {
-                auto block_start = content.find('{', pos);
-                auto block_end = content.find('}', block_start);
-                if (block_start != std::string::npos && block_end != std::string::npos) {
-                    const std::string_view sub = std::string_view(content).substr(block_start, block_end - block_start + 1);
-                    TerrainSemanticsDefinition def;
-                    def.contract = *contract_opt;
-                    def.id = id;
-                    def.surface = get_json_string(sub, "surface").value_or("grass");
-                    def.buildable = get_json_bool(sub, "buildable").value_or(false);
-                    def.water = get_json_bool(sub, "water").value_or(false);
-                    def.pedestrian_traversable = get_json_bool(sub, "pedestrianTraversable").value_or(false);
-                    def.navigation_type = get_json_string(sub, "navigationType").value_or("none");
-
-                    catalog_[id] = def;
-                }
-            }
-        }
-        return true;
-    } catch (...) {
-        return false;
-    }
+const TerrainSemanticsCatalog* global_terrain_semantics_catalog() {
+    return g_has_global ? &g_global_catalog : nullptr;
 }
 
-const TerrainSemanticsDefinition* TerrainSemanticsCatalog::find(const std::string& terrain_def_id) const {
-    auto it = catalog_.find(terrain_def_id);
-    if (it != catalog_.end()) {
-        return &it->second;
-    }
-    return nullptr;
-}
-
-} // namespace ch
+}  // namespace ch
