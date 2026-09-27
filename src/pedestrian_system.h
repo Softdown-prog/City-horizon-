@@ -88,6 +88,9 @@ public:
     [[nodiscard]] bool spend_monthly_budget(std::uint64_t pedestrian_id, std::int64_t cents);
     [[nodiscard]] std::int64_t monthly_budget_cents(std::uint64_t pedestrian_id) const;
     void reset_monthly_budgets();
+    // Observe the game calendar once from any runtime call site. The system owns
+    // the last-seen month/year, so multiple render paths cannot reset a budget twice.
+    void sync_monthly_budget_cycle(int month, int year);
 
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
@@ -106,5 +109,7 @@ private:
     PedestrianVisualDefinition visual_definition_;
     std::vector<PedestrianInstance> instances_;
     std::uint64_t next_id_ = 1;
+    int budget_month_ = 0;
+    int budget_year_ = 0;
     std::mt19937 clothing_rng_{std::random_device{}()};
 };
