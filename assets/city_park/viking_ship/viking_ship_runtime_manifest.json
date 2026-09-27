@@ -50,10 +50,21 @@
     "motionParent": "SwingPivot",
     "geometryParent": "BoatRoot",
     "reviewRevision": "V15",
+    "reviewWorkflowRun": 36350851439,
+    "humanReviewed": true,
+    "approvedProxySha256": "c92f1feac2c816599edfac0bf00aa1a645389b7cca86f3350b6b73bd9d33e89b",
     "runtimeSeatBindingReady": true,
     "runtimePromoted": false
   },
+  "swingReview": {
+    "contract": "CH_VIKING_SWING_CH_ACTOR_PASSENGER_PROXY_V1",
+    "frameCount": 12,
+    "fps": 8,
+    "amplitudeDegrees": 35.0,
+    "humanReviewed": true,
+    "approvedProxySha256": "c92f1feac2c816599edfac0bf00aa1a645389b7cca86f3350b6b73bd9d33e89b"
+  },
   "swingFramesBaked": false,
   "animationPending": true,
-  "status": "runtime_static_registered_v15_real_rider_seat_binding_ready_visual_promotion_pending"
+  "status": "runtime_static_registered_v15_passenger_swing_human_approved_final_bake_pending"
 }
