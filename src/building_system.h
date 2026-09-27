@@ -124,6 +124,19 @@ struct BuildingResourceInput {
     std::int64_t local_supply_bonus = 0;
 };
 
+// CH_CITIZEN_NEEDS_V1. A service may satisfy one or more citizen needs after a
+// completed visit. Zero leaves a need unchanged; positive values add points and
+// are clamped by PedestrianSystem to its 0..100 range.
+struct BuildingNeedsEffect {
+    float hunger = 0.0F;
+    float thirst = 0.0F;
+    float fun = 0.0F;
+
+    [[nodiscard]] bool any() const noexcept {
+        return hunger > 0.0F || thirst > 0.0F || fun > 0.0F;
+    }
+};
+
 struct BuildingLevelDefinition {
     int level = 1;
     std::int64_t upgrade_cost = 0;
@@ -232,6 +245,9 @@ struct BuildingDefinition {
     // service_population_for_full_demand. These values keep shop balancing data-driven.
     std::uint32_t base_service_customers_per_month = 0;
     std::uint32_t service_population_for_full_demand = 0;
+    // Data-driven citizen need restoration. Future stores/attractions only need
+    // to author needsEffect in JSON; the decision/runtime code remains generic.
+    BuildingNeedsEffect needs_effect;
     // Zero for non-residential definitions. Capacity is owned by the
     // PopulationSystem; it does not determine property-tax revenue.
     std::uint32_t residential_capacity = 0;
@@ -363,35 +379,34 @@ public:
     void set_next_instance_id(std::uint64_t next_instance_id);
     [[nodiscard]] std::uint64_t next_instance_id() const;
     [[nodiscard]] const BuildingInstance* find_by_id(std::uint64_t instance_id) const;
+    [[nodiscard]] BuildingInstance* find_by_id(std::uint64_t instance_id);
     [[nodiscard]] const BuildingInstance* instance_at(int tile_x, int tile_y) const;
     [[nodiscard]] bool is_occupied(int tile_x, int tile_y) const;
+    [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
     [[nodiscard]] bool remove_instance(const BuildingDefinition& definition, std::uint64_t instance_id);
-    [[nodiscard]] bool set_operational(std::uint64_t instance_id, bool operational);
     [[nodiscard]] bool begin_activity(std::uint64_t instance_id);
     [[nodiscard]] bool end_activity(std::uint64_t instance_id);
     [[nodiscard]] bool set_service_price(std::uint64_t instance_id, const BuildingDefinition& definition,
-                                         std::int64_t service_price);
-    [[nodiscard]] bool set_color_customization(std::uint64_t instance_id, BuildingColorTint wall, BuildingColorTint roof);
-    [[nodiscard]] bool set_wall_color_customization(std::uint64_t instance_id, BuildingColorTint wall);
-    [[nodiscard]] bool set_roof_color_customization(std::uint64_t instance_id, BuildingColorTint roof);
-    [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id);
-    std::size_t set_operational_by_definition(std::string_view definition_id, bool operational);
-    [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
+                                         std::int64_t price);
+    [[nodiscard]] bool set_wall_color(std::uint64_t instance_id, BuildingColorTint tint);
+    [[nodiscard]] bool set_roof_color(std::uint64_t instance_id, BuildingColorTint tint);
+    [[nodiscard]] bool clear_wall_color(std::uint64_t instance_id);
+    [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);
+    [[nodiscard]] bool link_ticket_booth(std::uint64_t booth_instance_id, std::uint64_t attraction_instance_id);
     [[nodiscard]] std::optional<std::uint64_t> linked_attraction_for_ticket_booth(std::uint64_t booth_instance_id) const;
     [[nodiscard]] std::optional<std::uint64_t> linked_ticket_booth_for_attraction(std::uint64_t attraction_instance_id) const;
 
 private:
-    void refresh_ticket_booth_links();
-    [[nodiscard]] bool is_inside_map(int tile_x, int tile_y) const;
     [[nodiscard]] int tile_key(int tile_x, int tile_y) const;
+    void occupy_footprint(const BuildingDefinition& definition, const BuildingInstance& instance);
+    void release_footprint(const BuildingDefinition& definition, const BuildingInstance& instance);
+    [[nodiscard]] bool restore_ticket_link(std::uint64_t booth_instance_id, std::uint64_t attraction_instance_id);
 
     int map_min_;
     int map_max_;
     std::uint64_t next_instance_id_ = 1;
     std::vector<BuildingInstance> instances_;
-    std::unordered_map<int, std::uint64_t> occupancy_;
-    std::unordered_set<std::uint64_t> ticket_required_instances_;
-    std::unordered_set<std::uint64_t> ticket_booth_instances_;
+    std::unordered_map<int, std::uint64_t> occupied_tiles_;
     std::unordered_map<std::uint64_t, std::uint64_t> ticket_booth_to_attraction_;
     std::unordered_map<std::uint64_t, std::uint64_t> attraction_to_ticket_booth_;
 };
