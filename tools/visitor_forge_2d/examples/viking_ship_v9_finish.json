@@ -1,0 +1,28 @@
+{
+  "contract": "CH_2D_RENDER_FINISH_V1",
+  "id": "attraction.park_viking_ship.01.v9_finish",
+  "minimumInputDimensionPx": 1280,
+  "finish": {
+    "color": 1.08,
+    "contrast": 1.05,
+    "sharpness": 1.10,
+    "unsharpRadius": 1.10,
+    "unsharpPercent": 32,
+    "unsharpThreshold": 2,
+    "edgeGuardLowAlpha": 18,
+    "edgeGuardHighAlpha": 150
+  },
+  "review": {
+    "cellWidth": 640,
+    "cellHeight": 640
+  },
+  "constraints": {
+    "preserveCanvas": true,
+    "preserveAlphaExactly": true,
+    "preserveSilhouette": true,
+    "preserveCamera": true,
+    "preserveFootprint": true,
+    "preserveClearance": true,
+    "noBackgroundPainting": true
+  }
+}
