@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "amusement_ride_contract.h"
 #include "building_system.h"
 #include "pedestrian_system.h"
 
@@ -19,9 +20,6 @@ namespace ch::building_visit_runtime {
 constexpr Uint64 kDoorAlignMs = 180;
 constexpr Uint64 kTicketServiceMs = 450;
 constexpr Uint64 kVisitorDwellMs = 3000;
-constexpr Uint64 kRideBoardingWindowMs = 2500;
-constexpr Uint64 kRideCycleMs = 3000;
-constexpr std::uint32_t kVikingShipCapacity = 20;
 
 enum class VisitPhase : std::uint8_t {
     ticket_approaching,
@@ -91,12 +89,14 @@ struct RideQueueState {
     return runtime_queues;
 }
 
+[[nodiscard]] inline const ch::amusement_ride::RuntimeDefinition* managed_ride_definition(
+    const BuildingDefinition& definition) {
+    return ch::amusement_ride::find(definition);
+}
+
 [[nodiscard]] inline std::uint32_t managed_ride_capacity(const BuildingDefinition& definition) {
-    // The Viking definition already freezes rideCapacity=20 in JSON. Until the
-    // generic BuildingDefinition schema promotes that field, keep the runtime
-    // gate intentionally narrow rather than accidentally assigning capacities
-    // to unrelated ticketed attractions.
-    return definition.id == "viking_ship_01" ? kVikingShipCapacity : 0U;
+    const ch::amusement_ride::RuntimeDefinition* ride = managed_ride_definition(definition);
+    return ride == nullptr ? 0U : std::min(ride->capacity, ride->seat_count);
 }
 
 [[nodiscard]] inline std::pair<int, int> access_offset(const GridDirection direction) {
@@ -387,9 +387,12 @@ inline void sync_managed_rides(PedestrianSystem& pedestrians, BuildingManager& b
         RideQueueState& queue = iterator->second;
         const BuildingInstance* ride = buildings.find_by_id(ride_id);
         const BuildingDefinition* definition = ride == nullptr ? nullptr : catalog.find(ride->definition_id);
-        const std::uint32_t capacity = definition == nullptr ? 0U : managed_ride_capacity(*definition);
+        const ch::amusement_ride::RuntimeDefinition* ride_definition =
+            definition == nullptr ? nullptr : managed_ride_definition(*definition);
+        const std::uint32_t capacity = ride_definition == nullptr
+            ? 0U : std::min(ride_definition->capacity, ride_definition->seat_count);
 
-        if (ride == nullptr || definition == nullptr || capacity == 0U) {
+        if (ride == nullptr || definition == nullptr || ride_definition == nullptr || capacity == 0U) {
             for (const std::uint64_t pedestrian_id : queue.waiting) {
                 if (auto found = states().find(pedestrian_id); found != states().end()) {
                     (void)pedestrians.set_visiting(pedestrian_id, false);
@@ -420,7 +423,7 @@ inline void sync_managed_rides(PedestrianSystem& pedestrians, BuildingManager& b
 
         if (!queue.riding.empty()) {
             if (simulation_running) queue.cycle_elapsed_ms += delta;
-            if (queue.cycle_elapsed_ms >= kRideCycleMs)
+            if (queue.cycle_elapsed_ms >= static_cast<Uint64>(ride_definition->cycle_duration_ms))
                 finish_managed_ride_batch(ride_id, queue, pedestrians, buildings, catalog, now);
             ++iterator;
             continue;
@@ -434,7 +437,7 @@ inline void sync_managed_rides(PedestrianSystem& pedestrians, BuildingManager& b
 
         if (simulation_running) queue.boarding_elapsed_ms += delta;
         const bool dispatch = queue.waiting.size() >= static_cast<std::size_t>(capacity) ||
-                              queue.boarding_elapsed_ms >= kRideBoardingWindowMs;
+                              queue.boarding_elapsed_ms >= static_cast<Uint64>(ride_definition->boarding_timeout_ms);
         if (!dispatch) {
             ++iterator;
             continue;
