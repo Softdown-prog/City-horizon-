@@ -58,5 +58,15 @@
       "2": "assets/buildings/mini_market/mini_market_north_mask.png",
       "3": "assets/buildings/mini_market/mini_market_east_mask.png"
     }
+  },
+  "activityOverlay": {
+    "contract": "CH_BUILDING_ACTIVITY_OVERLAY_V1",
+    "enabled": true,
+    "sprites": {
+      "0": "assets/buildings/mini_market/mini_market_activity_south.png",
+      "1": "assets/buildings/mini_market/mini_market_activity_west.png",
+      "2": "assets/buildings/mini_market/mini_market_activity_north.png",
+      "3": "assets/buildings/mini_market/mini_market_activity_east.png"
+    }
   }
 }
