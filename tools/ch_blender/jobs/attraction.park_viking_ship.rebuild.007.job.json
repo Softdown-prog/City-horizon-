@@ -5,7 +5,7 @@
   "script": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v7_curved_guarded.py",
   "qualityStage": "proxy",
   "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
-  "requestTag": "render-user-request-2026-09-27-curved-longship-v7",
+  "requestTag": "render-user-request-2026-09-27-curved-longship-v7-retry-parametric-fix",
   "args": [
     "--recipe",
     "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.rebuild_v5.json",
