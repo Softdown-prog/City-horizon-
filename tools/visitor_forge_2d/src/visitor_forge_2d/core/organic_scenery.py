@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse, hashlib, json, math, random
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops
 
 CONTRACT='CH_2D_ORGANIC_SCENERY_V1'
 CAMERA_CONTRACT='CH_CAMERA_V1'
@@ -19,18 +19,43 @@ def _alpha_safe_resize(im,size):
     except (ValueError,OSError): return rgba.resize(size,Image.Resampling.LANCZOS)
 
 def _paint(mask, top, bottom, right_shade=0.0, highlight=None):
-    w,h=mask.size; a=_hex(top); b=_hex(bottom)
-    surf=Image.new('RGBA',(w,h)); pix=surf.load()
-    for y in range(h):
-        ty=y/max(1,h-1)
-        for x in range(w):
-            tx=x/max(1,w-1); base=[_lerp(a[c],b[c],ty) for c in range(3)]
-            shade=1-right_shade*tx
-            glow=0
-            if highlight:
-                hx,hy,r,s=highlight; d=math.hypot(tx-hx,ty-hy); glow=max(0,1-d/r)*s
-            pix[x,y]=(*(max(0,min(255,round(v*shade+255*glow))) for v in base),0)
-    surf.putalpha(mask); return surf
+    w, h = mask.size
+    a, b = _hex(top), _hex(bottom)
+    
+    # 1. Vertical gradient top -> bottom
+    grad = Image.new('L', (1, h))
+    grad.putdata([round(y / max(1, h-1) * 255) for y in range(h)])
+    grad = grad.resize((w, h))
+    surf = Image.composite(Image.new('RGB', (w, h), b), Image.new('RGB', (w, h), a), grad).convert('RGBA')
+    
+    # 2. Right horizontal shade
+    if right_shade > 0:
+        hgrad = Image.new('L', (w, 1))
+        hgrad.putdata([round(255 * (1.0 - right_shade * (x / max(1, w-1)))) for x in range(w)])
+        hgrad = hgrad.resize((w, h))
+        r, g, b_ch, a_ch = surf.split()
+        r = ImageChops.multiply(r, hgrad)
+        g = ImageChops.multiply(g, hgrad)
+        b_ch = ImageChops.multiply(b_ch, hgrad)
+        surf = Image.merge('RGBA', (r, g, b_ch, a_ch))
+        
+    # 3. Highlight radial glow
+    if highlight:
+        hx, hy, r_fac, s = highlight
+        glow_img = Image.new('L', (w, h), 0)
+        draw_glow = ImageDraw.Draw(glow_img)
+        cx, cy = round(hx * w), round(hy * h)
+        radius = round(r_fac * max(w, h))
+        draw_glow.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=round(s * 255))
+        glow_img = glow_img.filter(ImageFilter.GaussianBlur(max(1.0, radius * 0.4)))
+        r, g, b_ch, a_ch = surf.split()
+        r = ImageChops.add(r, glow_img)
+        g = ImageChops.add(g, glow_img)
+        b_ch = ImageChops.add(b_ch, glow_img)
+        surf = Image.merge('RGBA', (r, g, b_ch, a_ch))
+        
+    surf.putalpha(mask)
+    return surf
 
 def _composite(work,mask,top,bottom,**kw):
     work.alpha_composite(_paint(mask,top,bottom,kw.get('right_shade',0),kw.get('highlight')))
@@ -74,7 +99,7 @@ def _branch(mask,rng,root,tip,width,droop,side,density=7,fill=255,tuft_strength=
 
 def _crown_masks(recipe,rng,W,H):
     """Build a dense conifer crown from overlapping branch fans rather than shelves."""
-    tiers=recipe['tiers']; cx=float(recipe.get('crownCx',recipe.get('anchor',[96,239])[0]))
+    tiers=recipe['tiers']; cx=recipe.get('crownCx', 96)
     back=Image.new('L',(W,H)); mid=Image.new('L',(W,H)); front=Image.new('L',(W,H)); core=Image.new('L',(W,H))
     for t in tiers:
         y=float(t['y']); span=float(t['span']); thick=float(t['thickness']); skew=float(t.get('skew',0))
@@ -107,25 +132,7 @@ def _crown_masks(recipe,rng,W,H):
 
 
 def _crown_masks_broadleaf(recipe, rng, W, H):
-    """Build a rounded deciduous canopy from layered irregular blobs.
-
-    Broadleaf trees have a wide, roughly spherical crown rather than a spire.
-    The algorithm places three depth layers (back / mid / front) of overlapping
-    organic blobs whose size, position and slight vertical offset vary with each
-    tier entry in the recipe.  The same raster-texture passes used for conifers
-    are reused unchanged on the output masks, so a single colour palette can
-    describe both species.
-
-    Recipe tier fields for broadleaf:
-      y          -- vertical centre of this cluster (canvas pixels)
-      span       -- half-width of the cluster (canvas pixels)
-      thickness  -- vertical radius of the cluster (canvas pixels)
-      skew       -- horizontal shift of the cluster centre (canvas pixels, optional)
-      lobes      -- polygon vertex count for _irregular_blob; higher = rounder
-                    (optional, default 20)
-
-    A recipe may also set crownCx (canvas x of the trunk centre, default 96).
-    """
+    """Build a rounded deciduous canopy from layered irregular blobs."""
     tiers = recipe['tiers']
     cx = float(recipe.get('crownCx', 96))
     back  = Image.new('L', (W, H))
@@ -186,11 +193,10 @@ def _scatter_texture(layer,rng,mask,color,count,alpha_range=(12,36),size_range=(
     bbox=mask.getbbox()
     if not bbox: return
     draw=ImageDraw.Draw(layer,'RGBA'); mp=mask.load(); col=_hex(color)
+    coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if mp[x,y] > 120]
+    if not coords: return
     for _ in range(count):
-        for _try in range(20):
-            x=rng.randrange(bbox[0],bbox[2]); y=rng.randrange(bbox[1],bbox[3])
-            if mp[x,y] > 120: break
-        else: continue
+        x, y = rng.choice(coords)
         r=rng.uniform(*size_range)*WORK_SCALE; a=rng.randint(*alpha_range)
         dx=rng.uniform(-.4,.2)*r; dy=rng.uniform(-.2,.35)*r
         draw.ellipse((x-r*elongate+dx,y-r*.38+dy,x+r*.35+dx,y+r*.38+dy),fill=(*col,a))
@@ -203,27 +209,70 @@ def _final_raster_pass(frame,rng,pal,recipe):
     dark=_hex(pal.get('occlusion','#123B30')); light=_hex(pal['highlight'])
     cfg=recipe.get('raster',{})
     grain=int(cfg.get('finalGrain',620)); needles=int(cfg.get('finalNeedles',300))
-    for _ in range(grain):
-        for _try in range(20):
-            x=rng.randrange(bbox[0],bbox[2]); y=rng.randrange(bbox[1],bbox[3])
-            if px[x,y]>170: break
-        else: continue
-        if rng.random()<.58:
-            c=dark; a=rng.randint(12,28)
-        else:
-            c=light; a=rng.randint(9,24)
-        if rng.random()<.72:
-            draw.point((x,y),fill=(*c,a))
-        else:
-            draw.line((x,y,x-rng.choice([1,2]),y+rng.choice([0,1])),fill=(*c,a),width=1)
-    for _ in range(needles):
-        for _try in range(20):
-            x=rng.randrange(bbox[0],bbox[2]); y=rng.randrange(bbox[1],bbox[3])
-            if px[x,y]>190: break
-        else: continue
-        length=rng.choice([2,2,3,3,4]); c=light if rng.random()<.58 else dark; a=rng.randint(18,48)
-        draw.line((x,y,x-length,y+rng.choice([0,0,1])),fill=(*c,a),width=1)
+    
+    grain_coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if px[x,y] > 170]
+    if grain_coords:
+        for _ in range(grain):
+            x, y = rng.choice(grain_coords)
+            if rng.random()<.58:
+                c=dark; a=rng.randint(12,28)
+            else:
+                c=light; a=rng.randint(9,24)
+            if rng.random()<.72:
+                draw.point((x,y),fill=(*c,a))
+            else:
+                draw.line((x,y,x-rng.choice([1,2]),y+rng.choice([0,1])),fill=(*c,a),width=1)
+                
+    needle_coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if px[x,y] > 190]
+    if needle_coords:
+        for _ in range(needles):
+            x, y = rng.choice(needle_coords)
+            length=rng.choice([2,2,3,3,4]); c=light if rng.random()<.58 else dark; a=rng.randint(18,48)
+            draw.line((x,y,x-length,y+rng.choice([0,0,1])),fill=(*c,a),width=1)
+            
     return out.filter(ImageFilter.UnsharpMask(radius=.65,percent=115,threshold=3))
+
+def _draw_trunk_and_bark(work, recipe, pal, W, H):
+    """Draw main trunk and any forked primary branches."""
+    anchor = recipe.get('anchor', [96, 239])
+    base_x, base_y = anchor[0], anchor[1]
+    
+    trunk = Image.new('L', (W, H))
+    branches = recipe.get('trunkBranches', None)
+    
+    if branches:
+        for b in branches:
+            p0 = tuple(b["p0"])
+            p1 = tuple(b.get("p1", p0))
+            p2 = tuple(b["p2"])
+            w0 = float(b.get("w0", 8.0))
+            w1 = float(b.get("w1", 4.0))
+            _tapered_stroke(trunk, p0, p1, p2, w0, w1, samples=44, fill=255)
+    else:
+        # Single tapered default trunk
+        d = ImageDraw.Draw(trunk)
+        tw = float(recipe.get('trunkWidth', 20.0))
+        top_y = float(recipe.get('trunkTopY', 120.0))
+        bot_y = float(base_y)
+        cx = float(base_x)
+        d.polygon([
+            ((cx - tw * 0.45) * WORK_SCALE, top_y * WORK_SCALE),
+            ((cx + tw * 0.45) * WORK_SCALE, (top_y + 2) * WORK_SCALE),
+            ((cx + tw * 0.55) * WORK_SCALE, bot_y * WORK_SCALE),
+            ((cx - tw * 0.55) * WORK_SCALE, bot_y * WORK_SCALE)
+        ], fill=255)
+
+    _composite(work, trunk, pal['trunk_top'], pal['trunk_bottom'], right_shade=.22, highlight=(.41,.48,.28,.15))
+    
+    # Bark highlight lines
+    bark = Image.new('RGBA', (W, H))
+    bd = ImageDraw.Draw(bark, 'RGBA')
+    tc = _hex(pal.get('trunk_light', '#DCA066'))
+    for xo in [-4, 0, 4]:
+        bd.line(((base_x + xo) * WORK_SCALE, (base_y - 70) * WORK_SCALE,
+                 (base_x + xo - 1) * WORK_SCALE, (base_y - 8) * WORK_SCALE),
+                fill=(*tc, 70), width=round(1.8 * WORK_SCALE))
+    work.alpha_composite(bark)
 
 def render(recipe):
     if recipe.get('contract')!=CONTRACT: raise ValueError(f'recipe must declare {CONTRACT}')
@@ -231,24 +280,19 @@ def render(recipe):
     if recipe['camera'].get('tile')!=[128,64]: raise ValueError('CH_CAMERA_V1 review requires 128x64 tile')
     canvas=recipe.get('canvas',[192,256]); anchor=recipe.get('anchor',[96,239]); seed=int(recipe.get('seed',1)); rng=random.Random(seed)
     W,H=canvas[0]*WORK_SCALE,canvas[1]*WORK_SCALE; pal=recipe['palette']; work=Image.new('RGBA',(W,H))
-    cx=float(recipe.get('crownCx',anchor[0])); base_y=float(anchor[1])
-    trunk_cfg=recipe.get('trunk',{})
-    trunk_top=float(trunk_cfg.get('topY',119))
-    trunk_top_width=float(trunk_cfg.get('topWidth',21))
-    trunk_base_width=float(trunk_cfg.get('baseWidth',14))
-    shadow_cfg=recipe.get('shadow',{})
-    shadow_width=float(shadow_cfg.get('width',94))
-    shadow_height=float(shadow_cfg.get('height',14))
-    shadow_cy=base_y-2
-    sm=Image.new('L',(W,H)); ImageDraw.Draw(sm).ellipse(((cx-shadow_width/2)*WORK_SCALE,(shadow_cy-shadow_height/2)*WORK_SCALE,(cx+shadow_width/2)*WORK_SCALE,(shadow_cy+shadow_height/2)*WORK_SCALE),fill=145); sm=sm.filter(ImageFilter.GaussianBlur(2.4*WORK_SCALE))
+    
+    # Ground shadow
+    sm=Image.new('L',(W,H))
+    sw = recipe.get('shadowWidth', 94)
+    ImageDraw.Draw(sm).ellipse(((anchor[0] - sw//2)*WORK_SCALE, (anchor[1] - 9)*WORK_SCALE,
+                                (anchor[0] + sw//2)*WORK_SCALE, (anchor[1] + 5)*WORK_SCALE), fill=145)
+    sm=sm.filter(ImageFilter.GaussianBlur(2.4*WORK_SCALE))
     sh=Image.new('RGBA',(W,H),(*_hex(pal['ground_shadow']),0)); sh.putalpha(sm); work.alpha_composite(sh)
-    trunk=Image.new('L',(W,H)); d=ImageDraw.Draw(trunk); d.polygon([((cx-trunk_top_width/2)*WORK_SCALE,trunk_top*WORK_SCALE),((cx+trunk_top_width/2)*WORK_SCALE,(trunk_top+2)*WORK_SCALE),((cx+trunk_base_width/2)*WORK_SCALE,base_y*WORK_SCALE),((cx-trunk_base_width/2)*WORK_SCALE,base_y*WORK_SCALE)],fill=255)
-    _composite(work,trunk,pal['trunk_top'],pal['trunk_bottom'],right_shade=.19,highlight=(.41,.48,.28,.12))
-    bark=Image.new('RGBA',(W,H)); bd=ImageDraw.Draw(bark,'RGBA'); tc=_hex(pal.get('trunk_light','#DCA066'))
-    trunk_length=base_y-trunk_top
-    for xo,start,end in [(-.28,.39,.93),(.07,.23,.84),(.35,.58,.94)]:
-        bd.line(((cx+xo*trunk_base_width)*WORK_SCALE,(trunk_top+start*trunk_length)*WORK_SCALE,(cx+xo*trunk_base_width-1)*WORK_SCALE,(trunk_top+end*trunk_length)*WORK_SCALE),fill=(*tc,76),width=2*WORK_SCALE)
-    work.alpha_composite(bark)
+    
+    # Trunk & branches
+    _draw_trunk_and_bark(work, recipe, pal, W, H)
+    
+    # Crown foliage layers
     crown_style = recipe.get('crownStyle', 'conifer')
     if crown_style == 'broadleaf':
         back, core, mid, front = _crown_masks_broadleaf(recipe, rng, W, H)
@@ -266,13 +310,12 @@ def render(recipe):
     mp=mask.load(); bbox=mask.getbbox(); hcol=_hex(pal['highlight']); scol=_hex(pal.get('occlusion','#123B30'))
     count=int(recipe.get('raster',{}).get('needleStrokes',500))
     if bbox:
-        for _ in range(count):
-            for _try in range(18):
-                x=rng.randrange(bbox[0],bbox[2]); y=rng.randrange(bbox[1],bbox[3])
-                if mp[x,y]>100: break
-            else: continue
-            lx=rng.uniform(2.5,7.0)*WORK_SCALE; c=hcol if rng.random()<.55 else scol; a=rng.randint(18,62)
-            dd.line((x,y,x-lx,y+rng.uniform(-.4,.8)*WORK_SCALE),fill=(*c,a),width=max(1,round(rng.uniform(.3,.7)*WORK_SCALE)))
+        coords = [(x,y) for y in range(bbox[1],bbox[3]) for x in range(bbox[0],bbox[2]) if mp[x,y] > 100]
+        if coords:
+            for _ in range(count):
+                x, y = rng.choice(coords)
+                lx=rng.uniform(2.5,7.0)*WORK_SCALE; c=hcol if rng.random()<.55 else scol; a=rng.randint(18,62)
+                dd.line((x,y,x-lx,y+rng.uniform(-.4,.8)*WORK_SCALE),fill=(*c,a),width=max(1,round(rng.uniform(.3,.7)*WORK_SCALE)))
     work.alpha_composite(detail.filter(ImageFilter.GaussianBlur(.08*WORK_SCALE)))
     frame=_alpha_safe_resize(work,tuple(canvas))
     frame=_final_raster_pass(frame,rng,pal,recipe)
