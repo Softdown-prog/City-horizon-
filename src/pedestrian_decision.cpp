@@ -33,7 +33,7 @@ std::optional<NavigationTile> PedestrianDecisionNode::home_entrance(
 
     const auto reachable = [&](NavigationTile tile) {
         return !buildings.is_occupied(tile.x, tile.y) && network.is_navigable(tile) &&
-               (!from || find_navigation_path(network, *from, tile).status == NavigationPathStatus::found);
+               (!from || tile == *from || find_navigation_path(network, *from, tile).status == NavigationPathStatus::found);
     };
     const auto candidates = road_access_candidates(*definition, building->rotation);
     for (const BuildingAccessPoint point : candidates) {
@@ -75,6 +75,14 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
     const std::optional<NavigationTile> current = exists ? std::optional<NavigationTile>{{
         pedestrians.instances().front().spatial.logical_tile_x, pedestrians.instances().front().spatial.logical_tile_y}}
         : std::nullopt;
+
+    // Route execution and indoor dwell are already owned by PedestrianSystem / the
+    // visitor bridge. Do not spend a decision tick proving home reachability while
+    // this agent cannot make a new autonomous choice anyway. This keeps expensive
+    // graph work event-driven instead of repeating it at the 15 Hz movement rate.
+    if (exists && (pedestrians.instances().front().state == PedestrianState::walking ||
+                   pedestrians.instances().front().state == PedestrianState::visiting)) return;
+
     std::optional<NavigationTile> entrance;
     if (home_id_) entrance = home_entrance(*home_id_, buildings, catalog, network, current);
     if (!entrance) {
@@ -88,9 +96,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
             decision_ = PedestrianDecision::looking_for_activity;
         }
     }
-    // The commercial/attraction visitor bridge owns its route and dwell state.
-    if (exists && (pedestrians.instances().front().state == PedestrianState::walking ||
-                   pedestrians.instances().front().state == PedestrianState::visiting)) return;
     if (raining && entrance) {
         // Let a walk or indoor visit finish before redirecting. Never snap a
         // moving pedestrian to a new route just because the weather changed.

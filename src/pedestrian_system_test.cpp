@@ -15,6 +15,28 @@ PedestrianSystem make_pedestrian_system() {
     return PedestrianSystem{{"citizen_common", 0.45F, 0.5F, 0.88F}};
 }
 
+class CountingNavigationNetwork final : public NavigationNetwork {
+public:
+    explicit CountingNavigationNetwork(const NavigationNetwork& inner) : inner_(inner) {}
+
+    [[nodiscard]] bool is_navigable(const NavigationTile tile) const override {
+        ++query_count_;
+        return inner_.is_navigable(tile);
+    }
+
+    [[nodiscard]] bool is_connected(const NavigationTile tile, const CardinalDirection direction) const override {
+        ++query_count_;
+        return inner_.is_connected(tile, direction);
+    }
+
+    void reset_query_count() { query_count_ = 0; }
+    [[nodiscard]] std::size_t query_count() const { return query_count_; }
+
+private:
+    const NavigationNetwork& inner_;
+    mutable std::size_t query_count_ = 0;
+};
+
 void advance_until_idle(PedestrianSystem& pedestrians, const NavigationNetwork& network) {
     for (int tick = 0; tick < 32 && pedestrians.instances().front().state == PedestrianState::walking; ++tick) {
         pedestrians.update_tick(0.25F, network);
@@ -178,7 +200,8 @@ void test_resident_leaves_and_returns_to_a_real_entrance() {
     RoadManager roads{-12, 12};
     SidewalkManager sidewalks{-12, 12};
     assert(sidewalks.place_tile(1, 3, "cement_path"));
-    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSurfaceNavigationNetwork surface_network{roads, sidewalks};
+    CountingNavigationNetwork network{surface_network};
     PedestrianSystem pedestrians = make_pedestrian_system();
     PedestrianDecisionNode decisions;
     decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
@@ -219,6 +242,13 @@ void test_resident_leaves_and_returns_to_a_real_entrance() {
         if (decisions.decision() == PedestrianDecision::walking_to_activity) break;
     }
     assert(decisions.decision() == PedestrianDecision::walking_to_activity);
+
+    // Decision work is event-driven while route execution is active. A walking
+    // resident must not re-run home reachability/pathfinding on every movement tick.
+    network.reset_query_count();
+    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    assert(network.query_count() == 0);
+
     for (int i = 0; i < 80; ++i) {
         pedestrians.update_tick(0.25F, network);
         decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
