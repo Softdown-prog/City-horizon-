@@ -51,6 +51,7 @@ struct VisitState {
     int door_x = 0;
     int door_y = 0;
     GridDirection door_facing = GridDirection::south;
+    std::int64_t charge_cents = 0;
     Uint64 last_tick_ms = 0;
     Uint64 elapsed_inside_ms = 0;
     VisitPhase phase = VisitPhase::approaching;
@@ -106,6 +107,22 @@ struct TicketedAttractionRoute {
         case GridDirection::west: return MobileEntityDirection::east;
     }
     return MobileEntityDirection::north;
+}
+
+[[nodiscard]] inline std::int64_t service_price_cents(const BuildingInstance& instance,
+                                                       const BuildingDefinition& definition) {
+    const ch::ServicePrice price = instance.service_price.minor_units > 0
+        ? instance.service_price
+        : definition.default_service_price;
+    if (price.minor_units <= 0) return 0;
+    const std::int64_t scale = price.units_per_dollar > 0 ? price.units_per_dollar : 1;
+    if (scale == 100) return price.minor_units;
+    if (scale == 1) return price.minor_units * 100;
+    return (price.minor_units * 100 + scale - 1) / scale;
+}
+
+[[nodiscard]] inline bool is_essential_service(const BuildingDefinition& definition) {
+    return definition.id == "bakery_01" || definition.id == "mini_market_01";
 }
 
 // Explicit accessPoints are authoritative visitor doors. Legacy/front-edge
@@ -183,7 +200,8 @@ struct TicketedAttractionRoute {
 
 [[nodiscard]] inline std::optional<EntranceRoute> best_reachable_entrance(
     const NavigationTile start, const BuildingManager& buildings,
-    const BuildingCatalog& catalog, const NavigationNetwork& network) {
+    const BuildingCatalog& catalog, const NavigationNetwork& network,
+    const std::int64_t budget_cents, const bool essential_only = false) {
     std::optional<EntranceRoute> best;
     std::size_t best_route_tiles = std::numeric_limits<std::size_t>::max();
 
@@ -191,6 +209,8 @@ struct TicketedAttractionRoute {
         if (!instance.operational) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition == nullptr || !supports_customer_visit(*definition)) continue;
+        if (essential_only && !is_essential_service(*definition)) continue;
+        if (service_price_cents(instance, *definition) > budget_cents) continue;
         const auto entrance = reachable_entrance_for_instance(start, instance, *definition, network);
         if (!entrance || entrance->route_tiles >= best_route_tiles) continue;
         best_route_tiles = entrance->route_tiles;
@@ -205,7 +225,8 @@ struct TicketedAttractionRoute {
 // needs no activity overlay on the booth itself.
 [[nodiscard]] inline std::optional<TicketedAttractionRoute> best_reachable_ticketed_attraction(
     const NavigationTile start, const BuildingManager& buildings,
-    const BuildingCatalog& catalog, const NavigationNetwork& network) {
+    const BuildingCatalog& catalog, const NavigationNetwork& network,
+    const std::int64_t budget_cents) {
     std::optional<TicketedAttractionRoute> best;
     std::size_t best_route_tiles = std::numeric_limits<std::size_t>::max();
     constexpr std::array<GridDirection, 4> sides = {
@@ -216,6 +237,7 @@ struct TicketedAttractionRoute {
         if (!booth.operational) continue;
         const BuildingDefinition* booth_definition = catalog.find(booth.definition_id);
         if (booth_definition == nullptr || !booth_definition->is_park_ticket_booth) continue;
+        if (service_price_cents(booth, *booth_definition) > budget_cents) continue;
 
         const std::optional<std::uint64_t> attraction_id =
             buildings.linked_attraction_for_ticket_booth(booth.instance_id);
@@ -226,8 +248,6 @@ struct TicketedAttractionRoute {
         if (attraction_definition == nullptr || !attraction_definition->requires_ticket_booth) continue;
         if (visitor_access_points(*attraction_definition, attraction->rotation).empty()) continue;
 
-        // The current booth is 1x1; using its rotated footprint here keeps the
-        // service-point rule safe if a wider booth family is introduced later.
         const BuildingFootprint booth_footprint = rotated_footprint(*booth_definition, booth.rotation);
         for (const GridDirection side : sides) {
             const auto [dx, dy] = access_offset(side);
@@ -346,8 +366,6 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 state.last_tick_ms = now;
                 if (simulation_running) state.elapsed_inside_ms += delta;
                 if (state.elapsed_inside_ms >= kTicketServiceMs) {
-                    // The one-to-one booth/ride link must still be valid at the
-                    // moment the ticket interaction completes.
                     const auto linked = buildings.linked_attraction_for_ticket_booth(
                         state.ticket_booth_instance_id);
                     (void)pedestrians.set_visiting(pedestrian_id, false);
@@ -388,6 +406,7 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 if (simulation_running) state.elapsed_inside_ms += delta;
                 if (state.elapsed_inside_ms >= kVisitorDwellMs) {
                     (void)buildings.end_activity(state.building_instance_id);
+                    (void)pedestrians.spend_monthly_budget(pedestrian_id, state.charge_cents);
                     (void)pedestrians.set_visiting(pedestrian_id, false);
                     state.phase = VisitPhase::completed_here;
                 }
@@ -395,8 +414,6 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             }
 
             if (state.phase == VisitPhase::completed_here) {
-                // Keep the guard until ordinary autonomous movement assigns a
-                // different trip, preventing instant re-entry at the same door.
                 if (pedestrian_snapshot.state == PedestrianState::walking &&
                     !is_expected_destination(pedestrian_snapshot, state)) {
                     runtime_states.erase(current);
@@ -450,17 +467,44 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             }
         }
 
-        if (!allow_autonomous_visits || pedestrian_snapshot.state != PedestrianState::idle) continue;
+        if (!allow_autonomous_visits || pedestrian_snapshot.state != PedestrianState::idle ||
+            !pedestrian_snapshot.outing_intent.active || pedestrian_snapshot.monthly_budget_cents <= 0) continue;
 
         const NavigationTile start{
             pedestrian_snapshot.spatial.logical_tile_x,
             pedestrian_snapshot.spatial.logical_tile_y,
         };
-        const auto entrance = best_reachable_entrance(start, buildings, catalog, network);
-        const auto ticketed = best_reachable_ticketed_attraction(start, buildings, catalog, network);
+        const std::int64_t budget = pedestrian_snapshot.monthly_budget_cents;
+        const auto entrance = best_reachable_entrance(start, buildings, catalog, network, budget, false);
+        const auto essential = best_reachable_entrance(start, buildings, catalog, network, budget, true);
+        const auto ticketed = best_reachable_ticketed_attraction(start, buildings, catalog, network, budget);
 
-        if (ticketed && (!entrance || ticketed->route_tiles <= entrance->route_tiles)) {
+        bool choose_ticketed = false;
+        std::optional<EntranceRoute> chosen_entrance;
+        switch (pedestrian_snapshot.outing_intent.preference) {
+            case PedestrianOutingPreference::outdoor_leisure:
+                choose_ticketed = ticketed.has_value();
+                if (!choose_ticketed) chosen_entrance = entrance;
+                break;
+            case PedestrianOutingPreference::covered_commerce:
+                chosen_entrance = entrance;
+                break;
+            case PedestrianOutingPreference::essential_commerce:
+                chosen_entrance = essential ? essential : entrance;
+                break;
+            case PedestrianOutingPreference::balanced:
+                if (ticketed && (!entrance || ticketed->route_tiles <= entrance->route_tiles)) choose_ticketed = true;
+                else chosen_entrance = entrance;
+                break;
+        }
+
+        if (choose_ticketed && ticketed) {
+            const BuildingInstance* booth = buildings.find_by_id(ticketed->booth_instance_id);
+            const BuildingDefinition* booth_definition = booth == nullptr ? nullptr : catalog.find(booth->definition_id);
+            if (booth == nullptr || booth_definition == nullptr) continue;
+            const std::int64_t charge = service_price_cents(*booth, *booth_definition);
             if (!pedestrians.send_pedestrian(start, ticketed->booth_service, network)) continue;
+            pedestrians.clear_outing_intent(pedestrian_id);
             runtime_states[pedestrian_id] = VisitState{
                 ticketed->attraction_instance_id,
                 ticketed->booth_instance_id,
@@ -472,6 +516,7 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 ticketed->attraction_entrance.door.x,
                 ticketed->attraction_entrance.door.y,
                 ticketed->attraction_entrance.door_facing,
+                charge,
                 now,
                 0,
                 VisitPhase::ticket_approaching,
@@ -479,19 +524,25 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             continue;
         }
 
-        if (!entrance) continue;
-        if (!pedestrians.send_pedestrian(start, entrance->approach, network)) continue;
+        if (!chosen_entrance) continue;
+        const BuildingInstance* destination = buildings.find_by_id(chosen_entrance->building_instance_id);
+        const BuildingDefinition* destination_definition = destination == nullptr ? nullptr : catalog.find(destination->definition_id);
+        if (destination == nullptr || destination_definition == nullptr) continue;
+        const std::int64_t charge = service_price_cents(*destination, *destination_definition);
+        if (!pedestrians.send_pedestrian(start, chosen_entrance->approach, network)) continue;
+        pedestrians.clear_outing_intent(pedestrian_id);
         runtime_states[pedestrian_id] = VisitState{
-            entrance->building_instance_id,
+            chosen_entrance->building_instance_id,
             0,
             0,
             0,
             GridDirection::south,
-            entrance->approach.x,
-            entrance->approach.y,
-            entrance->door.x,
-            entrance->door.y,
-            entrance->door_facing,
+            chosen_entrance->approach.x,
+            chosen_entrance->approach.y,
+            chosen_entrance->door.x,
+            chosen_entrance->door.y,
+            chosen_entrance->door_facing,
+            charge,
             now,
             0,
             VisitPhase::approaching,
