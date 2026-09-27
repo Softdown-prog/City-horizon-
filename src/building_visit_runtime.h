@@ -516,7 +516,7 @@ inline void filter_inside_pedestrians(std::vector<MobileEntityRenderData>& entit
     const std::size_t pedestrian_start = entities.size() - instances.size();
     std::size_t write_index = pedestrian_start;
     for (std::size_t index = 0; index < instances.size(); ++index) {
-        if (is_inside(instances[index].id)) continue;
+        if (is_inside(instances[index].id) || instances[index].state == PedestrianState::resting) continue;
         if (write_index != pedestrian_start + index) {
             entities[write_index] = std::move(entities[pedestrian_start + index]);
         }

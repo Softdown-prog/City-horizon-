@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-enum class PedestrianState { idle, walking, visiting };
+enum class PedestrianState { idle, walking, visiting, resting };
 
 struct PedestrianVisualDefinition {
     std::string animation_set_id;
@@ -54,6 +54,9 @@ public:
     // Door alignment changes only presentation facing. It never moves the foot
     // contact and therefore cannot bypass the navigation surface contract.
     [[nodiscard]] bool face_pedestrian(std::uint64_t pedestrian_id, MobileEntityDirection direction);
+    // Rest only at the home's walkable entrance after arriving there.
+    [[nodiscard]] bool rest_at_home(NavigationTile entrance);
+    void wake_up();
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);

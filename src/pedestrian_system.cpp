@@ -93,6 +93,23 @@ bool PedestrianSystem::face_pedestrian(const std::uint64_t pedestrian_id, const 
 
 void PedestrianSystem::clear() { instances_.clear(); }
 
+bool PedestrianSystem::rest_at_home(const NavigationTile entrance) {
+    if (instances_.empty()) return false;
+    PedestrianInstance& pedestrian = instances_.front();
+    if (pedestrian.state != PedestrianState::idle ||
+        pedestrian.spatial.logical_tile_x != entrance.x || pedestrian.spatial.logical_tile_y != entrance.y) return false;
+    pedestrian.state = PedestrianState::resting;
+    pedestrian.route.clear();
+    pedestrian.next_waypoint = 0;
+    return true;
+}
+
+void PedestrianSystem::wake_up() {
+    if (!instances_.empty() && instances_.front().state == PedestrianState::resting) {
+        instances_.front().state = PedestrianState::idle;
+    }
+}
+
 MobileEntityDirection PedestrianSystem::direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return MobileEntityDirection::east;
     if (to.x < from.x) return MobileEntityDirection::west;

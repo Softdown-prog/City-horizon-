@@ -115,6 +115,7 @@ add_executable(city_builder
     src/mobile_animation.cpp
     src/mobile_entity.h
     src/navigation_network.cpp
+    src/pedestrian_decision.cpp
     src/pedestrian_system.cpp
     src/population_system.cpp
     src/power_system.cpp
@@ -264,6 +265,7 @@ if(BUILD_TESTING)
         src/farming_system.cpp
         src/mobile_animation.cpp
         src/navigation_network.cpp
+        src/pedestrian_decision.cpp
         src/pedestrian_system.cpp
         src/population_system.cpp
         src/power_system.cpp

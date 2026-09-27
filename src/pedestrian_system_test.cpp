@@ -1,9 +1,12 @@
 #include "navigation_network.h"
+#include "pedestrian_decision.h"
 #include "pedestrian_system.h"
 #include "road_system.h"
 #include "sidewalk_system.h"
 
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 namespace {
@@ -118,11 +121,73 @@ void test_visiting_state_blocks_reroute_and_faces_door() {
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::west);
 }
 
+void test_resident_leaves_and_returns_to_a_real_entrance() {
+    const auto fixture = std::filesystem::temp_directory_path() / "ch_pedestrian_decision_fixture";
+    std::filesystem::create_directories(fixture);
+    {
+        std::ofstream out(fixture / "house.json");
+        out << R"({"id":"test_home","name":"Home","category":"residential","texture":"house.png",
+            "footprint":{"width":3,"height":3},"residentialCapacity":4,
+            "roadAccessMode":"front_edge","frontEdge":"south"})";
+    }
+    BuildingCatalog catalog;
+    assert(catalog.load_from_directory(fixture));
+    const BuildingDefinition* house = catalog.find("test_home");
+    assert(house != nullptr);
+    BuildingManager buildings{-12, 12};
+    const auto id = buildings.place(*house, 0, 0);
+    assert(id);
+    RoadManager roads{-12, 12};
+    SidewalkManager sidewalks{-12, 12};
+    assert(sidewalks.place_tile(1, 3, "cement_path"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSystem pedestrians = make_pedestrian_system();
+    PedestrianDecisionNode decisions;
+    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    assert(decisions.home_id() == id);
+    assert(decisions.decision() == PedestrianDecision::resting_at_home);
+    assert(pedestrians.instances().front().spatial.logical_tile_x == 1);
+    assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
+    assert(pedestrians.render_entities({}).size() == 1); // bridge filters resting residents after visitors
+    // With no outing available, the resident stays inside after each retry.
+    for (int i = 0; i < 20; ++i) decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    assert(pedestrians.instances().front().state == PedestrianState::resting);
+    for (int y = 4; y <= 8; ++y) assert(sidewalks.place_tile(1, y, "cement_path"));
+    bool left = false;
+    bool returned = false;
+    for (int i = 0; i < 250; ++i) {
+        pedestrians.update_tick(0.25F, network);
+        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+        left |= decisions.decision() == PedestrianDecision::walking_to_activity;
+        returned |= decisions.decision() == PedestrianDecision::returning_home;
+        if (left && returned && decisions.decision() == PedestrianDecision::resting_at_home) break;
+    }
+    assert(left && returned);
+    assert(pedestrians.instances().front().state == PedestrianState::resting);
+    assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
+
+    pedestrians.wake_up();
+    const auto pedestrian_id = pedestrians.instances().front().id;
+    assert(pedestrians.set_visiting(pedestrian_id, true));
+    assert(!pedestrians.rest_at_home({1, 3}));
+    decisions.update(10.0F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    assert(pedestrians.instances().front().state == PedestrianState::visiting);
+    assert(pedestrians.set_visiting(pedestrian_id, false));
+    assert(pedestrians.rest_at_home({1, 3}));
+
+    assert(buildings.remove_instance(*house, *id));
+    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    assert(!decisions.home_id());
+    assert(pedestrians.instances().front().state != PedestrianState::resting);
+    std::filesystem::remove_all(fixture);
+}
+
 } // namespace
 
 int main() {
     test_sidewalk_route_and_turns();
     test_demolition_replans_once_then_stops_safely();
     test_surface_turn_and_idle();
+    test_resident_leaves_and_returns_to_a_real_entrance();
     test_visiting_state_blocks_reroute_and_faces_door();
 }
