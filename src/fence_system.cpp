@@ -55,6 +55,21 @@ namespace {
            (dy == 0 && (dx == 1 || dx == -1));
 }
 
+[[nodiscard]] constexpr std::pair<FenceVertex, FenceVertex> tile_crossing_segment(
+    const int tile_x, const int tile_y, const CardinalDirection direction) {
+    switch (direction) {
+        case CardinalDirection::north:
+            return {{tile_x, tile_y}, {tile_x + 1, tile_y}};
+        case CardinalDirection::east:
+            return {{tile_x + 1, tile_y}, {tile_x + 1, tile_y + 1}};
+        case CardinalDirection::south:
+            return {{tile_x, tile_y + 1}, {tile_x + 1, tile_y + 1}};
+        case CardinalDirection::west:
+            return {{tile_x, tile_y}, {tile_x, tile_y + 1}};
+    }
+    return {};
+}
+
 }  // namespace
 
 FenceVisualState resolve_fence_visual(const FenceConnection connections,
@@ -211,27 +226,31 @@ std::vector<FenceSegment> FenceManager::segments() const {
 
 bool FenceManager::blocks_tile_crossing(const int tile_x, const int tile_y,
                                         const CardinalDirection direction) const {
-    FenceVertex from{};
-    FenceVertex to{};
-    switch (direction) {
-        case CardinalDirection::north:
-            from = {tile_x, tile_y};
-            to = {tile_x + 1, tile_y};
-            break;
-        case CardinalDirection::east:
-            from = {tile_x + 1, tile_y};
-            to = {tile_x + 1, tile_y + 1};
-            break;
-        case CardinalDirection::south:
-            from = {tile_x, tile_y + 1};
-            to = {tile_x + 1, tile_y + 1};
-            break;
-        case CardinalDirection::west:
-            from = {tile_x, tile_y};
-            to = {tile_x, tile_y + 1};
-            break;
-    }
+    const auto [from, to] = tile_crossing_segment(tile_x, tile_y, direction);
     return has_segment(from, to) && !is_open_gate(from, to);
+}
+
+bool FenceManager::is_open_gate_crossing(const int tile_x, const int tile_y,
+                                         const CardinalDirection direction) const {
+    const auto [from, to] = tile_crossing_segment(tile_x, tile_y, direction);
+    return is_open_gate(from, to);
+}
+
+std::optional<FenceGateCrossing> FenceManager::open_gate_crossing(
+    FenceVertex from, FenceVertex to) const {
+    if (!is_open_gate(from, to)) return std::nullopt;
+
+    if (from.y == to.y) {
+        const int x = std::min(from.x, to.x);
+        const int y = from.y;
+        return FenceGateCrossing{{x, y - 1}, {x, y}};
+    }
+    if (from.x == to.x) {
+        const int x = from.x;
+        const int y = std::min(from.y, to.y);
+        return FenceGateCrossing{{x - 1, y}, {x, y}};
+    }
+    return std::nullopt;
 }
 
 bool FenceManager::set_gate(const int vertex_x, const int vertex_y, const bool enabled) {
