@@ -401,6 +401,7 @@ private:
     void occupy_footprint(const BuildingDefinition& definition, const BuildingInstance& instance);
     void release_footprint(const BuildingDefinition& definition, const BuildingInstance& instance);
     [[nodiscard]] bool restore_ticket_link(std::uint64_t booth_instance_id, std::uint64_t attraction_instance_id);
+    void unlink_ticket_booth(std::uint64_t booth_instance_id);
 
     int map_min_;
     int map_max_;

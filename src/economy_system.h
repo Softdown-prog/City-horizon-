@@ -14,6 +14,7 @@ class FarmingSystem;
 
 enum class EconomyTransactionType : std::uint8_t {
     building_construction,
+    building_upgrade,
     land_purchase,
     tax_revenue,
     service_revenue,
@@ -60,6 +61,7 @@ public:
     [[nodiscard]] bool can_afford(std::int64_t cost) const;
     [[nodiscard]] bool try_spend(std::int64_t cost);
     [[nodiscard]] bool spend_for_building(std::int64_t cost, const GameDate& date, std::uint64_t building_instance_id);
+    [[nodiscard]] bool spend_for_upgrade(std::int64_t cost, const GameDate& date, std::uint64_t building_instance_id);
     [[nodiscard]] bool spend_for_land(std::int64_t cost, const GameDate& date, std::uint32_t land_parcel_id);
     void earn_agricultural_sale(std::int64_t amount, const GameDate& date);
     void restore_funds(std::int64_t funds);

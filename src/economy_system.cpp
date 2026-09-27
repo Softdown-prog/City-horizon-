@@ -49,6 +49,15 @@ bool CityEconomy::spend_for_building(const std::int64_t cost, const GameDate& da
     return true;
 }
 
+bool CityEconomy::spend_for_upgrade(const std::int64_t cost, const GameDate& date,
+                                           const std::uint64_t building_instance_id) {
+    if (!try_spend(cost)) {
+        return false;
+    }
+    record(EconomyTransactionType::building_upgrade, -cost, date, building_instance_id);
+    return true;
+}
+
 bool CityEconomy::spend_for_land(const std::int64_t cost, const GameDate& date, const std::uint32_t land_parcel_id) {
     if (!try_spend(cost)) {
         return false;
@@ -306,6 +315,7 @@ void CityEconomy::record(const EconomyTransactionType type, const std::int64_t a
 const char* economy_transaction_label(const EconomyTransactionType type) {
     switch (type) {
         case EconomyTransactionType::building_construction: return "BUILD";
+        case EconomyTransactionType::building_upgrade: return "UPGRADE";
         case EconomyTransactionType::land_purchase: return "LAND PURCHASE";
         case EconomyTransactionType::tax_revenue: return "TAX";
         case EconomyTransactionType::service_revenue: return "SERVICE SALES";
