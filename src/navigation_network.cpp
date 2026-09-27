@@ -1,4 +1,5 @@
 #include "navigation_network.h"
+#include "crosswalk_system.h"
 
 #include <algorithm>
 #include <deque>
@@ -10,6 +11,12 @@ namespace {
 
 [[nodiscard]] std::string tile_key(const NavigationTile tile) {
     return std::to_string(tile.x) + ':' + std::to_string(tile.y);
+}
+
+[[nodiscard]] bool is_walkable_floor_style(const SidewalkTile* floor) {
+    if (floor == nullptr) return false;
+    return floor->style_id == "dirt_path" || floor->style_id == "sand_path" ||
+           floor->style_id == "cement_path" || floor->style_id == "concrete_01";
 }
 
 }  // namespace
@@ -46,16 +53,44 @@ bool SidewalkNavigationNetwork::is_connected(const NavigationTile tile, const Ca
 }
 
 bool PedestrianSurfaceNavigationNetwork::is_navigable(const NavigationTile tile) const {
-    if (roads_.is_road(tile.x, tile.y)) return true;
-    const SidewalkTile* floor = sidewalks_.tile_at(tile.x, tile.y);
-    if (floor == nullptr) return false;
-    return floor->style_id == "dirt_path" || floor->style_id == "sand_path" ||
-           floor->style_id == "cement_path" || floor->style_id == "concrete_01";
+    // Roads belong exclusively to vehicle traffic. Pedestrians only receive a
+    // road exception from PedestrianCrosswalkNavigationNetwork.
+    if (roads_.is_road(tile.x, tile.y)) return false;
+    return is_walkable_floor_style(sidewalks_.tile_at(tile.x, tile.y));
 }
 
 bool PedestrianSurfaceNavigationNetwork::is_connected(const NavigationTile tile, const CardinalDirection direction) const {
     const TileOffset offset = direction_offset(direction);
     return is_navigable(tile) && is_navigable({tile.x + offset.x, tile.y + offset.y});
+}
+
+bool PedestrianCrosswalkNavigationNetwork::is_navigable(const NavigationTile tile) const {
+    if (surfaces_.is_navigable(tile)) return true;
+    return roads_.is_road(tile.x, tile.y) && crosswalks_.is_active_portal(tile.x, tile.y, sidewalks_);
+}
+
+bool PedestrianCrosswalkNavigationNetwork::is_connected(const NavigationTile tile,
+                                                         const CardinalDirection direction) const {
+    const TileOffset offset = direction_offset(direction);
+    const NavigationTile other{tile.x + offset.x, tile.y + offset.y};
+
+    const bool from_crosswalk = crosswalks_.is_crosswalk(tile.x, tile.y);
+    const bool to_crosswalk = crosswalks_.is_crosswalk(other.x, other.y);
+
+    if (!from_crosswalk && !to_crosswalk) {
+        return surfaces_.is_connected(tile, direction);
+    }
+
+    // Crossing cells may be entered/exited only along the authored portal axis.
+    if (from_crosswalk) {
+        return crosswalks_.is_active_portal(tile.x, tile.y, sidewalks_) &&
+               crosswalks_.allows_direction(tile.x, tile.y, direction) &&
+               surfaces_.is_navigable(other);
+    }
+
+    return crosswalks_.is_active_portal(other.x, other.y, sidewalks_) &&
+           crosswalks_.allows_direction(other.x, other.y, opposite_direction(direction)) &&
+           surfaces_.is_navigable(tile);
 }
 
 NavigationPathResult find_navigation_path(const NavigationNetwork& network, const NavigationTile start, const NavigationTile goal) {
