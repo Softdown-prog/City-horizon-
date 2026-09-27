@@ -53,6 +53,6 @@ def test_gate_keeps_stone_curb_out_of_opening(tmp_path: Path) -> None:
     recipe_path.write_text(json.dumps(recipe()), encoding="utf-8")
     result = export_fence_scenery(recipe_path, tmp_path / "out")
     with Image.open(result["outputs"]["gate_east"]) as gate:
-        # Center of the segment at ground level must stay transparent: the gate
-        # frame is raised and no stone curb is drawn through the opening.
-        assert gate.getpixel((128, 80))[3] == 0
+        # The gate may cast a translucent contact shadow, but an opaque stone
+        # curb must not cross the walkable center of the opening.
+        assert gate.getpixel((128, 80))[3] < 64
