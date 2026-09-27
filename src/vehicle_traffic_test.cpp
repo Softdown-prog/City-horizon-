@@ -1,3 +1,4 @@
+#include "crosswalk_system.h"
 #include "road_system.h"
 #include "vehicle_system.h"
 
@@ -89,6 +90,27 @@ int main() {
     for (int i = 0; i < 10; ++i) traffic.update_tick(0.10F, suv, roads);
     assert(traffic.instances().front().speed > 0.0F);
     assert(traffic.instances().front().state == TrafficVehicleState::cruising);
+
+    CrosswalkManager crosswalks{-16, 16};
+    assert(crosswalks.place(3, 0, CrosswalkAxis::north_south, roads));
+    crosswalks.set_pedestrian_occupied(3, 0, true);
+    traffic.clear();
+    TrafficVehicleInstance crossing_car;
+    crossing_car.route = valid_route;
+    crossing_car.speed = suv.cruise_speed;
+    assert(traffic.add(crossing_car, suv, roads));
+    bool crossing_brake = false;
+    for (int i = 0; i < 40; ++i) {
+        traffic.update_tick(0.10F, suv, roads, &crosswalks);
+        const auto& car = traffic.instances().front();
+        crossing_brake = crossing_brake || car.state == TrafficVehicleState::braking || car.state == TrafficVehicleState::stopped;
+        assert(car.map_x < 3.0F);
+    }
+    assert(crossing_brake);
+    const float stopped_speed = traffic.instances().front().speed;
+    crosswalks.set_pedestrian_occupied(3, 0, false);
+    for (int i = 0; i < 8; ++i) traffic.update_tick(0.10F, suv, roads, &crosswalks);
+    assert(traffic.instances().front().speed > stopped_speed);
 
     std::cout << "vehicle_traffic_test: PASS\n";
     return 0;

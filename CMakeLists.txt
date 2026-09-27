@@ -106,6 +106,7 @@ add_executable(city_builder
     src/main.cpp
     src/audio_manager.cpp
     src/building_system.cpp
+    src/crosswalk_system.cpp
     src/economy_system.cpp
     src/farming_system.cpp
     src/fence_system.cpp
@@ -241,6 +242,7 @@ if(BUILD_TESTING)
 
     add_executable(navigation_network_test
         src/navigation_network_test.cpp
+        src/crosswalk_system.cpp
         src/fence_system.cpp
         src/building_system.cpp
         src/economy_system.cpp
@@ -281,6 +283,24 @@ if(BUILD_TESTING)
         NAME pedestrian_system_test
         COMMAND pedestrian_system_test
     )
+
+    add_executable(vehicle_traffic_test
+        src/vehicle_traffic_test.cpp
+        src/building_system.cpp
+        src/crosswalk_system.cpp
+        src/economy_system.cpp
+        src/farming_system.cpp
+        src/mobile_animation.cpp
+        src/navigation_network.cpp
+        src/population_system.cpp
+        src/power_system.cpp
+        src/resource_system.cpp
+        src/road_system.cpp
+        src/sidewalk_system.cpp
+        src/vehicle_system.cpp
+    )
+    target_link_libraries(vehicle_traffic_test PRIVATE ch_core)
+    add_test(NAME vehicle_traffic_test COMMAND vehicle_traffic_test)
 
     add_executable(weather_system_test
         src/weather_system_test.cpp

@@ -13,6 +13,8 @@
 #include "mobile_animation.h"
 #include "road_system.h"
 
+class CrosswalkManager;
+
 using VehicleDirection = MobileEntityDirection;
 enum class ServiceVehicleState { idle, moving_to_job, working, returning };
 
@@ -148,7 +150,8 @@ public:
                            const RoadManager& roads);
     void update_tick(float tick_seconds,
                      const TrafficVehicleDefinition& definition,
-                     const RoadManager& roads);
+                     const RoadManager& roads,
+                     const CrosswalkManager* crosswalks = nullptr);
     void interpolate_visual(float frame_seconds);
     void clear();
     [[nodiscard]] const std::vector<TrafficVehicleInstance>& instances() const;
@@ -165,6 +168,9 @@ private:
     [[nodiscard]] bool vehicle_ahead(std::size_t index,
                                      float required_gap,
                                      float* distance = nullptr) const;
+    [[nodiscard]] bool occupied_crosswalk_ahead(std::size_t index,
+                                                float required_gap,
+                                                const CrosswalkManager& crosswalks) const;
     void refresh_anchor(TrafficVehicleInstance& vehicle,
                         const TrafficVehicleDefinition& definition) const;
 

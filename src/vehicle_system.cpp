@@ -1,4 +1,5 @@
 #include "vehicle_system.h"
+#include "crosswalk_system.h"
 
 #include <algorithm>
 #include <cctype>
@@ -292,9 +293,28 @@ bool TrafficVehicleManager::vehicle_ahead(const std::size_t index,
     return found;
 }
 
+bool TrafficVehicleManager::occupied_crosswalk_ahead(const std::size_t index,
+                                                     const float required_gap,
+                                                     const CrosswalkManager& crosswalks) const {
+    if (index >= instances_.size()) return false;
+    const TrafficVehicleInstance& vehicle = instances_[index];
+    if (vehicle.route.empty() || vehicle.segment_index + 1 >= vehicle.route.size()) return false;
+
+    float distance = 1.0F - std::clamp(vehicle.segment_progress, 0.0F, 1.0F);
+    for (std::size_t route_index = vehicle.segment_index + 1;
+         route_index < vehicle.route.size() && distance <= required_gap + 1.0F;
+         ++route_index) {
+        const TileCoordinate tile = vehicle.route[route_index];
+        if (crosswalks.pedestrian_occupied(tile.x, tile.y) && distance <= required_gap) return true;
+        distance += 1.0F;
+    }
+    return false;
+}
+
 void TrafficVehicleManager::update_tick(const float tick_seconds,
                                         const TrafficVehicleDefinition& definition,
-                                        const RoadManager& roads) {
+                                        const RoadManager& roads,
+                                        const CrosswalkManager* crosswalks) {
     if (tick_seconds <= 0.0F) return;
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {
@@ -310,7 +330,8 @@ void TrafficVehicleManager::update_tick(const float tick_seconds,
 
         refresh_anchor(vehicle, definition);
         const float required_gap = definition.safe_distance + vehicle.speed * definition.look_ahead_time;
-        const bool blocked = vehicle_ahead(i, required_gap);
+        const bool blocked = vehicle_ahead(i, required_gap) ||
+            (crosswalks != nullptr && occupied_crosswalk_ahead(i, required_gap, *crosswalks));
         if (blocked) {
             vehicle.speed = std::max(0.0F, vehicle.speed - definition.braking * tick_seconds);
             vehicle.state = vehicle.speed <= 0.001F ? TrafficVehicleState::stopped : TrafficVehicleState::braking;

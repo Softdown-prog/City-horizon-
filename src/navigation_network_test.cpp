@@ -1,3 +1,4 @@
+#include "crosswalk_system.h"
 #include "navigation_network.h"
 #include "park_fence_runtime.h"
 
@@ -78,19 +79,26 @@ void test_sidewalks() {
 void test_pedestrian_surface_route() {
     RoadManager roads{-8, 8};
     SidewalkManager sidewalks{-8, 8};
-    assert(sidewalks.place_tile(0, 0, "cement_path"));
-    assert(sidewalks.place_tile(1, 0, "sand_path"));
-    assert(sidewalks.place_tile(2, 0, "dirt_path"));
-    assert(roads.place_tile(3, 0));
-    assert(roads.place_tile(3, 1));
-    assert(sidewalks.place_tile(2, 1, "grass"));
-    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
-    assert_path(find_navigation_path(network, {0, 0}, {3, 1}), {0, 0}, {3, 1}, 5);
-    assert(network.can_move({1, 0}, CardinalDirection::east));
-    assert(!network.is_navigable({2, 1}));
-    assert(!network.can_move({2, 0}, CardinalDirection::south));
-    assert(sidewalks.remove_tile(1, 0));
-    assert(find_navigation_path(network, {0, 0}, {3, 1}).status == NavigationPathStatus::no_path);
+    assert(sidewalks.place_tile(1, 0, "concrete_01"));
+    assert(sidewalks.place_tile(1, 2, "concrete_01"));
+    assert(roads.place_tile(1, 1));
+
+    PedestrianSurfaceNavigationNetwork floors{roads, sidewalks};
+    assert(!floors.is_navigable({1, 1}));
+    assert(find_navigation_path(floors, {1, 0}, {1, 2}).status == NavigationPathStatus::no_path);
+
+    CrosswalkManager crosswalks{-8, 8};
+    PedestrianCrosswalkNavigationNetwork crossings{roads, sidewalks, crosswalks};
+    assert(find_navigation_path(crossings, {1, 0}, {1, 2}).status == NavigationPathStatus::no_path);
+    assert(crosswalks.place(1, 1, CrosswalkAxis::north_south, roads));
+    assert(crosswalks.is_active_portal(1, 1, sidewalks));
+    assert_path(find_navigation_path(crossings, {1, 0}, {1, 2}), {1, 0}, {1, 2}, 3);
+    assert(crossings.can_move({1, 0}, CardinalDirection::south));
+    assert(!crossings.can_move({1, 1}, CardinalDirection::east));
+
+    assert(sidewalks.remove_tile(1, 2));
+    assert(!crosswalks.is_active_portal(1, 1, sidewalks));
+    assert(find_navigation_path(crossings, {1, 0}, {1, 2}).status == NavigationPathStatus::no_path);
 }
 
 void test_patrol_follows_corner_without_grass() {

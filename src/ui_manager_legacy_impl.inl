@@ -575,13 +575,17 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
 
     if (model.active_tool == UiTool::sidewalks) {
         const float button_y = toolbar_y + 39.0F;
-        const float button_width = (context_width - 24.0F) / 3.0F;
-        add_button({context_x + 6.0F, button_y, button_width, 28.0F}, "TERRA", UiAction::select_sidewalk_style,
+        const float button_width = (context_width - 36.0F) / 5.0F;
+        add_button({context_x + 4.0F, button_y, button_width, 28.0F}, "TERRA", UiAction::select_sidewalk_style,
                    true, model.sidewalk_style == "dirt_path", "dirt_path");
-        add_button({context_x + 12.0F + button_width, button_y, button_width, 28.0F}, "AREIA", UiAction::select_sidewalk_style,
+        add_button({context_x + 8.0F + button_width, button_y, button_width, 28.0F}, "AREIA", UiAction::select_sidewalk_style,
                    true, model.sidewalk_style == "sand_path", "sand_path");
-        add_button({context_x + 18.0F + button_width * 2.0F, button_y, button_width, 28.0F}, "GRAMA", UiAction::select_sidewalk_style,
+        add_button({context_x + 12.0F + button_width * 2.0F, button_y, button_width, 28.0F}, "GRAMA", UiAction::select_sidewalk_style,
                    true, model.sidewalk_style == "grass", "grass");
+        add_button({context_x + 16.0F + button_width * 3.0F, button_y, button_width, 28.0F}, "FX N-S", UiAction::select_sidewalk_style,
+                   true, model.sidewalk_style == "crosswalk_ns", "crosswalk_ns");
+        add_button({context_x + 20.0F + button_width * 4.0F, button_y, button_width, 28.0F}, "FX L-O", UiAction::select_sidewalk_style,
+                   true, model.sidewalk_style == "crosswalk_ew", "crosswalk_ew");
     }
 
     if (model.active_tool != UiTool::none) {

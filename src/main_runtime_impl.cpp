@@ -9,6 +9,7 @@
 
 #include "audio_manager.h"
 #include "building_system.h"
+#include "crosswalk_runtime.h"
 #include "economy_system.h"
 #include "farming_system.h"
 #include "land_system.h"
@@ -763,7 +764,7 @@ struct BuildingPlacementValidation {
         // the catalogue at the base capacity made most civic/commercial
         // buildings impossible to add before the player could expand power.
         return failure == PlacementFailure::none && affordable && !on_road && !on_sidewalk && !on_farm &&
-               on_owned_land && on_allowed_terrain && has_road_access;
+               on_owned_land && on_allowed_terrain;
     }
 };
 
@@ -804,9 +805,6 @@ struct BuildingPlacementValidation {
     }
     if (!validation.on_allowed_terrain) {
         return "REQUIRES GRASS TILE";
-    }
-    if (!validation.has_road_access) {
-        return validation.accepts_path_access ? "ROAD OR PATH ADJACENCY REQUIRED" : "ROAD AT ENTRANCE REQUIRED";
     }
     if (!validation.affordable) {
         return "NOT ENOUGH FUNDS";
@@ -990,6 +988,27 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
     draw_text(renderer, axis_x.x + 4.0F, axis_x.y - 8.0F, "X", 255, 92, 92);
     draw_text(renderer, axis_y.x + 4.0F, axis_y.y - 8.0F, "Y", 104, 236, 124);
     draw_text(renderer, geometry.screen_anchor.x + 10.0F, geometry.screen_anchor.y - 10.0F, "A", 72, 236, 255);
+}
+
+void render_crosswalks(SDL_Renderer* renderer, const CrosswalkManager& crosswalks,
+                       TextureCache& textures, const std::filesystem::path& asset_root,
+                       const Camera& camera, const float viewport_width, const float viewport_height) {
+    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+    const bool quarter_turn = (camera_rotation_turns(camera.rotation) % 2U) != 0U;
+    for (const CrosswalkPortal& portal : crosswalks.portals()) {
+        CrosswalkAxis visual_axis = portal.axis;
+        if (quarter_turn) {
+            visual_axis = visual_axis == CrosswalkAxis::north_south
+                ? CrosswalkAxis::east_west : CrosswalkAxis::north_south;
+        }
+        const std::filesystem::path path = asset_root / "assets/roads/crosswalk_01" /
+            (visual_axis == CrosswalkAxis::north_south ? "crosswalk_south.png" : "crosswalk_east.png");
+        const TextureAsset* texture = textures.load(renderer, path);
+        if (texture != nullptr) {
+            ch::MapRenderer::render_road_sprite(renderer, *texture, portal.tile_x, portal.tile_y,
+                                                cs, viewport_width, viewport_height);
+        }
+    }
 }
 
 void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager, const BuildingCatalog& catalog,
@@ -1239,9 +1258,7 @@ void render_seagull_south(SDL_Renderer* renderer, const TextureCache& textures, 
 }
 
 [[nodiscard]] std::string catalog_requirements_label(const BuildingDefinition& definition) {
-    std::string label = definition.requires_road_or_path_access
-        ? "RUA OU CAMINHO ADJACENTE"
-        : (definition.requires_road_access ? "RUA OBRIGATORIA" : "SEM RUA");
+    std::string label = "POSICIONAMENTO LIVRE";
     if (definition.grass_only) label += " | SOMENTE GRAMA";
     if (definition.power_consumption != 0) {
         label += " | ENERGIA " + std::to_string(definition.power_consumption);
@@ -2152,7 +2169,8 @@ int main() {
             case UiAction::activate_roads: begin_road_mode(); break;
             case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
             case UiAction::select_sidewalk_style:
-                if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "grass") {
+                if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "grass" ||
+                    action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {
                     sidewalk_style = action.payload;
                     begin_sidewalk_mode();
                 }
@@ -2212,6 +2230,7 @@ int main() {
                 break;
             case UiAction::start_new_city:
                 pedestrians.clear();
+                crosswalk_runtime::clear();
                 automatic_pedestrian = actor_ready;
                 pedestrian_decisions.reset();
                 if (actor_ready) {
@@ -2986,6 +3005,7 @@ int main() {
                                 ++removed_buildings;
                             }
                             if (sidewalks.remove_tile(x, y)) ++removed_floors;
+                            (void)crosswalk_runtime::crosswalks().remove(x, y);
                             if (roads.remove_tile(x, y)) ++removed_roads;
                             if (restore_grass(x, y)) ++restored_ground;
                         }
@@ -3100,8 +3120,20 @@ int main() {
                 }
                 if (sidewalk_mode && sidewalk_dragging) {
                     int changed = 0, blocked = 0;
+                    const bool placing_crosswalk = sidewalk_style == "crosswalk_ns" || sidewalk_style == "crosswalk_ew";
                     for (const TileCoordinate& tile : roads.line_between(sidewalk_drag_start,
                                                                            {released_tile.first, released_tile.second})) {
+                        if (placing_crosswalk) {
+                            if (!lands.is_tile_owned(tile.x, tile.y) || !roads.is_drivable(tile.x, tile.y)) {
+                                ++blocked;
+                                continue;
+                            }
+                            const CrosswalkAxis axis = sidewalk_style == "crosswalk_ns"
+                                ? CrosswalkAxis::north_south : CrosswalkAxis::east_west;
+                            if (crosswalk_runtime::crosswalks().place(tile.x, tile.y, axis, roads)) ++changed;
+                            else ++blocked;
+                            continue;
+                        }
                         const SidewalkPlacementFailure failure = sidewalks.validate_placement(tile.x, tile.y, roads, buildings);
                         if (!lands.is_tile_owned(tile.x, tile.y) || !editable_ground(tile.x, tile.y) ||
                             (failure != SidewalkPlacementFailure::none &&
@@ -3493,6 +3525,14 @@ int main() {
                 pedestrian_decisions.update(scheduled.mobile_tick_seconds, pedestrians, pedestrian_surfaces,
                                             buildings, catalog, roads, sidewalks, weather.is_raining());
             }
+            crosswalk_runtime::crosswalks().clear_occupancy();
+            for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+                const int px = pedestrian.spatial.logical_tile_x;
+                const int py = pedestrian.spatial.logical_tile_y;
+                if (crosswalk_runtime::crosswalks().is_crosswalk(px, py)) {
+                    crosswalk_runtime::crosswalks().set_pedestrian_occupied(px, py, true);
+                }
+            }
         }
         for (const TileCoordinate& completed : service_vehicles.take_completed_tiles()) {
             (void)farming.prepare_soil(completed.x, completed.y);
@@ -3580,6 +3620,8 @@ int main() {
                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
                      static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
+                          static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         render_sidewalks(renderer, sidewalks, textures, asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         render_farming(renderer, farming, crop_catalog, textures, asset_root, camera,
                        static_cast<float>(viewport_width), static_cast<float>(viewport_height));
