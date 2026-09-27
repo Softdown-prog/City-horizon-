@@ -24,10 +24,19 @@ void WeatherSystem::reset_drop(RainDrop& drop, const bool anywhere) {
 
 void WeatherSystem::set_state(const WeatherState state) {
     if (state_ == state) return;
+    const bool was_raining = is_raining();
+    const bool will_rain = state == WeatherState::raining || state == WeatherState::thunderstorm;
     state_ = state;
     flash_alpha_ = 0;
     thunder_timer_ = 5.0F + random_unit() * 7.0F;
-    if (is_raining() && width_ > 0 && height_ > 0) {
+
+    if (!was_raining && will_rain) {
+        rain_episode_remaining_seconds_ = 50.0F + random_unit() * 10.0F;
+    } else if (!will_rain) {
+        rain_episode_remaining_seconds_ = 0.0F;
+    }
+
+    if (will_rain && width_ > 0 && height_ > 0) {
         for (RainDrop& drop : drops_) reset_drop(drop, true);
     }
 }
@@ -65,6 +74,17 @@ void WeatherSystem::update(const float seconds, const int width, const int heigh
     }
     flash_alpha_ = 0;
     if (!is_raining()) return;
+
+    // Rain duration follows real elapsed time rather than simulation speed.
+    // Clamp only extreme stalls so a debugger pause cannot instantly consume
+    // an entire weather episode.
+    const float weather_dt = std::clamp(seconds, 0.0F, 0.25F);
+    rain_episode_remaining_seconds_ = std::max(0.0F, rain_episode_remaining_seconds_ - weather_dt);
+    if (rain_episode_remaining_seconds_ <= 0.0F) {
+        set_state(WeatherState::overcast);
+        return;
+    }
+
     // Stall clamping avoids a jump across the entire screen after a breakpoint.
     const float dt = std::clamp(seconds, 0.0F, 0.05F);
     const std::size_t count = state_ == WeatherState::thunderstorm ? drops_.size() : 180U;
