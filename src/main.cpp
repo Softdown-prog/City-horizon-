@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries twelve compatibility/runtime fixes without duplicating the runtime loop:
+// carries thirteen compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -42,6 +42,8 @@
 //     visibly at the paired booth, follows walkable tiles to the ride's authored
 //     boarding access, then raises the ride activity counter so activity_loop
 //     animation/audio can run. The ticket booth itself requires no activity overlay.
+// 13. A citizen's personal spending budget is restored exactly when the game
+//     calendar enters a new month; it is independent from jobs or utility systems.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -177,6 +179,14 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 // production automatic-pedestrian mode is active.
 #define mobile_render_entities() \
     ([&]() { \
+        static int ch_budget_month = simulation_clock.date().month; \
+        static int ch_budget_year = simulation_clock.date().year; \
+        const GameDate ch_budget_date = simulation_clock.date(); \
+        if (ch_budget_date.month != ch_budget_month || ch_budget_date.year != ch_budget_year) { \
+            pedestrians.reset_monthly_budgets(); \
+            ch_budget_month = ch_budget_date.month; \
+            ch_budget_year = ch_budget_date.year; \
+        } \
         ch_sync_ferris_wheel_audio_visibility(audio, buildings, catalog); \
         const PedestrianSurfaceNavigationNetwork ch_visit_surfaces{roads, sidewalks}; \
         ch::building_visit_runtime::sync( \
