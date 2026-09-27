@@ -13,7 +13,7 @@ jobs:
       - name: Install SDL configure dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev
+          sudo apt-get install -y libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev
       - name: Configure focused test build
         run: cmake -S . -B build-weather-audio -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
       - name: Build weather and audio tests only
