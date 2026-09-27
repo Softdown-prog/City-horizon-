@@ -5,6 +5,7 @@ Esta pasta guarda os assets aprovados para o runtime do parque de diversões. Ca
 Itens atuais:
 
 - `ferris_wheel/`: roda-gigante animada (`ferris_wheel_01`).
+- `viking_ship/`: Navio Viking 5×4 (`viking_ship_01`), atualmente registrado com quatro rotações estáticas; os frames de balanço serão adicionados em uma etapa posterior.
 - `ticket_booth/`: bilheteria estática 2×2 com quatro direções (`park_ticket_booth_01`). Não depende de rua nem de caminho e foi concebida para ficar próxima das atrações.
 
 ## Footprint visual x ocupação física das atrações
