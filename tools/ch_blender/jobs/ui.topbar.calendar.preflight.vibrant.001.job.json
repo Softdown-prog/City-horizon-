@@ -1,0 +1,9 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "ui.topbar.calendar.preflight.vibrant.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_ui_topbar_guarded.py",
+  "qualityStage": "preflight",
+  "args": ["--spec", "tools/tycoon_photo_studio/assets/ui_topbar_v1.json", "--asset", "calendar", "--studio-preset", "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json", "--output", "out/ch_blender_agent/ui.topbar.calendar.vibrant.001"],
+  "outputDir": "out/ch_blender_agent/ui.topbar.calendar.vibrant.001"
+}
