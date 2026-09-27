@@ -1,0 +1,25 @@
+{
+  "contract": "CH_RUNTIME_COLOR_MASK_PROMOTION_V1",
+  "assetId": "building.mini_market.01",
+  "sourceAssetId": "commercial_mini_market_3x2_01",
+  "fileStem": "mini_market",
+  "maskContract": "CH_COLOR_MASK_V1",
+  "approved": true,
+  "sourceCommit": "801b591bafba28493c7d93fa432cf895daa14c39",
+  "sourceWorkflowRun": 36294002069,
+  "sourceArtifactId": 10923835375,
+  "sourceArtifactName": "CH-Blender-Agent-36294002069-1",
+  "sourceDir": "commercial.mini_market.v2.color_mask.final",
+  "destination": "assets/buildings/mini_market",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [256, 256],
+  "format": "PNG_RGBA",
+  "channels": {
+    "R": "wall",
+    "G": "roof"
+  },
+  "blueChannel": "unused",
+  "alpha": "coverage",
+  "scope": "large_surfaces_only",
+  "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333"
+}
