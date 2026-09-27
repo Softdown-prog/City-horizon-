@@ -59,6 +59,10 @@ struct SeatBinding {
         binding.seat_index = state->second.ride_seat_index;
         binding.actor_source = pedestrian->animation.animation_set_id;
         binding.clothing = pedestrian->clothing;
+        // CH_AMUSEMENT_RIDE_V1 only accepts stable_per_visitor passenger palettes.
+        // PedestrianSystem enables this on a render copy for world actors; the ride
+        // binding carries the same jacket/pants palette into the seated overlay.
+        binding.clothing.enabled = true;
         result.push_back(std::move(binding));
     }
 
