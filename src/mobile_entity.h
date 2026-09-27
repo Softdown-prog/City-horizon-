@@ -1,11 +1,26 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 // Shared vocabulary for any moving map entity. It deliberately contains no
 // pathfinding, farming, vehicle, or renderer implementation details.
 enum class MobileEntityDirection { south, east, north, west };
+
+struct MobileClothingColor {
+    std::uint8_t r = 255;
+    std::uint8_t g = 255;
+    std::uint8_t b = 255;
+    [[nodiscard]] bool operator==(const MobileClothingColor&) const = default;
+};
+
+struct MobileClothingTint {
+    bool enabled = false;
+    MobileClothingColor jacket;
+    MobileClothingColor pants;
+    [[nodiscard]] bool operator==(const MobileClothingTint&) const = default;
+};
 
 struct MobileEntitySpatialState {
     // The logical world position changes on the fixed simulation tick.
@@ -41,4 +56,5 @@ struct MobileEntityRenderData {
     float art_scale = 1.0F;
     float sprite_anchor_x = 0.5F;
     float sprite_anchor_y = 1.0F;
+    MobileClothingTint clothing;
 };

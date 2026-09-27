@@ -121,6 +121,32 @@ void test_visiting_state_blocks_reroute_and_faces_door() {
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::west);
 }
 
+void test_clothing_is_chosen_once_per_actor_birth() {
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    for (int x = 0; x <= 2; ++x) assert(sidewalks.place_tile(x, 0, "cement_path"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSystem pedestrians{{"ch_actor_green_01", 1.0F, 0.5F, 60.0F / 64.0F}};
+    assert(pedestrians.send_pedestrian({0, 0}, {2, 0}, network));
+    const std::uint64_t born_id = pedestrians.instances().front().id;
+    const MobileClothingTint born_outfit = pedestrians.render_entities({}).front().clothing;
+    assert(born_outfit.enabled);
+    assert(born_outfit.jacket != MobileClothingColor{});
+    assert(born_outfit.pants != MobileClothingColor{});
+    advance_until_idle(pedestrians, network);
+    assert(pedestrians.send_pedestrian({2, 0}, {0, 0}, network));
+    assert(pedestrians.instances().front().id == born_id);
+    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
+    advance_until_idle(pedestrians, network);
+    assert(pedestrians.rest_at_home({0, 0}));
+    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
+    pedestrians.wake_up();
+    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
+    pedestrians.clear();
+    assert(pedestrians.send_pedestrian({0, 0}, {1, 0}, network));
+    assert(pedestrians.instances().front().id != born_id);
+}
+
 void test_resident_leaves_and_returns_to_a_real_entrance() {
     const auto fixture = std::filesystem::temp_directory_path() / "ch_pedestrian_decision_fixture";
     std::filesystem::create_directories(fixture);
@@ -190,4 +216,5 @@ int main() {
     test_surface_turn_and_idle();
     test_resident_leaves_and_returns_to_a_real_entrance();
     test_visiting_state_blocks_reroute_and_faces_door();
+    test_clothing_is_chosen_once_per_actor_birth();
 }

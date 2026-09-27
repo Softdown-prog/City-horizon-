@@ -4,6 +4,7 @@
 #include "navigation_network.h"
 
 #include <cstdint>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,7 @@ struct PedestrianInstance {
     float speed = 2.25F;
     bool replanned_after_network_change = false;
     MobileAnimationPlayer animation;
+    MobileClothingTint clothing;
 };
 
 // One runtime pedestrian consuming a topology-backed route. Population,
@@ -73,4 +75,5 @@ private:
     PedestrianVisualDefinition visual_definition_;
     std::vector<PedestrianInstance> instances_;
     std::uint64_t next_id_ = 1;
+    std::mt19937 clothing_rng_{std::random_device{}()};
 };

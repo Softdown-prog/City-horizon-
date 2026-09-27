@@ -287,6 +287,61 @@ public:
         return found == textures_.end() ? nullptr : &found->second;
     }
 
+    // Recolor a chosen actor frame once and cache it for the resident's outfit.
+    // Writing the original alpha directly avoids doubled fringe opacity from
+    // drawing translucent overlays over an already antialiased sprite.
+    [[nodiscard]] const TextureAsset* load_actor_clothing(SDL_Renderer* renderer,
+                                                           const std::filesystem::path& frame_path,
+                                                           const MobileClothingTint& clothing) {
+        const std::string key = frame_path.generic_string() + "#CH_ACTOR_CLOTHING_" +
+            std::to_string(clothing.jacket.r) + ":" + std::to_string(clothing.jacket.g) + ":" +
+            std::to_string(clothing.jacket.b) + ":" + std::to_string(clothing.pants.r) + ":" +
+            std::to_string(clothing.pants.g) + ":" + std::to_string(clothing.pants.b);
+        if (const auto existing = textures_.find(key); existing != textures_.end()) return &existing->second;
+
+        const std::filesystem::path mask_path = frame_path.parent_path().parent_path() / "masks" / frame_path.filename();
+        SDL_Surface* frame = SDL_LoadPNG(frame_path.string().c_str());
+        SDL_Surface* mask = SDL_LoadPNG(mask_path.string().c_str());
+        if (frame == nullptr || mask == nullptr || frame->w != mask->w || frame->h != mask->h) {
+            if (frame != nullptr) SDL_DestroySurface(frame);
+            if (mask != nullptr) SDL_DestroySurface(mask);
+            return nullptr; // Preserve the approved frame when a mask is absent.
+        }
+        SDL_Surface* result = SDL_CreateSurface(frame->w, frame->h, SDL_PIXELFORMAT_RGBA32);
+        if (result == nullptr) {
+            SDL_DestroySurface(mask);
+            SDL_DestroySurface(frame);
+            return nullptr;
+        }
+        for (int y = 0; y < frame->h; ++y) {
+            for (int x = 0; x < frame->w; ++x) {
+                Uint8 r = 0, g = 0, b = 0, a = 0;
+                Uint8 jacket = 0, pants = 0, shade = 0, mask_alpha = 0;
+                (void)SDL_ReadSurfacePixel(frame, x, y, &r, &g, &b, &a);
+                (void)SDL_ReadSurfacePixel(mask, x, y, &jacket, &pants, &shade, &mask_alpha);
+                const MobileClothingColor* tint = mask_alpha == a && jacket == 255 && pants == 0 ? &clothing.jacket :
+                    mask_alpha == a && pants == 255 && jacket == 0 ? &clothing.pants : nullptr;
+                if (tint != nullptr) {
+                    r = static_cast<Uint8>((static_cast<unsigned>(tint->r) * shade + 127U) / 255U);
+                    g = static_cast<Uint8>((static_cast<unsigned>(tint->g) * shade + 127U) / 255U);
+                    b = static_cast<Uint8>((static_cast<unsigned>(tint->b) * shade + 127U) / 255U);
+                }
+                (void)SDL_WriteSurfacePixel(result, x, y, r, g, b, a);
+            }
+        }
+        TextureAsset asset;
+        asset.texture = SDL_CreateTextureFromSurface(renderer, result);
+        asset.source_width = static_cast<float>(result->w);
+        asset.source_height = static_cast<float>(result->h);
+        SDL_DestroySurface(result);
+        SDL_DestroySurface(mask);
+        SDL_DestroySurface(frame);
+        if (asset.texture == nullptr) return nullptr;
+        SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+        return &textures_.emplace(key, asset).first->second;
+    }
+
     [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
         const auto found = textures_.find(path.generic_string());
         return found == textures_.end() ? nullptr : &found->second;
@@ -876,7 +931,7 @@ void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager, co
 void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,
                            const BuildingCatalog& building_catalog, const LandManager& lands,
                            const std::vector<MobileEntityRenderData>& mobile_entities,
-                           const MobileAnimationCatalog& animations, const TextureCache& textures,
+                           const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
                            float viewport_width, float viewport_height) {
     struct EntityDraw {
@@ -947,7 +1002,10 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
             continue;
         }
         const MobileEntityRenderData& entity = *draw.mobile_entity;
-        const TextureAsset* texture = textures.find(root / entity.sprite_asset);
+        const auto frame_path = root / entity.sprite_asset;
+        const TextureAsset* texture = entity.clothing.enabled
+            ? textures.load_actor_clothing(renderer, frame_path, entity.clothing) : nullptr;
+        if (texture == nullptr) texture = textures.find(frame_path);
         if (texture == nullptr) continue;
         const SDL_FPoint anchor = world_to_screen(entity.spatial.visual_world_x + entity.spatial.ground_anchor_x,
                                                   entity.spatial.visual_world_y + entity.spatial.ground_anchor_y,

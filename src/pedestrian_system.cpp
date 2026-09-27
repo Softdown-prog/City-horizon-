@@ -1,10 +1,18 @@
 #include "pedestrian_system.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <utility>
 
 namespace {
+
+// Restrained colors readable at 48x64, applied to authored shade masks. Only
+// clothing changes; anatomy, face, shirt, hair and shoes stay on the base PNG.
+constexpr std::array<MobileClothingColor, 7> kJacketColors = {{{21, 155, 88}, {178, 70, 91},
+    {181, 139, 65}, {58, 150, 143}, {121, 104, 164}, {172, 103, 62}, {84, 124, 174}}};
+constexpr std::array<MobileClothingColor, 5> kPantsColors = {{{38, 89, 220}, {78, 102, 159},
+    {89, 102, 127}, {121, 86, 65}, {82, 113, 96}}};
 
 [[nodiscard]] CardinalDirection topology_direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return CardinalDirection::east;
@@ -42,6 +50,10 @@ bool PedestrianSystem::send_pedestrian(const NavigationTile start, const Navigat
         PedestrianInstance pedestrian;
         pedestrian.id = next_id_++;
         pedestrian.animation.animation_set_id = visual_definition_.animation_set_id;
+        pedestrian.clothing.jacket = kJacketColors[
+            std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
+        pedestrian.clothing.pants = kPantsColors[
+            std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
         instances_.push_back(std::move(pedestrian));
     }
     PedestrianInstance& pedestrian = instances_.front();
@@ -220,6 +232,8 @@ std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const Mobi
         entity.art_scale = visual_definition_.art_scale;
         entity.sprite_anchor_x = visual_definition_.sprite_anchor_x;
         entity.sprite_anchor_y = visual_definition_.sprite_anchor_y;
+        entity.clothing = pedestrian.clothing;
+        entity.clothing.enabled = visual_definition_.animation_set_id == "ch_actor_green_01";
         result.push_back(std::move(entity));
     }
     return result;
