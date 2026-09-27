@@ -98,9 +98,8 @@ inline void clear() {
 
 // Collision-aware pedestrian graph. Surface topology remains authoritative for
 // where pedestrians may stand; buildings remove occupied cells and closed
-// fence segments veto crossing only the edge they occupy. Open gates are
-// intentionally passable because FenceManager::blocks_tile_crossing() already
-// treats them as openings.
+// fence segments veto crossing only the edge they occupy. An open gate is a
+// usable entrance only when both tiles separated by that gate are walkable.
 class PedestrianCollisionNavigationNetwork final : public NavigationNetwork {
 public:
     PedestrianCollisionNavigationNetwork(const RoadManager& roads,
@@ -114,8 +113,22 @@ public:
 
     [[nodiscard]] bool is_connected(const NavigationTile tile,
                                     const CardinalDirection direction) const override {
-        return base_.is_connected(tile, direction) &&
-               !fences().blocks_tile_crossing(tile.x, tile.y, direction);
+        if (!base_.is_connected(tile, direction)) return false;
+        if (fences().blocks_tile_crossing(tile.x, tile.y, direction)) return false;
+
+        if (fences().is_open_gate_crossing(tile.x, tile.y, direction)) {
+            const TileOffset offset = direction_offset(direction);
+            const NavigationTile other{tile.x + offset.x, tile.y + offset.y};
+            return is_navigable(tile) && is_navigable(other);
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool is_walkable_open_gate(const FenceSegment& segment) const {
+        const auto crossing = fences().open_gate_crossing(segment.from, segment.to);
+        if (!crossing) return false;
+        return is_navigable({crossing->first.x, crossing->first.y}) &&
+               is_navigable({crossing->second.x, crossing->second.y});
     }
 
 private:
