@@ -32,6 +32,7 @@ constexpr std::string_view kParkCategory = "PARK";
 constexpr std::string_view kLegacyParkCategory = "CITY PARK";
 constexpr std::string_view kParkFenceToolId = "park_fence_classic_iron_v1";
 constexpr std::string_view kParkIronStoneFenceToolId = "park_iron_fence_01";
+constexpr std::string_view kParkChainlinkFenceToolId = "park_chainlink_fence_01";
 constexpr std::string_view kParkGateToolId = "park_gate_classic_iron_v1";
 
 FenceManager& g_park_fences = park_fence_runtime::fences();
@@ -75,6 +76,10 @@ std::unordered_map<std::string, CatalogCardInteractionFx> g_catalog_card_fx;
     if (style == ParkFenceStyle::iron_stone) {
         return runtime_asset_path(
             "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_east.png");
+    }
+    if (style == ParkFenceStyle::chainlink) {
+        return runtime_asset_path(
+            "assets/city_park/fences/park_chainlink_fence_01/park_chainlink_fence_01_segment_east.png");
     }
     return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");
 }
@@ -160,6 +165,19 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
             1,
         });
     }
+    if (!has_item(kParkChainlinkFenceToolId)) {
+        model.build_items.push_back({
+            std::string(kParkChainlinkFenceToolId),
+            "Alambrado Galvanizado",
+            std::string(kParkCategory),
+            "SEM CUSTO",
+            true,
+            park_fence_thumbnail_path(ParkFenceStyle::chainlink),
+            "BORDA DO GRID",
+            "CLIQUE E ARRASTE | MALHA + CONEXAO AUTOMATICA",
+            1,
+        });
+    }
     if (!has_item(kParkGateToolId)) {
         model.build_items.push_back({
             std::string(kParkGateToolId),
@@ -184,7 +202,9 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
 
     if (g_park_fence_tool_active || g_park_gate_tool_active) {
         const std::string_view active_fence_id = g_park_fence_style == ParkFenceStyle::iron_stone
-            ? kParkIronStoneFenceToolId : kParkFenceToolId;
+            ? kParkIronStoneFenceToolId
+            : (g_park_fence_style == ParkFenceStyle::chainlink
+                ? kParkChainlinkFenceToolId : kParkFenceToolId);
         model.selected_building_id = std::string(g_park_gate_tool_active ? kParkGateToolId : active_fence_id);
         model.placement_preview_path = g_park_gate_tool_active
             ? park_fence_thumbnail_path(ParkFenceStyle::classic_iron)
@@ -271,6 +291,16 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
 
 void set_fence_draw_color(SDL_Renderer* renderer, const ParkFenceStyle style,
                           const bool preview, const bool highlight) {
+    if (style == ParkFenceStyle::chainlink) {
+        if (preview) {
+            SDL_SetRenderDrawColor(renderer, highlight ? 213 : 151, highlight ? 224 : 164,
+                                   highlight ? 228 : 171, 225);
+        } else {
+            SDL_SetRenderDrawColor(renderer, highlight ? 204 : 112, highlight ? 216 : 126,
+                                   highlight ? 221 : 134, 245);
+        }
+        return;
+    }
     if (style == ParkFenceStyle::iron_stone) {
         if (preview) {
             SDL_SetRenderDrawColor(renderer, highlight ? 160 : 104, highlight ? 174 : 123,
@@ -305,13 +335,14 @@ void set_fence_stone_color(SDL_Renderer* renderer, const bool preview, const boo
         {vertex.x + 1, vertex.y}, {vertex.x - 1, vertex.y},
         {vertex.x, vertex.y + 1}, {vertex.x, vertex.y - 1},
     }};
+    bool touches_chainlink = false;
     for (const FenceVertex neighbour : neighbours) {
-        if (g_park_fences.has_segment(vertex, neighbour) &&
-            park_fence_runtime::segment_style(vertex, neighbour) == ParkFenceStyle::iron_stone) {
-            return ParkFenceStyle::iron_stone;
-        }
+        if (!g_park_fences.has_segment(vertex, neighbour)) continue;
+        const ParkFenceStyle style = park_fence_runtime::segment_style(vertex, neighbour);
+        if (style == ParkFenceStyle::iron_stone) return ParkFenceStyle::iron_stone;
+        if (style == ParkFenceStyle::chainlink) touches_chainlink = true;
     }
-    return ParkFenceStyle::classic_iron;
+    return touches_chainlink ? ParkFenceStyle::chainlink : ParkFenceStyle::classic_iron;
 }
 
 void draw_fence_post(SDL_Renderer* renderer, const FenceVertex vertex,
@@ -320,9 +351,10 @@ void draw_fence_post(SDL_Renderer* renderer, const FenceVertex vertex,
     const ch::ScreenPoint ground = ch::world_to_screen_point(
         static_cast<float>(vertex.x), static_cast<float>(vertex.y),
         view.camera, view.viewport_width, view.viewport_height);
-    const float height = 31.0F * view.camera.zoom;
+    const float height = (style == ParkFenceStyle::chainlink ? 33.0F : 31.0F) * view.camera.zoom;
     const float half_width = std::max(1.0F,
-        (style == ParkFenceStyle::iron_stone ? 2.1F : 1.4F) * view.camera.zoom);
+        (style == ParkFenceStyle::iron_stone ? 2.1F
+         : style == ParkFenceStyle::chainlink ? 1.8F : 1.4F) * view.camera.zoom);
 
     if (style == ParkFenceStyle::iron_stone) {
         const float footing = std::max(2.0F, 3.0F * view.camera.zoom);
@@ -350,9 +382,32 @@ void draw_fence_segment(SDL_Renderer* renderer, const FenceVertex from, const Fe
     const ch::ScreenPoint b = ch::world_to_screen_point(
         static_cast<float>(to.x), static_cast<float>(to.y),
         view.camera, view.viewport_width, view.viewport_height);
-    const float lower = 10.0F * view.camera.zoom;
-    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;
+    const float lower = (style == ParkFenceStyle::chainlink ? 4.0F : 10.0F) * view.camera.zoom;
+    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F
+                         : style == ParkFenceStyle::chainlink ? 29.0F : 22.0F) * view.camera.zoom;
     const float thickness = std::max(1.0F, view.camera.zoom);
+
+    if (style == ParkFenceStyle::chainlink) {
+        set_fence_draw_color(renderer, style, preview, false);
+        for (const float y_offset : {lower, upper}) {
+            SDL_RenderLine(renderer, a.x, a.y - y_offset, b.x, b.y - y_offset);
+        }
+        constexpr int mesh_cells = 8;
+        for (int index = 0; index < mesh_cells; ++index) {
+            const float t0 = static_cast<float>(index) / static_cast<float>(mesh_cells);
+            const float t1 = static_cast<float>(index + 1) / static_cast<float>(mesh_cells);
+            const float x0 = a.x + (b.x - a.x) * t0;
+            const float y0 = a.y + (b.y - a.y) * t0;
+            const float x1 = a.x + (b.x - a.x) * t1;
+            const float y1 = a.y + (b.y - a.y) * t1;
+            SDL_RenderLine(renderer, x0, y0 - lower, x1, y1 - upper);
+            SDL_RenderLine(renderer, x0, y0 - upper, x1, y1 - lower);
+        }
+        set_fence_draw_color(renderer, style, preview, true);
+        SDL_RenderLine(renderer, a.x, a.y - upper - thickness,
+                       b.x, b.y - upper - thickness);
+        return;
+    }
 
     if (style == ParkFenceStyle::iron_stone) {
         const int curb_lines = std::max(2, static_cast<int>(std::round(4.0F * view.camera.zoom)));
@@ -409,8 +464,9 @@ void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
     const float ny = vx / length;
     const ch::ScreenPoint left{a.x + vx * 0.28F, a.y + vy * 0.28F};
     const ch::ScreenPoint right{a.x + vx * 0.72F, a.y + vy * 0.72F};
-    const float lower = 10.0F * view.camera.zoom;
-    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;
+    const float lower = (style == ParkFenceStyle::chainlink ? 4.0F : 10.0F) * view.camera.zoom;
+    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F
+                         : style == ParkFenceStyle::chainlink ? 29.0F : 22.0F) * view.camera.zoom;
     const float leaf_depth = 15.0F * view.camera.zoom;
 
     set_fence_draw_color(renderer, style, false, false);
@@ -429,6 +485,23 @@ void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
                 const float x = hinge.x + nx * leaf_depth * t;
                 const float y = hinge.y + ny * leaf_depth * t;
                 SDL_RenderLine(renderer, x, y - lower, x, y - upper);
+            }
+        }
+    }
+    if (style == ParkFenceStyle::chainlink) {
+        for (const ch::ScreenPoint hinge : {left, right}) {
+            const float tip_x = hinge.x + nx * leaf_depth;
+            const float tip_y = hinge.y + ny * leaf_depth;
+            constexpr int gate_mesh_cells = 4;
+            for (int index = 0; index < gate_mesh_cells; ++index) {
+                const float t0 = static_cast<float>(index) / static_cast<float>(gate_mesh_cells);
+                const float t1 = static_cast<float>(index + 1) / static_cast<float>(gate_mesh_cells);
+                const float x0 = hinge.x + (tip_x - hinge.x) * t0;
+                const float y0 = hinge.y + (tip_y - hinge.y) * t0;
+                const float x1 = hinge.x + (tip_x - hinge.x) * t1;
+                const float y1 = hinge.y + (tip_y - hinge.y) * t1;
+                SDL_RenderLine(renderer, x0, y0 - lower, x1, y1 - upper);
+                SDL_RenderLine(renderer, x0, y0 - upper, x1, y1 - lower);
             }
         }
     }
@@ -608,6 +681,7 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
     const bool model_has_other_selection = !model.selected_building_id.empty() &&
         model.selected_building_id != kParkFenceToolId &&
         model.selected_building_id != kParkIronStoneFenceToolId &&
+        model.selected_building_id != kParkChainlinkFenceToolId &&
         model.selected_building_id != kParkGateToolId;
     if (park_tool_active &&
         (!model.build_panel_open || model.overlay != UiOverlay::none ||
@@ -796,15 +870,20 @@ UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const fl
     if (result.consumed) {
         if (result.action && result.action->action == UiAction::select_building &&
             (result.action->payload == kParkFenceToolId ||
-             result.action->payload == kParkIronStoneFenceToolId)) {
+             result.action->payload == kParkIronStoneFenceToolId ||
+             result.action->payload == kParkChainlinkFenceToolId)) {
             g_park_fence_style = result.action->payload == kParkIronStoneFenceToolId
-                ? ParkFenceStyle::iron_stone : ParkFenceStyle::classic_iron;
+                ? ParkFenceStyle::iron_stone
+                : (result.action->payload == kParkChainlinkFenceToolId
+                    ? ParkFenceStyle::chainlink : ParkFenceStyle::classic_iron);
             g_park_fence_tool_active = true;
             g_park_gate_tool_active = false;
             g_park_fence_placement.cancel_drag();
             g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone
                 ? "GRADE DE FERRO E PEDRA: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"
-                : "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
+                : (g_park_fence_style == ParkFenceStyle::chainlink
+                    ? "ALAMBRADO GALVANIZADO: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"
+                    : "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES");
             result.action.reset();
         } else if (result.action && result.action->action == UiAction::select_building &&
                    result.action->payload == kParkGateToolId) {
@@ -855,7 +934,9 @@ UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const fl
     g_park_fence_placement.begin_drag(*vertex);
     g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone
         ? "GRADE DE FERRO E PEDRA: ARRASTE E SOLTE PARA CONSTRUIR"
-        : "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR";
+        : (g_park_fence_style == ParkFenceStyle::chainlink
+            ? "ALAMBRADO GALVANIZADO: ARRASTE E SOLTE PARA CONSTRUIR"
+            : "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR");
     return result;
 }
 
@@ -888,7 +969,9 @@ void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y
         g_park_fence_status = placed > 0
             ? (g_park_fence_style == ParkFenceStyle::iron_stone
                 ? "GRADE DE FERRO E PEDRA CONSTRUIDA: "
-                : "GRADE DO PARQUE CONSTRUIDA: ") +
+                : (g_park_fence_style == ParkFenceStyle::chainlink
+                    ? "ALAMBRADO GALVANIZADO CONSTRUIDO: "
+                    : "GRADE DO PARQUE CONSTRUIDA: ")) +
               std::to_string(placed) + " PONTO(S) | CONTINUE ARRASTANDO"
             : "GRADE DO PARQUE: TRECHO JA EXISTE";
     } else {
