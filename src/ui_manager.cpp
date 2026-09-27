@@ -26,15 +26,19 @@
 
 namespace {
 
+using ParkFenceStyle = park_fence_runtime::ParkFenceStyle;
+
 constexpr std::string_view kParkCategory = "PARK";
 constexpr std::string_view kLegacyParkCategory = "CITY PARK";
 constexpr std::string_view kParkFenceToolId = "park_fence_classic_iron_v1";
+constexpr std::string_view kParkIronStoneFenceToolId = "park_iron_fence_01";
 constexpr std::string_view kParkGateToolId = "park_gate_classic_iron_v1";
 
 FenceManager& g_park_fences = park_fence_runtime::fences();
 FencePlacementController& g_park_fence_placement = park_fence_runtime::placement();
 bool g_park_fence_tool_active = false;
 bool g_park_gate_tool_active = false;
+ParkFenceStyle g_park_fence_style = ParkFenceStyle::classic_iron;
 std::string g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
 std::optional<UiRect> g_floor_catalog_bounds;
 
@@ -67,7 +71,11 @@ std::unordered_map<std::string, CatalogCardInteractionFx> g_catalog_card_fx;
     }};
 }
 
-[[nodiscard]] std::string park_fence_thumbnail_path() {
+[[nodiscard]] std::string park_fence_thumbnail_path(const ParkFenceStyle style = ParkFenceStyle::classic_iron) {
+    if (style == ParkFenceStyle::iron_stone) {
+        return runtime_asset_path(
+            "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_east.png");
+    }
     return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");
 }
 
@@ -133,9 +141,22 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
             std::string(kParkCategory),
             "SEM CUSTO",
             true,
-            park_fence_thumbnail_path(),
+            park_fence_thumbnail_path(ParkFenceStyle::classic_iron),
             "BORDA DO GRID",
             "CLIQUE E ARRASTE | CONEXAO AUTOMATICA",
+            1,
+        });
+    }
+    if (!has_item(kParkIronStoneFenceToolId)) {
+        model.build_items.push_back({
+            std::string(kParkIronStoneFenceToolId),
+            "Grade de Ferro e Pedra",
+            std::string(kParkCategory),
+            "SEM CUSTO",
+            true,
+            park_fence_thumbnail_path(ParkFenceStyle::iron_stone),
+            "BORDA DO GRID",
+            "CLIQUI E ARRASTE | MURETA DE PEDRA + FERRO",
             1,
         });
     }
@@ -146,7 +167,7 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
             std::string(kParkCategory),
             "SEM CUSTO",
             true,
-            park_fence_thumbnail_path(),
+            park_fence_thumbnail_path(ParkFenceStyle::classic_iron),
             "1 TRECHO",
             "APLIQUE SOBRE UMA CERCA | PASSAGEM LIVRE",
             1,
@@ -162,8 +183,12 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
     if (deficit != std::string::npos) model.status.erase(deficit);
 
     if (g_park_fence_tool_active || g_park_gate_tool_active) {
-        model.selected_building_id = std::string(g_park_gate_tool_active ? kParkGateToolId : kParkFenceToolId);
-        model.placement_preview_path = park_fence_thumbnail_path();
+        const std::string_view active_fence_id = g_park_fence_style == ParkFenceStyle::iron_stone
+            ? kParkIronStoneFenceToolId : kParkFenceToolId;
+        model.selected_building_id = std::string(g_park_gate_tool_active ? kParkGateToolId : active_fence_id);
+        model.placement_preview_path = g_park_gate_tool_active
+            ? park_fence_thumbnail_path(ParkFenceStyle::classic_iron)
+            : park_fence_thumbnail_path(g_park_fence_style);
         model.placement_preview_frame_count = 1;
         model.placement_rotatable = false;
         model.placement_rotation_label = g_park_gate_tool_active ? "PORTAO ABERTO" : "AUTO";
@@ -244,7 +269,18 @@ GameplayUiModel runtime_ui_model(GameplayUiModel model) {
     return nearest && nearest_distance <= maximum_distance * maximum_distance ? nearest : std::nullopt;
 }
 
-void set_fence_draw_color(SDL_Renderer* renderer, const bool preview, const bool highlight) {
+void set_fence_draw_color(SDL_Renderer* renderer, const ParkFenceStyle style,
+                          const bool preview, const bool highlight) {
+    if (style == ParkFenceStyle::iron_stone) {
+        if (preview) {
+            SDL_SetRenderDrawColor(renderer, highlight ? 160 : 104, highlight ? 174 : 123,
+                                   highlight ? 174 : 126, 225);
+        } else {
+            SDL_SetRenderDrawColor(renderer, highlight ? 79 : 35, highlight ? 87 : 40,
+                                   highlight ? 87 : 42, 250);
+        }
+        return;
+    }
     if (preview) {
         SDL_SetRenderDrawColor(renderer, highlight ? 132 : 96, highlight ? 232 : 205,
                                highlight ? 156 : 124, 225);
@@ -254,23 +290,60 @@ void set_fence_draw_color(SDL_Renderer* renderer, const bool preview, const bool
     }
 }
 
+void set_fence_stone_color(SDL_Renderer* renderer, const bool preview, const bool highlight) {
+    if (preview) {
+        SDL_SetRenderDrawColor(renderer, highlight ? 177 : 128, highlight ? 165 : 120,
+                               highlight ? 145 : 108, 220);
+    } else {
+        SDL_SetRenderDrawColor(renderer, highlight ? 150 : 103, highlight ? 140 : 97,
+                               highlight ? 123 : 88, 250);
+    }
+}
+
+[[nodiscard]] ParkFenceStyle fence_style_at_vertex(const FenceVertex vertex) {
+    const std::array<FenceVertex, 4> neighbours = {{
+        {vertex.x + 1, vertex.y}, {vertex.x - 1, vertex.y},
+        {vertex.x, vertex.y + 1}, {vertex.x, vertex.y - 1},
+    }};
+    for (const FenceVertex neighbour : neighbours) {
+        if (g_park_fences.has_segment(vertex, neighbour) &&
+            park_fence_runtime::segment_style(vertex, neighbour) == ParkFenceStyle::iron_stone) {
+            return ParkFenceStyle::iron_stone;
+        }
+    }
+    return ParkFenceStyle::classic_iron;
+}
+
 void draw_fence_post(SDL_Renderer* renderer, const FenceVertex vertex,
-                     const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+                     const ch::runtime_view::ViewSnapshot& view, const bool preview,
+                     const ParkFenceStyle style) {
     const ch::ScreenPoint ground = ch::world_to_screen_point(
         static_cast<float>(vertex.x), static_cast<float>(vertex.y),
         view.camera, view.viewport_width, view.viewport_height);
     const float height = 31.0F * view.camera.zoom;
-    const float half_width = std::max(1.0F, 1.4F * view.camera.zoom);
-    set_fence_draw_color(renderer, preview, false);
+    const float half_width = std::max(1.0F,
+        (style == ParkFenceStyle::iron_stone ? 2.1F : 1.4F) * view.camera.zoom);
+
+    if (style == ParkFenceStyle::iron_stone) {
+        const float footing = std::max(2.0F, 3.0F * view.camera.zoom);
+        set_fence_stone_color(renderer, preview, false);
+        SDL_RenderLine(renderer, ground.x - footing, ground.y,
+                       ground.x + footing, ground.y);
+        SDL_RenderLine(renderer, ground.x - footing, ground.y - view.camera.zoom,
+                       ground.x + footing, ground.y - view.camera.zoom);
+    }
+
+    set_fence_draw_color(renderer, style, preview, false);
     SDL_RenderLine(renderer, ground.x - half_width, ground.y, ground.x - half_width, ground.y - height);
     SDL_RenderLine(renderer, ground.x, ground.y, ground.x, ground.y - height);
     SDL_RenderLine(renderer, ground.x + half_width, ground.y, ground.x + half_width, ground.y - height);
-    set_fence_draw_color(renderer, preview, true);
+    set_fence_draw_color(renderer, style, preview, true);
     SDL_RenderLine(renderer, ground.x - half_width, ground.y - height, ground.x + half_width, ground.y - height);
 }
 
 void draw_fence_segment(SDL_Renderer* renderer, const FenceVertex from, const FenceVertex to,
-                        const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+                        const ch::runtime_view::ViewSnapshot& view, const bool preview,
+                        const ParkFenceStyle style) {
     const ch::ScreenPoint a = ch::world_to_screen_point(
         static_cast<float>(from.x), static_cast<float>(from.y),
         view.camera, view.viewport_width, view.viewport_height);
@@ -278,20 +351,51 @@ void draw_fence_segment(SDL_Renderer* renderer, const FenceVertex from, const Fe
         static_cast<float>(to.x), static_cast<float>(to.y),
         view.camera, view.viewport_width, view.viewport_height);
     const float lower = 10.0F * view.camera.zoom;
-    const float upper = 22.0F * view.camera.zoom;
+    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;
     const float thickness = std::max(1.0F, view.camera.zoom);
 
-    set_fence_draw_color(renderer, preview, false);
+    if (style == ParkFenceStyle::iron_stone) {
+        const int curb_lines = std::max(2, static_cast<int>(std::round(4.0F * view.camera.zoom)));
+        set_fence_stone_color(renderer, preview, false);
+        for (int line = 0; line < curb_lines; ++line) {
+            const float offset = static_cast<float>(line);
+            SDL_RenderLine(renderer, a.x, a.y - offset, b.x, b.y - offset);
+        }
+        set_fence_stone_color(renderer, preview, true);
+        SDL_RenderLine(renderer, a.x, a.y - static_cast<float>(curb_lines),
+                       b.x, b.y - static_cast<float>(curb_lines));
+
+        set_fence_draw_color(renderer, style, preview, false);
+        for (const float y_offset : {lower, upper}) {
+            SDL_RenderLine(renderer, a.x, a.y - y_offset, b.x, b.y - y_offset);
+            SDL_RenderLine(renderer, a.x, a.y - y_offset - thickness,
+                           b.x, b.y - y_offset - thickness);
+        }
+        constexpr int bars = 8;
+        for (int index = 1; index <= bars; ++index) {
+            const float t = static_cast<float>(index) / static_cast<float>(bars + 1);
+            const float x = a.x + (b.x - a.x) * t;
+            const float y = a.y + (b.y - a.y) * t;
+            SDL_RenderLine(renderer, x, y - lower, x, y - upper);
+        }
+        set_fence_draw_color(renderer, style, preview, true);
+        SDL_RenderLine(renderer, a.x, a.y - upper - thickness,
+                       b.x, b.y - upper - thickness);
+        return;
+    }
+
+    set_fence_draw_color(renderer, style, preview, false);
     for (const float y_offset : {lower, upper}) {
         SDL_RenderLine(renderer, a.x, a.y - y_offset, b.x, b.y - y_offset);
         SDL_RenderLine(renderer, a.x, a.y - y_offset - thickness, b.x, b.y - y_offset - thickness);
     }
-    set_fence_draw_color(renderer, preview, true);
+    set_fence_draw_color(renderer, style, preview, true);
     SDL_RenderLine(renderer, a.x, a.y - upper - thickness, b.x, b.y - upper - thickness);
 }
 
 void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
-                            const ch::runtime_view::ViewSnapshot& view) {
+                            const ch::runtime_view::ViewSnapshot& view,
+                            const ParkFenceStyle style) {
     const ch::ScreenPoint a = ch::world_to_screen_point(
         static_cast<float>(segment.from.x), static_cast<float>(segment.from.y),
         view.camera, view.viewport_width, view.viewport_height);
@@ -306,10 +410,10 @@ void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
     const ch::ScreenPoint left{a.x + vx * 0.28F, a.y + vy * 0.28F};
     const ch::ScreenPoint right{a.x + vx * 0.72F, a.y + vy * 0.72F};
     const float lower = 10.0F * view.camera.zoom;
-    const float upper = 22.0F * view.camera.zoom;
+    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;
     const float leaf_depth = 15.0F * view.camera.zoom;
 
-    set_fence_draw_color(renderer, false, false);
+    set_fence_draw_color(renderer, style, false, false);
     for (const float y_offset : {lower, upper}) {
         SDL_RenderLine(renderer, a.x, a.y - y_offset, left.x, left.y - y_offset);
         SDL_RenderLine(renderer, right.x, right.y - y_offset, b.x, b.y - y_offset);
@@ -318,7 +422,17 @@ void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
         SDL_RenderLine(renderer, right.x, right.y - y_offset,
                        right.x + nx * leaf_depth, right.y + ny * leaf_depth - y_offset);
     }
-    set_fence_draw_color(renderer, false, true);
+    if (style == ParkFenceStyle::iron_stone) {
+        for (const ch::ScreenPoint hinge : {left, right}) {
+            for (int index = 1; index <= 3; ++index) {
+                const float t = static_cast<float>(index) / 4.0F;
+                const float x = hinge.x + nx * leaf_depth * t;
+                const float y = hinge.y + ny * leaf_depth * t;
+                SDL_RenderLine(renderer, x, y - lower, x, y - upper);
+            }
+        }
+    }
+    set_fence_draw_color(renderer, style, false, true);
     SDL_RenderLine(renderer, left.x, left.y - upper,
                    left.x + nx * leaf_depth, left.y + ny * leaf_depth - upper);
     SDL_RenderLine(renderer, right.x, right.y - upper,
@@ -327,12 +441,13 @@ void draw_open_gate_segment(SDL_Renderer* renderer, const FenceSegment& segment,
 
 void render_fence_connections(SDL_Renderer* renderer, const FenceVertex vertex,
                               const FenceConnection connections,
-                              const ch::runtime_view::ViewSnapshot& view, const bool preview) {
+                              const ch::runtime_view::ViewSnapshot& view, const bool preview,
+                              const ParkFenceStyle style) {
     if (has_connection(connections, CardinalDirection::east)) {
-        draw_fence_segment(renderer, vertex, {vertex.x + 1, vertex.y}, view, preview);
+        draw_fence_segment(renderer, vertex, {vertex.x + 1, vertex.y}, view, preview, style);
     }
     if (has_connection(connections, CardinalDirection::south)) {
-        draw_fence_segment(renderer, vertex, {vertex.x, vertex.y + 1}, view, preview);
+        draw_fence_segment(renderer, vertex, {vertex.x, vertex.y + 1}, view, preview, style);
     }
 }
 
@@ -342,20 +457,22 @@ void render_park_fences(SDL_Renderer* renderer) {
     if (!view.valid) return;
 
     for (const FenceSegment& segment : g_park_fences.segments()) {
-        if (segment.open_gate) draw_open_gate_segment(renderer, segment, view);
-        else draw_fence_segment(renderer, segment.from, segment.to, view, false);
+        const ParkFenceStyle style = park_fence_runtime::segment_style(segment.from, segment.to);
+        if (segment.open_gate) draw_open_gate_segment(renderer, segment, view, style);
+        else draw_fence_segment(renderer, segment.from, segment.to, view, false, style);
     }
     for (const FenceNode& node : g_park_fences.nodes()) {
-        draw_fence_post(renderer, {node.vertex_x, node.vertex_y}, view, false);
+        const FenceVertex vertex{node.vertex_x, node.vertex_y};
+        draw_fence_post(renderer, vertex, view, false, fence_style_at_vertex(vertex));
     }
 
     if (!g_park_fence_tool_active || !g_park_fence_placement.dragging()) return;
     const std::vector<FencePlacementPreviewNode> preview = g_park_fence_placement.preview_nodes();
     for (const FencePlacementPreviewNode& node : preview) {
-        render_fence_connections(renderer, node.vertex, node.state.connections, view, true);
+        render_fence_connections(renderer, node.vertex, node.state.connections, view, true, g_park_fence_style);
     }
     for (const FencePlacementPreviewNode& node : preview) {
-        draw_fence_post(renderer, node.vertex, view, true);
+        draw_fence_post(renderer, node.vertex, view, true, g_park_fence_style);
     }
 }
 
@@ -489,7 +606,9 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
                                const GameplayUiModel& model) {
     const bool park_tool_active = g_park_fence_tool_active || g_park_gate_tool_active;
     const bool model_has_other_selection = !model.selected_building_id.empty() &&
-        model.selected_building_id != kParkFenceToolId && model.selected_building_id != kParkGateToolId;
+        model.selected_building_id != kParkFenceToolId &&
+        model.selected_building_id != kParkIronStoneFenceToolId &&
+        model.selected_building_id != kParkGateToolId;
     if (park_tool_active &&
         (!model.build_panel_open || model.overlay != UiOverlay::none ||
          model.active_tool != UiTool::buildings || model_has_other_selection)) {
@@ -676,11 +795,16 @@ UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const fl
 
     if (result.consumed) {
         if (result.action && result.action->action == UiAction::select_building &&
-            result.action->payload == kParkFenceToolId) {
+            (result.action->payload == kParkFenceToolId ||
+             result.action->payload == kParkIronStoneFenceToolId)) {
+            g_park_fence_style = result.action->payload == kParkIronStoneFenceToolId
+                ? ParkFenceStyle::iron_stone : ParkFenceStyle::classic_iron;
             g_park_fence_tool_active = true;
             g_park_gate_tool_active = false;
             g_park_fence_placement.cancel_drag();
-            g_park_fence_status = "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
+            g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone
+                ? "GRADE DE FERRO E PEDRA: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"
+                : "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";
             result.action.reset();
         } else if (result.action && result.action->action == UiAction::select_building &&
                    result.action->payload == kParkGateToolId) {
@@ -729,7 +853,9 @@ UiInputResult GameplayUi::handle_mouse_button_down(const float mouse_x, const fl
     }
 
     g_park_fence_placement.begin_drag(*vertex);
-    g_park_fence_status = "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR";
+    g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone
+        ? "GRADE DE FERRO E PEDRA: ARRASTE E SOLTE PARA CONSTRUIR"
+        : "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR";
     return result;
 }
 
@@ -746,9 +872,24 @@ void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y
 
     if (const std::optional<FenceVertex> vertex = nearest_fence_vertex(mouse_x, mouse_y)) {
         g_park_fence_placement.update_drag(*vertex);
+        const std::vector<FenceVertex> route = g_park_fence_placement.preview_route();
+        std::vector<bool> existing_segments;
+        existing_segments.reserve(route.size() > 1 ? route.size() - 1 : 0);
+        for (std::size_t index = 1; index < route.size(); ++index) {
+            existing_segments.push_back(g_park_fences.has_segment(route[index - 1], route[index]));
+        }
+
         const int placed = g_park_fence_placement.commit_drag();
+        for (std::size_t index = 1; index < route.size(); ++index) {
+            if (!existing_segments[index - 1] && g_park_fences.has_segment(route[index - 1], route[index])) {
+                park_fence_runtime::set_segment_style(route[index - 1], route[index], g_park_fence_style);
+            }
+        }
         g_park_fence_status = placed > 0
-            ? "GRADE DO PARQUE CONSTRUIDA: " + std::to_string(placed) + " PONTO(S) | CONTINUE ARRASTANDO"
+            ? (g_park_fence_style == ParkFenceStyle::iron_stone
+                ? "GRADE DE FERRO E PEDRA CONSTRUIDA: "
+                : "GRADE DO PARQUE CONSTRUIDA: ") +
+              std::to_string(placed) + " PONTO(S) | CONTINUE ARRASTANDO"
             : "GRADE DO PARQUE: TRECHO JA EXISTE";
     } else {
         g_park_fence_placement.cancel_drag();
