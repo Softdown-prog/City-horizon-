@@ -106,7 +106,26 @@ def build_asset(asset_id, materials):
         obj = bpy.context.object
         obj.name = name
         obj.data.materials.append(materials[material_key])
-        add_bevel(obj, 0.025, 2)
+        add_bevel(obj, 0.028, 2)
+        scene_gate.tag(obj, role)
+        authored.append(obj)
+        return obj
+
+    def arc_curve(name, angles_deg, radius, z, material_key,
+                  role="ui.camera_rotation.glyph"):
+        curve = bpy.data.curves.new(name=f"{name}Curve", type="CURVE")
+        curve.dimensions = "3D"
+        curve.resolution_u = 2
+        curve.bevel_depth = 0.105
+        curve.bevel_resolution = 4
+        spline = curve.splines.new("POLY")
+        spline.points.add(len(angles_deg) - 1)
+        for point, angle_deg in zip(spline.points, angles_deg):
+            angle = math.radians(angle_deg)
+            point.co = (math.cos(angle) * radius, math.sin(angle) * radius, z, 1.0)
+        obj = bpy.data.objects.new(name, curve)
+        bpy.context.collection.objects.link(obj)
+        obj.data.materials.append(materials[material_key])
         scene_gate.tag(obj, role)
         authored.append(obj)
         return obj
@@ -125,60 +144,50 @@ def build_asset(asset_id, materials):
     box("CameraControlInset", (0.0, 0.0, 0.235), (1.86, 1.76, 0.07),
         "base_light", bevel=0.075, role="ui.camera_rotation.base")
 
-    cylinder("CameraControlButtonShadow", (0.0, 0.0, 0.38), 0.82, 0.26,
+    cylinder("CameraControlButtonShadow", (0.0, 0.0, 0.38), 0.84, 0.26,
              "button_shadow", role="ui.camera_rotation.button")
-    cylinder("CameraControlButton", (0.0, 0.0, 0.54), 0.76, 0.30,
+    cylinder("CameraControlButton", (0.0, 0.0, 0.54), 0.78, 0.30,
              accent_button, role="ui.camera_rotation.button")
-    cylinder("CameraControlButtonFace", (0.0, 0.0, 0.705), 0.64, 0.045,
+    cylinder("CameraControlButtonFace", (0.0, 0.0, 0.705), 0.67, 0.045,
              accent_rim, role="ui.camera_rotation.highlight")
 
-    # C-shaped arrow assembled from tangent arc segments. A full torus looks
-    # ambiguous at HUD scale; this broken arc plus a large triangular arrowhead
-    # keeps rotation direction unmistakable after downsampling.
-    arc_angles = (28.0, 62.0, 96.0, 130.0, 164.0, 198.0)
-    if not left:
-        arc_angles = tuple(180.0 - angle for angle in arc_angles)
-    radius = 0.48
-    for index, angle_deg in enumerate(arc_angles):
-        angle = math.radians(angle_deg)
-        x = math.cos(angle) * radius
-        y = math.sin(angle) * radius
-        tangent = angle_deg + (90.0 if left else -90.0)
-        box(
-            f"CameraArc{index}",
-            (x, y, 0.765),
-            (0.34, 0.17, 0.105),
-            "arrow_white",
-            bevel=0.055,
-            role="ui.camera_rotation.glyph",
-            rotation_z=tangent,
-        )
+    # Proxy v1 read too much like a gauge at HUD size. V2 uses one continuous,
+    # thick C-arrow occupying most of the button face, plus a much larger gold
+    # arrowhead. Direction must be legible even after downsampling to ~34 px.
+    if left:
+        arc_angles = tuple(-45.0 + 17.5 * index for index in range(15))
+        end_angle_deg = arc_angles[-1]
+        tangent_deg = end_angle_deg + 90.0
+    else:
+        arc_angles = tuple(225.0 - 17.5 * index for index in range(15))
+        end_angle_deg = arc_angles[-1]
+        tangent_deg = end_angle_deg - 90.0
 
-    end_angle_deg = arc_angles[-1]
+    arc_curve("CameraRotationArc", arc_angles, 0.49, 0.805, "arrow_white")
+
     end_angle = math.radians(end_angle_deg)
-    arrow_x = math.cos(end_angle) * 0.58
-    arrow_y = math.sin(end_angle) * 0.58
-    # A triangular prism is intentionally oversized relative to the arc so the
-    # direction survives small-size UI rendering and hover scaling.
-    arrow_rotation = end_angle_deg + (-10.0 if left else 190.0)
+    arrow_x = math.cos(end_angle) * 0.54
+    arrow_y = math.sin(end_angle) * 0.54
     triangle_prism(
         "CameraArrowHead",
-        (arrow_x, arrow_y, 0.79),
-        0.31,
-        0.13,
+        (arrow_x, arrow_y, 0.825),
+        0.37,
+        0.15,
         "arrow_gold",
-        arrow_rotation,
+        tangent_deg,
     )
 
-    # Central compass gem adds a lively tycoon accent without competing with
-    # the directional arrow.
-    box("CameraCompassGem", (0.0, 0.0, 0.79), (0.23, 0.23, 0.12),
-        "gem_teal" if left else "gem_purple", bevel=0.045,
-        role="ui.camera_rotation.highlight", rotation_z=45.0)
+    # Small central compass jewel gives the two controls individual color while
+    # remaining subordinate to the large white/gold rotation glyph.
+    cylinder("CameraCompassRing", (0.0, 0.0, 0.81), 0.20, 0.075,
+             "arrow_gold", role="ui.camera_rotation.highlight")
+    cylinder("CameraCompassGem", (0.0, 0.0, 0.855), 0.115, 0.075,
+             "gem_teal" if left else "gem_purple",
+             role="ui.camera_rotation.highlight")
 
     # Small warm highlight on the front edge gives both controls the same toy-
     # like polished read as the existing CH Blender topbar icons.
-    box("CameraControlWarmHighlight", (0.0, -0.74, 0.39), (0.86, 0.10, 0.08),
+    box("CameraControlWarmHighlight", (0.0, -0.74, 0.39), (0.90, 0.10, 0.08),
         "sunny_yellow", bevel=0.035, role="ui.camera_rotation.highlight")
 
     return authored
