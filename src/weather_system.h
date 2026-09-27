@@ -23,8 +23,13 @@ public:
 
     [[nodiscard]] WeatherState state() const { return state_; }
     [[nodiscard]] bool is_raining() const {
+        // Existing runtime call sites pass only a rain bool into citizen logic.
+        // Record the exact queried state so that decision code can still
+        // distinguish sunny from overcast without disturbing that interface.
+        observed_state_ = state_;
         return state_ == WeatherState::raining || state_ == WeatherState::thunderstorm;
     }
+    [[nodiscard]] static WeatherState observed_state() { return observed_state_; }
     [[nodiscard]] const char* state_name() const;
     [[nodiscard]] std::uint8_t tint_alpha() const;
     [[nodiscard]] std::uint8_t flash_alpha() const { return flash_alpha_; }
@@ -36,6 +41,7 @@ private:
     void reset_drop(RainDrop& drop, bool anywhere);
 
     WeatherState state_ = WeatherState::sunny;
+    inline static WeatherState observed_state_ = WeatherState::sunny;
     std::uint32_t random_state_;
     int width_ = 0;
     int height_ = 0;
