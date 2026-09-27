@@ -179,14 +179,8 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 // production automatic-pedestrian mode is active.
 #define mobile_render_entities() \
     ([&]() { \
-        static int ch_budget_month = simulation_clock.date().month; \
-        static int ch_budget_year = simulation_clock.date().year; \
-        const GameDate ch_budget_date = simulation_clock.date(); \
-        if (ch_budget_date.month != ch_budget_month || ch_budget_date.year != ch_budget_year) { \
-            pedestrians.reset_monthly_budgets(); \
-            ch_budget_month = ch_budget_date.month; \
-            ch_budget_year = ch_budget_date.year; \
-        } \
+        const auto ch_budget_date = simulation_clock.date(); \
+        pedestrians.sync_monthly_budget_cycle(ch_budget_date.month, ch_budget_date.year); \
         ch_sync_ferris_wheel_audio_visibility(audio, buildings, catalog); \
         const PedestrianSurfaceNavigationNetwork ch_visit_surfaces{roads, sidewalks}; \
         ch::building_visit_runtime::sync( \
