@@ -40,7 +40,7 @@ set(SDLMIXER_MP3 OFF CACHE BOOL "Disable unused MP3 decoder" FORCE)
 set(SDLMIXER_OPUS OFF CACHE BOOL "Disable unused Opus decoder" FORCE)
 set(SDLMIXER_VOC OFF CACHE BOOL "Disable unused VOC decoder" FORCE)
 set(SDLMIXER_WAVE OFF CACHE BOOL "Disable unused WAV decoder" FORCE)
-set(SDLMIXER_WAVPACK OFF CACHE BOOL "Disable unused WavPack decoder" FORCE)
+set(SDLMIXER_WAVPACK OFF CACHE BOOL "Disable unused WAVPACK decoder" FORCE)
 set(SDLMIXER_VORBIS_STB OFF CACHE BOOL "Use libvorbisfile for OGG decoding" FORCE)
 set(SDLMIXER_VORBIS_VORBISFILE ON CACHE BOOL "Enable OGG Vorbis decoding" FORCE)
 set(SDLMIXER_VORBIS_VORBISFILE_SHARED OFF CACHE BOOL "Link Vorbis decoder statically" FORCE)
@@ -193,8 +193,6 @@ if(BUILD_TESTING)
         src/simulation_clock.cpp
         src/vehicle_system.cpp
     )
-    # The normal target name stays stable; this avoids a file-lock collision
-    # with a previously interrupted test process on this Windows session.
     set_target_properties(economy_simulation_test PROPERTIES OUTPUT_NAME economy_simulation_test_run)
     target_link_libraries(economy_simulation_test PRIVATE ch_core)
     add_test(
@@ -241,6 +239,7 @@ if(BUILD_TESTING)
 
     add_executable(navigation_network_test
         src/navigation_network_test.cpp
+        src/fence_system.cpp
         src/building_system.cpp
         src/economy_system.cpp
         src/farming_system.cpp
@@ -301,8 +300,6 @@ if(BUILD_TESTING)
         src/simulation_clock.cpp
         src/vehicle_system.cpp
     )
-    # Keep this target separate from an interrupted legacy process that can
-    # retain its former executable on Windows.
     set_target_properties(land_system_test PROPERTIES OUTPUT_NAME land_system_test_run)
     target_link_libraries(land_system_test PRIVATE ch_core)
     add_test(
@@ -439,7 +436,6 @@ else()
     target_compile_options(ch_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# Keep the runtime asset path independent from the IDE's working directory.
 add_custom_command(TARGET city_builder POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:SDL3::SDL3-shared>"
@@ -449,13 +445,9 @@ add_custom_command(TARGET city_builder POST_BUILD
         "$<TARGET_FILE_DIR:city_builder>/assets"
 )
 
-# Package the visual candidate for the explicit F7/F8 review. Keep its files
-# in tools/visitor_forge_2d rather than classifying them as approved assets.
 option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" ON)
 if(CH_VISITOR_FORGE_PREVIEW)
     target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
-    # A preview PNG can change without recompiling C++; refresh the packaged
-    # frames on every explicit city_builder build during visual iteration.
     add_custom_target(visitor_forge_preview_copy
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview"
