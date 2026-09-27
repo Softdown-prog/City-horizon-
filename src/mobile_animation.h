@@ -4,8 +4,10 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 // Immutable, shared animation data. Gameplay supplies a state and direction;
@@ -60,8 +62,28 @@ public:
                        MobileEntityDirection direction, float frame_seconds) const;
 
 private:
+    struct TransparentStringHash {
+        using is_transparent = void;
+        [[nodiscard]] std::size_t operator()(const std::string_view value) const noexcept {
+            return std::hash<std::string_view>{}(value);
+        }
+        [[nodiscard]] std::size_t operator()(const std::string& value) const noexcept {
+            return std::hash<std::string_view>{}(value);
+        }
+        [[nodiscard]] std::size_t operator()(const char* value) const noexcept {
+            return std::hash<std::string_view>{}(value);
+        }
+    };
+    using StringIndex = std::unordered_map<std::string, std::size_t, TransparentStringHash, std::equal_to<>>;
+
     [[nodiscard]] const MobileAnimationClip* find_clip(const MobileAnimationSet& set, std::string_view state,
                                                         MobileEntityDirection direction) const;
     [[nodiscard]] std::string_view fallback_for(const MobileAnimationSet& set, std::string_view state) const;
+
     std::vector<MobileAnimationSet> sets_;
+    // Runtime animation resolution happens for every visible mobile entity on
+    // every frame. Keep immutable catalogue IDs indexed so that lookup does not
+    // grow linearly with the number of animation sets or clips.
+    StringIndex set_indices_;
+    std::vector<StringIndex> clip_indices_;
 };

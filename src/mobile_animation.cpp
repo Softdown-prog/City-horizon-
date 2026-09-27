@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -100,6 +101,8 @@ namespace {
 
 bool MobileAnimationCatalog::load_from_directory(const std::filesystem::path& directory) {
     sets_.clear();
+    set_indices_.clear();
+    clip_indices_.clear();
     return append_from_directory(directory);
 }
 
@@ -135,7 +138,16 @@ bool MobileAnimationCatalog::append_from_directory(const std::filesystem::path& 
             }
         }
         if (!set.clips.empty() && find_set(set.id) == nullptr) {
+            const std::size_t set_index = sets_.size();
             sets_.push_back(std::move(set));
+            set_indices_.emplace(sets_.back().id, set_index);
+
+            clip_indices_.emplace_back();
+            StringIndex& clip_index = clip_indices_.back();
+            clip_index.reserve(sets_.back().clips.size());
+            for (std::size_t index = 0; index < sets_.back().clips.size(); ++index) {
+                clip_index.emplace(sets_.back().clips[index].id, index);
+            }
             added = true;
         }
     }
@@ -143,8 +155,9 @@ bool MobileAnimationCatalog::append_from_directory(const std::filesystem::path& 
 }
 
 const MobileAnimationSet* MobileAnimationCatalog::find_set(const std::string_view id) const {
-    for (const MobileAnimationSet& set : sets_) if (set.id == id) return &set;
-    return nullptr;
+    const auto found = set_indices_.find(id);
+    if (found == set_indices_.end() || found->second >= sets_.size()) return nullptr;
+    return &sets_[found->second];
 }
 
 const MobileAnimationClip* MobileAnimationCatalog::find_clip(const MobileAnimationSet& set, const std::string_view state,
@@ -181,10 +194,15 @@ const MobileAnimationClip* MobileAnimationCatalog::resolve_clip(const std::strin
 }
 
 const MobileAnimationClip* MobileAnimationCatalog::find_clip(const std::string_view set_id, const std::string_view clip_id) const {
-    const MobileAnimationSet* set = find_set(set_id);
-    if (set == nullptr) return nullptr;
-    const auto found = std::find_if(set->clips.begin(), set->clips.end(), [&](const MobileAnimationClip& clip) { return clip.id == clip_id; });
-    return found == set->clips.end() ? nullptr : &*found;
+    const auto set_found = set_indices_.find(set_id);
+    if (set_found == set_indices_.end()) return nullptr;
+    const std::size_t set_index = set_found->second;
+    if (set_index >= sets_.size() || set_index >= clip_indices_.size()) return nullptr;
+
+    const StringIndex& clip_index = clip_indices_[set_index];
+    const auto clip_found = clip_index.find(clip_id);
+    if (clip_found == clip_index.end() || clip_found->second >= sets_[set_index].clips.size()) return nullptr;
+    return &sets_[set_index].clips[clip_found->second];
 }
 
 const std::string* MobileAnimationCatalog::current_frame(const MobileAnimationPlayer& player) const {
@@ -214,10 +232,28 @@ void MobileAnimationCatalog::update_player(MobileAnimationPlayer& player, const 
     const float effective_frames_per_second = desired->frames_per_second * std::max(0.0F, player.playback_rate);
     if (effective_frames_per_second <= 0.0F) return;
     const float frame_seconds_per_frame = 1.0F / effective_frames_per_second;
-    while (player.accumulated_seconds >= frame_seconds_per_frame) {
-        player.accumulated_seconds -= frame_seconds_per_frame;
-        if (player.frame_index + 1 < desired->frames.size()) ++player.frame_index;
-        else if (desired->loop) player.frame_index = 0;
-        else { player.frame_index = desired->frames.size() - 1; player.accumulated_seconds = 0.0F; break; }
+    if (player.accumulated_seconds < frame_seconds_per_frame) return;
+
+    // Advance in constant time. A long frame, debugger pause or window stall
+    // must not execute one loop iteration per missed animation frame for every
+    // entity on the following render frame.
+    const std::size_t frame_steps = static_cast<std::size_t>(
+        std::floor(player.accumulated_seconds / frame_seconds_per_frame));
+
+    if (desired->loop) {
+        player.frame_index = (player.frame_index + frame_steps) % desired->frames.size();
+        player.accumulated_seconds = std::fmod(player.accumulated_seconds, frame_seconds_per_frame);
+        return;
+    }
+
+    const std::size_t remaining = desired->frames.size() - 1 -
+        std::min(player.frame_index, desired->frames.size() - 1);
+    const std::size_t advanced = std::min(frame_steps, remaining);
+    player.frame_index += advanced;
+    if (advanced < frame_steps || player.frame_index + 1 >= desired->frames.size()) {
+        player.frame_index = desired->frames.size() - 1;
+        player.accumulated_seconds = 0.0F;
+    } else {
+        player.accumulated_seconds -= static_cast<float>(advanced) * frame_seconds_per_frame;
     }
 }
