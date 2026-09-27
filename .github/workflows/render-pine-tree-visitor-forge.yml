@@ -3,17 +3,6 @@ name: Render Pine Tree Visitor Forge
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'tools/visitor_forge_2d/examples/pine_tree_organic_v1.json'
-      - 'tools/visitor_forge_2d/examples/pine_small_v1.json'
-      - 'tools/visitor_forge_2d/examples/pine_tall_v1.json'
-      - 'tools/visitor_forge_2d/examples/pine_robust_v1.json'
-      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py'
-      - 'tools/visitor_forge_2d/tests/test_organic_scenery.py'
-      - 'tools/visitor_forge_2d/docs/ORGANIC_SCENERY.md'
-      - 'tools/visitor_forge_2d/pyproject.toml'
-      - '.github/workflows/render-pine-tree-visitor-forge.yml'
 
 permissions:
   contents: read

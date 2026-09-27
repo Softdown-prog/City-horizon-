@@ -17,6 +17,7 @@ from .character.concept_rig import build_concept_rig
 from .character.gait_warp import render_directional_gait
 from .character.preview_audit import audit_preview
 from .core.shape_recipe import export_palette_family, export_shape_recipe
+from .workers import run_workers
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -93,6 +94,12 @@ def command_draw_recipe(args: argparse.Namespace) -> int:
                                      palette_path=Path(args.palette) if args.palette else None,
                                      variant=args.variant, seed=args.seed)
     print(json.dumps({"status": "ok", **result}, indent=2))
+    return 0
+
+
+def command_run_workers(args: argparse.Namespace) -> int:
+    result = run_workers(Path(args.recipe), Path(args.output))
+    print(json.dumps(result, indent=2))
     return 0
 
 
@@ -384,6 +391,13 @@ def build_parser() -> argparse.ArgumentParser:
     draw_variant.add_argument("--seed", type=int, help="Deterministically select a palette variant")
     draw_variant.add_argument("--all-variants", action="store_true", help="Render all colorways and one gameplay-size board")
     draw.set_defaults(func=command_draw_recipe)
+
+    workers = subparsers.add_parser(
+        "run-workers", help="validate, render and audit a procedural 2D recipe",
+    )
+    workers.add_argument("--recipe", required=True, help="Shape or organic scenery JSON")
+    workers.add_argument("--output", required=True, help="Root for isolated review outputs")
+    workers.set_defaults(func=command_run_workers)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)

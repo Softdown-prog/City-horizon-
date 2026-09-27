@@ -8,6 +8,8 @@ corretas, o catálogo de teste, os comandos de geração e o gate visual.
 
 **Para desenhar pequenos objetos 2D sem rig de personagem:** use
 [`docs/DESENHO_2D.md`](docs/DESENHO_2D.md) e o comando `draw-recipe`.
+Para processar receitas com ajudantes de validação, render e auditoria e com
+jobs paralelos no GitHub Actions, veja [`docs/WORKERS.md`](docs/WORKERS.md).
 Há uma receita versionada de placa de parque em `examples/park_wayfinding_sign.json`.
 `examples/park_furniture_palette.json` demonstra três cores reproduzíveis e
 `draw-recipe --all-variants` produz o painel conjunto em escala de jogo.
