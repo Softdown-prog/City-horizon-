@@ -30,16 +30,39 @@ bool test_controlled_exponential_growth() {
         out << R"({"id":"dense_home","name":"Dense Home","category":"residential","texture":"house.png",
             "footprint":{"width":1,"height":1},"residentialCapacity":2000})";
     }
+    {
+        std::ofstream out(fixture / "apartment_25.json");
+        out << R"({"id":"apartment_25","name":"Apartment 25","category":"residential","texture":"apartment.png",
+            "footprint":{"width":2,"height":2},"residentialCapacity":25})";
+    }
 
     BuildingCatalog catalog;
     bool ok = require(catalog.load_from_directory(fixture), "growth fixture catalog loads");
     const BuildingDefinition* home = catalog.find("dense_home");
+    const BuildingDefinition* apartment = catalog.find("apartment_25");
     ok &= require(home != nullptr && home->residential_capacity == 2000,
                   "growth fixture exposes large residential capacity");
+    ok &= require(apartment != nullptr && apartment->residential_capacity == 25,
+                  "residential capacity remains authored per building type");
     if (!ok) {
         std::filesystem::remove_all(fixture);
         return false;
     }
+
+    BuildingManager apartment_buildings(-4, 4);
+    const auto apartment_id = apartment_buildings.place(*apartment, 0, 0);
+    ok &= require(apartment_id.has_value(), "twenty-five resident apartment places");
+    PopulationSystem apartment_population;
+    apartment_population.rebuild_capacity(apartment_buildings, catalog);
+    ok &= require(apartment_population.residential_capacity() == 25,
+                  "an apartment contributes all twenty-five authored resident slots");
+    apartment_population.restore_current_population(25, apartment_buildings, catalog);
+    const BuildingInstance* apartment_instance = apartment_id
+        ? apartment_buildings.find_by_id(*apartment_id)
+        : nullptr;
+    ok &= require(apartment_instance != nullptr &&
+                      apartment_population.residents_for(*apartment_instance, apartment_buildings, catalog) == 25,
+                  "resident assignment uses the building's authored capacity rather than a hard-coded house size");
 
     BuildingManager buildings(-4, 4);
     ok &= require(buildings.place(*home, 0, 0).has_value(), "growth fixture residence places");
@@ -53,8 +76,8 @@ bool test_controlled_exponential_growth() {
                   "potential and actual growth are exposed for UI and balancing");
 
     population.restore_current_population(10, buildings, catalog);
-    ok &= require(population.advance_month(buildings, catalog) == 4,
-                  "small towns retain the four-resident starter migration floor");
+    ok &= require(population.advance_month(buildings, catalog) == 5,
+                  "small towns retain the five-resident starter migration floor");
 
     population.restore_current_population(2000, buildings, catalog);
     ok &= require(population.advance_month(buildings, catalog) == 0,
@@ -77,11 +100,11 @@ int main(const int argc, char** argv) {
     if (!require(catalog.load_from_directory(argv[1]), "catalog loads")) {
         return 1;
     }
-    const BuildingDefinition* house = catalog.find("house_suburban_01");
-    if (!require(house != nullptr && house->category == "residential" && house->residential_capacity == 4 &&
+    const BuildingDefinition* house = catalog.find("residential_suburban_cottage_01");
+    if (!require(house != nullptr && house->category == "residential" && house->residential_capacity == 5 &&
                      house->property_tax_per_year == 240 && house->tax_revenue_per_month == 0 &&
                      house->maintenance_per_month == 0,
-                 "residential capacity and annual property tax come from the house definition")) {
+                 "basic house contributes five residents and keeps its authored economics")) {
         return 1;
     }
 
@@ -98,14 +121,14 @@ int main(const int argc, char** argv) {
         return 1;
     }
     population.rebuild_capacity(buildings, catalog);
-    if (!require(population.residential_capacity() == 4 && population.current_population() == 0,
-                 "one house contributes its full capacity immediately")) {
+    if (!require(population.residential_capacity() == 5 && population.current_population() == 0,
+                 "one basic house contributes five resident slots immediately")) {
         return 1;
     }
 
     CityEconomy economy;
-    if (!require(population.advance_month(buildings, catalog) == 4 && population.current_population() == 4,
-                 "starter migration fills the first available residence at monthly settlement")) {
+    if (!require(population.advance_month(buildings, catalog) == 5 && population.current_population() == 5,
+                 "starter migration fills the five-person basic house at monthly settlement")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 2, 1});
@@ -118,7 +141,7 @@ int main(const int argc, char** argv) {
     for (int month = 0; month < 3; ++month) {
         (void)population.advance_month(buildings, catalog);
     }
-    if (!require(population.current_population() == 4 && population.advance_month(buildings, catalog) == 0,
+    if (!require(population.current_population() == 5 && population.advance_month(buildings, catalog) == 0,
                  "population stops exactly at residential capacity")) {
         return 1;
     }
@@ -159,17 +182,17 @@ int main(const int argc, char** argv) {
     population.rebuild_capacity(buildings, catalog);
     const BuildingInstance* first_house = buildings.find_by_id(*first_house_id);
     const BuildingInstance* second_house = buildings.find_by_id(*second_house_id);
-    if (!require(population.residential_capacity() == 8 && population.current_population() == 4 &&
+    if (!require(population.residential_capacity() == 10 && population.current_population() == 5 &&
                      first_house != nullptr && second_house != nullptr &&
-                     population.residents_for(*first_house, buildings, catalog) == 4 &&
+                     population.residents_for(*first_house, buildings, catalog) == 5 &&
                      population.residents_for(*second_house, buildings, catalog) == 0,
-                 "capacity grows without duplicating existing residents")) {
+                 "a second basic house adds another five slots without duplicating residents")) {
         return 1;
     }
     (void)population.advance_month(buildings, catalog);
-    if (!require(population.residents_for(*first_house, buildings, catalog) == 4 &&
-                     population.residents_for(*second_house, buildings, catalog) == 4,
-                 "residents are deterministically assigned to newly available homes")) {
+    if (!require(population.residents_for(*first_house, buildings, catalog) == 5 &&
+                     population.residents_for(*second_house, buildings, catalog) == 5,
+                 "residents are deterministically assigned to each home's authored five-person capacity")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 1, 3});

@@ -7,10 +7,6 @@
 
 namespace {
 
-[[nodiscard]] bool has_residential_capacity(const BuildingDefinition& definition) {
-    return definition.residential_capacity != 0;
-}
-
 [[nodiscard]] std::uint32_t saturating_u32(const std::uint64_t value) {
     return static_cast<std::uint32_t>(
         std::min<std::uint64_t>(value, std::numeric_limits<std::uint32_t>::max()));
@@ -68,6 +64,8 @@ std::uint32_t PopulationSystem::housing_demand_cap() const {
 
 void PopulationSystem::rebuild_capacity(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                         const PowerSystem* power, const RoadManager* roads) {
+    // Power is intentionally ignored by Population Growth V1. Keep the parameter
+    // only for API/save compatibility with older callers.
     (void)power;
     std::uint64_t total = 0;
     std::uint64_t usable_total = 0;
@@ -157,8 +155,10 @@ std::uint32_t PopulationSystem::residents_for(const BuildingInstance& instance,
     std::uint32_t remaining = current_population_;
     for (const BuildingInstance& candidate : buildings.instances()) {
         const BuildingDefinition* definition = catalog.find(candidate.definition_id);
-        if (definition == nullptr || !has_residential_capacity(*definition)) continue;
-        const std::uint32_t assigned = std::min(remaining, definition->residential_capacity);
+        if (definition == nullptr) continue;
+        const std::uint32_t capacity = candidate.current_level_definition(*definition).residential_capacity;
+        if (capacity == 0) continue;
+        const std::uint32_t assigned = std::min(remaining, capacity);
         if (candidate.instance_id == instance.instance_id) return assigned;
         remaining -= assigned;
     }
