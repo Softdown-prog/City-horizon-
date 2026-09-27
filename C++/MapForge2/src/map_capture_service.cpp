@@ -93,33 +93,78 @@ void drawPortalMarker(QPainter& painter, const QJsonObject& portal,
                       const ch::CameraState& camera, const int width, const int height) {
     if (!portal.value("enabled").toBool(false)) return;
     const QPointF tile = pairOr(portal, "tile", QPointF(0.0, 0.0));
-    const QPolygonF polygon = tilePolygon(static_cast<int>(tile.x()), static_cast<int>(tile.y()), camera, width, height);
-    const QColor color = colorOr(portal, "color", QColor(255, 192, 62, 245));
-    QPen pen(color);
-    pen.setWidthF(3.0);
-    painter.setPen(pen);
+    const int tileX = static_cast<int>(tile.x());
+    const int tileY = static_cast<int>(tile.y());
+    const QColor accent = colorOr(portal, "color", QColor(255, 192, 62, 245));
+
+    // Show only a short approach outside the starter parcel. The road belongs to
+    // the world connection, not to the player's buildable land, so it never steals
+    // useful starter tiles or crosses locked expansion parcels.
+    const bool drawApproach = portal.value("drawApproach").toBool(true);
+    if (drawApproach) {
+        const QPolygonF outside = tilePolygon(tileX - 1, tileY, camera, width, height);
+        painter.setPen(QPen(QColor(47, 51, 54, 245), 1.0));
+        painter.setBrush(QColor(58, 62, 65, 245));
+        painter.drawPolygon(outside);
+
+        const QPointF leftMid = (outside.at(0) + outside.at(3)) * 0.5;
+        const QPointF rightMid = (outside.at(1) + outside.at(2)) * 0.5;
+        painter.setPen(QPen(QColor(224, 190, 70, 220), 1.8));
+        painter.drawLine(leftMid, rightMid);
+    }
+
+    // Connection tile receives a restrained edge highlight rather than a debug
+    // crosshair. The highlight is useful in capture/tutorial material but reads
+    // as a gateway, not an editor gizmo.
+    const QPolygonF polygon = tilePolygon(tileX, tileY, camera, width, height);
+    QPen portalPen(accent);
+    portalPen.setWidthF(2.2);
+    painter.setPen(portalPen);
     painter.setBrush(Qt::NoBrush);
-    painter.drawPolygon(polygon);
+    painter.drawPolyline(polygon);
 
-    const auto center = ch::world_to_screen_point(static_cast<float>(tile.x()) + 0.5F,
-                                                   static_cast<float>(tile.y()) + 0.5F,
+    const auto center = ch::world_to_screen_point(static_cast<float>(tile.x()) - 0.10F,
+                                                   static_cast<float>(tile.y()) + 0.36F,
                                                    camera, width, height);
-    painter.drawLine(QPointF(center.x - 14.0, center.y), QPointF(center.x + 14.0, center.y));
-    painter.drawLine(QPointF(center.x, center.y - 14.0), QPointF(center.x, center.y + 14.0));
 
-    const QString label = portal.value("label").toString(QStringLiteral("PORTAL RODOVIARIO"));
+    // Small roadside sign mounted just outside the parcel boundary.
+    const QRectF sign(center.x - 78.0, center.y - 78.0, 156.0, 48.0);
+    painter.setPen(QPen(QColor(216, 225, 218, 255), 2.0));
+    painter.setBrush(QColor(28, 92, 79, 248));
+    painter.drawRoundedRect(sign, 5.0, 5.0);
+    painter.setPen(QPen(QColor(112, 120, 110, 255), 3.0));
+    painter.drawLine(QPointF(sign.left() + 25.0, sign.bottom()), QPointF(sign.left() + 25.0, sign.bottom() + 24.0));
+    painter.drawLine(QPointF(sign.right() - 25.0, sign.bottom()), QPointF(sign.right() - 25.0, sign.bottom() + 24.0));
+
     QFont font = painter.font();
     font.setBold(true);
-    font.setPointSize(11);
+    font.setPointSize(10);
     painter.setFont(font);
-    painter.drawText(QPointF(center.x + 18.0, center.y - 12.0), label);
+    painter.setPen(QColor(242, 247, 239, 255));
+    const QString signLabel = portal.value("signLabel").toString(QStringLiteral("CITY HORIZON"));
+    painter.drawText(sign.adjusted(8.0, 5.0, -8.0, -22.0), Qt::AlignCenter, signLabel);
+    font.setBold(false);
+    font.setPointSize(8);
+    painter.setFont(font);
+    const QString signDetail = portal.value("signDetail").toString(QStringLiteral("ENTRADA DA CIDADE"));
+    painter.drawText(sign.adjusted(8.0, 23.0, -8.0, -4.0), Qt::AlignCenter, signDetail);
 
-    const QString detail = portal.value("detail").toString();
-    if (!detail.isEmpty()) {
-        font.setBold(false);
-        font.setPointSize(9);
+    if (portal.value("showTutorialLabel").toBool(false)) {
+        const QString label = portal.value("label").toString(QStringLiteral("CONEXAO RODOVIARIA"));
+        font.setBold(true);
+        font.setPointSize(10);
         painter.setFont(font);
-        painter.drawText(QPointF(center.x + 18.0, center.y + 8.0), detail);
+        painter.setPen(accent);
+        painter.drawText(QPointF(center.x + 92.0, center.y - 46.0), label);
+
+        const QString detail = portal.value("detail").toString();
+        if (!detail.isEmpty()) {
+            font.setBold(false);
+            font.setPointSize(8);
+            painter.setFont(font);
+            painter.setPen(QColor(225, 235, 230, 245));
+            painter.drawText(QPointF(center.x + 92.0, center.y - 27.0), detail);
+        }
     }
 }
 
