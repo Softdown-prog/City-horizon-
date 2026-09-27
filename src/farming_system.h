@@ -50,6 +50,9 @@ public:
     [[nodiscard]] const std::vector<CropDefinition>& definitions() const;
 private:
     std::vector<CropDefinition> definitions_;
+    // Runtime growth/harvest/render paths resolve crop ids frequently. Keep an
+    // index so lookups stay O(1) as more crop definitions are added.
+    std::unordered_map<std::string, std::size_t> definition_indices_;
 };
 
 enum class FarmTileState : std::uint8_t { prepared_soil, planted, ready_to_harvest };
