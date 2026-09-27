@@ -1491,6 +1491,8 @@ int main() {
 #if defined(CH_VISITOR_FORGE_PREVIEW)
     // Visitor Forge remains a review candidate: only the F8 test selects this set.
     preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/visitor_forge_2d/runtime_preview");
+    preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/ch_actor_lab/runtime_preview") ||
+                                preview_animations_loaded;
 #endif
     if (!approved_animations_loaded && !preview_animations_loaded) {
         std::cerr << "No valid mobile animation sets were loaded; directional static sprites remain available.\n";
@@ -1720,7 +1722,8 @@ int main() {
     int mixamo_gait_preset_index = 2;
     // Start the explicit F7 test with the character the player is reviewing.
     // Other looks remain available through F8; no NPC is spawned automatically.
-    int pedestrian_visual_index = mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") != nullptr ? 5 :
+    int pedestrian_visual_index = mobile_animations.find_set("ch_actor_software_v1") != nullptr ? 7 :
+        mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") != nullptr ? 5 :
         mobile_animations.find_set("visitor_male_01_south_front_candidate") != nullptr ? 4 : 0;
     const auto pedestrian_visual_id = [&]() -> std::string_view {
         switch (pedestrian_visual_index) {
@@ -1730,6 +1733,7 @@ int main() {
             case 4: return "visitor_male_01_south_front_candidate";
             case 5: return "visitor_male_01_full_pose_east_candidate";
             case 6: return "visitor_male_01_structural_gait_v2_candidate";
+            case 7: return "ch_actor_software_v1";
             default: return "worker_cleaner_female";
         }
     };
@@ -1741,10 +1745,16 @@ int main() {
             case 4: return "VISITOR FOUR DIRECTION GAIT";
             case 5: return "VISITOR FULL POSE EAST";
             case 6: return "VISITOR STRUCTURAL GAIT V2";
+            case 7: return "CH ACTOR SOFTWARE V1";
             default: return "CLEANER";
         }
     };
     const auto pedestrian_visual_preset = [&](const float speed) {
+        if (pedestrian_visual_index == 7) {
+            // Native 48x64 candidate: projected ground origin at [24,60].
+            return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F,
+                                              0.5F, 60.0F / 64.0F, speed, 1.0F, 0.5F, 0.72F};
+        }
         if (pedestrian_visual_index >= 3) {
             // 128 px canvas, 97 px body: 97 * (56 / 97) = 56 px at zoom 1.
             // The shared foot pivot is [64, 116] in every direction and pose.
@@ -1762,10 +1772,13 @@ int main() {
                 default: return 0.80F;
             }
         }();
-        const PedestrianVisualDefinition preset = pedestrian_visual_preset(speed);
-        const char* preset_name = mixamo_gait_preset_index == 0 ? "A 0.50" : mixamo_gait_preset_index == 1 ? "B 0.65" : "C 0.80";
+        const float selected_speed = pedestrian_visual_index == 7 ? 0.30F : speed;
+        const PedestrianVisualDefinition preset = pedestrian_visual_preset(selected_speed);
+        const char* preset_name = pedestrian_visual_index == 7 ? "CH 0.30" :
+            mixamo_gait_preset_index == 0 ? "A 0.50" : mixamo_gait_preset_index == 1 ? "B 0.65" : "C 0.80";
         const bool visitor_preview = pedestrian_visual_index >= 3;
-        const int duration_ms = pedestrian_visual_index == 5 ? 270 : visitor_preview ? 220 : 175;
+        const int duration_ms = pedestrian_visual_index == 7 ? 138 :
+            pedestrian_visual_index == 5 ? 270 : visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
         constexpr int kRequiredSidewalkTiles = 6;
         const PedestrianLaneNavigationNetwork network{roads};
@@ -3186,7 +3199,8 @@ int main() {
                         send_mixamo_se_test();
                         break;
                     case SDL_SCANCODE_F8: {
-                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
+                        const int visual_count = mobile_animations.find_set("ch_actor_software_v1") != nullptr ? 8 :
+                            mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
                             mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :
                             mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 :
                             mobile_animations.find_set("visitor_male_01_structural_gait_v2_candidate") == nullptr ? 6 : 7;

@@ -1,0 +1,46 @@
+{
+  "contract": "CH_ACTOR_SOFTWARE_CANDIDATE_V1",
+  "status": "CANDIDATE",
+  "camera": {
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "projection": "orthographic"
+  },
+  "frame": {
+    "width": 48,
+    "height": 64,
+    "anchor": [
+      24,
+      60
+    ]
+  },
+  "sheet": {
+    "width": 384,
+    "height": 256,
+    "rows": [
+      "S",
+      "E",
+      "W",
+      "N"
+    ],
+    "framePhases": [
+      0.0,
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875
+    ]
+  },
+  "palette": {
+    "jacket": "#15803d",
+    "shirt": "#f8fafc",
+    "pants": "#1d4ed8",
+    "hair": "#5a3825",
+    "skin": "#f6c29e",
+    "shoes": "#1f2937"
+  },
+  "runtimePromotion": false
+}

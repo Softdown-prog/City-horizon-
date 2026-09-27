@@ -1,0 +1,114 @@
+{
+  "id": "ch_actor_software_v1",
+  "status": "candidate_f8_only",
+  "clips": [
+    {
+      "id": "idle_south",
+      "state": "idle",
+      "direction": "south",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/s_idle.png"
+      ]
+    },
+    {
+      "id": "walking_south",
+      "state": "walking",
+      "direction": "south",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_00.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_01.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_02.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_03.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_04.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_05.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_06.png",
+        "tools/ch_actor_lab/art/software_v1/frames/s_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_east",
+      "state": "idle",
+      "direction": "east",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/e_idle.png"
+      ]
+    },
+    {
+      "id": "walking_east",
+      "state": "walking",
+      "direction": "east",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_00.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_01.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_02.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_03.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_04.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_05.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_06.png",
+        "tools/ch_actor_lab/art/software_v1/frames/e_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_west",
+      "state": "idle",
+      "direction": "west",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/w_idle.png"
+      ]
+    },
+    {
+      "id": "walking_west",
+      "state": "walking",
+      "direction": "west",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_00.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_01.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_02.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_03.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_04.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_05.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_06.png",
+        "tools/ch_actor_lab/art/software_v1/frames/w_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_north",
+      "state": "idle",
+      "direction": "north",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/n_idle.png"
+      ]
+    },
+    {
+      "id": "walking_north",
+      "state": "walking",
+      "direction": "north",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_00.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_01.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_02.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_03.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_04.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_05.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_06.png",
+        "tools/ch_actor_lab/art/software_v1/frames/n_walk_07.png"
+      ]
+    }
+  ]
+}

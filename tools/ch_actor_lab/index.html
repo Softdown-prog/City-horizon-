@@ -90,11 +90,12 @@
   add(torso,new THREE.BoxGeometry(.09,.28,.05),palette.shirt,0,.16,.12);
   for(const x of [-.07,.07]) add(torso,new THREE.BoxGeometry(.045,.29,.05),palette.jacket,x,.16,.135);
   const head=new THREE.Group(); head.position.y=.32; torso.add(head);
-  const face=add(head,new THREE.SphereGeometry(.15,12,10),palette.skin,0,.14,0); face.scale.set(.9,1.05,.9);
+  // Keep the face ahead of the hair shell in both front quarter views.
+  const face=add(head,new THREE.SphereGeometry(.15,12,10),palette.skin,0,.14,.065); face.scale.set(.9,1.05,.9);
   // Meia esfera superior: o cabelo não cobre o rosto frontal.
-  const cap=add(head,new THREE.SphereGeometry(.17,12,10,0,Math.PI*2,0,Math.PI*.58),palette.hair,0,.17,-.02); cap.scale.set(.96,.92,1);
-  add(head,new THREE.SphereGeometry(.045,8,6),palette.hair,0,.24,.125);
-  for(const x of [-.055,.055]) add(head,new THREE.SphereGeometry(.01,6,4),palette.hair,x,.155,.133);
+  const cap=add(head,new THREE.SphereGeometry(.17,12,10,0,Math.PI*2,0,Math.PI*.58),palette.hair,0,.17,-.055); cap.scale.set(.96,.92,1);
+  add(head,new THREE.SphereGeometry(.045,8,6),palette.hair,0,.24,.15);
+  for(const x of [-.055,.055]) add(head,new THREE.SphereGeometry(.012,6,4),palette.hair,x,.155,.202);
   const arms=[];
   for(const sign of [-1,1]) {const arm=new THREE.Group(); arm.position.set(sign*.17,.29,0); torso.add(arm); arms.push(arm);
     add(arm,new THREE.CylinderGeometry(.052,.047,.22,8),palette.jacket,0,-.11,0);
