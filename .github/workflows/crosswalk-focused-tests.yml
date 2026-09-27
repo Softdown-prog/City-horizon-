@@ -1,0 +1,24 @@
+name: Crosswalk Focused Tests
+
+on:
+  push:
+    paths:
+      - '.github/workflows/crosswalk-focused-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL configure dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev libasound2-dev
+      - name: Configure
+        run: cmake -S . -B build-crosswalk -DBUILD_TESTING=ON
+      - name: Build focused targets
+        run: cmake --build build-crosswalk --target navigation_network_test vehicle_traffic_test -j2
+      - name: Run focused tests
+        run: |
+          ./build-crosswalk/navigation_network_test
+          ./build-crosswalk/vehicle_traffic_test
