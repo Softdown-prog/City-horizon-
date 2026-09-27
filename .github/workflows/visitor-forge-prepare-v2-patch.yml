@@ -38,9 +38,13 @@ jobs:
           rt = str(out / 'main_runtime_impl.cpp')
 
           replace_once(cm,
-              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n',
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1"\n'
               '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n'
-              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"\n')
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n',
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"\n'
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n')
           replace_once(cm,
               '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
               '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"\n'
