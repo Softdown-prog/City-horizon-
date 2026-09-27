@@ -42,6 +42,12 @@
     ],
     "FerrisWheelRunning": [
       "attractions/ferris_wheel_running.ogg"
+    ],
+    "WeatherRain": [
+      "weather/rain_calm.ogg"
+    ],
+    "WeatherThunder": [
+      "weather/thunder.ogg"
     ]
   },
   "music": {
