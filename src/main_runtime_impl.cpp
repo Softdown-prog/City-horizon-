@@ -1728,6 +1728,7 @@ int main() {
             case 3: return "visitor_male_01_forge_preview";
             case 4: return "visitor_male_01_south_front_candidate";
             case 5: return "visitor_male_01_full_pose_east_candidate";
+            case 6: return "visitor_male_01_structural_gait_v2_candidate";
             default: return "worker_cleaner_female";
         }
     };
@@ -1738,6 +1739,7 @@ int main() {
             case 3: return "VISITOR FORGE PREVIEW";
             case 4: return "VISITOR FOUR DIRECTION GAIT";
             case 5: return "VISITOR FULL POSE EAST";
+            case 6: return "VISITOR STRUCTURAL GAIT V2";
             default: return "CLEANER";
         }
     };
@@ -3185,7 +3187,8 @@ int main() {
                     case SDL_SCANCODE_F8: {
                         const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
                             mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :
-                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 : 6;
+                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 :
+                            mobile_animations.find_set("visitor_male_01_structural_gait_v2_candidate") == nullptr ? 6 : 7;
                         pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
                         // Keep review candidates slow enough for each contact
                         // pose to read against world movement.
