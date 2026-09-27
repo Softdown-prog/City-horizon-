@@ -1,10 +1,7 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "repositoryFile": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_south_animation.png",
-    "frameIndex": 0,
-    "frameWidth": 256,
-    "frameHeight": 256
+    "repositoryFile": "assets/roads/premium_01/road_10.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -18,11 +15,11 @@
     },
     "camera": {
       "zoom": 0.92,
-      "focusTile": [0.5, 0.5],
+      "focusTile": [-13.5, 0.5],
       "focusScreen": [0.5, 0.58]
     },
     "stage": {
-      "minTile": -6,
+      "minTile": -18,
       "maxTile": 6,
       "groundColor": "#708963",
       "alternateGroundColor": "#768f69",
@@ -32,15 +29,21 @@
       "grassSpeckleColor": "#5f7f50"
     },
     "candidate": {
-      "tile": [0.5, 0.5],
-      "footprint": [4, 3],
-      "scale": 2.0,
-      "offsetPixels": [128, 96],
-      "showFootprint": true,
-      "showAnchor": true,
-      "renderAsGroundTile": false,
-      "footprintColor": "#f6c448",
-      "anchorColor": "#ffd640"
+      "tile": [-16, 0],
+      "tiles": [[-16, 0], [-15, 0], [-14, 0], [-13, 0], [-12, 0], [-11, 0]],
+      "footprint": [1, 1],
+      "scale": 1.0,
+      "offsetPixels": [0, 0],
+      "showFootprint": false,
+      "showAnchor": false,
+      "renderAsGroundTile": true
+    },
+    "portal": {
+      "enabled": true,
+      "tile": [-16, 0],
+      "color": "#ffc03e",
+      "label": "PORTAL RODOVIARIO",
+      "detail": "CONEXAO COM O MUNDO EXTERIOR"
     }
   }
 }
