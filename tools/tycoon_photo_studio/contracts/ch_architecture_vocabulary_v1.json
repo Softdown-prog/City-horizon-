@@ -1,0 +1,92 @@
+{
+  "contract": "CH_ARCHITECTURE_VOCABULARY_V1",
+  "purpose": "Reusable architectural art vocabulary for deterministic CH Blender asset authoring.",
+  "policy": {
+    "cameraOwnedByStudio": true,
+    "renderOwnedByStudio": true,
+    "qualityGateOwnedByGuardedBuilder": true,
+    "modulesOwnGeometryVocabularyOnly": true,
+    "assetSpecificOverridesAllowed": true,
+    "approvedAssetGeometryMustNotChangeSilently": true
+  },
+  "phases": {
+    "1": "silhouette_and_primary_read",
+    "2": "grounding_materials_and_lighting",
+    "3": "ornament_and_personality"
+  },
+  "modules": [
+    {
+      "id": "roof_form",
+      "phase": 1,
+      "scope": ["gable", "hip", "dormer", "eave", "ridge"],
+      "goal": "Stable readable roof silhouettes before micro detail."
+    },
+    {
+      "id": "roof_surface",
+      "phase": 1,
+      "scope": ["shingle_courses", "staggered_joints", "ridge_caps", "metal_or_tile_variants"],
+      "goal": "Prevent flat block-like roofs while preserving gameplay readability."
+    },
+    {
+      "id": "windows",
+      "phase": 1,
+      "scope": ["frames", "mullions", "sills", "casings", "warm_glass"],
+      "goal": "Make openings readable and consistent at game scale."
+    },
+    {
+      "id": "entrances",
+      "phase": 1,
+      "scope": ["doors", "panels", "stoops", "porches", "columns", "entry_lamps"],
+      "goal": "Give each building a clear functional front."
+    },
+    {
+      "id": "architectural_trim",
+      "phase": 1,
+      "scope": ["fascia", "gutters", "corner_boards", "cornice", "edge_hierarchy"],
+      "goal": "Break boxy massing with reusable edge language."
+    },
+    {
+      "id": "foundation",
+      "phase": 2,
+      "scope": ["base_courses", "plinths", "steps", "ground_contact"],
+      "goal": "Seat assets convincingly on terrain without baking public sidewalks."
+    },
+    {
+      "id": "ornamental_vegetation",
+      "phase": 3,
+      "scope": ["shrubs", "flower_clusters", "mulch_beds", "low_private_landscaping"],
+      "goal": "Raise visual richness without hiding entrances or exceeding the footprint."
+    },
+    {
+      "id": "emissive_lighting",
+      "phase": 2,
+      "scope": ["windows", "lamps", "shopfronts"],
+      "goal": "Standardize warm readable emissive surfaces without requiring activity overlays."
+    },
+    {
+      "id": "wall_surfaces",
+      "phase": 2,
+      "scope": ["siding", "plaster", "masonry", "timber", "concrete"],
+      "goal": "Create facade variety through low-noise reusable surface families."
+    },
+    {
+      "id": "small_arch_props",
+      "phase": 3,
+      "scope": ["chimneys", "downspouts", "vents", "awnings", "small_signs", "planters"],
+      "goal": "Add personality late, after silhouette and primary read are already valid."
+    }
+  ],
+  "authoringOrder": [
+    "roof_form",
+    "roof_surface",
+    "windows",
+    "entrances",
+    "architectural_trim",
+    "foundation",
+    "wall_surfaces",
+    "emissive_lighting",
+    "ornamental_vegetation",
+    "small_arch_props"
+  ],
+  "reviewRule": "A module may be technically valid without being visually approved. New variants still require proxy review through the guarded CH Blender workflow."
+}
