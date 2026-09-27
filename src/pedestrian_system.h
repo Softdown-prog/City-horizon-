@@ -51,8 +51,11 @@ struct PedestrianInstance {
     MobileClothingTint clothing;
     MobileClothingColor umbrella_color;
 
-    // Citizen Economy V1. Currency is stored in cents so CH_SERVICE_PRICE_V1
+    // Citizen Economy V2. Currency is stored in cents so CH_SERVICE_PRICE_V1
     // can be charged exactly without migrating the aggregate city treasury.
+    // Each citizen keeps an authored-by-rule monthly allowance; there is no
+    // explicit social-class gameplay model, profession or salary location.
+    std::int64_t monthly_budget_capacity_cents = 5'000;
     std::int64_t monthly_budget_cents = 5'000;
     PedestrianOutingIntent outing_intent;
 };
@@ -62,7 +65,10 @@ struct PedestrianInstance {
 // let the same storage safely scale to many simultaneously active citizens.
 class PedestrianSystem {
 public:
-    static constexpr std::int64_t kDefaultMonthlyBudgetCents = 5'000; // $50.00 tuning baseline.
+    static constexpr std::int64_t kDefaultMonthlyBudgetCents = 5'000; // lowest household-spending baseline.
+    static constexpr std::int64_t kMiddleMonthlyBudgetCents = 9'000;
+    static constexpr std::int64_t kUpperMonthlyBudgetCents = 15'000;
+    static constexpr std::int64_t kHighMonthlyBudgetCents = 20'000;
     static constexpr std::uint32_t kDecisionShardCount = 8;
 
     explicit PedestrianSystem(PedestrianVisualDefinition visual_definition);
@@ -99,6 +105,8 @@ public:
     void clear_outing_intent(std::uint64_t pedestrian_id);
     [[nodiscard]] bool spend_monthly_budget(std::uint64_t pedestrian_id, std::int64_t cents);
     [[nodiscard]] std::int64_t monthly_budget_cents(std::uint64_t pedestrian_id) const;
+    [[nodiscard]] std::int64_t monthly_budget_capacity_cents(std::uint64_t pedestrian_id) const;
+    [[nodiscard]] static std::int64_t budget_capacity_for_id(std::uint64_t pedestrian_id);
     void reset_monthly_budgets();
     // Observe the game calendar once from any runtime call site. The system owns
     // the last-seen month/year, so multiple render paths cannot reset a budget twice.
