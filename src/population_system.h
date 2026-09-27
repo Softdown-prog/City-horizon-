@@ -11,9 +11,10 @@ class RoadManager;
 // resident entities: homes contribute capacity and occupants are assigned in
 // stable building-instance order for economic accounting.
 //
-// Population growth V1 is intentionally simple: authored residential capacity
-// plus road usability are the only gameplay gates. Energy, sanitation and jobs
-// are not population-growth requirements in this tranche.
+// Population growth V1 is intentionally simple: authored residential capacity,
+// usable residential road access, and (when runtime road topology is supplied)
+// one road connection to the map edge are the only gameplay gates. Energy,
+// sanitation and jobs are not population-growth requirements in this tranche.
 class PopulationSystem {
 public:
     // A basic City Horizon house holds five residents, so starter migration can
