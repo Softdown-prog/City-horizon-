@@ -103,13 +103,14 @@ std::vector<TileCoordinate> RoadManager::line_between(TileCoordinate start, cons
 }
 
 bool RoadManager::has_world_connection() const {
-    for (const RoadTile& tile : tiles_) {
-        if (tile.tile_x == map_min_ || tile.tile_x == map_max_ ||
-            tile.tile_y == map_min_ || tile.tile_y == map_max_) {
-            return true;
-        }
-    }
-    return false;
+    // The outside-world road is represented by a logical gateway at the west
+    // edge of the starter 32x32 parcel. Requiring an eastward connection means
+    // the player must actually extend the road into the city; a lone marker tile
+    // can never unlock immigration by accident.
+    if (!is_inside_map(kExternalRoadGatewayX, kExternalRoadGatewayY)) return false;
+    return is_road(kExternalRoadGatewayX, kExternalRoadGatewayY) &&
+           is_connected_to(kExternalRoadGatewayX, kExternalRoadGatewayY,
+                           CardinalDirection::east);
 }
 
 bool RoadManager::place_tile(const int tile_x, const int tile_y) {
