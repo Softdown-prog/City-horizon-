@@ -4,6 +4,7 @@
 #include "pedestrian_system.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -11,9 +12,11 @@
 
 namespace ch::ride_passenger_runtime {
 
-// CH_RIDE_PASSENGER_SEAT_BINDING_V1 is the renderer-facing bridge between the
-// synchronized ride queue and authored seat layouts. A binding exists only for
-// a visitor that actually boarded the current ride batch.
+inline constexpr const char* kSeatBindingContract = "CH_RIDE_PASSENGER_SEAT_BINDING_V1";
+
+// Renderer-facing bridge between the synchronized ride queue and authored seat
+// layouts. A binding exists only for a visitor that actually boarded the current
+// ride batch. The clothing values come from that same citizen instance.
 struct SeatBinding {
     std::uint64_t ride_instance_id = 0;
     std::uint64_t pedestrian_id = 0;
@@ -65,15 +68,32 @@ struct SeatBinding {
     return result;
 }
 
+[[nodiscard]] inline std::vector<SeatBinding> all_active_seat_bindings(
+    const PedestrianSystem& pedestrians) {
+    std::vector<SeatBinding> result;
+    for (const auto& [ride_instance_id, queue] : building_visit_runtime::ride_queues()) {
+        if (queue.riding.empty()) continue;
+        std::vector<SeatBinding> ride = active_seat_bindings(ride_instance_id, pedestrians);
+        result.insert(result.end(), std::make_move_iterator(ride.begin()), std::make_move_iterator(ride.end()));
+    }
+    std::sort(result.begin(), result.end(), [](const SeatBinding& left, const SeatBinding& right) {
+        if (left.ride_instance_id != right.ride_instance_id)
+            return left.ride_instance_id < right.ride_instance_id;
+        if (left.seat_index != right.seat_index) return left.seat_index < right.seat_index;
+        return left.pedestrian_id < right.pedestrian_id;
+    });
+    return result;
+}
+
 [[nodiscard]] inline bool has_duplicate_or_invalid_seat(const std::vector<SeatBinding>& bindings,
                                                         const std::size_t seat_count) {
-    int previous = -1;
+    std::vector<bool> occupied(seat_count, false);
     for (const SeatBinding& binding : bindings) {
-        if (binding.seat_index < 0 || static_cast<std::size_t>(binding.seat_index) >= seat_count ||
-            binding.seat_index == previous) {
+        if (binding.seat_index < 0 || static_cast<std::size_t>(binding.seat_index) >= seat_count)
             return true;
-        }
-        previous = binding.seat_index;
+        const std::size_t index = static_cast<std::size_t>(binding.seat_index);
+        if (occupied[index]) return true;
+        occupied[index] = true;
     }
     return false;
 }
