@@ -1,0 +1,32 @@
+{
+  "contract": "CH_VIKING_SHIP_MICRODETAIL_V8",
+  "assetId": "attraction.park_viking_ship.01",
+  "inheritsGeometry": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json",
+  "intent": "Preserve the approved V7 height, footprint and clearance while adding readable fairground micro-detail to the ship and loading platform.",
+  "ship": {
+    "sidePlankSeams": 4,
+    "verticalHullStuds": 9,
+    "rivetPairsPerSide": 11,
+    "topRailThickness": 0.10,
+    "seatEndCaps": true,
+    "prowBanding": true,
+    "shieldBossAccent": true
+  },
+  "platform": {
+    "deckSeams": 8,
+    "stairTreadStrips": 6,
+    "supportBasePlates": true,
+    "supportBaseBoltsPerPlate": 4,
+    "boardingGatePosts": true,
+    "edgeTrimRedWhite": true,
+    "maintenanceHatches": 2
+  },
+  "constraints": {
+    "changePivotHeight": false,
+    "changeBoatDrop": false,
+    "changeFootprint": false,
+    "changeClearanceThresholds": false,
+    "keepMotionOverlay": true,
+    "keepIdleLightOverlay": true
+  }
+}
