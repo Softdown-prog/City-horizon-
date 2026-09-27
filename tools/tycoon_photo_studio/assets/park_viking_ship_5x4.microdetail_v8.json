@@ -28,6 +28,34 @@
     "edgeTrimRedWhite": true,
     "maintenanceHatches": 2
   },
+  "optional2DPolish": {
+    "enabled": "review_gate_only",
+    "tool": "tools/visitor_forge_2d",
+    "contract": "CH_2D_SHAPE_RECIPE_V1",
+    "purpose": "Apply only small deterministic raster/paint overlays after the 1280px Blender master is visually reviewed. Use for edge cleanup, color separation, small highlights, rivet/light accents and minor platform/boat paint corrections; never use it to change perspective, footprint, support height, swing clearance or rebuild missing 3D structure.",
+    "inputPolicy": "Always retain the untouched Blender RGBA master and generate a separate 2D-polished candidate.",
+    "minimumOutputDimensionPx": 1280,
+    "alphaSafe": true,
+    "allowed": [
+      "edge_cleanup",
+      "local_contrast",
+      "small_highlight_overlay",
+      "small_shadow_overlay",
+      "paint_accent",
+      "light_bulb_accent",
+      "rivet_accent",
+      "minor_color_balance"
+    ],
+    "forbidden": [
+      "change_camera",
+      "change_perspective",
+      "change_footprint",
+      "change_support_height",
+      "change_boat_drop",
+      "fake_swing_clearance",
+      "replace_structural_geometry"
+    ]
+  },
   "constraints": {
     "changePivotHeight": false,
     "changeBoatDrop": false,
