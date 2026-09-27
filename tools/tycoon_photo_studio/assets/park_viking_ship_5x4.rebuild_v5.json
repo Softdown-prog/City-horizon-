@@ -1,0 +1,171 @@
+{
+  "contract": "CITY_HORIZON_VIKING_SHIP_RIDE_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "rebuild": {
+    "id": "CH_VIKING_SHIP_RCT_REFERENCE_V1",
+    "fromScratch": true,
+    "supersedesForReview": "Rebuild V4 and every CH_TYCOON_MINIATURE_V1 Viking candidate",
+    "intent": "Use the user-supplied RollerCoaster Tycoon pirate-ship screenshot only as a readability and park-layout reference: slim open supports, long low ship, thin integrated ride pad, queue rails and matte game-scale materials. Explicitly reject glossy toy, LEGO and plastic-machine language."
+  },
+  "visualLanguage": {
+    "target": "classic_tycoon_park_ride_readability_with_modern_clean_prerender",
+    "mustReadAs": [
+      "park attraction integrated into a five-by-four tile site",
+      "slim tall open A-frame rather than chunky machine blocks",
+      "long low timber pirate ship",
+      "queue fencing and boarding space that establish human scale",
+      "matte painted or weathered structural material",
+      "clear silhouette at gameplay scale"
+    ],
+    "rejectIfReadsAs": [
+      "LEGO",
+      "plastic toy",
+      "gumball prize",
+      "glossy modern 3D showcase model",
+      "oversized blue and yellow beams",
+      "thick white pedestal",
+      "candy-colored structural members",
+      "decorative ball joints",
+      "compact ride squeezed into the center of the footprint"
+    ],
+    "layoutRules": {
+      "frame": "four slim open support legs use most of the site depth while preserving large negative spaces",
+      "ship": "ship is long and sits relatively close to the pad at rest",
+      "site": "thin ride pad plus queue lanes occupy the footprint; platform must not look like a pedestal",
+      "mechanics": "pins plates bolts and axle may be visible but should not dominate the silhouette"
+    },
+    "surfaceRules": {
+      "metal": "high roughness, restrained saturation, minimal specular highlight",
+      "wood": "dry dark timber with faceted hull separation, not orange molded plastic",
+      "lights": "subdued or off for the static approval render",
+      "palette": "warm neutral/dark structural frame with muted secondary accents"
+    }
+  },
+  "referencePolicy": {
+    "purpose": "Use the user-supplied RollerCoaster Tycoon pirate-ship screenshot for proportion, silhouette, site occupation, queue/fence scale and gameplay readability only.",
+    "exclude": ["reference_branding", "reference_text", "exact_texture_copy", "surrounding_roller_coaster", "hospital", "people", "terrain"],
+    "firstGate": "Approve static silhouette/material/site read before any final swing timing, GIF cadence or decorative light animation."
+  },
+  "footprint": {
+    "widthTiles": 5,
+    "depthTiles": 4,
+    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3]]
+  },
+  "geometry": {
+    "unitsPerTile": 3.0,
+    "baseWidth": 14.85,
+    "baseDepth": 11.85,
+    "baseHeight": 0.24,
+    "deckWidth": 14.50,
+    "deckDepth": 11.50,
+    "deckHeight": 0.16,
+    "platformTopZ": 0.40,
+
+    "pivotZ": 15.20,
+    "supportHalfWidth": 6.15,
+    "supportHalfDepth": 4.55,
+    "supportBeamWidth": 0.48,
+    "supportBeamDepth": 0.34,
+    "supportFlangeDepth": 0.045,
+    "innerBraceWidth": 0.30,
+    "innerBraceDepth": 0.22,
+    "lowerCrossBraceWidth": 0.30,
+    "lowerCrossBraceDepth": 0.22,
+    "lowerCrossBraceHeightRatio": 0.28,
+    "footBlockWidth": 0.78,
+    "footBlockDepth": 0.66,
+    "footBlockHeight": 0.10,
+    "anchorBoltRadius": 0.045,
+    "primaryBevel": 0.014,
+    "secondaryBevel": 0.009,
+
+    "axleRadius": 0.24,
+    "axleDepth": 9.90,
+    "bearingRadius": 0.56,
+    "bearingDepth": 0.22,
+
+    "boatDrop": 9.20,
+    "boatAttachHalfX": 4.85,
+    "boatJointZ": -0.72,
+    "boatJointHalfDepth": 1.68,
+    "swingArmWidth": 0.36,
+    "swingArmDepth": 0.26,
+    "shipLength": 13.20,
+    "shipHalfWidth": 1.85,
+    "shipDeckZ": -1.42,
+    "seatRows": 8,
+
+    "loadingPlatformWidth": 13.50,
+    "loadingPlatformDepth": 6.80,
+    "loadingPlatformHeight": 0.11,
+    "stairWidth": 3.40,
+    "stairDepth": 2.15,
+    "stairSteps": 5,
+    "railingHeight": 0.82,
+    "railingRadius": 0.034,
+
+    "previewSwingDegrees": 0.0,
+    "clearanceReviewDegrees": 48.0,
+    "minimumRestHullGapWorld": 1.20,
+    "maximumRestHullGapWorld": 2.80,
+    "minimumSwingClearanceWorld": 0.65,
+    "minimumPivotZ": 14.40,
+    "minimumSupportBeamWidth": 0.40,
+    "maximumSupportBeamWidth": 0.56,
+    "minimumSupportHeightToBaseWidthRatio": 0.95,
+    "minimumSupportDepthUtilization": 0.72,
+    "minimumLoadingDepthUtilization": 0.50,
+    "minimumLoadingWidthUtilization": 0.86,
+    "maximumPrimaryBevel": 0.022,
+    "clearancePolicy": "Keep the rest position visually low like the park reference while preserving positive world-space clearance at the review swing angle."
+  },
+  "reviewTargets": {
+    "masterCanvasPx": 1280,
+    "silhouette": "slim_open_A_frame_long_low_ship_large_negative_space",
+    "siteRead": "integrated_park_ride_with_queue_lanes_across_5x4_not_pedestal",
+    "materialRead": "matte_dark_structure_plus_dry_timber_not_plastic",
+    "lightingRead": "broad_soft_game_asset_lighting_without_blue_edge_gloss",
+    "referenceRead": "classic_tycoon_scale_and_clarity_without_copying_reference_pixels",
+    "note": "Static approval pass only. Final swing arc, frame count and FPS remain undefined."
+  },
+  "animation": {
+    "enabled": false,
+    "prepared": true,
+    "pivotObject": "SwingPivot",
+    "rotationAxis": "Y",
+    "frameCount": null,
+    "fps": null,
+    "note": "Do not define final swing frames until V5 static art is approved."
+  },
+  "runtimeLayers": {
+    "contract": "CH_ATTRACTION_MULTI_OVERLAY_V1",
+    "staticBase": {"role":"attraction_static_base","animated":false},
+    "motionOverlay": {"role":"attraction_motion_overlay","animated":true,"activeWhen":"ride_running","frameCount":null,"fps":null},
+    "idleLightOverlay": {"role":"attraction_idle_light_overlay","animated":true,"activeWhen":"ride_idle","disabledWhen":"ride_running","behavior":"blink","groups":["A","B"],"frameCount":null,"fps":null}
+  },
+  "materials": {
+    "steelDark": {"name":"RCTV5FrameDark","rgba":[0.050,0.044,0.036,1.0],"roughness":0.86,"metallic":0.34},
+    "steelMid": {"name":"RCTV5FrameMid","rgba":[0.145,0.120,0.088,1.0],"roughness":0.84,"metallic":0.28},
+    "steelLight": {"name":"RCTV5Hardware","rgba":[0.40,0.39,0.35,1.0],"roughness":0.78,"metallic":0.52},
+    "steelBlue": {"name":"RCTV5MutedSlate","rgba":[0.075,0.095,0.105,1.0],"roughness":0.84,"metallic":0.30},
+    "yellow": {"name":"RCTV5MutedOchre","rgba":[0.31,0.215,0.080,1.0],"roughness":0.86,"metallic":0.12},
+    "red": {"name":"RCTV5MutedRideRed","rgba":[0.31,0.055,0.045,1.0],"roughness":0.82,"metallic":0.08},
+    "white": {"name":"RCTV5WarmOffWhite","rgba":[0.57,0.54,0.46,1.0],"roughness":0.88,"metallic":0.02},
+    "gold": {"name":"RCTV5AgedBrass","rgba":[0.34,0.22,0.075,1.0],"roughness":0.78,"metallic":0.40},
+    "teal": {"name":"RCTV5MutedGreen","rgba":[0.07,0.18,0.16,1.0],"roughness":0.84,"metallic":0.08},
+    "woodDark": {"name":"RCTV5HullDarkTimber","rgba":[0.090,0.034,0.018,1.0],"roughness":0.91,"metallic":0.0},
+    "wood": {"name":"RCTV5HullTimber","rgba":[0.235,0.090,0.038,1.0],"roughness":0.90,"metallic":0.0},
+    "woodLight": {"name":"RCTV5HullLightTimber","rgba":[0.33,0.15,0.060,1.0],"roughness":0.87,"metallic":0.0},
+    "seatRed": {"name":"RCTV5SeatMutedRed","rgba":[0.27,0.036,0.034,1.0],"roughness":0.84,"metallic":0.02},
+    "platform": {"name":"RCTV5PadJoint","rgba":[0.18,0.17,0.15,1.0],"roughness":0.92,"metallic":0.04},
+    "platformWhite": {"name":"RCTV5RidePad","rgba":[0.40,0.365,0.31,1.0],"roughness":0.94,"metallic":0.0},
+    "panelCream": {"name":"RCTV5BoardingSurface","rgba":[0.31,0.285,0.24,1.0],"roughness":0.94,"metallic":0.0},
+    "lampWarm": {"name":"RCTV5LampWarmOff","rgba":[0.48,0.31,0.08,1.0],"roughness":0.72,"metallic":0.02},
+    "lampRed": {"name":"RCTV5LampRedOff","rgba":[0.35,0.045,0.035,1.0],"roughness":0.72,"metallic":0.02},
+    "lampCyan": {"name":"RCTV5LampCyanOff","rgba":[0.05,0.22,0.20,1.0],"roughness":0.72,"metallic":0.02},
+    "lampPink": {"name":"RCTV5LampPinkOff","rgba":[0.28,0.06,0.10,1.0],"roughness":0.72,"metallic":0.02}
+  }
+}
