@@ -114,7 +114,11 @@ std::int32_t PopulationSystem::on_month_closed(const BuildingManager& buildings,
     const std::uint32_t available_slots = powered_residential_capacity_ > current_population_
         ? powered_residential_capacity_ - current_population_
         : 0;
-    const std::uint32_t arrived = std::min(potential_growth, available_slots);
+    // When runtime road topology is supplied, immigration needs one real road
+    // touching the map edge. Tests/tools that intentionally omit RoadManager keep
+    // the older pure-capacity behaviour for deterministic isolated validation.
+    const bool outside_connection = roads == nullptr || roads->has_world_connection();
+    const std::uint32_t arrived = outside_connection ? std::min(potential_growth, available_slots) : 0U;
 
     current_population_ += arrived;
     last_month_potential_growth_ = potential_growth;
