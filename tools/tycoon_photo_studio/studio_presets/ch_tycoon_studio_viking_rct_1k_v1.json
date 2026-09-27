@@ -1,0 +1,100 @@
+{
+  "id": "CH_TYCOON_STUDIO_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric_2_to_1",
+    "yawDegrees": 45.0,
+    "elevationDegrees": 30.0,
+    "target": [0.0, 0.0, 3.0],
+    "horizontalDistance": 8.0,
+    "orthoScale": 5.9
+  },
+  "render": {
+    "engine": "CYCLES",
+    "device": "CPU",
+    "samples": 24,
+    "denoising": true,
+    "sourceResolution": [2048, 2048],
+    "finalResolution": [1280, 1280],
+    "viewTransform": "Standard",
+    "look": "Medium High Contrast",
+    "exposure": 0.06,
+    "gamma": 1.0,
+    "transparent": true,
+    "outputFormat": "PNG_RGBA_FULL_COLOR"
+  },
+  "world": {"color": [0.18, 0.175, 0.16, 1.0], "strength": 0.64},
+  "lights": [
+    {
+      "name": "Tycoon_Key_Soft",
+      "type": "AREA",
+      "location": [-9.0, -9.5, 17.0],
+      "energy": 930.0,
+      "color": [1.0, 0.92, 0.80],
+      "size": 7.8,
+      "useShadow": true,
+      "target": [0.0, 0.0, 5.8]
+    },
+    {
+      "name": "Tycoon_Fill_Broad",
+      "type": "AREA",
+      "location": [8.0, 7.0, 11.5],
+      "energy": 430.0,
+      "color": [0.84, 0.88, 0.92],
+      "size": 9.0,
+      "useShadow": false,
+      "target": [0.0, 0.0, 4.6]
+    },
+    {
+      "name": "Tycoon_Top_Diffuse",
+      "type": "AREA",
+      "location": [0.0, -1.0, 20.0],
+      "energy": 260.0,
+      "color": [0.96, 0.93, 0.86],
+      "size": 10.0,
+      "useShadow": false,
+      "target": [0.0, 0.0, 6.0]
+    }
+  ],
+  "shadowReceiver": {
+    "location": [0.0, 0.0, -0.055],
+    "dimensions": [7.5, 7.5, 0.10],
+    "materialColor": [0.68, 0.66, 0.60, 1.0],
+    "roughness": 1.0
+  },
+  "postProcess": {
+    "productionMode": "stylized_prerendered_full_rgba",
+    "productionColorMode": "PNG_RGBA_FULL_COLOR",
+    "productionPaletteLimit": null,
+    "candidateVariant": 1,
+    "paletteColors": 128,
+    "paletteColorsScope": "retro_comparison_review_only_not_production",
+    "paletteReductionRequired": false,
+    "ditherRequired": false,
+    "strictRetroEmulation": false,
+    "optionalRetroProfilesAllowed": true,
+    "retroComparison": {"enabled": true, "purpose": "review_only", "productionEligible": false, "paletteVariantIds": [2,3,4]},
+    "shadowColor": [31, 29, 26],
+    "shadowAlphaScale": 0.62,
+    "shadowAlphaMax": 112,
+    "shadowBlurRadius": 1.7,
+    "fallbackShadowThreshold": 12,
+    "fallbackShadowScale": 1.82,
+    "fallbackShadowAlphaMax": 102,
+    "fallbackShadowBlurRadius": 2.4,
+    "edgeAlphaThreshold": 92,
+    "edgeOpacityScale": 0.32,
+    "edgeOpacityMax": 82
+  },
+  "styleIntent": {
+    "target": "classic_tycoon_readability_modern_clean_prerender",
+    "runtimeRemains2D": true,
+    "preferMaterialStructureOverPixelSimulation": true,
+    "preferSubtleStylizationOverHeavyRetroFilters": true,
+    "highResolutionMaster": true,
+    "minimumMasterDimensionPx": 1280,
+    "presetVariant": "viking_ship_rct_reference_soft_diffuse_1k_review",
+    "lightingIntent": "Broad soft illumination with restrained highlights; preserve matte dark frame and dry timber without blue rim-light or plastic showroom gloss."
+  }
+}
