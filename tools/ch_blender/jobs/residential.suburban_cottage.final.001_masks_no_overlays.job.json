@@ -1,0 +1,34 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "residential.suburban_cottage.final.001_masks_no_overlays",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/export_residential_suburban_cottage_final.py",
+  "qualityStage": "final",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_review_v1.json",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "d843c3b509abb4d80a57b3a92fbe36edc84a48ef7bcde8986f1daf131b9729ac"
+  },
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/residential_suburban_cottage_3x3_01.house.json",
+    "--mask-config",
+    "tools/tycoon_photo_studio/assets/residential_suburban_cottage_3x3_01.color_mask.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+    "--output",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays"
+  ],
+  "expectedOutputs": [
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_south.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_east.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_west.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_north.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_south_mask.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_east_mask.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_west_mask.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/residential_suburban_cottage_3x3_01_north_mask.png",
+    "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays/final_export_metadata.json"
+  ],
+  "outputDir": "out/ch_blender_agent/residential.suburban_cottage.final.001_masks_no_overlays"
+}
