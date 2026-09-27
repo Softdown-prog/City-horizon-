@@ -100,6 +100,16 @@ def _v5_report(recipe):
 
 def _build_for_gate_v5(args):
     recipe, studio, scene, root, pivot, ground, authored, out = _original_build_for_gate(args)
+
+    # V5's procedural build_base returns the asset root for composition, while the
+    # generic Viking gate expects the returned object itself to be the ground-contact
+    # mesh.  Explicitly tag the actual thin foundation so preflight measures Z=0
+    # against the ride pad rather than only the elevated A-frame members.
+    foundation = base.bpy.data.objects.get("CHR_VikingPadFoundation")
+    if foundation is None:
+        raise RuntimeError("CH_VIKING_V5_FOUNDATION_MISSING")
+    base.scene_gate.tag(foundation, "attraction.base", ground_contact=True)
+
     report = _v5_report(recipe)
     root["rebuildContract"] = "CH_VIKING_SHIP_RCT_REFERENCE_V1"
     root["visualLanguage"] = "classic_tycoon_park_scale_not_toy"
