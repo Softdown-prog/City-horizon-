@@ -1,0 +1,18 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_PROMOTION_V1",
+  "approved": true,
+  "promotionAttempt": 1,
+  "assetId": "building.mini_market.01",
+  "sourceAssetId": "commercial_mini_market_3x2_01",
+  "displayName": "Mini Mercado",
+  "fileStem": "mini_market",
+  "sourceCommit": "f18b1c299ac59b2061f36068df69414b34bbdb9a",
+  "sourceWorkflowRun": 36291989047,
+  "sourceArtifactId": 10922079780,
+  "sourceArtifactName": "CH-Blender-Agent-36291989047-1",
+  "sourceDir": "commercial.mini_market.v2.final",
+  "destination": "assets/buildings/mini_market",
+  "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
+  "format": "PNG_RGBA",
+  "transparentBackground": true
+}
