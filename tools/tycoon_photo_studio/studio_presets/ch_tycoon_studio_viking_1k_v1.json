@@ -1,5 +1,5 @@
 {
-  "id": "CH_TYCOON_STUDIO_VIKING_1K_V1",
+  "id": "CH_TYCOON_STUDIO_V1",
   "visualContract": "CH_STYLIZED_PRERENDER_V1",
   "camera": {
     "contract": "CH_CAMERA_V1",
@@ -93,6 +93,7 @@
     "manualPerAssetPixelCleanup": "exception_only",
     "selectiveEffectsRequireExplicitMaterialIdentityWhenAvailable": true,
     "highResolutionMaster": true,
-    "minimumMasterDimensionPx": 1280
+    "minimumMasterDimensionPx": 1280,
+    "presetVariant": "viking_ship_1k_review"
   }
 }
