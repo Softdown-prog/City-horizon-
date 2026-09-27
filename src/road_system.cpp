@@ -102,6 +102,16 @@ std::vector<TileCoordinate> RoadManager::line_between(TileCoordinate start, cons
     return result;
 }
 
+bool RoadManager::has_world_connection() const {
+    for (const RoadTile& tile : tiles_) {
+        if (tile.tile_x == map_min_ || tile.tile_x == map_max_ ||
+            tile.tile_y == map_min_ || tile.tile_y == map_max_) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool RoadManager::place_tile(const int tile_x, const int tile_y) {
     if (!is_inside_map(tile_x, tile_y) || is_road(tile_x, tile_y)) {
         return false;
