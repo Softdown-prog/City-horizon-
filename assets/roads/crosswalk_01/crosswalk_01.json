@@ -1,0 +1,36 @@
+{
+  "id": "crosswalk_01",
+  "contract": "CH_CROSSWALK_PORTAL_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "canvas": [128, 64],
+  "artApproved": true,
+  "runtimePromotion": true,
+  "styles": {
+    "crosswalk_ns": {
+      "sprites": {
+        "south": "assets/roads/crosswalk_01/crosswalk_south.png",
+        "north": "assets/roads/crosswalk_01/crosswalk_north.png"
+      },
+      "pedestrianAxis": "north_south",
+      "entryA": [0.5, 0.0],
+      "conflictAnchor": [0.5, 0.5],
+      "entryB": [0.5, 1.0]
+    },
+    "crosswalk_ew": {
+      "sprites": {
+        "east": "assets/roads/crosswalk_01/crosswalk_east.png",
+        "west": "assets/roads/crosswalk_01/crosswalk_west.png"
+      },
+      "pedestrianAxis": "east_west",
+      "entryA": [0.0, 0.5],
+      "conflictAnchor": [0.5, 0.5],
+      "entryB": [1.0, 0.5]
+    }
+  },
+  "rules": {
+    "placement": "road_tile_only",
+    "pedestrians": "cross_road_only_through_portal_axis",
+    "vehicles": "yield_when_conflict_zone_is_occupied",
+    "ordinaryPedestrianRoadTravel": false
+  }
+}
