@@ -19,11 +19,11 @@ jobs:
         run: python3 tools/crosswalk_runtime_integration.py
       - name: Validate diff
         run: git diff --check
-      - name: Commit integration
+      - name: Commit repair
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CMakeLists.txt src/vehicle_system.h src/vehicle_system.cpp src/vehicle_traffic_test.cpp src/navigation_network_test.cpp src/ui_manager_legacy_impl.inl src/main_runtime_impl.cpp
-          git commit -m "feat(crosswalk): integrate placement navigation and traffic yielding"
+          git add src/building_system.h src/economy_system.h src/economy_system.cpp
+          git commit -m "fix(build): complete upgrade and ticket unlink contracts"
           git pull --rebase origin main
           git push origin HEAD:main
