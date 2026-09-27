@@ -19,10 +19,14 @@ namespace ch::building_visit_runtime {
 constexpr Uint64 kDoorAlignMs = 180;
 constexpr Uint64 kTicketServiceMs = 450;
 constexpr Uint64 kVisitorDwellMs = 3000;
+constexpr Uint64 kRideBoardingWindowMs = 2500;
+constexpr Uint64 kRideCycleMs = 3000;
+constexpr std::uint32_t kVikingShipCapacity = 20;
 
 enum class VisitPhase : std::uint8_t {
     ticket_approaching,
     ticketing,
+    queued,
     approaching,
     entering,
     aligning,
@@ -45,6 +49,7 @@ struct VisitState {
     std::int64_t charge_cents = 0;
     Uint64 last_tick_ms = 0;
     Uint64 elapsed_inside_ms = 0;
+    int ride_seat_index = -1;
     VisitPhase phase = VisitPhase::approaching;
 };
 
@@ -65,9 +70,33 @@ struct TicketedAttractionRoute {
     std::size_t route_tiles = 0;
 };
 
+// CH_AMUSEMENT_RIDE_QUEUE_V1 runtime side. The queue is ordered by successful
+// ticket service. A running batch owns explicit seat indexes so the passenger
+// overlay can later draw exactly the riders that actually boarded.
+struct RideQueueState {
+    std::vector<std::uint64_t> waiting;
+    std::vector<std::uint64_t> riding;
+    Uint64 last_tick_ms = 0;
+    Uint64 boarding_elapsed_ms = 0;
+    Uint64 cycle_elapsed_ms = 0;
+};
+
 [[nodiscard]] inline std::unordered_map<std::uint64_t, VisitState>& states() {
     static std::unordered_map<std::uint64_t, VisitState> runtime_states;
     return runtime_states;
+}
+
+[[nodiscard]] inline std::unordered_map<std::uint64_t, RideQueueState>& ride_queues() {
+    static std::unordered_map<std::uint64_t, RideQueueState> runtime_queues;
+    return runtime_queues;
+}
+
+[[nodiscard]] inline std::uint32_t managed_ride_capacity(const BuildingDefinition& definition) {
+    // The Viking definition already freezes rideCapacity=20 in JSON. Until the
+    // generic BuildingDefinition schema promotes that field, keep the runtime
+    // gate intentionally narrow rather than accidentally assigning capacities
+    // to unrelated ticketed attractions.
+    return definition.id == "viking_ship_01" ? kVikingShipCapacity : 0U;
 }
 
 [[nodiscard]] inline std::pair<int, int> access_offset(const GridDirection direction) {
@@ -252,11 +281,26 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
     return best;
 }
 
+inline void erase_rider_id(std::vector<std::uint64_t>& ids, const std::uint64_t pedestrian_id) {
+    ids.erase(std::remove(ids.begin(), ids.end(), pedestrian_id), ids.end());
+}
+
+inline void remove_from_ride_runtime(const std::uint64_t pedestrian_id, const std::uint64_t ride_id) {
+    const auto found = ride_queues().find(ride_id);
+    if (found == ride_queues().end()) return;
+    erase_rider_id(found->second.waiting, pedestrian_id);
+    erase_rider_id(found->second.riding, pedestrian_id);
+    if (found->second.waiting.empty() && found->second.riding.empty()) ride_queues().erase(found);
+}
+
 inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
                          PedestrianSystem& pedestrians, BuildingManager& buildings) {
     if (state.phase == VisitPhase::inside) (void)buildings.end_activity(state.building_instance_id);
-    if (state.phase == VisitPhase::ticketing || state.phase == VisitPhase::aligning ||
-        state.phase == VisitPhase::inside) (void)pedestrians.set_visiting(pedestrian_id, false);
+    if (state.phase == VisitPhase::queued || state.phase == VisitPhase::inside)
+        remove_from_ride_runtime(pedestrian_id, state.building_instance_id);
+    if (state.phase == VisitPhase::ticketing || state.phase == VisitPhase::queued ||
+        state.phase == VisitPhase::aligning || state.phase == VisitPhase::inside)
+        (void)pedestrians.set_visiting(pedestrian_id, false);
 }
 
 [[nodiscard]] inline bool is_expected_destination(const PedestrianInstance& pedestrian,
@@ -264,7 +308,7 @@ inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
     int expected_x = state.door_x;
     int expected_y = state.door_y;
     if (state.phase == VisitPhase::ticket_approaching || state.phase == VisitPhase::ticketing ||
-        state.phase == VisitPhase::returning_to_booth) {
+        state.phase == VisitPhase::queued || state.phase == VisitPhase::returning_to_booth) {
         expected_x = state.ticket_x;
         expected_y = state.ticket_y;
     } else if (state.phase == VisitPhase::approaching) {
@@ -292,6 +336,134 @@ inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
     state.elapsed_inside_ms = 0;
     state.phase = VisitPhase::ticketing;
     return true;
+}
+
+inline void enqueue_managed_rider(const std::uint64_t pedestrian_id, VisitState& state,
+                                  const Uint64 now) {
+    RideQueueState& queue = ride_queues()[state.building_instance_id];
+    if (queue.last_tick_ms == 0) queue.last_tick_ms = now;
+    if (std::find(queue.waiting.begin(), queue.waiting.end(), pedestrian_id) == queue.waiting.end() &&
+        std::find(queue.riding.begin(), queue.riding.end(), pedestrian_id) == queue.riding.end()) {
+        queue.waiting.push_back(pedestrian_id);
+    }
+    state.ride_seat_index = -1;
+    state.last_tick_ms = now;
+    state.elapsed_inside_ms = 0;
+    state.phase = VisitPhase::queued;
+}
+
+inline void finish_managed_ride_batch(const std::uint64_t ride_id, RideQueueState& queue,
+                                      PedestrianSystem& pedestrians, BuildingManager& buildings,
+                                      const BuildingCatalog& catalog, const Uint64 now) {
+    const BuildingInstance* ride = buildings.find_by_id(ride_id);
+    const BuildingDefinition* definition = ride == nullptr ? nullptr : catalog.find(ride->definition_id);
+    for (const std::uint64_t pedestrian_id : queue.riding) {
+        auto found = states().find(pedestrian_id);
+        if (found == states().end()) continue;
+        VisitState& state = found->second;
+        if (state.phase != VisitPhase::inside || state.building_instance_id != ride_id) continue;
+        (void)buildings.end_activity(ride_id);
+        if (definition != nullptr) apply_need_effects(pedestrian_id, *definition, pedestrians);
+        (void)pedestrians.set_visiting(pedestrian_id, false);
+        state.ride_seat_index = -1;
+        state.last_tick_ms = now;
+        state.elapsed_inside_ms = 0;
+        // The logical actor never left the booth service tile. Unhiding it here
+        // therefore makes the visitor reappear exactly where the ticket/queue
+        // flow started, ready for the normal pedestrian decision system.
+        state.phase = VisitPhase::completed_here;
+    }
+    queue.riding.clear();
+    queue.cycle_elapsed_ms = 0;
+    queue.boarding_elapsed_ms = 0;
+}
+
+inline void sync_managed_rides(PedestrianSystem& pedestrians, BuildingManager& buildings,
+                               const BuildingCatalog& catalog, const bool simulation_running,
+                               const Uint64 now) {
+    auto& queues = ride_queues();
+    for (auto iterator = queues.begin(); iterator != queues.end();) {
+        const std::uint64_t ride_id = iterator->first;
+        RideQueueState& queue = iterator->second;
+        const BuildingInstance* ride = buildings.find_by_id(ride_id);
+        const BuildingDefinition* definition = ride == nullptr ? nullptr : catalog.find(ride->definition_id);
+        const std::uint32_t capacity = definition == nullptr ? 0U : managed_ride_capacity(*definition);
+
+        if (ride == nullptr || definition == nullptr || capacity == 0U) {
+            for (const std::uint64_t pedestrian_id : queue.waiting) {
+                if (auto found = states().find(pedestrian_id); found != states().end()) {
+                    (void)pedestrians.set_visiting(pedestrian_id, false);
+                    found->second.phase = VisitPhase::completed_here;
+                    found->second.ride_seat_index = -1;
+                }
+            }
+            for (const std::uint64_t pedestrian_id : queue.riding) {
+                if (auto found = states().find(pedestrian_id); found != states().end()) {
+                    (void)pedestrians.set_visiting(pedestrian_id, false);
+                    found->second.phase = VisitPhase::completed_here;
+                    found->second.ride_seat_index = -1;
+                }
+            }
+            iterator = queues.erase(iterator);
+            continue;
+        }
+
+        queue.waiting.erase(std::remove_if(queue.waiting.begin(), queue.waiting.end(),
+            [ride_id](const std::uint64_t pedestrian_id) {
+                const auto found = states().find(pedestrian_id);
+                return found == states().end() || found->second.phase != VisitPhase::queued ||
+                       found->second.building_instance_id != ride_id;
+            }), queue.waiting.end());
+
+        const Uint64 delta = queue.last_tick_ms == 0 || now < queue.last_tick_ms ? 0 : now - queue.last_tick_ms;
+        queue.last_tick_ms = now;
+
+        if (!queue.riding.empty()) {
+            if (simulation_running) queue.cycle_elapsed_ms += delta;
+            if (queue.cycle_elapsed_ms >= kRideCycleMs)
+                finish_managed_ride_batch(ride_id, queue, pedestrians, buildings, catalog, now);
+            ++iterator;
+            continue;
+        }
+
+        if (queue.waiting.empty()) {
+            queue.boarding_elapsed_ms = 0;
+            ++iterator;
+            continue;
+        }
+
+        if (simulation_running) queue.boarding_elapsed_ms += delta;
+        const bool dispatch = queue.waiting.size() >= static_cast<std::size_t>(capacity) ||
+                              queue.boarding_elapsed_ms >= kRideBoardingWindowMs;
+        if (!dispatch) {
+            ++iterator;
+            continue;
+        }
+
+        const std::size_t batch_size = std::min<std::size_t>(queue.waiting.size(), capacity);
+        std::vector<std::uint64_t> batch(queue.waiting.begin(), queue.waiting.begin() + batch_size);
+        queue.waiting.erase(queue.waiting.begin(), queue.waiting.begin() + batch_size);
+        queue.boarding_elapsed_ms = 0;
+        queue.cycle_elapsed_ms = 0;
+
+        int seat_index = 0;
+        for (const std::uint64_t pedestrian_id : batch) {
+            auto found = states().find(pedestrian_id);
+            if (found == states().end() || found->second.phase != VisitPhase::queued ||
+                found->second.building_instance_id != ride_id) continue;
+            if (!buildings.begin_activity(ride_id)) {
+                (void)pedestrians.set_visiting(pedestrian_id, false);
+                found->second.phase = VisitPhase::completed_here;
+                continue;
+            }
+            found->second.ride_seat_index = seat_index++;
+            found->second.last_tick_ms = now;
+            found->second.elapsed_inside_ms = 0;
+            found->second.phase = VisitPhase::inside;
+            queue.riding.push_back(pedestrian_id);
+        }
+        ++iterator;
+    }
 }
 
 inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
@@ -326,15 +498,43 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 if (simulation_running) state.elapsed_inside_ms += delta;
                 if (state.elapsed_inside_ms >= kTicketServiceMs) {
                     const auto linked = buildings.linked_attraction_for_ticket_booth(state.ticket_booth_instance_id);
+                    if (!linked || *linked != state.building_instance_id) {
+                        (void)pedestrians.set_visiting(pedestrian_id, false);
+                        runtime_states.erase(current);
+                        continue;
+                    }
+
+                    const BuildingInstance* attraction = buildings.find_by_id(state.building_instance_id);
+                    const BuildingDefinition* attraction_definition =
+                        attraction == nullptr ? nullptr : catalog.find(attraction->definition_id);
+                    if (attraction_definition != nullptr && managed_ride_capacity(*attraction_definition) > 0U) {
+                        // The ticket is purchased at the booth, before a seat is
+                        // reserved. The queue then owns this visitor until a batch
+                        // is dispatched or the visit is cancelled.
+                        if (state.charge_cents > 0 &&
+                            !pedestrians.spend_monthly_budget(pedestrian_id, state.charge_cents)) {
+                            (void)pedestrians.set_visiting(pedestrian_id, false);
+                            runtime_states.erase(current);
+                            continue;
+                        }
+                        state.charge_cents = 0;
+                        enqueue_managed_rider(pedestrian_id, state, now);
+                        continue;
+                    }
+
                     (void)pedestrians.set_visiting(pedestrian_id, false);
-                    if (!linked || *linked != state.building_instance_id) { runtime_states.erase(current); continue; }
                     const NavigationTile service{state.ticket_x, state.ticket_y};
                     const NavigationTile approach{state.approach_x, state.approach_y};
-                    if (!pedestrians.send_pedestrian(service, approach, network)) { runtime_states.erase(current); continue; }
+                    if (!pedestrians.send_pedestrian(service, approach, network)) {
+                        runtime_states.erase(current);
+                        continue;
+                    }
                     state.phase = VisitPhase::approaching;
                 }
                 continue;
             }
+
+            if (state.phase == VisitPhase::queued) continue;
 
             if (state.phase == VisitPhase::aligning) {
                 const Uint64 delta = now >= state.last_tick_ms ? now - state.last_tick_ms : 0;
@@ -353,17 +553,21 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             }
 
             if (state.phase == VisitPhase::inside) {
+                const BuildingInstance* destination = buildings.find_by_id(state.building_instance_id);
+                const BuildingDefinition* definition =
+                    destination == nullptr ? nullptr : catalog.find(destination->definition_id);
+                if (definition != nullptr && managed_ride_capacity(*definition) > 0U) {
+                    // Managed rides complete as one synchronized batch below.
+                    continue;
+                }
+
                 const Uint64 delta = now >= state.last_tick_ms ? now - state.last_tick_ms : 0;
                 state.last_tick_ms = now;
                 if (simulation_running) state.elapsed_inside_ms += delta;
                 if (state.elapsed_inside_ms >= kVisitorDwellMs) {
                     (void)buildings.end_activity(state.building_instance_id);
                     (void)pedestrians.spend_monthly_budget(pedestrian_id, state.charge_cents);
-                    if (const BuildingInstance* destination = buildings.find_by_id(state.building_instance_id)) {
-                        if (const BuildingDefinition* definition = catalog.find(destination->definition_id)) {
-                            apply_need_effects(pedestrian_id, *definition, pedestrians);
-                        }
-                    }
+                    if (definition != nullptr) apply_need_effects(pedestrian_id, *definition, pedestrians);
                     (void)pedestrians.set_visiting(pedestrian_id, false);
                     if (state.ticket_booth_instance_id != 0) {
                         const NavigationTile ride_exit{state.door_x, state.door_y};
@@ -391,7 +595,6 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             const NavigationTile current_tile{pedestrian_snapshot.spatial.logical_tile_x,
                                               pedestrian_snapshot.spatial.logical_tile_y};
             if (state.phase == VisitPhase::returning_to_booth) {
-                const NavigationTile ticket{state.ticket_x, state.ticket_y};
                 runtime_states.erase(current);
                 continue;
             }
@@ -462,7 +665,7 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 ticketed->booth_facing, ticketed->attraction_entrance.approach.x,
                 ticketed->attraction_entrance.approach.y, ticketed->attraction_entrance.door.x,
                 ticketed->attraction_entrance.door.y, ticketed->attraction_entrance.door_facing,
-                charge, now, 0, VisitPhase::ticket_approaching};
+                charge, now, 0, -1, VisitPhase::ticket_approaching};
             continue;
         }
 
@@ -476,13 +679,32 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
         runtime_states[pedestrian_id] = VisitState{chosen_entrance->building_instance_id, 0, 0, 0,
             GridDirection::south, chosen_entrance->approach.x, chosen_entrance->approach.y,
             chosen_entrance->door.x, chosen_entrance->door.y, chosen_entrance->door_facing,
-            charge, now, 0, VisitPhase::approaching};
+            charge, now, 0, -1, VisitPhase::approaching};
     }
+
+    sync_managed_rides(pedestrians, buildings, catalog, simulation_running, now);
 }
 
 [[nodiscard]] inline bool is_inside(const std::uint64_t pedestrian_id) {
     const auto found = states().find(pedestrian_id);
     return found != states().end() && found->second.phase == VisitPhase::inside;
+}
+
+[[nodiscard]] inline std::optional<int> ride_seat_index_for(const std::uint64_t pedestrian_id) {
+    const auto found = states().find(pedestrian_id);
+    if (found == states().end() || found->second.phase != VisitPhase::inside ||
+        found->second.ride_seat_index < 0) return std::nullopt;
+    return found->second.ride_seat_index;
+}
+
+[[nodiscard]] inline std::size_t ride_queue_size(const std::uint64_t attraction_instance_id) {
+    const auto found = ride_queues().find(attraction_instance_id);
+    return found == ride_queues().end() ? 0U : found->second.waiting.size();
+}
+
+[[nodiscard]] inline std::size_t ride_occupancy(const std::uint64_t attraction_instance_id) {
+    const auto found = ride_queues().find(attraction_instance_id);
+    return found == ride_queues().end() ? 0U : found->second.riding.size();
 }
 
 inline void filter_inside_pedestrians(std::vector<MobileEntityRenderData>& entities,
@@ -503,6 +725,7 @@ inline void filter_inside_pedestrians(std::vector<MobileEntityRenderData>& entit
 inline void clear(PedestrianSystem& pedestrians, BuildingManager& buildings) {
     for (auto& [pedestrian_id, state] : states()) cancel_visit(pedestrian_id, state, pedestrians, buildings);
     states().clear();
+    ride_queues().clear();
 }
 
 }  // namespace ch::building_visit_runtime
