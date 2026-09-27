@@ -1,0 +1,67 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.mini_market.01",
+  "displayName": "Mini Mercado",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    256,
+    256
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 2
+  },
+  "views": {
+    "south": {
+      "file": "mini_market_south.png",
+      "pivot": {
+        "x": 128,
+        "y": 157
+      },
+      "sha256": "44c09cf485ed96b2457fc591e25b2352156eb001a3742cf92327e1cf75ba0562"
+    },
+    "east": {
+      "file": "mini_market_east.png",
+      "pivot": {
+        "x": 128,
+        "y": 157
+      },
+      "sha256": "a31cb8d601eff5f357e6a2a202fda76b18677352816d9031727bcfbe2f1b9661"
+    },
+    "west": {
+      "file": "mini_market_west.png",
+      "pivot": {
+        "x": 128,
+        "y": 157
+      },
+      "sha256": "8b65488423c60fd989047b5313945d00daadbd1e4b7cc9d6689c7edf88b839ff"
+    },
+    "north": {
+      "file": "mini_market_north.png",
+      "pivot": {
+        "x": 128,
+        "y": 157
+      },
+      "sha256": "7ea101a42f5c6e4a6fb94a992c270fba0349e1ce1282d90b92525c08a4d60848"
+    }
+  },
+  "spriteSheet": "mini_market_4view.png",
+  "sourceCommit": "f18b1c299ac59b2061f36068df69414b34bbdb9a",
+  "sourceWorkflowRun": 36291989047,
+  "sourceArtifactId": 10922079780,
+  "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
+  "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess",
+  "approvedForRuntime": true,
+  "sourceAssetId": "commercial_mini_market_3x2_01"
+}
