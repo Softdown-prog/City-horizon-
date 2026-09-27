@@ -94,10 +94,35 @@ void test_surface_turn_and_idle() {
     assert(pedestrians.instances().empty());
 }
 
+void test_visiting_state_blocks_reroute_and_faces_door() {
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    assert(sidewalks.place_tile(0, 0, "concrete_01"));
+    assert(sidewalks.place_tile(1, 0, "concrete_01"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+
+    PedestrianSystem pedestrians = make_pedestrian_system();
+    assert(pedestrians.send_pedestrian({0, 0}, {1, 0}, network));
+    advance_until_idle(pedestrians, network);
+
+    const std::uint64_t id = pedestrians.instances().front().id;
+    assert(pedestrians.face_pedestrian(id, MobileEntityDirection::north));
+    assert(pedestrians.set_visiting(id, true));
+    assert(pedestrians.instances().front().state == PedestrianState::visiting);
+    assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::north);
+    assert(!pedestrians.send_pedestrian({1, 0}, {0, 0}, network));
+
+    assert(pedestrians.set_visiting(id, false));
+    assert(pedestrians.instances().front().state == PedestrianState::idle);
+    assert(pedestrians.send_pedestrian({1, 0}, {0, 0}, network));
+    assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::west);
+}
+
 } // namespace
 
 int main() {
     test_sidewalk_route_and_turns();
     test_demolition_replans_once_then_stops_safely();
     test_surface_turn_and_idle();
+    test_visiting_state_blocks_reroute_and_faces_door();
 }
