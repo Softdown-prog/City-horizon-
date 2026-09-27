@@ -1,0 +1,90 @@
+name: Weather audio runtime integration (one shot)
+
+on:
+  push:
+    paths:
+      - .github/workflows/weather-audio-runtime-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward to current main
+        run: |
+          git fetch origin main
+          git checkout main
+          git merge --ff-only origin/main
+      - name: Patch AudioManager and weather runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, got {count}')
+              return text.replace(old, new, 1)
+
+          audio = Path('src/audio_manager.cpp')
+          text = audio.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '    "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification", "FerrisWheelRunning",\n',
+              '    "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification", "FerrisWheelRunning",\n'
+              '    "WeatherRain", "WeatherThunder",\n',
+              'event names')
+
+          text = replace_once(
+              text,
+              '''    activity_loop_track_ = MIX_CreateTrack(mixer_);\n    if (activity_loop_track_ == nullptr) {\n        std::cerr << "Continuous activity audio track could not be created: " << SDL_GetError() << '\\n';\n    }\n\n    if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr) {\n''',
+              '''    activity_loop_track_ = MIX_CreateTrack(mixer_);\n    if (activity_loop_track_ == nullptr) {\n        std::cerr << "Continuous activity audio track could not be created: " << SDL_GetError() << '\\n';\n    }\n    ambience_loop_track_ = MIX_CreateTrack(mixer_);\n    if (ambience_loop_track_ == nullptr) {\n        std::cerr << "Weather ambience audio track could not be created: " << SDL_GetError() << '\\n';\n    }\n\n    if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr ||\n        ambience_loop_track_ == nullptr) {\n''',
+              'ambience track init')
+
+          text = replace_once(
+              text,
+              '''    available_ = false;\n    looping_event_ = SoundEvent::count;\n    if (activity_loop_track_ != nullptr) {\n        MIX_DestroyTrack(activity_loop_track_);\n        activity_loop_track_ = nullptr;\n    }\n''',
+              '''    available_ = false;\n    looping_event_ = SoundEvent::count;\n    ambience_looping_event_ = SoundEvent::count;\n    if (activity_loop_track_ != nullptr) {\n        MIX_DestroyTrack(activity_loop_track_);\n        activity_loop_track_ = nullptr;\n    }\n    if (ambience_loop_track_ != nullptr) {\n        MIX_DestroyTrack(ambience_loop_track_);\n        ambience_loop_track_ = nullptr;\n    }\n''',
+              'ambience shutdown')
+
+          marker = '''bool AudioManager::play_loading_music() {\n'''
+          ambience_fn = '''bool AudioManager::set_ambience_loop(const SoundEvent event, const bool enabled) {\n    if (!available_ || ambience_loop_track_ == nullptr) {\n        return false;\n    }\n\n    if (!enabled) {\n        if (MIX_TrackPlaying(ambience_loop_track_) && !MIX_StopTrack(ambience_loop_track_, 0)) {\n            std::cerr << "Weather ambience could not stop: " << SDL_GetError() << '\\n';\n            return false;\n        }\n        ambience_looping_event_ = SoundEvent::count;\n        return true;\n    }\n\n    const std::size_t index = event_index(event);\n    if (index >= kEventCount || effects_[index].empty()) {\n        return false;\n    }\n    if (ambience_looping_event_ == event && MIX_TrackPlaying(ambience_loop_track_)) {\n        return true;\n    }\n    if (MIX_TrackPlaying(ambience_loop_track_) && !MIX_StopTrack(ambience_loop_track_, 0)) {\n        std::cerr << "Previous weather ambience could not stop: " << SDL_GetError() << '\\n';\n        return false;\n    }\n    if (!MIX_SetTrackAudio(ambience_loop_track_, effects_[index].front()) ||\n        !MIX_PlayTrack(ambience_loop_track_, 0) ||\n        !MIX_SetTrackLoops(ambience_loop_track_, -1)) {\n        std::cerr << "Weather ambience could not play: " << kEventNames[index]\n                  << "\\nSDL error: " << SDL_GetError() << '\\n';\n        (void)MIX_StopTrack(ambience_loop_track_, 0);\n        ambience_looping_event_ = SoundEvent::count;\n        return false;\n    }\n\n    ambience_looping_event_ = event;\n    return true;\n}\n\n'''
+          text = replace_once(text, marker, ambience_fn + marker, 'ambience function')
+
+          text = replace_once(
+              text,
+              '''    if (activity_loop_track_ != nullptr && !MIX_SetTrackGain(activity_loop_track_, volume_settings_.effects)) {\n        std::cerr << "Could not apply continuous effects volume: " << SDL_GetError() << '\\n';\n    }\n    if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {\n''',
+              '''    if (activity_loop_track_ != nullptr && !MIX_SetTrackGain(activity_loop_track_, volume_settings_.effects)) {\n        std::cerr << "Could not apply continuous effects volume: " << SDL_GetError() << '\\n';\n    }\n    if (ambience_loop_track_ != nullptr && !MIX_SetTrackGain(ambience_loop_track_, volume_settings_.ambience)) {\n        std::cerr << "Could not apply ambience volume: " << SDL_GetError() << '\\n';\n    }\n    if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {\n''',
+              'ambience volume')
+          audio.write_text(text, encoding='utf-8')
+
+          runtime = Path('src/main_runtime_impl.cpp')
+          text = runtime.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '''        const float frame_seconds = static_cast<float>(elapsed_seconds);\n        weather.update(frame_seconds, viewport_width, viewport_height);\n        seagull_seconds += std::min(frame_seconds, 0.050F);\n''',
+              '''        const float frame_seconds = static_cast<float>(elapsed_seconds);\n        const bool was_raining = weather.is_raining();\n        weather.update(frame_seconds, viewport_width, viewport_height);\n        const bool is_raining_now = weather.is_raining();\n        if (is_raining_now != was_raining) {\n            (void)audio.set_ambience_loop(SoundEvent::weather_rain, is_raining_now);\n        }\n        if (weather.flash_alpha() != 0) {\n            (void)audio.play(SoundEvent::weather_thunder);\n        }\n        seagull_seconds += std::min(frame_seconds, 0.050F);\n''',
+              'weather audio update')
+          text = replace_once(
+              text,
+              '''                    case SDL_SCANCODE_F12:\n                        weather.cycle_state();\n                        status = std::string("WEATHER: ") + weather.state_name() + " | F12 TO CHANGE";\n                        break;\n''',
+              '''                    case SDL_SCANCODE_F12: {\n                        const bool was_raining = weather.is_raining();\n                        weather.cycle_state();\n                        if (weather.is_raining() != was_raining) {\n                            (void)audio.set_ambience_loop(SoundEvent::weather_rain, weather.is_raining());\n                        }\n                        status = std::string("WEATHER: ") + weather.state_name() + " | F12 TO CHANGE";\n                        break;\n                    }\n''',
+              'manual weather audio sync')
+          runtime.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
+          grep -q '"WeatherRain", "WeatherThunder"' src/audio_manager.cpp
+          grep -q 'set_ambience_loop' src/audio_manager.cpp
+          grep -q 'SoundEvent::weather_thunder' src/main_runtime_impl.cpp
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/audio_manager.cpp src/main_runtime_impl.cpp
+          git commit -m "feat(weather): sync rain ambience and thunder audio"
+          git push origin main
