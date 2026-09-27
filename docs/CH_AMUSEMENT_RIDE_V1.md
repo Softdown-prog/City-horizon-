@@ -43,7 +43,8 @@ Example:
       "overlayContract": "CH_RIDE_PASSENGER_OVERLAY_V1",
       "actorSource": "ch_actor_green_01",
       "paletteMode": "stable_per_visitor",
-      "seatAssignment": "queue_order_next_free_slot"
+      "seatAssignment": "queue_order_next_free_slot",
+      "seatLayoutManifest": "assets/city_park/example_ride/example_ride_passenger_seats.json"
     }
   }
 }
@@ -61,9 +62,10 @@ The managed ride lifecycle is:
 4. The visitor enters the ride FIFO queue while remaining logically at the booth service position.
 5. A batch dispatches when capacity is reached or `boardingTimeoutMs` expires.
 6. Riders receive deterministic seat indexes from queue order.
-7. World CHActors are hidden while riding; the passenger overlay represents only the riders that actually boarded.
-8. The ride runs for `cycle.durationMs`.
-9. The complete batch is released together, fun is restored, and the CHActors reappear at the ticket-booth service point before returning to normal autonomous decisions.
+7. `CH_RIDE_PASSENGER_SEAT_BINDING_V1` binds each real rider id and clothing palette to that runtime seat index.
+8. World CHActors are hidden while riding; the passenger overlay represents only the riders that actually boarded.
+9. The ride runs for `cycle.durationMs`.
+10. The complete batch is released together, fun is restored, and the CHActors reappear at the ticket-booth service point before returning to normal autonomous decisions.
 
 The queue and cycle are per attraction instance. Two copies of the same ride therefore keep independent queues and independent batches.
 
@@ -85,9 +87,12 @@ Capacity must be greater than zero. The runtime currently caps authored capacity
 - `seatCount >= capacity`;
 - a non-empty `actorSource`;
 - `paletteMode: "stable_per_visitor"` so a citizen keeps the same clothing colors while walking, queueing and riding;
-- `seatAssignment: "queue_order_next_free_slot"`.
+- `seatAssignment: "queue_order_next_free_slot"`;
+- a non-empty `seatLayoutManifest` using `CH_RIDE_PASSENGER_SEAT_LAYOUT_V1`.
 
-The visual overlay must use the runtime seat index rather than filling seats decoratively. This prevents a half-full ride from rendering as full and prevents a full ride from appearing empty.
+The runtime owns occupancy. `ride_seat_index` is assigned only when a real queued visitor enters the active batch. `CH_RIDE_PASSENGER_SEAT_BINDING_V1` exposes the attraction instance id, pedestrian id, seat index, actor source and the actual citizen clothing tint. The renderer must map `seat_index` directly to the matching `slotId` in the seat-layout manifest.
+
+A seat layout uses zero-based contiguous `slotId` values and must contain exactly `seatCount` usable slots. A visual overlay must never fill seats decoratively. If only seven visitors boarded, only the seven runtime bindings may render; if the ride is empty, no passenger may be shown.
 
 ## Ticket booth ownership
 
@@ -104,11 +109,12 @@ Before a new ride is considered runtime-ready, verify the following in its autho
 3. `needsEffect.fun` is authored so visitors can discover the ride without id-specific code.
 4. `amusementRide.capacity` matches the intended gameplay capacity.
 5. Queue timeout and cycle duration are authored in the JSON.
-6. Passenger `seatCount` is at least the ride capacity.
-7. CHActor passenger overlay positions exist for every usable seat and every supported ride direction/frame.
-8. Passenger colors come from the actual visitor instance and remain stable during the cycle.
-9. Runtime animation uses activity state so an empty/idle ride does not pretend to carry passengers.
-10. Ticket purchase, queue order, batch dispatch, exit and need restoration are verified in-game.
+6. Passenger `seatCount` is at least the ride capacity and a valid `seatLayoutManifest` exists.
+7. Seat-layout `slotId` values are contiguous from zero and match the authored passenger geometry order.
+8. CHActor passenger overlay positions exist for every usable seat and every supported ride direction/frame.
+9. Passenger colors come from the actual visitor binding and remain stable during the cycle.
+10. Runtime animation uses activity state so an empty/idle ride does not pretend to carry passengers.
+11. Ticket purchase, queue order, batch dispatch, seat binding, exit and need restoration are verified in-game.
 
 ## Legacy ticketed attractions
 
