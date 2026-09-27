@@ -27,6 +27,7 @@ enum class VisitPhase : std::uint8_t {
     entering,
     aligning,
     inside,
+    returning_to_booth,
     completed_here,
 };
 
@@ -214,9 +215,6 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
     const std::int64_t budget_cents, const PedestrianNeed need) {
     std::optional<TicketedAttractionRoute> best;
     std::size_t best_route_tiles = std::numeric_limits<std::size_t>::max();
-    constexpr std::array<GridDirection, 4> sides = {
-        GridDirection::north, GridDirection::east, GridDirection::south, GridDirection::west,
-    };
     for (const BuildingInstance& booth : buildings.instances()) {
         if (!booth.operational) continue;
         const BuildingDefinition* booth_definition = catalog.find(booth.definition_id);
@@ -231,24 +229,24 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
             !satisfies_need(*attraction_definition, need)) continue;
         if (visitor_access_points(*attraction_definition, attraction->rotation).empty()) continue;
 
-        const BuildingFootprint booth_footprint = rotated_footprint(*booth_definition, booth.rotation);
-        for (const GridDirection side : sides) {
-            const auto [dx, dy] = access_offset(side);
-            const int local_x = side == GridDirection::west ? 0 :
-                                side == GridDirection::east ? booth_footprint.width - 1 : booth_footprint.width / 2;
-            const int local_y = side == GridDirection::north ? 0 :
-                                side == GridDirection::south ? booth_footprint.height - 1 : booth_footprint.height / 2;
-            const NavigationTile service{booth.tile_x + local_x + dx, booth.tile_y + local_y + dy};
+        const std::vector<BuildingAccessPoint> booth_access =
+            visitor_access_points(*booth_definition, booth.rotation);
+        if (booth_access.empty()) continue;
+        for (const BuildingAccessPoint& access : booth_access) {
+            const auto [dx, dy] = access_offset(access.facing);
+            const NavigationTile service{booth.tile_x + access.local_x + dx,
+                                         booth.tile_y + access.local_y + dy};
             if (!network.is_navigable(service)) continue;
             const NavigationPathResult to_booth = find_navigation_path(network, start, service);
             if (to_booth.status != NavigationPathStatus::found || to_booth.tiles.empty()) continue;
-            const auto attraction_entrance = reachable_entrance_for_instance(service, *attraction, *attraction_definition, network);
+            const auto attraction_entrance = reachable_entrance_for_instance(
+                service, *attraction, *attraction_definition, network);
             if (!attraction_entrance) continue;
             const std::size_t cost = to_booth.tiles.size() + attraction_entrance->route_tiles;
             if (cost >= best_route_tiles) continue;
             best_route_tiles = cost;
-            best = TicketedAttractionRoute{booth.instance_id, attraction->instance_id, service, side,
-                                           *attraction_entrance, cost};
+            best = TicketedAttractionRoute{booth.instance_id, attraction->instance_id, service,
+                                           access.facing, *attraction_entrance, cost};
         }
     }
     return best;
@@ -265,7 +263,8 @@ inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
                                                    const VisitState& state) {
     int expected_x = state.door_x;
     int expected_y = state.door_y;
-    if (state.phase == VisitPhase::ticket_approaching || state.phase == VisitPhase::ticketing) {
+    if (state.phase == VisitPhase::ticket_approaching || state.phase == VisitPhase::ticketing ||
+        state.phase == VisitPhase::returning_to_booth) {
         expected_x = state.ticket_x;
         expected_y = state.ticket_y;
     } else if (state.phase == VisitPhase::approaching) {
@@ -314,7 +313,8 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 continue;
             }
             if ((state.phase == VisitPhase::ticket_approaching || state.phase == VisitPhase::approaching ||
-                 state.phase == VisitPhase::entering) && !is_expected_destination(pedestrian_snapshot, state)) {
+                 state.phase == VisitPhase::entering || state.phase == VisitPhase::returning_to_booth) &&
+                !is_expected_destination(pedestrian_snapshot, state)) {
                 cancel_visit(pedestrian_id, state, pedestrians, buildings);
                 runtime_states.erase(current);
                 continue;
@@ -365,7 +365,18 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                         }
                     }
                     (void)pedestrians.set_visiting(pedestrian_id, false);
-                    state.phase = VisitPhase::completed_here;
+                    if (state.ticket_booth_instance_id != 0) {
+                        const NavigationTile ride_exit{state.door_x, state.door_y};
+                        const NavigationTile booth_return{state.ticket_x, state.ticket_y};
+                        if (network.is_navigable(ride_exit) && network.is_navigable(booth_return) &&
+                            pedestrians.send_pedestrian(ride_exit, booth_return, network)) {
+                            state.phase = VisitPhase::returning_to_booth;
+                        } else {
+                            state.phase = VisitPhase::completed_here;
+                        }
+                    } else {
+                        state.phase = VisitPhase::completed_here;
+                    }
                 }
                 continue;
             }
@@ -379,6 +390,11 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             if (pedestrian_snapshot.state == PedestrianState::walking) continue;
             const NavigationTile current_tile{pedestrian_snapshot.spatial.logical_tile_x,
                                               pedestrian_snapshot.spatial.logical_tile_y};
+            if (state.phase == VisitPhase::returning_to_booth) {
+                const NavigationTile ticket{state.ticket_x, state.ticket_y};
+                runtime_states.erase(current);
+                continue;
+            }
             if (state.phase == VisitPhase::ticket_approaching) {
                 const NavigationTile ticket{state.ticket_x, state.ticket_y};
                 if (!(current_tile == ticket) || !begin_ticket_service(pedestrian_id, state, pedestrians, now))
