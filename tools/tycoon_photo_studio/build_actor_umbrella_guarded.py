@@ -44,9 +44,9 @@ def build_canopy():
                                        0.94, 1.01, 1.04, 0.99))]
     piping = bs.make_material("WovenEdge", (0.32, 0.41, 0.42, 1), 0.85)
     ferrule = bs.make_material("BrushedMetalTip", (0.43, 0.48, 0.49, 1), 0.48, 0.28)
-    rings = ((0.0, 1.35), (0.25, 1.325), (0.49, 1.21), (0.72, 1.07))
+    rings = ((0.25, 1.325), (0.49, 1.21), (0.72, 1.07))
     segments = 12
-    vertices = []
+    vertices = [(0.0, 0.0, 1.35)]
     for radius, z in rings:
         for i in range(segments):
             a = 2 * math.pi * i / segments
@@ -55,11 +55,16 @@ def build_canopy():
             vertices.append((radius * math.cos(a), radius * math.sin(a), z + dz))
     faces = []
     material_indices = []
+    for i in range(segments):
+        faces.append((0, 1 + i, 1 + (i + 1) % segments))
+        material_indices.append(i)
     for ring in range(len(rings) - 1):
         for i in range(segments):
             nxt = (i + 1) % segments
-            faces.append((ring * segments + i, ring * segments + nxt,
-                          (ring + 1) * segments + nxt, (ring + 1) * segments + i))
+            faces.append((1 + ring * segments + i,
+                          1 + (ring + 1) * segments + i,
+                          1 + (ring + 1) * segments + nxt,
+                          1 + ring * segments + nxt))
             material_indices.append(i)
     mesh = bpy.data.meshes.new("CutAndSewnGores")
     mesh.from_pydata(vertices, [], faces)
@@ -100,7 +105,7 @@ def build_canopy():
     for i in range(segments):
         a = 2 * math.pi * i / segments
         tube(f"GoreSeam_{i:02}", [(r * math.cos(a), r * math.sin(a), z + 0.006)
-                                    for r, z in rings[1:]], piping, 0.004,
+                                    for r, z in rings], piping, 0.004,
              "prop.umbrella.stitch")
     tube("ScallopedBinding", [(0.72 * math.cos(2 * math.pi * i / 72),
                                 0.72 * math.sin(2 * math.pi * i / 72),
@@ -130,8 +135,8 @@ def render_fabric_mask(scene, dome, details, path):
     white.inputs["Color"].default_value = (1, 1, 1, 1)
     emission.node_tree.links.new(white.outputs[0], output.inputs[0])
     try:
-        dome.data.materials.clear()
-        dome.data.materials.append(emission)
+        for i in range(len(original_materials)):
+            dome.data.materials[i] = emission
         for obj in details:
             obj.hide_render = True
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -142,9 +147,8 @@ def render_fabric_mask(scene, dome, details, path):
         scene.render.image_settings.color_mode = "RGBA"
         bpy.ops.render.render(write_still=True)
     finally:
-        dome.data.materials.clear()
-        for material in original_materials:
-            dome.data.materials.append(material)
+        for i, material in enumerate(original_materials):
+            dome.data.materials[i] = material
         for obj in details:
             obj.hide_render = False
         (scene.render.engine, scene.render.resolution_x,
