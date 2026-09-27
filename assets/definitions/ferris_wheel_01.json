@@ -10,22 +10,10 @@
     "3": "assets/city_park/ferris_wheel/attraction.park_ferris_wheel.01_east_animation.png"
   },
   "spriteAnchors": {
-    "0": {
-      "x": 0.25,
-      "y": 0.8125
-    },
-    "1": {
-      "x": 0.25,
-      "y": 0.8125
-    },
-    "2": {
-      "x": 0.25,
-      "y": 0.8125
-    },
-    "3": {
-      "x": 0.25,
-      "y": 0.8125
-    }
+    "0": { "x": 0.25, "y": 0.8125 },
+    "1": { "x": 0.25, "y": 0.8125 },
+    "2": { "x": 0.25, "y": 0.8125 },
+    "3": { "x": 0.25, "y": 0.8125 }
   },
   "rotatable": true,
   "requiresRoadAccess": false,
@@ -33,6 +21,9 @@
   "requiresTicketBooth": true,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    { "x": 3, "y": 4, "facing": "south" }
+  ],
   "footprint": {
     "width": 6,
     "height": 5
