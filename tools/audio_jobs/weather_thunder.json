@@ -1,0 +1,8 @@
+{
+  "source": "Converter/v1419-chuva-com-trovao-02-307290.mp3",
+  "output": "assets/audio/weather/thunder.ogg",
+  "catalog": "assets/audio/audio_catalog.json",
+  "kind": "effect",
+  "event": "WeatherThunder",
+  "mode": "replace"
+}
