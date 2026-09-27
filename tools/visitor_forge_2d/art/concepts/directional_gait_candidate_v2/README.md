@@ -28,6 +28,10 @@ PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d render-directio
 A saída deve incluir `east/north/west_walk_a.png`, `*_walk_b.png`,
 `four_direction_structural_gait_56px.png` e `review_metrics.json`.
 
+O workflow `.github/workflows/visitor-forge-structural-gait.yml` executa somente
+os testes focados deste estudo, renderiza o mesmo painel e publica a pasta de
+revisão como artifact. Ele não compila o City Horizon nem promove sprites.
+
 ## Gate visual obrigatório
 
 Passar nos limites estruturais e no Identity Lock significa apenas que o frame
