@@ -58,6 +58,7 @@ bool PedestrianSystem::send_pedestrian(const NavigationTile start, const Navigat
             std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
         pedestrian.umbrella_color = kUmbrellaColors[
             std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
+        pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
         instances_.push_back(std::move(pedestrian));
     }
     PedestrianInstance& pedestrian = instances_.front();
@@ -117,12 +118,53 @@ bool PedestrianSystem::rest_at_home(const NavigationTile entrance) {
     pedestrian.state = PedestrianState::resting;
     pedestrian.route.clear();
     pedestrian.next_waypoint = 0;
+    pedestrian.outing_intent = {};
     return true;
 }
 
 void PedestrianSystem::wake_up() {
     if (!instances_.empty() && instances_.front().state == PedestrianState::resting) {
         instances_.front().state = PedestrianState::idle;
+    }
+}
+
+bool PedestrianSystem::authorize_outing(const PedestrianOutingPreference preference) {
+    if (instances_.empty()) return false;
+    PedestrianInstance& pedestrian = instances_.front();
+    if (pedestrian.state != PedestrianState::resting || pedestrian.monthly_budget_cents <= 0) return false;
+    pedestrian.outing_intent.active = true;
+    pedestrian.outing_intent.preference = preference;
+    pedestrian.state = PedestrianState::idle;
+    return true;
+}
+
+void PedestrianSystem::clear_outing_intent(const std::uint64_t pedestrian_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    if (found != instances_.end()) found->outing_intent = {};
+}
+
+bool PedestrianSystem::spend_monthly_budget(const std::uint64_t pedestrian_id, const std::int64_t cents) {
+    if (cents < 0) return false;
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    if (found == instances_.end() || cents > found->monthly_budget_cents) return false;
+    found->monthly_budget_cents -= cents;
+    return true;
+}
+
+std::int64_t PedestrianSystem::monthly_budget_cents(const std::uint64_t pedestrian_id) const {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    return found == instances_.end() ? 0 : found->monthly_budget_cents;
+}
+
+void PedestrianSystem::reset_monthly_budgets() {
+    for (PedestrianInstance& pedestrian : instances_) {
+        pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
     }
 }
 
