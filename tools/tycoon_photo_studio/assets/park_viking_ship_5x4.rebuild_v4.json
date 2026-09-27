@@ -1,0 +1,172 @@
+{
+  "contract": "CITY_HORIZON_VIKING_SHIP_RIDE_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "rebuild": {
+    "id": "CH_VIKING_SHIP_REBUILD_V4",
+    "fromScratch": true,
+    "inheritsGeometryLanguageFrom": "CH_VIKING_SHIP_REBUILD_V3",
+    "supersedesForReview": "Rebuild V3 open-site candidate; retain V3 as comparison only",
+    "intent": "Keep V3's tall non-toy open-site language, but remove the remaining miniature read by making the yellow structural members substantially larger, lowering the ship toward the deck while preserving safe swing clearance, and opening the boarding platform across more of the 5x4 site."
+  },
+  "visualLanguage": {
+    "target": "full_scale_stylized_real_fairground_machine_open_5x4_layout",
+    "mustReadAs": [
+      "full-size amusement ride occupying a five-by-four tile site",
+      "large yellow structural braces and suspension arms",
+      "heavy ship hanging closer to the operating deck",
+      "wide open industrial boarding platform",
+      "painted structural steel",
+      "real timber hull"
+    ],
+    "rejectIfReadsAs": [
+      "miniature support hardware",
+      "thin yellow sticks",
+      "ship floating too high above the deck",
+      "cramped boarding appendage",
+      "plastic toy",
+      "LEGO-like construction",
+      "gumball prize"
+    ],
+    "layoutRules": {
+      "depthUse": "front and rear A-frame planes must continue to use most of the four-tile depth",
+      "yellowMembers": "yellow inner braces and yellow suspension arms must be visually substantial structural members, not thin accents",
+      "shipHeight": "resting ship should sit noticeably closer to the operating deck than V3 without sacrificing swing clearance",
+      "boardingZone": "loading area should span most of the site width and read as an open operating platform",
+      "negativeSpace": "keep visible breathing room around the ship and between the A-frame planes"
+    },
+    "surfaceRules": {
+      "paintedSteel": "medium-high roughness, restrained saturation, visible dark steel separation",
+      "wood": "rough darker timber, not orange plastic",
+      "accents": "fairground colors are secondary accents, not candy coating"
+    }
+  },
+  "referencePolicy": {
+    "purpose": "Use the user-supplied real fairground pirate-ship photos for full-scale proportion, substantial yellow structural members, lower resting ship height, open platform layout and material separation only.",
+    "exclude": ["ticket_booth", "reference_branding", "reference_text", "people", "surrounding_scenery"],
+    "firstGate": "Approve yellow-member scale, lower boat position and open platform before decorative artwork or animation frames."
+  },
+  "footprint": {
+    "widthTiles": 5,
+    "depthTiles": 4,
+    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3]]
+  },
+  "geometry": {
+    "unitsPerTile": 3.0,
+    "baseWidth": 14.85,
+    "baseDepth": 11.85,
+    "baseHeight": 0.46,
+    "deckWidth": 14.45,
+    "deckDepth": 11.45,
+    "deckHeight": 0.18,
+    "platformTopZ": 1.02,
+
+    "pivotZ": 16.80,
+    "supportHalfWidth": 6.70,
+    "supportHalfDepth": 4.72,
+    "supportBeamWidth": 0.92,
+    "supportBeamDepth": 0.66,
+    "supportFlangeDepth": 0.080,
+    "innerBraceWidth": 0.58,
+    "innerBraceDepth": 0.42,
+    "lowerCrossBraceWidth": 0.40,
+    "lowerCrossBraceDepth": 0.30,
+    "lowerCrossBraceHeightRatio": 0.27,
+    "footBlockWidth": 1.42,
+    "footBlockDepth": 1.22,
+    "footBlockHeight": 0.34,
+    "anchorBoltRadius": 0.080,
+    "primaryBevel": 0.032,
+    "secondaryBevel": 0.020,
+
+    "axleRadius": 0.36,
+    "axleDepth": 10.10,
+    "bearingRadius": 0.86,
+    "bearingDepth": 0.28,
+
+    "boatDrop": 8.50,
+    "boatAttachHalfX": 5.02,
+    "boatJointZ": -0.76,
+    "boatJointHalfDepth": 1.96,
+    "swingArmWidth": 0.72,
+    "swingArmDepth": 0.50,
+    "shipLength": 13.55,
+    "shipHalfWidth": 2.12,
+    "shipDeckZ": -1.46,
+    "seatRows": 8,
+
+    "loadingPlatformWidth": 13.85,
+    "loadingPlatformDepth": 4.15,
+    "loadingPlatformHeight": 0.40,
+    "stairWidth": 3.80,
+    "stairDepth": 3.20,
+    "stairSteps": 7,
+    "railingHeight": 1.00,
+    "railingRadius": 0.042,
+
+    "previewSwingDegrees": 0.0,
+    "clearanceReviewDegrees": 58.0,
+    "minimumRestHullGapWorld": 3.30,
+    "maximumRestHullGapWorld": 3.90,
+    "minimumSwingClearanceWorld": 3.80,
+    "minimumPivotZ": 16.00,
+    "minimumSupportBeamWidth": 0.90,
+    "minimumSupportHeightToBaseWidthRatio": 1.08,
+    "minimumSupportDepthUtilization": 0.76,
+    "minimumLoadingDepthUtilization": 0.34,
+    "minimumLoadingWidthUtilization": 0.90,
+    "minimumInnerBraceWidth": 0.55,
+    "minimumSwingArmWidth": 0.68,
+    "maximumPrimaryBevel": 0.045,
+    "clearancePolicy": "The boat must sit materially lower than V3 while remaining mechanically safe. Reject if rest gap is still too large, if swing clearance is unsafe, if yellow structural members regress to thin accents, or if the platform stops using the available 5x4 site."
+  },
+  "reviewTargets": {
+    "masterCanvasPx": 1280,
+    "minimumVisibleAFrameHeightPx": 500,
+    "targetVisibleBoatPlatformGapPx": "roughly_65_to_85",
+    "silhouette": "tall_open_A_frame_with_substantial_yellow_members_and_lower_heavy_ship",
+    "siteRead": "wide_open_5x4_operating_platform_not_compact_pad",
+    "materialRead": "painted_steel_plus_real_wood_not_plastic",
+    "lightingRead": "retain V3 full-height illumination without crushed blacks",
+    "note": "V4 intentionally lowers the boat relative to V3. World-space rest and swing gates remain authoritative."
+  },
+  "animation": {
+    "enabled": false,
+    "prepared": true,
+    "pivotObject": "SwingPivot",
+    "rotationAxis": "Y",
+    "frameCount": null,
+    "fps": null,
+    "note": "Do not define swing frames until V4 yellow-member scale, rest height and platform openness are approved."
+  },
+  "runtimeLayers": {
+    "contract": "CH_ATTRACTION_MULTI_OVERLAY_V1",
+    "staticBase": {"role":"attraction_static_base","animated":false},
+    "motionOverlay": {"role":"attraction_motion_overlay","animated":true,"activeWhen":"ride_running","frameCount":null,"fps":null},
+    "idleLightOverlay": {"role":"attraction_idle_light_overlay","animated":true,"activeWhen":"ride_idle","disabledWhen":"ride_running","behavior":"blink","groups":["A","B"],"frameCount":null,"fps":null}
+  },
+  "materials": {
+    "steelDark": {"name":"RebuildV4SteelBlack","rgba":[0.024,0.032,0.040,1.0],"roughness":0.58,"metallic":0.82},
+    "steelMid": {"name":"RebuildV4SteelMid","rgba":[0.12,0.14,0.16,1.0],"roughness":0.56,"metallic":0.76},
+    "steelLight": {"name":"RebuildV4GalvanizedSteel","rgba":[0.54,0.57,0.59,1.0],"roughness":0.62,"metallic":0.58},
+    "steelBlue": {"name":"RebuildV4IndustrialBlue","rgba":[0.035,0.135,0.275,1.0],"roughness":0.58,"metallic":0.64},
+    "yellow": {"name":"RebuildV4SafetyOchre","rgba":[0.74,0.41,0.035,1.0],"roughness":0.61,"metallic":0.28},
+    "red": {"name":"RebuildV4FairgroundRed","rgba":[0.56,0.045,0.055,1.0],"roughness":0.60,"metallic":0.20},
+    "white": {"name":"RebuildV4WarmPaint","rgba":[0.82,0.81,0.74,1.0],"roughness":0.66,"metallic":0.08},
+    "gold": {"name":"RebuildV4AgedBrass","rgba":[0.52,0.31,0.060,1.0],"roughness":0.58,"metallic":0.56},
+    "teal": {"name":"RebuildV4MutedTeal","rgba":[0.030,0.27,0.30,1.0],"roughness":0.62,"metallic":0.22},
+    "woodDark": {"name":"RebuildV4HullDarkTimber","rgba":[0.115,0.035,0.016,1.0],"roughness":0.82,"metallic":0.0},
+    "wood": {"name":"RebuildV4HullTimber","rgba":[0.30,0.095,0.030,1.0],"roughness":0.78,"metallic":0.0},
+    "woodLight": {"name":"RebuildV4HullLightTimber","rgba":[0.43,0.18,0.050,1.0],"roughness":0.74,"metallic":0.0},
+    "seatRed": {"name":"RebuildV4SeatRed","rgba":[0.39,0.030,0.040,1.0],"roughness":0.68,"metallic":0.05},
+    "platform": {"name":"RebuildV4PlatformSteel","rgba":[0.22,0.24,0.25,1.0],"roughness":0.72,"metallic":0.48},
+    "platformWhite": {"name":"RebuildV4GalvanizedDeck","rgba":[0.62,0.64,0.62,1.0],"roughness":0.72,"metallic":0.38},
+    "panelCream": {"name":"RebuildV4PanelNeutral","rgba":[0.50,0.45,0.34,1.0],"roughness":0.72,"metallic":0.02},
+    "lampWarm": {"name":"RebuildV4LampWarm","rgba":[0.90,0.64,0.18,1.0],"roughness":0.34,"metallic":0.05},
+    "lampRed": {"name":"RebuildV4LampRed","rgba":[0.76,0.065,0.05,1.0],"roughness":0.34,"metallic":0.05},
+    "lampCyan": {"name":"RebuildV4LampCyan","rgba":[0.06,0.66,0.62,1.0],"roughness":0.32,"metallic":0.04},
+    "lampPink": {"name":"RebuildV4LampPink","rgba":[0.78,0.10,0.27,1.0],"roughness":0.32,"metallic":0.04}
+  }
+}
