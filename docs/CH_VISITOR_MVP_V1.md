@@ -57,3 +57,11 @@ walk path
 ```
 
 No child visitor is required for this MVP.
+
+## Navigation architecture
+
+The scalable visitor/crowd navigation design is documented separately in [`CH_PEDESTRIAN_NAVIGATION_V1.md`](CH_PEDESTRIAN_NAVIGATION_V1.md).
+
+That contract intentionally preserves the current tile `NavigationNetwork`, BFS proof and `PedestrianSystem` while defining the future path toward autonomous wandering, goal seeking, compressed junction graphs, bounded pathfinding budgets, recent-node anti-loop memory and plaza/wide-corridor handling.
+
+Do not implement the entire crowd architecture merely to complete this visual MVP. Navigation must grow in vertical slices as actual autonomous visitors and population scale require it.
