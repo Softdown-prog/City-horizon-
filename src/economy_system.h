@@ -54,6 +54,8 @@ public:
     [[nodiscard]] std::int64_t funds() const;
     [[nodiscard]] const MonthlyEconomySummary& monthly_summary() const;
     [[nodiscard]] const std::vector<EconomyTransaction>& ledger() const;
+    [[nodiscard]] int consecutive_negative_months() const;
+    [[nodiscard]] bool bankrupt() const;
 
     [[nodiscard]] bool can_afford(std::int64_t cost) const;
     [[nodiscard]] bool try_spend(std::int64_t cost);
@@ -65,7 +67,8 @@ public:
     [[nodiscard]] int last_property_tax_year() const;
     void rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                  const PopulationSystem& population, const FarmingSystem* farming = nullptr);
-    // Invoked once per calendar close, never polled from the frame loop.
+    // Invoked once per calendar close, never polled from the frame loop. Three
+    // consecutive month closes with a negative treasury mark the city bankrupt.
     void on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
                          const PopulationSystem& population, const GameDate& closing_date,
                          const ServiceVehicleCatalog* vehicle_catalog = nullptr,
@@ -94,10 +97,13 @@ private:
                 std::uint64_t building_instance_id = 0, std::uint32_t land_parcel_id = 0);
 
     static constexpr std::size_t kMaxLedgerEntries = 100;
+    static constexpr int kBankruptcyMonths = 3;
     std::int64_t funds_ = 50'000;
     // The fiscal closure marker prevents a save/load from charging January's
     // property tax twice for the same game year.
     int last_property_tax_year_ = 0;
+    int consecutive_negative_months_ = 0;
+    bool bankrupt_ = false;
     MonthlyEconomySummary monthly_summary_;
     std::vector<EconomyTransaction> ledger_;
 };
