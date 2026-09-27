@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries six compatibility fixes without duplicating the runtime loop:
+// carries seven compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -21,6 +21,10 @@
 // 6. Ferris-wheel audio is frame-synchronized with both ride activity and the
 //    canonical visible viewport. An active wheel is audible only while its
 //    logical footprint intersects the current camera view.
+// 7. Runtime rendering builds a conservative camera-visible working set before
+//    terrain traversal, road/building sorting and per-tile geometry.  The
+//    canonical MapRenderer remains unchanged for Map Forge and render-contract
+//    verification.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -28,6 +32,7 @@
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
 #include "src/runtime_view_state.h"
+#include "src/runtime_map_renderer.h"
 
 #include <algorithm>
 
@@ -168,8 +173,14 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         return play_sound(ch_sound_event); \
     }())
 
+// Redirect only runtime call sites. Both renderer class declarations are
+// already parsed above, so Map Forge and the canonical render library keep
+// their original MapRenderer implementation.
+#define MapRenderer RuntimeMapRenderer
+
 #include "main_runtime_impl.cpp"
 
+#undef MapRenderer
 #undef play_sound
 #undef mobile_render_entities
 #undef set_service_price
