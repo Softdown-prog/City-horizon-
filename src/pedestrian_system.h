@@ -10,6 +10,18 @@
 
 enum class PedestrianState { idle, walking, visiting, resting };
 
+enum class PedestrianOutingPreference : std::uint8_t {
+    balanced,
+    outdoor_leisure,
+    covered_commerce,
+    essential_commerce,
+};
+
+struct PedestrianOutingIntent {
+    bool active = false;
+    PedestrianOutingPreference preference = PedestrianOutingPreference::balanced;
+};
+
 struct PedestrianVisualDefinition {
     std::string animation_set_id;
     float art_scale = 0.45F;
@@ -37,12 +49,20 @@ struct PedestrianInstance {
     MobileAnimationPlayer animation;
     MobileClothingTint clothing;
     MobileClothingColor umbrella_color;
+
+    // Citizen Economy V1. Currency is stored in cents so CH_SERVICE_PRICE_V1
+    // can be charged exactly without migrating the aggregate city treasury.
+    std::int64_t monthly_budget_cents = 5'000;
+    PedestrianOutingIntent outing_intent;
 };
 
-// One runtime pedestrian consuming a topology-backed route. Population,
-// individual needs and persistence are separate gameplay work.
+// One runtime pedestrian consuming a topology-backed route. Population count
+// remains aggregate, while this visual citizen carries only the small amount of
+// state needed for home/activity behaviour and a monthly consumption budget.
 class PedestrianSystem {
 public:
+    static constexpr std::int64_t kDefaultMonthlyBudgetCents = 5'000; // $50.00 tuning baseline.
+
     explicit PedestrianSystem(PedestrianVisualDefinition visual_definition);
 
     // Debug visual retune reuses the same entity and route.
@@ -60,6 +80,15 @@ public:
     // Rest only at the home's walkable entrance after arriving there.
     [[nodiscard]] bool rest_at_home(NavigationTile entrance);
     void wake_up();
+
+    // A citizen may decide to leave only while resting at home. The visit bridge
+    // consumes this one-shot intent when it starts a concrete destination route.
+    [[nodiscard]] bool authorize_outing(PedestrianOutingPreference preference);
+    void clear_outing_intent(std::uint64_t pedestrian_id);
+    [[nodiscard]] bool spend_monthly_budget(std::uint64_t pedestrian_id, std::int64_t cents);
+    [[nodiscard]] std::int64_t monthly_budget_cents(std::uint64_t pedestrian_id) const;
+    void reset_monthly_budgets();
+
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);
