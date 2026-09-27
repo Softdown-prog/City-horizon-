@@ -17,8 +17,6 @@ void test_roads() {
     RoadManager roads{-8, 8};
     RoadNavigationNetwork network{roads};
 
-    // A four-way crossing proves straight runs, T branches and reciprocal
-    // traversal through the shared center.
     assert(roads.place_tile(0, 0));
     assert(roads.place_tile(-1, 0));
     assert(roads.place_tile(1, 0));
@@ -28,7 +26,6 @@ void test_roads() {
     assert(network.can_move({1, 0}, CardinalDirection::west));
     assert_path(find_navigation_path(network, {-1, 0}, {0, 1}), {-1, 0}, {0, 1}, 3);
 
-    // A separate L validates a curve, rather than merely a crossing.
     assert(roads.place_tile(3, 0));
     assert(roads.place_tile(4, 0));
     assert(roads.place_tile(4, 1));
@@ -37,8 +34,6 @@ void test_roads() {
     assert(roads.place_tile(7, 7));
     assert(find_navigation_path(network, {7, 7}, {0, 0}).status == NavigationPathStatus::no_path);
 
-    // The current live topology is queried for each search: removing the
-    // centre immediately makes the former crossing inaccessible.
     assert(roads.remove_tile(0, 0));
     assert(find_navigation_path(network, {-1, 0}, {0, 1}).status == NavigationPathStatus::no_path);
 }
@@ -48,8 +43,6 @@ void test_pedestrian_lanes_derive_from_roads() {
     PedestrianLaneNavigationNetwork pedestrians{roads};
     for (int x = 0; x < 6; ++x) assert(roads.place_tile(x, 0));
 
-    // No SidewalkManager data is required: the same N/E/S/W mask that carries
-    // vehicles exposes a separate pedestrian-lane graph for the renderer.
     assert(pedestrians.can_move({0, 0}, CardinalDirection::east));
     assert_path(find_navigation_path(pedestrians, {0, 0}, {5, 0}), {0, 0}, {5, 0}, 6);
     assert(roads.remove_tile(3, 0));
@@ -94,7 +87,7 @@ void test_pedestrian_surface_route() {
     PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
     assert_path(find_navigation_path(network, {0, 0}, {3, 1}), {0, 0}, {3, 1}, 5);
     assert(network.can_move({1, 0}, CardinalDirection::east));
-    assert(!network.is_navigable({2, 1})); // grass is not a route
+    assert(!network.is_navigable({2, 1}));
     assert(!network.can_move({2, 0}, CardinalDirection::south));
     assert(sidewalks.remove_tile(1, 0));
     assert(find_navigation_path(network, {0, 0}, {3, 1}).status == NavigationPathStatus::no_path);
@@ -126,9 +119,6 @@ void test_fenced_destination_requires_walkable_gate() {
         }
     }
 
-    // Enclose tiles x=2..3, y=0..1. The start is outside at (0,1), while
-    // the destination is inside at (3,1). With every edge closed there is no
-    // legal path into the enclosure.
     const std::vector<FenceVertex> perimeter = {
         {2, 0}, {3, 0}, {4, 0}, {4, 1}, {4, 2}, {3, 2}, {2, 2}, {2, 1},
     };
@@ -141,15 +131,13 @@ void test_fenced_destination_requires_walkable_gate() {
     const NavigationTile target{3, 1};
     assert(find_navigation_path(network, start, target).status == NavigationPathStatus::no_path);
 
-    // Open exactly the west-side gate between outside tile (1,1) and inside
-    // tile (2,1). The route must now enter through that edge.
     const FenceVertex gate_from{2, 1};
     const FenceVertex gate_to{2, 2};
     assert(park_fence_runtime::fences().set_open_gate(gate_from, gate_to));
     const auto crossing = park_fence_runtime::fences().open_gate_crossing(gate_from, gate_to);
     assert(crossing);
-    assert(crossing->first == FenceTile{1, 1});
-    assert(crossing->second == FenceTile{2, 1});
+    assert(crossing->first.x == 1 && crossing->first.y == 1);
+    assert(crossing->second.x == 2 && crossing->second.y == 1);
 
     const NavigationPathResult through_gate = find_navigation_path(network, start, target);
     assert(through_gate.status == NavigationPathStatus::found);
@@ -163,8 +151,6 @@ void test_fenced_destination_requires_walkable_gate() {
     }
     assert(used_gate);
 
-    // A visually open gate is not a usable entrance if the connected tile is
-    // no longer part of the pedestrian surface.
     assert(sidewalks.remove_tile(2, 1));
     assert(!network.is_connected({1, 1}, CardinalDirection::east));
     assert(find_navigation_path(network, start, target).status == NavigationPathStatus::no_path);
