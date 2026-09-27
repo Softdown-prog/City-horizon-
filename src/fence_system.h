@@ -3,6 +3,7 @@
 #include "tile_topology.h"
 
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -68,6 +69,21 @@ struct FenceSegment {
     bool open_gate = false;
 };
 
+struct FenceTile {
+    int x = 0;
+    int y = 0;
+
+    [[nodiscard]] constexpr bool operator==(const FenceTile&) const = default;
+};
+
+// The two terrain/path tiles separated by one gate segment. This is the
+// navigation-side meaning of a gate: it connects these two cells and nothing
+// else. A caller still decides whether both cells are actually walkable.
+struct FenceGateCrossing {
+    FenceTile first{};
+    FenceTile second{};
+};
+
 class FenceManager {
 public:
     FenceManager(int map_min, int map_max);
@@ -102,6 +118,10 @@ public:
     [[nodiscard]] std::vector<FenceSegment> segments() const;
     [[nodiscard]] bool blocks_tile_crossing(int tile_x, int tile_y,
                                             CardinalDirection direction) const;
+    [[nodiscard]] bool is_open_gate_crossing(int tile_x, int tile_y,
+                                             CardinalDirection direction) const;
+    [[nodiscard]] std::optional<FenceGateCrossing> open_gate_crossing(
+        FenceVertex from, FenceVertex to) const;
 
     // Legacy node-gate API kept for old callers. New runtime UI uses the
     // segment-level gate methods above.
