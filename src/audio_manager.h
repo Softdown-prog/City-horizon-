@@ -54,6 +54,9 @@ public:
     [[nodiscard]] bool set_looping(SoundEvent event, bool enabled);
     // Starts/stops continuous weather/environment ambience independently from attraction loops.
     [[nodiscard]] bool set_ambience_loop(SoundEvent event, bool enabled);
+    // Plays a weather one-shot on a dedicated priority track so thunder cannot
+    // be dropped just because all ordinary UI/effect tracks are busy.
+    [[nodiscard]] bool play_weather_effect(SoundEvent event);
     // Starts the music declared under music.Loading in audio_catalog.json.
     [[nodiscard]] bool play_loading_music();
 
@@ -78,6 +81,7 @@ private:
     SoundEvent looping_event_ = SoundEvent::count;
     MIX_Track* ambience_loop_track_ = nullptr;
     SoundEvent ambience_looping_event_ = SoundEvent::count;
+    MIX_Track* weather_effect_track_ = nullptr;
     MIX_Audio* loading_music_ = nullptr;
     MIX_Track* music_track_ = nullptr;
     AudioVolumeSettings volume_settings_;
