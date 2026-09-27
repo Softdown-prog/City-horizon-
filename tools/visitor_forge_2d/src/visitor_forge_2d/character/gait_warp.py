@@ -22,6 +22,8 @@ from ..core.exporter import alpha_safe_resize
 
 
 LOCKED_MASTER_ROWS = 280
+LEGACY_GAIT_CONTRACT = "CH_VISITOR_DIRECTIONAL_GAIT_STUDY_V1"
+STRUCTURAL_GAIT_CONTRACT = "CH_VISITOR_STRUCTURAL_GAIT_V1"
 
 
 def warp_intact_master(master: Image.Image, left: tuple[float, float],
@@ -67,13 +69,21 @@ def warp_intact_master(master: Image.Image, left: tuple[float, float],
 def render_directional_gait(tool_root: Path, recipe_path: Path,
                             output: Path) -> dict:
     recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+    contract = recipe.get("contract")
+    if contract == STRUCTURAL_GAIT_CONTRACT:
+        # Structural gait is a separate V2 visual candidate. Keep the same CLI
+        # entry point so V1 and V2 can be rendered side-by-side from recipes.
+        from .structural_gait import render_structural_gait
+        return render_structural_gait(tool_root, recipe_path, output)
+    if contract != LEGACY_GAIT_CONTRACT:
+        raise ValueError(f"Unsupported directional gait contract: {contract!r}")
     if set(recipe["directions"]) != {"east", "north", "west"}:
         raise ValueError("The gait study requires EAST, NORTH and WEST")
     output.mkdir(parents=True, exist_ok=True)
     root = tool_root / "art/concepts"
     panel = Image.new("RGBA", (4 * 105, 4 * 112), (77, 116, 51, 255))
     draw = ImageDraw.Draw(panel)
-    report = {"contract": "CH_VISITOR_DIRECTIONAL_GAIT_STUDY_V1",
+    report = {"contract": LEGACY_GAIT_CONTRACT,
               "recipeSha256": hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
               "anchor": [64, 116], "directions": {}, "runtimePromotion": False}
     for row, direction in enumerate(("east", "north", "west", "south")):
