@@ -168,6 +168,19 @@ void PedestrianSystem::reset_monthly_budgets() {
     }
 }
 
+void PedestrianSystem::sync_monthly_budget_cycle(const int month, const int year) {
+    if (month < 1 || month > 12 || year < 1) return;
+    if (budget_month_ == 0 || budget_year_ == 0) {
+        budget_month_ = month;
+        budget_year_ = year;
+        return;
+    }
+    if (month == budget_month_ && year == budget_year_) return;
+    reset_monthly_budgets();
+    budget_month_ = month;
+    budget_year_ = year;
+}
+
 MobileEntityDirection PedestrianSystem::direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return MobileEntityDirection::east;
     if (to.x < from.x) return MobileEntityDirection::west;
