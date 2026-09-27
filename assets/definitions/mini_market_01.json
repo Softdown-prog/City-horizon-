@@ -1,0 +1,62 @@
+{
+  "id": "mini_market_01",
+  "name": "Mini Mercado",
+  "category": "commercial",
+  "texture": "assets/buildings/mini_market/mini_market_south.png",
+  "sprites": {
+    "0": "assets/buildings/mini_market/mini_market_south.png",
+    "1": "assets/buildings/mini_market/mini_market_west.png",
+    "2": "assets/buildings/mini_market/mini_market_north.png",
+    "3": "assets/buildings/mini_market/mini_market_east.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.5,
+      "y": 0.61328125
+    },
+    "1": {
+      "x": 0.5,
+      "y": 0.61328125
+    },
+    "2": {
+      "x": 0.5,
+      "y": 0.61328125
+    },
+    "3": {
+      "x": 0.5,
+      "y": 0.61328125
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "footprint": {
+    "width": 3,
+    "height": 2
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "alpha": "coverage",
+    "sprites": {
+      "0": "assets/buildings/mini_market/mini_market_south_mask.png",
+      "1": "assets/buildings/mini_market/mini_market_west_mask.png",
+      "2": "assets/buildings/mini_market/mini_market_north_mask.png",
+      "3": "assets/buildings/mini_market/mini_market_east_mask.png"
+    }
+  }
+}
