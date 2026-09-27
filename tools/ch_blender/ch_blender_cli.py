@@ -31,6 +31,9 @@ from agent_worker import (
     validate_job,
 )
 
+PARAMETRIC_CONTRACT_ID = "CH_PARAMETRIC_AUTHORING_V1"
+PARAMETRIC_CONTRACT_PATH = REPO_ROOT / "tools/ch_blender/contracts/ch_parametric_authoring_v1.json"
+
 
 def emit(payload: dict, path: Path | None = None) -> None:
     text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -44,16 +47,58 @@ def manifest() -> dict:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
+def parametric_contract() -> dict:
+    data = json.loads(PARAMETRIC_CONTRACT_PATH.read_text(encoding="utf-8"))
+    if data.get("contract") != PARAMETRIC_CONTRACT_ID:
+        raise RuntimeError(f"Expected {PARAMETRIC_CONTRACT_ID} at {PARAMETRIC_CONTRACT_PATH}")
+    units = data.get("units", {})
+    if units.get("system") != "METRIC" or float(units.get("blenderUnitMeters", 0.0)) != 1.0:
+        raise RuntimeError("CH_PARAMETRIC_AUTHORING_V1 must use METRIC units at 1 Blender unit = 1 metre")
+    stage_order = data.get("modifierStack", {}).get("stageOrder", [])
+    expected_stages = ["source", "shape", "deform", "surface", "uv", "detail", "finalize"]
+    if stage_order != expected_stages:
+        raise RuntimeError(f"Unexpected CH parametric modifier stage order: {stage_order}")
+    if not data.get("proceduralSystems", {}).get("deterministicSeedRequired", False):
+        raise RuntimeError("CH parametric procedural systems must require deterministic seeds")
+    if data.get("sourceLink", {}).get("nativeDynamicAutodeskLink") is not False:
+        raise RuntimeError("CH Blender must not claim native Autodesk RVT/DWG dynamic-link support")
+    if not data.get("quality", {}).get("authoringSourceMustRemainEditable", False):
+        raise RuntimeError("CH parametric authoring source must remain editable")
+    return data
+
+
+def parametric_contract_summary() -> dict:
+    data = parametric_contract()
+    return {
+        "contract": data["contract"],
+        "path": PARAMETRIC_CONTRACT_PATH.relative_to(REPO_ROOT).as_posix(),
+        "metricUnitMeters": data["units"]["blenderUnitMeters"],
+        "modifierStageOrder": data["modifierStack"]["stageOrder"],
+        "deterministicProceduralSeeds": data["proceduralSystems"]["deterministicSeedRequired"],
+        "trackedSourceReimport": data["sourceLink"]["supportedPolicy"],
+        "nativeAutodeskDynamicLink": data["sourceLink"]["nativeDynamicAutodeskLink"],
+        "runtimeRepresentation": data["runtimeRepresentation"],
+    }
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     blender = resolve_blender(args.blender)
     identity = blender_identity(blender)
+    m = manifest()
+    parametric = parametric_contract_summary()
+    declared = m.get("cityHorizonContracts", {}).get("parametricAuthoring")
+    if declared != PARAMETRIC_CONTRACT_ID:
+        raise RuntimeError(
+            f"Manifest parametricAuthoring contract {declared!r} does not match {PARAMETRIC_CONTRACT_ID}"
+        )
     payload = {
         "contract": "CH_BLENDER_DOCTOR_V1",
         "status": "ok",
         "repoRoot": str(REPO_ROOT),
         "manifest": str(MANIFEST_PATH.relative_to(REPO_ROOT)),
         "blender": identity,
-        "contracts": manifest()["cityHorizonContracts"],
+        "contracts": m["cityHorizonContracts"],
+        "parametricAuthoring": parametric,
         "agentJobContract": JOB_CONTRACT,
         "agentReportContract": REPORT_CONTRACT,
     }
@@ -113,6 +158,7 @@ def cmd_contract(_: argparse.Namespace) -> int:
             "approval": "CH_PROXY_APPROVAL_V1",
             "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
         },
+        "parametricAuthoring": parametric_contract_summary(),
         "operations": {
             "guarded_blender_script": {
                 "preferredForNewAssets": True,

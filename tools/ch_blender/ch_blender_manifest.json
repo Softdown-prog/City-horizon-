@@ -18,7 +18,20 @@
     "camera": "CH_CAMERA_V1",
     "studio": "CH_TYCOON_STUDIO_V1",
     "style": "CH_STYLIZED_PRERENDER_V1",
-    "bake": "TYCOON_ASSET_BAKE_V1"
+    "bake": "TYCOON_ASSET_BAKE_V1",
+    "parametricAuthoring": "CH_PARAMETRIC_AUTHORING_V1"
+  },
+  "authoringStandards": {
+    "parametricContract": "tools/ch_blender/contracts/ch_parametric_authoring_v1.json",
+    "helperModule": "tools/ch_blender/parametric_authoring.py",
+    "metricSceneUnits": true,
+    "nonDestructiveModifierStages": true,
+    "persistentSelectionChannels": ["vertex_groups", "named_attributes", "material_slots"],
+    "deterministicProceduralGenerators": true,
+    "realWorldMappingMetadata": true,
+    "trackedSourceReimport": true,
+    "nativeAutodeskDynamicLink": false,
+    "runtimeStillPreRendered2D": true
   },
   "renderPipelines": {
     "contract": "CH_RENDER_PIPELINES_V1",
@@ -74,7 +87,11 @@
     "agentFirst": true,
     "deterministicWorker": true,
     "repositoryContractsRemainAuthority": true,
-    "failFastAssetAuthoring": true
+    "failFastAssetAuthoring": true,
+    "nonDestructiveParametricAuthoring": true,
+    "deterministicProceduralSeeds": true,
+    "externalSourceProvenanceRequiredWhenLinked": true,
+    "proprietaryRendererDependencyAllowedByDefault": false
   },
   "qualityGates": {
     "contract": "CH_ASSET_QUALITY_GATES_V1",

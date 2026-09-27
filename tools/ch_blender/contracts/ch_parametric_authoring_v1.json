@@ -1,0 +1,96 @@
+{
+  "contract": "CH_PARAMETRIC_AUTHORING_V1",
+  "purpose": "Non-destructive, deterministic Blender authoring rules for reusable City Horizon assets and asset families.",
+  "scope": "offline_authoring_only",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered",
+  "units": {
+    "system": "METRIC",
+    "lengthUnit": "METERS",
+    "blenderUnitMeters": 1.0,
+    "realWorldScaleWhenKnown": true,
+    "gameFootprintRemainsAuthoritative": true
+  },
+  "modifierStack": {
+    "nonDestructiveByDefault": true,
+    "stageOrder": [
+      "source",
+      "shape",
+      "deform",
+      "surface",
+      "uv",
+      "detail",
+      "finalize"
+    ],
+    "persistentSelectionChannels": [
+      "vertex_groups",
+      "named_attributes",
+      "material_slots"
+    ],
+    "destructiveApplyPolicy": "final_bake_copy_only",
+    "sharedWorldDeformers": [
+      "LATTICE",
+      "GEOMETRY_NODES",
+      "EMPTY_DRIVEN_MODIFIER"
+    ]
+  },
+  "proceduralSystems": {
+    "deterministicSeedRequired": true,
+    "scatter": {
+      "preferred": ["GEOMETRY_NODES", "COLLECTION_INSTANCES"],
+      "useCases": ["vegetation", "props", "crowd_static", "debris"]
+    },
+    "linearAndRail": {
+      "preferred": ["ARRAY_CURVE", "GEOMETRY_NODES"],
+      "useCases": ["fences", "curbs", "sidewalk_details", "rails", "facade_modules"]
+    },
+    "simulation": {
+      "preferred": ["GEOMETRY_NODES", "BLENDER_PHYSICS"],
+      "policy": "bake_or_sample_deterministically_before_runtime_export"
+    }
+  },
+  "mapping": {
+    "realWorldScaleMetadata": true,
+    "preferredCoordinates": ["UV", "OBJECT", "GENERATED"],
+    "metersPerRepeatRequiredWhenRealWorld": true,
+    "applyObjectScaleBeforeFinalUvValidation": true
+  },
+  "shading": {
+    "osl": "optional_cycles_authoring_only",
+    "runtimeShaderDependency": false,
+    "finalOutputMustBakeToRgba": true
+  },
+  "sourceLink": {
+    "supportedPolicy": "tracked_reimport_metadata",
+    "preferredInterchange": ["USD", "GLTF", "FBX", "OBJ", "STL"],
+    "nativeDynamicAutodeskLink": false,
+    "requiresConversion": ["RVT", "DWG", "DXF_when_importer_unavailable"],
+    "requiredMetadata": [
+      "sourceKind",
+      "sourcePath",
+      "sourceSha256",
+      "sourceUnitScaleMeters",
+      "reimportPolicy"
+    ],
+    "defaultReimportPolicy": "replace_geometry_preserve_authored_material_roles"
+  },
+  "provenance": {
+    "requiredOnParametricRoot": [
+      "chParametricContract",
+      "chAuthoringMode"
+    ],
+    "recommended": [
+      "chGeneratorKind",
+      "chProceduralSeed",
+      "chSourceKind",
+      "chSourcePath",
+      "chSourceSha256",
+      "chMetersPerRepeat"
+    ]
+  },
+  "quality": {
+    "preserveExistingGate": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "finalBakeUsesEvaluatedGeometry": true,
+    "authoringSourceMustRemainEditable": true,
+    "noRuntimeDependencyOnBlendModifiers": true
+  }
+}
