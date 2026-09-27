@@ -17,7 +17,7 @@
     .views { display:grid; grid-template-columns:repeat(4,minmax(80px,1fr)); gap:8px }
     .view { text-align:center; background:#101a25; padding:6px; border-radius:8px }
     canvas { image-rendering:pixelated; image-rendering:crisp-edges }
-    .view canvas { width:96px; height:128px; max-width:100% }
+    .view canvas { width:96px; height:auto; max-width:100% }
     .sheet { overflow:auto; background-color:#182538; background-image:linear-gradient(45deg,#28364a 25%,transparent 25%),linear-gradient(-45deg,#28364a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#28364a 75%),linear-gradient(-45deg,transparent 75%,#28364a 75%); background-position:0 0,0 8px,8px -8px,-8px 0; background-size:16px 16px; padding:12px }
     .sheet canvas { width:auto; max-width:none; border:1px solid #577085 }
     .palette { display:grid; grid-template-columns:repeat(2,1fr); gap:0 12px }
@@ -50,7 +50,7 @@
       <p><small>O PNG exportado tem o tamanho real indicado no manifesto. Os fundos dos previews e o marcador do pivô não entram na spritesheet.</small></p>
     </section>
     <div>
-      <section><h2>Prévia sobre o piso · 1× ampliado para inspeção</h2><div class="views">
+      <section><h2>Prévia sobre o piso · ampliada para inspeção</h2><div class="views">
         <div class="view">S · ↙ SW<br><canvas id="viewS"></canvas></div>
         <div class="view">E · ↘ SE<br><canvas id="viewE"></canvas></div>
         <div class="view">W · ↖ NW<br><canvas id="viewW"></canvas></div>
