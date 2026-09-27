@@ -1,0 +1,27 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_viking_ship.rebuild.009",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v9_ship_overhaul_guarded.py",
+  "qualityStage": "proxy",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
+  "requestTag": "render-user-request-2026-09-27-v9-ship-overhaul",
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.rebuild_v5.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_viking_rct_1k_v1.json",
+    "--output",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k",
+    "--save-blend",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/park_viking_ship_rebuild_v9_ship_overhaul.blend"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k",
+  "expectedOutputs": [
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/preflight_report.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/proxy_south.png",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/proxy_report.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/studio_metadata.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v9_ship_overhaul_1k/park_viking_ship_rebuild_v9_ship_overhaul.blend"
+  ]
+}
