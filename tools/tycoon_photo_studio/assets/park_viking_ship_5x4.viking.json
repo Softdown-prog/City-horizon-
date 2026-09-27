@@ -6,24 +6,13 @@
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "referencePolicy": {
     "purpose": "Use the user-supplied real amusement-park ship photos as mechanism, proportion, loading-platform and lighting reference. Do not literally copy branding, painted artwork, people, surroundings or ticketing.",
-    "exclude": [
-      "ticket_booth",
-      "reference_branding",
-      "reference_text",
-      "people",
-      "surrounding_scenery"
-    ],
-    "designIntent": "A colorful Viking-themed travelling-fair pendulum ride: tall open A-frame, blue square outer steel, yellow inner bracing, raised white loading platform, deep brown longship, red/black/white Viking fascia and a separate blinking-light overlay compatible with the City Horizon Ferris-wheel family."
+    "exclude": ["ticket_booth", "reference_branding", "reference_text", "people", "surrounding_scenery"],
+    "designIntent": "A colorful Viking-themed travelling-fair pendulum ride: very tall open A-frame, blue square outer steel, yellow inner bracing, raised white loading platform, deep brown longship, red/black/white Viking fascia and a separate blinking-light overlay compatible with the City Horizon Ferris-wheel family."
   },
   "footprint": {
     "widthTiles": 5,
     "depthTiles": 4,
-    "occupiedCells": [
-      [0,0],[1,0],[2,0],[3,0],[4,0],
-      [0,1],[1,1],[2,1],[3,1],[4,1],
-      [0,2],[1,2],[2,2],[3,2],[4,2],
-      [0,3],[1,3],[2,3],[3,3],[4,3]
-    ]
+    "occupiedCells": [[0,0],[1,0],[2,0],[3,0],[4,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3]]
   },
   "geometry": {
     "unitsPerTile": 3.0,
@@ -34,20 +23,20 @@
     "deckDepth": 11.2,
     "deckHeight": 0.18,
     "platformTopZ": 1.02,
-    "pivotZ": 8.25,
-    "supportHalfWidth": 5.75,
+    "pivotZ": 10.25,
+    "supportHalfWidth": 6.05,
     "supportHalfDepth": 3.18,
-    "supportBeamWidth": 0.52,
-    "supportBeamDepth": 0.40,
-    "innerBraceWidth": 0.26,
-    "innerBraceDepth": 0.22,
-    "swingArmWidth": 0.34,
-    "swingArmDepth": 0.28,
-    "boatDrop": 2.35,
+    "supportBeamWidth": 0.58,
+    "supportBeamDepth": 0.44,
+    "innerBraceWidth": 0.28,
+    "innerBraceDepth": 0.24,
+    "swingArmWidth": 0.36,
+    "swingArmDepth": 0.30,
+    "boatDrop": 4.35,
     "boatJointZ": -1.34,
     "boatAttachHalfX": 3.65,
-    "axleRadius": 0.46,
-    "axleDepth": 6.95,
+    "axleRadius": 0.48,
+    "axleDepth": 7.15,
     "shipLength": 12.10,
     "shipHalfWidth": 1.72,
     "shipDeckZ": -1.66,
@@ -60,9 +49,11 @@
     "stairSteps": 6,
     "railingHeight": 0.92,
     "railingRadius": 0.045,
-    "supportLampCount": 12,
+    "supportLampCount": 14,
     "boatLampCount": 9,
-    "previewSwingDegrees": 0.0
+    "previewSwingDegrees": 0.0,
+    "clearanceReviewDegrees": 55.0,
+    "clearancePolicy": "Raise pivot and lengthen hangers by the same amount so loading height stays approximately unchanged while swing-end ground clearance increases."
   },
   "animation": {
     "enabled": false,
@@ -73,52 +64,13 @@
     "frameStart": null,
     "frameEnd": null,
     "fps": null,
-    "note": "Geometry and clearance are being approved first. Final swing arc, frame count and FPS remain undefined. Static A-frame/base never rotate; SwingPivot owns the hangers and boat."
+    "note": "Geometry and swing-clearance are being approved first. Final swing arc, frame count and FPS remain undefined. Static A-frame/base never rotate; SwingPivot owns the hangers and boat."
   },
   "runtimeLayers": {
     "contract": "CH_ATTRACTION_MULTI_OVERLAY_V1",
-    "staticBase": {
-      "role": "attraction_static_base",
-      "animated": false,
-      "includes": [
-        "raised_base",
-        "A_frames",
-        "backdrop",
-        "loading_platform",
-        "stairs",
-        "railings",
-        "operator_console",
-        "lamp_housings"
-      ]
-    },
-    "motionOverlay": {
-      "role": "attraction_motion_overlay",
-      "animated": true,
-      "activeWhen": "ride_running",
-      "includes": [
-        "SwingPivot",
-        "BoatRoot",
-        "long_hangers",
-        "viking_ship",
-        "seats",
-        "restraints"
-      ],
-      "frameCount": null,
-      "fps": null,
-      "note": "Final swing animation is defined only after this visual/mechanical proxy is approved."
-    },
-    "idleLightOverlay": {
-      "role": "attraction_idle_light_overlay",
-      "animated": true,
-      "activeWhen": "ride_idle",
-      "disabledWhen": "ride_running",
-      "behavior": "blink",
-      "pattern": "alternating_groups_a_b",
-      "groups": ["A", "B"],
-      "frameCount": null,
-      "fps": null,
-      "note": "Bulb locations are authored now. Blink cadence and final overlay frame count are deferred."
-    }
+    "staticBase": {"role":"attraction_static_base","animated":false,"includes":["raised_base","A_frames","backdrop","loading_platform","stairs","railings","operator_console","lamp_housings"]},
+    "motionOverlay": {"role":"attraction_motion_overlay","animated":true,"activeWhen":"ride_running","includes":["SwingPivot","BoatRoot","long_hangers","viking_ship","seats","restraints"],"frameCount":null,"fps":null,"note":"Final swing animation is defined only after this visual/mechanical proxy is approved."},
+    "idleLightOverlay": {"role":"attraction_idle_light_overlay","animated":true,"activeWhen":"ride_idle","disabledWhen":"ride_running","behavior":"blink","pattern":"alternating_groups_a_b","groups":["A","B"],"frameCount":null,"fps":null,"note":"Bulb locations are authored now. Blink cadence and final overlay frame count are deferred."}
   },
   "materials": {
     "steelDark": {"name":"VikingSteelBlack","rgba":[0.025,0.035,0.045,1.0],"roughness":0.36,"metallic":0.76},
@@ -143,7 +95,7 @@
     "lampPink": {"name":"VikingLampPink","rgba":[1.0,0.18,0.46,1.0],"roughness":0.20,"metallic":0.01}
   },
   "prototypeNotes": {
-    "status": "geometry_proxy_v3_real_ride_reference",
+    "status": "geometry_proxy_v4_tall_clearance",
     "ticketBoothIncluded": false,
     "terrainIncluded": false,
     "visualCompatibilityReference": "attraction.park_ferris_wheel.01",
@@ -155,16 +107,13 @@
       "A large triangular decorative panel fills the far side without occupying the swing plane.",
       "A compact illuminated sign/light box sits above the pivot."
     ],
-    "requestedV3Changes": [
-      "remove roof-like top crossbeam",
-      "raise the overall structure again",
-      "use real A-frame proportions",
-      "use blue outer square steel and yellow braces",
-      "make the ship deeper and lower relative to the pivot",
-      "build a raised white loading deck and side staircase",
-      "add a large decorative Viking side panel",
-      "increase fairground bulbs while keeping them a separate idle overlay"
+    "requestedV4Changes": [
+      "raise pivot from 8.25 to 10.25 units",
+      "lengthen hangers by the same 2.0 units so the rest/loading height remains approximately unchanged",
+      "widen the A-frame feet slightly for the taller structure",
+      "thicken primary square steel members for believable scale",
+      "review clearance at approximately plus/minus 55 degrees before defining the final animation arc"
     ],
-    "nextGate": "Review SOUTH proxy for real fairground-machine silhouette, A-frame height, exposed axle, long hanger clearance, low/deep ship, raised boarding platform, decorative panel and light placement. Do not define swing/blink frame counts yet."
+    "nextGate": "Review SOUTH proxy for the taller A-frame and convincing real-ride proportions. After visual approval, render explicit swing-clearance checks before locking the final arc/frame count."
   }
 }
