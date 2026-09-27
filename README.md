@@ -218,6 +218,7 @@ If a commit that only changes `tools/ch_blender/jobs/` starts MapForge Windows, 
 
 ### Feedback da build de setembro de 2026
 
+- O Mini Mercado agora está registrado como `mini_market_01`, footprint 3×2, quatro rotações, com `CH_COLOR_MASK_V1` ligado ao runtime. O painel de seleção reutiliza as paletas existentes de `Parede` (R) e `Telhado` (G), `ORIGINAL` restaura as cores e o save preserva as personalizações; os detalhes fora das grandes superfícies permanecem fixos.
 - O terreno de grama inicial usa `assets/terrain/grass_isometric_01.png`; o antigo caminho `_clean` não existe no pacote. As 16 ruas em `assets/roads/premium_01/` são geradas com `python tools/generate_road_tiles.py --all --runtime-names --output-dir assets/roads/premium_01 --preview work/road_geometry_preview.png`. Examine a continuidade e a escala no executável Windows antes da aprovação visual final.
 - `assets/definitions/road_visual_catalog.json` mapeia todos os 16 estados de conexão. O teste `road_visual_catalog_test` valida caminhos e assinaturas PNG.
 - O catálogo de áudio inclui música de carregamento e o novo `UiClick`. A faixa toca uma vez a partir da inicialização do áudio; a tela de carregamento é rápida, portanto ela pode continuar durante o início da partida.
