@@ -16,15 +16,19 @@ namespace park_fence_runtime {
 enum class ParkFenceStyle : std::uint8_t {
     classic_iron = 0,
     iron_stone = 1,
+    chainlink = 2,
 };
 
 inline constexpr std::string_view kClassicIronFenceStyleId = "park_fence_classic_iron_v1";
 inline constexpr std::string_view kIronStoneFenceStyleId = "park_iron_fence_01";
+inline constexpr std::string_view kChainlinkFenceStyleId = "park_chainlink_fence_01";
 
 [[nodiscard]] inline std::string_view fence_style_id(const ParkFenceStyle style) {
     switch (style) {
         case ParkFenceStyle::iron_stone:
             return kIronStoneFenceStyleId;
+        case ParkFenceStyle::chainlink:
+            return kChainlinkFenceStyleId;
         case ParkFenceStyle::classic_iron:
         default:
             return kClassicIronFenceStyleId;
@@ -34,6 +38,7 @@ inline constexpr std::string_view kIronStoneFenceStyleId = "park_iron_fence_01";
 [[nodiscard]] inline std::optional<ParkFenceStyle> fence_style_from_id(const std::string_view id) {
     if (id == kClassicIronFenceStyleId) return ParkFenceStyle::classic_iron;
     if (id == kIronStoneFenceStyleId) return ParkFenceStyle::iron_stone;
+    if (id == kChainlinkFenceStyleId) return ParkFenceStyle::chainlink;
     return std::nullopt;
 }
 
