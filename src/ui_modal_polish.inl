@@ -100,31 +100,166 @@ if (renderer != nullptr && model_.overlay != UiOverlay::none && overlay_bounds_)
             case UiAction::start_new_city: return "land";
             case UiAction::continue_saved_city: return "load";
             case UiAction::open_quit_confirm: return "close";
+            case UiAction::cancel_quit: return "close";
             case UiAction::quit_game: return "close";
+            case UiAction::back_to_pause: return "pause";
+            case UiAction::back_from_save_load: return "pause";
+            case UiAction::open_administration: return "buildings";
+            case UiAction::open_reports: return "funds";
+            case UiAction::close_modal: return "close";
             default: return nullptr;
         }
     };
 
-    // Canonical icons are drawn after the modal dimmer so they remain crisp.
+    const auto ch_is_primary_action = [](const UiAction action) {
+        return action == UiAction::resume_game ||
+               action == UiAction::start_new_city ||
+               action == UiAction::continue_saved_city ||
+               action == UiAction::save_game ||
+               action == UiAction::settings_apply;
+    };
+    const auto ch_is_destructive_action = [](const UiAction action) {
+        return action == UiAction::open_quit_confirm || action == UiAction::quit_game;
+    };
+
+    // Repaint modal controls as complete tactile buttons, not just flat legacy
+    // rectangles with an icon laid on top. The original hitboxes and actions
+    // remain untouched; this is a pure render post-pass.
     for (const UiButton& button : buttons_) {
-        const char* icon_name = ch_button_icon_name(button);
-        if (icon_name == nullptr || !button.enabled) continue;
+        if (button.action == UiAction::none || button.build_card || button.color_swatch) continue;
         const float center_x = button.bounds.x + button.bounds.width * 0.5F;
         const float center_y = button.bounds.y + button.bounds.height * 0.5F;
         if (!ch_modal_panel.contains(center_x, center_y)) continue;
 
-        const float press_offset = button.state == UiButtonState::pressed ? 1.0F : 0.0F;
-        const SDL_FRect icon_plate = {button.bounds.x + 7.0F + press_offset,
-                                      button.bounds.y + (button.bounds.height - 26.0F) * 0.5F + press_offset,
-                                      26.0F, 26.0F};
-        SDL_SetRenderDrawColor(renderer, 5, 21, 30, button.state == UiButtonState::hover ? 190 : 150);
-        SDL_RenderFillRect(renderer, &icon_plate);
-        SDL_SetRenderDrawColor(renderer, button.state == UiButtonState::hover ? 123 : 72,
-                               button.state == UiButtonState::hover ? 216 : 143,
-                               button.state == UiButtonState::hover ? 233 : 166, 210);
-        SDL_RenderRect(renderer, &icon_plate);
-        ch_draw_icon(icon_name, {icon_plate.x + 3.0F, icon_plate.y + 3.0F, 20.0F, 20.0F},
-                     button.state == UiButtonState::pressed ? 215 : 255);
+        const bool enabled = button.enabled;
+        const bool hovered = enabled && button.state == UiButtonState::hover;
+        const bool pressed = enabled && button.state == UiButtonState::pressed;
+        const bool primary = enabled && ch_is_primary_action(button.action);
+        const bool destructive = enabled && ch_is_destructive_action(button.action);
+        const float sink = pressed ? 2.0F : 0.0F;
+
+        Uint8 fill_r = 25;
+        Uint8 fill_g = 68;
+        Uint8 fill_b = 86;
+        Uint8 border_r = 75;
+        Uint8 border_g = 144;
+        Uint8 border_b = 165;
+        Uint8 text_r = 235;
+        Uint8 text_g = 244;
+        Uint8 text_b = 247;
+
+        if (!enabled) {
+            fill_r = 29; fill_g = 39; fill_b = 45;
+            border_r = 55; border_g = 70; border_b = 77;
+            text_r = 109; text_g = 123; text_b = 130;
+        } else if (destructive) {
+            fill_r = hovered ? 124 : 96;
+            fill_g = hovered ? 50 : 40;
+            fill_b = hovered ? 43 : 39;
+            border_r = hovered ? 244 : 195;
+            border_g = hovered ? 132 : 101;
+            border_b = hovered ? 113 : 91;
+            if (pressed) {
+                fill_r = 74; fill_g = 32; fill_b = 31;
+            }
+        } else if (primary) {
+            fill_r = hovered ? 34 : 27;
+            fill_g = hovered ? 111 : 91;
+            fill_b = hovered ? 125 : 108;
+            border_r = hovered ? 126 : 90;
+            border_g = hovered ? 222 : 188;
+            border_b = hovered ? 227 : 204;
+            if (pressed) {
+                fill_r = 20; fill_g = 70; fill_b = 82;
+            }
+        } else if (hovered) {
+            fill_r = 31; fill_g = 87; fill_b = 108;
+            border_r = 104; border_g = 196; border_b = 216;
+        } else if (pressed) {
+            fill_r = 18; fill_g = 52; fill_b = 69;
+        }
+
+        const SDL_FRect shadow = {button.bounds.x + 3.0F, button.bounds.y + 4.0F,
+                                  button.bounds.width, button.bounds.height};
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, enabled ? 104 : 62);
+        SDL_RenderFillRect(renderer, &shadow);
+
+        const SDL_FRect face = {button.bounds.x + sink, button.bounds.y + sink,
+                                button.bounds.width, button.bounds.height};
+        SDL_SetRenderDrawColor(renderer, fill_r, fill_g, fill_b, 252);
+        SDL_RenderFillRect(renderer, &face);
+        SDL_SetRenderDrawColor(renderer, border_r, border_g, border_b, enabled ? 245 : 185);
+        SDL_RenderRect(renderer, &face);
+
+        // Top/left highlight and lower/right shade make normal/hover controls
+        // read as raised. Pressing reverses the lighting and visibly sinks them.
+        if (!pressed) {
+            SDL_SetRenderDrawColor(renderer,
+                                   destructive ? 255 : 184,
+                                   destructive ? 179 : 232,
+                                   destructive ? 155 : 241,
+                                   enabled ? 112 : 40);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + 2.0F,
+                           face.x + face.w - 2.0F, face.y + 2.0F);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + 2.0F,
+                           face.x + 2.0F, face.y + face.h - 2.0F);
+            SDL_SetRenderDrawColor(renderer, 2, 13, 19, 205);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + face.h - 2.0F,
+                           face.x + face.w - 2.0F, face.y + face.h - 2.0F);
+            SDL_RenderLine(renderer, face.x + face.w - 2.0F, face.y + 2.0F,
+                           face.x + face.w - 2.0F, face.y + face.h - 2.0F);
+        } else {
+            SDL_SetRenderDrawColor(renderer, 1, 10, 15, 210);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + 2.0F,
+                           face.x + face.w - 2.0F, face.y + 2.0F);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + 2.0F,
+                           face.x + 2.0F, face.y + face.h - 2.0F);
+            SDL_SetRenderDrawColor(renderer, 146, 218, 232, 84);
+            SDL_RenderLine(renderer, face.x + 2.0F, face.y + face.h - 2.0F,
+                           face.x + face.w - 2.0F, face.y + face.h - 2.0F);
+        }
+
+        if (hovered) {
+            const SDL_FRect hover_inner = {face.x + 3.0F, face.y + 3.0F,
+                                           std::max(0.0F, face.w - 6.0F),
+                                           std::max(0.0F, face.h - 6.0F)};
+            SDL_SetRenderDrawColor(renderer,
+                                   destructive ? 255 : 139,
+                                   destructive ? 171 : 230,
+                                   destructive ? 145 : 241,
+                                   90);
+            SDL_RenderRect(renderer, &hover_inner);
+        }
+
+        const char* icon_name = ch_button_icon_name(button);
+        const float content_offset = sink;
+        if (icon_name != nullptr && button.bounds.width >= 72.0F && button.bounds.height >= 26.0F) {
+            const float plate_size = std::clamp(button.bounds.height - 10.0F, 20.0F, 28.0F);
+            const SDL_FRect icon_plate = {button.bounds.x + 7.0F + content_offset,
+                                          button.bounds.y + (button.bounds.height - plate_size) * 0.5F + content_offset,
+                                          plate_size, plate_size};
+            SDL_SetRenderDrawColor(renderer, 4, 18, 27, enabled ? 186 : 112);
+            SDL_RenderFillRect(renderer, &icon_plate);
+            SDL_SetRenderDrawColor(renderer, border_r, border_g, border_b, enabled ? 205 : 120);
+            SDL_RenderRect(renderer, &icon_plate);
+            const float icon_padding = std::max(3.0F, plate_size * 0.16F);
+            ch_draw_icon(icon_name,
+                         {icon_plate.x + icon_padding, icon_plate.y + icon_padding,
+                          plate_size - icon_padding * 2.0F, plate_size - icon_padding * 2.0F},
+                         enabled ? (pressed ? 218 : 255) : 105);
+
+            const float text_x = icon_plate.x + icon_plate.w + 9.0F;
+            const float text_y = button.bounds.y + std::max(8.0F, (button.bounds.height - 8.0F) * 0.5F) + content_offset;
+            draw_text_fit(renderer, text_x, text_y,
+                          std::max(1.0F, button.bounds.x + button.bounds.width - text_x - 8.0F),
+                          button.label, text_r, text_g, text_b);
+        } else {
+            draw_text_centered_fit(renderer,
+                                   {button.bounds.x + content_offset, button.bounds.y + content_offset,
+                                    button.bounds.width, button.bounds.height},
+                                   button.bounds.y + std::max(8.0F, (button.bounds.height - 8.0F) * 0.5F) + content_offset,
+                                   button.label, text_r, text_g, text_b);
+        }
     }
 
     if (model_.overlay == UiOverlay::settings) {
