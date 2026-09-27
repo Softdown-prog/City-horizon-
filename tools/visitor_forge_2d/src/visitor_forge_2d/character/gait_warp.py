@@ -21,6 +21,9 @@ from .review import frame_measurements
 from ..core.exporter import alpha_safe_resize
 
 
+LOCKED_MASTER_ROWS = 280
+
+
 def warp_intact_master(master: Image.Image, left: tuple[float, float],
                        right: tuple[float, float]) -> Image.Image:
     """Move the lower body with a continuous inverse mesh on a 512px master."""
@@ -50,10 +53,15 @@ def warp_intact_master(master: Image.Image, left: tuple[float, float],
             corners = (inverse(x, y), inverse(x, y1),
                        inverse(x1, y1), inverse(x1, y))
             mesh.append(((x, y, x1, y1), tuple(n for pair in corners for n in pair)))
-    return master.convert("RGBa").transform(
+    warped = master.convert("RGBa").transform(
         master.size, Image.Transform.MESH, mesh,
         resample=Image.Resampling.BICUBIC,
     ).convert("RGBA")
+    # The gait intentionally starts below the locked head/torso area. Restore
+    # those source pixels verbatim so mesh resampling cannot introduce tiny
+    # identity drift in a region that is not supposed to animate at all.
+    warped.paste(master.crop((0, 0, master.width, LOCKED_MASTER_ROWS)), (0, 0))
+    return warped
 
 
 def render_directional_gait(tool_root: Path, recipe_path: Path,
