@@ -42,8 +42,12 @@
       "enabled": true,
       "tile": [-16, 0],
       "color": "#ffc03e",
-      "label": "PORTAL RODOVIARIO",
-      "detail": "CONEXAO COM O MUNDO EXTERIOR"
+      "drawApproach": true,
+      "signLabel": "CITY HORIZON",
+      "signDetail": "ENTRADA DA CIDADE",
+      "showTutorialLabel": true,
+      "label": "CONEXAO RODOVIARIA",
+      "detail": "LIGUE SUA PRIMEIRA RUA A ESTA ENTRADA"
     }
   }
 }
