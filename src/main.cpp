@@ -20,6 +20,7 @@
 //     three consecutive negative-treasury month closes.
 // 15. Once bankrupt, the simulation clock is frozen while ESC remains available
 //     for the existing menu flow.
+// 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -35,13 +36,10 @@
 #include "src/runtime_game_ui.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ch {
 
-// main_runtime_impl.cpp expresses a UI click as `current_price + delta`, where
-// delta is +1 or -1.  ServicePrice may represent cents and carries its own
-// authored click step (for example 25 cents). Resolve that intent here before
-// the absolute-price setter receives it.
 [[nodiscard]] inline std::int64_t operator+(const ServicePrice& price,
                                             const std::int64_t delta) noexcept {
     const std::int64_t step = price.step_minor_units > 0 ? price.step_minor_units : 1;
@@ -52,9 +50,6 @@ namespace ch {
 
 }  // namespace ch
 
-// Runtime economy wrapper. The canonical CityEconomy owns all finance rules;
-// this class merely mirrors its bankruptcy result into a small presentation
-// bridge so UI/clock code can react without editing the large main loop.
 class ChCityEconomy : public CityEconomy {
 public:
     using CityEconomy::CityEconomy;
@@ -85,9 +80,6 @@ public:
     }
 };
 
-// Runtime-only clock wrapper. Bankruptcy is a terminal gameplay condition, so
-// world simulation stops immediately while the existing keyboard/menu event loop
-// remains alive and can still handle ESC.
 class ChSimulationClock : public SimulationClock {
 public:
     using SimulationClock::SimulationClock;
@@ -112,10 +104,6 @@ public:
     }
 };
 
-// Ticket booths remain the canonical owner of a Park ride's ticket price.  The
-// ride panel may still expose the shared value for convenience; if the player
-// changes it there, mirror the resulting (already clamped) price into the linked
-// booth before CityEconomy synchronizes booth -> ride.
 [[nodiscard]] inline bool ch_sync_service_price_after_ui_edit(
     BuildingManager& buildings, const BuildingCatalog& catalog,
     const std::uint64_t edited_instance_id, const BuildingDefinition& edited_definition) {
@@ -139,11 +127,6 @@ public:
         static_cast<std::int64_t>(edited->service_price));
 }
 
-// Audio visibility follows the same canonical camera snapshot populated by the
-// projection layer.  No independent audio camera or distance heuristic exists.
-// The footprint is projected as the same isometric diamond used by the world;
-// when that projected envelope no longer intersects the viewport, the ride is
-// considered outside the visible set and must be silent.
 [[nodiscard]] inline bool ch_ferris_wheel_visible_in_current_view(
     const BuildingInstance& instance, const BuildingDefinition& definition) {
     const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
@@ -192,32 +175,45 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         ch_ferris_wheel_should_be_audible(buildings, catalog));
 }
 
-// main_runtime_impl.cpp has two geometry-only parcels() reads: one for camera
-// clamping and one for cursor roaming.  Redirect those reads to the complete
-// world geometry.  land_system.h is included above so its public declaration is
-// not rewritten by this compatibility macro.
-#define parcels() world_parcels()
+[[nodiscard]] inline const char* ch_pedestrian_activity_label(const PedestrianState state) {
+    switch (state) {
+        case PedestrianState::resting: return "EM CASA";
+        case PedestrianState::walking: return "CAMINHANDO";
+        case PedestrianState::visiting: return "CONSUMINDO / VISITANDO";
+        case PedestrianState::idle: return "AGUARDANDO DECISAO";
+    }
+    return "AGUARDANDO";
+}
 
-// These headers are already included above, so the substitutions apply only to
-// runtime call sites/declarations inside main_runtime_impl.cpp, never to the
-// canonical class declarations themselves.
+inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSystem& pedestrians) {
+    if (pedestrians.instances().empty()) {
+        model.citizen_status.reset();
+        return;
+    }
+    const PedestrianInstance& pedestrian = pedestrians.instances().front();
+    const PedestrianNeeds needs = pedestrian.needs;
+    UiCitizenStatus status;
+    status.citizen_id = pedestrian.id;
+    status.title = "CIDADAO #" + std::to_string(pedestrian.id);
+    status.activity = ch_pedestrian_activity_label(pedestrian.state);
+    status.money = "$" + std::to_string(pedestrian.monthly_budget_cents / 100) +
+                   " / $" + std::to_string(pedestrian.monthly_budget_capacity_cents / 100);
+    status.hunger = std::clamp(static_cast<int>(std::lround(needs.hunger)), 0, 100);
+    status.thirst = std::clamp(static_cast<int>(std::lround(needs.thirst)), 0, 100);
+    status.fun = std::clamp(static_cast<int>(std::lround(needs.fun)), 0, 100);
+    model.citizen_status = std::move(status);
+}
+
+#define parcels() world_parcels()
 #define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
 #define SaveManager ParkFenceSaveManager
 #define CityEconomy ChCityEconomy
 #define SimulationClock ChSimulationClock
 
-// The runtime has one player-facing service-price setter call. Preserve that
-// existing action path, then synchronize a linked ticket booth when the edited
-// instance is a Park ride. Ordinary shops simply return true from the helper.
 #define set_service_price(instance_id, definition, service_price) \
     set_service_price((instance_id), (definition), (service_price)) && \
     ch_sync_service_price_after_ui_edit(buildings, catalog, (instance_id), (definition))
 
-// `mobile_render_entities()` is evaluated in the normal frame path immediately
-// before world entities are rendered (and may also be queried by debug UI).
-// The visit bridge consumes the exact same road/path/floor surface contract as
-// normal pedestrian routing. It may start autonomous visits only while the
-// production automatic-pedestrian mode is active.
 #define mobile_render_entities() \
     ([&]() { \
         const auto ch_budget_date = simulation_clock.date(); \
@@ -227,16 +223,12 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         ch::building_visit_runtime::sync( \
             pedestrians, buildings, catalog, ch_visit_surfaces, \
             simulation_clock.speed() != SimulationSpeed::paused, automatic_pedestrian); \
-        /* sync may change facing/state after the ordinary animation update. */ \
-        /* A zero-time refresh switches the directional clip without advancing it. */ \
         pedestrians.update_animation(0.0F, mobile_animations); \
         auto ch_mobile_entities = mobile_render_entities(); \
         ch::building_visit_runtime::filter_inside_pedestrians(ch_mobile_entities, pedestrians); \
         return ch_mobile_entities; \
     }())
 
-// `play_sound` is a local lambda inside the implementation.  A function-like
-// macro is used here only around its call sites; its declaration is untouched.
 #define play_sound(sound_event) \
     ([&]() { \
         const SoundEvent ch_sound_event = (sound_event); \
@@ -246,16 +238,6 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         return play_sound(ch_sound_event); \
     }())
 
-// The implementation already has one placement-rotation lambda and complete
-// four-way projection/render support. Function-like macro expansion leaves that
-// lambda declaration untouched, but intercepts its call sites. During ordinary
-// gameplay Z/X now rotate the camera; while placing a rotatable building they
-// retain their original building-rotation behaviour.
-//
-// Camera pan is screen-space. Before changing the facing, recover the exact
-// logical world point under the viewport centre, rotate that point into the new
-// camera basis, then solve the new pan that puts it back at the same centre.
-// This prevents the city from jumping around the screen on every 90-degree turn.
 #define rotate_placement(clockwise) \
     ([&]() { \
         const bool ch_camera_clockwise = static_cast<bool>(clockwise); \
@@ -286,14 +268,18 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
-// Redirect only runtime call sites. These class declarations are already parsed
-// above, so canonical Map Forge rendering and the established GameplayUi remain
-// untouched outside the executable translation unit.
 #define MapRenderer RuntimeMapRenderer
 #define GameplayUi ChRuntimeGameplayUi
+#define update_layout(viewport_width, viewport_height, model) \
+    ([&]() { \
+        auto ch_ui_model = (model); \
+        ch_fill_citizen_status(ch_ui_model, pedestrians); \
+        update_layout((viewport_width), (viewport_height), ch_ui_model); \
+    }())
 
 #include "main_runtime_impl.cpp"
 
+#undef update_layout
 #undef GameplayUi
 #undef MapRenderer
 #undef rotate_placement
