@@ -53,6 +53,7 @@ public:
             UiInputResult result;
             result.consumed = true;
             if (primary_button && game_over_menu_bounds().contains(mouse_x, mouse_y)) {
+                ch::runtime_game_state::reset();
                 result.action = UiActionEvent{UiAction::open_main_menu, "bankruptcy_game_over"};
             }
             return result;
