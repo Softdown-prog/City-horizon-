@@ -15,9 +15,6 @@ namespace {
 }
 
 [[nodiscard]] bool is_essential_definition(const BuildingDefinition& definition) {
-    // Explicit V1 list. These are the two current neighbourhood-needs services.
-    // A later content pass may promote this to authored metadata when more service
-    // families exist; keeping the list here avoids inventing a jobs/needs system.
     return definition.id == "bakery_01" || definition.id == "mini_market_01";
 }
 
@@ -44,10 +41,8 @@ float PedestrianDecisionNode::outing_probability(const WeatherState weather,
 PedestrianOutingPreference PedestrianDecisionNode::preference_for_weather(
     const WeatherState weather, const bool essential_service_available) {
     switch (weather) {
-        case WeatherState::sunny:
-            return PedestrianOutingPreference::outdoor_leisure;
-        case WeatherState::overcast:
-            return PedestrianOutingPreference::balanced;
+        case WeatherState::sunny: return PedestrianOutingPreference::outdoor_leisure;
+        case WeatherState::overcast: return PedestrianOutingPreference::balanced;
         case WeatherState::raining:
         case WeatherState::thunderstorm:
             return essential_service_available
@@ -91,7 +86,6 @@ std::optional<NavigationTile> PedestrianDecisionNode::home_entrance(
         const NavigationTile tile = outside(*building, point);
         if (reachable(tile)) return tile;
     }
-    // Legacy residences without a declared facade admit any perimeter tile.
     if (resolved_road_access_mode(*definition) != RoadAccessMode::any_perimeter) return std::nullopt;
     const BuildingFootprint size = rotated_footprint(*definition, building->rotation);
     for (int x = 0; x < size.width; ++x) {
@@ -127,8 +121,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
         pedestrians.instances().front().spatial.logical_tile_x, pedestrians.instances().front().spatial.logical_tile_y}}
         : std::nullopt;
 
-    // Critical contract: once the resident is in transit or consuming, weather
-    // is irrelevant. Never cancel/recalculate a live trip because the sky changed.
     if (exists && (pedestrians.instances().front().state == PedestrianState::walking ||
                    pedestrians.instances().front().state == PedestrianState::visiting)) {
         if (decision_ == PedestrianDecision::awaiting_activity) retry_seconds_ = 0.0F;
@@ -156,7 +148,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
 
     if (!exists) {
         if (entrance) {
-            // Spawn logically at the doorstep, then stay hidden in AtHome.
             if (pedestrians.send_pedestrian(*entrance, *entrance, network)) {
                 (void)pedestrians.rest_at_home(*entrance);
                 decision_ = PedestrianDecision::resting_at_home;
@@ -164,7 +155,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
             }
             return;
         }
-        // Cities without a residence retain the developer-visible street preview.
         for (const SidewalkTile& tile : sidewalks.tiles()) {
             if (start_activity({tile.tile_x, tile.tile_y}, pedestrians, network)) return;
         }
@@ -199,8 +189,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
         }
 
         WeatherState weather = WeatherSystem::observed_state();
-        // Keep the legacy bool meaningful for isolated tests/callers that have no
-        // live WeatherSystem instance while preserving exact overcast at runtime.
         if (raining && weather != WeatherState::thunderstorm) weather = WeatherState::raining;
         const bool essential = essential_service_available(buildings, catalog);
         if (!decide_to_leave(weather, essential)) {
@@ -208,9 +196,8 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
             return;
         }
 
-        if (pedestrians.authorize_outing(preference_for_weather(weather, essential))) {
-            // The building-visit bridge consumes the intent and sends the actor
-            // directly from the home entrance to an eligible destination.
+        const PedestrianNeed need = pedestrians.priority_need(resident.id);
+        if (pedestrians.authorize_outing(preference_for_weather(weather, essential), need)) {
             decision_ = PedestrianDecision::awaiting_activity;
             retry_seconds_ = 2.0F;
             return;
@@ -220,9 +207,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
     }
 
     if (decision_ == PedestrianDecision::awaiting_activity) {
-        // If the visit bridge could not find an affordable/reachable destination,
-        // cancel the one-shot intent and go back inside. If a visit did happen,
-        // the bridge clears the intent and this same branch sends the citizen home.
         pedestrians.clear_outing_intent(pedestrians.instances().front().id);
         if (entrance) {
             if (at == *entrance && pedestrians.rest_at_home(*entrance)) {
@@ -241,7 +225,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
     }
 
     if (decision_ == PedestrianDecision::walking_to_activity) {
-        // Legacy/no-home street preview keeps the old visible idle window.
         decision_ = PedestrianDecision::awaiting_activity;
         retry_seconds_ = 1.0F;
         return;
@@ -256,8 +239,6 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
         }
     }
 
-    // Residence-backed agents do not wander arbitrarily anymore. Their only
-    // autonomous departure is the explicit AtHome decision above.
     if (entrance) {
         if (at != *entrance && pedestrians.send_pedestrian(at, *entrance, network)) {
             decision_ = PedestrianDecision::returning_home;
