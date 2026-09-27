@@ -62,7 +62,8 @@
   "approvedProxySha256": "d843c3b509abb4d80a57b3a92fbe36edc84a48ef7bcde8986f1daf131b9729ac",
   "postProcess": "CH_TYCOON_STUDIO_V1 canonical full-frame LANCZOS downsample to gameplay scale; no palette reduction",
   "approvedForRuntimeArt": true,
-  "runtimeGameplayDefinitionRegistered": false,
+  "runtimeGameplayDefinitionRegistered": true,
+  "runtimeGameplayDefinition": "assets/definitions/residential_suburban_cottage_01.json",
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
     "enabled": true,
