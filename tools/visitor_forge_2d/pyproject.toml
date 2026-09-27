@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 ch-visitor-forge-2d = "visitor_forge_2d.cli:main"
+ch-fence-2d = "visitor_forge_2d.fence_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
