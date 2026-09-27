@@ -4,6 +4,7 @@
 #include "navigation_network.h"
 
 #include <cstdint>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -56,20 +57,28 @@ struct PedestrianInstance {
     PedestrianOutingIntent outing_intent;
 };
 
-// One runtime pedestrian consuming a topology-backed route. Population count
-// remains aggregate, while this visual citizen carries only the small amount of
-// state needed for home/activity behaviour and a monthly consumption budget.
+// Runtime pedestrians remain contiguous in one vector for cache locality. The
+// legacy no-id helpers still target the first actor, while id-addressable APIs
+// let the same storage safely scale to many simultaneously active citizens.
 class PedestrianSystem {
 public:
     static constexpr std::int64_t kDefaultMonthlyBudgetCents = 5'000; // $50.00 tuning baseline.
+    static constexpr std::uint32_t kDecisionShardCount = 8;
 
     explicit PedestrianSystem(PedestrianVisualDefinition visual_definition);
 
-    // Debug visual retune reuses the same entity and route.
+    // Debug visual retune reuses the same entities and routes.
     void configure_visual_test(PedestrianVisualDefinition visual_definition);
 
+    // Multi-citizen foundation. Spawn creates one idle actor at a valid
+    // navigation tile; routing/behaviour commands can then address that actor by id.
+    [[nodiscard]] std::optional<std::uint64_t> spawn_pedestrian(
+        NavigationTile at, const NavigationNetwork& network);
+    [[nodiscard]] bool send_pedestrian(std::uint64_t pedestrian_id, NavigationTile start,
+                                       NavigationTile destination, const NavigationNetwork& network);
     [[nodiscard]] bool send_pedestrian(NavigationTile start, NavigationTile destination,
                                        const NavigationNetwork& network);
+
     // Building visits protect an idle pedestrian from the ordinary autonomous
     // route scheduler while it aligns to the door or remains hidden inside.
     // Presentation resolves this state through the normal idle directional clip.
@@ -78,11 +87,14 @@ public:
     // contact and therefore cannot bypass the navigation surface contract.
     [[nodiscard]] bool face_pedestrian(std::uint64_t pedestrian_id, MobileEntityDirection direction);
     // Rest only at the home's walkable entrance after arriving there.
+    [[nodiscard]] bool rest_at_home(std::uint64_t pedestrian_id, NavigationTile entrance);
     [[nodiscard]] bool rest_at_home(NavigationTile entrance);
+    void wake_up(std::uint64_t pedestrian_id);
     void wake_up();
 
     // A citizen may decide to leave only while resting at home. The visit bridge
     // consumes this one-shot intent when it starts a concrete destination route.
+    [[nodiscard]] bool authorize_outing(std::uint64_t pedestrian_id, PedestrianOutingPreference preference);
     [[nodiscard]] bool authorize_outing(PedestrianOutingPreference preference);
     void clear_outing_intent(std::uint64_t pedestrian_id);
     [[nodiscard]] bool spend_monthly_budget(std::uint64_t pedestrian_id, std::int64_t cents);
@@ -91,6 +103,11 @@ public:
     // Observe the game calendar once from any runtime call site. The system owns
     // the last-seen month/year, so multiple render paths cannot reset a budget twice.
     void sync_monthly_budget_cycle(int month, int year);
+
+    // Stable deterministic time slicing: expensive citizen decisions may process
+    // one shard per simulation tick while route movement continues every mobile tick.
+    [[nodiscard]] static std::uint32_t decision_shard_for(std::uint64_t pedestrian_id);
+    [[nodiscard]] static bool decision_due(std::uint64_t pedestrian_id, std::uint64_t simulation_tick);
 
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
@@ -101,6 +118,11 @@ public:
     [[nodiscard]] const std::vector<PedestrianInstance>& instances() const;
 
 private:
+    [[nodiscard]] PedestrianInstance* find_instance(std::uint64_t pedestrian_id);
+    [[nodiscard]] const PedestrianInstance* find_instance(std::uint64_t pedestrian_id) const;
+    [[nodiscard]] PedestrianInstance& create_pedestrian(NavigationTile at);
+    void assign_route(PedestrianInstance& pedestrian, NavigationTile start,
+                      NavigationTile destination, const NavigationPathResult& path);
     [[nodiscard]] static MobileEntityDirection direction_to(NavigationTile from, NavigationTile to);
     [[nodiscard]] static std::string_view animation_state(PedestrianState state);
     [[nodiscard]] static bool remaining_route_is_valid(const PedestrianInstance& pedestrian, const NavigationNetwork& network);
