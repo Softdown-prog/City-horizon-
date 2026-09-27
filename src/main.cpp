@@ -1,59 +1,38 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries thirteen compatibility/runtime fixes without duplicating the runtime loop:
+// carries runtime compatibility/features without duplicating the runtime loop:
 //
-// 1. Building placement is one-shot: after a successful building is placed
-//    and its BuildingPlace sound is emitted, the active placement id is cleared
-//    before the next frame.
-// 2. Camera/cursor world bounds use every generated parcel, not only purchased
-//    parcels.  Placement/economy ownership still goes through LandManager's
-//    is_tile_owned()/is_area_owned(), so locked land remains locked until bought.
-// 3. Pedestrian lane navigation is wrapped by the Park fence barrier graph, so
-//    closed fence segments block crossings while open gates remain walkable.
-// 4. Runtime SaveManager is replaced by its Park-fence-aware drop-in wrapper,
-//    preserving the existing city JSON while persisting the fence network next
-//    to the same save slot.
-// 5. Service-price clicks use each definition's authored price step. A direct
-//    price edit on a ticketed ride is mirrored into its linked booth before the
-//    economy refresh, keeping the booth authoritative without making the ride
-//    panel appear frozen.
-// 6. Ferris-wheel audio is frame-synchronized with both ride activity and the
-//    canonical visible viewport. An active wheel is audible only while its
-//    logical footprint intersects the current camera view.
-// 7. Runtime rendering builds a conservative camera-visible working set before
-//    terrain traversal, road/building sorting and per-tile geometry.  The
-//    canonical MapRenderer remains unchanged for Map Forge and render-contract
-//    verification.
-// 8. Z/X become production camera-rotation controls whenever no building is
-//    being placed. The view turns in exact 90-degree steps across all four
-//    cardinal facings while preserving the logical point at screen centre.
-// 9. GameplayUi is wrapped by two top-bar camera buttons that emit the same
-//    rotate actions. Their final presentation is supplied by CH Blender RGBA
-//    assets, with hover/press animation and a safe fallback before promotion.
-// 10. Interior-building visits use authored front doors on the live pedestrian
-//     surface graph. The actor faces inward before disappearing, side/back entry
-//     and off-surface shortcuts are rejected, and activity remains held during
-//     the short interior visit.
-// 11. Visitor-facing eligibility is explicit: residences, outdoor vendors,
-//     ticket booths and ticket-gated rides are not treated as ordinary interiors.
-//     New service buildings need a real front access before pedestrians may enter.
-// 12. Ticketed Park rides use a booth-to-boarding sequence. A pedestrian stops
-//     visibly at the paired booth, follows walkable tiles to the ride's authored
-//     boarding access, then raises the ride activity counter so activity_loop
-//     animation/audio can run. The ticket booth itself requires no activity overlay.
-// 13. A citizen's personal spending budget is restored exactly when the game
-//     calendar enters a new month; it is independent from jobs or utility systems.
+// 1. Building placement is one-shot after a successful placement.
+// 2. Camera/cursor geometry spans every generated parcel while ownership rules stay authoritative.
+// 3. Pedestrian navigation respects Park fence barriers and gates.
+// 4. SaveManager persists the Park fence network alongside the canonical city save.
+// 5. Service-price clicks respect authored price steps and linked Park booths.
+// 6. Ferris-wheel audio follows activity plus current camera visibility.
+// 7. Runtime rendering uses a conservative camera-visible working set.
+// 8. Z/X rotate the production camera when no building is being placed.
+// 9. Runtime UI adds camera controls and lightweight procedural overlays.
+// 10. Interior visits use authored front doors and the live pedestrian graph.
+// 11. Visitor eligibility remains explicit for residences/vendors/booths/rides.
+// 12. Ticketed Park rides use the booth -> boarding sequence.
+// 13. Citizen monthly spending budgets reset exactly once per game month.
+// 14. Bankruptcy state is bridged into a blocking Game Over presentation after
+//     three consecutive negative-treasury month closes.
+// 15. Once bankrupt, the simulation clock is frozen while ESC remains available
+//     for the existing menu flow.
 
 #include "audio_manager.h"
 #include "building_system.h"
 #include "building_visit_runtime.h"
+#include "economy_system.h"
 #include "land_system.h"
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
+#include "simulation_clock.h"
 #include "src/runtime_view_state.h"
 #include "src/runtime_map_renderer.h"
-#include "src/camera_rotation_ui.h"
+#include "src/runtime_game_state.h"
+#include "src/runtime_game_ui.h"
 
 #include <algorithm>
 
@@ -72,6 +51,66 @@ namespace ch {
 }
 
 }  // namespace ch
+
+// Runtime economy wrapper. The canonical CityEconomy owns all finance rules;
+// this class merely mirrors its bankruptcy result into a small presentation
+// bridge so UI/clock code can react without editing the large main loop.
+class ChCityEconomy : public CityEconomy {
+public:
+    using CityEconomy::CityEconomy;
+
+    void restore_funds(const std::int64_t funds) {
+        CityEconomy::restore_funds(funds);
+        ch::runtime_game_state::reset();
+    }
+
+    void on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
+                         const PopulationSystem& population, const GameDate& closing_date,
+                         const ServiceVehicleCatalog* vehicle_catalog = nullptr,
+                         const ServiceVehicleManager* vehicles = nullptr,
+                         FarmingSystem* farming = nullptr) {
+        CityEconomy::on_month_closed(buildings, catalog, population, closing_date,
+                                     vehicle_catalog, vehicles, farming);
+        ch::runtime_game_state::update(bankrupt(), consecutive_negative_months());
+    }
+
+    void process_month(const BuildingManager& buildings, const BuildingCatalog& catalog,
+                       const PopulationSystem& population, const GameDate& closing_date,
+                       const ServiceVehicleCatalog* vehicle_catalog = nullptr,
+                       const ServiceVehicleManager* vehicles = nullptr,
+                       FarmingSystem* farming = nullptr) {
+        CityEconomy::process_month(buildings, catalog, population, closing_date,
+                                   vehicle_catalog, vehicles, farming);
+        ch::runtime_game_state::update(bankrupt(), consecutive_negative_months());
+    }
+};
+
+// Runtime-only clock wrapper. Bankruptcy is a terminal gameplay condition, so
+// world simulation stops immediately while the existing keyboard/menu event loop
+// remains alive and can still handle ESC.
+class ChSimulationClock : public SimulationClock {
+public:
+    using SimulationClock::SimulationClock;
+
+    [[nodiscard]] SimulationSpeed speed() const {
+        return ch::runtime_game_state::game_over
+            ? SimulationSpeed::paused
+            : SimulationClock::speed();
+    }
+
+    void set_speed(const SimulationSpeed speed) {
+        if (!ch::runtime_game_state::game_over) SimulationClock::set_speed(speed);
+    }
+
+    void toggle_pause() {
+        if (!ch::runtime_game_state::game_over) SimulationClock::toggle_pause();
+    }
+
+    [[nodiscard]] SimulationAdvance advance_seconds(const double real_seconds) {
+        if (ch::runtime_game_state::game_over) return {};
+        return SimulationClock::advance_seconds(real_seconds);
+    }
+};
 
 // Ticket booths remain the canonical owner of a Park ride's ticket price.  The
 // ride panel may still expose the shared value for convenience; if the player
@@ -164,6 +203,8 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 // canonical class declarations themselves.
 #define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
 #define SaveManager ParkFenceSaveManager
+#define CityEconomy ChCityEconomy
+#define SimulationClock ChSimulationClock
 
 // The runtime has one player-facing service-price setter call. Preserve that
 // existing action path, then synchronize a linked ticket booth when the edited
@@ -249,7 +290,7 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 // above, so canonical Map Forge rendering and the established GameplayUi remain
 // untouched outside the executable translation unit.
 #define MapRenderer RuntimeMapRenderer
-#define GameplayUi ChGameplayUi
+#define GameplayUi ChRuntimeGameplayUi
 
 #include "main_runtime_impl.cpp"
 
@@ -259,6 +300,8 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 #undef play_sound
 #undef mobile_render_entities
 #undef set_service_price
+#undef SimulationClock
+#undef CityEconomy
 #undef SaveManager
 #undef PedestrianLaneNavigationNetwork
 #undef parcels
