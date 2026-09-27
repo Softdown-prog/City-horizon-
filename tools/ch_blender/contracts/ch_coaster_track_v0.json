@@ -1,0 +1,70 @@
+{
+  "contract": "CH_COASTER_TRACK_V0",
+  "status": "prototype",
+  "authority": "City Horizon procedural coaster authoring",
+  "units": {
+    "blenderUnitsPerTile": 3.0,
+    "heightStep": 0.75,
+    "heightStepsPerTile": 4
+  },
+  "trackProfile": {
+    "gauge": 0.95,
+    "railRadius": 0.08,
+    "tieWidth": 1.35,
+    "tieDepth": 0.14,
+    "tieHeight": 0.10,
+    "tieSpacing": 0.36,
+    "railCenterHeight": 0.48
+  },
+  "pieceVocabulary": [
+    "straight",
+    "curve_left",
+    "curve_right",
+    "slope_up",
+    "slope_down"
+  ],
+  "pieceRules": {
+    "straight": {
+      "footprintTiles": [1, 1],
+      "entry": {"edge": "south", "heightStep": 0, "heading": "north"},
+      "exit": {"edge": "north", "heightStep": 0, "heading": "north"}
+    },
+    "curve_left": {
+      "footprintTiles": [1, 1],
+      "entry": {"edge": "south", "heightStep": 0, "heading": "north"},
+      "exit": {"edge": "west", "heightStep": 0, "heading": "west"}
+    },
+    "curve_right": {
+      "footprintTiles": [1, 1],
+      "entry": {"edge": "south", "heightStep": 0, "heading": "north"},
+      "exit": {"edge": "east", "heightStep": 0, "heading": "east"}
+    },
+    "slope_up": {
+      "footprintTiles": [1, 1],
+      "entry": {"edge": "south", "heightStep": 0, "heading": "north"},
+      "exit": {"edge": "north", "heightStep": 1, "heading": "north"}
+    },
+    "slope_down": {
+      "footprintTiles": [1, 1],
+      "entry": {"edge": "south", "heightStep": 1, "heading": "north"},
+      "exit": {"edge": "north", "heightStep": 0, "heading": "north"}
+    }
+  },
+  "runtimeModel": {
+    "visualRepresentation": "pre-rendered 2D sprites",
+    "logicalRepresentation": "piece graph plus sampled 3D centerline",
+    "trainMotion": "distance along centerline",
+    "requiredFutureData": [
+      "clearance envelope",
+      "support occupancy",
+      "block section",
+      "speed modifiers"
+    ]
+  },
+  "authoringPolicy": {
+    "pipeline": "CH Blender guarded_blender_script",
+    "qualityGate": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "runtime3D": false,
+    "deterministic": true
+  }
+}
