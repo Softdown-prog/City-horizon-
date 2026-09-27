@@ -177,6 +177,9 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         ch::building_visit_runtime::sync( \
             pedestrians, buildings, catalog, ch_visit_surfaces, \
             simulation_clock.speed() != SimulationSpeed::paused, automatic_pedestrian); \
+        /* sync may change facing/state after the ordinary animation update. */ \
+        /* A zero-time refresh switches the directional clip without advancing it. */ \
+        pedestrians.update_animation(0.0F, mobile_animations); \
         auto ch_mobile_entities = mobile_render_entities(); \
         ch::building_visit_runtime::filter_inside_pedestrians(ch_mobile_entities, pedestrians); \
         return ch_mobile_entities; \
