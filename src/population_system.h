@@ -12,11 +12,18 @@ class RoadManager;
 // stable building-instance order for economic accounting.
 class PopulationSystem {
 public:
-    static constexpr std::uint32_t kMaxMonthlyImmigration = 20;
+    // Small cities need a minimum immigration pulse so the first residential
+    // buildings do not sit empty for many game months. Once the city is larger,
+    // percentage growth naturally overtakes this floor.
+    static constexpr std::uint32_t kStarterMonthlyImmigration = 4;
+    static constexpr std::uint32_t kMonthlyGrowthBasisPoints = 400; // 4.00%
 
     [[nodiscard]] std::uint32_t current_population() const;
     [[nodiscard]] std::uint32_t residential_capacity() const;
     [[nodiscard]] std::uint32_t powered_residential_capacity() const;
+    [[nodiscard]] std::uint32_t housing_demand() const;
+    [[nodiscard]] std::uint32_t last_month_potential_growth() const;
+    [[nodiscard]] std::uint32_t last_month_growth() const;
     [[nodiscard]] int months_without_power() const;
     [[nodiscard]] int crisis_recovery_month() const;
 
@@ -25,13 +32,16 @@ public:
                           const PowerSystem* power = nullptr, const RoadManager* roads = nullptr);
 
     // Advances a single deterministic monthly population step and returns net population change.
-    // Immigration occurs only once per month at month-close settlement.
+    // Immigration occurs only once per month at month-close settlement. Demand grows
+    // proportionally with population, then housing capacity clamps actual arrivals.
     std::int32_t advance_month(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                const PowerSystem* power = nullptr, const RoadManager* roads = nullptr);
     std::int32_t on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                 const PowerSystem* power = nullptr, const RoadManager* roads = nullptr);
 
-    // Save/load boundary.
+    // Save/load boundary. Housing demand is deliberately recomputed after load in
+    // this first growth tranche; persistent demand can be added in a save-version bump
+    // when employment/attractiveness become authored simulation contracts.
     void restore_current_population(std::uint32_t population, const BuildingManager& buildings,
                                     const BuildingCatalog& catalog, const PowerSystem* power = nullptr,
                                     const RoadManager* roads = nullptr, int months_without_power = 0,
@@ -43,9 +53,15 @@ public:
                                                const BuildingCatalog& catalog) const;
 
 private:
+    [[nodiscard]] std::uint32_t organic_monthly_demand() const;
+    [[nodiscard]] std::uint32_t housing_demand_cap() const;
+
     std::uint32_t current_population_ = 0;
     std::uint32_t residential_capacity_ = 0;
     std::uint32_t powered_residential_capacity_ = 0;
+    std::uint32_t housing_demand_ = 0;
+    std::uint32_t last_month_potential_growth_ = 0;
+    std::uint32_t last_month_growth_ = 0;
     int months_without_power_ = 0;
     int crisis_recovery_month_ = 0;
 };
