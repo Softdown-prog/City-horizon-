@@ -44,6 +44,9 @@
   "maximumServicePrice": 40,
   "baseServiceCustomersPerMonth": 90,
   "servicePopulationForFullDemand": 60,
+  "needsEffect": {
+    "fun": 70
+  },
   "artScale": 0.6703,
   "animation": {
     "layout": "horizontal",
