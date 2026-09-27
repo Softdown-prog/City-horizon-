@@ -84,12 +84,8 @@ public:
     [[nodiscard]] bool cancel_active_task(const ServiceVehicleCatalog& catalog, const TraversableTile& traversable);
     [[nodiscard]] bool is_reserved(int x, int y) const;
     [[nodiscard]] bool has_active_task() const;
-    // Logical movement/task progress is advanced by the fixed mobile tick.
     void update_tick(float tick_seconds, const ServiceVehicleCatalog& catalog, const TraversableTile& traversable);
-    // Rendering calls this every frame to keep logical tick movement smooth.
     void interpolate_visual(float frame_seconds);
-    // Frame-only visual update; task, route and field work remain on the
-    // simulation tick in update_tick.
     void update_animation(float frame_seconds, const MobileAnimationCatalog& animations);
     [[nodiscard]] std::vector<MobileEntityRenderData> render_entities(const ServiceVehicleCatalog& catalog,
                                                                        const MobileAnimationCatalog& animations) const;
@@ -108,4 +104,68 @@ private:
     std::unordered_set<std::uint64_t> reserved_tiles_;
     std::vector<TileCoordinate> completed_tiles_;
     unsigned int next_task_number_ = 1;
+};
+
+// -----------------------------------------------------------------------------
+// CH_ROAD_TRAFFIC_V1
+// Lightweight city traffic contract. Runtime sprites stay 2D; this layer owns
+// only the logical road anchor, right-hand lane offset, car-to-car separation
+// and acceleration/braking. It deliberately does not own road topology.
+// -----------------------------------------------------------------------------
+enum class TrafficVehicleState { cruising, braking, stopped };
+
+struct TrafficVehicleDefinition {
+    std::string id = "vehicle.road.suv_01";
+    float cruise_speed = 1.35F;       // tiles / second
+    float acceleration = 1.10F;       // tiles / second^2
+    float braking = 2.75F;            // tiles / second^2
+    float safe_distance = 0.72F;      // logical anchor distance in tiles
+    float look_ahead_time = 0.65F;    // adds speed-dependent stopping margin
+    float lane_offset = 0.18F;        // right-hand traffic offset from tile centre
+    float sprite_anchor_x = 0.5F;
+    float sprite_anchor_y = 0.88F;    // ground contact under the wheels
+};
+
+struct TrafficVehicleInstance {
+    std::string vehicle_id = "vehicle.road.suv_01";
+    std::vector<TileCoordinate> route; // includes the spawn tile at index 0
+    std::size_t segment_index = 0;     // segment route[i] -> route[i + 1]
+    float segment_progress = 0.0F;     // 0..1 along current road segment
+    float speed = 0.0F;
+    float map_x = 0.0F;                // logical road/lane anchor
+    float map_y = 0.0F;
+    float visual_x = 0.0F;
+    float visual_y = 0.0F;
+    VehicleDirection direction = VehicleDirection::south;
+    TrafficVehicleState state = TrafficVehicleState::stopped;
+};
+
+class TrafficVehicleManager {
+public:
+    [[nodiscard]] bool add(TrafficVehicleInstance instance,
+                           const TrafficVehicleDefinition& definition,
+                           const RoadManager& roads);
+    void update_tick(float tick_seconds,
+                     const TrafficVehicleDefinition& definition,
+                     const RoadManager& roads);
+    void interpolate_visual(float frame_seconds);
+    void clear();
+    [[nodiscard]] const std::vector<TrafficVehicleInstance>& instances() const;
+
+    [[nodiscard]] static bool route_is_drivable(const std::vector<TileCoordinate>& route,
+                                                const RoadManager& roads);
+    [[nodiscard]] static std::pair<float, float> lane_anchor(const TileCoordinate& tile,
+                                                              VehicleDirection direction,
+                                                              float lane_offset);
+
+private:
+    [[nodiscard]] static VehicleDirection direction_between(const TileCoordinate& from,
+                                                            const TileCoordinate& to);
+    [[nodiscard]] bool vehicle_ahead(std::size_t index,
+                                     float required_gap,
+                                     float* distance = nullptr) const;
+    void refresh_anchor(TrafficVehicleInstance& vehicle,
+                        const TrafficVehicleDefinition& definition) const;
+
+    std::vector<TrafficVehicleInstance> instances_;
 };
