@@ -1,0 +1,36 @@
+{
+  "contract": "CH_2D_FENCE_SCENERY_V1",
+  "variant": "chainlink",
+  "id": "park_chainlink_fence_01",
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30
+  },
+  "canvas": [192, 128],
+  "anchor": [96, 64],
+  "segmentVectors": {
+    "east": [64.0, 32.0],
+    "south": [-64.0, 32.0]
+  },
+  "modules": {
+    "segment_east": "park_chainlink_fence_01_segment_east.png",
+    "segment_south": "park_chainlink_fence_01_segment_south.png",
+    "gate_east": "park_chainlink_fence_01_gate_east.png",
+    "gate_south": "park_chainlink_fence_01_gate_south.png",
+    "post": "park_chainlink_fence_01_post.png"
+  },
+  "sha256": {
+    "park_chainlink_fence_01_gate_east.png": "62fa527fb4c6e1a8126f86acb3d52a2cbf0de80783c3c147c1b8f5e0af03d578",
+    "park_chainlink_fence_01_gate_south.png": "da86321d14833d9d2050381fcf113e9eb7f9b1b0a704b37307a0ff7f7ad0aea6",
+    "park_chainlink_fence_01_post.png": "df228220b1e61b5cf92c8f3426d3454c26b26d1fcf73f4a0cc0dc5b3153b6d46",
+    "park_chainlink_fence_01_segment_east.png": "afd4657cdd0791deebc4d88d3d4eb061687ab407a0c0b839650597440a7053d3",
+    "park_chainlink_fence_01_segment_south.png": "148a6bdc237602d03eb2faf25ba7a05633a1284961140624c7b784d2179c6abc"
+  },
+  "topology": "FenceManager owns automatic straight/corner/tee/cross composition; one post per occupied vertex",
+  "gate": "two-leaf chain-link gate segment; open_gate remains a segment property for pedestrian crossing",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/park_chainlink_fence_01.json",
+  "artApproved": false,
+  "runtimePromotion": false
+}
