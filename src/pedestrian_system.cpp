@@ -31,6 +31,10 @@ void PedestrianSystem::configure_visual_test(PedestrianVisualDefinition visual_d
 
 bool PedestrianSystem::send_pedestrian(const NavigationTile start, const NavigationTile destination,
                                        const NavigationNetwork& network) {
+    // A visitor hidden inside a building is intentionally unavailable to the
+    // ordinary autonomous route scheduler until the visit bridge releases it.
+    if (!instances_.empty() && instances_.front().state == PedestrianState::visiting) return false;
+
     const NavigationPathResult path = find_navigation_path(network, start, destination);
     if (path.status != NavigationPathStatus::found) return false;
 
@@ -58,6 +62,23 @@ bool PedestrianSystem::send_pedestrian(const NavigationTile start, const Navigat
     pedestrian.state = pedestrian.next_waypoint < pedestrian.route.size() ? PedestrianState::walking : PedestrianState::idle;
     if (pedestrian.state == PedestrianState::walking) {
         pedestrian.spatial.direction = direction_to(start, pedestrian.route[pedestrian.next_waypoint]);
+    }
+    return true;
+}
+
+bool PedestrianSystem::set_visiting(const std::uint64_t pedestrian_id, const bool visiting) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    if (found == instances_.end()) return false;
+
+    if (visiting) {
+        // Building entry is committed only after the route reached its authored
+        // door tile. Refuse to hide an actor while it is still travelling.
+        if (found->state == PedestrianState::walking) return false;
+        found->state = PedestrianState::visiting;
+    } else if (found->state == PedestrianState::visiting) {
+        found->state = PedestrianState::idle;
     }
     return true;
 }
