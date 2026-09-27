@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries seven compatibility/runtime fixes without duplicating the runtime loop:
+// carries eight compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -25,6 +25,9 @@
 //    terrain traversal, road/building sorting and per-tile geometry.  The
 //    canonical MapRenderer remains unchanged for Map Forge and render-contract
 //    verification.
+// 8. Z/X become production camera-rotation controls whenever no building is
+//    being placed. The view turns in exact 90-degree steps across all four
+//    cardinal facings while preserving the logical point at screen centre.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -173,6 +176,46 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         return play_sound(ch_sound_event); \
     }())
 
+// The implementation already has one placement-rotation lambda and complete
+// four-way projection/render support. Function-like macro expansion leaves that
+// lambda declaration untouched, but intercepts its call sites. During ordinary
+// gameplay Z/X now rotate the camera; while placing a rotatable building they
+// retain their original building-rotation behaviour.
+//
+// Camera pan is screen-space. Before changing the facing, recover the exact
+// logical world point under the viewport centre, rotate that point into the new
+// camera basis, then solve the new pan that puts it back at the same centre.
+// This prevents the city from jumping around the screen on every 90-degree turn.
+#define rotate_placement(clockwise) \
+    ([&]() { \
+        const bool ch_camera_clockwise = static_cast<bool>(clockwise); \
+        if (!placement_definition_id.empty()) { \
+            rotate_placement(ch_camera_clockwise); \
+            return; \
+        } \
+        const float ch_half_tile_width = kTileWidth * 0.5F * camera.zoom; \
+        const float ch_half_tile_height = kTileHeight * 0.5F * camera.zoom; \
+        if (ch_half_tile_width <= 0.0F || ch_half_tile_height <= 0.0F) return; \
+        const float ch_axis_x = -camera.pan_x / ch_half_tile_width; \
+        const float ch_axis_y = -camera.pan_y / ch_half_tile_height; \
+        const CameraWorldPoint ch_focus = logical_world_point( \
+            (ch_axis_y + ch_axis_x) * 0.5F, \
+            (ch_axis_y - ch_axis_x) * 0.5F, \
+            camera.rotation); \
+        const CameraRotation ch_next_rotation = ch_camera_clockwise \
+            ? rotate_camera_clockwise(camera.rotation) \
+            : rotate_camera_counter_clockwise(camera.rotation); \
+        const CameraWorldPoint ch_focus_in_new_view = camera_view_point( \
+            ch_focus.x, ch_focus.y, ch_next_rotation); \
+        camera.rotation = ch_next_rotation; \
+        camera.pan_x = -(ch_focus_in_new_view.x - ch_focus_in_new_view.y) * ch_half_tile_width; \
+        camera.pan_y = -(ch_focus_in_new_view.x + ch_focus_in_new_view.y) * ch_half_tile_height; \
+        camera.pan_velocity_x = 0.0F; \
+        camera.pan_velocity_y = 0.0F; \
+        status = std::string("CAMERA FACING ") + camera_rotation_label(camera.rotation) + " | Z/X ROTATE"; \
+        (void)play_sound(SoundEvent::ui_click); \
+    }())
+
 // Redirect only runtime call sites. Both renderer class declarations are
 // already parsed above, so Map Forge and the canonical render library keep
 // their original MapRenderer implementation.
@@ -181,6 +224,7 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 #include "main_runtime_impl.cpp"
 
 #undef MapRenderer
+#undef rotate_placement
 #undef play_sound
 #undef mobile_render_entities
 #undef set_service_price
