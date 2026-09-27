@@ -179,6 +179,13 @@ void test_resident_leaves_and_returns_to_a_real_entrance() {
     for (int i = 0; i < 20; ++i) decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
     assert(pedestrians.instances().front().state == PedestrianState::resting);
     for (int y = 4; y <= 8; ++y) assert(sidewalks.place_tile(1, y, "cement_path"));
+    // A rainy resident stays sheltered even when a walk is available.
+    for (int i = 0; i < 40; ++i) {
+        pedestrians.update_tick(0.25F, network);
+        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
+        assert(decisions.decision() == PedestrianDecision::resting_at_home);
+        assert(pedestrians.instances().front().state == PedestrianState::resting);
+    }
     bool left = false;
     bool returned = false;
     for (int i = 0; i < 250; ++i) {
@@ -191,6 +198,22 @@ void test_resident_leaves_and_returns_to_a_real_entrance() {
     assert(left && returned);
     assert(pedestrians.instances().front().state == PedestrianState::resting);
     assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
+
+    // Rain during an outing completes the current segment, then returns home;
+    // clearing the weather permits another autonomous walk.
+    for (int i = 0; i < 60; ++i) {
+        pedestrians.update_tick(0.25F, network);
+        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+        if (decisions.decision() == PedestrianDecision::walking_to_activity) break;
+    }
+    assert(decisions.decision() == PedestrianDecision::walking_to_activity);
+    for (int i = 0; i < 80; ++i) {
+        pedestrians.update_tick(0.25F, network);
+        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
+        if (decisions.decision() == PedestrianDecision::resting_at_home) break;
+    }
+    assert(decisions.decision() == PedestrianDecision::resting_at_home);
+    assert(pedestrians.instances().front().state == PedestrianState::resting);
 
     pedestrians.wake_up();
     const auto pedestrian_id = pedestrians.instances().front().id;

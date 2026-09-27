@@ -70,7 +70,7 @@ bool PedestrianDecisionNode::start_activity(const NavigationTile from, Pedestria
 
 void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedestrians, const NavigationNetwork& network,
                                      const BuildingManager& buildings, const BuildingCatalog& catalog,
-                                     const RoadManager& roads, const SidewalkManager& sidewalks) {
+                                     const RoadManager& roads, const SidewalkManager& sidewalks, const bool raining) {
     const bool exists = !pedestrians.instances().empty();
     const std::optional<NavigationTile> current = exists ? std::optional<NavigationTile>{{
         pedestrians.instances().front().spatial.logical_tile_x, pedestrians.instances().front().spatial.logical_tile_y}}
@@ -91,6 +91,24 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
     // The commercial/attraction visitor bridge owns its route and dwell state.
     if (exists && (pedestrians.instances().front().state == PedestrianState::walking ||
                    pedestrians.instances().front().state == PedestrianState::visiting)) return;
+    if (raining && entrance) {
+        // Let a walk or indoor visit finish before redirecting. Never snap a
+        // moving pedestrian to a new route just because the weather changed.
+        retry_seconds_ = 0.0F;
+        if (!exists) {
+            if (pedestrians.send_pedestrian(*entrance, *entrance, network)) {
+                (void)pedestrians.rest_at_home(*entrance);
+                decision_ = PedestrianDecision::resting_at_home;
+            }
+        } else if (*current == *entrance && pedestrians.instances().front().state == PedestrianState::resting) {
+            decision_ = PedestrianDecision::resting_at_home;
+        } else if (*current == *entrance && pedestrians.rest_at_home(*entrance)) {
+            decision_ = PedestrianDecision::resting_at_home;
+        } else if (pedestrians.send_pedestrian(*current, *entrance, network)) {
+            decision_ = PedestrianDecision::returning_home;
+        }
+        return;
+    }
     if (exists && decision_ == PedestrianDecision::walking_to_activity) {
         // Give the visitor bridge a visible idle window to choose a shop or
         // ticketed attraction before the decision node sends the walker home.

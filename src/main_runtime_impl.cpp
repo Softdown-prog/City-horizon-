@@ -29,6 +29,7 @@
 #include "sidewalk_system.h"
 #include "ui_manager.h"
 #include "vehicle_system.h"
+#include "weather_system.h"
 
 #include <algorithm>
 #include <array>
@@ -62,6 +63,27 @@ constexpr float kCameraPanResponsiveness = 14.0F;
 // frames at 175 ms. This remains presentation tuning, not a navigation rule.
 constexpr float kMixamoWalkSeTestSpeed = 0.80F;
 constexpr float kMixamoWalkSeTestRate = 125.0F / 175.0F;
+
+void render_weather(SDL_Renderer* renderer, const WeatherSystem& weather, const int width, const int height) {
+    if (weather.tint_alpha() == 0) return;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 25, 37, 57, weather.tint_alpha());
+    const SDL_FRect viewport{0.0F, 0.0F, static_cast<float>(width), static_cast<float>(height)};
+    SDL_RenderFillRect(renderer, &viewport);
+    if (weather.is_raining()) {
+        SDL_SetRenderDrawColor(renderer, 205, 222, 243, weather.state() == WeatherState::thunderstorm ? 110 : 84);
+        const std::size_t count = weather.state() == WeatherState::thunderstorm ? weather.drops().size() : 180U;
+        for (std::size_t i = 0; i < count; ++i) {
+            const RainDrop& drop = weather.drops()[i];
+            SDL_RenderLine(renderer, drop.x + drop.length * 0.18F, drop.y - drop.length,
+                           drop.x, drop.y);
+        }
+    }
+    if (weather.flash_alpha() != 0) {
+        SDL_SetRenderDrawColor(renderer, 235, 242, 255, weather.flash_alpha());
+        SDL_RenderFillRect(renderer, &viewport);
+    }
+}
 
 // Opaque bounds recorded by the PNG pipeline for grass_isometric_01_clean.png.
 constexpr float kGrassOpaqueLeft = 53.0F;
@@ -1778,6 +1800,7 @@ int main() {
     // or road tile. The decision node owns autonomous activity and home rest.
     bool automatic_pedestrian = actor_ready;
     PedestrianDecisionNode pedestrian_decisions;
+    WeatherSystem weather;
     // Every preset keeps the approved 175 ms canonical cycle. Only world
     // velocity varies for runtime foot-skating calibration of the new skin.
     int mixamo_gait_preset_index = 2;
@@ -3174,6 +3197,10 @@ int main() {
                     case SDL_SCANCODE_F9:
                         (void)load_current_city(false);
                         break;
+                    case SDL_SCANCODE_F12:
+                        weather.cycle_state();
+                        status = std::string("WEATHER: ") + weather.state_name() + " | F12 TO CHANGE";
+                        break;
                     case SDL_SCANCODE_F11: {
                         if (!selected_instance_id) {
                             status = "ACTIVITY TEST: SELECT A BUILDING FIRST";
@@ -3322,6 +3349,7 @@ int main() {
         const double elapsed_seconds = static_cast<double>(current_simulation_ticks - last_simulation_ticks) / 1000.0;
         last_simulation_ticks = current_simulation_ticks;
         const float frame_seconds = static_cast<float>(elapsed_seconds);
+        weather.update(frame_seconds, viewport_width, viewport_height);
         seagull_seconds += std::min(frame_seconds, 0.050F);
         if (seagull_pass_active) {
             seagull_pass_elapsed += std::min(frame_seconds, 0.050F);
@@ -3393,7 +3421,7 @@ int main() {
             pedestrians.update_tick(scheduled.mobile_tick_seconds, pedestrian_surfaces);
             if (automatic_pedestrian) {
                 pedestrian_decisions.update(scheduled.mobile_tick_seconds, pedestrians, pedestrian_surfaces,
-                                            buildings, catalog, roads, sidewalks);
+                                            buildings, catalog, roads, sidewalks, weather.is_raining());
             }
         }
         for (const TileCoordinate& completed : service_vehicles.take_completed_tiles()) {
@@ -3628,6 +3656,8 @@ int main() {
             }
         }
 
+        // Weather is a screen-space layer above the world and below all UI.
+        render_weather(renderer, weather, viewport_width, viewport_height);
         gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));
         gameplay_ui.render(renderer);
         SDL_RenderPresent(renderer);

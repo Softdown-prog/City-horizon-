@@ -128,6 +128,7 @@ add_executable(city_builder
     src/sidewalk_system.cpp
     src/ui_manager.cpp
     src/vehicle_system.cpp
+    src/weather_system.cpp
 )
 target_link_libraries(city_builder PRIVATE ch_core ch_render SDL3::SDL3 SDL3_mixer::SDL3_mixer)
 
@@ -279,6 +280,12 @@ if(BUILD_TESTING)
         NAME pedestrian_system_test
         COMMAND pedestrian_system_test
     )
+
+    add_executable(weather_system_test
+        src/weather_system_test.cpp
+        src/weather_system.cpp
+    )
+    add_test(NAME weather_system_test COMMAND weather_system_test)
 
     add_executable(land_system_test
         src/land_system_test.cpp

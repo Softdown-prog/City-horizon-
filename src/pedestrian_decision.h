@@ -18,7 +18,7 @@ public:
     void reset();
     void update(float seconds, PedestrianSystem& pedestrians, const NavigationNetwork& network,
                 const BuildingManager& buildings, const BuildingCatalog& catalog,
-                const RoadManager& roads, const SidewalkManager& sidewalks);
+                const RoadManager& roads, const SidewalkManager& sidewalks, bool raining = false);
     [[nodiscard]] PedestrianDecision decision() const { return decision_; }
     [[nodiscard]] std::optional<std::uint64_t> home_id() const { return home_id_; }
 
