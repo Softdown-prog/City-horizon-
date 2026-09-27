@@ -9,8 +9,8 @@
 #include <string>
 
 // Runtime-only gameplay shell layered over the existing HUD/camera controls.
-// It adds two lightweight 2D procedural overlays without introducing image
-// dependencies: an initial road-connection tutorial and the bankruptcy Game Over.
+// It adds lightweight 2D procedural overlays without introducing image
+// dependencies: tutorial, citizen status bars and bankruptcy Game Over.
 class ChRuntimeGameplayUi : public ChGameplayUi {
 public:
     void update_layout(const int viewport_width, const int viewport_height,
@@ -18,6 +18,7 @@ public:
         ChGameplayUi::update_layout(viewport_width, viewport_height, model);
         viewport_width_ = std::max(viewport_width, 1);
         viewport_height_ = std::max(viewport_height, 1);
+        citizen_status_ = model.citizen_status;
 
         if (model.startup_main_menu) tutorial_armed_ = true;
         if (model.overlay == UiOverlay::none && tutorial_armed_ && !tutorial_shown_) {
@@ -74,6 +75,9 @@ public:
     void render(SDL_Renderer* renderer) const {
         ChGameplayUi::render(renderer);
         if (renderer == nullptr) return;
+        if (!tutorial_visible_ && !ch::runtime_game_state::game_over && citizen_status_) {
+            render_citizen_status(renderer, *citizen_status_);
+        }
         if (tutorial_visible_) render_tutorial(renderer);
         if (ch::runtime_game_state::game_over) render_game_over(renderer);
     }
@@ -92,6 +96,71 @@ private:
                               const Uint8 b = 238) {
         const float width = static_cast<float>(value.size()) * 8.0F;
         text(renderer, center_x - width * 0.5F, y, value.c_str(), r, g, b);
+    }
+
+    static int clamped_percent(const int value) {
+        return std::clamp(value, 0, 100);
+    }
+
+    static void render_need_bar(SDL_Renderer* renderer, const float x, const float y,
+                                const float width, const char* label, const int value,
+                                const Uint8 r, const Uint8 g, const Uint8 b,
+                                const bool lowest) {
+        const int clamped = clamped_percent(value);
+        const float bar_x = x + 84.0F;
+        const float bar_y = y + 1.0F;
+        const float bar_h = 12.0F;
+        const SDL_FRect background{bar_x, bar_y, width, bar_h};
+        SDL_SetRenderDrawColor(renderer, 25, 31, 35, 235);
+        SDL_RenderFillRect(renderer, &background);
+        SDL_SetRenderDrawColor(renderer, 76, 89, 94, 255);
+        SDL_RenderRect(renderer, &background);
+
+        const float fill_width = width * static_cast<float>(clamped) / 100.0F;
+        if (fill_width > 0.0F) {
+            const SDL_FRect fill{bar_x + 1.0F, bar_y + 1.0F,
+                                 std::max(0.0F, fill_width - 2.0F), bar_h - 2.0F};
+            SDL_SetRenderDrawColor(renderer, r, g, b, 245);
+            SDL_RenderFillRect(renderer, &fill);
+        }
+
+        text(renderer, x, y + 3.0F, label,
+             lowest ? 255 : 220, lowest ? 219 : 228, lowest ? 132 : 226);
+        const std::string value_text = std::to_string(clamped);
+        text(renderer, bar_x + width + 9.0F, y + 3.0F, value_text.c_str(), 231, 237, 232);
+    }
+
+    void render_citizen_status(SDL_Renderer* renderer, const UiCitizenStatus& status) const {
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        const float panel_w = 318.0F;
+        const float panel_h = 128.0F;
+        const float panel_x = 18.0F;
+        const float panel_y = std::max(18.0F, static_cast<float>(viewport_height_) - panel_h - 18.0F);
+        const SDL_FRect panel{panel_x, panel_y, panel_w, panel_h};
+
+        SDL_SetRenderDrawColor(renderer, 12, 29, 37, 236);
+        SDL_RenderFillRect(renderer, &panel);
+        SDL_SetRenderDrawColor(renderer, 76, 164, 181, 255);
+        SDL_RenderRect(renderer, &panel);
+        SDL_RenderLine(renderer, panel.x + 2.0F, panel.y + 3.0F,
+                       panel.x + panel.w - 2.0F, panel.y + 3.0F);
+
+        text(renderer, panel.x + 14.0F, panel.y + 15.0F,
+             status.title.c_str(), 151, 229, 240);
+        text(renderer, panel.x + 14.0F, panel.y + 31.0F,
+             status.activity.c_str(), 193, 209, 204);
+        text(renderer, panel.x + 190.0F, panel.y + 31.0F,
+             status.money.c_str(), 178, 217, 186);
+
+        const int lowest_value = std::min(status.hunger, std::min(status.thirst, status.fun));
+        const float row_x = panel.x + 14.0F;
+        const float bar_width = 158.0F;
+        render_need_bar(renderer, row_x, panel.y + 55.0F, bar_width,
+                        "FOME", status.hunger, 214, 143, 72, status.hunger == lowest_value);
+        render_need_bar(renderer, row_x, panel.y + 77.0F, bar_width,
+                        "SEDE", status.thirst, 80, 164, 212, status.thirst == lowest_value);
+        render_need_bar(renderer, row_x, panel.y + 99.0F, bar_width,
+                        "DIVERSAO", status.fun, 174, 104, 193, status.fun == lowest_value);
     }
 
     [[nodiscard]] UiRect game_over_menu_bounds() const {
@@ -142,8 +211,6 @@ private:
         const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
         if (!view.valid) return;
 
-        // A short external-road approach communicates that the world continues
-        // beyond the starter parcel without consuming buildable player tiles.
         const ch::ScreenPoint outside = ch::world_to_screen_point(
             static_cast<float>(kExternalRoadGatewayX) - 0.5F,
             static_cast<float>(kExternalRoadGatewayY) + 0.5F,
@@ -160,8 +227,6 @@ private:
         SDL_SetRenderDrawColor(renderer, 224, 190, 70, 225);
         SDL_RenderLine(renderer, outside.x, outside.y, gateway.x, gateway.y);
 
-        // Roadside city sign. It is intentionally a scenic/tutor marker rather
-        // than a building and therefore owns no map footprint.
         const float sign_x = outside.x - 64.0F;
         const float sign_y = outside.y - 86.0F;
         const SDL_FRect sign{sign_x, sign_y, 150.0F, 46.0F};
@@ -179,7 +244,6 @@ private:
         centered_text(renderer, sign.x + sign.w * 0.5F, sign.y + 27.0F,
                       "ENTRADA DA CIDADE", 205, 224, 214);
 
-        // Tutorial-only callout points at the exact logical connection tile.
         const float radius = 11.0F;
         SDL_SetRenderDrawColor(renderer, 255, 192, 62, SDL_ALPHA_OPAQUE);
         const SDL_FRect marker{gateway.x - radius, gateway.y - radius,
@@ -241,4 +305,5 @@ private:
     bool tutorial_armed_ = true;
     bool tutorial_shown_ = false;
     bool tutorial_visible_ = false;
+    std::optional<UiCitizenStatus> citizen_status_;
 };
