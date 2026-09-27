@@ -10,8 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Configure focused headless test build
-        run: cmake -S . -B build-weather-audio -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF -DSDL_UNIX_CONSOLE_BUILD=ON
+      - name: Install SDL configure dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev
+      - name: Configure focused test build
+        run: cmake -S . -B build-weather-audio -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
       - name: Build weather and audio tests only
         run: cmake --build build-weather-audio --target weather_system_test audio_manager_test -j2
       - name: Run weather test
