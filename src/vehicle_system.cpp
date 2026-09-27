@@ -165,3 +165,191 @@ std::vector<MobileEntityRenderData> ServiceVehicleManager::render_entities(const
 std::vector<TileCoordinate> ServiceVehicleManager::take_completed_tiles() { auto result = std::move(completed_tiles_); completed_tiles_.clear(); return result; }
 void ServiceVehicleManager::clear() { instances_.clear(); tasks_.clear(); reserved_tiles_.clear(); completed_tiles_.clear(); next_task_number_ = 1; }
 const std::vector<ServiceVehicleInstance>& ServiceVehicleManager::instances() const { return instances_; }
+
+namespace {
+CardinalDirection cardinal_between(const TileCoordinate& from, const TileCoordinate& to) {
+    if (to.x > from.x) return CardinalDirection::east;
+    if (to.x < from.x) return CardinalDirection::west;
+    if (to.y > from.y) return CardinalDirection::south;
+    return CardinalDirection::north;
+}
+}
+
+VehicleDirection TrafficVehicleManager::direction_between(const TileCoordinate& from,
+                                                           const TileCoordinate& to) {
+    if (to.x > from.x) return VehicleDirection::east;
+    if (to.x < from.x) return VehicleDirection::west;
+    if (to.y > from.y) return VehicleDirection::south;
+    return VehicleDirection::north;
+}
+
+std::pair<float, float> TrafficVehicleManager::lane_anchor(const TileCoordinate& tile,
+                                                            const VehicleDirection direction,
+                                                            const float lane_offset) {
+    float x = static_cast<float>(tile.x);
+    float y = static_cast<float>(tile.y);
+    switch (direction) {
+        case VehicleDirection::north: x += lane_offset; break;
+        case VehicleDirection::east: y += lane_offset; break;
+        case VehicleDirection::south: x -= lane_offset; break;
+        case VehicleDirection::west: y -= lane_offset; break;
+    }
+    return {x, y};
+}
+
+bool TrafficVehicleManager::route_is_drivable(const std::vector<TileCoordinate>& route,
+                                               const RoadManager& roads) {
+    if (route.empty()) return false;
+    for (const auto& tile : route) {
+        if (!roads.is_drivable(tile.x, tile.y)) return false;
+    }
+    for (std::size_t i = 0; i + 1 < route.size(); ++i) {
+        const auto& from = route[i];
+        const auto& to = route[i + 1];
+        const int manhattan = std::abs(to.x - from.x) + std::abs(to.y - from.y);
+        if (manhattan != 1) return false;
+        const CardinalDirection direction = cardinal_between(from, to);
+        if (!roads.is_connected_to(from.x, from.y, direction) ||
+            !roads.is_connected_to(to.x, to.y, opposite_direction(direction))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void TrafficVehicleManager::refresh_anchor(TrafficVehicleInstance& vehicle,
+                                           const TrafficVehicleDefinition& definition) const {
+    if (vehicle.route.empty()) return;
+    if (vehicle.route.size() == 1 || vehicle.segment_index + 1 >= vehicle.route.size()) {
+        const auto anchor = lane_anchor(vehicle.route.back(), vehicle.direction, definition.lane_offset);
+        vehicle.map_x = anchor.first;
+        vehicle.map_y = anchor.second;
+        return;
+    }
+
+    const auto& from = vehicle.route[vehicle.segment_index];
+    const auto& to = vehicle.route[vehicle.segment_index + 1];
+    vehicle.direction = direction_between(from, to);
+    const float progress = std::clamp(vehicle.segment_progress, 0.0F, 1.0F);
+    float x = static_cast<float>(from.x) + static_cast<float>(to.x - from.x) * progress;
+    float y = static_cast<float>(from.y) + static_cast<float>(to.y - from.y) * progress;
+    switch (vehicle.direction) {
+        case VehicleDirection::north: x += definition.lane_offset; break;
+        case VehicleDirection::east: y += definition.lane_offset; break;
+        case VehicleDirection::south: x -= definition.lane_offset; break;
+        case VehicleDirection::west: y -= definition.lane_offset; break;
+    }
+    vehicle.map_x = x;
+    vehicle.map_y = y;
+}
+
+bool TrafficVehicleManager::add(TrafficVehicleInstance instance,
+                                const TrafficVehicleDefinition& definition,
+                                const RoadManager& roads) {
+    if (instance.vehicle_id != definition.id || !route_is_drivable(instance.route, roads)) return false;
+    if (instance.route.size() >= 2) instance.direction = direction_between(instance.route[0], instance.route[1]);
+    instance.segment_index = 0;
+    instance.segment_progress = 0.0F;
+    instance.speed = std::clamp(instance.speed, 0.0F, definition.cruise_speed);
+    instance.state = instance.speed > 0.001F ? TrafficVehicleState::cruising : TrafficVehicleState::stopped;
+    refresh_anchor(instance, definition);
+    instance.visual_x = instance.map_x;
+    instance.visual_y = instance.map_y;
+    instances_.push_back(std::move(instance));
+    return true;
+}
+
+bool TrafficVehicleManager::vehicle_ahead(const std::size_t index,
+                                          const float required_gap,
+                                          float* distance) const {
+    if (index >= instances_.size()) return false;
+    const auto& vehicle = instances_[index];
+    float fx = 0.0F;
+    float fy = 0.0F;
+    switch (vehicle.direction) {
+        case VehicleDirection::north: fy = -1.0F; break;
+        case VehicleDirection::east: fx = 1.0F; break;
+        case VehicleDirection::south: fy = 1.0F; break;
+        case VehicleDirection::west: fx = -1.0F; break;
+    }
+
+    float nearest = required_gap + 1.0F;
+    bool found = false;
+    for (std::size_t i = 0; i < instances_.size(); ++i) {
+        if (i == index) continue;
+        const auto& other = instances_[i];
+        if (other.direction != vehicle.direction) continue;
+        const float dx = other.map_x - vehicle.map_x;
+        const float dy = other.map_y - vehicle.map_y;
+        const float forward = dx * fx + dy * fy;
+        const float lateral = std::abs(dx * fy - dy * fx);
+        if (forward <= 0.0F || lateral > 0.30F) continue;
+        const float gap = std::sqrt(dx * dx + dy * dy);
+        if (gap < nearest) nearest = gap;
+        if (gap <= required_gap) found = true;
+    }
+    if (distance != nullptr) *distance = nearest;
+    return found;
+}
+
+void TrafficVehicleManager::update_tick(const float tick_seconds,
+                                        const TrafficVehicleDefinition& definition,
+                                        const RoadManager& roads) {
+    if (tick_seconds <= 0.0F) return;
+
+    for (std::size_t i = 0; i < instances_.size(); ++i) {
+        auto& vehicle = instances_[i];
+        if (!route_is_drivable(vehicle.route, roads) ||
+            vehicle.route.size() < 2 ||
+            vehicle.segment_index + 1 >= vehicle.route.size()) {
+            vehicle.speed = 0.0F;
+            vehicle.state = TrafficVehicleState::stopped;
+            refresh_anchor(vehicle, definition);
+            continue;
+        }
+
+        refresh_anchor(vehicle, definition);
+        const float required_gap = definition.safe_distance + vehicle.speed * definition.look_ahead_time;
+        const bool blocked = vehicle_ahead(i, required_gap);
+        if (blocked) {
+            vehicle.speed = std::max(0.0F, vehicle.speed - definition.braking * tick_seconds);
+            vehicle.state = vehicle.speed <= 0.001F ? TrafficVehicleState::stopped : TrafficVehicleState::braking;
+        } else {
+            vehicle.speed = std::min(definition.cruise_speed,
+                                     vehicle.speed + definition.acceleration * tick_seconds);
+            vehicle.state = vehicle.speed <= 0.001F ? TrafficVehicleState::stopped : TrafficVehicleState::cruising;
+        }
+
+        float travel = vehicle.speed * tick_seconds;
+        while (travel > 0.0F && vehicle.segment_index + 1 < vehicle.route.size()) {
+            const float remaining = 1.0F - vehicle.segment_progress;
+            const float step = std::min(remaining, travel);
+            vehicle.segment_progress += step;
+            travel -= step;
+            if (vehicle.segment_progress >= 0.99999F) {
+                ++vehicle.segment_index;
+                vehicle.segment_progress = 0.0F;
+                if (vehicle.segment_index + 1 < vehicle.route.size()) {
+                    vehicle.direction = direction_between(vehicle.route[vehicle.segment_index],
+                                                          vehicle.route[vehicle.segment_index + 1]);
+                } else {
+                    vehicle.speed = 0.0F;
+                    vehicle.state = TrafficVehicleState::stopped;
+                    break;
+                }
+            }
+        }
+        refresh_anchor(vehicle, definition);
+    }
+}
+
+void TrafficVehicleManager::interpolate_visual(const float frame_seconds) {
+    const float interpolation = std::clamp(frame_seconds * 12.0F, 0.0F, 1.0F);
+    for (auto& vehicle : instances_) {
+        vehicle.visual_x += (vehicle.map_x - vehicle.visual_x) * interpolation;
+        vehicle.visual_y += (vehicle.map_y - vehicle.visual_y) * interpolation;
+    }
+}
+
+void TrafficVehicleManager::clear() { instances_.clear(); }
+const std::vector<TrafficVehicleInstance>& TrafficVehicleManager::instances() const { return instances_; }
