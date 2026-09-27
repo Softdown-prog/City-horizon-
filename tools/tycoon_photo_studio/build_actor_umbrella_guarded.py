@@ -40,7 +40,7 @@ def build_canopy():
     # side profile after reducing it to the pedestrian's 48x64 frame.
     # Different gores get the same neutral textile with tiny value
     # changes, leaving the fixed studio lights to define the larger volumes.
-    fabric = [bs.make_material(f"Fabric_{i}", (0.26 * v, 0.58 * v, 0.70 * v, 1), 0.91)
+    fabric = [bs.make_material(f"Fabric_{i}", (0.82 * v, 0.82 * v, 0.79 * v, 1), 0.91)
               for i, v in enumerate((0.95, 1.0, 1.04, 0.98, 0.92, 0.99, 1.03, 0.97,
                                        0.94, 1.01, 1.04, 0.99))]
     piping = bs.make_material("WovenEdge", (0.32, 0.41, 0.42, 1), 0.85)
@@ -123,21 +123,28 @@ def build_canopy():
     return [dome, *details], dome, details
 
 
-def render_fabric_mask(scene, dome, details, path):
+def render_fabric_mask(scene, dome, details, path, *, accent_only=False):
     previous = (scene.render.engine, scene.render.resolution_x,
                 scene.render.resolution_y, scene.render.filepath)
     original_materials = list(dome.data.materials)
-    emission = bpy.data.materials.new("MaskWhiteEmission")
-    emission.use_nodes = True
-    nodes = emission.node_tree.nodes
-    nodes.clear()
-    output = nodes.new("ShaderNodeOutputMaterial")
-    white = nodes.new("ShaderNodeEmission")
-    white.inputs["Color"].default_value = (1, 1, 1, 1)
-    emission.node_tree.links.new(white.outputs[0], output.inputs[0])
+    def emission_material(name, color):
+        emission = bpy.data.materials.new(name)
+        emission.use_nodes = True
+        nodes = emission.node_tree.nodes
+        nodes.clear()
+        output = nodes.new("ShaderNodeOutputMaterial")
+        source = nodes.new("ShaderNodeEmission")
+        source.inputs["Color"].default_value = (color, color, color, 1)
+        emission.node_tree.links.new(source.outputs[0], output.inputs[0])
+        return emission
+
+    white = emission_material("MaskWhiteEmission", 1.0)
+    black = emission_material("MaskBlackEmission", 0.0)
     try:
         for i in range(len(original_materials)):
-            dome.data.materials[i] = emission
+            # Six alternating gores make broad, readable colored stripes.
+            # All other gores stay white; the fixed ribs and edge stay unmasked.
+            dome.data.materials[i] = white if not accent_only or i % 2 == 0 else black
         for obj in details:
             obj.hide_render = True
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -187,6 +194,7 @@ def main():
                                         direction="south")
         (output / "proxy_report.json").write_text(json.dumps(proxy, indent=2), encoding="utf-8")
         render_fabric_mask(scene, dome, details, output / "fabric_mask_south.png")
+        render_fabric_mask(scene, dome, details, output / "accent_mask_south.png", accent_only=True)
 
 
 if __name__ == "__main__":
