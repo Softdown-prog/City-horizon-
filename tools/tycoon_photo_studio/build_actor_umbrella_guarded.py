@@ -36,17 +36,18 @@ def parse_args():
 
 
 def build_canopy():
-    # Four radial rings make a shallow, curved fabric dome instead of a flat
-    # polygon. Different gores get the same neutral textile with tiny value
+    # A raised central crown and three radial rings give the canopy a visible
+    # side profile after reducing it to the pedestrian's 48x64 frame.
+    # Different gores get the same neutral textile with tiny value
     # changes, leaving the fixed studio lights to define the larger volumes.
     fabric = [bs.make_material(f"Fabric_{i}", (0.26 * v, 0.58 * v, 0.70 * v, 1), 0.91)
               for i, v in enumerate((0.95, 1.0, 1.04, 0.98, 0.92, 0.99, 1.03, 0.97,
                                        0.94, 1.01, 1.04, 0.99))]
     piping = bs.make_material("WovenEdge", (0.32, 0.41, 0.42, 1), 0.85)
     ferrule = bs.make_material("BrushedMetalTip", (0.43, 0.48, 0.49, 1), 0.48, 0.28)
-    rings = ((0.25, 1.325), (0.49, 1.21), (0.72, 1.07))
+    rings = ((0.25, 1.43), (0.49, 1.29), (0.72, 1.07))
     segments = 12
-    vertices = [(0.0, 0.0, 1.35)]
+    vertices = [(0.0, 0.0, 1.49)]
     for radius, z in rings:
         for i in range(segments):
             a = 2 * math.pi * i / segments
@@ -113,7 +114,7 @@ def build_canopy():
                                for i in range(73)], piping, 0.009,
          "prop.umbrella.binding")
     bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.018, radius2=0.005,
-                                    depth=0.10, location=(0, 0, 1.40))
+                                    depth=0.10, location=(0, 0, 1.54))
     tip = bpy.context.object
     tip.name = "UmbrellaFerrule"
     tip.data.materials.append(ferrule)

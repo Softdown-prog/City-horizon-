@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from build_umbrella_overlays import FRAME_DIR, hand_contact, is_hand_pixel
 
-DEFAULT_COLOR = (69, 151, 183)
+GAMEPLAY_COLOR = (69, 151, 183)
 
 
 def fit_canopy(color: Image.Image, fabric: Image.Image) -> tuple[Image.Image, Image.Image]:
@@ -24,14 +24,38 @@ def fit_canopy(color: Image.Image, fabric: Image.Image) -> tuple[Image.Image, Im
         raise ValueError("Empty Blender canopy proxy")
     source = color.crop(bbox)
     source_mask = fabric.crop(bbox)
-    # Fit without stretching the dome. The canopy has a 35x17 pixel budget;
+    # Fit without stretching the dome. The canopy has a 35x20 pixel budget;
     # the framed actor remains 48x64 with the original (24, 60) anchor.
-    factor = min(35 / source.width, 17 / source.height)
+    factor = min(35 / source.width, 20 / source.height)
     width = max(1, round(source.width * factor))
     height = max(1, round(source.height * factor))
     source = source.resize((width, height), Image.Resampling.LANCZOS)
     source_mask = source_mask.resize((width, height), Image.Resampling.LANCZOS)
     return source, source_mask
+
+
+def grade_for_gameplay(canopy: Image.Image, fabric: Image.Image) -> tuple[Image.Image, Image.Image]:
+    """Keep Blender's dome lighting but recover contrast at 48x64.
+
+    The emission pass selects fabric; the fixed binding and ferrule retain
+    their rendered hue. No silhouette, ribs or volume are painted in 2D.
+    """
+    graded = canopy.copy()
+    selection = Image.new("RGBA", canopy.size)
+    for y in range(canopy.height):
+        for x in range(canopy.width):
+            r, g, b, a = canopy.getpixel((x, y))
+            coverage = fabric.getpixel((x, y))[3]
+            if a < 96 or coverage < max(128, a * 3 // 4):
+                continue
+            # Match the established umbrella palette while using the value
+            # differences baked by the CH Blender studio for each gore.
+            luminance = (54 * r + 183 * g + 19 * b) / 256
+            shade = max(137, min(242, round(luminance / 157 * 207)))
+            rgb = tuple((component * shade + 127) // 255 for component in GAMEPLAY_COLOR)
+            graded.putpixel((x, y), (*rgb, a))
+            selection.putpixel((x, y), (255, 0, shade, a))
+    return graded, selection
 
 
 def overlay_for_pose(actor: Image.Image, canopy: Image.Image, fabric: Image.Image,
@@ -48,24 +72,20 @@ def overlay_for_pose(actor: Image.Image, canopy: Image.Image, fabric: Image.Imag
     painter.line((centre - 1, 13, hand_x - 1, hand_y - 2), fill=(108, 127, 127, 255))
     painter.arc((hand_x - 1, hand_y, hand_x + 3, hand_y + 5), 0, 170,
                 fill=(29, 42, 45, 255))
-    overlay.alpha_composite(canopy, (top, 0))
-
-    for y in range(canopy.height):
-        for x in range(canopy.width):
-            px, py = top + x, y
-            if not (0 <= px < 48):
-                continue
-            r, g, b, a = canopy.getpixel((x, y))
-            coverage = fabric.getpixel((x, y))[3]
-            if a < 60 or coverage < max(96, a // 2):
-                continue
-            # Only the fabric becomes recolorable. Fixed piping, ferrule and
-            # shaft remain authored colors. B is the rendered lighting value.
-            luminance = (54 * r + 183 * g + 19 * b) / 256
-            baseline = (54 * DEFAULT_COLOR[0] + 183 * DEFAULT_COLOR[1]
-                        + 19 * DEFAULT_COLOR[2]) / 256
-            shade = max(72, min(255, round(luminance / baseline * 220)))
-            mask.putpixel((px, py), (255, 0, shade, overlay.getpixel((px, py))[3]))
+    graded, selection = grade_for_gameplay(canopy, fabric)
+    # A one-pixel dark rim is drawn behind the rendered canopy. It restores
+    # its silhouette against streets and roofs without covering Blender ribs.
+    silhouette = canopy.getchannel("A").point(lambda a: 255 if a >= 96 else 0)
+    outside = Image.new("RGBA", canopy.size, (20, 43, 51, 0))
+    outside.putalpha(silhouette.filter(ImageFilter.MaxFilter(3)))
+    overlay.alpha_composite(outside, (top, 1))
+    overlay.alpha_composite(graded, (top, 1))
+    mask.paste(selection, (top, 1))
+    for y in range(1, 1 + selection.height):
+        for x in range(top, top + selection.width):
+            if 0 <= x < 48 and mask.getpixel((x, y))[0] == 255:
+                r, g, shade, _ = mask.getpixel((x, y))
+                mask.putpixel((x, y), (r, g, shade, overlay.getpixel((x, y))[3]))
 
     for y in range(hand_y - 2, hand_y + 3):
         for x in range(hand_x - 2, hand_x + 3):
