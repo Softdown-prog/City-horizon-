@@ -1,0 +1,48 @@
+name: Visitor Forge structural gait V2
+
+on:
+  push:
+    paths:
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/character/structural_gait.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/character/gait_warp.py'
+      - 'tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/**'
+      - 'tools/visitor_forge_2d/tests/test_structural_gait.py'
+      - '.github/workflows/visitor-forge-structural-gait.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-and-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Visitor Forge test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e tools/visitor_forge_2d
+          python -m pip install pytest
+
+      - name: Run focused structural gait tests
+        run: python -m pytest -q tools/visitor_forge_2d/tests/test_structural_gait.py
+
+      - name: Render structural gait review
+        run: |
+          python -m visitor_forge_2d render-directional-gait \
+            --tool-root tools/visitor_forge_2d \
+            --recipe tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/recipe.json \
+            --output out/visitor_forge_2d/directional_gait_v2_review
+
+      - name: Upload gameplay-scale review
+        uses: actions/upload-artifact@v4
+        with:
+          name: visitor-forge-structural-gait-v2
+          path: out/visitor_forge_2d/directional_gait_v2_review/
+          if-no-files-found: error
