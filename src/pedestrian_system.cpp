@@ -13,6 +13,8 @@ constexpr std::array<MobileClothingColor, 7> kJacketColors = {{{21, 155, 88}, {1
     {181, 139, 65}, {58, 150, 143}, {121, 104, 164}, {172, 103, 62}, {84, 124, 174}}};
 constexpr std::array<MobileClothingColor, 5> kPantsColors = {{{38, 89, 220}, {78, 102, 159},
     {89, 102, 127}, {121, 86, 65}, {82, 113, 96}}};
+constexpr std::array<MobileClothingColor, 7> kUmbrellaColors = {{{208, 79, 77}, {225, 181, 66},
+    {69, 151, 183}, {119, 102, 172}, {89, 164, 114}, {223, 122, 81}, {176, 86, 130}}};
 
 [[nodiscard]] CardinalDirection topology_direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return CardinalDirection::east;
@@ -54,6 +56,8 @@ bool PedestrianSystem::send_pedestrian(const NavigationTile start, const Navigat
             std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
         pedestrian.clothing.pants = kPantsColors[
             std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
+        pedestrian.umbrella_color = kUmbrellaColors[
+            std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
         instances_.push_back(std::move(pedestrian));
     }
     PedestrianInstance& pedestrian = instances_.front();
@@ -218,7 +222,8 @@ void PedestrianSystem::update_animation(const float frame_seconds, const MobileA
     }
 }
 
-std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const MobileAnimationCatalog& animations) const {
+std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const MobileAnimationCatalog& animations,
+                                                                      const bool raining) const {
     std::vector<MobileEntityRenderData> result;
     result.reserve(instances_.size());
     for (const PedestrianInstance& pedestrian : instances_) {
@@ -234,6 +239,9 @@ std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const Mobi
         entity.sprite_anchor_y = visual_definition_.sprite_anchor_y;
         entity.clothing = pedestrian.clothing;
         entity.clothing.enabled = visual_definition_.animation_set_id == "ch_actor_green_01";
+        entity.umbrella.enabled = entity.clothing.enabled && raining &&
+            pedestrian.state != PedestrianState::visiting && pedestrian.state != PedestrianState::resting;
+        entity.umbrella.fabric = pedestrian.umbrella_color;
         result.push_back(std::move(entity));
     }
     return result;

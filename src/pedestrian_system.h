@@ -36,6 +36,7 @@ struct PedestrianInstance {
     bool replanned_after_network_change = false;
     MobileAnimationPlayer animation;
     MobileClothingTint clothing;
+    MobileClothingColor umbrella_color;
 };
 
 // One runtime pedestrian consuming a topology-backed route. Population,
@@ -63,7 +64,8 @@ public:
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);
     void update_animation(float frame_seconds, const MobileAnimationCatalog& animations);
-    [[nodiscard]] std::vector<MobileEntityRenderData> render_entities(const MobileAnimationCatalog& animations) const;
+    [[nodiscard]] std::vector<MobileEntityRenderData> render_entities(const MobileAnimationCatalog& animations,
+                                                                       bool raining = false) const;
     [[nodiscard]] const std::vector<PedestrianInstance>& instances() const;
 
 private:

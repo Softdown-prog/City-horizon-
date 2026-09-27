@@ -364,6 +364,56 @@ public:
         return &textures_.emplace(key, asset).first->second;
     }
 
+    // Pair a frame-aligned umbrella overlay with its R/shade mask. Cache the
+    // composed texture by color, keeping the authored silhouette and alpha.
+    [[nodiscard]] const TextureAsset* load_actor_umbrella(SDL_Renderer* renderer,
+                                                           const std::filesystem::path& frame_path,
+                                                           const MobileClothingColor& fabric) {
+        const std::filesystem::path umbrella_root = frame_path.parent_path().parent_path() / "umbrella";
+        const std::filesystem::path overlay_path = umbrella_root / "frames" / frame_path.filename();
+        const std::string key = overlay_path.generic_string() + "#CH_UMBRELLA_" +
+            std::to_string(fabric.r) + ":" + std::to_string(fabric.g) + ":" + std::to_string(fabric.b);
+        if (const auto existing = textures_.find(key); existing != textures_.end()) return &existing->second;
+        SDL_Surface* overlay = SDL_LoadPNG(overlay_path.string().c_str());
+        SDL_Surface* mask = SDL_LoadPNG((umbrella_root / "masks" / frame_path.filename()).string().c_str());
+        if (overlay == nullptr || mask == nullptr || overlay->w != mask->w || overlay->h != mask->h) {
+            if (overlay != nullptr) SDL_DestroySurface(overlay);
+            if (mask != nullptr) SDL_DestroySurface(mask);
+            return nullptr;
+        }
+        SDL_Surface* result = SDL_CreateSurface(overlay->w, overlay->h, SDL_PIXELFORMAT_RGBA32);
+        if (result == nullptr) {
+            SDL_DestroySurface(mask);
+            SDL_DestroySurface(overlay);
+            return nullptr;
+        }
+        for (int y = 0; y < overlay->h; ++y) {
+            for (int x = 0; x < overlay->w; ++x) {
+                Uint8 r = 0, g = 0, b = 0, a = 0;
+                Uint8 selected = 0, unused = 0, shade = 0, mask_alpha = 0;
+                (void)SDL_ReadSurfacePixel(overlay, x, y, &r, &g, &b, &a);
+                (void)SDL_ReadSurfacePixel(mask, x, y, &selected, &unused, &shade, &mask_alpha);
+                if (selected == 255 && mask_alpha == a && a != 0) {
+                    r = static_cast<Uint8>((static_cast<unsigned>(fabric.r) * shade + 127U) / 255U);
+                    g = static_cast<Uint8>((static_cast<unsigned>(fabric.g) * shade + 127U) / 255U);
+                    b = static_cast<Uint8>((static_cast<unsigned>(fabric.b) * shade + 127U) / 255U);
+                }
+                (void)SDL_WriteSurfacePixel(result, x, y, r, g, b, a);
+            }
+        }
+        TextureAsset asset;
+        asset.texture = SDL_CreateTextureFromSurface(renderer, result);
+        asset.source_width = static_cast<float>(result->w);
+        asset.source_height = static_cast<float>(result->h);
+        SDL_DestroySurface(result);
+        SDL_DestroySurface(mask);
+        SDL_DestroySurface(overlay);
+        if (asset.texture == nullptr) return nullptr;
+        SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(asset.texture, SDL_SCALEMODE_LINEAR);
+        return &textures_.emplace(key, asset).first->second;
+    }
+
     [[nodiscard]] const TextureAsset* find(const std::filesystem::path& path) const {
         const auto found = textures_.find(path.generic_string());
         return found == textures_.end() ? nullptr : &found->second;
@@ -1037,6 +1087,12 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                                        anchor.y - texture->source_height * scale * entity.sprite_anchor_y,
                                        texture->source_width * scale, texture->source_height * scale};
         SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
+        if (entity.umbrella.enabled) {
+            if (const TextureAsset* umbrella = textures.load_actor_umbrella(renderer, frame_path, entity.umbrella.fabric)) {
+                // Both assets have the same 48x64 canvas and foot anchor.
+                SDL_RenderTexture(renderer, umbrella->texture, nullptr, &destination);
+            }
+        }
     }
 }
 
@@ -1790,9 +1846,10 @@ int main() {
         const FarmTile* tile = farming.tile_at(x, y);
         return tile == nullptr || tile->state == FarmTileState::prepared_soil;
     };
+    WeatherSystem weather;
     const auto mobile_render_entities = [&]() {
         std::vector<MobileEntityRenderData> entities = service_vehicles.render_entities(service_vehicle_catalog, mobile_animations);
-        std::vector<MobileEntityRenderData> pedestrian_entities = pedestrians.render_entities(mobile_animations);
+        std::vector<MobileEntityRenderData> pedestrian_entities = pedestrians.render_entities(mobile_animations, weather.is_raining());
         entities.insert(entities.end(), std::make_move_iterator(pedestrian_entities.begin()), std::make_move_iterator(pedestrian_entities.end()));
         return entities;
     };
@@ -1800,7 +1857,6 @@ int main() {
     // or road tile. The decision node owns autonomous activity and home rest.
     bool automatic_pedestrian = actor_ready;
     PedestrianDecisionNode pedestrian_decisions;
-    WeatherSystem weather;
     // Every preset keeps the approved 175 ms canonical cycle. Only world
     // velocity varies for runtime foot-skating calibration of the new skin.
     int mixamo_gait_preset_index = 2;

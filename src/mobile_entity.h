@@ -22,6 +22,11 @@ struct MobileClothingTint {
     [[nodiscard]] bool operator==(const MobileClothingTint&) const = default;
 };
 
+struct MobileUmbrellaTint {
+    bool enabled = false;
+    MobileClothingColor fabric;
+};
+
 struct MobileEntitySpatialState {
     // The logical world position changes on the fixed simulation tick.
     float logical_world_x = 0.0F;
@@ -57,4 +62,5 @@ struct MobileEntityRenderData {
     float sprite_anchor_x = 0.5F;
     float sprite_anchor_y = 1.0F;
     MobileClothingTint clothing;
+    MobileUmbrellaTint umbrella;
 };
