@@ -93,19 +93,26 @@ bool test_world_connection_gate() {
     BuildingCatalog catalog;
     bool ok = require(catalog.load_from_directory(fixture), "world-gate fixture loads");
     const BuildingDefinition* home = catalog.find("world_gate_home");
-    BuildingManager buildings(-2, 2);
+    BuildingManager buildings(-20, 20);
     ok &= require(home != nullptr && buildings.place(*home, 0, 0).has_value(), "world-gate home places");
 
-    RoadManager roads(-2, 2);
+    RoadManager roads(-20, 20);
     PopulationSystem population;
     population.rebuild_capacity(buildings, catalog, nullptr, &roads);
     ok &= require(population.advance_month(buildings, catalog, nullptr, &roads) == 0,
-                  "immigration waits while no road touches the map edge");
+                  "immigration waits while the starter-parcel gateway is disconnected");
     ok &= require(population.housing_demand() > 0, "blocked external immigration remains visible as demand");
-    ok &= require(roads.place_tile(2, 0), "edge road can be placed");
-    ok &= require(roads.has_world_connection(), "edge road is recognized as outside-world connection");
+
+    ok &= require(roads.place_tile(kExternalRoadGatewayX, kExternalRoadGatewayY),
+                  "gateway road tile can be placed inside the starter parcel");
+    ok &= require(!roads.has_world_connection(),
+                  "an isolated gateway tile does not open outside-world immigration");
+    ok &= require(roads.place_tile(kExternalRoadGatewayX + 1, kExternalRoadGatewayY),
+                  "gateway road can continue east into the city");
+    ok &= require(roads.has_world_connection(),
+                  "gateway connected inward is recognized as outside-world connection");
     ok &= require(population.advance_month(buildings, catalog, nullptr, &roads) == 10,
-                  "queued demand can enter after the outside connection opens");
+                  "queued demand can enter after the starter gateway opens");
 
     std::filesystem::remove_all(fixture);
     return ok;
