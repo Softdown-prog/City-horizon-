@@ -31,8 +31,8 @@ void PedestrianSystem::configure_visual_test(PedestrianVisualDefinition visual_d
 
 bool PedestrianSystem::send_pedestrian(const NavigationTile start, const NavigationTile destination,
                                        const NavigationNetwork& network) {
-    // A visitor hidden inside a building is intentionally unavailable to the
-    // ordinary autonomous route scheduler until the visit bridge releases it.
+    // A visitor aligning at a door or hidden inside a building is intentionally
+    // unavailable to the ordinary autonomous route scheduler until released.
     if (!instances_.empty() && instances_.front().state == PedestrianState::visiting) return false;
 
     const NavigationPathResult path = find_navigation_path(network, start, destination);
@@ -73,13 +73,21 @@ bool PedestrianSystem::set_visiting(const std::uint64_t pedestrian_id, const boo
     if (found == instances_.end()) return false;
 
     if (visiting) {
-        // Building entry is committed only after the route reached its authored
-        // door tile. Refuse to hide an actor while it is still travelling.
+        // Entry is committed only after the pedestrian reaches its door tile.
         if (found->state == PedestrianState::walking) return false;
         found->state = PedestrianState::visiting;
     } else if (found->state == PedestrianState::visiting) {
         found->state = PedestrianState::idle;
     }
+    return true;
+}
+
+bool PedestrianSystem::face_pedestrian(const std::uint64_t pedestrian_id, const MobileEntityDirection direction) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    if (found == instances_.end() || found->state == PedestrianState::walking) return false;
+    found->spatial.direction = direction;
     return true;
 }
 
