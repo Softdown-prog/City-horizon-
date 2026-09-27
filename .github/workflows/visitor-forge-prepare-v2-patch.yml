@@ -1,0 +1,86 @@
+name: Prepare Visitor Forge V2 patch artifact
+
+on:
+  push:
+    paths:
+      - '.github/workflows/visitor-forge-prepare-v2-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare exact source patch copies
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil
+
+          out = Path('out/v2_patch')
+          out.mkdir(parents=True, exist_ok=True)
+          shutil.copy2('CMakeLists.txt', out / 'CMakeLists.txt')
+          shutil.copy2('src/main_runtime_impl.cpp', out / 'main_runtime_impl.cpp')
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          cm = str(out / 'CMakeLists.txt')
+          rt = str(out / 'main_runtime_impl.cpp')
+
+          replace_once(cm,
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n',
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"\n')
+          replace_once(cm,
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"\n',
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"\n'
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"\n')
+          replace_once(cm,
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_a.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_b.png"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n',
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_a.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_b.png"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"\n'
+              '        COMMAND ${CMAKE_COMMAND} -E copy_if_different\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/east_walk_a.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/east_walk_b.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/north_walk_a.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/north_walk_b.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/west_walk_a.png"\n'
+              '            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/west_walk_b.png"\n'
+              '            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"\n')
+
+          replace_once(rt,
+              '            case 5: return "visitor_male_01_full_pose_east_candidate";\n            default: return "worker_cleaner_female";\n',
+              '            case 5: return "visitor_male_01_full_pose_east_candidate";\n            case 6: return "visitor_male_01_structural_gait_v2_candidate";\n            default: return "worker_cleaner_female";\n')
+          replace_once(rt,
+              '            case 5: return "VISITOR FULL POSE EAST";\n            default: return "CLEANER";\n',
+              '            case 5: return "VISITOR FULL POSE EAST";\n            case 6: return "VISITOR STRUCTURAL GAIT V2";\n            default: return "CLEANER";\n')
+          replace_once(rt,
+              '                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :\n                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :\n                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 : 6;\n',
+              '                        const int visual_count = mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :\n                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :\n                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 :\n                            mobile_animations.find_set("visitor_male_01_structural_gait_v2_candidate") == nullptr ? 6 : 7;\n')
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visitor-forge-v2-source-patch
+          path: out/v2_patch/
+          if-no-files-found: error
