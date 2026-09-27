@@ -1,0 +1,10 @@
+{
+  "contract": "CH_RUNTIME_PROMOTION_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "sourceWorkflowRun": 36347551550,
+  "artifact": "CH-Blender-Agent-36347551550-1",
+  "directions": ["south", "east", "west", "north"],
+  "staticOnly": true,
+  "swingFramesBaked": false,
+  "destination": "assets/city_park/viking_ship"
+}
