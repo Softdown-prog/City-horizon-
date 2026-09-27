@@ -1,0 +1,95 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.residential_suburban_cottage.01",
+  "displayName": "Casa suburbana",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    256,
+    256
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "pivotPolicy": "projected world origin fixed across directions",
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 3
+  },
+  "views": {
+    "south": {
+      "file": "residential_suburban_cottage_3x3_01_south.png",
+      "pivot": {
+        "x": 128,
+        "y": 154
+      },
+      "sha256": "00563363f7f8ae4230730ba7a492b6f95df60b201f3857bca0c568a648fc73d7"
+    },
+    "east": {
+      "file": "residential_suburban_cottage_3x3_01_east.png",
+      "pivot": {
+        "x": 128,
+        "y": 154
+      },
+      "sha256": "b2f4b82a96b3a92216b2ecec7108b31c20cb0f8ad8804b7ad4f299013b907d86"
+    },
+    "west": {
+      "file": "residential_suburban_cottage_3x3_01_west.png",
+      "pivot": {
+        "x": 128,
+        "y": 154
+      },
+      "sha256": "02e6a3e776e7c6a4b6fc165db10f03467f43a40a98d400c6f8d5dc85609158c3"
+    },
+    "north": {
+      "file": "residential_suburban_cottage_3x3_01_north.png",
+      "pivot": {
+        "x": 128,
+        "y": 154
+      },
+      "sha256": "c454d5203e54792153a29c20f0522512ca94195ce554cad8bbeb2087034e0d1a"
+    }
+  },
+  "sourceWorkflowRun": 36282353214,
+  "sourceArtifactId": 10919576704,
+  "sourceArtifactSha256": "3806642b381c314e3fb5142532839b4d62913df4dbe716d364d4f98c16a4da85",
+  "approvedProxySha256": "d843c3b509abb4d80a57b3a92fbe36edc84a48ef7bcde8986f1daf131b9729ac",
+  "postProcess": "CH_TYCOON_STUDIO_V1 canonical full-frame LANCZOS downsample to gameplay scale; no palette reduction",
+  "approvedForRuntimeArt": true,
+  "runtimeGameplayDefinitionRegistered": false,
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "house_wall",
+      "G": "house_roof",
+      "B": "house_trim"
+    },
+    "alpha": "coverage",
+    "views": {
+      "south": {
+        "file": "residential_suburban_cottage_3x3_01_south_mask.png",
+        "sha256": "078a5d8e8090fef9a78f7854c9699fb67c02f859f19965d4f22400827b64eaa2"
+      },
+      "east": {
+        "file": "residential_suburban_cottage_3x3_01_east_mask.png",
+        "sha256": "013f56a44f7ba0f7b311571163b2a3208fc3408aa99a70e53cca01c66a450dcd"
+      },
+      "west": {
+        "file": "residential_suburban_cottage_3x3_01_west_mask.png",
+        "sha256": "e1f8a1d60915f2db6ca4ce35c9e90d4b69651bf432f8a5bfc8e2c30a0a0dce52"
+      },
+      "north": {
+        "file": "residential_suburban_cottage_3x3_01_north_mask.png",
+        "sha256": "3f362a85baf762d7821d2c470ecc136e4375ac9b7826c610c33490f8cc5292f5"
+      }
+    },
+    "postProcess": "canonical downsample only; no lighting/AO/shadow/dither/halo removal"
+  }
+}
