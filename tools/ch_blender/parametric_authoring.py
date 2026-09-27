@@ -1,9 +1,9 @@
 """CH Blender parametric-authoring helpers.
 
 This module brings the parts of mature DCC parametric workflows that make sense
-for City Horizon into Blender without pretending Blender is 3ds Max.  It keeps
+for City Horizon into Blender without pretending Blender is 3ds Max. It keeps
 source geometry editable, records deterministic procedural intent, standardizes
-metric scale/mapping metadata, and tracks external source provenance.  Runtime
+metric scale/mapping metadata, and tracks external source provenance. Runtime
 remains pre-rendered 2D RGBA; no modifier or shader becomes an SDL dependency.
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ import bpy
 
 CONTRACT_ID = "CH_PARAMETRIC_AUTHORING_V1"
 CONTRACT_PATH = Path(__file__).resolve().parent / "contracts" / "ch_parametric_authoring_v1.json"
+MODIFIER_STAGE_PREFIX = "chModifierStage::"
 
 
 def load_contract() -> dict:
@@ -48,6 +49,21 @@ def _stage_index(stage: str) -> int:
     return stages.index(stage)
 
 
+def _modifier_stage_key(modifier_name: str) -> str:
+    return f"{MODIFIER_STAGE_PREFIX}{modifier_name}"
+
+
+def _read_modifier_stage(obj: bpy.types.Object, modifier_name: str) -> dict | None:
+    raw = obj.get(_modifier_stage_key(modifier_name))
+    if raw is None:
+        return None
+    try:
+        data = json.loads(str(raw))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def add_modifier_stage(
     obj: bpy.types.Object,
     *,
@@ -58,27 +74,31 @@ def add_modifier_stage(
 ) -> bpy.types.Modifier:
     """Create and tag a modifier as one ordered non-destructive authoring stage.
 
-    `selection_channel` is normally a vertex group or named attribute.  It
-    records sub-object intent even when a particular Blender modifier exposes
-    the actual selector through a modifier-specific property.
+    Blender 4.2 modifiers themselves do not support arbitrary ID properties, so
+    CH stage metadata is stored on the owning object and keyed by modifier name.
+    This keeps the modifier editable while preserving deterministic stage audit
+    data for the repository contract.
     """
     stage_index = _stage_index(stage)
-    tagged = [
-        (int(mod.get("chStageIndex", -1)), mod.name)
-        for mod in obj.modifiers
-        if mod.get("chParametricContract") == CONTRACT_ID
-    ]
+    tagged: list[tuple[int, str]] = []
+    for mod in obj.modifiers:
+        metadata = _read_modifier_stage(obj, mod.name)
+        if metadata and metadata.get("contract") == CONTRACT_ID:
+            tagged.append((int(metadata.get("stageIndex", -1)), mod.name))
     if tagged and stage_index < max(index for index, _ in tagged):
         raise ValueError(
             f"Modifier stage {stage!r} would precede an existing later CH stage on {obj.name!r}"
         )
 
     modifier = obj.modifiers.new(name=name, type=modifier_type)
-    modifier["chParametricContract"] = CONTRACT_ID
-    modifier["chStage"] = stage
-    modifier["chStageIndex"] = stage_index
+    metadata = {
+        "contract": CONTRACT_ID,
+        "stage": stage,
+        "stageIndex": stage_index,
+    }
     if selection_channel:
-        modifier["chSelectionChannel"] = selection_channel
+        metadata["selectionChannel"] = selection_channel
+    obj[_modifier_stage_key(modifier.name)] = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
     return modifier
 
 
@@ -91,7 +111,7 @@ def tag_shared_world_deformer(
     """Record one world-space/shared deformation relationship.
 
     Blender equivalents are Lattice, Geometry Nodes, or empty-driven modifier
-    controls.  This metadata keeps the relation auditable across asset builders.
+    controls. This metadata keeps the relation auditable across asset builders.
     """
     allowed = set(load_contract()["modifierStack"]["sharedWorldDeformers"])
     normalized = kind.upper()
@@ -187,9 +207,10 @@ def validate_parametric_object(obj: bpy.types.Object) -> list[str]:
     stages = contract["modifierStack"]["stageOrder"]
     previous = -1
     for modifier in obj.modifiers:
-        if modifier.get("chParametricContract") != CONTRACT_ID:
+        metadata = _read_modifier_stage(obj, modifier.name)
+        if not metadata or metadata.get("contract") != CONTRACT_ID:
             continue
-        stage = modifier.get("chStage")
+        stage = metadata.get("stage")
         if stage not in stages:
             errors.append(f"CH_PARAMETRIC_UNKNOWN_STAGE:{obj.name}:{modifier.name}:{stage}")
             continue
