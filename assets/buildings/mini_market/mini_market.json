@@ -63,5 +63,60 @@
   "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
   "postProcess": "CH_TYCOON_STUDIO_V1 canonical postprocess",
   "approvedForRuntime": true,
-  "sourceAssetId": "commercial_mini_market_3x2_01"
+  "sourceAssetId": "commercial_mini_market_3x2_01",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "blueChannel": "unused",
+    "alpha": "coverage",
+    "scope": "large_surfaces_only",
+    "views": {
+      "south": {
+        "file": "mini_market_south_mask.png",
+        "sha256": "8a78e48dc480b21ed424ed65d8db9b642d862ecd294d9fae46bca78fdeb2fbad",
+        "wallPixels": 3085,
+        "roofPixels": 6567,
+        "coveredPixels": 29733
+      },
+      "east": {
+        "file": "mini_market_east_mask.png",
+        "sha256": "e843bf91d76ea1992e965aee4091eccffba386cefc642a668adaa596619fa9d6",
+        "wallPixels": 5219,
+        "roofPixels": 6571,
+        "coveredPixels": 29716
+      },
+      "west": {
+        "file": "mini_market_west_mask.png",
+        "sha256": "108d39878a684fc0bc3150c092769998382ff05f50f05f68c297d7ee0beefbdc",
+        "wallPixels": 7770,
+        "roofPixels": 7013,
+        "coveredPixels": 29228
+      },
+      "north": {
+        "file": "mini_market_north_mask.png",
+        "sha256": "ff848957e02459e2b9085dc3c71141f34d724abb8ee77d0a5441359e60c1aae2",
+        "wallPixels": 9944,
+        "roofPixels": 7009,
+        "coveredPixels": 29228
+      }
+    },
+    "fourView": {
+      "file": "mini_market_mask_4view.png",
+      "sha256": "f4cfa1e565d5ea1f81625c7873e854291748def7a86b21773a87e9901ee1e41c"
+    },
+    "review": {
+      "file": "mini_market_mask_review.png",
+      "sha256": "ed8ba31eb68e21f3b506b5c0e92b680160b7e29e469cadf644dd3a1e13466c23"
+    },
+    "sourceCommit": "801b591bafba28493c7d93fa432cf895daa14c39",
+    "sourceWorkflowRun": 36294002069,
+    "sourceArtifactId": 10923835375,
+    "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
+    "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
+    "runtimeTintingImplemented": false
+  }
 }
