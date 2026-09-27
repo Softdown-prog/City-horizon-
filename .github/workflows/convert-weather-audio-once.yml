@@ -20,8 +20,10 @@ jobs:
           git fetch origin main
           git checkout main
           git merge --ff-only origin/main
-      - name: Verify ffmpeg tools
+      - name: Install ffmpeg tools
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
       - name: Validate source durations
