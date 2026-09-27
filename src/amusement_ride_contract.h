@@ -31,6 +31,7 @@ struct RuntimeDefinition {
     std::string actor_source;
     std::string palette_mode;
     std::string seat_assignment;
+    std::string seat_layout_manifest;
 };
 
 namespace detail {
@@ -179,10 +180,12 @@ namespace detail {
     result.actor_source = json_string(*passengers, "actorSource").value_or("");
     result.palette_mode = json_string(*passengers, "paletteMode").value_or("");
     result.seat_assignment = json_string(*passengers, "seatAssignment").value_or("");
+    result.seat_layout_manifest = json_string(*passengers, "seatLayoutManifest").value_or("");
 
     if (result.passenger_overlay_contract != "CH_RIDE_PASSENGER_OVERLAY_V1" ||
         result.actor_source.empty() || result.palette_mode != "stable_per_visitor" ||
-        result.seat_assignment != "queue_order_next_free_slot") return std::nullopt;
+        result.seat_assignment != "queue_order_next_free_slot" || result.seat_layout_manifest.empty())
+        return std::nullopt;
     return result;
 }
 
