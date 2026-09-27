@@ -1,0 +1,278 @@
+{
+  "contract": "CITY_HORIZON_COMMERCIAL_BUILDING_V1",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "assetId": "commercial_mini_market_3x2_01",
+  "assetType": "commercial_building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "referenceDescriptor": "tools/tycoon_photo_studio/references/commercial_mini_market_01.reference.json",
+  "designIntent": {
+    "summary": "Original compact neighborhood mini market inspired by the supplied reference: cream facade, deep green branding bands and awnings, broad warm storefront glazing, produce crates, planters and rooftop mechanical equipment.",
+    "silhouette": "wide one-story flat-roof retail box with parapet, centered raised sign crown and readable awnings",
+    "readOrder": [
+      "raised_green_sign_crown",
+      "striped_center_awning",
+      "warm_storefront_glazing",
+      "cream_facade",
+      "produce_crates",
+      "rooftop_hvac"
+    ],
+    "detailLevel": "medium_high",
+    "rules": [
+      "storefront and sign must read clearly at gameplay scale before roof equipment detail",
+      "central entrance remains visually obvious in every approved south-facing proxy",
+      "roof equipment stays below the parapet silhouette where possible",
+      "side facades receive windows or service detail so rotations never look blank",
+      "no public sidewalk, curb, road or parking slab is baked into the asset",
+      "no brand text is authored; use only a generic basket emblem"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 2
+  },
+  "mass": {
+    "foundationWidth": 6.44,
+    "foundationDepth": 4.44,
+    "foundationHeight": 0.22,
+    "bodyWidth": 6.18,
+    "bodyDepth": 4.18,
+    "wallHeight": 2.92,
+    "wallBaseZ": 0.22
+  },
+  "roof": {
+    "slabWidth": 6.3,
+    "slabDepth": 4.3,
+    "slabZ": 3.17,
+    "slabHeight": 0.18,
+    "parapetHeight": 0.38,
+    "parapetThickness": 0.18,
+    "parapetCapHeight": 0.12
+  },
+  "facade": {
+    "frontBandHeight": 0.58,
+    "frontBandCenterZ": 2.7,
+    "greenInsetHeight": 0.42,
+    "signWidth": 2.46,
+    "signHeight": 1.0,
+    "signCenterZ": 3.0,
+    "signRoundRadius": 0.9,
+    "woodKickHeight": 0.46
+  },
+  "entry": {
+    "centerX": 0.0,
+    "doorWidth": 1.34,
+    "doorHeight": 2.08,
+    "doorCenterZ": 1.28,
+    "matWidth": 1.48,
+    "matDepth": 0.58
+  },
+  "windows": {
+    "frontWidth": 1.62,
+    "frontHeight": 1.74,
+    "frontCenterZ": 1.31,
+    "frontCentersX": [
+      -2.05,
+      2.05
+    ],
+    "sideWidth": 1.74,
+    "sideHeight": 1.62,
+    "sideCenterZ": 1.35,
+    "sideCenterY": -0.36
+  },
+  "awnings": {
+    "centerWidth": 2.3,
+    "centerDepth": 0.92,
+    "centerCenterZ": 2.23,
+    "centerStripes": 7,
+    "sideWidth": 1.86,
+    "sideDepth": 0.78,
+    "sideCenterZ": 2.18
+  },
+  "roofEquipment": {
+    "hvacUnits": [
+      {
+        "x": -1.85,
+        "y": 0.58,
+        "width": 1.12,
+        "depth": 0.92,
+        "height": 0.7
+      },
+      {
+        "x": 2.05,
+        "y": 0.62,
+        "width": 0.84,
+        "depth": 0.72,
+        "height": 0.78
+      }
+    ],
+    "roundVent": {
+      "x": 0.42,
+      "y": 0.22,
+      "radius": 0.28,
+      "height": 0.34
+    }
+  },
+  "frontProps": {
+    "produceCrates": [
+      {
+        "x": -1.05,
+        "y": -2.33,
+        "kind": "green"
+      },
+      {
+        "x": 1.12,
+        "y": -2.34,
+        "kind": "red"
+      },
+      {
+        "x": 1.78,
+        "y": -2.32,
+        "kind": "orange"
+      }
+    ],
+    "planters": [
+      {
+        "x": -2.78,
+        "y": -2.25
+      },
+      {
+        "x": 2.78,
+        "y": -2.24
+      }
+    ]
+  },
+  "materials": {
+    "wall": {
+      "name": "MiniMarketWarmCream",
+      "rgba": [0.84, 0.77, 0.66, 1.0],
+      "recipe": "plaster",
+      "roughness": 0.84,
+      "seed": 101,
+      "strength": 0.14
+    },
+    "green": {
+      "name": "MiniMarketGroceryGreen",
+      "rgba": [0.16, 0.34, 0.14, 1.0],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 103,
+      "strength": 0.03
+    },
+    "greenLight": {
+      "name": "MiniMarketGroceryGreenLight",
+      "rgba": [0.31, 0.5, 0.2, 1.0],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 107,
+      "strength": 0.03
+    },
+    "trim": {
+      "name": "MiniMarketStoneTrim",
+      "rgba": [0.78, 0.74, 0.69, 1.0],
+      "recipe": "stone",
+      "roughness": 0.88,
+      "seed": 109,
+      "strength": 0.1
+    },
+    "roof": {
+      "name": "MiniMarketFlatRoof",
+      "rgba": [0.34, 0.34, 0.35, 1.0],
+      "recipe": "concrete",
+      "roughness": 0.9,
+      "seed": 113,
+      "strength": 0.08
+    },
+    "frame": {
+      "name": "MiniMarketDarkFrame",
+      "rgba": [0.055, 0.06, 0.055, 1.0],
+      "recipe": "solid",
+      "roughness": 0.66,
+      "seed": 127,
+      "strength": 0.02
+    },
+    "glass": {
+      "name": "MiniMarketWarmGlass",
+      "rgba": [0.95, 0.52, 0.12, 1.0],
+      "recipe": "glass",
+      "roughness": 0.2,
+      "seed": 131,
+      "strength": 0.04
+    },
+    "wood": {
+      "name": "MiniMarketProduceWood",
+      "rgba": [0.46, 0.25, 0.11, 1.0],
+      "recipe": "timber",
+      "roughness": 0.8,
+      "seed": 137,
+      "strength": 0.14
+    },
+    "metal": {
+      "name": "MiniMarketRoofMetal",
+      "rgba": [0.43, 0.43, 0.44, 1.0],
+      "recipe": "metal_panel",
+      "roughness": 0.64,
+      "metallic": 0.12,
+      "seed": 139,
+      "strength": 0.08
+    },
+    "darkMetal": {
+      "name": "MiniMarketDarkMetal",
+      "rgba": [0.11, 0.12, 0.11, 1.0],
+      "recipe": "solid",
+      "roughness": 0.58,
+      "metallic": 0.18,
+      "seed": 149,
+      "strength": 0.02
+    },
+    "mat": {
+      "name": "MiniMarketEntryMat",
+      "rgba": [0.19, 0.31, 0.16, 1.0],
+      "recipe": "solid",
+      "roughness": 0.92,
+      "seed": 151,
+      "strength": 0.02
+    },
+    "red": {
+      "name": "MiniMarketProduceRed",
+      "rgba": [0.67, 0.08, 0.045, 1.0],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 157,
+      "strength": 0.02
+    },
+    "orange": {
+      "name": "MiniMarketProduceOrange",
+      "rgba": [0.92, 0.38, 0.045, 1.0],
+      "recipe": "solid",
+      "roughness": 0.76,
+      "seed": 163,
+      "strength": 0.02
+    },
+    "leaf": {
+      "name": "MiniMarketLeafGreen",
+      "rgba": [0.13, 0.39, 0.1, 1.0],
+      "recipe": "solid",
+      "roughness": 0.82,
+      "seed": 167,
+      "strength": 0.02
+    }
+  },
+  "buildingPostProcess": {
+    "profile": "commercial_mini_market_game_first_v1",
+    "intent": "preserve_sign_awning_storefront_readability",
+    "paletteColors": 160,
+    "paletteDither": false,
+    "posterizeBitsPerChannel": 7,
+    "contrastMultiplier": 1.03,
+    "saturationMultiplier": 1.03,
+    "outlineAlpha": 42,
+    "internalEdgeAlpha": 10,
+    "internalEdgeThreshold": 104,
+    "surfacePolicy": {
+      "preferLargeColorBlocks": true,
+      "avoidArchitecturalMaterialDrama": true,
+      "warmStorefrontIsSecondaryRead": true,
+      "rooftopEquipmentMustRemainSubordinate": true
+    }
+  }
+}

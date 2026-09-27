@@ -1,0 +1,50 @@
+{
+  "contract": "CH_REFERENCE_DESCRIPTOR_V1",
+  "assetId": "commercial_mini_market_3x2_01",
+  "sourceType": "user_supplied_visual_reference",
+  "sourceSha256": "4107ef1456397e56e834a62f6c9df8d0294b30863b372a3b4de1f11ec563f93b",
+  "sourceDimensions": [
+    1536,
+    1536
+  ],
+  "storedInRepository": false,
+  "usage": "art_direction_only",
+  "visualSummary": {
+    "buildingType": "compact neighborhood mini market",
+    "silhouette": "single-story flat-roof commercial box with raised parapet and centered arched sign panel",
+    "palette": [
+      "warm cream stone/stucco",
+      "deep grocery green",
+      "charcoal storefront frames",
+      "warm amber interior light",
+      "natural wood produce crates"
+    ],
+    "frontage": [
+      "center double-glass entrance",
+      "large storefront glazing",
+      "green awnings",
+      "produce crates",
+      "small planters",
+      "wall lamps"
+    ],
+    "roof": [
+      "parapet",
+      "two compact HVAC units",
+      "round exhaust vent"
+    ],
+    "styleNotes": [
+      "stylized miniature city-builder read",
+      "oversized readable architectural details",
+      "clean broad color blocks",
+      "warm storefront glow"
+    ]
+  },
+  "adaptationRules": [
+    "create original City Horizon geometry; do not reconstruct the reference literally",
+    "keep CH_CAMERA_V1 and CH_TYCOON_STUDIO_V1 fixed",
+    "no public sidewalk, curb, parking lane, road slab or large tree baked into the building",
+    "preserve a strong storefront silhouette before micro-detail",
+    "keep produce displays and planters inside the authored private frontage envelope",
+    "use a generic basket emblem only; no brand text or trademark reconstruction"
+  ]
+}
