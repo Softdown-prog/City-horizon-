@@ -1,0 +1,50 @@
+{
+  "contract": "CH_UI_TOPBAR_SET_V1",
+  "id": "city_horizon_topbar_art_v1",
+  "purpose": "Pre-rendered 3D texture segment and icons for the City Horizon upper HUD bar.",
+  "runtime": "PNG RGBA 2D",
+  "renderClass": "compact_256",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioContract": "CH_TYCOON_STUDIO_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "footprint": {"widthTiles": 1, "depthTiles": 1},
+  "runtimeTargets": {
+    "panel": "assets/ui/topbar/topbar_panel_3d.png",
+    "funds": "assets/ui/topbar/funds_3d.png",
+    "calendar": "assets/ui/topbar/calendar_3d.png",
+    "population": "assets/ui/topbar/population_3d.png",
+    "pause": "assets/ui/topbar/pause_3d.png",
+    "administration": "assets/ui/topbar/administration_3d.png",
+    "settings": "assets/ui/topbar/settings_3d.png"
+  },
+  "assets": {
+    "panel": {"displayName": "Barra superior", "intent": "tactile dark-blue beveled HUD panel segment with cyan highlight"},
+    "funds": {"displayName": "Fundos", "intent": "stacked gold coin medallion readable at small HUD size"},
+    "calendar": {"displayName": "Data", "intent": "small bound calendar with blue header and readable cells"},
+    "population": {"displayName": "Populacao", "intent": "three simple stylized citizens grouped as a population symbol"},
+    "pause": {"displayName": "Pausa", "intent": "raised blue control with two cyan pause bars"},
+    "administration": {"displayName": "Administracao", "intent": "miniature civic hall with columns"},
+    "settings": {"displayName": "Configuracoes", "intent": "chunky mechanical gear symbol with secondary gear"}
+  },
+  "materials": {
+    "panel_shadow": {"rgba": [0.025, 0.055, 0.075, 1.0], "roughness": 0.76},
+    "panel_edge": {"rgba": [0.12, 0.25, 0.32, 1.0], "roughness": 0.68, "metallic": 0.12},
+    "panel_face": {"rgba": [0.055, 0.15, 0.21, 1.0], "roughness": 0.72},
+    "panel_inset": {"rgba": [0.025, 0.085, 0.12, 1.0], "roughness": 0.82},
+    "cyan_glow": {"rgba": [0.28, 0.78, 0.90, 1.0], "roughness": 0.34, "metallic": 0.10},
+    "icon_base": {"rgba": [0.075, 0.18, 0.24, 1.0], "roughness": 0.78},
+    "gold": {"rgba": [0.72, 0.48, 0.10, 1.0], "roughness": 0.36, "metallic": 0.62},
+    "gold_light": {"rgba": [0.95, 0.72, 0.22, 1.0], "roughness": 0.28, "metallic": 0.55},
+    "paper": {"rgba": [0.79, 0.82, 0.80, 1.0], "roughness": 0.90},
+    "accent_blue": {"rgba": [0.16, 0.38, 0.55, 1.0], "roughness": 0.58},
+    "accent_cyan": {"rgba": [0.20, 0.68, 0.78, 1.0], "roughness": 0.46},
+    "metal_light": {"rgba": [0.58, 0.66, 0.70, 1.0], "roughness": 0.42, "metallic": 0.58},
+    "stone": {"rgba": [0.42, 0.45, 0.46, 1.0], "roughness": 0.90},
+    "stone_light": {"rgba": [0.64, 0.65, 0.62, 1.0], "roughness": 0.88},
+    "stone_white": {"rgba": [0.78, 0.78, 0.72, 1.0], "roughness": 0.86},
+    "skin": {"rgba": [0.63, 0.43, 0.30, 1.0], "roughness": 0.82},
+    "person_blue": {"rgba": [0.18, 0.36, 0.55, 1.0], "roughness": 0.74},
+    "person_teal": {"rgba": [0.12, 0.48, 0.50, 1.0], "roughness": 0.72},
+    "button_blue": {"rgba": [0.10, 0.30, 0.43, 1.0], "roughness": 0.58}
+  }
+}
