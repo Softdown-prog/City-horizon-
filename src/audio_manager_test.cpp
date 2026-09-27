@@ -29,8 +29,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Eight tracks are allocated for overlapping UI feedback. This sequence also
-    // exercises both variations for events that have them.
+    // Deliberately occupy all eight ordinary effect tracks. Weather thunder must
+    // still play on its dedicated priority track while UI/gameplay audio overlaps.
     const SoundEvent events[] = {
         SoundEvent::ui_select, SoundEvent::ui_select, SoundEvent::ui_confirm,
         SoundEvent::building_place, SoundEvent::ui_error, SoundEvent::ui_back,
@@ -51,8 +51,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Rain ambience could not start independently.\n";
         return 1;
     }
-    if (!audio.play(SoundEvent::weather_thunder)) {
-        std::cerr << "Thunder event could not play.\n";
+    if (!audio.play_weather_effect(SoundEvent::weather_thunder)) {
+        std::cerr << "Thunder priority event could not play while ordinary tracks were busy.\n";
         return 1;
     }
     if (!audio.set_ambience_loop(SoundEvent::weather_rain, false)) {
