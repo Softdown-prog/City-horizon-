@@ -1,5 +1,6 @@
 #pragma once
 
+#include "building_system.h"
 #include "fence_placement_controller.h"
 #include "fence_system.h"
 #include "navigation_network.h"
@@ -95,11 +96,37 @@ inline void clear() {
     clear_segment_styles();
 }
 
+// Collision-aware pedestrian graph. Surface topology remains authoritative for
+// where pedestrians may stand; buildings remove occupied cells and closed
+// fence segments veto crossing only the edge they occupy. Open gates are
+// intentionally passable because FenceManager::blocks_tile_crossing() already
+// treats them as openings.
+class PedestrianCollisionNavigationNetwork final : public NavigationNetwork {
+public:
+    PedestrianCollisionNavigationNetwork(const RoadManager& roads,
+                                         const SidewalkManager& sidewalks,
+                                         const BuildingManager& buildings)
+        : base_(roads, sidewalks), buildings_(buildings) {}
+
+    [[nodiscard]] bool is_navigable(const NavigationTile tile) const override {
+        return base_.is_navigable(tile) && !buildings_.is_occupied(tile.x, tile.y);
+    }
+
+    [[nodiscard]] bool is_connected(const NavigationTile tile,
+                                    const CardinalDirection direction) const override {
+        return base_.is_connected(tile, direction) &&
+               !fences().blocks_tile_crossing(tile.x, tile.y, direction);
+    }
+
+private:
+    PedestrianSurfaceNavigationNetwork base_;
+    const BuildingManager& buildings_;
+};
+
 }  // namespace park_fence_runtime
 
-// Drop-in replacement for the current pedestrian road-lane graph. Logical
-// roads remain the source of walkable tiles, while Park fences veto crossings
-// on their grid edge. Open gates deliberately do not veto the crossing.
+// Legacy road-only adapter kept for compatibility with focused tests and older
+// call sites. New runtime pedestrians should use PedestrianCollisionNavigationNetwork.
 class ParkFencePedestrianNavigationNetwork final : public NavigationNetwork {
 public:
     explicit ParkFencePedestrianNavigationNetwork(const RoadManager& roads)
