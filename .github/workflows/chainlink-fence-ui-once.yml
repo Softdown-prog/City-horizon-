@@ -1,0 +1,124 @@
+name: Chainlink fence UI integration (one shot)
+
+on:
+  push:
+    paths:
+      - .github/workflows/chainlink-fence-ui-once.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward to current main
+        run: |
+          git fetch origin main
+          git checkout main
+          git merge --ff-only origin/main
+      - name: Integrate chainlink fence into PARK UI and renderer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/ui_manager.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = []
+          replacements.append((
+          'constexpr std::string_view kParkIronStoneFenceToolId = "park_iron_fence_01";\nconstexpr std::string_view kParkGateToolId = "park_gate_classic_iron_v1";',
+          'constexpr std::string_view kParkIronStoneFenceToolId = "park_iron_fence_01";\nconstexpr std::string_view kParkChainlinkFenceToolId = "park_chainlink_fence_01";\nconstexpr std::string_view kParkGateToolId = "park_gate_classic_iron_v1";'))
+
+          replacements.append((
+          '''    if (style == ParkFenceStyle::iron_stone) {\n        return runtime_asset_path(\n            "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_east.png");\n    }\n    return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");''',
+          '''    if (style == ParkFenceStyle::iron_stone) {\n        return runtime_asset_path(\n            "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_east.png");\n    }\n    if (style == ParkFenceStyle::chainlink) {\n        return runtime_asset_path(\n            "assets/city_park/fences/park_chainlink_fence_01/park_chainlink_fence_01_segment_east.png");\n    }\n    return runtime_asset_path("assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png");'''))
+
+          replacements.append((
+          '''    if (!has_item(kParkGateToolId)) {''',
+          '''    if (!has_item(kParkChainlinkFenceToolId)) {\n        model.build_items.push_back({\n            std::string(kParkChainlinkFenceToolId),\n            "Alambrado Galvanizado",\n            std::string(kParkCategory),\n            "SEM CUSTO",\n            true,\n            park_fence_thumbnail_path(ParkFenceStyle::chainlink),\n            "BORDA DO GRID",\n            "CLIQUE E ARRASTE | MALHA + CONEXAO AUTOMATICA",\n            1,\n        });\n    }\n    if (!has_item(kParkGateToolId)) {'''))
+
+          replacements.append((
+          '''        const std::string_view active_fence_id = g_park_fence_style == ParkFenceStyle::iron_stone\n            ? kParkIronStoneFenceToolId : kParkFenceToolId;''',
+          '''        const std::string_view active_fence_id = g_park_fence_style == ParkFenceStyle::iron_stone\n            ? kParkIronStoneFenceToolId\n            : (g_park_fence_style == ParkFenceStyle::chainlink\n                ? kParkChainlinkFenceToolId : kParkFenceToolId);'''))
+
+          replacements.append((
+          '''    if (style == ParkFenceStyle::iron_stone) {\n        if (preview) {''',
+          '''    if (style == ParkFenceStyle::chainlink) {\n        if (preview) {\n            SDL_SetRenderDrawColor(renderer, highlight ? 213 : 151, highlight ? 224 : 164,\n                                   highlight ? 228 : 171, 225);\n        } else {\n            SDL_SetRenderDrawColor(renderer, highlight ? 204 : 112, highlight ? 216 : 126,\n                                   highlight ? 221 : 134, 245);\n        }\n        return;\n    }\n    if (style == ParkFenceStyle::iron_stone) {\n        if (preview) {'''))
+
+          replacements.append((
+          '''    for (const FenceVertex neighbour : neighbours) {\n        if (g_park_fences.has_segment(vertex, neighbour) &&\n            park_fence_runtime::segment_style(vertex, neighbour) == ParkFenceStyle::iron_stone) {\n            return ParkFenceStyle::iron_stone;\n        }\n    }\n    return ParkFenceStyle::classic_iron;''',
+          '''    bool touches_chainlink = false;\n    for (const FenceVertex neighbour : neighbours) {\n        if (!g_park_fences.has_segment(vertex, neighbour)) continue;\n        const ParkFenceStyle style = park_fence_runtime::segment_style(vertex, neighbour);\n        if (style == ParkFenceStyle::iron_stone) return ParkFenceStyle::iron_stone;\n        if (style == ParkFenceStyle::chainlink) touches_chainlink = true;\n    }\n    return touches_chainlink ? ParkFenceStyle::chainlink : ParkFenceStyle::classic_iron;'''))
+
+          replacements.append((
+          '''    const float height = 31.0F * view.camera.zoom;\n    const float half_width = std::max(1.0F,\n        (style == ParkFenceStyle::iron_stone ? 2.1F : 1.4F) * view.camera.zoom);''',
+          '''    const float height = (style == ParkFenceStyle::chainlink ? 33.0F : 31.0F) * view.camera.zoom;\n    const float half_width = std::max(1.0F,\n        (style == ParkFenceStyle::iron_stone ? 2.1F\n         : style == ParkFenceStyle::chainlink ? 1.8F : 1.4F) * view.camera.zoom);'''))
+
+          replacements.append((
+          '''    const float lower = 10.0F * view.camera.zoom;\n    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;\n    const float thickness = std::max(1.0F, view.camera.zoom);\n\n    if (style == ParkFenceStyle::iron_stone) {''',
+          '''    const float lower = (style == ParkFenceStyle::chainlink ? 4.0F : 10.0F) * view.camera.zoom;\n    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F\n                         : style == ParkFenceStyle::chainlink ? 29.0F : 22.0F) * view.camera.zoom;\n    const float thickness = std::max(1.0F, view.camera.zoom);\n\n    if (style == ParkFenceStyle::chainlink) {\n        set_fence_draw_color(renderer, style, preview, false);\n        for (const float y_offset : {lower, upper}) {\n            SDL_RenderLine(renderer, a.x, a.y - y_offset, b.x, b.y - y_offset);\n        }\n        constexpr int mesh_cells = 8;\n        for (int index = 0; index < mesh_cells; ++index) {\n            const float t0 = static_cast<float>(index) / static_cast<float>(mesh_cells);\n            const float t1 = static_cast<float>(index + 1) / static_cast<float>(mesh_cells);\n            const float x0 = a.x + (b.x - a.x) * t0;\n            const float y0 = a.y + (b.y - a.y) * t0;\n            const float x1 = a.x + (b.x - a.x) * t1;\n            const float y1 = a.y + (b.y - a.y) * t1;\n            SDL_RenderLine(renderer, x0, y0 - lower, x1, y1 - upper);\n            SDL_RenderLine(renderer, x0, y0 - upper, x1, y1 - lower);\n        }\n        set_fence_draw_color(renderer, style, preview, true);\n        SDL_RenderLine(renderer, a.x, a.y - upper - thickness,\n                       b.x, b.y - upper - thickness);\n        return;\n    }\n\n    if (style == ParkFenceStyle::iron_stone) {'''))
+
+          replacements.append((
+          '''    const float lower = 10.0F * view.camera.zoom;\n    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F : 22.0F) * view.camera.zoom;\n    const float leaf_depth = 15.0F * view.camera.zoom;''',
+          '''    const float lower = (style == ParkFenceStyle::chainlink ? 4.0F : 10.0F) * view.camera.zoom;\n    const float upper = (style == ParkFenceStyle::iron_stone ? 24.0F\n                         : style == ParkFenceStyle::chainlink ? 29.0F : 22.0F) * view.camera.zoom;\n    const float leaf_depth = 15.0F * view.camera.zoom;'''))
+
+          replacements.append((
+          '''    if (style == ParkFenceStyle::iron_stone) {\n        for (const ch::ScreenPoint hinge : {left, right}) {''',
+          '''    if (style == ParkFenceStyle::iron_stone) {\n        for (const ch::ScreenPoint hinge : {left, right}) {''', 1))
+
+          # Insert chain-link mesh into both opened gate leaves immediately before highlight rails.
+          replacements.append((
+          '''    }\n    set_fence_draw_color(renderer, style, false, true);\n    SDL_RenderLine(renderer, left.x, left.y - upper,''',
+          '''    }\n    if (style == ParkFenceStyle::chainlink) {\n        for (const ch::ScreenPoint hinge : {left, right}) {\n            const float tip_x = hinge.x + nx * leaf_depth;\n            const float tip_y = hinge.y + ny * leaf_depth;\n            constexpr int gate_mesh_cells = 4;\n            for (int index = 0; index < gate_mesh_cells; ++index) {\n                const float t0 = static_cast<float>(index) / static_cast<float>(gate_mesh_cells);\n                const float t1 = static_cast<float>(index + 1) / static_cast<float>(gate_mesh_cells);\n                const float x0 = hinge.x + (tip_x - hinge.x) * t0;\n                const float y0 = hinge.y + (tip_y - hinge.y) * t0;\n                const float x1 = hinge.x + (tip_x - hinge.x) * t1;\n                const float y1 = hinge.y + (tip_y - hinge.y) * t1;\n                SDL_RenderLine(renderer, x0, y0 - lower, x1, y1 - upper);\n                SDL_RenderLine(renderer, x0, y0 - upper, x1, y1 - lower);\n            }\n        }\n    }\n    set_fence_draw_color(renderer, style, false, true);\n    SDL_RenderLine(renderer, left.x, left.y - upper,'''))
+
+          replacements.append((
+          '''        model.selected_building_id != kParkFenceToolId &&\n        model.selected_building_id != kParkIronStoneFenceToolId &&\n        model.selected_building_id != kParkGateToolId;''',
+          '''        model.selected_building_id != kParkFenceToolId &&\n        model.selected_building_id != kParkIronStoneFenceToolId &&\n        model.selected_building_id != kParkChainlinkFenceToolId &&\n        model.selected_building_id != kParkGateToolId;'''))
+
+          replacements.append((
+          '''            (result.action->payload == kParkFenceToolId ||\n             result.action->payload == kParkIronStoneFenceToolId)) {\n            g_park_fence_style = result.action->payload == kParkIronStoneFenceToolId\n                ? ParkFenceStyle::iron_stone : ParkFenceStyle::classic_iron;''',
+          '''            (result.action->payload == kParkFenceToolId ||\n             result.action->payload == kParkIronStoneFenceToolId ||\n             result.action->payload == kParkChainlinkFenceToolId)) {\n            g_park_fence_style = result.action->payload == kParkIronStoneFenceToolId\n                ? ParkFenceStyle::iron_stone\n                : (result.action->payload == kParkChainlinkFenceToolId\n                    ? ParkFenceStyle::chainlink : ParkFenceStyle::classic_iron);'''))
+
+          replacements.append((
+          '''            g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone\n                ? "GRADE DE FERRO E PEDRA: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"\n                : "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES";''',
+          '''            g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone\n                ? "GRADE DE FERRO E PEDRA: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"\n                : (g_park_fence_style == ParkFenceStyle::chainlink\n                    ? "ALAMBRADO GALVANIZADO: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES"\n                    : "GRADE DO PARQUE: CLIQUE E ARRASTE ENTRE AS BORDAS DOS TILES");'''))
+
+          replacements.append((
+          '''    g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone\n        ? "GRADE DE FERRO E PEDRA: ARRASTE E SOLTE PARA CONSTRUIR"\n        : "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR";''',
+          '''    g_park_fence_status = g_park_fence_style == ParkFenceStyle::iron_stone\n        ? "GRADE DE FERRO E PEDRA: ARRASTE E SOLTE PARA CONSTRUIR"\n        : (g_park_fence_style == ParkFenceStyle::chainlink\n            ? "ALAMBRADO GALVANIZADO: ARRASTE E SOLTE PARA CONSTRUIR"\n            : "GRADE DO PARQUE: ARRASTE E SOLTE PARA CONSTRUIR");'''))
+
+          replacements.append((
+          '''            ? (g_park_fence_style == ParkFenceStyle::iron_stone\n                ? "GRADE DE FERRO E PEDRA CONSTRUIDA: "\n                : "GRADE DO PARQUE CONSTRUIDA: ") +''',
+          '''            ? (g_park_fence_style == ParkFenceStyle::iron_stone\n                ? "GRADE DE FERRO E PEDRA CONSTRUIDA: "\n                : (g_park_fence_style == ParkFenceStyle::chainlink\n                    ? "ALAMBRADO GALVANIZADO CONSTRUIDO: "\n                    : "GRADE DO PARQUE CONSTRUIDA: ")) +'''))
+
+          for entry in replacements:
+              if len(entry) == 2:
+                  old, new = entry
+                  count = 1
+              else:
+                  old, new, count = entry
+              found = text.count(old)
+              if found < count:
+                  raise SystemExit(f'expected pattern not found ({found} < {count}): {old[:100]!r}')
+              text = text.replace(old, new, count)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
+          grep -q 'Alambrado Galvanizado' src/ui_manager.cpp
+          grep -q 'ParkFenceStyle::chainlink' src/ui_manager.cpp
+      - name: Commit UI integration
+        run: |
+          if git diff --quiet; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ui_manager.cpp
+          git commit -m "feat(ui): add chainlink fence to PARK"
+          git push origin main
