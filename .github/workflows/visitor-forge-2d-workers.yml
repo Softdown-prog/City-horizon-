@@ -58,6 +58,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Visitor-Forge-2D-${{ matrix.name }}-${{ github.run_number }}
-          path: out/visitor_forge_2d/workers/${{ matrix.name }}/
+          path: out/visitor_forge_2d/workers/
           retention-days: 14
           if-no-files-found: error

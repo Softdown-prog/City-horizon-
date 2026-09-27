@@ -20,6 +20,8 @@ A saída fica em `out/visitor_forge_2d/workers/pine_small_v1/`, separada por ID,
 com PNG, review 1x/2x, prancha de câmera (quando aplicável), metadados e
 `worker_report.json`. A conclusão é `review_ready`: métricas e CI não aprovam
 arte nem promovem um PNG para `assets/`.
+O nome da pasta é o `id` declarado no JSON, que pode diferir do nome do arquivo
+da receita; o artifact do CI captura a raiz `workers/` para cobrir ambos.
 
 O workflow `Visitor Forge 2D Workers` usa uma matriz de seis receitas: quatro
 pinheiros, canteiro e placa. Cada item roda em um worker paralelo do GitHub
