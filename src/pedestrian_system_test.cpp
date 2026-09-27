@@ -29,7 +29,7 @@ void test_sidewalk_route_and_turns() {
     }
 
     PedestrianSystem pedestrians = make_pedestrian_system();
-    assert(pedestrians.send_test_pedestrian({0, 0}, {2, 2}, network));
+    assert(pedestrians.send_pedestrian({0, 0}, {2, 2}, network));
     assert(pedestrians.instances().front().state == PedestrianState::walking);
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::east);
     advance_until_idle(pedestrians, network);
@@ -50,7 +50,7 @@ void test_demolition_replans_once_then_stops_safely() {
         assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
     }
     PedestrianSystem pedestrians = make_pedestrian_system();
-    assert(pedestrians.send_test_pedestrian({0, 0}, {2, 0}, network));
+    assert(pedestrians.send_pedestrian({0, 0}, {2, 0}, network));
     assert(sidewalks.remove_tile(1, 0));
     pedestrians.update_tick(0.05F, network);
     assert(pedestrians.instances().front().state == PedestrianState::walking);
@@ -66,7 +66,7 @@ void test_demolition_replans_once_then_stops_safely() {
     assert(broken_sidewalks.place_tile(1, 0, "concrete_01"));
     assert(broken_sidewalks.place_tile(2, 0, "concrete_01"));
     PedestrianSystem stranded = make_pedestrian_system();
-    assert(stranded.send_test_pedestrian({0, 0}, {2, 0}, broken_network));
+    assert(stranded.send_pedestrian({0, 0}, {2, 0}, broken_network));
     assert(broken_sidewalks.remove_tile(1, 0));
     stranded.update_tick(0.05F, broken_network);
     assert(stranded.instances().front().state == PedestrianState::idle);
@@ -82,12 +82,16 @@ void test_surface_turn_and_idle() {
     assert(roads.place_tile(1, 1));
     PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
     PedestrianSystem pedestrians = make_pedestrian_system();
-    assert(pedestrians.send_test_pedestrian({0, 0}, {1, 1}, network));
+    assert(pedestrians.send_pedestrian({0, 0}, {1, 1}, network));
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::east);
     pedestrians.update_tick(0.46F, network);
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::south);
     pedestrians.update_tick(0.46F, network);
     assert(pedestrians.instances().front().state == PedestrianState::idle);
+    assert(pedestrians.send_pedestrian({1, 1}, {0, 0}, network));
+    assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::north);
+    pedestrians.clear();
+    assert(pedestrians.instances().empty());
 }
 
 } // namespace

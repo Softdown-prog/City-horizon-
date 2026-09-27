@@ -3,6 +3,7 @@
 #include "road_system.h"
 #include "sidewalk_system.h"
 
+#include <cstddef>
 #include <vector>
 
 struct NavigationTile {
@@ -78,3 +79,7 @@ struct NavigationPathResult {
 // behavior at the current map size.
 [[nodiscard]] NavigationPathResult find_navigation_path(const NavigationNetwork& network,
                                                         NavigationTile start, NavigationTile goal);
+// Choose a reachable destination far enough for a visible stroll, including
+// turns. The returned path uses the same traversable edges as ordinary BFS.
+[[nodiscard]] NavigationPathResult find_navigation_path_with_minimum_length(
+    const NavigationNetwork& network, NavigationTile start, std::size_t minimum_tiles);

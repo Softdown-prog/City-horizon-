@@ -36,19 +36,18 @@ struct PedestrianInstance {
     MobileAnimationPlayer animation;
 };
 
-// Runtime-only, deliberately small proof that a mobile entity can consume a
-// topology-backed network without putting pedestrian logic into navigation or
-// rendering. It is not part of population/save gameplay yet.
+// One runtime pedestrian consuming a topology-backed route. Population,
+// individual needs and persistence are separate gameplay work.
 class PedestrianSystem {
 public:
     explicit PedestrianSystem(PedestrianVisualDefinition visual_definition);
 
-    // Test-only visual retune: it reuses the same entity, route and catalogue
-    // while resetting the player so a new cadence begins at frame zero.
+    // Debug visual retune reuses the same entity and route.
     void configure_visual_test(PedestrianVisualDefinition visual_definition);
 
-    [[nodiscard]] bool send_test_pedestrian(NavigationTile start, NavigationTile destination,
-                                            const NavigationNetwork& network);
+    [[nodiscard]] bool send_pedestrian(NavigationTile start, NavigationTile destination,
+                                       const NavigationNetwork& network);
+    void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);
     void update_animation(float frame_seconds, const MobileAnimationCatalog& animations);

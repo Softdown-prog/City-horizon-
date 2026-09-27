@@ -37,6 +37,8 @@ Esse contrato é parte da lógica de colocação: uma construção visualmente d
 
 ## Estado temporário do runtime
 
+O pedestre `ch_actor_green_01` foi aprovado na prévia de gameplay e promovido para `assets/characters/ch_actor_green_01/frames/` e `assets/definitions/animations/ch_actor_green_01.json`. A fonte reproduzível permanece em `tools/ch_actor_lab/software_render.py`. Os PNGs são RGBA 48×64 (8 quadros de caminhada e 1 parado para cada uma das quatro direções); o pivô é `[24,60]` e a câmera é `CH_CAMERA_V1`. O runtime posiciona esse pivô no centro lógico do tile caminhável, sem depender da opção de compilação de previews. O primeiro uso é um único pedestre de circulação automática em piso/rua; outros estados e população persistente aguardam uma etapa de gameplay.
+
 A grama canônica permanece como asset legado de terreno:
 
 - `assets/terrain/grass_isometric_01.png`

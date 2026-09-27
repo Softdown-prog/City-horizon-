@@ -99,6 +99,19 @@ void test_pedestrian_surface_route() {
     assert(find_navigation_path(network, {0, 0}, {3, 1}).status == NavigationPathStatus::no_path);
 }
 
+void test_patrol_follows_corner_without_grass() {
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    for (const NavigationTile tile : {NavigationTile{0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}, {3, 2}}) {
+        assert(sidewalks.place_tile(tile.x, tile.y, "sand_path"));
+    }
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    const auto route = find_navigation_path_with_minimum_length(network, {0, 0}, 6);
+    assert_path(route, {0, 0}, {3, 2}, 6);
+    assert(find_navigation_path_with_minimum_length(network, {0, 0}, 7).status == NavigationPathStatus::no_path);
+    assert(!network.is_navigable({3, 1}));
+}
+
 } // namespace
 
 int main() {
@@ -106,4 +119,5 @@ int main() {
     test_pedestrian_lanes_derive_from_roads();
     test_sidewalks();
     test_pedestrian_surface_route();
+    test_patrol_follows_corner_without_grass();
 }

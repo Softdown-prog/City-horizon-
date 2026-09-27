@@ -455,8 +455,6 @@ if(CH_VISITOR_FORGE_PREVIEW)
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"
-            "$<TARGET_FILE_DIR:city_builder>/tools/ch_actor_lab/runtime_preview"
-            "$<TARGET_FILE_DIR:city_builder>/tools/ch_actor_lab/art/software_v1/frames"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
@@ -469,12 +467,6 @@ if(CH_VISITOR_FORGE_PREVIEW)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/ch_actor_lab/runtime_preview/ch_actor_software_v1.json"
-            "$<TARGET_FILE_DIR:city_builder>/tools/ch_actor_lab/runtime_preview/ch_actor_software_v1.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/tools/ch_actor_lab/art/software_v1/frames"
-            "$<TARGET_FILE_DIR:city_builder>/tools/ch_actor_lab/art/software_v1/frames"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/frames_preview"
             "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"

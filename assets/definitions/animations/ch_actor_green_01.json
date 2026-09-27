@@ -1,0 +1,128 @@
+{
+  "id": "ch_actor_green_01",
+  "status": "approved_runtime",
+  "clips": [
+    {
+      "id": "idle_south",
+      "state": "idle",
+      "direction": "south",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/s_idle.png"
+      ]
+    },
+    {
+      "id": "walking_south",
+      "state": "walking",
+      "direction": "south",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/s_walk_00.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_01.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_02.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_03.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_04.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_05.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_06.png",
+        "assets/characters/ch_actor_green_01/frames/s_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_east",
+      "state": "idle",
+      "direction": "east",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/e_idle.png"
+      ]
+    },
+    {
+      "id": "walking_east",
+      "state": "walking",
+      "direction": "east",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/e_walk_00.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_01.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_02.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_03.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_04.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_05.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_06.png",
+        "assets/characters/ch_actor_green_01/frames/e_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_west",
+      "state": "idle",
+      "direction": "west",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/w_idle.png"
+      ]
+    },
+    {
+      "id": "walking_west",
+      "state": "walking",
+      "direction": "west",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/w_walk_00.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_01.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_02.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_03.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_04.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_05.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_06.png",
+        "assets/characters/ch_actor_green_01/frames/w_walk_07.png"
+      ]
+    },
+    {
+      "id": "idle_north",
+      "state": "idle",
+      "direction": "north",
+      "fps": 1,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/n_idle.png"
+      ]
+    },
+    {
+      "id": "walking_north",
+      "state": "walking",
+      "direction": "north",
+      "fps": 7.2727272727272725,
+      "loop": true,
+      "frames": [
+        "assets/characters/ch_actor_green_01/frames/n_walk_00.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_01.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_02.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_03.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_04.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_05.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_06.png",
+        "assets/characters/ch_actor_green_01/frames/n_walk_07.png"
+      ]
+    }
+  ],
+  "contract": "CH_ACTOR_SOFTWARE_V1",
+  "frame": {
+    "width": 48,
+    "height": 64,
+    "groundAnchor": [
+      24,
+      60
+    ]
+  },
+  "camera": {
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "projection": "orthographic"
+  }
+}

@@ -29,8 +29,8 @@ void PedestrianSystem::configure_visual_test(PedestrianVisualDefinition visual_d
     }
 }
 
-bool PedestrianSystem::send_test_pedestrian(const NavigationTile start, const NavigationTile destination,
-                                            const NavigationNetwork& network) {
+bool PedestrianSystem::send_pedestrian(const NavigationTile start, const NavigationTile destination,
+                                       const NavigationNetwork& network) {
     const NavigationPathResult path = find_navigation_path(network, start, destination);
     if (path.status != NavigationPathStatus::found) return false;
 
@@ -61,6 +61,8 @@ bool PedestrianSystem::send_test_pedestrian(const NavigationTile start, const Na
     }
     return true;
 }
+
+void PedestrianSystem::clear() { instances_.clear(); }
 
 MobileEntityDirection PedestrianSystem::direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return MobileEntityDirection::east;

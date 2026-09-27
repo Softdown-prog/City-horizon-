@@ -1489,10 +1489,8 @@ int main() {
     const bool approved_animations_loaded = mobile_animations.load_from_directory(asset_root / "assets/definitions/animations");
     bool preview_animations_loaded = false;
 #if defined(CH_VISITOR_FORGE_PREVIEW)
-    // Visitor Forge remains a review candidate: only the F8 test selects this set.
+    // Other Visitor Forge experiments remain optional F8 candidates.
     preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/visitor_forge_2d/runtime_preview");
-    preview_animations_loaded = mobile_animations.append_from_directory(asset_root / "tools/ch_actor_lab/runtime_preview") ||
-                                preview_animations_loaded;
 #endif
     if (!approved_animations_loaded && !preview_animations_loaded) {
         std::cerr << "No valid mobile animation sets were loaded; directional static sprites remain available.\n";
@@ -1515,7 +1513,11 @@ int main() {
     for (const AgriculturalResourceDefinition& resource : resource_catalog.definitions()) resource_storage_classes[resource.id] = resource.storage_class;
     farming.register_resource_storage_classes(resource_storage_classes);
     ServiceVehicleManager service_vehicles;
-    PedestrianSystem pedestrians{{"worker_cleaner_female", 1.0F, 0.5F, 0.862F, kMixamoWalkSeTestSpeed, kMixamoWalkSeTestRate, 0.5F, 0.72F}};
+    const bool actor_ready = mobile_animations.find_set("ch_actor_green_01") != nullptr;
+    PedestrianSystem pedestrians{actor_ready
+        ? PedestrianVisualDefinition{"ch_actor_green_01", 1.0F, 0.5F, 60.0F / 64.0F, 0.30F, 1.0F, 0.5F, 0.5F}
+        : PedestrianVisualDefinition{"worker_cleaner_female", 1.0F, 0.5F, 0.862F,
+                                     kMixamoWalkSeTestSpeed, kMixamoWalkSeTestRate, 0.5F, 0.72F}};
     LandManager lands(kMapMin, kMapMax);
     CityEconomy economy;
     PopulationSystem population;
@@ -1713,15 +1715,15 @@ int main() {
         entities.insert(entities.end(), std::make_move_iterator(pedestrian_entities.begin()), std::make_move_iterator(pedestrian_entities.end()));
         return entities;
     };
-    // F7 uses the same navigable cells as the foot contact: floor first, then
-    // road. Each frame's [24,60] pivot is placed at the tile centre by the
-    // mobile renderer; the route never crosses undecorated terrain.
+    // The sprite's [24,60] foot pivot meets the centre of the occupied floor
+    // or road tile. The actor reverses direction at the end of a short route.
+    bool automatic_pedestrian = actor_ready;
+    float pedestrian_rest_seconds = 0.0F;
     // Every preset keeps the approved 175 ms canonical cycle. Only world
     // velocity varies for runtime foot-skating calibration of the new skin.
     int mixamo_gait_preset_index = 2;
-    // Start the explicit F7 test with the character the player is reviewing.
-    // Other looks remain available through F8; no NPC is spawned automatically.
-    int pedestrian_visual_index = mobile_animations.find_set("ch_actor_software_v1") != nullptr ? 7 :
+    // F7/F8 remain manual developer controls; the approved actor is active by default.
+    int pedestrian_visual_index = actor_ready ? 7 :
         mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") != nullptr ? 5 :
         mobile_animations.find_set("visitor_male_01_south_front_candidate") != nullptr ? 4 : 0;
     const auto pedestrian_visual_id = [&]() -> std::string_view {
@@ -1732,7 +1734,7 @@ int main() {
             case 4: return "visitor_male_01_south_front_candidate";
             case 5: return "visitor_male_01_full_pose_east_candidate";
             case 6: return "visitor_male_01_structural_gait_v2_candidate";
-            case 7: return "ch_actor_software_v1";
+            case 7: return "ch_actor_green_01";
             default: return "worker_cleaner_female";
         }
     };
@@ -1744,15 +1746,15 @@ int main() {
             case 4: return "VISITOR FOUR DIRECTION GAIT";
             case 5: return "VISITOR FULL POSE EAST";
             case 6: return "VISITOR STRUCTURAL GAIT V2";
-            case 7: return "CH ACTOR SOFTWARE V1";
+            case 7: return "CH ACTOR GREEN 01";
             default: return "CLEANER";
         }
     };
     const auto pedestrian_visual_preset = [&](const float speed) {
         if (pedestrian_visual_index == 7) {
-            // Native 48x64 candidate: projected ground origin at [24,60].
+            // Approved 48x64 sprite: projected foot origin at [24,60].
             return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F,
-                                              0.5F, 60.0F / 64.0F, speed, 1.0F, 0.5F, 0.72F};
+                                              0.5F, 60.0F / 64.0F, speed, 1.0F, 0.5F, 0.5F};
         }
         if (pedestrian_visual_index >= 3) {
             // 128 px canvas, 97 px body: 97 * (56 / 97) = 56 px at zoom 1.
@@ -1763,7 +1765,25 @@ int main() {
         return PedestrianVisualDefinition{std::string(pedestrian_visual_id()), 1.0F,
                                           0.5F, 0.862F, speed, 125.0F / 175.0F, 0.5F, 0.72F};
     };
+    const auto send_available_walk = [&]() {
+        constexpr std::size_t kMinimumTiles = 6;
+        const PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+        const auto try_start = [&](const int x, const int y) {
+            const NavigationTile start{x, y};
+            const NavigationPathResult route = find_navigation_path_with_minimum_length(network, start, kMinimumTiles);
+            return route.status == NavigationPathStatus::found &&
+                   pedestrians.send_pedestrian(start, route.tiles.back(), network);
+        };
+        for (const SidewalkTile& tile : sidewalks.tiles()) {
+            if (try_start(tile.tile_x, tile.tile_y)) return true;
+        }
+        for (const RoadTile& tile : roads.tiles()) {
+            if (try_start(tile.tile_x, tile.tile_y)) return true;
+        }
+        return false;
+    };
     const auto send_mixamo_se_test = [&]() {
+        automatic_pedestrian = false;
         const float speed = [&]() {
             switch (mixamo_gait_preset_index) {
                 case 0: return 0.50F;
@@ -1779,29 +1799,13 @@ int main() {
         const int duration_ms = pedestrian_visual_index == 7 ? 138 :
             pedestrian_visual_index == 5 ? 270 : visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
-        constexpr int kRouteLength = 6;
-        const PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
-        const auto try_start = [&](const int x, const int y) {
-            for (const NavigationTile goal : {NavigationTile{x + kRouteLength - 1, y},
-                                              NavigationTile{x, y + kRouteLength - 1}}) {
-                if (!network.is_navigable(goal)) continue;
-                if (pedestrians.send_test_pedestrian({x, y}, goal, network)) {
-                    status = std::string(pedestrian_visual_label()) + " " + preset_name + ": " + std::to_string(duration_ms) + " MS | " +
-                             std::to_string(preset.movement_speed_tiles_per_second) +
-                             " T/S | CALCADA / RUA";
-                    mixamo_gait_preset_index = (mixamo_gait_preset_index + 1) % 3;
-                    return true;
-                }
-            }
-            return false;
-        };
-        for (const SidewalkTile& tile : sidewalks.tiles()) {
-            if (try_start(tile.tile_x, tile.tile_y)) return;
+        if (send_available_walk()) {
+            status = std::string(pedestrian_visual_label()) + " " + preset_name + ": " + std::to_string(duration_ms) + " MS | " +
+                     std::to_string(preset.movement_speed_tiles_per_second) + " T/S | CALCADA / RUA";
+            mixamo_gait_preset_index = (mixamo_gait_preset_index + 1) % 3;
+            return;
         }
-        for (const RoadTile& tile : roads.tiles()) {
-            if (try_start(tile.tile_x, tile.tile_y)) return;
-        }
-        status = "PEDESTRIAN: CONNECT 6 FLOOR / ROAD TILES FOR F7";
+        status = "PEDESTRIAN: CONNECT 6 FLOOR / ROAD TILES";
     };
 
     const auto clear_map_modes = [&]() {
@@ -1964,6 +1968,13 @@ int main() {
                                                              sidewalks, farming, lands, population, &service_vehicle_catalog,
                                                              &service_vehicles, &mission_manager, &terrain_paint);
         if (result.success) {
+            pedestrians.clear();
+            automatic_pedestrian = actor_ready;
+            pedestrian_rest_seconds = 0.0F;
+            if (actor_ready) {
+                pedestrian_visual_index = 7;
+                pedestrians.configure_visual_test(pedestrian_visual_preset(0.30F));
+            }
             active_map_doc = ch::MapDocument::load_from_file(initial_city_path.string());
             if (!active_map_doc) active_map_doc.emplace("{}");
             for (const TerrainPaintTile& tile : terrain_paint) {
@@ -2060,6 +2071,13 @@ int main() {
                 (void)play_sound(SoundEvent::ui_open_panel);
                 break;
             case UiAction::start_new_city:
+                pedestrians.clear();
+                automatic_pedestrian = actor_ready;
+                pedestrian_rest_seconds = 0.0F;
+                if (actor_ready) {
+                    pedestrian_visual_index = 7;
+                    pedestrians.configure_visual_test(pedestrian_visual_preset(0.30F));
+                }
                 clear_map_modes();
                 build_panel_open = false;
                 selected_instance_id.reset();
@@ -3184,13 +3202,14 @@ int main() {
                         break;
                     }
                     case SDL_SCANCODE_F6: {
+                        automatic_pedestrian = false;
                         const PedestrianSurfaceNavigationNetwork pedestrian_surfaces{roads, sidewalks};
                         if (!navigation_debug_start || !navigation_debug_goal) {
                             status = "PEDESTRIAN: SET FLOOR / ROAD START (F3) AND GOAL (F4)";
                         } else if (!pedestrian_surfaces.is_navigable(*navigation_debug_start) ||
                                    !pedestrian_surfaces.is_navigable(*navigation_debug_goal)) {
                             status = "PEDESTRIAN: START AND GOAL MUST BE WALKABLE";
-                        } else if (pedestrians.send_test_pedestrian(*navigation_debug_start, *navigation_debug_goal,
+                        } else if (pedestrians.send_pedestrian(*navigation_debug_start, *navigation_debug_goal,
                                                                      pedestrian_surfaces)) {
                             status = "PEDESTRIAN WALKING ON FLOOR / ROAD";
                         } else {
@@ -3202,12 +3221,12 @@ int main() {
                         send_mixamo_se_test();
                         break;
                     case SDL_SCANCODE_F8: {
-                        const int visual_count = mobile_animations.find_set("ch_actor_software_v1") != nullptr ? 8 :
-                            mobile_animations.find_set("visitor_male_01_forge_preview") == nullptr ? 3 :
-                            mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 4 :
-                            mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") == nullptr ? 5 :
-                            mobile_animations.find_set("visitor_male_01_structural_gait_v2_candidate") == nullptr ? 6 : 7;
-                        pedestrian_visual_index = (pedestrian_visual_index + 1) % visual_count;
+                        // An ordinary production package may contain only the
+                        // approved actor; skip absent experimental catalogs.
+                        for (int option = 0; option < 8; ++option) {
+                            pedestrian_visual_index = (pedestrian_visual_index + 1) % 8;
+                            if (mobile_animations.find_set(pedestrian_visual_id()) != nullptr) break;
+                        }
                         // Keep review candidates slow enough for each contact
                         // pose to read against world movement.
                         const float preview_speed = pedestrian_visual_index >= 4 ? 0.30F : 0.80F;
@@ -3306,7 +3325,31 @@ int main() {
         const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
         for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
             service_vehicles.update_tick(scheduled.mobile_tick_seconds, service_vehicle_catalog, vehicle_traversable);
-            pedestrians.update_tick(scheduled.mobile_tick_seconds, PedestrianSurfaceNavigationNetwork{roads, sidewalks});
+            const PedestrianSurfaceNavigationNetwork pedestrian_surfaces{roads, sidewalks};
+            const bool was_walking = !pedestrians.instances().empty() &&
+                                     pedestrians.instances().front().state == PedestrianState::walking;
+            pedestrians.update_tick(scheduled.mobile_tick_seconds, pedestrian_surfaces);
+            if (automatic_pedestrian) {
+                if (was_walking && pedestrians.instances().front().state == PedestrianState::idle) {
+                    pedestrian_rest_seconds = 0.9F;
+                } else {
+                    pedestrian_rest_seconds = std::max(0.0F, pedestrian_rest_seconds - scheduled.mobile_tick_seconds);
+                }
+                if (pedestrian_rest_seconds <= 0.0F &&
+                    (pedestrians.instances().empty() || pedestrians.instances().front().state == PedestrianState::idle)) {
+                    bool started = false;
+                    if (!pedestrians.instances().empty()) {
+                        const PedestrianInstance& walker = pedestrians.instances().front();
+                        if (walker.route.size() >= 2) {
+                            const NavigationTile current{walker.spatial.logical_tile_x, walker.spatial.logical_tile_y};
+                            const NavigationTile opposite = current == walker.route.front() ? walker.route.back() : walker.route.front();
+                            started = pedestrians.send_pedestrian(current, opposite, pedestrian_surfaces);
+                        }
+                    }
+                    if (!started) started = send_available_walk();
+                    if (!started) pedestrian_rest_seconds = 1.0F;
+                }
+            }
         }
         for (const TileCoordinate& completed : service_vehicles.take_completed_tiles()) {
             (void)farming.prepare_soil(completed.x, completed.y);
