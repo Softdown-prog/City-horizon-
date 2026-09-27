@@ -34,10 +34,12 @@
   "source": "CH Blender V13 four static rotations",
   "sourceWorkflowRun": 36347551550,
   "sourceCommit": "422b695ed976c36cd446ab274a2d631d608f3b25",
+  "gameplaySourceOfTruth": "assets/definitions/viking_ship_01.json",
+  "rideContract": "CH_AMUSEMENT_RIDE_V1",
   "rideCapacity": 20,
   "rideQueueContract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
   "passengerOverlay": {
-    "contract": "CH_VIKING_PASSENGER_OVERLAY_V1",
+    "contract": "CH_RIDE_PASSENGER_OVERLAY_V1",
     "actorSource": "assets/characters/ch_actor_green_01",
     "seatCount": 20,
     "seatAssignment": "queue_order_next_free_slot",
@@ -49,5 +51,5 @@
   },
   "swingFramesBaked": false,
   "animationPending": true,
-  "status": "runtime_static_registered_v15_passenger_swing_proxy_pending_review"
+  "status": "runtime_static_registered_v15_data_driven_ride_passenger_swing_proxy_pending_review"
 }
