@@ -50,9 +50,7 @@ void test_sidewalk_route_and_turns() {
     SidewalkManager sidewalks{-8, 8};
     SidewalkNavigationNetwork network{sidewalks};
     const std::vector<NavigationTile> tiles = {{0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 1}};
-    for (const NavigationTile tile : tiles) {
-        assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
-    }
+    for (const NavigationTile tile : tiles) assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
 
     PedestrianSystem pedestrians = make_pedestrian_system();
     assert(pedestrians.send_pedestrian({0, 0}, {2, 2}, network));
@@ -70,9 +68,7 @@ void test_demolition_replans_once_then_stops_safely() {
     SidewalkManager sidewalks{-8, 8};
     SidewalkNavigationNetwork network{sidewalks};
     const std::vector<NavigationTile> tiles = {{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}};
-    for (const NavigationTile tile : tiles) {
-        assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
-    }
+    for (const NavigationTile tile : tiles) assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
     PedestrianSystem pedestrians = make_pedestrian_system();
     assert(pedestrians.send_pedestrian({0, 0}, {2, 0}, network));
     assert(sidewalks.remove_tile(1, 0));
@@ -185,11 +181,11 @@ void test_budget_distribution() {
     std::size_t upper = 0;
     std::size_t high = 0;
     for (std::uint64_t id = 1; id <= 100; ++id) {
-        const std::int64_t budget = PedestrianSystem::budget_capacity_for_id(id);
-        if (budget == PedestrianSystem::kDefaultMonthlyBudgetCents) ++low;
-        else if (budget == PedestrianSystem::kMiddleMonthlyBudgetCents) ++middle;
-        else if (budget == PedestrianSystem::kUpperMonthlyBudgetCents) ++upper;
-        else if (budget == PedestrianSystem::kHighMonthlyBudgetCents) ++high;
+        const std::int64_t budget = PedestrianSystem::budget_capacity_for(id);
+        if (budget == 5'000) ++low;
+        else if (budget == 9'000) ++middle;
+        else if (budget == 15'000) ++upper;
+        else if (budget == 20'000) ++high;
         else assert(false);
     }
     assert(low == 70);
@@ -198,19 +194,37 @@ void test_budget_distribution() {
     assert(high == 2);
 }
 
+void test_need_decay_priority_and_restore() {
+    RoadManager roads{-4, 4};
+    SidewalkManager sidewalks{-4, 4};
+    assert(sidewalks.place_tile(0, 0, "cement_path"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSystem pedestrians = make_pedestrian_system();
+    assert(pedestrians.send_pedestrian({0, 0}, {0, 0}, network));
+    const std::uint64_t id = pedestrians.instances().front().id;
+
+    pedestrians.update_tick(10.0F, network);
+    const PedestrianNeeds after_ten = pedestrians.needs(id);
+    assert(std::abs(after_ten.hunger - 90.0F) < 0.001F);
+    assert(std::abs(after_ten.thirst - 90.0F) < 0.001F);
+    assert(std::abs(after_ten.fun - 90.0F) < 0.001F);
+
+    assert(pedestrians.restore_need(id, PedestrianNeed::hunger, 5.0F));
+    assert(pedestrians.restore_need(id, PedestrianNeed::fun, 8.0F));
+    assert(pedestrians.priority_need(id) == PedestrianNeed::thirst);
+    assert(pedestrians.restore_need(id, PedestrianNeed::thirst, 1000.0F));
+    assert(std::abs(pedestrians.needs(id).thirst - 100.0F) < 0.001F);
+}
+
 void test_weather_policy_and_monthly_budget() {
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::sunny, false) - 0.85F) < 0.001F);
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::overcast, false) - 0.45F) < 0.001F);
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::raining, false) - 0.12F) < 0.001F);
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::raining, true) - 0.45F) < 0.001F);
-    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::sunny, false) ==
-           PedestrianOutingPreference::outdoor_leisure);
-    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::overcast, false) ==
-           PedestrianOutingPreference::balanced);
-    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, false) ==
-           PedestrianOutingPreference::covered_commerce);
-    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, true) ==
-           PedestrianOutingPreference::essential_commerce);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::sunny, false) == PedestrianOutingPreference::outdoor_leisure);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::overcast, false) == PedestrianOutingPreference::balanced);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, false) == PedestrianOutingPreference::covered_commerce);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, true) == PedestrianOutingPreference::essential_commerce);
 
     RoadManager roads{-4, 4};
     SidewalkManager sidewalks{-4, 4};
@@ -225,18 +239,16 @@ void test_weather_policy_and_monthly_budget() {
     assert(pedestrians.spend_monthly_budget(id, 300));
     assert(pedestrians.monthly_budget_cents(id) == 4'700);
     assert(!pedestrians.spend_monthly_budget(id, 4'701));
-    assert(pedestrians.authorize_outing(PedestrianOutingPreference::covered_commerce));
+    assert(pedestrians.authorize_outing(PedestrianOutingPreference::covered_commerce, PedestrianNeed::thirst));
     assert(pedestrians.instances().front().outing_intent.active);
+    assert(pedestrians.instances().front().outing_intent.priority_need == PedestrianNeed::thirst);
     pedestrians.clear_outing_intent(id);
     assert(!pedestrians.instances().front().outing_intent.active);
     assert(pedestrians.spend_monthly_budget(id, 4'700));
     assert(pedestrians.monthly_budget_cents(id) == 0);
     assert(pedestrians.rest_at_home({0, 0}));
-    assert(!pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
+    assert(!pedestrians.authorize_outing(PedestrianOutingPreference::balanced, PedestrianNeed::fun));
 
-    // The first observed calendar only initializes the cycle. Same-month calls
-    // do not refill. Crossing a month boundary restores this citizen's own
-    // assigned allowance, not a global flat amount.
     pedestrians.sync_monthly_budget_cycle(1, 1);
     pedestrians.sync_monthly_budget_cycle(1, 1);
     assert(pedestrians.monthly_budget_cents(id) == 0);
@@ -247,7 +259,7 @@ void test_weather_policy_and_monthly_budget() {
     assert(pedestrians.monthly_budget_cents(id) == 4'700);
     pedestrians.sync_monthly_budget_cycle(1, 2);
     assert(pedestrians.monthly_budget_cents(id) == pedestrians.monthly_budget_capacity_cents(id));
-    assert(pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
+    assert(pedestrians.authorize_outing(PedestrianOutingPreference::balanced, PedestrianNeed::hunger));
 }
 
 void test_resident_at_home_decision_and_weather_immunity_in_transit() {
@@ -281,8 +293,6 @@ void test_resident_at_home_decision_and_weather_immunity_in_transit() {
     assert(pedestrians.instances().front().spatial.logical_tile_x == 1);
     assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
 
-    // Sunny policy is deterministic under the node seed; within several rest
-    // decisions it must authorize a one-shot outing rather than random wandering.
     bool authorized = false;
     for (int i = 0; i < 120; ++i) {
         decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, false);
@@ -293,8 +303,6 @@ void test_resident_at_home_decision_and_weather_immunity_in_transit() {
     assert(decisions.decision() == PedestrianDecision::awaiting_activity);
     assert(pedestrians.instances().front().state == PedestrianState::idle);
 
-    // Simulate the visit bridge consuming the intent and starting a route. A
-    // sudden rain decision tick cannot cancel/replan the live walk.
     const std::uint64_t pedestrian_id = pedestrians.instances().front().id;
     pedestrians.clear_outing_intent(pedestrian_id);
     assert(pedestrians.send_pedestrian({1, 3}, {1, 8}, network));
@@ -328,5 +336,6 @@ int main() {
     test_visiting_state_blocks_reroute_and_faces_door();
     test_clothing_is_chosen_once_per_actor_birth();
     test_budget_distribution();
+    test_need_decay_priority_and_restore();
     test_weather_policy_and_monthly_budget();
 }
