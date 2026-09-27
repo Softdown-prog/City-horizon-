@@ -3418,7 +3418,7 @@ int main() {
             (void)audio.set_ambience_loop(SoundEvent::weather_rain, is_raining_now);
         }
         if (weather.flash_alpha() != 0) {
-            (void)audio.play(SoundEvent::weather_thunder);
+            (void)audio.play_weather_effect(SoundEvent::weather_thunder);
         }
         seagull_seconds += std::min(frame_seconds, 0.050F);
         if (seagull_pass_active) {

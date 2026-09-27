@@ -195,9 +195,13 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
     if (ambience_loop_track_ == nullptr) {
         std::cerr << "Weather ambience audio track could not be created: " << SDL_GetError() << '\n';
     }
+    weather_effect_track_ = MIX_CreateTrack(mixer_);
+    if (weather_effect_track_ == nullptr) {
+        std::cerr << "Weather one-shot audio track could not be created: " << SDL_GetError() << '\n';
+    }
 
     if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr ||
-        ambience_loop_track_ == nullptr) {
+        ambience_loop_track_ == nullptr || weather_effect_track_ == nullptr) {
         std::cerr << "Audio disabled: no usable cached effects or playback tracks.\n";
         shutdown();
         return false;
@@ -221,6 +225,10 @@ void AudioManager::shutdown() {
     if (ambience_loop_track_ != nullptr) {
         MIX_DestroyTrack(ambience_loop_track_);
         ambience_loop_track_ = nullptr;
+    }
+    if (weather_effect_track_ != nullptr) {
+        MIX_DestroyTrack(weather_effect_track_);
+        weather_effect_track_ = nullptr;
     }
     if (music_track_ != nullptr) {
         MIX_DestroyTrack(music_track_);
@@ -366,6 +374,31 @@ bool AudioManager::set_ambience_loop(const SoundEvent event, const bool enabled)
     return true;
 }
 
+bool AudioManager::play_weather_effect(const SoundEvent event) {
+    if (!available_ || weather_effect_track_ == nullptr) {
+        return false;
+    }
+    const std::size_t index = event_index(event);
+    if (index >= kEventCount || effects_[index].empty()) {
+        return false;
+    }
+
+    // A new lightning flash has priority over the tail of an older weather
+    // one-shot. Restarting this dedicated track never steals an ordinary UI
+    // effect, attraction loop, rain ambience or music track.
+    if (MIX_TrackPlaying(weather_effect_track_) && !MIX_StopTrack(weather_effect_track_, 0)) {
+        std::cerr << "Previous weather one-shot could not stop: " << SDL_GetError() << '\n';
+        return false;
+    }
+    if (!MIX_SetTrackAudio(weather_effect_track_, effects_[index].front()) ||
+        !MIX_PlayTrack(weather_effect_track_, 0)) {
+        std::cerr << "Weather one-shot could not play: " << kEventNames[index]
+                  << "\nSDL error: " << SDL_GetError() << '\n';
+        return false;
+    }
+    return true;
+}
+
 bool AudioManager::play_loading_music() {
     if (!available_ || music_track_ == nullptr || loading_music_ == nullptr) return false;
     if (MIX_TrackPlaying(music_track_)) return true;
@@ -440,6 +473,9 @@ void AudioManager::apply_volume_settings() {
     }
     if (ambience_loop_track_ != nullptr && !MIX_SetTrackGain(ambience_loop_track_, volume_settings_.ambience)) {
         std::cerr << "Could not apply ambience volume: " << SDL_GetError() << '\n';
+    }
+    if (weather_effect_track_ != nullptr && !MIX_SetTrackGain(weather_effect_track_, volume_settings_.effects)) {
+        std::cerr << "Could not apply weather effect volume: " << SDL_GetError() << '\n';
     }
     if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {
         std::cerr << "Could not apply music volume: " << SDL_GetError() << '\n';
