@@ -22,20 +22,25 @@ SimulationScheduleAdvance SimulationScheduler::advance_frame(const float frame_s
     if (frame_seconds <= 0.0F) return {0, mobile_tick_seconds_};
 
     mobile_accumulator_ += frame_seconds;
-    SimulationScheduleAdvance result{0, mobile_tick_seconds_};
-    while (mobile_accumulator_ >= mobile_tick_seconds_ &&
-           result.mobile_ticks < kMaxMobileCatchUpTicksPerFrame) {
-        mobile_accumulator_ -= mobile_tick_seconds_;
-        ++result.mobile_ticks;
-    }
 
-    // Drop only excessive historical backlog. Keeping at most one partial tick
-    // prevents a permanent spiral-of-death after a hitch without changing the
-    // normal fixed-step cadence during regular gameplay.
+    // Compute due work in O(1). The previous loop executed once for every
+    // accumulated simulation tick and could amplify a hitch into another hitch.
+    const float due_float = std::floor(mobile_accumulator_ / mobile_tick_seconds_);
+    const std::uint32_t due_ticks = due_float <= 0.0F
+        ? 0U
+        : static_cast<std::uint32_t>(std::min(
+              due_float, static_cast<float>(kMaxMobileCatchUpTicksPerFrame)));
+
+    mobile_accumulator_ -= static_cast<float>(due_ticks) * mobile_tick_seconds_;
+
+    // Drop only excessive historical backlog. Keeping one partial tick retains
+    // the normal fixed-step cadence while preventing a spiral-of-death after a
+    // debugger pause, window stall or unusually expensive render frame.
     if (mobile_accumulator_ >= mobile_tick_seconds_) {
         mobile_accumulator_ = std::fmod(mobile_accumulator_, mobile_tick_seconds_);
     }
-    return result;
+
+    return {due_ticks, mobile_tick_seconds_};
 }
 
 float SimulationScheduler::mobile_tick_hz() const {
