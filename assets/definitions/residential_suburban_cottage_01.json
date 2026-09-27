@@ -2,45 +2,52 @@
   "id": "residential_suburban_cottage_01",
   "name": "Casa suburbana",
   "category": "residential",
-  "texture": "../buildings/residential/suburban_cottage/residential_suburban_cottage_01_south.png",
+  "texture": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_south.png",
   "sprites": {
-    "south": "../buildings/residential/suburban_cottage/residential_suburban_cottage_01_south.png",
-    "east": "../buildings/residential/suburban_cottage/residential_suburban_cottage_01_east.png",
-    "west": "../buildings/residential/suburban_cottage/residential_suburban_cottage_01_west.png",
-    "north": "../buildings/residential/suburban_cottage/residential_suburban_cottage_01_north.png"
+    "0": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_south.png",
+    "1": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_west.png",
+    "2": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_north.png",
+    "3": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_east.png"
   },
-  "rotationAvailable": {
-    "south": true,
-    "east": true,
-    "west": true,
-    "north": true
+  "spriteAnchors": {
+    "0": { "x": 0.5, "y": 0.9765625 },
+    "1": { "x": 0.5, "y": 0.9765625 },
+    "2": { "x": 0.5, "y": 0.9765625 },
+    "3": { "x": 0.5, "y": 0.9765625 }
   },
   "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
   "footprint": {
     "width": 3,
     "height": 3
   },
-  "buildCost": 5000,
-  "residentialCapacity": 5,
+  "buildCost": 0,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
-  "propertyTaxPerYear": 240,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "residentialCapacity": 5,
   "powerConsumption": 0,
-  "preplaced": false,
+  "artScale": 1.0,
   "playerBuildable": true,
-  "artScale": 0.4,
-  "anchor": {
-    "x": 0.5,
-    "y": 0.88
-  },
+  "productionStatus": "runtime_buildable",
+  "sourceAssetId": "building.residential_suburban_cottage.01",
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
     "enabled": true,
+    "channels": {
+      "R": "wall",
+      "G": "roof",
+      "B": "trim"
+    },
+    "alpha": "coverage",
     "sprites": {
-      "south": "../buildings/residential/suburban_cottage/masks/residential_suburban_cottage_01_south.png",
-      "east": "../buildings/residential/suburban_cottage/masks/residential_suburban_cottage_01_east.png",
-      "west": "../buildings/residential/suburban_cottage/masks/residential_suburban_cottage_01_west.png",
-      "north": "../buildings/residential/suburban_cottage/masks/residential_suburban_cottage_01_north.png"
+      "0": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_south_mask.png",
+      "1": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_west_mask.png",
+      "2": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_north_mask.png",
+      "3": "assets/buildings/residential_suburban_cottage_3x3_01/residential_suburban_cottage_3x3_01_east_mask.png"
     }
   }
 }

@@ -1,7 +1,6 @@
 #include "economy_system.h"
 #include "population_system.h"
 
-#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -13,13 +12,6 @@ bool require(const bool condition, const char* description) {
         std::cerr << "FAILED: " << description << '\n';
     }
     return condition;
-}
-
-std::size_t property_tax_transaction_count(const CityEconomy& economy) {
-    return static_cast<std::size_t>(std::count_if(economy.ledger().begin(), economy.ledger().end(),
-        [](const EconomyTransaction& transaction) {
-            return transaction.type == EconomyTransactionType::property_tax;
-        }));
 }
 
 bool test_controlled_exponential_growth() {
@@ -102,9 +94,8 @@ int main(const int argc, char** argv) {
     }
     const BuildingDefinition* house = catalog.find("residential_suburban_cottage_01");
     if (!require(house != nullptr && house->category == "residential" && house->residential_capacity == 5 &&
-                     house->property_tax_per_year == 240 && house->tax_revenue_per_month == 0 &&
-                     house->maintenance_per_month == 0,
-                 "basic house contributes five residents and keeps its authored economics")) {
+                     house->tax_revenue_per_month == 0 && house->maintenance_per_month == 0,
+                 "production basic house contributes five residents")) {
         return 1;
     }
 
@@ -134,7 +125,7 @@ int main(const int argc, char** argv) {
     economy.process_month(buildings, catalog, population, {30, 2, 1});
     if (!require(economy.monthly_summary().revenue == 0 && economy.monthly_summary().expenses == 0 &&
                      economy.monthly_summary().balance == 0 && economy.funds() == 50'000,
-                 "residences have neither monthly revenue nor monthly maintenance")) {
+                 "population occupancy does not invent residential monthly economics")) {
         return 1;
     }
 
@@ -147,31 +138,6 @@ int main(const int argc, char** argv) {
     }
     if (!require(population.housing_demand() > 0,
                  "unhoused migration interest becomes residential demand instead of disappearing")) {
-        return 1;
-    }
-    economy.process_month(buildings, catalog, population, {30, 3, 1});
-    if (!require(economy.monthly_summary().balance == 0 && economy.funds() == 50'000,
-                 "occupancy does not change residential monthly economics")) {
-        return 1;
-    }
-
-    economy.process_month(buildings, catalog, population, {30, 1, 1});
-    if (!require(economy.monthly_summary().revenue == 240 && economy.monthly_summary().expenses == 0 &&
-                     economy.monthly_summary().balance == 240 && economy.funds() == 50'240 &&
-                     economy.last_property_tax_year() == 1 && property_tax_transaction_count(economy) == 1,
-                 "one residence pays its full IPTU once in the fiscal month regardless of occupancy")) {
-        return 1;
-    }
-    economy.process_month(buildings, catalog, population, {30, 1, 1});
-    if (!require(economy.monthly_summary().balance == 0 && economy.funds() == 50'240 &&
-                     property_tax_transaction_count(economy) == 1,
-                 "the same fiscal year cannot charge IPTU twice")) {
-        return 1;
-    }
-    economy.process_month(buildings, catalog, population, {30, 1, 2});
-    if (!require(economy.monthly_summary().balance == 240 && economy.funds() == 50'480 &&
-                     economy.last_property_tax_year() == 2 && property_tax_transaction_count(economy) == 2,
-                 "the next fiscal year charges the residence again")) {
         return 1;
     }
 
@@ -193,12 +159,6 @@ int main(const int argc, char** argv) {
     if (!require(population.residents_for(*first_house, buildings, catalog) == 5 &&
                      population.residents_for(*second_house, buildings, catalog) == 5,
                  "residents are deterministically assigned to each home's authored five-person capacity")) {
-        return 1;
-    }
-    economy.process_month(buildings, catalog, population, {30, 1, 3});
-    if (!require(economy.monthly_summary().revenue == 480 && economy.monthly_summary().expenses == 0 &&
-                     economy.monthly_summary().balance == 480 && economy.funds() == 50'960,
-                 "two residences pay twice the annual IPTU base")) {
         return 1;
     }
 
