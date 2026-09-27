@@ -40,6 +40,9 @@
   "rideQueueContract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
   "passengerOverlay": {
     "contract": "CH_RIDE_PASSENGER_OVERLAY_V1",
+    "bindingContract": "CH_RIDE_PASSENGER_SEAT_BINDING_V1",
+    "seatLayoutContract": "CH_RIDE_PASSENGER_SEAT_LAYOUT_V1",
+    "seatLayoutManifest": "assets/city_park/viking_ship/viking_ship_passenger_seats_v15.json",
     "actorSource": "assets/characters/ch_actor_green_01",
     "seatCount": 20,
     "seatAssignment": "queue_order_next_free_slot",
@@ -47,9 +50,10 @@
     "motionParent": "SwingPivot",
     "geometryParent": "BoatRoot",
     "reviewRevision": "V15",
+    "runtimeSeatBindingReady": true,
     "runtimePromoted": false
   },
   "swingFramesBaked": false,
   "animationPending": true,
-  "status": "runtime_static_registered_v15_data_driven_ride_passenger_swing_proxy_pending_review"
+  "status": "runtime_static_registered_v15_real_rider_seat_binding_ready_visual_promotion_pending"
 }
