@@ -1720,7 +1720,8 @@ int main() {
     int mixamo_gait_preset_index = 2;
     // Start the explicit F7 test with the character the player is reviewing.
     // Other looks remain available through F8; no NPC is spawned automatically.
-    int pedestrian_visual_index = mobile_animations.find_set("visitor_male_01_south_front_candidate") == nullptr ? 0 : 4;
+    int pedestrian_visual_index = mobile_animations.find_set("visitor_male_01_full_pose_east_candidate") != nullptr ? 5 :
+        mobile_animations.find_set("visitor_male_01_south_front_candidate") != nullptr ? 4 : 0;
     const auto pedestrian_visual_id = [&]() -> std::string_view {
         switch (pedestrian_visual_index) {
             case 1: return "citizen_female_light_blue";

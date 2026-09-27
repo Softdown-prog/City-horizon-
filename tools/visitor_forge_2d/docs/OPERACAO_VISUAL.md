@@ -15,6 +15,15 @@ o Visitor Forge usa peças RGBA e poses e produz PNGs, sem render 3D obrigatóri
 | Passos EAST/NORTH/WEST | `art/concepts/directional_gait_candidate_v1/recipe.json` |
 | Catálogo de teste com quatro direções | `runtime_preview/visitor_male_01_south_front_candidate.json` |
 
+O teste F8 ganhou mais duas opções depois desse catálogo: **sexta**, Full Pose
+EAST (`runtime_preview/visitor_male_01_full_pose_east_candidate.json`); **sétima**,
+Structural Gait V2 (`runtime_preview/visitor_male_01_structural_gait_v2_candidate.json`).
+O par EAST de poses completas é agora a aparência inicial do teste F7 quando
+disponível. As demais direções da sexta opção ainda usam o estudo V1. A sétima
+troca EAST/NORTH/WEST pelo V2, mas conserva os braços quase imóveis; não é uma
+aprovação visual. Veja `art/concepts/walk_map_comparison_v1/` para o painel e
+GIF comparativos a 56 px sobre a captura do MapForge.
+
 Os arquivos em `art/concepts/frames_preview/` e o catálogo
 `runtime_preview/visitor_male_01.json` são a prévia **anterior**. Não baseie
 uma nova caminhada SOUTH neles. Não chame um master de 512 px de frame final;
@@ -68,7 +77,8 @@ encostar na linha 115 com anchor comum `[64, 116]`; cada pose de caminhada
 dura 220 ms. Os passos são intencionalmente curtos, mas podem deslizar no mapa.
 
 Para teste na engine: compile `city_builder` com
-`-DCH_VISITOR_FORGE_PREVIEW=ON`, selecione a **quinta** aparência com F8;
+`-DCH_VISITOR_FORGE_PREVIEW=ON`. F7 começa no Full Pose EAST quando está
+embalado; selecione a quinta aparência com F8 para comparar o estudo V1;
 marque origem/destino em ruas com F3/F4 e mova com F6. Para SOUTH lógico, use
 rota ao longo de +Y; na projeção isométrica essa rota aparece inclinada na
 tela. F7 testa uma rota +X e altera velocidade. Confira as quatro direções
