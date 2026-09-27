@@ -1713,10 +1713,9 @@ int main() {
         entities.insert(entities.end(), std::make_move_iterator(pedestrian_entities.begin()), std::make_move_iterator(pedestrian_entities.end()));
         return entities;
     };
-    // A non-mutating runtime proof: F7 searches the current map for six road
-    // tiles along +X. PedestrianLaneNavigationNetwork derives its route from
-    // that road topology while the per-entity ground offset puts the sprite on
-    // the integrated sidewalk edge rather than in the vehicle lane.
+    // F7 uses the same navigable cells as the foot contact: floor first, then
+    // road. Each frame's [24,60] pivot is placed at the tile centre by the
+    // mobile renderer; the route never crosses undecorated terrain.
     // Every preset keeps the approved 175 ms canonical cycle. Only world
     // velocity varies for runtime foot-skating calibration of the new skin.
     int mixamo_gait_preset_index = 2;
@@ -1780,27 +1779,29 @@ int main() {
         const int duration_ms = pedestrian_visual_index == 7 ? 138 :
             pedestrian_visual_index == 5 ? 270 : visitor_preview ? 220 : 175;
         pedestrians.configure_visual_test(preset);
-        constexpr int kRequiredSidewalkTiles = 6;
-        const PedestrianLaneNavigationNetwork network{roads};
-        for (int y = kMapMin; y <= kMapMax; ++y) {
-            for (int x = kMapMin; x <= kMapMax - (kRequiredSidewalkTiles - 1); ++x) {
-                bool straight_road = true;
-                for (int offset = 0; offset < kRequiredSidewalkTiles; ++offset) {
-                    if (!roads.is_road(x + offset, y)) {
-                        straight_road = false;
-                        break;
-                    }
-                }
-                if (straight_road && pedestrians.send_test_pedestrian({x, y}, {x + kRequiredSidewalkTiles - 1, y}, network)) {
+        constexpr int kRouteLength = 6;
+        const PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+        const auto try_start = [&](const int x, const int y) {
+            for (const NavigationTile goal : {NavigationTile{x + kRouteLength - 1, y},
+                                              NavigationTile{x, y + kRouteLength - 1}}) {
+                if (!network.is_navigable(goal)) continue;
+                if (pedestrians.send_test_pedestrian({x, y}, goal, network)) {
                     status = std::string(pedestrian_visual_label()) + " " + preset_name + ": " + std::to_string(duration_ms) + " MS | " +
                              std::to_string(preset.movement_speed_tiles_per_second) +
-                             (visitor_preview ? " T/S | 56 PX PREVIEW" : " T/S | 32 PX");
+                             " T/S | CALCADA / RUA";
                     mixamo_gait_preset_index = (mixamo_gait_preset_index + 1) % 3;
-                    return;
+                    return true;
                 }
             }
+            return false;
+        };
+        for (const SidewalkTile& tile : sidewalks.tiles()) {
+            if (try_start(tile.tile_x, tile.tile_y)) return;
         }
-        status = "MIXAMO SE TEST: DRAW 6 STRAIGHT ROAD TILES ALONG +X";
+        for (const RoadTile& tile : roads.tiles()) {
+            if (try_start(tile.tile_x, tile.tile_y)) return;
+        }
+        status = "PEDESTRIAN: CONNECT 6 FLOOR / ROAD TILES FOR F7";
     };
 
     const auto clear_map_modes = [&]() {
@@ -3182,19 +3183,21 @@ int main() {
                         }
                         break;
                     }
-                    case SDL_SCANCODE_F6:
+                    case SDL_SCANCODE_F6: {
+                        const PedestrianSurfaceNavigationNetwork pedestrian_surfaces{roads, sidewalks};
                         if (!navigation_debug_start || !navigation_debug_goal) {
-                            status = "PEDESTRIAN DEBUG: SET ROAD START (F3) AND GOAL (F4)";
-                        } else if (!roads.is_road(navigation_debug_start->x, navigation_debug_start->y) ||
-                                   !roads.is_road(navigation_debug_goal->x, navigation_debug_goal->y)) {
-                            status = "PEDESTRIAN: START AND GOAL MUST BE ROADS";
+                            status = "PEDESTRIAN: SET FLOOR / ROAD START (F3) AND GOAL (F4)";
+                        } else if (!pedestrian_surfaces.is_navigable(*navigation_debug_start) ||
+                                   !pedestrian_surfaces.is_navigable(*navigation_debug_goal)) {
+                            status = "PEDESTRIAN: START AND GOAL MUST BE WALKABLE";
                         } else if (pedestrians.send_test_pedestrian(*navigation_debug_start, *navigation_debug_goal,
-                                                                     PedestrianLaneNavigationNetwork{roads})) {
-                            status = "PEDESTRIAN WALKING ON INTEGRATED ROAD EDGE";
+                                                                     pedestrian_surfaces)) {
+                            status = "PEDESTRIAN WALKING ON FLOOR / ROAD";
                         } else {
-                            status = "PEDESTRIAN: NO ROAD-EDGE PATH";
+                            status = "PEDESTRIAN: NO WALKABLE PATH";
                         }
                         break;
+                    }
                     case SDL_SCANCODE_F7:
                         send_mixamo_se_test();
                         break;
@@ -3303,7 +3306,7 @@ int main() {
         const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
         for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
             service_vehicles.update_tick(scheduled.mobile_tick_seconds, service_vehicle_catalog, vehicle_traversable);
-            pedestrians.update_tick(scheduled.mobile_tick_seconds, PedestrianLaneNavigationNetwork{roads});
+            pedestrians.update_tick(scheduled.mobile_tick_seconds, PedestrianSurfaceNavigationNetwork{roads, sidewalks});
         }
         for (const TileCoordinate& completed : service_vehicles.take_completed_tiles()) {
             (void)farming.prepare_soil(completed.x, completed.y);

@@ -81,10 +81,29 @@ void test_sidewalks() {
     assert(find_navigation_path(network, {-1, 0}, {1, 0}).status == NavigationPathStatus::no_path);
 }
 
+void test_pedestrian_surface_route() {
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    assert(sidewalks.place_tile(0, 0, "cement_path"));
+    assert(sidewalks.place_tile(1, 0, "sand_path"));
+    assert(sidewalks.place_tile(2, 0, "dirt_path"));
+    assert(roads.place_tile(3, 0));
+    assert(roads.place_tile(3, 1));
+    assert(sidewalks.place_tile(2, 1, "grass"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    assert_path(find_navigation_path(network, {0, 0}, {3, 1}), {0, 0}, {3, 1}, 5);
+    assert(network.can_move({1, 0}, CardinalDirection::east));
+    assert(!network.is_navigable({2, 1})); // grass is not a route
+    assert(!network.can_move({2, 0}, CardinalDirection::south));
+    assert(sidewalks.remove_tile(1, 0));
+    assert(find_navigation_path(network, {0, 0}, {3, 1}).status == NavigationPathStatus::no_path);
+}
+
 } // namespace
 
 int main() {
     test_roads();
     test_pedestrian_lanes_derive_from_roads();
     test_sidewalks();
+    test_pedestrian_surface_route();
 }

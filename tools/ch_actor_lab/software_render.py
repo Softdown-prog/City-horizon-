@@ -23,9 +23,10 @@ COLORS = {
     "jacket": "#15803d", "shirt": "#f8fafc", "pants": "#1d4ed8",
     "hair": "#5a3825", "skin": "#f6c29e", "shoes": "#1f2937",
 }
-# Rotation of a +Z-facing visitor around world Y while camera stays fixed.
-DIRECTIONS = (("S", "SW", math.pi / 2), ("E", "SE", 0),
-              ("W", "NW", math.pi), ("N", "NE", -math.pi / 2))
+# +Z projects screen SW, +X SE, -X NW and -Z NE. Keep these
+# rotations in lockstep with the engine's logical X/Y tile projection.
+DIRECTIONS = (("S", "SW", 0), ("E", "SE", math.pi / 2),
+              ("W", "NW", -math.pi / 2), ("N", "NE", math.pi))
 
 
 def rgb(hex_color: str, factor: float = 1) -> tuple[int, int, int, int]:
@@ -207,23 +208,39 @@ def map_board(sheet: Image.Image, count: int, capture: Path, out: Path) -> None:
 def map_motion(sheet: Image.Image, count: int, capture: Path, out: Path) -> None:
     background = Image.open(capture).convert("RGBA").crop((260, 310, 640, 690))
     vectors = ((-64, 32), (64, 32), (-64, -32), (64, -32))
+    surfaces = (("cimento", (143, 151, 149, 225)), ("areia", (184, 153, 101, 225)),
+                ("rua", (88, 97, 106, 230)), ("terra", (151, 117, 83, 225)))
     frames = []
     for tick in range(count * 2):
         board = Image.new("RGBA", (760, 760))
         for row, (logical, screen, _) in enumerate(DIRECTIONS):
             scene = background.copy()
             dx, dy = vectors[row]
+            # A labelled validation overlay. The actual runtime reads the
+            # RoadManager / SidewalkManager; this captured map has only grass.
+            overlay = Image.new("RGBA", scene.size)
+            floor = ImageDraw.Draw(overlay)
+            surface_name, fill = surfaces[row]
+            for step in range(3):
+                cx, cy = 142 + step * dx, 306 + step * dy
+                floor.polygon(((cx, cy - 32), (cx + 64, cy),
+                               (cx, cy + 32), (cx - 64, cy)),
+                              fill=fill, outline=(50, 60, 61, 255), width=1)
+            scene.alpha_composite(overlay)
             # 0.30 tile/s at eight 137.5 ms frames: world motion is continuous.
             progress = .30 * tick * (1.1 / count)
             foot_x = 142 + round(dx * progress)
             foot_y = 306 + round(dy * progress)
+            contact = ImageDraw.Draw(scene)
+            contact.ellipse((foot_x - 2, foot_y - 2, foot_x + 2, foot_y + 2),
+                            fill=(250, 205, 84, 255))
             col = tick % count
             sprite = sheet.crop((col * FRAME[0], row * FRAME[1],
                                  (col + 1) * FRAME[0], (row + 1) * FRAME[1]))
             scene.alpha_composite(sprite, (foot_x - ANCHOR[0], foot_y - ANCHOR[1]))
             draw = ImageDraw.Draw(scene)
             draw.rectangle((0, 0, 154, 31), fill=(13, 30, 27, 235))
-            draw.text((8, 8), f"{logical} / {screen}  quadro {col}", fill="white")
+            draw.text((8, 8), f"{logical} / {screen}  {surface_name}  q{col}", fill="white")
             board.alpha_composite(scene, ((row % 2) * 380, (row // 2) * 380))
         frames.append(board.convert("RGB"))
     duration = round(1100 / count)

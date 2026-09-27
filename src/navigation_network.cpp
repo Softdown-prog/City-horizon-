@@ -45,6 +45,19 @@ bool SidewalkNavigationNetwork::is_connected(const NavigationTile tile, const Ca
     return sidewalks_.is_connected_to(tile.x, tile.y, direction);
 }
 
+bool PedestrianSurfaceNavigationNetwork::is_navigable(const NavigationTile tile) const {
+    if (roads_.is_road(tile.x, tile.y)) return true;
+    const SidewalkTile* floor = sidewalks_.tile_at(tile.x, tile.y);
+    if (floor == nullptr) return false;
+    return floor->style_id == "dirt_path" || floor->style_id == "sand_path" ||
+           floor->style_id == "cement_path" || floor->style_id == "concrete_01";
+}
+
+bool PedestrianSurfaceNavigationNetwork::is_connected(const NavigationTile tile, const CardinalDirection direction) const {
+    const TileOffset offset = direction_offset(direction);
+    return is_navigable(tile) && is_navigable({tile.x + offset.x, tile.y + offset.y});
+}
+
 NavigationPathResult find_navigation_path(const NavigationNetwork& network, const NavigationTile start, const NavigationTile goal) {
     if (!network.is_navigable(start) || !network.is_navigable(goal)) return {};
     if (start == goal) return {NavigationPathStatus::found, {start}};

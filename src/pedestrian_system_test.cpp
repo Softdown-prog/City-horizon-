@@ -74,9 +74,26 @@ void test_demolition_replans_once_then_stops_safely() {
     assert(stranded.instances().front().spatial.logical_tile_y == 0);
 }
 
+void test_surface_turn_and_idle() {
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    assert(sidewalks.place_tile(0, 0, "cement_path"));
+    assert(sidewalks.place_tile(1, 0, "sand_path"));
+    assert(roads.place_tile(1, 1));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSystem pedestrians = make_pedestrian_system();
+    assert(pedestrians.send_test_pedestrian({0, 0}, {1, 1}, network));
+    assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::east);
+    pedestrians.update_tick(0.46F, network);
+    assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::south);
+    pedestrians.update_tick(0.46F, network);
+    assert(pedestrians.instances().front().state == PedestrianState::idle);
+}
+
 } // namespace
 
 int main() {
     test_sidewalk_route_and_turns();
     test_demolition_replans_once_then_stops_safely();
+    test_surface_turn_and_idle();
 }

@@ -62,14 +62,13 @@
   <script>
   'use strict';
   // CH_CAMERA_V1: câmera fixa 45°/30°; cada direção gira apenas o ator.
-  // Com +Z como frente do boneco, estas rotações preservam o mapeamento
-  // relativo da prova V0 (S/E/W/N) após a mudança de yaw da câmera.
+  // +Z aponta SW, +X SE, -X NW, -Z NE na projeção fixa do mapa.
   const CONTRACT = Object.freeze({version:'CH_ACTOR_CONTRACT_V1', camera:'CH_CAMERA_V1', yawDeg:45, pitchDeg:30,
     anchorOffsetPx:4, directions:[
-      {logical:'S',screen:'SW',row:0,angleRad:Math.PI/2},
-      {logical:'E',screen:'SE',row:1,angleRad:0},
-      {logical:'W',screen:'NW',row:2,angleRad:Math.PI},
-      {logical:'N',screen:'NE',row:3,angleRad:-Math.PI/2}
+      {logical:'S',screen:'SW',row:0,angleRad:0},
+      {logical:'E',screen:'SE',row:1,angleRad:Math.PI/2},
+      {logical:'W',screen:'NW',row:2,angleRad:-Math.PI/2},
+      {logical:'N',screen:'NE',row:3,angleRad:Math.PI}
     ]});
   const $=id=>document.getElementById(id);
   if(!window.THREE) { $('status').textContent='Three.js não carregou. Verifique a conexão e recarregue a página.'; throw Error('Three.js unavailable'); }

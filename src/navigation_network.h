@@ -53,6 +53,20 @@ private:
     const SidewalkManager& sidewalks_;
 };
 
+// The pedestrian's foot contact travels on occupied floor or road cells,
+// including transitions between concrete, sand, dirt and road. Rendering
+// seam masks remain style-specific; walking adjacency is independent of art.
+class PedestrianSurfaceNavigationNetwork final : public NavigationNetwork {
+public:
+    PedestrianSurfaceNavigationNetwork(const RoadManager& roads, const SidewalkManager& sidewalks)
+        : roads_(roads), sidewalks_(sidewalks) {}
+    [[nodiscard]] bool is_navigable(NavigationTile tile) const override;
+    [[nodiscard]] bool is_connected(NavigationTile tile, CardinalDirection direction) const override;
+private:
+    const RoadManager& roads_;
+    const SidewalkManager& sidewalks_;
+};
+
 enum class NavigationPathStatus { found, no_path };
 
 struct NavigationPathResult {
