@@ -3,6 +3,7 @@
 
 #include <QColor>
 #include <QFile>
+#include <QFont>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -88,6 +89,40 @@ void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const QPointF& 
     painter.drawImage(target, sprite);
 }
 
+void drawPortalMarker(QPainter& painter, const QJsonObject& portal,
+                      const ch::CameraState& camera, const int width, const int height) {
+    if (!portal.value("enabled").toBool(false)) return;
+    const QPointF tile = pairOr(portal, "tile", QPointF(0.0, 0.0));
+    const QPolygonF polygon = tilePolygon(static_cast<int>(tile.x()), static_cast<int>(tile.y()), camera, width, height);
+    const QColor color = colorOr(portal, "color", QColor(255, 192, 62, 245));
+    QPen pen(color);
+    pen.setWidthF(3.0);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPolygon(polygon);
+
+    const auto center = ch::world_to_screen_point(static_cast<float>(tile.x()) + 0.5F,
+                                                   static_cast<float>(tile.y()) + 0.5F,
+                                                   camera, width, height);
+    painter.drawLine(QPointF(center.x - 14.0, center.y), QPointF(center.x + 14.0, center.y));
+    painter.drawLine(QPointF(center.x, center.y - 14.0), QPointF(center.x, center.y + 14.0));
+
+    const QString label = portal.value("label").toString(QStringLiteral("PORTAL RODOVIARIO"));
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPointSize(11);
+    painter.setFont(font);
+    painter.drawText(QPointF(center.x + 18.0, center.y - 12.0), label);
+
+    const QString detail = portal.value("detail").toString();
+    if (!detail.isEmpty()) {
+        font.setBold(false);
+        font.setPointSize(9);
+        painter.setFont(font);
+        painter.drawText(QPointF(center.x + 18.0, center.y + 8.0), detail);
+    }
+}
+
 MapCaptureResult fail(int code, const QString& message) {
     return MapCaptureResult{false, code, message};
 }
@@ -116,6 +151,7 @@ MapCaptureResult runMapCapture(const QString& output_path,
     const QJsonObject cameraSpec = capture.value("camera").toObject();
     const QJsonObject stage = capture.value("stage").toObject();
     const QJsonObject candidateSpec = capture.value("candidate").toObject();
+    const QJsonObject portalSpec = capture.value("portal").toObject();
 
     const int width = std::clamp(canvas.value("width").toInt(1024), 320, 4096);
     const int height = std::clamp(canvas.value("height").toInt(768), 240, 4096);
@@ -210,6 +246,8 @@ MapCaptureResult runMapCapture(const QString& output_path,
     } else {
         drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
     }
+
+    drawPortalMarker(painter, portalSpec, camera, width, height);
 
     if (candidateSpec.value("showAnchor").toBool(true)) {
         const auto ground = ch::world_to_screen_point(static_cast<float>(candidateTile.x()) + 0.5F,
