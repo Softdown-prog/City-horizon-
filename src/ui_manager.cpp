@@ -759,6 +759,7 @@ void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y
 void GameplayUi::render(SDL_Renderer* renderer) const {
     if (model_.overlay == UiOverlay::none) render_park_fences(renderer);
     render_legacy(renderer);
+#include "ui_modal_polish.inl"
     if (renderer != nullptr && model_.overlay == UiOverlay::none) {
         render_catalog_card_interaction_fx(renderer, buttons_);
     }
