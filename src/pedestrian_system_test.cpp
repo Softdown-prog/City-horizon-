@@ -179,6 +179,25 @@ void test_clothing_is_chosen_once_per_actor_birth() {
     assert(pedestrians.instances().front().id != born_id);
 }
 
+void test_budget_distribution() {
+    std::size_t low = 0;
+    std::size_t middle = 0;
+    std::size_t upper = 0;
+    std::size_t high = 0;
+    for (std::uint64_t id = 1; id <= 100; ++id) {
+        const std::int64_t budget = PedestrianSystem::budget_capacity_for_id(id);
+        if (budget == PedestrianSystem::kDefaultMonthlyBudgetCents) ++low;
+        else if (budget == PedestrianSystem::kMiddleMonthlyBudgetCents) ++middle;
+        else if (budget == PedestrianSystem::kUpperMonthlyBudgetCents) ++upper;
+        else if (budget == PedestrianSystem::kHighMonthlyBudgetCents) ++high;
+        else assert(false);
+    }
+    assert(low == 70);
+    assert(middle == 20);
+    assert(upper == 8);
+    assert(high == 2);
+}
+
 void test_weather_policy_and_monthly_budget() {
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::sunny, false) - 0.85F) < 0.001F);
     assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::overcast, false) - 0.45F) < 0.001F);
@@ -201,6 +220,7 @@ void test_weather_policy_and_monthly_budget() {
     assert(pedestrians.send_pedestrian({0, 0}, {0, 0}, network));
     assert(pedestrians.rest_at_home({0, 0}));
     const std::uint64_t id = pedestrians.instances().front().id;
+    assert(pedestrians.monthly_budget_capacity_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
     assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
     assert(pedestrians.spend_monthly_budget(id, 300));
     assert(pedestrians.monthly_budget_cents(id) == 4'700);
@@ -215,17 +235,18 @@ void test_weather_policy_and_monthly_budget() {
     assert(!pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
 
     // The first observed calendar only initializes the cycle. Same-month calls
-    // do not refill. Crossing a month boundary refills exactly once.
+    // do not refill. Crossing a month boundary restores this citizen's own
+    // assigned allowance, not a global flat amount.
     pedestrians.sync_monthly_budget_cycle(1, 1);
     pedestrians.sync_monthly_budget_cycle(1, 1);
     assert(pedestrians.monthly_budget_cents(id) == 0);
     pedestrians.sync_monthly_budget_cycle(2, 1);
-    assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
+    assert(pedestrians.monthly_budget_cents(id) == pedestrians.monthly_budget_capacity_cents(id));
     assert(pedestrians.spend_monthly_budget(id, 300));
     pedestrians.sync_monthly_budget_cycle(2, 1);
     assert(pedestrians.monthly_budget_cents(id) == 4'700);
     pedestrians.sync_monthly_budget_cycle(1, 2);
-    assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
+    assert(pedestrians.monthly_budget_cents(id) == pedestrians.monthly_budget_capacity_cents(id));
     assert(pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
 }
 
@@ -306,5 +327,6 @@ int main() {
     test_resident_at_home_decision_and_weather_immunity_in_transit();
     test_visiting_state_blocks_reroute_and_faces_door();
     test_clothing_is_chosen_once_per_actor_birth();
+    test_budget_distribution();
     test_weather_policy_and_monthly_budget();
 }
