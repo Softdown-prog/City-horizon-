@@ -61,7 +61,10 @@ def _flatten(frame: Image.Image, background: tuple[int, int, int]) -> Image.Imag
 def _shared_palette(frames: list[Image.Image]) -> Image.Image:
     thumbs: list[Image.Image] = []
     for frame in frames:
-        thumb = frame.copy()
+        # Pillow only accepts RGB/L inputs when quantizing against a palette. Keep the
+        # shared palette source explicitly RGB even if an upstream renderer changes
+        # the PNG mode in the future (RGBA, P, LA, etc.).
+        thumb = frame.convert("RGB")
         thumb.thumbnail((160, 160), Image.Resampling.LANCZOS)
         thumbs.append(thumb)
     width = max(img.width for img in thumbs)
@@ -82,7 +85,7 @@ def _contact_sheet(frames: list[Image.Image], output: Path, labels: bool = True)
     sheet = Image.new("RGB", (cols * cell_w, rows * cell_h), (24, 30, 36))
     draw = ImageDraw.Draw(sheet)
     for index, frame in enumerate(frames):
-        copy = frame.copy()
+        copy = frame.convert("RGB")
         copy.thumbnail((cell_w - 12, 310), Image.Resampling.LANCZOS)
         col = index % cols
         row = index // cols
@@ -113,7 +116,10 @@ def build_from_manifest(manifest_path: Path) -> dict:
 
     palette = _shared_palette(ordered)
     paletted = [
-        frame.quantize(palette=palette, dither=Image.Dither.NONE)
+        # Explicit conversion is intentional. Some Pillow/plugin combinations can
+        # preserve a non-RGB mode even after compositing, and palette quantization
+        # rejects RGBA/P/LA inputs. This makes GIF generation renderer-agnostic.
+        frame.convert("RGB").quantize(palette=palette, dither=Image.Dither.NONE)
         for frame in ordered
     ]
 
