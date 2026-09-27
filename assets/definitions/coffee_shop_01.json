@@ -10,27 +10,18 @@
     "3": "assets/buildings/coffee_shop/coffee_shop_east.png"
   },
   "spriteAnchors": {
-    "0": {
-      "x": 0.5,
-      "y": 0.84375
-    },
-    "1": {
-      "x": 0.5,
-      "y": 0.84375
-    },
-    "2": {
-      "x": 0.5,
-      "y": 0.84375
-    },
-    "3": {
-      "x": 0.5,
-      "y": 0.84375
-    }
+    "0": { "x": 0.5, "y": 0.84375 },
+    "1": { "x": 0.5, "y": 0.84375 },
+    "2": { "x": 0.5, "y": 0.84375 },
+    "3": { "x": 0.5, "y": 0.84375 }
   },
   "rotatable": true,
   "requiresRoadAccess": true,
   "roadAccessMode": "front_edge",
   "frontEdge": "south",
+  "accessPoints": [
+    { "x": 1, "y": 1, "facing": "south" }
+  ],
   "footprint": {
     "width": 2,
     "height": 2
