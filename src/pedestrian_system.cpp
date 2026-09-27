@@ -53,6 +53,17 @@ const PedestrianInstance* PedestrianSystem::find_instance(const std::uint64_t pe
     return found == instances_.end() ? nullptr : &*found;
 }
 
+std::int64_t PedestrianSystem::budget_capacity_for_id(const std::uint64_t pedestrian_id) {
+    // Stable hundred-person cycle. This creates an economy mix without exposing
+    // social classes as gameplay state: 70% low allowance, 20% middle, 8% upper,
+    // and 2% high. The assignment never changes across monthly resets.
+    const std::uint64_t slot = pedestrian_id == 0 ? 0 : (pedestrian_id - 1) % 100;
+    if (slot < 70) return kDefaultMonthlyBudgetCents;
+    if (slot < 90) return kMiddleMonthlyBudgetCents;
+    if (slot < 98) return kUpperMonthlyBudgetCents;
+    return kHighMonthlyBudgetCents;
+}
+
 PedestrianInstance& PedestrianSystem::create_pedestrian(const NavigationTile at) {
     PedestrianInstance pedestrian;
     pedestrian.id = next_id_++;
@@ -64,7 +75,8 @@ PedestrianInstance& PedestrianSystem::create_pedestrian(const NavigationTile at)
         std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
     pedestrian.umbrella_color = kUmbrellaColors[
         std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
-    pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
+    pedestrian.monthly_budget_capacity_cents = budget_capacity_for_id(pedestrian.id);
+    pedestrian.monthly_budget_cents = pedestrian.monthly_budget_capacity_cents;
     pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
     pedestrian.spatial.logical_world_x = static_cast<float>(at.x);
     pedestrian.spatial.logical_world_y = static_cast<float>(at.y);
@@ -209,9 +221,14 @@ std::int64_t PedestrianSystem::monthly_budget_cents(const std::uint64_t pedestri
     return pedestrian == nullptr ? 0 : pedestrian->monthly_budget_cents;
 }
 
+std::int64_t PedestrianSystem::monthly_budget_capacity_cents(const std::uint64_t pedestrian_id) const {
+    const PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    return pedestrian == nullptr ? 0 : pedestrian->monthly_budget_capacity_cents;
+}
+
 void PedestrianSystem::reset_monthly_budgets() {
     for (PedestrianInstance& pedestrian : instances_) {
-        pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
+        pedestrian.monthly_budget_cents = pedestrian.monthly_budget_capacity_cents;
     }
 }
 
