@@ -2,6 +2,8 @@
 #include "population_system.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 namespace {
@@ -18,6 +20,50 @@ std::size_t property_tax_transaction_count(const CityEconomy& economy) {
         [](const EconomyTransaction& transaction) {
             return transaction.type == EconomyTransactionType::property_tax;
         }));
+}
+
+bool test_controlled_exponential_growth() {
+    const std::filesystem::path fixture = std::filesystem::temp_directory_path() / "ch_population_growth_fixture";
+    std::filesystem::create_directories(fixture);
+    {
+        std::ofstream out(fixture / "dense_home.json");
+        out << R"({"id":"dense_home","name":"Dense Home","category":"residential","texture":"house.png",
+            "footprint":{"width":1,"height":1},"residentialCapacity":2000})";
+    }
+
+    BuildingCatalog catalog;
+    bool ok = require(catalog.load_from_directory(fixture), "growth fixture catalog loads");
+    const BuildingDefinition* home = catalog.find("dense_home");
+    ok &= require(home != nullptr && home->residential_capacity == 2000,
+                  "growth fixture exposes large residential capacity");
+    if (!ok) {
+        std::filesystem::remove_all(fixture);
+        return false;
+    }
+
+    BuildingManager buildings(-4, 4);
+    ok &= require(buildings.place(*home, 0, 0).has_value(), "growth fixture residence places");
+
+    PopulationSystem population;
+    population.restore_current_population(1000, buildings, catalog);
+    const std::int32_t growth = population.advance_month(buildings, catalog);
+    ok &= require(growth == 40 && population.current_population() == 1040,
+                  "one thousand residents create four-percent monthly organic demand");
+    ok &= require(population.last_month_potential_growth() == 40 && population.last_month_growth() == 40,
+                  "potential and actual growth are exposed for UI and balancing");
+
+    population.restore_current_population(10, buildings, catalog);
+    ok &= require(population.advance_month(buildings, catalog) == 4,
+                  "small towns retain the four-resident starter migration floor");
+
+    population.restore_current_population(2000, buildings, catalog);
+    ok &= require(population.advance_month(buildings, catalog) == 0,
+                  "housing capacity remains a hard upper bound on arrivals");
+    ok &= require(population.housing_demand() == 80,
+                  "blocked four-percent demand becomes bounded housing pressure");
+
+    std::filesystem::remove_all(fixture);
+    return ok;
 }
 
 }  // namespace
@@ -59,7 +105,7 @@ int main(const int argc, char** argv) {
 
     CityEconomy economy;
     if (!require(population.advance_month(buildings, catalog) == 4 && population.current_population() == 4,
-                 "population grows up to available powered capacity in monthly settlement")) {
+                 "starter migration fills the first available residence at monthly settlement")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 2, 1});
@@ -74,6 +120,10 @@ int main(const int argc, char** argv) {
     }
     if (!require(population.current_population() == 4 && population.advance_month(buildings, catalog) == 0,
                  "population stops exactly at residential capacity")) {
+        return 1;
+    }
+    if (!require(population.housing_demand() > 0,
+                 "unhoused migration interest becomes residential demand instead of disappearing")) {
         return 1;
     }
     economy.process_month(buildings, catalog, population, {30, 3, 1});
@@ -126,6 +176,10 @@ int main(const int argc, char** argv) {
     if (!require(economy.monthly_summary().revenue == 480 && economy.monthly_summary().expenses == 0 &&
                      economy.monthly_summary().balance == 480 && economy.funds() == 50'960,
                  "two residences pay twice the annual IPTU base")) {
+        return 1;
+    }
+
+    if (!test_controlled_exponential_growth()) {
         return 1;
     }
 
