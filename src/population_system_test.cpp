@@ -1,5 +1,6 @@
 #include "economy_system.h"
 #include "population_system.h"
+#include "road_system.h"
 
 #include <filesystem>
 #include <fstream>
@@ -78,6 +79,54 @@ bool test_controlled_exponential_growth() {
                   "blocked four-percent demand becomes bounded housing pressure");
 
     std::filesystem::remove_all(fixture);
+    return ok;
+}
+
+bool test_world_connection_gate() {
+    const std::filesystem::path fixture = std::filesystem::temp_directory_path() / "ch_population_world_gate_fixture";
+    std::filesystem::create_directories(fixture);
+    {
+        std::ofstream out(fixture / "home.json");
+        out << R"({"id":"world_gate_home","name":"Home","category":"residential","texture":"house.png",
+            "footprint":{"width":1,"height":1},"residentialCapacity":10})";
+    }
+    BuildingCatalog catalog;
+    bool ok = require(catalog.load_from_directory(fixture), "world-gate fixture loads");
+    const BuildingDefinition* home = catalog.find("world_gate_home");
+    BuildingManager buildings(-2, 2);
+    ok &= require(home != nullptr && buildings.place(*home, 0, 0).has_value(), "world-gate home places");
+
+    RoadManager roads(-2, 2);
+    PopulationSystem population;
+    population.rebuild_capacity(buildings, catalog, nullptr, &roads);
+    ok &= require(population.advance_month(buildings, catalog, nullptr, &roads) == 0,
+                  "immigration waits while no road touches the map edge");
+    ok &= require(population.housing_demand() > 0, "blocked external immigration remains visible as demand");
+    ok &= require(roads.place_tile(2, 0), "edge road can be placed");
+    ok &= require(roads.has_world_connection(), "edge road is recognized as outside-world connection");
+    ok &= require(population.advance_month(buildings, catalog, nullptr, &roads) == 10,
+                  "queued demand can enter after the outside connection opens");
+
+    std::filesystem::remove_all(fixture);
+    return ok;
+}
+
+bool test_three_negative_month_bankruptcy(const BuildingCatalog& catalog) {
+    BuildingManager buildings(-2, 2);
+    PopulationSystem population;
+    CityEconomy economy;
+    economy.restore_funds(-1);
+    bool ok = true;
+    for (int month = 1; month <= 2; ++month) {
+        economy.process_month(buildings, catalog, population, {30, month, 1});
+        ok &= require(!economy.bankrupt(), "city survives the first two negative-treasury closes");
+        ok &= require(economy.consecutive_negative_months() == month,
+                      "negative-treasury streak increments once per month close");
+    }
+    economy.process_month(buildings, catalog, population, {30, 3, 1});
+    ok &= require(economy.bankrupt() && economy.consecutive_negative_months() == 3,
+                  "third consecutive negative-treasury close declares bankruptcy");
+    ok &= require(!economy.can_afford(0), "bankrupt city cannot authorize new spending");
     return ok;
 }
 
@@ -162,7 +211,8 @@ int main(const int argc, char** argv) {
         return 1;
     }
 
-    if (!test_controlled_exponential_growth()) {
+    if (!test_controlled_exponential_growth() || !test_world_connection_gate() ||
+        !test_three_negative_month_bankruptcy(catalog)) {
         return 1;
     }
 
