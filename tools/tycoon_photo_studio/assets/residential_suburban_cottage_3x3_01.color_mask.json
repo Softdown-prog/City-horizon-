@@ -1,0 +1,18 @@
+{
+  "contract": "CH_COLOR_MASK_V1",
+  "enabled": true,
+  "assetId": "residential_suburban_cottage_3x3_01",
+  "channels": {
+    "R": "house_wall",
+    "G": "house_roof",
+    "B": "house_trim"
+  },
+  "alpha": "coverage",
+  "policy": {
+    "overlays": false,
+    "preserveGlassGlow": true,
+    "preserveFoundation": true,
+    "preserveLandscaping": true,
+    "preserveDoor": true
+  }
+}
