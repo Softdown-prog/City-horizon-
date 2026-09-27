@@ -39,29 +39,54 @@ void PedestrianSystem::configure_visual_test(PedestrianVisualDefinition visual_d
     }
 }
 
-bool PedestrianSystem::send_pedestrian(const NavigationTile start, const NavigationTile destination,
-                                       const NavigationNetwork& network) {
-    // A visitor aligning at a door or hidden inside a building is intentionally
-    // unavailable to the ordinary autonomous route scheduler until released.
-    if (!instances_.empty() && instances_.front().state == PedestrianState::visiting) return false;
+PedestrianInstance* PedestrianSystem::find_instance(const std::uint64_t pedestrian_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    return found == instances_.end() ? nullptr : &*found;
+}
 
-    const NavigationPathResult path = find_navigation_path(network, start, destination);
-    if (path.status != NavigationPathStatus::found) return false;
+const PedestrianInstance* PedestrianSystem::find_instance(const std::uint64_t pedestrian_id) const {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    return found == instances_.end() ? nullptr : &*found;
+}
 
-    if (instances_.empty()) {
-        PedestrianInstance pedestrian;
-        pedestrian.id = next_id_++;
-        pedestrian.animation.animation_set_id = visual_definition_.animation_set_id;
-        pedestrian.clothing.jacket = kJacketColors[
-            std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
-        pedestrian.clothing.pants = kPantsColors[
-            std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
-        pedestrian.umbrella_color = kUmbrellaColors[
-            std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
-        pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
-        instances_.push_back(std::move(pedestrian));
-    }
-    PedestrianInstance& pedestrian = instances_.front();
+PedestrianInstance& PedestrianSystem::create_pedestrian(const NavigationTile at) {
+    PedestrianInstance pedestrian;
+    pedestrian.id = next_id_++;
+    pedestrian.animation.animation_set_id = visual_definition_.animation_set_id;
+    pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
+    pedestrian.clothing.jacket = kJacketColors[
+        std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
+    pedestrian.clothing.pants = kPantsColors[
+        std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
+    pedestrian.umbrella_color = kUmbrellaColors[
+        std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
+    pedestrian.monthly_budget_cents = kDefaultMonthlyBudgetCents;
+    pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
+    pedestrian.spatial.logical_world_x = static_cast<float>(at.x);
+    pedestrian.spatial.logical_world_y = static_cast<float>(at.y);
+    pedestrian.spatial.logical_tile_x = at.x;
+    pedestrian.spatial.logical_tile_y = at.y;
+    pedestrian.spatial.visual_world_x = static_cast<float>(at.x);
+    pedestrian.spatial.visual_world_y = static_cast<float>(at.y);
+    pedestrian.spatial.ground_anchor_x = visual_definition_.lane_ground_anchor_x;
+    pedestrian.spatial.ground_anchor_y = visual_definition_.lane_ground_anchor_y;
+    pedestrian.destination = at;
+    instances_.push_back(std::move(pedestrian));
+    return instances_.back();
+}
+
+std::optional<std::uint64_t> PedestrianSystem::spawn_pedestrian(
+    const NavigationTile at, const NavigationNetwork& network) {
+    if (!network.is_navigable(at)) return std::nullopt;
+    return create_pedestrian(at).id;
+}
+
+void PedestrianSystem::assign_route(PedestrianInstance& pedestrian, const NavigationTile start,
+                                    const NavigationTile destination, const NavigationPathResult& path) {
     pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
     pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
     pedestrian.spatial.logical_world_x = static_cast<float>(start.x);
@@ -80,86 +105,108 @@ bool PedestrianSystem::send_pedestrian(const NavigationTile start, const Navigat
     if (pedestrian.state == PedestrianState::walking) {
         pedestrian.spatial.direction = direction_to(start, pedestrian.route[pedestrian.next_waypoint]);
     }
+}
+
+bool PedestrianSystem::send_pedestrian(const std::uint64_t pedestrian_id, const NavigationTile start,
+                                       const NavigationTile destination, const NavigationNetwork& network) {
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr || pedestrian->state == PedestrianState::visiting) return false;
+
+    const NavigationPathResult path = find_navigation_path(network, start, destination);
+    if (path.status != NavigationPathStatus::found) return false;
+    assign_route(*pedestrian, start, destination, path);
     return true;
 }
 
+bool PedestrianSystem::send_pedestrian(const NavigationTile start, const NavigationTile destination,
+                                       const NavigationNetwork& network) {
+    if (instances_.empty()) {
+        if (!network.is_navigable(start)) return false;
+        const std::uint64_t id = create_pedestrian(start).id;
+        return send_pedestrian(id, start, destination, network);
+    }
+    return send_pedestrian(instances_.front().id, start, destination, network);
+}
+
 bool PedestrianSystem::set_visiting(const std::uint64_t pedestrian_id, const bool visiting) {
-    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
-        return pedestrian.id == pedestrian_id;
-    });
-    if (found == instances_.end()) return false;
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr) return false;
 
     if (visiting) {
         // Entry is committed only after the pedestrian reaches its door tile.
-        if (found->state == PedestrianState::walking) return false;
-        found->state = PedestrianState::visiting;
-    } else if (found->state == PedestrianState::visiting) {
-        found->state = PedestrianState::idle;
+        if (pedestrian->state == PedestrianState::walking) return false;
+        pedestrian->state = PedestrianState::visiting;
+    } else if (pedestrian->state == PedestrianState::visiting) {
+        pedestrian->state = PedestrianState::idle;
     }
     return true;
 }
 
 bool PedestrianSystem::face_pedestrian(const std::uint64_t pedestrian_id, const MobileEntityDirection direction) {
-    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
-        return pedestrian.id == pedestrian_id;
-    });
-    if (found == instances_.end() || found->state == PedestrianState::walking) return false;
-    found->spatial.direction = direction;
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr || pedestrian->state == PedestrianState::walking) return false;
+    pedestrian->spatial.direction = direction;
     return true;
 }
 
 void PedestrianSystem::clear() { instances_.clear(); }
 
-bool PedestrianSystem::rest_at_home(const NavigationTile entrance) {
-    if (instances_.empty()) return false;
-    PedestrianInstance& pedestrian = instances_.front();
-    if (pedestrian.state != PedestrianState::idle ||
-        pedestrian.spatial.logical_tile_x != entrance.x || pedestrian.spatial.logical_tile_y != entrance.y) return false;
-    pedestrian.state = PedestrianState::resting;
-    pedestrian.route.clear();
-    pedestrian.next_waypoint = 0;
-    pedestrian.outing_intent = {};
+bool PedestrianSystem::rest_at_home(const std::uint64_t pedestrian_id, const NavigationTile entrance) {
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr || pedestrian->state != PedestrianState::idle ||
+        pedestrian->spatial.logical_tile_x != entrance.x || pedestrian->spatial.logical_tile_y != entrance.y) return false;
+    pedestrian->state = PedestrianState::resting;
+    pedestrian->route.clear();
+    pedestrian->next_waypoint = 0;
+    pedestrian->outing_intent = {};
     return true;
 }
 
-void PedestrianSystem::wake_up() {
-    if (!instances_.empty() && instances_.front().state == PedestrianState::resting) {
-        instances_.front().state = PedestrianState::idle;
+bool PedestrianSystem::rest_at_home(const NavigationTile entrance) {
+    return !instances_.empty() && rest_at_home(instances_.front().id, entrance);
+}
+
+void PedestrianSystem::wake_up(const std::uint64_t pedestrian_id) {
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian != nullptr && pedestrian->state == PedestrianState::resting) {
+        pedestrian->state = PedestrianState::idle;
     }
 }
 
-bool PedestrianSystem::authorize_outing(const PedestrianOutingPreference preference) {
-    if (instances_.empty()) return false;
-    PedestrianInstance& pedestrian = instances_.front();
-    if (pedestrian.state != PedestrianState::resting || pedestrian.monthly_budget_cents <= 0) return false;
-    pedestrian.outing_intent.active = true;
-    pedestrian.outing_intent.preference = preference;
-    pedestrian.state = PedestrianState::idle;
+void PedestrianSystem::wake_up() {
+    if (!instances_.empty()) wake_up(instances_.front().id);
+}
+
+bool PedestrianSystem::authorize_outing(const std::uint64_t pedestrian_id,
+                                        const PedestrianOutingPreference preference) {
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr || pedestrian->state != PedestrianState::resting ||
+        pedestrian->monthly_budget_cents <= 0) return false;
+    pedestrian->outing_intent.active = true;
+    pedestrian->outing_intent.preference = preference;
+    pedestrian->state = PedestrianState::idle;
     return true;
 }
 
+bool PedestrianSystem::authorize_outing(const PedestrianOutingPreference preference) {
+    return !instances_.empty() && authorize_outing(instances_.front().id, preference);
+}
+
 void PedestrianSystem::clear_outing_intent(const std::uint64_t pedestrian_id) {
-    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
-        return pedestrian.id == pedestrian_id;
-    });
-    if (found != instances_.end()) found->outing_intent = {};
+    if (PedestrianInstance* pedestrian = find_instance(pedestrian_id)) pedestrian->outing_intent = {};
 }
 
 bool PedestrianSystem::spend_monthly_budget(const std::uint64_t pedestrian_id, const std::int64_t cents) {
     if (cents < 0) return false;
-    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
-        return pedestrian.id == pedestrian_id;
-    });
-    if (found == instances_.end() || cents > found->monthly_budget_cents) return false;
-    found->monthly_budget_cents -= cents;
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr || cents > pedestrian->monthly_budget_cents) return false;
+    pedestrian->monthly_budget_cents -= cents;
     return true;
 }
 
 std::int64_t PedestrianSystem::monthly_budget_cents(const std::uint64_t pedestrian_id) const {
-    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
-        return pedestrian.id == pedestrian_id;
-    });
-    return found == instances_.end() ? 0 : found->monthly_budget_cents;
+    const PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    return pedestrian == nullptr ? 0 : pedestrian->monthly_budget_cents;
 }
 
 void PedestrianSystem::reset_monthly_budgets() {
@@ -179,6 +226,15 @@ void PedestrianSystem::sync_monthly_budget_cycle(const int month, const int year
     reset_monthly_budgets();
     budget_month_ = month;
     budget_year_ = year;
+}
+
+std::uint32_t PedestrianSystem::decision_shard_for(const std::uint64_t pedestrian_id) {
+    return static_cast<std::uint32_t>(pedestrian_id % kDecisionShardCount);
+}
+
+bool PedestrianSystem::decision_due(const std::uint64_t pedestrian_id, const std::uint64_t simulation_tick) {
+    return decision_shard_for(pedestrian_id) ==
+        static_cast<std::uint32_t>(simulation_tick % kDecisionShardCount);
 }
 
 MobileEntityDirection PedestrianSystem::direction_to(const NavigationTile from, const NavigationTile to) {
@@ -228,6 +284,9 @@ bool PedestrianSystem::replan_once_or_stop(PedestrianInstance& pedestrian, const
 }
 
 void PedestrianSystem::update_tick(const float tick_seconds, const NavigationNetwork& network) {
+    // Route execution is intentionally cheap and runs for every active walker.
+    // Expensive intent/destination decisions are scheduled separately and should
+    // use decision_due() when the multi-citizen decision manager is enabled.
     for (PedestrianInstance& pedestrian : instances_) {
         if (pedestrian.state != PedestrianState::walking) continue;
         if (!remaining_route_is_valid(pedestrian, network) && !replan_once_or_stop(pedestrian, network)) continue;
