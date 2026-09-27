@@ -39,15 +39,64 @@ def parse_args():
 def add_box(name, location, dimensions, material, bevel=0.05, rotation=(0.0, 0.0, 0.0)):
     obj = bs.add_box(name, location, dimensions, material, bevel=bevel)
     obj.rotation_euler = tuple(rotation)
+    for modifier in obj.modifiers:
+        if modifier.type == "BEVEL":
+            modifier.segments = max(modifier.segments, 2)
     bpy.context.view_layer.update()
     return obj
+
+
+def add_cabin_shell(material):
+    """Create a compact trapezoidal SUV greenhouse/body shell.
+
+    The lower cabin remains broad while the upper corners taper inward and both
+    the windshield and rear header slope toward the roof. This keeps the proxy
+    readable at gameplay scale without the box-on-box silhouette of V1.
+    """
+    x_bottom = 0.79
+    x_top = 0.69
+    y_front_bottom = -0.90
+    y_rear_bottom = 1.22
+    y_front_top = -0.53
+    y_rear_top = 0.96
+    z_bottom = 1.18
+    z_top = 1.80
+    vertices = [
+        (-x_bottom, y_front_bottom, z_bottom),
+        (x_bottom, y_front_bottom, z_bottom),
+        (x_bottom, y_rear_bottom, z_bottom),
+        (-x_bottom, y_rear_bottom, z_bottom),
+        (-x_top, y_front_top, z_top),
+        (x_top, y_front_top, z_top),
+        (x_top, y_rear_top, z_top),
+        (-x_top, y_rear_top, z_top),
+    ]
+    faces = [
+        (0, 1, 2, 3),
+        (4, 7, 6, 5),
+        (0, 4, 5, 1),
+        (1, 5, 6, 2),
+        (2, 6, 7, 3),
+        (3, 7, 4, 0),
+    ]
+    mesh = bpy.data.meshes.new("SUV_CabinShellMesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    cabin = bpy.data.objects.new("SUV_CabinShell", mesh)
+    bpy.context.collection.objects.link(cabin)
+    cabin.data.materials.append(material)
+    bevel = cabin.modifiers.new("CabinEdgeSoftening", "BEVEL")
+    bevel.width = 0.075
+    bevel.segments = 2
+    scene_gate.tag(cabin, "vehicle.body")
+    return cabin
 
 
 def add_wheel(name, location, rubber, rim):
     # Vehicle longitudinal axis is Y; wheel axle is X. Cylinder primitive starts
     # on Z, so rotate it 90 degrees around Y.
     bpy.ops.mesh.primitive_cylinder_add(
-        vertices=20,
+        vertices=24,
         radius=0.39,
         depth=0.24,
         location=location,
@@ -63,7 +112,7 @@ def add_wheel(name, location, rubber, rim):
 
     side = -1.0 if location[0] < 0.0 else 1.0
     bpy.ops.mesh.primitive_cylinder_add(
-        vertices=20,
+        vertices=24,
         radius=0.225,
         depth=0.255,
         location=(location[0] + side * 0.004, location[1], location[2]),
@@ -72,6 +121,9 @@ def add_wheel(name, location, rubber, rim):
     hub = bpy.context.object
     hub.name = f"{name}_Rim"
     hub.data.materials.append(rim)
+    hub_bevel = hub.modifiers.new("RimEdgeSoftening", "BEVEL")
+    hub_bevel.width = 0.018
+    hub_bevel.segments = 2
     scene_gate.tag(hub, "vehicle.wheel.rim")
     return [tire, hub]
 
@@ -89,58 +141,85 @@ def build_suv():
 
     authored = []
 
-    # SOUTH = nose toward -Y. Broad simple masses are intentional: at the
-    # eventual ~50-60 px gameplay size the silhouette must read before trim.
-    lower = add_box("SUV_LowerBody", (0.0, 0.0, 0.66), (1.84, 4.18, 0.58), body, 0.11)
-    belt = add_box("SUV_BeltBody", (0.0, 0.05, 1.02), (1.76, 3.72, 0.48), body, 0.10)
-    hood = add_box("SUV_Hood", (0.0, -1.45, 1.18), (1.66, 1.02, 0.28), body, 0.09,
-                   (math.radians(-3.0), 0.0, 0.0))
-    cabin = add_box("SUV_Cabin", (0.0, 0.20, 1.48), (1.58, 2.18, 0.72), body, 0.12)
-    roof = add_box("SUV_Roof", (0.0, 0.27, 1.82), (1.42, 1.76, 0.16), body, 0.08)
+    # SOUTH = nose toward -Y. The V2 silhouette keeps the same overall footprint
+    # but uses a more tapered upper body and slightly softer major transitions.
+    lower = add_box("SUV_LowerBody", (0.0, 0.0, 0.66), (1.84, 4.18, 0.58), body, 0.13)
+    belt = add_box("SUV_BeltBody", (0.0, 0.03, 1.00), (1.76, 3.68, 0.44), body, 0.11)
+    hood = add_box("SUV_Hood", (0.0, -1.47, 1.17), (1.64, 1.06, 0.25), body, 0.10,
+                   (math.radians(-5.0), 0.0, 0.0))
+    cabin = add_cabin_shell(body)
+    roof = add_box("SUV_Roof", (0.0, 0.22, 1.84), (1.34, 1.44, 0.13), body, 0.09)
     authored.extend((lower, belt, hood, cabin, roof))
-    for obj in (lower, belt, hood, cabin, roof):
+    for obj in (lower, belt, hood, roof):
         scene_gate.tag(obj, "vehicle.body")
 
-    # Dark glazing: windshield/rear glass plus uninterrupted side glass bands.
-    windshield = add_box("SUV_Windshield", (0.0, -0.91, 1.53), (1.39, 0.055, 0.48), glass, 0.025,
-                         (math.radians(-12.0), 0.0, 0.0))
-    rear_window = add_box("SUV_RearWindow", (0.0, 1.29, 1.50), (1.38, 0.055, 0.44), glass, 0.025,
-                          (math.radians(8.0), 0.0, 0.0))
-    left_windows = add_box("SUV_LeftWindows", (-0.805, 0.19, 1.50), (0.045, 1.79, 0.43), glass, 0.018)
-    right_windows = add_box("SUV_RightWindows", (0.805, 0.19, 1.50), (0.045, 1.79, 0.43), glass, 0.018)
+    # Subtle body-colour shoulders over the wheel positions make the wheel arches
+    # read as designed fenders rather than wheels intersecting a rectangular slab.
+    for x in (-0.82, 0.82):
+        for y in (-1.36, 1.36):
+            shoulder = add_box(
+                f"SUV_FenderShoulder_{'L' if x < 0 else 'R'}_{'F' if y < 0 else 'R'}",
+                (x, y, 0.87), (0.22, 0.88, 0.24), body, 0.075,
+            )
+            authored.append(shoulder)
+            scene_gate.tag(shoulder, "vehicle.body")
+
+    # Dark glazing follows the new sloped greenhouse. Lamps remain non-emissive;
+    # later night/rain lighting can be a separate overlay without changing body art.
+    windshield = add_box("SUV_Windshield", (0.0, -0.715, 1.49), (1.36, 0.052, 0.50), glass, 0.022,
+                         (math.radians(-30.0), 0.0, 0.0))
+    rear_window = add_box("SUV_RearWindow", (0.0, 1.085, 1.49), (1.34, 0.052, 0.46), glass, 0.022,
+                          (math.radians(24.0), 0.0, 0.0))
+    left_windows = add_box("SUV_LeftWindows", (-0.735, 0.20, 1.50), (0.038, 1.56, 0.40), glass, 0.016)
+    right_windows = add_box("SUV_RightWindows", (0.735, 0.20, 1.50), (0.038, 1.56, 0.40), glass, 0.016)
     authored.extend((windshield, rear_window, left_windows, right_windows))
     for obj in (windshield, rear_window, left_windows, right_windows):
         scene_gate.tag(obj, "vehicle.glass")
 
-    # B pillars break up the glass without introducing a second body colour.
-    for x in (-0.824, 0.824):
-        pillar = add_box(f"SUV_B_Pillar_{'L' if x < 0 else 'R'}", (x, 0.22, 1.50),
-                         (0.052, 0.13, 0.48), bumper, 0.01)
-        authored.append(pillar)
-        scene_gate.tag(pillar, "vehicle.trim")
+    # Pillars and restrained door seams improve readability at 50-60 px without
+    # introducing a second paint colour or fine texture noise.
+    for x in (-0.752, 0.752):
+        side_name = "L" if x < 0 else "R"
+        pillar = add_box(f"SUV_B_Pillar_{side_name}", (x, 0.20, 1.50),
+                         (0.045, 0.12, 0.46), bumper, 0.008)
+        seam_front = add_box(f"SUV_DoorSeamFront_{side_name}", (x, -0.38, 1.03),
+                             (0.028, 0.025, 0.36), bumper, 0.005)
+        seam_rear = add_box(f"SUV_DoorSeamRear_{side_name}", (x, 0.70, 1.03),
+                            (0.028, 0.025, 0.36), bumper, 0.005)
+        handle_front = add_box(f"SUV_HandleFront_{side_name}", (x, -0.20, 1.22),
+                               (0.032, 0.24, 0.045), iron, 0.008)
+        handle_rear = add_box(f"SUV_HandleRear_{side_name}", (x, 0.66, 1.22),
+                              (0.032, 0.24, 0.045), iron, 0.008)
+        authored.extend((pillar, seam_front, seam_rear, handle_front, handle_rear))
+        for obj in (pillar, seam_front, seam_rear, handle_front, handle_rear):
+            scene_gate.tag(obj, "vehicle.trim")
 
-    # Black bumpers and grille are deliberately chunky enough to survive
-    # downsampling. Head/tail lamps are unlit materials; future weather/night
-    # lighting will use overlays instead of emissive geometry.
-    front_bumper = add_box("SUV_FrontBumper", (0.0, -2.12, 0.66), (1.72, 0.16, 0.24), bumper, 0.045)
-    rear_bumper = add_box("SUV_RearBumper", (0.0, 2.12, 0.66), (1.72, 0.16, 0.24), bumper, 0.045)
-    grille = add_box("SUV_FrontGrille", (0.0, -2.205, 0.89), (0.72, 0.055, 0.28), bumper, 0.02)
+    # Black bumpers plus a simple grille pattern are deliberately chunky enough
+    # to survive downsampling.
+    front_bumper = add_box("SUV_FrontBumper", (0.0, -2.12, 0.66), (1.70, 0.16, 0.23), bumper, 0.055)
+    rear_bumper = add_box("SUV_RearBumper", (0.0, 2.12, 0.66), (1.70, 0.16, 0.23), bumper, 0.055)
+    grille = add_box("SUV_FrontGrille", (0.0, -2.205, 0.89), (0.72, 0.052, 0.25), bumper, 0.018)
     authored.extend((front_bumper, rear_bumper, grille))
     for obj in (front_bumper, rear_bumper, grille):
         scene_gate.tag(obj, "vehicle.bumper")
+    for x in (-0.22, 0.0, 0.22):
+        bar = add_box(f"SUV_GrilleBar_{x:+.2f}", (x, -2.238, 0.89),
+                      (0.035, 0.025, 0.20), iron, 0.006)
+        authored.append(bar)
+        scene_gate.tag(bar, "vehicle.trim")
 
     for x in (-0.55, 0.55):
         light = add_box(f"SUV_Headlamp_{'L' if x < 0 else 'R'}", (x, -2.205, 1.03),
-                        (0.42, 0.052, 0.18), headlamp, 0.025)
+                        (0.40, 0.050, 0.17), headlamp, 0.025)
         authored.append(light)
         scene_gate.tag(light, "vehicle.light.front")
         tail = add_box(f"SUV_Taillamp_{'L' if x < 0 else 'R'}", (x, 2.205, 1.00),
-                       (0.34, 0.052, 0.22), taillamp, 0.025)
+                       (0.32, 0.050, 0.21), taillamp, 0.025)
         authored.append(tail)
         scene_gate.tag(tail, "vehicle.light.rear")
 
-    # Four independent wheels with grey iron rims, matching the requested
-    # simple tyre/body material separation for later recolour masks.
+    # Four independent wheels with neutral grey rims, preserving clean material
+    # separation for the future body-colour mask.
     for x in (-0.91, 0.91):
         for y in (-1.36, 1.36):
             authored.extend(add_wheel(
@@ -149,9 +228,9 @@ def build_suv():
             ))
 
     # Compact body-colour mirrors; no chrome or extra paint region.
-    for x in (-0.98, 0.98):
-        mirror = add_box(f"SUV_Mirror_{'L' if x < 0 else 'R'}", (x, -0.52, 1.39),
-                         (0.22, 0.28, 0.13), body, 0.055)
+    for x in (-0.96, 0.96):
+        mirror = add_box(f"SUV_Mirror_{'L' if x < 0 else 'R'}", (x, -0.51, 1.39),
+                         (0.20, 0.26, 0.12), body, 0.055)
         authored.append(mirror)
         scene_gate.tag(mirror, "vehicle.body")
 
@@ -178,6 +257,7 @@ def main():
     root["visualContract"] = "CH_STYLIZED_PRERENDER_V1"
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
     root["vehicleClass"] = "compact_suv"
+    root["proxyRevision"] = 2
     root["bodyColorMaskReady"] = True
     root["runtimeTrafficReady"] = False
     root["headlightOverlayReady"] = False
