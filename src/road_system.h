@@ -65,6 +65,10 @@ public:
     [[nodiscard]] RoadVisualType visual_type(int tile_x, int tile_y) const;
     [[nodiscard]] std::vector<TileCoordinate> line_between(TileCoordinate start, TileCoordinate end) const;
 
+    // The first immigration gate: at least one authored road must physically
+    // touch a map edge to represent a connection with the outside world.
+    [[nodiscard]] bool has_world_connection() const;
+
     // Building overlap is intentionally validated by the placement layer;
     // RoadManager itself remains a reusable road-only data structure.
     [[nodiscard]] bool place_tile(int tile_x, int tile_y);
