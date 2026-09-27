@@ -16,6 +16,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from .concept_rig import concept_ground_shadow
+from .identity_lock import assert_identity_lock
 from .review import frame_measurements
 from ..core.exporter import alpha_safe_resize
 
@@ -94,9 +95,11 @@ def render_directional_gait(tool_root: Path, recipe_path: Path,
                 frame = alpha_safe_resize(composed, (128, 128))
                 frame.save(output / f"{direction}_{pose}.png", format="PNG", optimize=False)
                 frames.append(frame)
+            identity_lock = assert_identity_lock(frames)
             report["directions"][direction] = {
                 "masterSha256": hashlib.sha256(master_path.read_bytes()).hexdigest(),
                 "measurements": frame_measurements(frames, (64, 116)),
+                "identityLock": identity_lock,
             }
         for col, frame in enumerate(frames):
             panel.alpha_composite(frame.resize((74, 74), Image.Resampling.LANCZOS),
