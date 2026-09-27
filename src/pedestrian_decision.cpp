@@ -122,8 +122,6 @@ bool PedestrianDecisionNode::start_activity(const NavigationTile from, Pedestria
 void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedestrians, const NavigationNetwork& network,
                                      const BuildingManager& buildings, const BuildingCatalog& catalog,
                                      const RoadManager& roads, const SidewalkManager& sidewalks, const bool raining) {
-    (void)raining; // Exact state is recorded by WeatherSystem::is_raining() at the runtime call site.
-
     const bool exists = !pedestrians.instances().empty();
     const std::optional<NavigationTile> current = exists ? std::optional<NavigationTile>{{
         pedestrians.instances().front().spatial.logical_tile_x, pedestrians.instances().front().spatial.logical_tile_y}}
@@ -132,7 +130,10 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
     // Critical contract: once the resident is in transit or consuming, weather
     // is irrelevant. Never cancel/recalculate a live trip because the sky changed.
     if (exists && (pedestrians.instances().front().state == PedestrianState::walking ||
-                   pedestrians.instances().front().state == PedestrianState::visiting)) return;
+                   pedestrians.instances().front().state == PedestrianState::visiting)) {
+        if (decision_ == PedestrianDecision::awaiting_activity) retry_seconds_ = 0.0F;
+        return;
+    }
 
     std::optional<NavigationTile> entrance;
     if (home_id_) entrance = home_entrance(*home_id_, buildings, catalog, network, current);
@@ -197,7 +198,10 @@ void PedestrianDecisionNode::update(const float seconds, PedestrianSystem& pedes
             return;
         }
 
-        const WeatherState weather = WeatherSystem::observed_state();
+        WeatherState weather = WeatherSystem::observed_state();
+        // Keep the legacy bool meaningful for isolated tests/callers that have no
+        // live WeatherSystem instance while preserving exact overcast at runtime.
+        if (raining && weather != WeatherState::thunderstorm) weather = WeatherState::raining;
         const bool essential = essential_service_available(buildings, catalog);
         if (!decide_to_leave(weather, essential)) {
             retry_seconds_ = 6.0F;
