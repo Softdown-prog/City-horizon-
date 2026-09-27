@@ -1,6 +1,6 @@
 {
   "contract": "CH_BLENDER_AGENT_JOB_V1",
-  "jobId": "attraction.park_viking_ship.rebuild.004.swing_preview",
+  "jobId": "attraction.park_viking_ship.rebuild.004.swing_preview.retry1",
   "operation": "guarded_blender_script",
   "script": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v4_swing_preview.py",
   "qualityStage": "proxy",
@@ -11,18 +11,18 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_viking_open_1k_v1.json",
     "--output",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1",
     "--save-blend",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/park_viking_ship_rebuild_v4_swing_review.blend"
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/park_viking_ship_rebuild_v4_swing_review.blend"
   ],
-  "outputDir": "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review",
+  "outputDir": "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1",
   "expectedOutputs": [
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/preflight_report.json",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/studio_metadata.json",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/animation_preview/animation_preview_manifest.json",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/animation_preview/frame_sequence.json",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/animation_preview/frames/frame_000.png",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/animation_preview/frames/frame_015.png",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review/park_viking_ship_rebuild_v4_swing_review.blend"
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/preflight_report.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/studio_metadata.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/animation_preview/animation_preview_manifest.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/animation_preview/frame_sequence.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/animation_preview/frames/frame_000.png",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/animation_preview/frames/frame_015.png",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v4_swing_review_retry1/park_viking_ship_rebuild_v4_swing_review.blend"
   ]
 }
