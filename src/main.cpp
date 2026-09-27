@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries eleven compatibility/runtime fixes without duplicating the runtime loop:
+// carries twelve compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -31,12 +31,17 @@
 // 9. GameplayUi is wrapped by two top-bar camera buttons that emit the same
 //    rotate actions. Their final presentation is supplied by CH Blender RGBA
 //    assets, with hover/press animation and a safe fallback before promotion.
-// 10. A pedestrian that finishes a route on an activity-building entrance is
-//     hidden for a short interior visit while the building activity counter is
-//     held. This is the first CH_VISITOR_MVP_V1 enter/leave vertical slice.
-// 11. Building visits use the live pedestrian surface graph and a two-tile
-//     front-door approach. The final visible hop is always toward the authored
-//     front door; side/back entry and off-surface shortcuts are rejected.
+// 10. Interior-building visits use authored front doors on the live pedestrian
+//     surface graph. The actor faces inward before disappearing, side/back entry
+//     and off-surface shortcuts are rejected, and activity remains held during
+//     the short interior visit.
+// 11. Visitor-facing eligibility is explicit: residences, outdoor vendors,
+//     ticket booths and ticket-gated rides are not treated as ordinary interiors.
+//     New service buildings need a real front access before pedestrians may enter.
+// 12. Ticketed Park rides use a booth-to-boarding sequence. A pedestrian stops
+//     visibly at the paired booth, follows walkable tiles to the ride's authored
+//     boarding access, then raises the ride activity counter so activity_loop
+//     animation/audio can run. The ticket booth itself requires no activity overlay.
 
 #include "audio_manager.h"
 #include "building_system.h"
