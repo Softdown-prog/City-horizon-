@@ -45,7 +45,6 @@ def hand_contact(frame: Image.Image, direction: str) -> tuple[int, int]:
 def make_overlay(frame: Image.Image, direction: str) -> tuple[Image.Image, Image.Image, tuple[int, int]]:
     hand_x, hand_y = hand_contact(frame, direction)
     centre = 25 if direction in "sn" else 22
-    canopy_y = 2
     overlay = Image.new("RGBA", (48, 64))
     mask = Image.new("RGBA", (48, 64))
     paint = ImageDraw.Draw(overlay)
@@ -53,35 +52,49 @@ def make_overlay(frame: Image.Image, direction: str) -> tuple[Image.Image, Image
 
     # A narrow angled shaft joins the canopy to the selected hand. The hand
     # pixels punch through its last two pixels to make the grip read naturally.
-    shaft_top = (centre, 15)
+    shaft_top = (centre, 13)
     shaft_bottom = (hand_x, hand_y + 2)
     paint.line((shaft_top, shaft_bottom), fill=(20, 34, 42, 255), width=2)
-    paint.line(((centre - 1, 16), (hand_x - 1, hand_y - 2)), fill=(103, 123, 131, 255), width=1)
+    paint.line(((centre - 1, 15), (hand_x - 1, hand_y - 2)), fill=(103, 123, 131, 255), width=1)
     paint.arc((hand_x - 1, hand_y, hand_x + 3, hand_y + 5), 0, 170, fill=(24, 41, 49, 255), width=1)
 
-    canopy = [(centre, canopy_y), (centre + 5, 3), (centre + 11, 5), (centre + 15, 8),
-              (centre + 17, 12), (centre + 16, 14), (centre + 12, 13),
-              (centre + 9, 16), (centre + 5, 14), (centre, 17),
-              (centre - 5, 14), (centre - 9, 16), (centre - 12, 13),
-              (centre - 16, 14), (centre - 17, 12), (centre - 15, 8),
-              (centre - 11, 5), (centre - 5, 3)]
+    # Raised dome with five fabric gores and a scalloped rim. The umbrella
+    # clears more of the approved hair than the first flat, three-panel study.
+    canopy = [(centre, 0), (centre + 5, 1), (centre + 11, 4), (centre + 15, 7),
+              (centre + 17, 11), (centre + 16, 13), (centre + 12, 11),
+              (centre + 9, 14), (centre + 5, 12), (centre, 15),
+              (centre - 5, 12), (centre - 9, 14), (centre - 12, 11),
+              (centre - 16, 13), (centre - 17, 11), (centre - 15, 7),
+              (centre - 11, 4), (centre - 5, 1)]
     paint.polygon(canopy, fill=(19, 40, 48, 255))
-    # Colorable faceted panels leave a one-pixel dark rim and seams. Mask B
-    # carries the same lighting for every randomly chosen fabric color.
+    # Each colorable gore has its own light value. Mask B stores that value so
+    # the weather palette preserves the dome instead of flattening it.
     sections = [
-        ([(centre, 4), (centre - 5, 4), (centre - 10, 6), (centre - 14, 9),
-          (centre - 15, 12), (centre - 12, 11), (centre - 9, 14), (centre - 5, 12)], 190),
-        ([(centre, 4), (centre - 4, 5), (centre - 5, 12), (centre, 15),
-          (centre + 4, 12)], 238),
-        ([(centre, 4), (centre + 5, 4), (centre + 10, 6), (centre + 14, 9),
-          (centre + 15, 12), (centre + 12, 11), (centre + 9, 14),
-          (centre + 5, 12), (centre, 15)], 172),
+        ([(centre - 1, 2), (centre - 6, 3), (centre - 11, 5), (centre - 14, 8),
+          (centre - 15, 11), (centre - 12, 10), (centre - 9, 12), (centre - 8, 8)], 162),
+        ([(centre, 2), (centre - 5, 3), (centre - 8, 8), (centre - 9, 12),
+          (centre - 5, 10), (centre - 3, 12)], 204),
+        ([(centre, 2), (centre - 3, 4), (centre - 4, 10), (centre, 13),
+          (centre + 4, 10), (centre + 3, 4)], 240),
+        ([(centre, 2), (centre + 5, 3), (centre + 8, 8), (centre + 9, 12),
+          (centre + 5, 10), (centre + 3, 12)], 195),
+        ([(centre + 1, 2), (centre + 6, 3), (centre + 11, 5), (centre + 14, 8),
+          (centre + 15, 11), (centre + 12, 10), (centre + 9, 12), (centre + 8, 8)], 153),
     ]
     for polygon, shade in sections:
         rgb = tuple((component * shade + 127) // 255 for component in DEFAULT_FABRIC)
         paint.polygon(polygon, fill=(*rgb, 255))
         shade_mask.polygon(polygon, fill=(255, 0, shade, 255))
-    paint.point((centre, 2), fill=(175, 192, 198, 255))
+    # A fine pale piping and a small metal ferrule add readable material
+    # details at 1x without putting high-frequency noise on the canopy.
+    piping = [(centre - 13, 10), (centre - 9, 12), (centre - 5, 10),
+              (centre, 13), (centre + 5, 10), (centre + 9, 12), (centre + 13, 10)]
+    paint.line(piping, fill=(146, 185, 190, 255), width=1)
+    shade_mask.line(piping, fill=(0, 0, 0, 0), width=1)
+    paint.line(((centre - 2, 4), (centre - 4, 8)), fill=(210, 229, 224, 255), width=1)
+    shade_mask.line(((centre - 2, 4), (centre - 4, 8)), fill=(0, 0, 0, 0), width=1)
+    paint.line(((centre, 0), (centre, 2)), fill=(167, 184, 181, 255), width=1)
+    shade_mask.line(((centre, 0), (centre, 2)), fill=(0, 0, 0, 0), width=1)
 
     # Remove the shaft over the contact skin, but retain the colored canopy.
     for y in range(hand_y - 2, hand_y + 3):
@@ -135,17 +148,28 @@ def build(frames: Path, output: Path, review: Path) -> None:
 
 
 def build_map_review(frames: Path, overlays: Path, capture: Path, review: Path) -> None:
-    """Visual simulation at 1x on an existing map capture, never an SDL capture."""
-    background = Image.open(capture).convert("RGBA")
-    if background.size != (760, 760):
-        raise ValueError(f"Expected 760x760 four-direction map capture: {capture}")
+    """Visual simulation using a clean MapForge crop, never an SDL capture."""
+    source = Image.open(capture).convert("RGBA")
+    # MapForge's raw 1280x853 screenshot contains no pedestrian. The older
+    # 760x760 actor board already contains a retired standing character.
+    if source.width >= 640 and source.height >= 690:
+        background = source.crop((260, 310, 640, 690))
+    elif source.size == (380, 380):
+        background = source
+    else:
+        raise ValueError(f"Expected a clean MapForge capture or 380x380 crop: {capture}")
+    background.save(review.parent / "map_background.png")
     colors = {"s": (208, 79, 77), "e": (225, 181, 66),
               "w": (119, 102, 172), "n": (69, 151, 183)}
     positions = [("s", 222, 232), ("e", 602, 232),
                  ("w", 222, 612), ("n", 602, 612)]
     sequence = []
     for index in range(8):
-        canvas = Image.alpha_composite(background, Image.new("RGBA", background.size, (25, 37, 57, 48)))
+        canvas = Image.new("RGBA", (760, 760))
+        for col in range(2):
+            for row in range(2):
+                canvas.alpha_composite(background, (col * 380, row * 380))
+        canvas = Image.alpha_composite(canvas, Image.new("RGBA", canvas.size, (25, 37, 57, 48)))
         for direction, x, y in positions:
             name = f"{direction}_walk_{index:02}.png"
             actor = Image.open(frames / name).convert("RGBA")
@@ -163,7 +187,7 @@ def main() -> None:
     parser.add_argument("--frames", type=Path, default=FRAME_DIR)
     parser.add_argument("--output", type=Path, default=OUT_DIR)
     parser.add_argument("--review", type=Path, default=REVIEW)
-    parser.add_argument("--map-capture", type=Path, help="Existing 760x760 map board for a visual simulation")
+    parser.add_argument("--map-capture", type=Path, help="Raw pedestrian-free MapForge capture or clean 380x380 crop")
     args = parser.parse_args()
     build(args.frames, args.output, args.review)
     if args.map_capture:
