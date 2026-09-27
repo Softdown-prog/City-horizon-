@@ -35,6 +35,10 @@
   "artScale": 1.0,
   "playerBuildable": true,
   "productionStatus": "runtime_buildable",
+  "needsEffect": {
+    "hunger": 45,
+    "thirst": 35
+  },
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
     "enabled": true,
