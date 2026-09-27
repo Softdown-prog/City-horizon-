@@ -48,9 +48,12 @@ public:
     [[nodiscard]] bool send_pedestrian(NavigationTile start, NavigationTile destination,
                                        const NavigationNetwork& network);
     // Building visits protect an idle pedestrian from the ordinary autonomous
-    // route scheduler while the actor is hidden inside. Presentation continues
-    // to resolve this state through the normal idle directional clips.
+    // route scheduler while it aligns to the door or remains hidden inside.
+    // Presentation resolves this state through the normal idle directional clip.
     [[nodiscard]] bool set_visiting(std::uint64_t pedestrian_id, bool visiting);
+    // Door alignment changes only presentation facing. It never moves the foot
+    // contact and therefore cannot bypass the navigation surface contract.
+    [[nodiscard]] bool face_pedestrian(std::uint64_t pedestrian_id, MobileEntityDirection direction);
     void clear();
     void update_tick(float tick_seconds, const NavigationNetwork& network);
     void interpolate_visual(float frame_seconds);
