@@ -43,6 +43,10 @@ def parse_args():
     parser.add_argument("--output", required=True)
     parser.add_argument("--stage", choices=("preflight", "proxy", "final"), required=True)
     parser.add_argument("--approval-proxy-sha", default=None)
+    # CH Blender owns the quality-stage/preflight policy and injects this path
+    # for guarded scripts. This baker does not need profile-specific overrides,
+    # but accepting the canonical argument keeps it compatible with the worker.
+    parser.add_argument("--preflight-profile", default=None)
     return parser.parse_args(argv)
 
 
