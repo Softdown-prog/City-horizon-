@@ -211,11 +211,20 @@ void test_weather_policy_and_monthly_budget() {
     assert(!pedestrians.instances().front().outing_intent.active);
     assert(pedestrians.spend_monthly_budget(id, 4'700));
     assert(pedestrians.monthly_budget_cents(id) == 0);
-    assert(!pedestrians.rest_at_home({0, 0})); // authorize_outing woke the actor.
-    assert(pedestrians.send_pedestrian({0, 0}, {0, 0}, network));
     assert(pedestrians.rest_at_home({0, 0}));
     assert(!pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
-    pedestrians.reset_monthly_budgets();
+
+    // The first observed calendar only initializes the cycle. Same-month calls
+    // do not refill. Crossing a month boundary refills exactly once.
+    pedestrians.sync_monthly_budget_cycle(1, 1);
+    pedestrians.sync_monthly_budget_cycle(1, 1);
+    assert(pedestrians.monthly_budget_cents(id) == 0);
+    pedestrians.sync_monthly_budget_cycle(2, 1);
+    assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
+    assert(pedestrians.spend_monthly_budget(id, 300));
+    pedestrians.sync_monthly_budget_cycle(2, 1);
+    assert(pedestrians.monthly_budget_cents(id) == 4'700);
+    pedestrians.sync_monthly_budget_cycle(1, 2);
     assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
     assert(pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
 }
@@ -274,16 +283,17 @@ void test_resident_at_home_decision_and_weather_immunity_in_transit() {
     assert(network.query_count() == 0);
 
     advance_until_idle(pedestrians, network);
-    for (int i = 0; i < 40 && decisions.decision() != PedestrianDecision::resting_at_home; ++i) {
+    for (int i = 0; i < 80 && decisions.decision() != PedestrianDecision::resting_at_home; ++i) {
         decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
         pedestrians.update_tick(0.25F, network);
     }
-    assert(decisions.decision() == PedestrianDecision::resting_at_home ||
-           decisions.decision() == PedestrianDecision::returning_home);
+    assert(decisions.decision() == PedestrianDecision::resting_at_home);
+    assert(pedestrians.instances().front().state == PedestrianState::resting);
 
     assert(buildings.remove_instance(*house, *id));
     decisions.update(3.0F, pedestrians, network, buildings, catalog, roads, sidewalks);
     assert(!decisions.home_id());
+    assert(pedestrians.instances().front().state != PedestrianState::resting);
     std::filesystem::remove_all(fixture);
 }
 
