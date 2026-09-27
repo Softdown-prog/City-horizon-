@@ -117,6 +117,6 @@
     "sourceArtifactId": 10923835375,
     "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
     "postProcess": "CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal",
-    "runtimeTintingImplemented": false
+    "runtimeTintingImplemented": true
   }
 }
