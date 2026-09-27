@@ -131,7 +131,7 @@ private:
         text(renderer, panel.x + 28.0F, panel.y + 61.0F,
              "1. SUA CIDADE PRECISA DE UMA CONEXAO COM O MUNDO EXTERIOR.");
         text(renderer, panel.x + 28.0F, panel.y + 84.0F,
-             "2. CONSTRUA UMA RUA ATE O PORTAL NA BORDA OESTE DO TERRENO INICIAL.");
+             "2. CONSTRUA UMA RUA ATE A ENTRADA RODOVIARIA NA BORDA OESTE.");
         text(renderer, panel.x + 28.0F, panel.y + 107.0F,
              "3. DEPOIS CONSTRUA MORADIAS. CASAS VAZIAS RECEBERAO NOVOS MORADORES.");
         text(renderer, panel.x + 28.0F, panel.y + 130.0F,
@@ -139,25 +139,54 @@ private:
         centered_text(renderer, panel.x + panel.w * 0.5F, panel.y + 174.0F,
                       "CLIQUE PARA CONTINUAR", 178, 217, 186);
 
-        // World-space marker for the road gateway. It occupies no tile by itself;
-        // it is only a tutorial beacon over the exact logical connection point.
         const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
         if (!view.valid) return;
+
+        // A short external-road approach communicates that the world continues
+        // beyond the starter parcel without consuming buildable player tiles.
+        const ch::ScreenPoint outside = ch::world_to_screen_point(
+            static_cast<float>(kExternalRoadGatewayX) - 0.5F,
+            static_cast<float>(kExternalRoadGatewayY) + 0.5F,
+            view.camera, view.viewport_width, view.viewport_height);
         const ch::ScreenPoint gateway = ch::world_to_screen_point(
             static_cast<float>(kExternalRoadGatewayX) + 0.5F,
             static_cast<float>(kExternalRoadGatewayY) + 0.5F,
             view.camera, view.viewport_width, view.viewport_height);
-        const float radius = 13.0F;
+
+        SDL_SetRenderDrawColor(renderer, 55, 60, 63, 245);
+        SDL_RenderLine(renderer, outside.x, outside.y - 5.0F, gateway.x, gateway.y - 5.0F);
+        SDL_RenderLine(renderer, outside.x, outside.y, gateway.x, gateway.y);
+        SDL_RenderLine(renderer, outside.x, outside.y + 5.0F, gateway.x, gateway.y + 5.0F);
+        SDL_SetRenderDrawColor(renderer, 224, 190, 70, 225);
+        SDL_RenderLine(renderer, outside.x, outside.y, gateway.x, gateway.y);
+
+        // Roadside city sign. It is intentionally a scenic/tutor marker rather
+        // than a building and therefore owns no map footprint.
+        const float sign_x = outside.x - 64.0F;
+        const float sign_y = outside.y - 86.0F;
+        const SDL_FRect sign{sign_x, sign_y, 150.0F, 46.0F};
+        SDL_SetRenderDrawColor(renderer, 28, 92, 79, 248);
+        SDL_RenderFillRect(renderer, &sign);
+        SDL_SetRenderDrawColor(renderer, 216, 225, 218, SDL_ALPHA_OPAQUE);
+        SDL_RenderRect(renderer, &sign);
+        SDL_SetRenderDrawColor(renderer, 112, 120, 110, SDL_ALPHA_OPAQUE);
+        SDL_RenderLine(renderer, sign.x + 24.0F, sign.y + sign.h,
+                       sign.x + 24.0F, sign.y + sign.h + 22.0F);
+        SDL_RenderLine(renderer, sign.x + sign.w - 24.0F, sign.y + sign.h,
+                       sign.x + sign.w - 24.0F, sign.y + sign.h + 22.0F);
+        centered_text(renderer, sign.x + sign.w * 0.5F, sign.y + 10.0F,
+                      "CITY HORIZON", 242, 247, 239);
+        centered_text(renderer, sign.x + sign.w * 0.5F, sign.y + 27.0F,
+                      "ENTRADA DA CIDADE", 205, 224, 214);
+
+        // Tutorial-only callout points at the exact logical connection tile.
+        const float radius = 11.0F;
         SDL_SetRenderDrawColor(renderer, 255, 192, 62, SDL_ALPHA_OPAQUE);
         const SDL_FRect marker{gateway.x - radius, gateway.y - radius,
                                radius * 2.0F, radius * 2.0F};
         SDL_RenderRect(renderer, &marker);
-        SDL_RenderLine(renderer, gateway.x - radius - 8.0F, gateway.y,
-                       gateway.x + radius + 8.0F, gateway.y);
-        SDL_RenderLine(renderer, gateway.x, gateway.y - radius - 8.0F,
-                       gateway.x, gateway.y + radius + 8.0F);
-        text(renderer, gateway.x + 20.0F, gateway.y - 5.0F,
-             "PORTAL RODOVIARIO", 255, 215, 112);
+        text(renderer, gateway.x + 18.0F, gateway.y - 5.0F,
+             "LIGUE SUA RUA AQUI", 255, 215, 112);
     }
 
     void render_game_over(SDL_Renderer* renderer) const {
