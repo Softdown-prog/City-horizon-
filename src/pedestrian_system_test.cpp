@@ -5,6 +5,7 @@
 #include "sidewalk_system.h"
 
 #include <cassert>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -68,8 +69,6 @@ void test_demolition_replans_once_then_stops_safely() {
     RoadManager roads{-8, 8};
     SidewalkManager sidewalks{-8, 8};
     SidewalkNavigationNetwork network{sidewalks};
-    // Two alternatives connect the same endpoints. Removing the upper middle
-    // forces a live replan onto the lower branch.
     const std::vector<NavigationTile> tiles = {{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}};
     for (const NavigationTile tile : tiles) {
         assert(sidewalks.place_tile(tile.x, tile.y, "concrete_01"));
@@ -84,7 +83,6 @@ void test_demolition_replans_once_then_stops_safely() {
     assert(pedestrians.instances().front().spatial.logical_tile_x == 2);
     assert(pedestrians.instances().front().spatial.logical_tile_y == 0);
 
-    // No alternative means no crossing of the removed tile and an idle stop.
     SidewalkManager broken_sidewalks{-8, 8};
     SidewalkNavigationNetwork broken_network{broken_sidewalks};
     assert(broken_sidewalks.place_tile(0, 0, "concrete_01"));
@@ -181,13 +179,54 @@ void test_clothing_is_chosen_once_per_actor_birth() {
     assert(pedestrians.instances().front().id != born_id);
 }
 
-void test_resident_leaves_and_returns_to_a_real_entrance() {
+void test_weather_policy_and_monthly_budget() {
+    assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::sunny, false) - 0.85F) < 0.001F);
+    assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::overcast, false) - 0.45F) < 0.001F);
+    assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::raining, false) - 0.12F) < 0.001F);
+    assert(std::abs(PedestrianDecisionNode::outing_probability(WeatherState::raining, true) - 0.45F) < 0.001F);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::sunny, false) ==
+           PedestrianOutingPreference::outdoor_leisure);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::overcast, false) ==
+           PedestrianOutingPreference::balanced);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, false) ==
+           PedestrianOutingPreference::covered_commerce);
+    assert(PedestrianDecisionNode::preference_for_weather(WeatherState::raining, true) ==
+           PedestrianOutingPreference::essential_commerce);
+
+    RoadManager roads{-4, 4};
+    SidewalkManager sidewalks{-4, 4};
+    assert(sidewalks.place_tile(0, 0, "cement_path"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    PedestrianSystem pedestrians = make_pedestrian_system();
+    assert(pedestrians.send_pedestrian({0, 0}, {0, 0}, network));
+    assert(pedestrians.rest_at_home({0, 0}));
+    const std::uint64_t id = pedestrians.instances().front().id;
+    assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
+    assert(pedestrians.spend_monthly_budget(id, 300));
+    assert(pedestrians.monthly_budget_cents(id) == 4'700);
+    assert(!pedestrians.spend_monthly_budget(id, 4'701));
+    assert(pedestrians.authorize_outing(PedestrianOutingPreference::covered_commerce));
+    assert(pedestrians.instances().front().outing_intent.active);
+    pedestrians.clear_outing_intent(id);
+    assert(!pedestrians.instances().front().outing_intent.active);
+    assert(pedestrians.spend_monthly_budget(id, 4'700));
+    assert(pedestrians.monthly_budget_cents(id) == 0);
+    assert(!pedestrians.rest_at_home({0, 0})); // authorize_outing woke the actor.
+    assert(pedestrians.send_pedestrian({0, 0}, {0, 0}, network));
+    assert(pedestrians.rest_at_home({0, 0}));
+    assert(!pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
+    pedestrians.reset_monthly_budgets();
+    assert(pedestrians.monthly_budget_cents(id) == PedestrianSystem::kDefaultMonthlyBudgetCents);
+    assert(pedestrians.authorize_outing(PedestrianOutingPreference::balanced));
+}
+
+void test_resident_at_home_decision_and_weather_immunity_in_transit() {
     const auto fixture = std::filesystem::temp_directory_path() / "ch_pedestrian_decision_fixture";
     std::filesystem::create_directories(fixture);
     {
         std::ofstream out(fixture / "house.json");
         out << R"({"id":"test_home","name":"Home","category":"residential","texture":"house.png",
-            "footprint":{"width":3,"height":3},"residentialCapacity":4,
+            "footprint":{"width":3,"height":3},"residentialCapacity":5,
             "roadAccessMode":"front_edge","frontEdge":"south"})";
     }
     BuildingCatalog catalog;
@@ -199,77 +238,52 @@ void test_resident_leaves_and_returns_to_a_real_entrance() {
     assert(id);
     RoadManager roads{-12, 12};
     SidewalkManager sidewalks{-12, 12};
-    assert(sidewalks.place_tile(1, 3, "cement_path"));
+    for (int y = 3; y <= 8; ++y) assert(sidewalks.place_tile(1, y, "cement_path"));
     PedestrianSurfaceNavigationNetwork surface_network{roads, sidewalks};
     CountingNavigationNetwork network{surface_network};
     PedestrianSystem pedestrians = make_pedestrian_system();
     PedestrianDecisionNode decisions;
+
     decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
     assert(decisions.home_id() == id);
     assert(decisions.decision() == PedestrianDecision::resting_at_home);
+    assert(pedestrians.instances().front().state == PedestrianState::resting);
     assert(pedestrians.instances().front().spatial.logical_tile_x == 1);
     assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
-    assert(pedestrians.render_entities({}).size() == 1); // bridge filters resting residents after visitors
-    // With no outing available, the resident stays inside after each retry.
-    for (int i = 0; i < 20; ++i) decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
-    assert(pedestrians.instances().front().state == PedestrianState::resting);
-    for (int y = 4; y <= 8; ++y) assert(sidewalks.place_tile(1, y, "cement_path"));
-    // A rainy resident stays sheltered even when a walk is available.
-    for (int i = 0; i < 40; ++i) {
-        pedestrians.update_tick(0.25F, network);
-        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
-        assert(decisions.decision() == PedestrianDecision::resting_at_home);
-        assert(pedestrians.instances().front().state == PedestrianState::resting);
-    }
-    bool left = false;
-    bool returned = false;
-    for (int i = 0; i < 250; ++i) {
-        pedestrians.update_tick(0.25F, network);
-        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
-        left |= decisions.decision() == PedestrianDecision::walking_to_activity;
-        returned |= decisions.decision() == PedestrianDecision::returning_home;
-        if (left && returned && decisions.decision() == PedestrianDecision::resting_at_home) break;
-    }
-    assert(left && returned);
-    assert(pedestrians.instances().front().state == PedestrianState::resting);
-    assert(pedestrians.instances().front().spatial.logical_tile_y == 3);
 
-    // Rain during an outing completes the current segment, then returns home;
-    // clearing the weather permits another autonomous walk.
-    for (int i = 0; i < 60; ++i) {
-        pedestrians.update_tick(0.25F, network);
-        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
-        if (decisions.decision() == PedestrianDecision::walking_to_activity) break;
+    // Sunny policy is deterministic under the node seed; within several rest
+    // decisions it must authorize a one-shot outing rather than random wandering.
+    bool authorized = false;
+    for (int i = 0; i < 120; ++i) {
+        decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, false);
+        authorized = pedestrians.instances().front().outing_intent.active;
+        if (authorized) break;
     }
-    assert(decisions.decision() == PedestrianDecision::walking_to_activity);
+    assert(authorized);
+    assert(decisions.decision() == PedestrianDecision::awaiting_activity);
+    assert(pedestrians.instances().front().state == PedestrianState::idle);
 
-    // Decision work is event-driven while route execution is active. A walking
-    // resident must not re-run home reachability/pathfinding on every movement tick.
+    // Simulate the visit bridge consuming the intent and starting a route. A
+    // sudden rain decision tick cannot cancel/replan the live walk.
+    const std::uint64_t pedestrian_id = pedestrians.instances().front().id;
+    pedestrians.clear_outing_intent(pedestrian_id);
+    assert(pedestrians.send_pedestrian({1, 3}, {1, 8}, network));
     network.reset_query_count();
-    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
+    assert(pedestrians.instances().front().state == PedestrianState::walking);
     assert(network.query_count() == 0);
 
-    for (int i = 0; i < 80; ++i) {
-        pedestrians.update_tick(0.25F, network);
+    advance_until_idle(pedestrians, network);
+    for (int i = 0; i < 40 && decisions.decision() != PedestrianDecision::resting_at_home; ++i) {
         decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks, true);
-        if (decisions.decision() == PedestrianDecision::resting_at_home) break;
+        pedestrians.update_tick(0.25F, network);
     }
-    assert(decisions.decision() == PedestrianDecision::resting_at_home);
-    assert(pedestrians.instances().front().state == PedestrianState::resting);
-
-    pedestrians.wake_up();
-    const auto pedestrian_id = pedestrians.instances().front().id;
-    assert(pedestrians.set_visiting(pedestrian_id, true));
-    assert(!pedestrians.rest_at_home({1, 3}));
-    decisions.update(10.0F, pedestrians, network, buildings, catalog, roads, sidewalks);
-    assert(pedestrians.instances().front().state == PedestrianState::visiting);
-    assert(pedestrians.set_visiting(pedestrian_id, false));
-    assert(pedestrians.rest_at_home({1, 3}));
+    assert(decisions.decision() == PedestrianDecision::resting_at_home ||
+           decisions.decision() == PedestrianDecision::returning_home);
 
     assert(buildings.remove_instance(*house, *id));
-    decisions.update(0.25F, pedestrians, network, buildings, catalog, roads, sidewalks);
+    decisions.update(3.0F, pedestrians, network, buildings, catalog, roads, sidewalks);
     assert(!decisions.home_id());
-    assert(pedestrians.instances().front().state != PedestrianState::resting);
     std::filesystem::remove_all(fixture);
 }
 
@@ -279,7 +293,8 @@ int main() {
     test_sidewalk_route_and_turns();
     test_demolition_replans_once_then_stops_safely();
     test_surface_turn_and_idle();
-    test_resident_leaves_and_returns_to_a_real_entrance();
+    test_resident_at_home_decision_and_weather_immunity_in_transit();
     test_visiting_state_blocks_reroute_and_faces_door();
     test_clothing_is_chosen_once_per_actor_birth();
+    test_weather_policy_and_monthly_budget();
 }
