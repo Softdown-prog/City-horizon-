@@ -56,6 +56,16 @@ Pose JSON changes joint rotation/translation/scale. Parent transforms propagate 
 
 This is intentionally closer to articulated illustration than to a 3D rig.
 
+## Identity lock
+
+Animation must preserve the approved character instead of redrawing a new one for each pose. `character/identity_lock.py` defines the first mechanical identity gate, `CH_VISITOR_IDENTITY_LOCK_V1`.
+
+The V1 gate compares only conservative gameplay-canvas zones for the head and torso core. Outer shoulders/arms and the lower body remain outside the lock so short walk motion is still allowed. Comparisons ignore hidden RGB under transparent pixels and report changed-pixel fractions for every animated frame relative to idle.
+
+The directional gait study applies this gate after generating `walk_a` and `walk_b`. If a locked region changes beyond the configured tolerance, generation fails instead of silently emitting the candidate. The resulting metrics are also stored under `identityLock` in the gait review JSON.
+
+This is a mechanical preservation check, not an art-approval system. A passing lock does not prove that anatomy, gait, direction, contact, scale or style are correct. Gameplay-scale visual review remains mandatory.
+
 ## Palette model
 
 Palette slots are named semantically by the character definition (`skin`, `shirt`, `pants`, etc.), but the compositor only sees named colors.
