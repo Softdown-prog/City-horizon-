@@ -21,6 +21,7 @@
 // 15. Once bankrupt, the simulation clock is frozen while ESC remains available
 //     for the existing menu flow.
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
+// 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -37,6 +38,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace ch {
 
@@ -185,23 +187,58 @@ inline void ch_sync_ferris_wheel_audio_visibility(
     return "AGUARDANDO";
 }
 
-inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSystem& pedestrians) {
-    if (pedestrians.instances().empty()) {
+[[nodiscard]] inline const PedestrianInstance* ch_find_pedestrian(
+    const PedestrianSystem& pedestrians, const std::optional<std::uint64_t> selected_id) {
+    if (selected_id) {
+        for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+            if (pedestrian.id == *selected_id) return &pedestrian;
+        }
+    }
+    return pedestrians.instances().empty() ? nullptr : &pedestrians.instances().front();
+}
+
+inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSystem& pedestrians,
+                                   const std::optional<std::uint64_t> selected_id) {
+    const PedestrianInstance* pedestrian = ch_find_pedestrian(pedestrians, selected_id);
+    if (pedestrian == nullptr) {
         model.citizen_status.reset();
         return;
     }
-    const PedestrianInstance& pedestrian = pedestrians.instances().front();
-    const PedestrianNeeds needs = pedestrian.needs;
+    const PedestrianNeeds needs = pedestrian->needs;
     UiCitizenStatus status;
-    status.citizen_id = pedestrian.id;
-    status.title = "CIDADAO #" + std::to_string(pedestrian.id);
-    status.activity = ch_pedestrian_activity_label(pedestrian.state);
-    status.money = "$" + std::to_string(pedestrian.monthly_budget_cents / 100) +
-                   " / $" + std::to_string(pedestrian.monthly_budget_capacity_cents / 100);
+    status.citizen_id = pedestrian->id;
+    status.title = "CIDADAO #" + std::to_string(pedestrian->id);
+    status.activity = ch_pedestrian_activity_label(pedestrian->state);
+    status.money = "$" + std::to_string(pedestrian->monthly_budget_cents / 100) +
+                   " / $" + std::to_string(pedestrian->monthly_budget_capacity_cents / 100);
     status.hunger = std::clamp(static_cast<int>(std::lround(needs.hunger)), 0, 100);
     status.thirst = std::clamp(static_cast<int>(std::lround(needs.thirst)), 0, 100);
     status.fun = std::clamp(static_cast<int>(std::lround(needs.fun)), 0, 100);
     model.citizen_status = std::move(status);
+}
+
+[[nodiscard]] inline std::optional<std::uint64_t> ch_pick_pedestrian_at_screen(
+    const PedestrianSystem& pedestrians, const float mouse_x, const float mouse_y,
+    const Camera& camera, const float viewport_width, const float viewport_height) {
+    constexpr float kPickRadiusPx = 28.0F;
+    constexpr float kPickRadiusSquared = kPickRadiusPx * kPickRadiusPx;
+    std::optional<std::uint64_t> best;
+    float best_distance_squared = kPickRadiusSquared;
+    for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+        if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
+        const SDL_FPoint screen = world_to_screen(
+            pedestrian.spatial.visual_world_x + pedestrian.spatial.ground_anchor_x,
+            pedestrian.spatial.visual_world_y + pedestrian.spatial.ground_anchor_y,
+            camera, viewport_width, viewport_height);
+        const float dx = mouse_x - screen.x;
+        const float dy = mouse_y - (screen.y - 16.0F * camera.zoom);
+        const float distance_squared = dx * dx + dy * dy;
+        if (distance_squared <= best_distance_squared) {
+            best_distance_squared = distance_squared;
+            best = pedestrian.id;
+        }
+    }
+    return best;
 }
 
 #define parcels() world_parcels()
@@ -273,7 +310,7 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
 #define update_layout(viewport_width, viewport_height, model) \
     ([&]() { \
         auto ch_ui_model = (model); \
-        ch_fill_citizen_status(ch_ui_model, pedestrians); \
+        ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
