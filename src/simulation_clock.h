@@ -25,9 +25,10 @@ struct SimulationAdvance {
 
 class SimulationClock {
 public:
-    // Thirty game days at speed1 take 210 real seconds (3m30s), deliberately
-    // inside the current three-to-four-minute monthly management cadence.
-    explicit SimulationClock(double seconds_per_game_day = 7.0);
+    // Thirty game days at speed1 take 300 real seconds (5 minutes). This gives
+    // the player enough time to build, inspect citizens and react before the
+    // monthly economy/population settlement closes.
+    explicit SimulationClock(double seconds_per_game_day = 10.0);
 
     [[nodiscard]] const GameDate& date() const;
     [[nodiscard]] SimulationSpeed speed() const;
@@ -44,7 +45,7 @@ private:
 
     GameDate date_;
     SimulationSpeed speed_ = SimulationSpeed::speed1;
-    double seconds_per_game_day_ = 7.0;
+    double seconds_per_game_day_ = 10.0;
     double accumulated_seconds_ = 0.0;
 };
 
