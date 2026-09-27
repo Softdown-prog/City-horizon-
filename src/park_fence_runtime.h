@@ -1,6 +1,7 @@
 #pragma once
 
 #include "building_system.h"
+#include "crosswalk_runtime.h"
 #include "fence_placement_controller.h"
 #include "fence_system.h"
 #include "navigation_network.h"
@@ -96,16 +97,16 @@ inline void clear() {
     clear_segment_styles();
 }
 
-// Collision-aware pedestrian graph. Surface topology remains authoritative for
-// where pedestrians may stand; buildings remove occupied cells and closed
-// fence segments veto crossing only the edge they occupy. An open gate is a
-// usable entrance only when both tiles separated by that gate are walkable.
+// Collision-aware pedestrian graph. Buildings remove occupied cells and closed
+// fence segments veto only their edge. Roads are vehicle-only; a pedestrian
+// may enter a road cell only through an active CrosswalkPortal, whose two sides
+// must both connect to walkable pedestrian floor.
 class PedestrianCollisionNavigationNetwork final : public NavigationNetwork {
 public:
     PedestrianCollisionNavigationNetwork(const RoadManager& roads,
                                          const SidewalkManager& sidewalks,
                                          const BuildingManager& buildings)
-        : base_(roads, sidewalks), buildings_(buildings) {}
+        : base_(roads, sidewalks, crosswalk_runtime::crosswalks()), buildings_(buildings) {}
 
     [[nodiscard]] bool is_navigable(const NavigationTile tile) const override {
         return base_.is_navigable(tile) && !buildings_.is_occupied(tile.x, tile.y);
@@ -132,7 +133,7 @@ public:
     }
 
 private:
-    PedestrianSurfaceNavigationNetwork base_;
+    PedestrianCrosswalkNavigationNetwork base_;
     const BuildingManager& buildings_;
 };
 
