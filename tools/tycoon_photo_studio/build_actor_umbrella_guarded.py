@@ -2,7 +2,8 @@
 
 The static fabric is baked in the frozen CH studio. The lower shaft belongs to
 the actor overlay compositor because its endpoint follows the animated hand.
-This study intentionally stops at the SOUTH proxy and does not promote art.
+The guarded final stage renders four views after the reviewed SOUTH proxy.
+Neither stage promotes art to the runtime assets directory.
 """
 
 from __future__ import annotations
@@ -30,8 +31,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--studio-preset", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--stage", choices=("preflight", "proxy"), default="preflight")
+    parser.add_argument("--stage", choices=("preflight", "proxy", "final"), default="preflight")
     parser.add_argument("--preflight-profile", default=None)
+    parser.add_argument("--approval-proxy-sha", default=None)
     return parser.parse_args(argv)
 
 
@@ -195,6 +197,33 @@ def main():
         (output / "proxy_report.json").write_text(json.dumps(proxy, indent=2), encoding="utf-8")
         render_fabric_mask(scene, dome, details, output / "fabric_mask_south.png")
         render_fabric_mask(scene, dome, details, output / "accent_mask_south.png", accent_only=True)
+    elif args.stage == "final":
+        if not args.approval_proxy_sha or len(args.approval_proxy_sha) != 64:
+            raise ValueError("The final bake requires the reviewed SOUTH proxy SHA-256")
+        (output / "proxy_approval.json").write_text(json.dumps({
+            "contract": "CH_PROXY_APPROVAL_V1",
+            "assetId": ASSET_ID,
+            "reviewed": True,
+            "proxySha256": args.approval_proxy_sha,
+        }, indent=2), encoding="utf-8")
+        (output / "studio_metadata.json").write_text(json.dumps({
+            "assetId": ASSET_ID,
+            "cameraContract": "CH_CAMERA_V1",
+            "studioPreset": "CH_TYCOON_STUDIO_V1",
+            "resolution": [256, 256],
+            "directions": [direction["id"] for direction in bs.DIRECTIONS],
+            "passes": ["canopy", "fabric_mask", "accent_mask"],
+        }, indent=2), encoding="utf-8")
+        for direction in bs.DIRECTIONS:
+            bs.set_direction(root, direction)
+            name = direction["id"]
+            scene_gate.render_proxy(scene=scene, authored=authored,
+                                    output_path=output / f"canopy_{name}.png",
+                                    profile=profile, asset_id=ASSET_ID,
+                                    direction=name)
+            render_fabric_mask(scene, dome, details, output / f"fabric_mask_{name}.png")
+            render_fabric_mask(scene, dome, details, output / f"accent_mask_{name}.png",
+                               accent_only=True)
 
 
 if __name__ == "__main__":
