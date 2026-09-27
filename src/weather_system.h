@@ -29,6 +29,7 @@ public:
     [[nodiscard]] std::uint8_t tint_alpha() const;
     [[nodiscard]] std::uint8_t flash_alpha() const { return flash_alpha_; }
     [[nodiscard]] const std::vector<RainDrop>& drops() const { return drops_; }
+    [[nodiscard]] float rain_episode_remaining_seconds() const { return rain_episode_remaining_seconds_; }
 
 private:
     [[nodiscard]] float random_unit();
@@ -39,6 +40,9 @@ private:
     int width_ = 0;
     int height_ = 0;
     float thunder_timer_ = 6.0F;
+    // A rain episode lasts 50-60 real-time seconds. Switching between calm
+    // rain and thunderstorm keeps the same episode instead of resetting it.
+    float rain_episode_remaining_seconds_ = 0.0F;
     std::uint8_t flash_alpha_ = 0;
     std::vector<RainDrop> drops_;
 };
