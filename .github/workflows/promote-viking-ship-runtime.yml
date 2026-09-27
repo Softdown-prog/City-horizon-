@@ -1,0 +1,62 @@
+name: Promote Viking Ship Runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/ch_blender/runtime_promotions/viking_ship_01.json"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Download approved static rotation artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: CH-Blender-Agent-36347551550-1
+          path: ${{ runner.temp }}/viking_ship_runtime
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 36347551550
+
+      - name: Promote four static rotations into City Park runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/viking_ship_runtime/attraction.park_viking_ship.rebuild.v13_four_rotations_1k"
+          dst="assets/city_park/viking_ship"
+          mkdir -p "$dst"
+
+          cp "$src/proxy_south.png" "$dst/attraction.park_viking_ship.01_south.png"
+          cp "$src/proxy_east.png"  "$dst/attraction.park_viking_ship.01_east.png"
+          cp "$src/proxy_west.png"  "$dst/attraction.park_viking_ship.01_west.png"
+          cp "$src/proxy_north.png" "$dst/attraction.park_viking_ship.01_north.png"
+
+          echo "a7ed11db4d928119de739fb09d8d2b6e30c66025a373a4b8bb74004989a72de2  $dst/attraction.park_viking_ship.01_south.png" | sha256sum -c -
+          echo "231298f03293ac63bf492d3a66b309d71fb0b37089716b8ea731fb45853177a1  $dst/attraction.park_viking_ship.01_east.png"  | sha256sum -c -
+          echo "0957d50220fd990590f5e51595a0dde396f72d99386b373f81f219e667ef00e4  $dst/attraction.park_viking_ship.01_west.png"  | sha256sum -c -
+          echo "41df15c7e69fb8d16768a5d7ffd720d4434ec5318868e99e38fa9a43742f1aaf  $dst/attraction.park_viking_ship.01_north.png" | sha256sum -c -
+
+      - name: Commit runtime sprites
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/city_park/viking_ship/*.png
+          if git diff --cached --quiet; then
+            echo "Runtime Viking sprites already promoted."
+            exit 0
+          fi
+          git commit -m "assets: promote Viking ship four static runtime rotations"
+          git push
