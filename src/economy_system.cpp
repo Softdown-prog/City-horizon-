@@ -21,8 +21,16 @@ const std::vector<EconomyTransaction>& CityEconomy::ledger() const {
     return ledger_;
 }
 
+int CityEconomy::consecutive_negative_months() const {
+    return consecutive_negative_months_;
+}
+
+bool CityEconomy::bankrupt() const {
+    return bankrupt_;
+}
+
 bool CityEconomy::can_afford(const std::int64_t cost) const {
-    return cost >= 0 && funds_ >= cost;
+    return !bankrupt_ && cost >= 0 && funds_ >= cost;
 }
 
 bool CityEconomy::try_spend(const std::int64_t cost) {
@@ -53,6 +61,8 @@ void CityEconomy::earn_agricultural_sale(const std::int64_t amount, const GameDa
 void CityEconomy::restore_funds(const std::int64_t funds) {
     funds_ = funds;
     last_property_tax_year_ = 0;
+    consecutive_negative_months_ = 0;
+    bankrupt_ = false;
     monthly_summary_ = {};
     ledger_.clear();
 }
@@ -270,6 +280,12 @@ void CityEconomy::on_month_closed(const BuildingManager& buildings, const Buildi
     }
     monthly_summary_.balance = monthly_summary_.revenue - monthly_summary_.expenses;
     funds_ += monthly_summary_.balance;
+    if (funds_ < 0) {
+        ++consecutive_negative_months_;
+        if (consecutive_negative_months_ >= kBankruptcyMonths) bankrupt_ = true;
+    } else {
+        consecutive_negative_months_ = 0;
+    }
     record(EconomyTransactionType::monthly_closure, monthly_summary_.balance, closing_date);
 }
 
