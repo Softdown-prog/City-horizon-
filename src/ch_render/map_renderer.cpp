@@ -92,10 +92,19 @@ TileConnectionMask camera_visual_connections(const TileConnectionMask connection
 }
 
 std::string sidewalk_sprite(const std::string& style_id, const TileConnectionMask connections) {
-    // Old saves may refer to concrete styles whose sprites were never shipped.
-    // Keep those walkable cells visible until approved concrete art is promoted.
     if (style_id == "cement_path" || style_id == "concrete_01") {
-        return dirt_path_sprite(connections);
+        static constexpr std::array<const char*, 16> kConcreteSprites = {
+            "sidewalk_concrete_00_isolated.png", "sidewalk_concrete_01_end_n.png",
+            "sidewalk_concrete_02_end_e.png", "sidewalk_concrete_03_curve_ne.png",
+            "sidewalk_concrete_04_end_s.png", "sidewalk_concrete_05_straight_ns.png",
+            "sidewalk_concrete_06_curve_es.png", "sidewalk_concrete_07_tee_no_w.png",
+            "sidewalk_concrete_08_end_w.png", "sidewalk_concrete_09_curve_nw.png",
+            "sidewalk_concrete_10_straight_ew.png", "sidewalk_concrete_11_tee_no_s.png",
+            "sidewalk_concrete_12_curve_sw.png", "sidewalk_concrete_13_tee_no_e.png",
+            "sidewalk_concrete_14_tee_no_n.png", "sidewalk_concrete_15_seamless.png",
+        };
+        return "assets/sidewalks/concrete_01/" +
+               std::string(kConcreteSprites.at(static_cast<std::size_t>(connections)));
     }
     if (style_id == "dirt_path") {
         return dirt_path_sprite(connections);
@@ -1036,7 +1045,7 @@ void MapForgeNativeViewport::resize(int physical_width, int physical_height) {
     physical_height_ = physical_height;
 
     if (window_ != nullptr) {
-        SDL_SetWindowSize(window_, physical_width, physical_height);
+        SDL_SetWindowSize(window_, physical_width_, physical_height_);
         SDL_SyncWindow(window_);
         int win_w = 0, win_h = 0;
         SDL_GetWindowSizeInPixels(window_, &win_w, &win_h);
