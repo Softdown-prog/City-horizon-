@@ -188,8 +188,8 @@ def _validate_job(job: dict[str, Any]) -> None:
             "Unsupported agent job contract",
             {"expected": JOB_CONTRACT, "actual": job.get("contract")},
         )
-    if not isinstance(job.get("jobId"), str) or not job["jobId"].strip():
-        raise WorkerError("JOB_INVALID", "jobId must be a non-empty string")
+    if not isinstance(job.get("jobId"), str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", job["jobId"]):
+        raise WorkerError("JOB_INVALID", "jobId must contain only letters, digits, dots, underscores and hyphens")
     if job.get("operation") not in {
         "canonical_bake",
         "blender_script",
@@ -198,6 +198,47 @@ def _validate_job(job: dict[str, Any]) -> None:
         raise WorkerError("JOB_INVALID", "Unsupported operation", {"operation": job.get("operation")})
     if job.get("operation") == "guarded_blender_script":
         _quality_stage(job)
+
+
+def validate_job(job_path: Path) -> dict[str, Any]:
+    """Check a job before downloading or starting Blender; never create output files."""
+    job_path = _repo_path(str(job_path))
+    job = _load_json(job_path)
+    _validate_job(job)
+    operation = job["operation"]
+    output_root = _repo_path(str(job.get("outputDir", f"out/ch_blender_agent/{job['jobId']}")), must_exist=False)
+    if output_root == REPO_ROOT or output_root.is_file():
+        raise WorkerError("JOB_INVALID", "outputDir must be a directory below the repository root")
+
+    if operation == "canonical_bake":
+        asset_config = _repo_path(str(job.get("assetConfig", "")))
+        _load_json(asset_config)
+        _repo_path(str(job.get("studioPreset") or DEFAULT_STUDIO.relative_to(REPO_ROOT)))
+    else:
+        script = _repo_path(str(job.get("script", "")))
+        if not script.is_file() or script.suffix != ".py":
+            raise WorkerError("JOB_INVALID", "script must name a repository Python file", {"script": str(script)})
+        args = job.get("args", [])
+        if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
+            raise WorkerError("JOB_INVALID", "args must be an ordered array of strings")
+        if operation == "guarded_blender_script":
+            _repo_path(str(job.get("qualityProfile") or DEFAULT_PREFLIGHT_PROFILE.relative_to(REPO_ROOT)))
+            reserved = ("--stage", "--preflight-profile", "--approval-proxy-sha")
+            if any(arg == flag or arg.startswith(flag + "=") for arg in args for flag in reserved):
+                raise WorkerError("JOB_INVALID", "Quality-stage arguments are owned by the CH Blender worker")
+            if args.count("--output") != 1 or args.index("--output") + 1 >= len(args):
+                raise WorkerError("JOB_INVALID", "Guarded jobs require one --output matching outputDir")
+            builder_output = _repo_path(args[args.index("--output") + 1], must_exist=False)
+            if builder_output != output_root:
+                raise WorkerError("JOB_INVALID", "Builder --output and outputDir must match",
+                                  {"builderOutput": str(builder_output), "outputDir": str(output_root)})
+
+    expected = job.get("expectedOutputs", [])
+    if not isinstance(expected, list) or not all(isinstance(item, str) for item in expected):
+        raise WorkerError("JOB_INVALID", "expectedOutputs must be an array of repository-relative paths")
+    for item in expected:
+        _repo_path(item, must_exist=False)
+    return job
 
 
 def _output_hashes(root: Path, started_ns: int) -> list[dict[str, Any]]:
@@ -464,8 +505,7 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
 
 
 def run_job(job_path: Path, blender_exe: Path) -> dict[str, Any]:
-    job = _load_json(job_path)
-    _validate_job(job)
+    job = validate_job(job_path)
     identity = blender_identity(blender_exe)
     started_ns = time.time_ns()
 

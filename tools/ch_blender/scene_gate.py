@@ -230,9 +230,8 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
     authored = _mesh_objects(authored)
 
     ground = bpy.data.objects.get("ShadowReceiverPlane")
-    if ground is not None:
-        ground.hide_render = True
-
+    old_visibility = [(obj, obj.hide_render) for obj in authored]
+    ground_visibility = ground.hide_render if ground is not None else None
     old = {
         "engine": scene.render.engine,
         "x": scene.render.resolution_x,
@@ -241,6 +240,7 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
         "path": scene.render.filepath,
         "transparent": scene.render.film_transparent,
         "color_mode": scene.render.image_settings.color_mode,
+        "file_format": scene.render.image_settings.file_format,
         "cycles_samples": getattr(scene.cycles, "samples", None),
     }
 
@@ -250,6 +250,8 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
     engine_used = requested_engine
 
     try:
+        if ground is not None:
+            ground.hide_render = True
         try:
             scene.render.engine = requested_engine
         except Exception:
@@ -276,10 +278,13 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
         scene.render.filepath = old["path"]
         scene.render.film_transparent = old["transparent"]
         scene.render.image_settings.color_mode = old["color_mode"]
+        scene.render.image_settings.file_format = old["file_format"]
         if old["cycles_samples"] is not None:
             scene.cycles.samples = old["cycles_samples"]
+        for obj, hidden in old_visibility:
+            obj.hide_render = hidden
         if ground is not None:
-            ground.hide_render = False
+            ground.hide_render = ground_visibility
 
     return {
         "contract": PROXY_CONTRACT,

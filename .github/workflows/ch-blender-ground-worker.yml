@@ -35,32 +35,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install worker dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pillow
-
-      - name: Setup shared cached CH Blender
-        id: ch-blender
-        uses: ./.github/actions/setup-ch-blender
-
       - name: Discover requested ground jobs
         id: jobs
         shell: bash
+        env:
+          REQUESTED_JOB: ${{ inputs.job_path }}
         run: |
           set -euo pipefail
           jobs_file="$RUNNER_TEMP/ch_blender_ground_jobs.txt"
           : > "$jobs_file"
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            printf '%s\n' "${{ inputs.job_path }}" >> "$jobs_file"
+            printf '%s\n' "$REQUESTED_JOB" >> "$jobs_file"
           else
             before="${{ github.event.before }}"
             if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
-              git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" -- 'tools/ch_blender/jobs_ground/*.ground.job.json' >> "$jobs_file"
+              git diff-tree --no-commit-id --name-only --diff-filter=ACMR -r "$GITHUB_SHA" -- 'tools/ch_blender/jobs_ground/*.ground.job.json' >> "$jobs_file"
             else
-              git diff --name-only "$before" "$GITHUB_SHA" -- 'tools/ch_blender/jobs_ground/*.ground.job.json' >> "$jobs_file"
+              if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+                git fetch --no-tags --depth=1 origin "$before"
+              fi
+              git diff --name-only --diff-filter=ACMR "$before" "$GITHUB_SHA" -- 'tools/ch_blender/jobs_ground/*.ground.job.json' >> "$jobs_file"
             fi
           fi
 
@@ -70,7 +65,7 @@ jobs:
 
           while IFS= read -r job; do
             case "$job" in
-              tools/ch_blender/jobs_ground/*.ground.job.json) ;;
+              tools/ch_blender/jobs_ground/*.ground.job.json) test -f "$job" ;;
               *) echo "Rejected non-ground job path: $job" >&2; exit 1 ;;
             esac
           done < "$jobs_file"
@@ -78,6 +73,29 @@ jobs:
           echo "jobs-file=$jobs_file" >> "$GITHUB_OUTPUT"
           echo "Ground jobs selected:"
           cat "$jobs_file"
+
+      - name: Validate ground jobs before setting up Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/ch_blender_ground_agent/reports
+          failed=0
+          while IFS= read -r job; do
+            safe="$(basename "$job" .ground.job.json | tr -cd 'A-Za-z0-9._-')"
+            python tools/ch_blender/ch_blender_cli.py validate-job --job "$job" \
+              --report "out/ch_blender_ground_agent/reports/${safe}.validation.json" || failed=1
+          done < "${{ steps.jobs.outputs.jobs-file }}"
+          exit "$failed"
+
+      - name: Install worker dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+
+      - name: Setup shared cached CH Blender
+        id: ch-blender
+        uses: ./.github/actions/setup-ch-blender
 
       - name: Validate CH Blender agent interface
         shell: bash
@@ -91,13 +109,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out/ch_blender_ground_agent/reports
+          failed=0
           while IFS= read -r job; do
-            test -f "$job"
             safe="$(basename "$job" .ground.job.json | tr -cd 'A-Za-z0-9._-')"
             python tools/ch_blender/ch_blender_cli.py run-job \
               --job "$job" \
-              --report "out/ch_blender_ground_agent/reports/${safe}.report.json"
+              --report "out/ch_blender_ground_agent/reports/${safe}.report.json" || failed=1
           done < "${{ steps.jobs.outputs.jobs-file }}"
+          exit "$failed"
 
       - name: Upload ground asset outputs and machine reports
         if: always()

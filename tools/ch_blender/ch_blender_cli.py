@@ -3,6 +3,7 @@
 
 Stable machine-facing interface:
   doctor         validate the pinned Blender executable and repository contracts
+  validate-job   validate one job without Blender or output files
   run-job        execute one CH_BLENDER_AGENT_JOB_V1 JSON job
   print-contract print the machine-readable worker contract
   cache-key      print the canonical shared GitHub cache key
@@ -27,6 +28,7 @@ from agent_worker import (
     error_report,
     resolve_blender,
     run_job,
+    validate_job,
 )
 
 
@@ -71,6 +73,7 @@ def cmd_run_job(args: argparse.Namespace) -> int:
         else (Path(args.report).resolve() if args.report else None)
     )
     try:
+        validate_job(job_path)
         blender = resolve_blender(args.blender)
         payload = run_job(job_path, blender)
         emit(payload, report_path)
@@ -78,6 +81,25 @@ def cmd_run_job(args: argparse.Namespace) -> int:
     except WorkerError as exc:
         payload = error_report(job_path, exc)
         emit(payload, report_path)
+        return EXIT.get(exc.code, 1)
+
+
+def cmd_validate_job(args: argparse.Namespace) -> int:
+    job_path = (REPO_ROOT / args.job).resolve() if not Path(args.job).is_absolute() else Path(args.job).resolve()
+    report_path = (REPO_ROOT / args.report).resolve() if args.report and not Path(args.report).is_absolute() else (Path(args.report).resolve() if args.report else None)
+    try:
+        job = validate_job(job_path)
+        emit({
+            "contract": "CH_BLENDER_JOB_VALIDATION_V1",
+            "status": "ok",
+            "jobId": job["jobId"],
+            "operation": job["operation"],
+            "qualityStage": job.get("qualityStage"),
+            "job": job_path.relative_to(REPO_ROOT).as_posix(),
+        }, report_path)
+        return EXIT["OK"]
+    except WorkerError as exc:
+        emit(error_report(job_path, exc), report_path)
         return EXIT.get(exc.code, 1)
 
 
@@ -174,6 +196,11 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--blender", default=None)
     run.add_argument("--report", default=None)
     run.set_defaults(func=cmd_run_job)
+
+    validate = sub.add_parser("validate-job", help="Check a job without Blender or output files")
+    validate.add_argument("--job", required=True)
+    validate.add_argument("--report", default=None)
+    validate.set_defaults(func=cmd_validate_job)
 
     contract = sub.add_parser("print-contract")
     contract.set_defaults(func=cmd_contract)

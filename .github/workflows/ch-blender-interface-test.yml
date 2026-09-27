@@ -1,0 +1,29 @@
+name: CH Blender Interface Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/agent_worker.py"
+      - "tools/ch_blender/ch_blender_cli.py"
+      - "tools/ch_blender/scene_gate.py"
+      - "tools/ch_blender/tests/**"
+      - ".github/workflows/ch-blender-agent-worker.yml"
+      - ".github/workflows/ch-blender-ground-worker.yml"
+      - ".github/workflows/ch-blender-interface-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test all existing job contracts and error paths without Blender
+        run: python -m unittest discover -s tools/ch_blender/tests -v

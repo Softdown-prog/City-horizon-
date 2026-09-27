@@ -15,10 +15,13 @@ Use:
 ```bash
 python tools/ch_blender/ch_blender_cli.py print-contract
 python tools/ch_blender/ch_blender_cli.py doctor
+python tools/ch_blender/ch_blender_cli.py validate-job --job tools/ch_blender/jobs/<id>.job.json
 python tools/ch_blender/ch_blender_cli.py run-job --job tools/ch_blender/jobs/<id>.job.json --report out/ch_blender_agent/reports/<id>.report.json
 ```
 
 The CLI emits JSON. Treat JSON status and process exit code as the machine contract. Do not scrape prose from Blender logs to decide whether the operation succeeded.
+
+Run `validate-job` before queuing a job. It checks the job contract, input files, profile, output paths, stage and review fields without finding or launching Blender. Guarded jobs must provide exactly one `--output` value that resolves to the declared `outputDir`. This catches a common expensive mistake before rendering. The GitHub agent and ground workflows run this check before setting up Blender, and continue through all selected jobs if one render fails so each gets a report. They still fail the workflow if any job fails.
 
 Binary resolution order:
 
