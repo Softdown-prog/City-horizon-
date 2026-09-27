@@ -15,6 +15,9 @@
   "isParkTicketBooth": true,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    { "x": 1, "y": 1, "facing": "south" }
+  ],
   "footprint": {
     "width": 2,
     "height": 2
