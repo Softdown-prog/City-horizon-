@@ -1,4 +1,5 @@
 #include "navigation_network.h"
+#include "park_fence_runtime.h"
 
 #include <cassert>
 
@@ -112,6 +113,89 @@ void test_patrol_follows_corner_without_grass() {
     assert(!network.is_navigable({3, 1}));
 }
 
+void test_fenced_destination_requires_walkable_gate() {
+    park_fence_runtime::fences().clear();
+    park_fence_runtime::clear_segment_styles();
+
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    BuildingManager buildings{-8, 8};
+    for (int y = 0; y <= 2; ++y) {
+        for (int x = 0; x <= 4; ++x) {
+            assert(sidewalks.place_tile(x, y, "concrete_01"));
+        }
+    }
+
+    // Enclose tiles x=2..3, y=0..1. The start is outside at (0,1), while
+    // the destination is inside at (3,1). With every edge closed there is no
+    // legal path into the enclosure.
+    const std::vector<FenceVertex> perimeter = {
+        {2, 0}, {3, 0}, {4, 0}, {4, 1}, {4, 2}, {3, 2}, {2, 2}, {2, 1},
+    };
+    for (const FenceVertex vertex : perimeter) {
+        assert(park_fence_runtime::fences().place_node(vertex.x, vertex.y));
+    }
+
+    park_fence_runtime::PedestrianCollisionNavigationNetwork network{roads, sidewalks, buildings};
+    const NavigationTile start{0, 1};
+    const NavigationTile target{3, 1};
+    assert(find_navigation_path(network, start, target).status == NavigationPathStatus::no_path);
+
+    // Open exactly the west-side gate between outside tile (1,1) and inside
+    // tile (2,1). The route must now enter through that edge.
+    const FenceVertex gate_from{2, 1};
+    const FenceVertex gate_to{2, 2};
+    assert(park_fence_runtime::fences().set_open_gate(gate_from, gate_to));
+    const auto crossing = park_fence_runtime::fences().open_gate_crossing(gate_from, gate_to);
+    assert(crossing);
+    assert(crossing->first == FenceTile{1, 1});
+    assert(crossing->second == FenceTile{2, 1});
+
+    const NavigationPathResult through_gate = find_navigation_path(network, start, target);
+    assert(through_gate.status == NavigationPathStatus::found);
+    bool used_gate = false;
+    for (std::size_t index = 1; index < through_gate.tiles.size(); ++index) {
+        if (through_gate.tiles[index - 1] == NavigationTile{1, 1} &&
+            through_gate.tiles[index] == NavigationTile{2, 1}) {
+            used_gate = true;
+            break;
+        }
+    }
+    assert(used_gate);
+
+    // A visually open gate is not a usable entrance if the connected tile is
+    // no longer part of the pedestrian surface.
+    assert(sidewalks.remove_tile(2, 1));
+    assert(!network.is_connected({1, 1}, CardinalDirection::east));
+    assert(find_navigation_path(network, start, target).status == NavigationPathStatus::no_path);
+
+    park_fence_runtime::fences().clear();
+}
+
+void test_building_occupancy_blocks_pedestrian_tile() {
+    park_fence_runtime::fences().clear();
+    RoadManager roads{-8, 8};
+    SidewalkManager sidewalks{-8, 8};
+    BuildingManager buildings{-8, 8};
+    for (int y = 0; y <= 2; ++y) {
+        for (int x = 0; x <= 4; ++x) {
+            assert(sidewalks.place_tile(x, y, "concrete_01"));
+        }
+    }
+
+    BuildingDefinition definition;
+    definition.id = "collision_test_building";
+    definition.footprint_width = 1;
+    definition.footprint_height = 1;
+    assert(buildings.place(definition, 2, 1));
+
+    park_fence_runtime::PedestrianCollisionNavigationNetwork network{roads, sidewalks, buildings};
+    assert(!network.is_navigable({2, 1}));
+    const NavigationPathResult route = find_navigation_path(network, {0, 1}, {4, 1});
+    assert(route.status == NavigationPathStatus::found);
+    for (const NavigationTile tile : route.tiles) assert(!(tile == NavigationTile{2, 1}));
+}
+
 } // namespace
 
 int main() {
@@ -120,4 +204,6 @@ int main() {
     test_sidewalks();
     test_pedestrian_surface_route();
     test_patrol_follows_corner_without_grass();
+    test_fenced_destination_requires_walkable_gate();
+    test_building_occupancy_blocks_pedestrian_tile();
 }
