@@ -78,24 +78,29 @@ jobs:
           assert d['approved'] is True
           assert d['format'] == 'PNG_RGBA'
           assert d['transparentBackground'] is True
-          assert d['colorMask']['contract'] == 'CH_COLOR_MASK_V1'
-          assert d['colorMask']['channels'] == {'R': 'wall', 'G': 'roof'}
+          color_mask = d.get('colorMask')
+          if color_mask:
+              assert color_mask['contract'] == 'CH_COLOR_MASK_V1'
+              assert color_mask['channels'] == {'R': 'wall', 'G': 'roof'}
           for key in ('sourceWorkflowRun','sourceArtifactId','sourceArtifactName','sourceDir','destination','assetId','fileStem','displayName','approvedProxySha256','sourceCommit'):
               assert d.get(key), key
           destination = Path(d['destination'])
           if not destination.as_posix().startswith('assets/buildings/'):
               raise SystemExit('destination must be under assets/buildings/')
+          values = {
+              'run_id': d['sourceWorkflowRun'],
+              'artifact_id': d['sourceArtifactId'],
+              'artifact_name': d['sourceArtifactName'],
+              'source_dir': d['sourceDir'],
+              'destination': d['destination'],
+              'asset_id': d['assetId'],
+              'source_asset_id': d.get('sourceAssetId', d['assetId']),
+              'file_stem': d['fileStem'],
+              'display_name': d['displayName'],
+              'color_mask_enabled': 'true' if bool(color_mask) else 'false',
+          }
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-              for key, value in {
-                  'run_id': d['sourceWorkflowRun'],
-                  'artifact_id': d['sourceArtifactId'],
-                  'artifact_name': d['sourceArtifactName'],
-                  'source_dir': d['sourceDir'],
-                  'destination': d['destination'],
-                  'asset_id': d['assetId'],
-                  'file_stem': d['fileStem'],
-                  'display_name': d['displayName'],
-              }.items():
+              for key, value in values.items():
                   f.write(f'{key}={value}\n')
           PY
 
@@ -107,6 +112,37 @@ jobs:
           run-id: ${{ steps.promotion.outputs.run_id }}
           artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
           path: out/runtime_building_promotion/source
+
+      - name: Normalize guarded source metadata
+        shell: bash
+        env:
+          SOURCE_DIR: ${{ steps.promotion.outputs.source_dir }}
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_building_promotion/source/$SOURCE_DIR"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_building_promotion/source -type d -name "$SOURCE_DIR" -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          export SOURCE
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from PIL import Image
+          source = Path(os.environ['SOURCE'])
+          path = source / 'studio_metadata.json'
+          data = json.loads(path.read_text(encoding='utf-8'))
+          if not data.get('renderResolution'):
+              directions = data.get('directions') or []
+              if not directions:
+                  raise SystemExit('studio_metadata.json has no directions')
+              first = source / directions[0]['colorSource']
+              with Image.open(first) as image:
+                  data['renderResolution'] = [int(image.width), int(image.height)]
+              path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+              print(f"Inferred renderResolution={data['renderResolution']} from {first.name}")
+          PY
 
       - name: Canonical post-process
         shell: bash
@@ -128,9 +164,11 @@ jobs:
         env:
           PROMOTION_PATH: ${{ steps.promotion_path.outputs.path }}
           ASSET_ID: ${{ steps.promotion.outputs.asset_id }}
+          SOURCE_ASSET_ID: ${{ steps.promotion.outputs.source_asset_id }}
           FILE_STEM: ${{ steps.promotion.outputs.file_stem }}
           DISPLAY_NAME: ${{ steps.promotion.outputs.display_name }}
           DESTINATION: ${{ steps.promotion.outputs.destination }}
+          COLOR_MASK_ENABLED: ${{ steps.promotion.outputs.color_mask_enabled }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -142,11 +180,13 @@ jobs:
           dst = Path(os.environ['DESTINATION'])
           dst.mkdir(parents=True, exist_ok=True)
           asset_id = os.environ['ASSET_ID']
+          source_asset_id = os.environ['SOURCE_ASSET_ID']
           stem = os.environ['FILE_STEM']
           directions = ('south', 'east', 'west', 'north')
           promotion = json.loads(Path(os.environ['PROMOTION_PATH']).read_text(encoding='utf-8'))
-          baked = json.loads((src / f'{asset_id}_manifest.json').read_text(encoding='utf-8'))
+          baked = json.loads((src / f'{source_asset_id}_manifest.json').read_text(encoding='utf-8'))
           frame_size = tuple(map(int, baked['finalFrameResolution']))
+          mask_enabled = os.environ.get('COLOR_MASK_ENABLED') == 'true'
           views = {}
           masks = {}
 
@@ -157,54 +197,47 @@ jobs:
               if im.size != expected_size:
                   raise SystemExit(f'{path}: expected {expected_size}, got {im.size}')
               alpha = im.getchannel('A')
-              lo, hi = alpha.getextrema()
+              _, hi = alpha.getextrema()
               if hi == 0:
                   raise SystemExit(f'{path}: empty alpha')
               return im
 
           for index, direction in enumerate(directions):
-              color_src = src / f'{asset_id}_{direction}.png'
-              mask_src = src / f'{asset_id}_{direction}_mask.png'
+              color_src = src / f'{source_asset_id}_{direction}.png'
               validate_rgba(color_src, frame_size)
-              mask_im = validate_rgba(mask_src, frame_size)
-
               color_dst = dst / f'{stem}_{direction}.png'
-              mask_dst = dst / f'{stem}_{direction}_mask.png'
               shutil.copy2(color_src, color_dst)
-              shutil.copy2(mask_src, mask_dst)
-
-              r, g, b, a = mask_im.split()
-              if b.getextrema()[1] != 0:
-                  raise SystemExit(f'{mask_src}: blue channel must be unused')
-              rp = sum(1 for v in r.getdata() if v > 127)
-              gp = sum(1 for v in g.getdata() if v > 127)
-              ap = sum(1 for v in a.getdata() if v > 0)
-              if rp == 0 or gp == 0:
-                  raise SystemExit(f'{mask_src}: expected both wall and roof pixels')
-
               pivot = baked['views'][index]['pivot']
               views[direction] = {
                   'file': color_dst.name,
                   'pivot': pivot,
                   'sha256': hashlib.sha256(color_dst.read_bytes()).hexdigest(),
               }
-              masks[direction] = {
-                  'file': mask_dst.name,
-                  'sha256': hashlib.sha256(mask_dst.read_bytes()).hexdigest(),
-                  'wallPixels': rp,
-                  'roofPixels': gp,
-                  'coveredPixels': ap,
-              }
 
-          sheet_src = src / f'{asset_id}_4view.png'
+              if mask_enabled:
+                  mask_src = src / f'{source_asset_id}_{direction}_mask.png'
+                  mask_im = validate_rgba(mask_src, frame_size)
+                  mask_dst = dst / f'{stem}_{direction}_mask.png'
+                  shutil.copy2(mask_src, mask_dst)
+                  r, g, b, a = mask_im.split()
+                  if b.getextrema()[1] != 0:
+                      raise SystemExit(f'{mask_src}: blue channel must be unused')
+                  rp = sum(1 for v in r.getdata() if v > 127)
+                  gp = sum(1 for v in g.getdata() if v > 127)
+                  ap = sum(1 for v in a.getdata() if v > 0)
+                  if rp == 0 or gp == 0:
+                      raise SystemExit(f'{mask_src}: expected both wall and roof pixels')
+                  masks[direction] = {
+                      'file': mask_dst.name,
+                      'sha256': hashlib.sha256(mask_dst.read_bytes()).hexdigest(),
+                      'wallPixels': rp,
+                      'roofPixels': gp,
+                      'coveredPixels': ap,
+                  }
+
+          sheet_src = src / f'{source_asset_id}_4view.png'
           sheet_dst = dst / f'{stem}_4view.png'
           shutil.copy2(sheet_src, sheet_dst)
-          mask4_src = src / f'{asset_id}_mask_4view.png'
-          mask4_dst = dst / f'{stem}_mask_4view.png'
-          shutil.copy2(mask4_src, mask4_dst)
-          mask_review_src = src / f'{asset_id}_mask_review.png'
-          mask_review_dst = dst / f'{stem}_mask_review.png'
-          shutil.copy2(mask_review_src, mask_review_dst)
 
           runtime_manifest = {
               'contract': 'CH_RUNTIME_BUILDING_V1',
@@ -227,7 +260,18 @@ jobs:
               'approvedProxySha256': promotion['approvedProxySha256'],
               'postProcess': 'CH_TYCOON_STUDIO_V1 canonical postprocess',
               'approvedForRuntime': True,
-              'colorMask': {
+          }
+          if source_asset_id != asset_id:
+              runtime_manifest['sourceAssetId'] = source_asset_id
+
+          if mask_enabled:
+              mask4_src = src / f'{source_asset_id}_mask_4view.png'
+              mask4_dst = dst / f'{stem}_mask_4view.png'
+              shutil.copy2(mask4_src, mask4_dst)
+              mask_review_src = src / f'{source_asset_id}_mask_review.png'
+              mask_review_dst = dst / f'{stem}_mask_review.png'
+              shutil.copy2(mask_review_src, mask_review_dst)
+              runtime_manifest['colorMask'] = {
                   'contract': 'CH_COLOR_MASK_V1',
                   'enabled': True,
                   'channels': {'R': 'wall', 'G': 'roof'},
@@ -245,8 +289,8 @@ jobs:
                   },
                   'postProcess': 'CH_COLOR_MASK_V1 canonical downsample only; no lighting/AO/shadow/dither/halo removal',
                   'runtimeTintingImplemented': False,
-              },
-          }
+              }
+
           (dst / f'{stem}.json').write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(runtime_manifest, indent=2))
           PY
@@ -263,8 +307,6 @@ jobs:
             exit 0
           fi
           git commit -m "asset: promote approved ${{ steps.promotion.outputs.asset_id }} to runtime"
-          # Main may advance while this job post-processes a large artifact. Rebase the
-          # asset-only commit onto the latest main before pushing instead of force-pushing.
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
