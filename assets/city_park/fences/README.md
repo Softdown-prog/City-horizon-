@@ -23,3 +23,22 @@ São persistidos os vértices da rede, a orientação de fallback e todos os seg
 A apresentação runtime atual é vetorial/procedural em SDL e usa a mesma linguagem verde-escura do conceito aprovado. O renderer de revisão do MapForge2 continua sendo a fonte para os PNGs autorais de alta fidelidade (`C++/MapForge2/src/park_fence_renderer.*`); esses PNGs não precisam ser gerados por build/Action para usar a cerca no jogo.
 
 Thumbnail do catálogo: `assets/ui/thumbnails/buildings/park_fence_classic_iron_v1.png`.
+
+## Família procedural promovida: `park_iron_fence_01`
+
+A referência visual aprovada foi reconstruída deterministicamente no Visitor Forge 2D pelo contrato `CH_2D_FENCE_SCENERY_V1` e agora está promovida para a biblioteca do jogo em:
+
+`assets/city_park/fences/park_iron_fence_01/`
+
+Arquivos runtime:
+
+- `park_iron_fence_01_segment_east.png`
+- `park_iron_fence_01_segment_south.png`
+- `park_iron_fence_01_gate_east.png`
+- `park_iron_fence_01_gate_south.png`
+- `park_iron_fence_01_post.png`
+- `park_iron_fence_01.json`
+
+Os módulos usam canvas RGBA 192×128, anchor `[96,64]` e `CH_CAMERA_V1` (tile 128×64, yaw 45°, elevação 30°). NORTH/WEST reutilizam as mesmas arestas físicas a partir do endpoint oposto; cantos, tees e crosses continuam sendo compostos pela topologia existente, com um único poste no vértice compartilhado.
+
+A fonte canônica continua em `tools/visitor_forge_2d/examples/park_iron_fence_01.json`. O manifesto promovido registra hashes dos PNGs e `runtimePromotion: true`. A troca do renderer vetorial atual por estes sprites é uma etapa separada; a promoção para `assets/` não altera a lógica de `FenceManager`, navegação ou save/load.

@@ -1,0 +1,38 @@
+{
+  "contract": "CH_2D_FENCE_SCENERY_V1",
+  "id": "park_iron_fence_01",
+  "status": "approved_runtime_asset",
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30
+  },
+  "canvas": [192, 128],
+  "anchor": [96, 64],
+  "segmentVectors": {
+    "east": [64.0, 32.0],
+    "south": [-64.0, 32.0]
+  },
+  "composition": "segment sprites plus one post per occupied fence vertex",
+  "gate": "two-leaf segment; no stone base across walkable opening",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/park_iron_fence_01.json",
+  "sourceRecipeSha256": "543b9539ad5a5b5cacb2ece0f478ac16788c5d4922c85b4205b3bb2dadbdf468",
+  "sprites": {
+    "segment_east": "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_east.png",
+    "segment_south": "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_segment_south.png",
+    "gate_east": "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_gate_east.png",
+    "gate_south": "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_gate_south.png",
+    "post": "assets/city_park/fences/park_iron_fence_01/park_iron_fence_01_post.png"
+  },
+  "sha256": {
+    "segment_east": "f582ada7df91bd8274ddb0e4bfe36fdb02d70e8e850bdec9d043ff6dba8ad455",
+    "segment_south": "ea4403b6b5c2e1096cf46193097a37c6c39f21847aca96ab7d4161cd85303d39",
+    "gate_east": "1d4ec11e808e6dab85bfc291c77e8c776e083843bf961275a1ce068cf9adf9ba",
+    "gate_south": "e1032776aa2d302e9aeebb1d3f7afd3039df1b340611dcb634f550bb2511c2be",
+    "post": "9bec284d831c7a94b1e4232ce1b727fc50b0de1e883a673049e40a5be546e785"
+  },
+  "artApproved": true,
+  "runtimePromotion": true,
+  "runtimeRendererHookup": false
+}
