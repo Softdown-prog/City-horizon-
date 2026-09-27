@@ -1,0 +1,60 @@
+{
+  "contract": "CH_ARCHITECTURE_ASSET_PROFILE_V1",
+  "assetId": "residential_suburban_cottage_3x3_01",
+  "vocabularyContract": "CH_ARCHITECTURE_VOCABULARY_V1",
+  "role": "calibration_asset",
+  "geometryPolicy": "approved_geometry_is_not_changed_by_catalog_registration",
+  "modules": [
+    {
+      "id": "roof_form",
+      "variant": "broad_gable_with_two_dormers",
+      "implementation": "guarded_builder_base"
+    },
+    {
+      "id": "roof_surface",
+      "variant": "charcoal_staggered_shingles_ridge_caps",
+      "implementation": "ch_architecture_modules.add_roof_surface_detail"
+    },
+    {
+      "id": "windows",
+      "variant": "dark_frame_warm_glass_heavy_casing",
+      "implementation": "guarded_builder_base+ch_architecture_modules"
+    },
+    {
+      "id": "entrances",
+      "variant": "panel_door_gabled_portico_columns_lamp",
+      "implementation": "guarded_builder_base+ch_architecture_modules"
+    },
+    {
+      "id": "architectural_trim",
+      "variant": "cream_fascia_dark_gutter_corner_boards",
+      "implementation": "ch_architecture_modules.add_eave_and_corner_trim"
+    },
+    {
+      "id": "foundation",
+      "variant": "stone_base_two_visual_courses",
+      "implementation": "ch_architecture_modules.add_foundation_courses"
+    },
+    {
+      "id": "ornamental_vegetation",
+      "variant": "compact_private_shrubs_flowers_mulch",
+      "implementation": "cottage_specific_layout+ch_architecture_modules.add_mulch_bed"
+    },
+    {
+      "id": "emissive_lighting",
+      "variant": "warm_windows_and_entry_lamp",
+      "implementation": "guarded_builder_materials"
+    },
+    {
+      "id": "wall_surfaces",
+      "variant": "cream_horizontal_siding_low_noise",
+      "implementation": "guarded_builder_base"
+    },
+    {
+      "id": "small_arch_props",
+      "variant": "offset_chimney_and_restrained_accents",
+      "implementation": "guarded_builder_base"
+    }
+  ],
+  "promotionRule": "Future buildings may reuse these module families, but new variants still require guarded SOUTH proxy review before final four-direction bake."
+}
