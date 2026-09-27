@@ -1,0 +1,8 @@
+{
+  "source": "Converter/freesound_community-chuva-forte-a-tarde-6106.mp3",
+  "output": "assets/audio/weather/rain_calm.ogg",
+  "catalog": "assets/audio/audio_catalog.json",
+  "kind": "effect",
+  "event": "WeatherRain",
+  "mode": "replace"
+}
