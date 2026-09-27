@@ -1,0 +1,51 @@
+{
+  "contract": "CH_VISITOR_STRUCTURAL_GAIT_V1",
+  "frameDurationMs": 220,
+  "workingCanvasSize": [512, 512],
+  "outputSize": [128, 128],
+  "anchor": [64, 116],
+  "directions": {
+    "east": {
+      "neutral": {
+        "left": {"hip": [238, 280], "knee": [230, 350], "ankle": [222, 417]},
+        "right": {"hip": [278, 280], "knee": [278, 348], "ankle": [283, 409]}
+      },
+      "walk_a": {
+        "left": {"hip": [238, 280], "knee": [240, 351], "ankle": [242, 419]},
+        "right": {"hip": [278, 280], "knee": [271, 345], "ankle": [268, 404]}
+      },
+      "walk_b": {
+        "left": {"hip": [238, 280], "knee": [223, 347], "ankle": [207, 412]},
+        "right": {"hip": [278, 280], "knee": [288, 350], "ankle": [303, 411]}
+      }
+    },
+    "north": {
+      "neutral": {
+        "left": {"hip": [238, 280], "knee": [230, 350], "ankle": [222, 417]},
+        "right": {"hip": [278, 280], "knee": [278, 348], "ankle": [283, 409]}
+      },
+      "walk_a": {
+        "left": {"hip": [238, 280], "knee": [222, 351], "ankle": [206, 419]},
+        "right": {"hip": [278, 280], "knee": [282, 345], "ankle": [291, 404]}
+      },
+      "walk_b": {
+        "left": {"hip": [238, 280], "knee": [226, 347], "ankle": [214, 412]},
+        "right": {"hip": [278, 280], "knee": [286, 349], "ankle": [299, 411]}
+      }
+    },
+    "west": {
+      "neutral": {
+        "left": {"hip": [238, 280], "knee": [230, 350], "ankle": [222, 417]},
+        "right": {"hip": [278, 280], "knee": [278, 348], "ankle": [283, 409]}
+      },
+      "walk_a": {
+        "left": {"hip": [238, 280], "knee": [220, 353], "ankle": [202, 421]},
+        "right": {"hip": [278, 280], "knee": [285, 345], "ankle": [298, 404]}
+      },
+      "walk_b": {
+        "left": {"hip": [238, 280], "knee": [237, 347], "ankle": [237, 412]},
+        "right": {"hip": [278, 280], "knee": [268, 349], "ankle": [263, 411]}
+      }
+    }
+  }
+}
