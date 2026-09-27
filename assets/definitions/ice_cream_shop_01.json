@@ -43,6 +43,10 @@
     "playerMaySetExtremePrices": true,
     "demandIsAuthoritativeLimit": true
   },
+  "needsEffect": {
+    "thirst": 45,
+    "hunger": 20
+  },
   "powerConsumption": 0,
   "artScale": 1,
   "playerBuildable": true,
