@@ -45,6 +45,9 @@
   },
   "baseServiceCustomersPerMonth": 100,
   "servicePopulationForFullDemand": 60,
+  "needsEffect": {
+    "thirst": 55
+  },
   "playerBuildable": true,
   "productionStatus": "runtime_buildable",
   "colorMask": {
