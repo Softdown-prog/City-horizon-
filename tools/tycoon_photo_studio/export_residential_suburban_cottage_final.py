@@ -60,7 +60,7 @@ def load_mask_spec(path):
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     if raw.get("assetId") != ASSET_ID:
         raise RuntimeError("CH_COTTAGE_MASK_ASSET_ID")
-    spec = mask_lib.normalize_spec(raw)
+    spec = mask_lib.normalize_spec({"colorMask": raw})
     if spec is None:
         raise RuntimeError("CH_COTTAGE_MASK_DISABLED")
     return raw, spec
@@ -89,9 +89,9 @@ def main():
     if not re.fullmatch(r"[0-9a-f]{64}", approval):
         raise RuntimeError("CH_FINAL_REQUIRES_APPROVED_PROXY_SHA")
 
-    # Reuse the guarded/detailed builder and its frozen camera/studio/preflight.
     class Args:
         pass
+
     ctx_args = Args()
     ctx_args.recipe = a.recipe
     ctx_args.studio_preset = a.studio_preset
@@ -152,6 +152,7 @@ def main():
         "recipeSha256": sha256(recipe_path),
         "colorMaskConfig": repo_path(a.mask_config).relative_to(ROOT).as_posix(),
         "colorMask": mask_lib.metadata(mask_spec, assignment),
+        "maskPolicy": raw_mask.get("policy", {}),
         "overlays": [],
         "overlayPolicy": "none",
         "outputs": directions,
