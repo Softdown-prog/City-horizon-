@@ -1,0 +1,42 @@
+{
+  "contract": "CH_UI_CAMERA_ROTATION_CONTROLS_V1",
+  "id": "city_horizon_camera_rotation_controls_v1",
+  "purpose": "Pre-rendered 3D left/right camera rotation buttons for the City Horizon upper HUD bar.",
+  "runtime": "PNG RGBA 2D",
+  "renderClass": "compact_256",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioContract": "CH_TYCOON_STUDIO_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "footprint": {"widthTiles": 1, "depthTiles": 1},
+  "artDirection": "bright cheerful classic-tycoon 3D controls: tactile toy-like buttons, large readable curved arrows, saturated cyan/coral bases, warm gold highlights, no gothic/dark mood",
+  "runtimeTargets": {
+    "camera_left": "assets/ui/topbar/camera_rotate_left_3d.png",
+    "camera_right": "assets/ui/topbar/camera_rotate_right_3d.png"
+  },
+  "assets": {
+    "camera_left": {
+      "displayName": "Girar camera para esquerda",
+      "intent": "bright cyan 3D tactile button with a large cream curved counter-clockwise arrow and gold arrowhead"
+    },
+    "camera_right": {
+      "displayName": "Girar camera para direita",
+      "intent": "bright coral 3D tactile button with a large cream curved clockwise arrow and gold arrowhead"
+    }
+  },
+  "materials": {
+    "base_shadow": {"rgba": [0.06, 0.14, 0.24, 1.0], "roughness": 0.68},
+    "base_light": {"rgba": [0.86, 0.97, 1.00, 1.0], "roughness": 0.34},
+    "base_cyan": {"rgba": [0.06, 0.78, 0.94, 1.0], "roughness": 0.36},
+    "base_coral": {"rgba": [1.00, 0.34, 0.22, 1.0], "roughness": 0.38},
+    "button_shadow": {"rgba": [0.04, 0.18, 0.38, 1.0], "roughness": 0.50},
+    "button_cyan": {"rgba": [0.03, 0.54, 1.00, 1.0], "roughness": 0.27, "metallic": 0.08},
+    "button_coral": {"rgba": [0.96, 0.23, 0.14, 1.0], "roughness": 0.29, "metallic": 0.06},
+    "rim_blue": {"rgba": [0.28, 0.96, 1.00, 1.0], "roughness": 0.18, "metallic": 0.10},
+    "rim_orange": {"rgba": [1.00, 0.58, 0.12, 1.0], "roughness": 0.20, "metallic": 0.08},
+    "arrow_white": {"rgba": [1.00, 0.98, 0.82, 1.0], "roughness": 0.38},
+    "arrow_gold": {"rgba": [1.00, 0.76, 0.12, 1.0], "roughness": 0.18, "metallic": 0.30},
+    "gem_teal": {"rgba": [0.03, 0.88, 0.64, 1.0], "roughness": 0.22, "metallic": 0.08},
+    "gem_purple": {"rgba": [0.72, 0.34, 1.00, 1.0], "roughness": 0.22, "metallic": 0.08},
+    "sunny_yellow": {"rgba": [1.00, 0.82, 0.08, 1.0], "roughness": 0.24, "metallic": 0.10}
+  }
+}

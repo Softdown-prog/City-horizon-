@@ -1,7 +1,7 @@
 // CITY HORIZON runtime entry point.
 //
 // The implementation remains in main_runtime_impl.cpp.  This narrow wrapper
-// carries eight compatibility/runtime fixes without duplicating the runtime loop:
+// carries nine compatibility/runtime fixes without duplicating the runtime loop:
 //
 // 1. Building placement is one-shot: after a successful building is placed
 //    and its BuildingPlace sound is emitted, the active placement id is cleared
@@ -28,6 +28,9 @@
 // 8. Z/X become production camera-rotation controls whenever no building is
 //    being placed. The view turns in exact 90-degree steps across all four
 //    cardinal facings while preserving the logical point at screen centre.
+// 9. GameplayUi is wrapped by two top-bar camera buttons that emit the same
+//    rotate actions. Their final presentation is supplied by CH Blender RGBA
+//    assets, with hover/press animation and a safe fallback before promotion.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -36,6 +39,7 @@
 #include "park_fence_save_manager.h"
 #include "src/runtime_view_state.h"
 #include "src/runtime_map_renderer.h"
+#include "src/camera_rotation_ui.h"
 
 #include <algorithm>
 
@@ -216,13 +220,15 @@ inline void ch_sync_ferris_wheel_audio_visibility(
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
-// Redirect only runtime call sites. Both renderer class declarations are
-// already parsed above, so Map Forge and the canonical render library keep
-// their original MapRenderer implementation.
+// Redirect only runtime call sites. These class declarations are already parsed
+// above, so canonical Map Forge rendering and the established GameplayUi remain
+// untouched outside the executable translation unit.
 #define MapRenderer RuntimeMapRenderer
+#define GameplayUi ChGameplayUi
 
 #include "main_runtime_impl.cpp"
 
+#undef GameplayUi
 #undef MapRenderer
 #undef rotate_placement
 #undef play_sound
