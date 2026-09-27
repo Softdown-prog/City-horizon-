@@ -22,6 +22,7 @@
 //     for the existing menu flow.
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
+// 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -189,12 +190,11 @@ inline void ch_sync_ferris_wheel_audio_visibility(
 
 [[nodiscard]] inline const PedestrianInstance* ch_find_pedestrian(
     const PedestrianSystem& pedestrians, const std::optional<std::uint64_t> selected_id) {
-    if (selected_id) {
-        for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
-            if (pedestrian.id == *selected_id) return &pedestrian;
-        }
+    if (!selected_id) return nullptr;
+    for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+        if (pedestrian.id == *selected_id) return &pedestrian;
     }
-    return pedestrians.instances().empty() ? nullptr : &pedestrians.instances().front();
+    return nullptr;
 }
 
 inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSystem& pedestrians,
