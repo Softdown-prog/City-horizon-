@@ -10,7 +10,7 @@ import viking_ship_rebuild_v7_curved_geometry as rebuild
 
 
 # Reuse the approved V5/V6 static quality gate, but point every geometry lookup to
-# the new curved longship pass.  This keeps site/frame/material constraints intact.
+# the new curved longship pass. This keeps site/frame/material constraints intact.
 v5gate.rebuild = rebuild
 base.hull_sections = rebuild.hull_sections
 base.build_base = rebuild.build_base
@@ -42,9 +42,9 @@ def _write_metadata_v7(recipe, scene, out):
     payload["revisionIntent"] = "longer hull, stronger sheer/keel arc, curved external bands"
     payload["parametricAuthoring"] = {
         "contract": "CH_PARAMETRIC_AUTHORING_V1",
-        "nonDestructiveHullSurfaceStage": true,
+        "nonDestructiveHullSurfaceStage": True,
         "deterministicGeneratorSeed": 7007,
-        "runtimeRepresentation": "2D_RGBA_pre_rendered"
+        "runtimeRepresentation": "2D_RGBA_pre_rendered",
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
