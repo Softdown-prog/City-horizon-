@@ -34,7 +34,20 @@
   "source": "CH Blender V13 four static rotations",
   "sourceWorkflowRun": 36347551550,
   "sourceCommit": "422b695ed976c36cd446ab274a2d631d608f3b25",
+  "rideCapacity": 20,
+  "rideQueueContract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
+  "passengerOverlay": {
+    "contract": "CH_VIKING_PASSENGER_OVERLAY_V1",
+    "actorSource": "assets/characters/ch_actor_green_01",
+    "seatCount": 20,
+    "seatAssignment": "queue_order_next_free_slot",
+    "paletteMode": "stable_per_visitor",
+    "motionParent": "SwingPivot",
+    "geometryParent": "BoatRoot",
+    "reviewRevision": "V15",
+    "runtimePromoted": false
+  },
   "swingFramesBaked": false,
   "animationPending": true,
-  "status": "runtime_static_registered_animation_pending"
+  "status": "runtime_static_registered_v15_passenger_swing_proxy_pending_review"
 }
