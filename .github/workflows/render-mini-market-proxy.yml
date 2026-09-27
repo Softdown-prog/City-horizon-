@@ -1,0 +1,54 @@
+name: Render Mini Market Proxy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/render-mini-market-proxy.yml"
+      - "tools/tycoon_photo_studio/build_commercial_mini_market_guarded.py"
+      - "tools/tycoon_photo_studio/assets/commercial_mini_market_3x2_01.shop.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio:${{ github.workspace }}/tools/ch_blender
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup CH Blender
+        uses: ./.github/actions/setup-ch-blender
+
+      - name: Render guarded SOUTH proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/mini_market_proxy
+          python tools/ch_blender/ch_blender_cli.py run-job \
+            --job tools/ch_blender/jobs/commercial.mini_market.proxy.001.job.json \
+            --report out/mini_market_proxy/agent_report.json
+          cp out/ch_blender_agent/commercial.mini_market.quality/proxy_south.png out/mini_market_proxy/mini_market_proxy_south.png
+          cp out/ch_blender_agent/commercial.mini_market.quality/proxy_report.json out/mini_market_proxy/proxy_report.json
+          cp out/ch_blender_agent/commercial.mini_market.quality/preflight_report.json out/mini_market_proxy/preflight_report.json
+
+      - name: Upload proxy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mini-Market-Proxy-${{ github.run_id }}
+          path: out/mini_market_proxy
+          if-no-files-found: error
+          retention-days: 14
