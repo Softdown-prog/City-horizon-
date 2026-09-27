@@ -1,0 +1,29 @@
+{
+  "id": "broadleaf_zoo_tall_v1",
+  "name": "Árvore Alta de Parque",
+  "category": "decor",
+  "texture": "assets/tree/broadleaf_zoo_tall_v1.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 75,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.9652777777777778
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_procedural_2d",
+  "sourceRecipe": "tools/tycoon_photo_studio/build_tycoon_tree_2d.py",
+  "exportTool": "build_tycoon_tree_2d",
+  "cameraContract": "CH_CAMERA_V1"
+}

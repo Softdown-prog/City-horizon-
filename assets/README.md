@@ -55,6 +55,8 @@ O pinheiro e o canteiro dourado da decoração usam PNGs 2D RGBA aprovados para 
 
 As três novas árvores aprovadas para o runtime são `pine_small_v1`, `pine_tall_v1` e `pine_robust_v1`. Seus PNGs transparentes em `assets/tree/` são cópias byte a byte dos resultados do Visitor Forge 2D em `tools/visitor_forge_2d/art/concepts/pine_family_v1/`. Cada definição em `assets/definitions/` usa `category: decor`, footprint 1×1, `artScale: 1.0` e o pivô normalizado da receita original: `[76,137]` em 152×150, `[88,249]` em 176×264 e `[110,217]` em 220×231. Assim, o centro do tronco permanece no chão do tile 128×64 da câmera `CH_CAMERA_V1` (yaw 45°, elevação 30°), mantendo as alturas de 136, 252 e 220 px em zoom 1. O pinheiro anterior continua como opção separada no catálogo.
 
+As novas árvores decíduas ramificadas aprovadas para o runtime de decor são `broadleaf_zoo_forked_v1` e `broadleaf_zoo_tall_v1`. Geradas proceduralmente via `build_tycoon_tree_2d.py` com copas multi-cluster e troncos ramificados em V, seus PNGs transparentes estão integrados em `assets/tree/` com definições 1×1 em `assets/definitions/` (`category: decor`, pivôs normalizados `[96,248]` em 192×256 e `[112,278]` em 224×288 na câmera `CH_CAMERA_V1`).
+
 Água/costa, pedra, decoração, farming, construções, props, veículos, parques, ruas, calçadas e demais bibliotecas visuais antigas removidas devem voltar somente pelo pipeline atual e pelo gate de validação correspondente.
 
 ## Regra para novos assets
