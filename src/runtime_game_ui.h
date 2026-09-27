@@ -27,6 +27,8 @@ public:
     }
 
     void handle_mouse_motion(const float mouse_x, const float mouse_y) {
+        mouse_x_ = mouse_x;
+        mouse_y_ = mouse_y;
         ChGameplayUi::handle_mouse_motion(mouse_x, mouse_y);
     }
 
@@ -39,6 +41,8 @@ public:
     [[nodiscard]] UiInputResult handle_mouse_button_down(const float mouse_x,
                                                          const float mouse_y,
                                                          const bool primary_button) {
+        mouse_x_ = mouse_x;
+        mouse_y_ = mouse_y;
         if (tutorial_visible_) {
             UiInputResult result;
             result.consumed = true;
@@ -48,6 +52,9 @@ public:
         if (ch::runtime_game_state::game_over) {
             UiInputResult result;
             result.consumed = true;
+            if (primary_button && game_over_menu_bounds().contains(mouse_x, mouse_y)) {
+                result.action = UiActionEvent{UiAction::open_main_menu, "bankruptcy_game_over"};
+            }
             return result;
         }
         return ChGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
@@ -84,6 +91,16 @@ private:
                               const Uint8 b = 238) {
         const float width = static_cast<float>(value.size()) * 8.0F;
         text(renderer, center_x - width * 0.5F, y, value.c_str(), r, g, b);
+    }
+
+    [[nodiscard]] UiRect game_over_menu_bounds() const {
+        const float width = 210.0F;
+        return {
+            (static_cast<float>(viewport_width_) - width) * 0.5F,
+            static_cast<float>(viewport_height_) * 0.5F + 65.0F,
+            width,
+            38.0F,
+        };
     }
 
     void render_tutorial(SDL_Renderer* renderer) const {
@@ -150,7 +167,7 @@ private:
         SDL_RenderFillRect(renderer, &veil);
 
         const float panel_width = std::min(560.0F, static_cast<float>(viewport_width_) - 48.0F);
-        const float panel_height = 220.0F;
+        const float panel_height = 250.0F;
         const SDL_FRect panel{
             (static_cast<float>(viewport_width_) - panel_width) * 0.5F,
             (static_cast<float>(viewport_height_) - panel_height) * 0.5F,
@@ -173,12 +190,24 @@ private:
                       220, 201, 201);
         centered_text(renderer, panel.x + panel.w * 0.5F, panel.y + 135.0F,
                       "A SIMULACAO FOI PAUSADA.", 220, 201, 201);
-        centered_text(renderer, panel.x + panel.w * 0.5F, panel.y + 174.0F,
-                      "PRESSIONE ESC PARA ACESSAR O MENU.", 255, 205, 140);
+
+        const UiRect button = game_over_menu_bounds();
+        const bool hovered = button.contains(mouse_x_, mouse_y_);
+        const SDL_FRect rect{button.x, button.y, button.width, button.height};
+        SDL_SetRenderDrawColor(renderer, hovered ? 109 : 77, hovered ? 54 : 38,
+                               hovered ? 58 : 44, SDL_ALPHA_OPAQUE);
+        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, hovered ? 255 : 221, hovered ? 164 : 92,
+                               hovered ? 164 : 92, SDL_ALPHA_OPAQUE);
+        SDL_RenderRect(renderer, &rect);
+        centered_text(renderer, button.x + button.width * 0.5F, button.y + 15.0F,
+                      "MENU PRINCIPAL", 255, 230, 230);
     }
 
     int viewport_width_ = 1;
     int viewport_height_ = 1;
+    float mouse_x_ = -1000.0F;
+    float mouse_y_ = -1000.0F;
     bool tutorial_armed_ = true;
     bool tutorial_shown_ = false;
     bool tutorial_visible_ = false;
