@@ -200,6 +200,7 @@ def main():
         render(scene, output / "proxy_south_overlay.png")
         write_json(output / "proxy_report.json", {
             "contract": "CH_PROXY_RENDER_V1",
+            "status": "ok",
             "assetId": asset_id,
             "direction": "south",
             "sha256": sha256(output / "proxy_south.png"),
@@ -245,8 +246,8 @@ def main():
     write_json(output / "proxy_approval.json", {
         "contract": "CH_PROXY_APPROVAL_V1",
         "assetId": asset_id,
-        "proxyReviewed": True,
-        "approvedProxySha256": approval,
+        "reviewed": True,
+        "proxySha256": approval,
     })
     print(f"[shop_activity] {asset_id} final four-direction light overlay rendered")
 
