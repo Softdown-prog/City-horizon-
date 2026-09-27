@@ -20,6 +20,7 @@ constexpr std::size_t event_index(const SoundEvent event) {
 constexpr std::array<std::string_view, static_cast<std::size_t>(SoundEvent::count)> kEventNames = {
     "UiClick", "UiSelect", "UiBack", "UiOpenPanel", "UiClosePanel", "UiConfirm",
     "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification", "FerrisWheelRunning",
+    "WeatherRain", "WeatherThunder",
 };
 
 [[nodiscard]] std::string read_text_file(const std::filesystem::path& path) {
@@ -190,8 +191,13 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
     if (activity_loop_track_ == nullptr) {
         std::cerr << "Continuous activity audio track could not be created: " << SDL_GetError() << '\n';
     }
+    ambience_loop_track_ = MIX_CreateTrack(mixer_);
+    if (ambience_loop_track_ == nullptr) {
+        std::cerr << "Weather ambience audio track could not be created: " << SDL_GetError() << '\n';
+    }
 
-    if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr) {
+    if (cached_audio_.empty() || tracks_.empty() || activity_loop_track_ == nullptr ||
+        ambience_loop_track_ == nullptr) {
         std::cerr << "Audio disabled: no usable cached effects or playback tracks.\n";
         shutdown();
         return false;
@@ -207,9 +213,14 @@ bool AudioManager::initialize(const std::filesystem::path& audio_directory) {
 void AudioManager::shutdown() {
     available_ = false;
     looping_event_ = SoundEvent::count;
+    ambience_looping_event_ = SoundEvent::count;
     if (activity_loop_track_ != nullptr) {
         MIX_DestroyTrack(activity_loop_track_);
         activity_loop_track_ = nullptr;
+    }
+    if (ambience_loop_track_ != nullptr) {
+        MIX_DestroyTrack(ambience_loop_track_);
+        ambience_loop_track_ = nullptr;
     }
     if (music_track_ != nullptr) {
         MIX_DestroyTrack(music_track_);
@@ -316,6 +327,45 @@ bool AudioManager::set_looping(const SoundEvent event, const bool enabled) {
     return true;
 }
 
+bool AudioManager::set_ambience_loop(const SoundEvent event, const bool enabled) {
+    if (!available_ || ambience_loop_track_ == nullptr) {
+        return false;
+    }
+
+    if (!enabled) {
+        if (MIX_TrackPlaying(ambience_loop_track_) && !MIX_StopTrack(ambience_loop_track_, 0)) {
+            std::cerr << "Weather ambience could not stop: " << SDL_GetError() << '\n';
+            return false;
+        }
+        ambience_looping_event_ = SoundEvent::count;
+        return true;
+    }
+
+    const std::size_t index = event_index(event);
+    if (index >= kEventCount || effects_[index].empty()) {
+        return false;
+    }
+    if (ambience_looping_event_ == event && MIX_TrackPlaying(ambience_loop_track_)) {
+        return true;
+    }
+    if (MIX_TrackPlaying(ambience_loop_track_) && !MIX_StopTrack(ambience_loop_track_, 0)) {
+        std::cerr << "Previous weather ambience could not stop: " << SDL_GetError() << '\n';
+        return false;
+    }
+    if (!MIX_SetTrackAudio(ambience_loop_track_, effects_[index].front()) ||
+        !MIX_PlayTrack(ambience_loop_track_, 0) ||
+        !MIX_SetTrackLoops(ambience_loop_track_, -1)) {
+        std::cerr << "Weather ambience could not play: " << kEventNames[index]
+                  << "\nSDL error: " << SDL_GetError() << '\n';
+        (void)MIX_StopTrack(ambience_loop_track_, 0);
+        ambience_looping_event_ = SoundEvent::count;
+        return false;
+    }
+
+    ambience_looping_event_ = event;
+    return true;
+}
+
 bool AudioManager::play_loading_music() {
     if (!available_ || music_track_ == nullptr || loading_music_ == nullptr) return false;
     if (MIX_TrackPlaying(music_track_)) return true;
@@ -387,6 +437,9 @@ void AudioManager::apply_volume_settings() {
     }
     if (activity_loop_track_ != nullptr && !MIX_SetTrackGain(activity_loop_track_, volume_settings_.effects)) {
         std::cerr << "Could not apply continuous effects volume: " << SDL_GetError() << '\n';
+    }
+    if (ambience_loop_track_ != nullptr && !MIX_SetTrackGain(ambience_loop_track_, volume_settings_.ambience)) {
+        std::cerr << "Could not apply ambience volume: " << SDL_GetError() << '\n';
     }
     if (music_track_ != nullptr && !MIX_SetTrackGain(music_track_, volume_settings_.music)) {
         std::cerr << "Could not apply music volume: " << SDL_GetError() << '\n';

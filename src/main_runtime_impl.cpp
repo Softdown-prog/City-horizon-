@@ -3254,10 +3254,15 @@ int main() {
                     case SDL_SCANCODE_F9:
                         (void)load_current_city(false);
                         break;
-                    case SDL_SCANCODE_F12:
+                    case SDL_SCANCODE_F12: {
+                        const bool was_raining = weather.is_raining();
                         weather.cycle_state();
+                        if (weather.is_raining() != was_raining) {
+                            (void)audio.set_ambience_loop(SoundEvent::weather_rain, weather.is_raining());
+                        }
                         status = std::string("WEATHER: ") + weather.state_name() + " | F12 TO CHANGE";
                         break;
+                    }
                     case SDL_SCANCODE_F11: {
                         if (!selected_instance_id) {
                             status = "ACTIVITY TEST: SELECT A BUILDING FIRST";
@@ -3406,7 +3411,15 @@ int main() {
         const double elapsed_seconds = static_cast<double>(current_simulation_ticks - last_simulation_ticks) / 1000.0;
         last_simulation_ticks = current_simulation_ticks;
         const float frame_seconds = static_cast<float>(elapsed_seconds);
+        const bool was_raining = weather.is_raining();
         weather.update(frame_seconds, viewport_width, viewport_height);
+        const bool is_raining_now = weather.is_raining();
+        if (is_raining_now != was_raining) {
+            (void)audio.set_ambience_loop(SoundEvent::weather_rain, is_raining_now);
+        }
+        if (weather.flash_alpha() != 0) {
+            (void)audio.play(SoundEvent::weather_thunder);
+        }
         seagull_seconds += std::min(frame_seconds, 0.050F);
         if (seagull_pass_active) {
             seagull_pass_elapsed += std::min(frame_seconds, 0.050F);
