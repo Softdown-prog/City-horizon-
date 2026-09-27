@@ -18,6 +18,7 @@
 #include "navigation_network.h"
 #include "pedestrian_decision.h"
 #include "pedestrian_system.h"
+#include "park_fence_runtime.h"
 #include "population_system.h"
 #include "power_system.h"
 #include "road_system.h"
@@ -1905,7 +1906,7 @@ int main() {
     };
     const auto send_available_walk = [&]() {
         constexpr std::size_t kMinimumTiles = 6;
-        const PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+        const park_fence_runtime::PedestrianCollisionNavigationNetwork network{roads, sidewalks, buildings};
         const auto try_start = [&](const int x, const int y) {
             const NavigationTile start{x, y};
             const NavigationPathResult route = find_navigation_path_with_minimum_length(network, start, kMinimumTiles);
@@ -3350,7 +3351,7 @@ int main() {
                     case SDL_SCANCODE_F6: {
                         automatic_pedestrian = false;
                         pedestrian_decisions.reset();
-                        const PedestrianSurfaceNavigationNetwork pedestrian_surfaces{roads, sidewalks};
+                        const park_fence_runtime::PedestrianCollisionNavigationNetwork pedestrian_surfaces{roads, sidewalks, buildings};
                         if (!navigation_debug_start || !navigation_debug_goal) {
                             status = "PEDESTRIAN: SET FLOOR / ROAD START (F3) AND GOAL (F4)";
                         } else if (!pedestrian_surfaces.is_navigable(*navigation_debug_start) ||
@@ -3473,7 +3474,7 @@ int main() {
         const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
         for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
             service_vehicles.update_tick(scheduled.mobile_tick_seconds, service_vehicle_catalog, vehicle_traversable);
-            const PedestrianSurfaceNavigationNetwork pedestrian_surfaces{roads, sidewalks};
+            const park_fence_runtime::PedestrianCollisionNavigationNetwork pedestrian_surfaces{roads, sidewalks, buildings};
             pedestrians.update_tick(scheduled.mobile_tick_seconds, pedestrian_surfaces);
             if (automatic_pedestrian) {
                 pedestrian_decisions.update(scheduled.mobile_tick_seconds, pedestrians, pedestrian_surfaces,
