@@ -1,8 +1,12 @@
 """Guarded four-rotation static bake for the approved City Horizon Viking ship V12.
 
-This pass does not create swing animation frames.  It renders the exact same
+This pass does not create swing animation frames. It renders the exact same
 approved static attraction in the four canonical City Horizon directions by
 rotating AssetRoot while keeping camera and lighting fixed.
+
+The CH Blender worker expects proxy_report.json to remain the canonical flat
+CH_PROXY_RENDER_V1 report for the south review proxy. The four-direction bake
+therefore writes the aggregate rotation data to rotation_report.json instead.
 """
 from __future__ import annotations
 
@@ -81,11 +85,15 @@ def main():
         reports[direction_id] = report
         print(f"[CH_GATE] Viking V13 {direction_id.upper()} ready: {report['sha256']}")
 
-    # Return the authored blend to the canonical south orientation before save.
-    bs.set_direction(root, bs.DIRECTIONS[0])
-    bpy.context.view_layer.update()
-
+    # Keep the generic guarded-worker contract intact: proxy_report.json is the
+    # canonical south proxy used for approval/hash validation.
     (out / "proxy_report.json").write_text(
+        json.dumps(reports["south"], indent=2),
+        encoding="utf-8",
+    )
+
+    # Store the complete four-direction static bake separately.
+    (out / "rotation_report.json").write_text(
         json.dumps(
             {
                 "contract": ROTATION_CONTRACT,
@@ -98,6 +106,11 @@ def main():
         ),
         encoding="utf-8",
     )
+
+    # Return the authored blend to the canonical south orientation before save.
+    bs.set_direction(root, bs.DIRECTIONS[0])
+    bpy.context.view_layer.update()
+
     base.save_blend(args.save_blend)
     print("[CH_GATE] Viking V13 four static rotations ready; no swing frames were created")
 
