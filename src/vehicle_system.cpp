@@ -25,21 +25,26 @@ const ServiceVehicleDefinition* ServiceVehicleCatalog::find(const std::string_vi
 const std::vector<ServiceVehicleDefinition>& ServiceVehicleCatalog::definitions() const { return definitions_; }
 bool ServiceVehicleManager::add(ServiceVehicleInstance instance, const ServiceVehicleCatalog& catalog) { const ServiceVehicleDefinition* definition = catalog.find(instance.vehicle_id); if (definition == nullptr) return false; instance.visual_x = instance.map_x; instance.visual_y = instance.map_y; instance.animation.animation_set_id = definition->animation_set_id; instances_.push_back(std::move(instance)); return true; }
 bool ServiceVehicleManager::has_idle_vehicle_for_role(const std::string_view role, const ServiceVehicleCatalog& catalog) const { for (const auto& vehicle : instances_) { const auto* definition = catalog.find(vehicle.vehicle_id); if (vehicle.owned && vehicle.state == ServiceVehicleState::idle && definition != nullptr && definition->role == role) return true; } return false; }
-std::string ServiceVehicleManager::tile_key(const int x, const int y) { return std::to_string(x) + ":" + std::to_string(y); }
+std::uint64_t ServiceVehicleManager::tile_key(const int x, const int y) {
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) |
+           static_cast<std::uint32_t>(y);
+}
 bool ServiceVehicleManager::is_reserved(const int x, const int y) const { return reserved_tiles_.contains(tile_key(x, y)); }
 bool ServiceVehicleManager::has_active_task() const { return !tasks_.empty(); }
 std::vector<TileCoordinate> ServiceVehicleManager::find_route(const TileCoordinate& from, const TileCoordinate& to, const TraversableTile& traversable) const {
     if (from.x == to.x && from.y == to.y) return {};
     std::deque<TileCoordinate> frontier; frontier.push_back(from);
-    std::unordered_map<std::string, TileCoordinate> previous;
-    std::unordered_set<std::string> visited; visited.insert(tile_key(from.x, from.y));
+    std::unordered_map<std::uint64_t, TileCoordinate> previous;
+    std::unordered_set<std::uint64_t> visited; visited.insert(tile_key(from.x, from.y));
+    previous.reserve(256);
+    visited.reserve(256);
     constexpr int max_search = 4096;
     const int offsets[][2] = {{1,0},{-1,0},{0,1},{0,-1}};
     while (!frontier.empty() && static_cast<int>(visited.size()) < max_search) {
         const auto current = frontier.front(); frontier.pop_front();
         for (const auto& offset : offsets) {
             const TileCoordinate next{current.x + offset[0], current.y + offset[1]};
-            const auto key = tile_key(next.x, next.y);
+            const std::uint64_t key = tile_key(next.x, next.y);
             if (visited.contains(key) || (!traversable(next.x, next.y) && !(next.x == to.x && next.y == to.y))) continue;
             previous.emplace(key, current); visited.insert(key);
             if (next.x == to.x && next.y == to.y) {
