@@ -1,0 +1,47 @@
+{
+  "id": "viking_ship_01",
+  "name": "Navio Viking",
+  "category": "city_park",
+  "texture": "assets/city_park/viking_ship/attraction.park_viking_ship.01_south.png",
+  "sprites": {
+    "0": "assets/city_park/viking_ship/attraction.park_viking_ship.01_south.png",
+    "1": "assets/city_park/viking_ship/attraction.park_viking_ship.01_west.png",
+    "2": "assets/city_park/viking_ship/attraction.park_viking_ship.01_north.png",
+    "3": "assets/city_park/viking_ship/attraction.park_viking_ship.01_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "requiresTicketBooth": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    { "x": 2, "y": 3, "facing": "south" }
+  ],
+  "footprint": {
+    "width": 5,
+    "height": 4
+  },
+  "occupancyFootprint": {
+    "width": 5,
+    "height": 4,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "buildCost": 25000,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "serviceName": "Ingresso do Navio Viking",
+  "defaultServicePrice": 8,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 40,
+  "baseServiceCustomersPerMonth": 90,
+  "servicePopulationForFullDemand": 60,
+  "artScale": 0.5362,
+  "playerBuildable": true,
+  "productionStatus": "runtime_static_four_direction_animation_pending",
+  "renderClass": "large_asset_1280",
+  "runtimeManifest": "assets/city_park/viking_ship/viking_ship_runtime_manifest.json",
+  "sourceProxySha256": "a7ed11db4d928119de739fb09d8d2b6e30c66025a373a4b8bb74004989a72de2"
+}
