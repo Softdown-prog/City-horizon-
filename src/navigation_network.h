@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <vector>
 
+class CrosswalkManager;
+
 struct NavigationTile {
     int x = 0;
     int y = 0;
@@ -13,8 +15,6 @@ struct NavigationTile {
     [[nodiscard]] constexpr bool operator==(const NavigationTile&) const = default;
 };
 
-// Minimal live graph interface. It is intentionally entity-agnostic: a future
-// enclosure or water network only needs to answer the same tile questions.
 class NavigationNetwork {
 public:
     virtual ~NavigationNetwork() = default;
@@ -33,9 +33,7 @@ private:
     const RoadManager& roads_;
 };
 
-// Pedestrians share the road topology but not the vehicle route semantics.
-// The visual lane offset is owned by the pedestrian presentation definition;
-// this graph deliberately derives its N/E/S/W edges straight from RoadManager.
+// Legacy road pedestrian adapter retained for focused compatibility tests only.
 class PedestrianLaneNavigationNetwork final : public NavigationNetwork {
 public:
     explicit PedestrianLaneNavigationNetwork(const RoadManager& roads) : roads_(roads) {}
@@ -54,9 +52,9 @@ private:
     const SidewalkManager& sidewalks_;
 };
 
-// The pedestrian's foot contact travels on occupied floor or road cells,
-// including transitions between concrete, sand, dirt and road. Rendering
-// seam masks remain style-specific; walking adjacency is independent of art.
+// CH_PEDESTRIAN_SURFACE_V2: ordinary roads are not pedestrian surfaces.
+// Walkable authored floor/path styles form the pedestrian graph. A road may be
+// entered only through PedestrianCrosswalkNavigationNetwork below.
 class PedestrianSurfaceNavigationNetwork final : public NavigationNetwork {
 public:
     PedestrianSurfaceNavigationNetwork(const RoadManager& roads, const SidewalkManager& sidewalks)
@@ -68,6 +66,25 @@ private:
     const SidewalkManager& sidewalks_;
 };
 
+// Adds explicit road-crossing portals to the pedestrian graph. Crosswalk road
+// cells are traversable only along their authored crossing axis, never along
+// the traffic lane. The portal is active only when walkable pedestrian floor
+// exists on both sides of the road.
+class PedestrianCrosswalkNavigationNetwork final : public NavigationNetwork {
+public:
+    PedestrianCrosswalkNavigationNetwork(const RoadManager& roads,
+                                         const SidewalkManager& sidewalks,
+                                         const CrosswalkManager& crosswalks)
+        : surfaces_(roads, sidewalks), roads_(roads), sidewalks_(sidewalks), crosswalks_(crosswalks) {}
+    [[nodiscard]] bool is_navigable(NavigationTile tile) const override;
+    [[nodiscard]] bool is_connected(NavigationTile tile, CardinalDirection direction) const override;
+private:
+    PedestrianSurfaceNavigationNetwork surfaces_;
+    const RoadManager& roads_;
+    const SidewalkManager& sidewalks_;
+    const CrosswalkManager& crosswalks_;
+};
+
 enum class NavigationPathStatus { found, no_path };
 
 struct NavigationPathResult {
@@ -75,11 +92,7 @@ struct NavigationPathResult {
     std::vector<NavigationTile> tiles;
 };
 
-// Uniform-cost BFS. A network edge is one tile, so A* would not add useful
-// behavior at the current map size.
 [[nodiscard]] NavigationPathResult find_navigation_path(const NavigationNetwork& network,
                                                         NavigationTile start, NavigationTile goal);
-// Choose a reachable destination far enough for a visible stroll, including
-// turns. The returned path uses the same traversable edges as ordinary BFS.
 [[nodiscard]] NavigationPathResult find_navigation_path_with_minimum_length(
     const NavigationNetwork& network, NavigationTile start, std::size_t minimum_tiles);
