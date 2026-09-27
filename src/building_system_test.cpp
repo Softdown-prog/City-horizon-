@@ -2,6 +2,7 @@
 #include "economy_system.h"
 #include "road_system.h"
 
+#include <cmath>
 #include <iostream>
 
 namespace {
@@ -23,6 +24,22 @@ int main(int argc, char** argv) {
 
     BuildingCatalog catalog;
     if (!require(catalog.load_from_directory(argv[1]), "catalog loads JSON definitions")) {
+        return 1;
+    }
+    const auto check_pine = [&](const char* id, const char* texture, const float anchor_y) {
+        const BuildingDefinition* pine = catalog.find(id);
+        return require(pine != nullptr, "procedural pine is in the runtime catalog") &&
+               require(pine->category == "decor" && pine->player_buildable &&
+                           pine->footprint_width == 1 && pine->footprint_height == 1 && !pine->rotatable,
+                       "procedural pine is a placeable 1x1 decoration") &&
+               require(pine->texture_path_for(BuildingRotation::r0) == texture &&
+                           pine->art_scale == 1.0F && pine->anchor_x == 0.5F &&
+                           std::abs(pine->anchor_y - anchor_y) < 0.0001F,
+                       "procedural pine keeps its Visitor Forge sprite scale and ground pivot");
+    };
+    if (!check_pine("pine_small_v1", "assets/tree/pine_small_v1.png", 137.0F / 150.0F) ||
+        !check_pine("pine_tall_v1", "assets/tree/pine_tall_v1.png", 249.0F / 264.0F) ||
+        !check_pine("pine_robust_v1", "assets/tree/pine_robust_v1.png", 217.0F / 231.0F)) {
         return 1;
     }
     const BuildingDefinition* cafe = catalog.find("cafe_01");

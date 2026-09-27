@@ -1,0 +1,29 @@
+{
+  "id": "pine_small_v1",
+  "name": "Pinheiro pequeno",
+  "category": "decor",
+  "texture": "assets/tree/pine_small_v1.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 40,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.9133333333333333
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_procedural_2d",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/pine_small_v1.json",
+  "exportTool": "visitor_forge_2d.core.organic_scenery",
+  "cameraContract": "CH_CAMERA_V1"
+}
