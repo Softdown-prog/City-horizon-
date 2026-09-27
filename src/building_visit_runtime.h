@@ -15,23 +15,22 @@
 
 // CH_VISITOR_MVP_V1 building entry bridge.
 //
-// A building visit is deliberately stricter than road-access placement. Road
-// access may accept a whole facade, while a pedestrian must use one authored
-// door. Every visit therefore has two navigable world tiles:
-//
-//   approach -> door -> hidden interior
-//
-// The final hop is always perpendicular to the authored facade and points
-// toward the building. If either tile is missing from the pedestrian surface
-// graph, or that final edge is disconnected, the building cannot be entered.
-// This keeps feet on road/path/floor tiles and prevents side/back entry.
+// Road-access placement and pedestrian entry are intentionally separate:
+// placement may accept a whole facade, while a visitor must use one authored
+// door. All visible movement stays on the pedestrian surface graph. When a
+// straight perpendicular approach exists it is preferred; otherwise the actor
+// may reach the front-door tile from the connected path/road and turns to face
+// inward before disappearing. A visitor can never enter from a side or rear
+// facade merely because that tile happens to be reachable.
 namespace ch::building_visit_runtime {
 
+constexpr Uint64 kDoorAlignMs = 180;
 constexpr Uint64 kVisitorDwellMs = 3000;
 
 enum class VisitPhase : std::uint8_t {
     approaching,
     entering,
+    aligning,
     inside,
     completed_here,
 };
@@ -42,6 +41,7 @@ struct VisitState {
     int approach_y = 0;
     int door_x = 0;
     int door_y = 0;
+    GridDirection door_facing = GridDirection::south;
     Uint64 last_tick_ms = 0;
     Uint64 elapsed_inside_ms = 0;
     VisitPhase phase = VisitPhase::approaching;
@@ -51,6 +51,7 @@ struct EntranceRoute {
     std::uint64_t building_instance_id = 0;
     NavigationTile approach;
     NavigationTile door;
+    GridDirection door_facing = GridDirection::south;
     std::size_t route_tiles = 0;
 };
 
@@ -79,7 +80,17 @@ struct EntranceRoute {
     return CardinalDirection::north;
 }
 
-// Explicit accessPoints are the authoritative visitor doors. Legacy/front-edge
+[[nodiscard]] inline MobileEntityDirection inward_mobile_direction(const GridDirection outward) {
+    switch (outward) {
+        case GridDirection::north: return MobileEntityDirection::south;
+        case GridDirection::east: return MobileEntityDirection::west;
+        case GridDirection::south: return MobileEntityDirection::north;
+        case GridDirection::west: return MobileEntityDirection::east;
+    }
+    return MobileEntityDirection::north;
+}
+
+// Explicit accessPoints are authoritative visitor doors. Legacy/front-edge
 // definitions receive one central fallback door only; the whole facade is never
 // treated as an entrance. For an even-width facade the higher index is chosen,
 // matching the current small-commercial right-hand front entrance convention.
@@ -117,21 +128,35 @@ struct EntranceRoute {
                 instance.tile_x + access.local_x + offset_x,
                 instance.tile_y + access.local_y + offset_y,
             };
-            const NavigationTile approach{door.x + offset_x, door.y + offset_y};
+            if (!network.is_navigable(door)) continue;
 
-            // Both visible foot positions must be authored walkable surfaces.
-            // The final move must be exactly opposite the outward door facing.
-            if (!network.is_navigable(door) || !network.is_navigable(approach) ||
-                !network.can_move(approach, inward_direction(access.facing))) {
-                continue;
+            // Prefer a true straight-in final hop when the map supplies a
+            // second walkable tile outside the door (for example sidewalk ->
+            // apron). This naturally leaves the walking sprite facing inward.
+            const NavigationTile straight_approach{door.x + offset_x, door.y + offset_y};
+            if (network.is_navigable(straight_approach) &&
+                network.can_move(straight_approach, inward_direction(access.facing))) {
+                const NavigationPathResult route = find_navigation_path(network, start, straight_approach);
+                if (route.status == NavigationPathStatus::found && !route.tiles.empty()) {
+                    const std::size_t cost = route.tiles.size() + 1;
+                    if (cost < best_route_tiles) {
+                        best_route_tiles = cost;
+                        best = EntranceRoute{instance.instance_id, straight_approach, door, access.facing, cost};
+                    }
+                    continue;
+                }
             }
 
-            const NavigationPathResult route = find_navigation_path(network, start, approach);
+            // A shop placed flush to a one-tile road often has no second tile
+            // perpendicular to its facade. Route to the authored door tile by
+            // the normal graph instead; the alignment phase below turns the
+            // actor to face inward before entry, without moving off-surface.
+            const NavigationPathResult route = find_navigation_path(network, start, door);
             if (route.status != NavigationPathStatus::found || route.tiles.empty()) continue;
-            if (route.tiles.size() >= best_route_tiles) continue;
-
-            best_route_tiles = route.tiles.size();
-            best = EntranceRoute{instance.instance_id, approach, door, route.tiles.size()};
+            const std::size_t cost = route.tiles.size();
+            if (cost >= best_route_tiles) continue;
+            best_route_tiles = cost;
+            best = EntranceRoute{instance.instance_id, door, door, access.facing, cost};
         }
     }
     return best;
@@ -141,6 +166,8 @@ inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
                          PedestrianSystem& pedestrians, BuildingManager& buildings) {
     if (state.phase == VisitPhase::inside) {
         (void)buildings.end_activity(state.building_instance_id);
+    }
+    if (state.phase == VisitPhase::aligning || state.phase == VisitPhase::inside) {
         (void)pedestrians.set_visiting(pedestrian_id, false);
     }
 }
@@ -152,9 +179,19 @@ inline void cancel_visit(const std::uint64_t pedestrian_id, VisitState& state,
     return pedestrian.destination.x == expected_x && pedestrian.destination.y == expected_y;
 }
 
+[[nodiscard]] inline bool begin_alignment(const std::uint64_t pedestrian_id, VisitState& state,
+                                          PedestrianSystem& pedestrians, const Uint64 now) {
+    if (!pedestrians.face_pedestrian(pedestrian_id, inward_mobile_direction(state.door_facing))) return false;
+    if (!pedestrians.set_visiting(pedestrian_id, true)) return false;
+    state.last_tick_ms = now;
+    state.elapsed_inside_ms = 0;
+    state.phase = VisitPhase::aligning;
+    return true;
+}
+
 // Called from the runtime frame bridge. Autonomous visits are started only for
-// the production pedestrian mode; manual F7/F8 route tests are not hijacked.
-// Dwell time advances only while simulation_running is true.
+// production pedestrian mode; manual F7/F8 route tests are not hijacked. Both
+// alignment and dwell timers pause with the simulation.
 inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                  const BuildingCatalog& catalog, const NavigationNetwork& network,
                  const bool simulation_running, const bool allow_autonomous_visits) {
@@ -174,15 +211,26 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                 continue;
             }
 
-            // Re-read by id indirectly on the next frame after any route/state
-            // mutation. The snapshot remains valid for the current decision.
-            if ((pedestrian_snapshot.state == PedestrianState::walking ||
-                 pedestrian_snapshot.state == PedestrianState::idle) &&
-                state.phase != VisitPhase::inside &&
-                state.phase != VisitPhase::completed_here &&
+            if ((state.phase == VisitPhase::approaching || state.phase == VisitPhase::entering) &&
                 !is_expected_destination(pedestrian_snapshot, state)) {
                 cancel_visit(pedestrian_id, state, pedestrians, buildings);
                 runtime_states.erase(current);
+                continue;
+            }
+
+            if (state.phase == VisitPhase::aligning) {
+                const Uint64 delta = now >= state.last_tick_ms ? now - state.last_tick_ms : 0;
+                state.last_tick_ms = now;
+                if (simulation_running) state.elapsed_inside_ms += delta;
+                if (state.elapsed_inside_ms >= kDoorAlignMs) {
+                    if (buildings.begin_activity(state.building_instance_id)) {
+                        state.elapsed_inside_ms = 0;
+                        state.phase = VisitPhase::inside;
+                    } else {
+                        (void)pedestrians.set_visiting(pedestrian_id, false);
+                        runtime_states.erase(current);
+                    }
+                }
                 continue;
             }
 
@@ -199,8 +247,8 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             }
 
             if (state.phase == VisitPhase::completed_here) {
-                // Keep the guard until normal autonomous movement assigns a new
-                // destination. That avoids immediate re-entry at the same door.
+                // Keep the guard until ordinary autonomous movement assigns a
+                // different trip, preventing instant re-entry at the same door.
                 if (pedestrian_snapshot.state == PedestrianState::walking &&
                     !is_expected_destination(pedestrian_snapshot, state)) {
                     runtime_states.erase(current);
@@ -218,11 +266,16 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             if (state.phase == VisitPhase::approaching) {
                 const NavigationTile approach{state.approach_x, state.approach_y};
                 const NavigationTile door{state.door_x, state.door_y};
-                if (!(current_tile == approach) || !network.is_navigable(door)) {
+                if (!(current_tile == approach)) {
                     runtime_states.erase(current);
                     continue;
                 }
-                if (pedestrians.send_pedestrian(approach, door, network)) {
+                if (approach == door) {
+                    if (!begin_alignment(pedestrian_id, state, pedestrians, now)) {
+                        runtime_states.erase(current);
+                    }
+                } else if (network.is_navigable(door) &&
+                           pedestrians.send_pedestrian(approach, door, network)) {
                     state.phase = VisitPhase::entering;
                 } else {
                     runtime_states.erase(current);
@@ -232,19 +285,10 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
 
             if (state.phase == VisitPhase::entering) {
                 const NavigationTile door{state.door_x, state.door_y};
-                if (!(current_tile == door)) {
+                if (!(current_tile == door) ||
+                    !begin_alignment(pedestrian_id, state, pedestrians, now)) {
                     runtime_states.erase(current);
-                    continue;
                 }
-                if (!buildings.begin_activity(state.building_instance_id) ||
-                    !pedestrians.set_visiting(pedestrian_id, true)) {
-                    (void)buildings.end_activity(state.building_instance_id);
-                    runtime_states.erase(current);
-                    continue;
-                }
-                state.last_tick_ms = now;
-                state.elapsed_inside_ms = 0;
-                state.phase = VisitPhase::inside;
                 continue;
             }
         }
@@ -265,6 +309,7 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
             entrance->approach.y,
             entrance->door.x,
             entrance->door.y,
+            entrance->door_facing,
             now,
             0,
             VisitPhase::approaching,
@@ -277,9 +322,9 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
     return found != states().end() && found->second.phase == VisitPhase::inside;
 }
 
-// main_runtime_impl currently appends pedestrian render data after service
-// vehicles. Preserve that ordering while removing only visitors that are
-// physically inside a building.
+// main_runtime_impl appends pedestrian render data after service vehicles.
+// Preserve that ordering while removing only visitors physically inside. The
+// short door-alignment phase deliberately remains visible for captures/gameplay.
 inline void filter_inside_pedestrians(std::vector<MobileEntityRenderData>& entities,
                                       const PedestrianSystem& pedestrians) {
     const auto& instances = pedestrians.instances();
