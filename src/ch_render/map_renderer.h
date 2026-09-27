@@ -11,6 +11,7 @@
 #include "src/ch_core/contracts.h"
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
+#include "src/runtime_view_state.h"
 #include "src/building_system.h"
 #include "src/farming_system.h"
 #include "src/land_system.h"
@@ -253,5 +254,43 @@ private:
 };
 
 } // namespace ch
+
+// Texture-level camera culling. The world renderer already projects every
+// destination rectangle through the canonical runtime camera. Rejecting a
+// rectangle that is completely outside that viewport avoids submitting the
+// texture draw to SDL/GPU while leaving simulation, depth order and asset
+// selection untouched. A small guard band prevents edge popping from
+// fractional zoom/antialiasing.
+namespace ch::render_perf {
+
+[[nodiscard]] inline bool texture_destination_visible(const SDL_FRect* destination) {
+    if (destination == nullptr) return true;
+    const runtime_view::ViewSnapshot& view = runtime_view::snapshot();
+    if (!view.valid) return true;
+
+    constexpr float kGuardPixels = 64.0F;
+    const float left = destination->x;
+    const float top = destination->y;
+    const float right = destination->x + destination->w;
+    const float bottom = destination->y + destination->h;
+    return right >= -kGuardPixels && bottom >= -kGuardPixels &&
+           left <= view.viewport_width + kGuardPixels &&
+           top <= view.viewport_height + kGuardPixels;
+}
+
+inline bool render_texture_culled(SDL_Renderer* renderer, SDL_Texture* texture,
+                                  const SDL_FRect* source, const SDL_FRect* destination) {
+    if (!texture_destination_visible(destination)) return true;
+    return SDL_RenderTexture(renderer, texture, source, destination);
+}
+
+}  // namespace ch::render_perf
+
+// Keep call sites on SDL's familiar API while routing runtime/map-renderer
+// texture submissions through the conservative visibility gate above. The SDL
+// declaration has already been included, so this affects only project call
+// sites compiled after this header.
+#define SDL_RenderTexture(renderer, texture, source, destination) \
+    ::ch::render_perf::render_texture_culled((renderer), (texture), (source), (destination))
 
 #endif // CITY_HORIZON_CH_RENDER_MAP_RENDERER_H
