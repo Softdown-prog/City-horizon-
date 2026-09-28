@@ -1,9 +1,9 @@
 name: City Builder Focused Compile Check
 
 # Focused validation for runtime/UI changes before local test builds.
-# Compile the real runtime from the repository root, then configure a separate
-# capture build that exercises the production GameplayUi without changing the
-# root project's CMAKE_SOURCE_DIR assumptions.
+# Compile the real runtime from the repository root, exercise the pedestrian
+# navigation regression contract, then configure a separate capture build that
+# exercises the production GameplayUi without changing root CMAKE_SOURCE_DIR assumptions.
 on:
   workflow_dispatch:
   push:
@@ -22,6 +22,7 @@ on:
       - "src/building_visit_runtime.h"
       - "src/navigation_network.cpp"
       - "src/navigation_network.h"
+      - "src/navigation_network_test.cpp"
       - "src/park_fence_runtime.h"
       - "src/pedestrian_system.cpp"
       - "src/pedestrian_system.h"
@@ -44,11 +45,19 @@ jobs:
 
       - name: Configure real City Builder
         shell: pwsh
-        run: cmake -S . -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
+        run: cmake -S . -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
 
       - name: Build real City Builder
         shell: pwsh
         run: cmake --build build/city-builder-check --config Release --target city_builder --parallel
+
+      - name: Build pedestrian navigation regression
+        shell: pwsh
+        run: cmake --build build/city-builder-check --config Release --target navigation_network_test --parallel
+
+      - name: Run pedestrian navigation regression
+        shell: pwsh
+        run: ctest --test-dir build/city-builder-check -C Release -R "^navigation_network_test$" --output-on-failure
 
       - name: Configure UI visual capture
         shell: pwsh
