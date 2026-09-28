@@ -7,7 +7,10 @@ on:
       - main
     paths:
       - "tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json"
+      - "tools/visitor_forge_2d/examples/finish/park_tree_broadleaf_organic_*.json"
       - "tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py"
+      - "tools/visitor_forge_2d/src/visitor_forge_2d/core/render_finish.py"
+      - "tools/visitor_forge_2d/finish_organic_asset.py"
       - "tools/visitor_forge_2d/build_rotation_bundle.py"
       - "tools/visitor_forge_2d/tests/test_organic_scenery.py"
       - "tools/visitor_forge_2d/tests/test_rotation_bundle.py"
@@ -45,6 +48,9 @@ jobs:
           mkdir -p out/visitor_forge_2d/broadleaf_family
           for recipe in tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json; do
             python -m visitor_forge_2d.core.organic_scenery \
+              --recipe "$recipe" \
+              --output out/visitor_forge_2d/broadleaf_family
+            python tools/visitor_forge_2d/finish_organic_asset.py \
               --recipe "$recipe" \
               --output out/visitor_forge_2d/broadleaf_family
             python tools/visitor_forge_2d/build_rotation_bundle.py \
