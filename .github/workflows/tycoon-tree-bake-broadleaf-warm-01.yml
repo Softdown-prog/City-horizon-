@@ -1,0 +1,183 @@
+name: Tycoon Tree Bake Broadleaf Warm 01
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/tycoon_photo_studio/assets/park_tree_broadleaf_warm_01.fractal.json"
+      - "tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json"
+      - "tools/tycoon_photo_studio/build_classic_tree.py"
+      - "tools/tycoon_photo_studio/run_classic_tree_compat.py"
+      - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
+      - ".github/workflows/tycoon-tree-bake-broadleaf-warm-01.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bake-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASSET_ID: park_tree_broadleaf_warm_01
+      TREE_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_warm_01.fractal.json
+      REFERENCE_SOURCE: tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json
+      STYLE_CONTRACT: tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json
+      STUDIO_PRESET: tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+      CH_TYCOON_SHADOW_SAMPLES: "4"
+      CH_TYCOON_SHADOW_DENOISING: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
+
+      - name: Validate warm broadleaf source lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_warm_01.fractal.json').read_text())
+          reference = json.loads(Path('tools/tycoon_photo_studio/assets/park_tree_broadleaf_02.fractal.json').read_text())
+          contract = json.loads(Path('tools/tycoon_photo_studio/contracts/ch_stylized_prerender_v1.json').read_text())
+          assert data['contract'] == 'TYCOON_FRACTAL_TREE_SOURCE_V1'
+          assert data['styleContract'] == 'CH_STYLIZED_PRERENDER_V1'
+          assert data['assetId'] == 'park_tree_broadleaf_warm_01'
+          assert data['referenceAssetId'] == 'park_tree_broadleaf_02'
+          assert reference['assetId'] == data['referenceAssetId']
+          assert contract['id'] == data['styleContract']
+          assert any(ref['assetId'] == data['referenceAssetId'] for ref in contract['referenceAssets'])
+          assert contract['vegetationGuidance']['woodAndFoliageMustUseSeparateFinishingPaths'] is True
+          assert data['fractalTree']['levels'] == 4
+          assert data['fractalTree']['primaryBranches'] == 5
+          assert data['leafCards']['count'] >= 1020
+          assert data['leafCards']['coreFillFraction'] >= 0.22
+          assert data['leafCards']['interiorFraction'] >= 0.50
+          assert len(data['leafCards']['materials']) >= 5
+          assert data['foliagePostProcess']['paletteColors'] == 32
+          assert data['foliagePostProcess']['posterizeBitsPerChannel'] == 4
+          assert data['woodPostProcess']['woodToneCount'] == 4
+          print('warmBroadleafSourceGate: PASS')
+          print('referenceAsset:', data['referenceAssetId'])
+          print('leafCards:', data['leafCards']['count'])
+          print('palette:', data['leafCards']['materials'])
+          PY
+
+      - name: Download pinned Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="4.2.3"
+          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
+          destination="$RUNNER_TEMP/blender"
+          url="https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz"
+          curl --fail --location --retry 3 --retry-delay 2 "$url" --output "$archive"
+          mkdir -p "$destination"
+          tar -xf "$archive" -C "$destination"
+          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
+          test -n "$blender_exe"
+          chmod +x "$blender_exe"
+          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+
+      - name: Bake warm broadleaf source renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tree_warm/source
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
+            --python tools/tycoon_photo_studio/run_classic_tree_compat.py -- \
+            --asset-config "$TREE_SOURCE" \
+            --studio-preset "$STUDIO_PRESET" \
+            --output "$PWD/out/tree_warm/source"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree_warm/source/studio_metadata.json').read_text())
+          s = m['sourceSummary']
+          assert s['sourceMode'] == 'procedural_leaf_card_tree_v1', s
+          assert s['branchCount'] == 75, s
+          assert s['leafCardCount'] == 1120, s
+          print('leafCardGeometryGate: PASS')
+          print('branches:', s['branchCount'], 'leafCards:', s['leafCardCount'])
+          PY
+
+      - name: Build final PNG package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tree_warm/final
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input out/tree_warm/source \
+            --output out/tree_warm/final \
+            --studio-preset "$STUDIO_PRESET"
+
+      - name: Apply proven foliage and organic wood stylizer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/tycoon_photo_studio/stylize_foliage_2d.py \
+            --package out/tree_warm/final \
+            --asset-id "$ASSET_ID" \
+            --asset-config "$TREE_SOURCE"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('out/tree_warm/final/park_tree_broadleaf_warm_01_manifest.json').read_text())
+          pp = m['candidatePostProcess']
+          assert pp['mode'] == 'stylized_prerender_foliage_wood_split_v1'
+          assert pp['paletteColors'] == 32
+          assert pp['dither'] == 'floyd_steinberg_foliage_only'
+          assert pp['expectsLeafMicrogeometry'] is True
+          assert pp['shadowAlphaMax'] == 102
+          assert abs(pp['shadowStrength'] - 0.40) < 1e-6
+          assert pp['shadowRadiusPx'] == 76.0
+          assert pp['posterizeBitsPerChannel'] == 4
+          assert pp['outlineAlpha'] == 30
+          wood = pp['woodTreatment']
+          assert wood['mode'] == 'organic_bark_tone_masses_v1'
+          assert wood['toneCount'] == 4
+          assert wood['floydSteinberg'] is False
+          print('warmFoliageWoodSplitGate: PASS')
+          PY
+
+      - name: Verify four-view package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for direction in south east west north; do
+            test -f "out/tree_warm/final/${ASSET_ID}_${direction}.png"
+          done
+          test -f "out/tree_warm/final/${ASSET_ID}_4view.png"
+          test -f "out/tree_warm/final/${ASSET_ID}_review.png"
+          test -f "out/tree_warm/final/${ASSET_ID}_4dir_context.png"
+          test -f "out/tree_warm/final/${ASSET_ID}_atlas.png"
+
+      - name: Upload warm broadleaf PNGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Park-Tree-Broadleaf-Warm-01-PNGs
+          path: |
+            out/tree_warm/final
+            out/tree_warm/source/studio_metadata.json
+          if-no-files-found: error
+          retention-days: 14
