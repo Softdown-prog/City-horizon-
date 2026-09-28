@@ -1,0 +1,45 @@
+name: CH Isometric Occlusion Navigation Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/ch_core/projection.cpp"
+      - "src/ch_core/projection.h"
+      - "src/building_system.cpp"
+      - "src/building_system.h"
+      - "src/navigation_network.cpp"
+      - "src/navigation_network.h"
+      - "src/navigation_network_test.cpp"
+      - "src/park_fence_runtime.h"
+      - "src/crosswalk_system.cpp"
+      - "src/crosswalk_system.h"
+      - "src/fence_system.cpp"
+      - "src/fence_system.h"
+      - "src/sidewalk_system.cpp"
+      - "src/sidewalk_system.h"
+      - "src/road_system.cpp"
+      - "src/road_system.h"
+      - "CMakeLists.txt"
+      - ".github/workflows/ch-isometric-occlusion-navigation-check.yml"
+
+jobs:
+  contract-regression:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure focused contract build
+        shell: pwsh
+        run: cmake -S . -B build/occlusion-nav-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build navigation contract test
+        shell: pwsh
+        run: cmake --build build/occlusion-nav-check --config Release --target navigation_network_test --parallel
+
+      - name: Run navigation contract test
+        shell: pwsh
+        run: ctest --test-dir build/occlusion-nav-check -C Release -R "^navigation_network_test$" --output-on-failure
