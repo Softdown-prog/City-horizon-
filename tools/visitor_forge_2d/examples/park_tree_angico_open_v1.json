@@ -1,0 +1,78 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "park_tree_angico_open_v1",
+  "pipelineRevision": 1,
+  "canvas": [192, 256],
+  "anchor": [96, 239],
+  "seed": 17631,
+  "crownStyle": "broadleaf",
+  "crownCx": 96,
+  "shadowWidth": 92,
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "worldHeightScreenVertical": true
+  },
+  "rotation": {
+    "mode": "procedural_quarter_turns",
+    "lightingSpace": "screen_camera_relative",
+    "views": ["south", "west", "north", "east"],
+    "yawDeg": {
+      "south": 45,
+      "west": 135,
+      "north": 225,
+      "east": 315
+    }
+  },
+  "lightingIntent": {
+    "top": "soft warm daylight",
+    "front": "fresh medium green leaf groups",
+    "base": "deep cool green branch interior",
+    "rotationSpace": "screen_camera_relative"
+  },
+  "broadleafStructure": {
+    "clustersPerBranch": 3,
+    "branchGroupsPerTier": 4,
+    "clusterScale": 0.18
+  },
+  "palette": {
+    "ground_shadow": "#272A20",
+    "trunk_top": "#805536",
+    "trunk_bottom": "#3C291E",
+    "trunk_light": "#B37B4A",
+    "back_top": "#315A3E",
+    "back_bottom": "#203829",
+    "mid_top": "#4F7B4B",
+    "mid_bottom": "#2E5639",
+    "front_top": "#709A5C",
+    "front_bottom": "#426C45",
+    "highlight": "#91B76D",
+    "occlusion": "#1E3A2A",
+    "leaf_shadow_top": "#365E3D",
+    "leaf_shadow_bottom": "#203829",
+    "leaf_light_top": "#98BC72",
+    "leaf_light_bottom": "#6F995A"
+  },
+  "raster": {
+    "shadowDabs": 28,
+    "highlightDabs": 42,
+    "needleStrokes": 0,
+    "finalGrain": 34,
+    "finalNeedles": 0
+  },
+  "trunkBranches": [
+    {"p0": [96, 239], "p1": [95, 181], "p2": [94, 111], "w0": 15, "w1": 6},
+    {"p0": [95, 160], "p1": [80, 133], "p2": [53, 105], "w0": 8, "w1": 3},
+    {"p0": [96, 158], "p1": [113, 129], "p2": [143, 101], "w0": 8, "w1": 3},
+    {"p0": [94, 136], "p1": [82, 111], "p2": [68, 83], "w0": 6, "w1": 2.5},
+    {"p0": [95, 132], "p1": [109, 107], "p2": [126, 79], "w0": 6, "w1": 2.5}
+  ],
+  "tiers": [
+    {"y": 54, "span": 58, "thickness": 34, "skew": 3, "lobes": 18},
+    {"y": 82, "span": 77, "thickness": 40, "skew": -3, "lobes": 20},
+    {"y": 111, "span": 82, "thickness": 44, "skew": 1, "lobes": 20}
+  ]
+}
