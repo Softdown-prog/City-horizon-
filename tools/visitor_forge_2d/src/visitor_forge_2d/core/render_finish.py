@@ -63,6 +63,37 @@ def _cap_mask(size: tuple[int, int], max_y_fraction: float) -> Image.Image:
     return mask
 
 
+def _shift_l(image: Image.Image, dx: int, dy: int) -> Image.Image:
+    shifted = Image.new("L", image.size, 0)
+    shifted.paste(image, (int(dx), int(dy)))
+    return shifted
+
+
+def _apply_micro_artifact_cleanup(work: Image.Image, alpha: Image.Image, cfg: dict) -> Image.Image:
+    """Suppress isolated dark pinholes inside the canopy without touching silhouette/trunk."""
+    if not cfg or not cfg.get("enabled", False):
+        return work
+
+    radius = max(1, int(cfg.get("radiusPx", 1)))
+    kernel = radius * 2 + 1
+    median = work.filter(ImageFilter.MedianFilter(kernel))
+    gray = work.convert("L")
+    median_gray = median.convert("L")
+    dark_delta = ImageChops.subtract(median_gray, gray)
+    threshold = max(0, int(cfg.get("threshold", 20)))
+    gain = max(0.0, float(cfg.get("gain", 8.0)))
+    mask = dark_delta.point(
+        lambda p: 0 if p <= threshold else min(255, round((p - threshold) * gain))
+    )
+
+    interior = alpha.filter(ImageFilter.MinFilter(kernel))
+    mask = ImageChops.multiply(mask, interior)
+    mask = ImageChops.multiply(mask, _cap_mask(work.size, float(cfg.get("maxYFraction", 1.0))))
+    strength = _clamp01(float(cfg.get("strength", 0.75)))
+    mask = mask.point(lambda p: round(p * strength))
+    return Image.composite(median, work, mask)
+
+
 def _apply_vertical_lighting(work: Image.Image, alpha: Image.Image, cfg: dict) -> Image.Image:
     if not cfg:
         return work
@@ -123,6 +154,47 @@ def _apply_internal_separation(work: Image.Image, alpha: Image.Image, cfg: dict)
     return Image.composite(separation_target, work, edges)
 
 
+def _apply_directional_relief(work: Image.Image, alpha: Image.Image, cfg: dict) -> Image.Image:
+    """Bevel existing foliage value boundaries with camera-relative highlight/shadow."""
+    if not cfg or not cfg.get("enabled", False):
+        return work
+
+    gray = work.convert("L")
+    dx = int(cfg.get("offsetX", 1))
+    dy = int(cfg.get("offsetY", 1))
+    shifted = _shift_l(gray, dx, dy)
+    highlight = ImageChops.subtract(gray, shifted)
+    shadow = ImageChops.subtract(shifted, gray)
+
+    threshold = max(0, int(cfg.get("threshold", 4)))
+    gain = max(0.0, float(cfg.get("gain", 6.0)))
+    remap = lambda p: 0 if p <= threshold else min(255, round((p - threshold) * gain))
+    highlight = highlight.point(remap)
+    shadow = shadow.point(remap)
+
+    radius = max(1, int(cfg.get("interiorRadiusPx", 2)))
+    interior = alpha.filter(ImageFilter.MinFilter(radius * 2 + 1))
+    cap = _cap_mask(work.size, float(cfg.get("maxYFraction", 1.0)))
+    valid = ImageChops.multiply(interior, cap)
+    highlight = ImageChops.multiply(highlight, valid)
+    shadow = ImageChops.multiply(shadow, valid)
+
+    highlight_strength = _clamp01(float(cfg.get("highlightStrength", 0.22)))
+    shadow_strength = _clamp01(float(cfg.get("shadowStrength", 0.30)))
+    highlight = highlight.point(lambda p: round(p * highlight_strength))
+    shadow = shadow.point(lambda p: round(p * shadow_strength))
+
+    highlight_color = Image.new("RGB", work.size, _hex_rgb(cfg.get("highlightColor", "#D4C277")))
+    shadow_color = Image.new("RGB", work.size, _hex_rgb(cfg.get("shadowColor", "#344329")))
+    highlight_mix = _clamp01(float(cfg.get("highlightMix", 0.26)))
+    shadow_mix = _clamp01(float(cfg.get("shadowMix", 0.34)))
+
+    highlighted = Image.blend(work, highlight_color, highlight_mix)
+    work = Image.composite(highlighted, work, highlight)
+    shadowed = Image.blend(work, shadow_color, shadow_mix)
+    return Image.composite(shadowed, work, shadow)
+
+
 def finish_render(input_path: Path, output_path: Path, recipe_path: Path,
                   review_path: Path | None = None) -> dict:
     """Apply a deterministic 2D finishing pass without changing silhouette or alpha.
@@ -145,7 +217,8 @@ def finish_render(input_path: Path, output_path: Path, recipe_path: Path,
         )
 
     finish = recipe.get("finish", {})
-    work = ImageEnhance.Color(rgb).enhance(float(finish.get("color", 1.0)))
+    work = _apply_micro_artifact_cleanup(rgb, alpha, finish.get("microArtifactCleanup", {}))
+    work = ImageEnhance.Color(work).enhance(float(finish.get("color", 1.0)))
     work = ImageEnhance.Contrast(work).enhance(float(finish.get("contrast", 1.0)))
     work = work.filter(ImageFilter.UnsharpMask(
         radius=float(finish.get("unsharpRadius", 1.0)),
@@ -155,6 +228,7 @@ def finish_render(input_path: Path, output_path: Path, recipe_path: Path,
     work = ImageEnhance.Sharpness(work).enhance(float(finish.get("sharpness", 1.0)))
     work = _apply_vertical_lighting(work, alpha, finish.get("verticalLighting", {}))
     work = _apply_internal_separation(work, alpha, finish.get("internalSeparation", {}))
+    work = _apply_directional_relief(work, alpha, finish.get("directionalRelief", {}))
 
     # Protect antialiased edges so the pass never invents a new silhouette or halo.
     edge_low = int(finish.get("edgeGuardLowAlpha", 18))
@@ -215,6 +289,8 @@ def finish_render(input_path: Path, output_path: Path, recipe_path: Path,
         "outputSha256": _sha256(output_path),
         "alphaPreserved": True,
         "geometryChanged": False,
+        "microArtifactCleanupApplied": bool(finish.get("microArtifactCleanup", {}).get("enabled", False)),
         "verticalLightingApplied": bool(finish.get("verticalLighting")),
         "internalSeparationApplied": bool(finish.get("internalSeparation", {}).get("enabled", False)),
+        "directionalReliefApplied": bool(finish.get("directionalRelief", {}).get("enabled", False)),
     }
