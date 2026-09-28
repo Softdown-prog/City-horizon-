@@ -30,6 +30,17 @@ def _recipe() -> dict:
     }
 
 
+def _anchor_has_contact(frame: Image.Image, anchor: list[int]) -> bool:
+    """Anchor is a ground-contact coordinate; visible sprite may end just above it after Lanczos."""
+    x, y = anchor
+    alpha = frame.getchannel("A")
+    for yy in range(max(0, y - 2), min(frame.height, y + 2)):
+        for xx in range(max(0, x - 2), min(frame.width, x + 3)):
+            if alpha.getpixel((xx, yy)) > 0:
+                return True
+    return False
+
+
 def test_organic_scenery_is_deterministic_and_camera_gated(tmp_path: Path) -> None:
     recipe = _recipe()
     first, metadata = render(recipe)
@@ -69,7 +80,7 @@ def test_pine_family_has_requested_heights_and_distinct_silhouettes() -> None:
         height = bottom - top
         limits = recipe["validation"]
         assert limits["minimumOpaqueHeightPx"] <= height <= limits["maximumOpaqueHeightPx"]
-        assert frame.getpixel(tuple(recipe["anchor"]))[3] > 0
+        assert _anchor_has_contact(frame, recipe["anchor"])
         sizes[name] = (right - left, height)
     assert sizes["pine_small_v1"][1] > 100
     assert sizes["pine_tall_v1"][1] > sizes["pine_robust_v1"][1] > sizes["pine_small_v1"][1]
@@ -87,8 +98,6 @@ def test_organic_scenery_rejects_wrong_camera() -> None:
 
 
 def test_broadleaf_crown_is_deterministic_and_differs_from_conifer(tmp_path: Path) -> None:
-    """crownStyle:broadleaf must render, be deterministic, and produce a distinct
-    silhouette from the same recipe rendered as a conifer."""
     recipe = _recipe()
     recipe["crownStyle"] = "broadleaf"
 
@@ -98,23 +107,43 @@ def test_broadleaf_crown_is_deterministic_and_differs_from_conifer(tmp_path: Pat
     assert first.mode == "RGBA" and first.size == (192, 256)
     assert meta_first["crownStyle"] == "broadleaf"
 
-    # The conifer and broadleaf crowns occupy different regions — pixel counts
-    # in the upper quarter of the canvas differ because conifers are narrow at
-    # the top while broadleaf clusters span more of the width at mid-crown.
     conifer_recipe = dict(recipe)
     conifer_recipe["crownStyle"] = "conifer"
     conifer_frame, conifer_meta = render(conifer_recipe)
     assert conifer_meta["crownStyle"] == "conifer"
-    assert first.tobytes() != conifer_frame.tobytes(), (
-        "broadleaf and conifer produced identical pixels; crown dispatch is broken"
-    )
+    assert first.tobytes() != conifer_frame.tobytes(), "broadleaf and conifer produced identical pixels"
 
-    # Export round-trip: isometric review file must be created.
     source = tmp_path / "broadleaf.json"
     source.write_text(json.dumps(recipe), encoding="utf-8")
     result = export(source, tmp_path / "out")
     with Image.open(result["isometricReview"]) as review:
         assert review.size == (768, 480)
+
+
+def test_canonical_broadleaf_02_applies_finish_and_exports_distinct_four_views(tmp_path: Path) -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    recipe_path = project_root / "examples" / "park_tree_broadleaf_organic_02.json"
+    recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+    # Resolve repository-relative finishRecipe when test runs from a temporary cwd.
+    recipe["finishRecipe"] = str(project_root / "examples" / "finish" / "park_tree_broadleaf_organic_02.json")
+    local_recipe = tmp_path / "park_tree_broadleaf_organic_02.json"
+    local_recipe.write_text(json.dumps(recipe), encoding="utf-8")
+
+    result = export(local_recipe, tmp_path / "out")
+    assert set(result["views"]) == {"south", "west", "north", "east"}
+    hashes = set()
+    for view, path_value in result["views"].items():
+        path = Path(path_value)
+        source = path.with_name(path.name.replace(f"_{view}.png", f"_{view}_source.png"))
+        assert path.is_file() and source.is_file()
+        with Image.open(path) as final, Image.open(source) as raw:
+            assert final.getchannel("A").tobytes() == raw.getchannel("A").tobytes(), "finish changed alpha"
+        hashes.add(path.read_bytes())
+    assert len(hashes) >= 2, "procedural quarter-turn views are byte-identical"
+
+    manifest = json.loads(Path(result["rotationManifest"]).read_text(encoding="utf-8"))
+    assert manifest["mode"] == "procedural_quarter_turns"
+    assert manifest["generatedViews"] is True
 
 
 def test_organic_scenery_rejects_unknown_crown_style() -> None:
