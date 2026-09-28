@@ -4,6 +4,7 @@
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/terrain_semantics_catalog.h"
 #include "src/ch_core/validation.h"
 #include "src/ch_render/map_renderer.h"
 
@@ -1731,14 +1732,13 @@ int main() {
     std::vector<WaterSurfaceTile> scenario_water_tiles;
     std::unordered_map<std::uint64_t, std::string> scenario_terrain_paths;
     std::vector<ShorelineOverlayTile> shoreline_overlays;
-    // The two opaque PNGs are material records generated from the approved
-    // Water V2 master. World coverage deliberately remains render_tile_fill,
-    // the seam-proven CH_GRID_V1 geometry, rather than their PNG rectangle.
-    const TextureAsset* water_base_deep = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_deep.png");
-    const TextureAsset* water_base_shallow = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_base_shallow.png");
-    const TextureAsset* water_caustics = textures.load(renderer, asset_root / "assets/terrain/coast_adjusted/water_caustics_01.png");
-    if (water_base_deep == nullptr || water_base_shallow == nullptr || water_caustics == nullptr) {
-        std::cerr << "CH_WATER_V2 assets unavailable; continuing with legacy terrain visuals\n";
+    // The game's texture lookup is cache-only during rendering. Load the
+    // approved world bases and palette-cycle atlases once at startup.
+    for (const char* name : {"water_shallow_world.png", "water_deep_world.png",
+                             "water_shallow_glint_cycle_atlas.png", "water_deep_glint_cycle_atlas.png"}) {
+        if (textures.load(renderer, asset_root / "assets/terrain/water" / name) == nullptr) {
+            std::cerr << "Water surface unavailable: " << name << '\n';
+        }
     }
     const std::filesystem::path scenarios_root = asset_root / "assets/scenarios";
     std::filesystem::path initial_city_path = scenarios_root / "initial_city.json";
@@ -1830,6 +1830,7 @@ int main() {
     std::vector<TerrainPaintTile> terrain_paint;
     bool sidewalk_mode = false;
     std::string sidewalk_style = "dirt_path";
+    std::string water_terrain_id;
     bool decoration_mode = false;
     bool agriculture_mode = false;
     bool agriculture_panel_open = false;
@@ -1977,6 +1978,7 @@ int main() {
         planting_dragging = false;
         land_mode = false;
         sidewalk_mode = false;
+        water_terrain_id.clear();
         agriculture_mode = false;
         agriculture_panel_open = false;
         farming_selection_id.clear();
@@ -2040,22 +2042,38 @@ int main() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
         status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
     };
+    const auto begin_water_mode = [&](const std::string& id) {
+        const ch::TerrainSemanticsDefinition* definition =
+            ch::TerrainSemanticsCatalog::global_instance().find(id);
+        if (definition == nullptr || !definition->water || definition->build_cost <= 0) return;
+        clear_map_modes();
+        build_panel_open = false;
+        water_terrain_id = id;
+        selected_instance_id.reset();
+        status = definition->display_name + ": " + format_money(definition->build_cost) +
+                 "/TILE | CLICK TO PLACE | RIGHT/ESC CANCEL";
+        (void)play_sound(SoundEvent::ui_select);
+    };
+    const auto record_terrain_paint = [&](const int x, const int y, const std::string& style) {
+        const auto saved = std::find_if(terrain_paint.begin(), terrain_paint.end(),
+            [x, y](const TerrainPaintTile& entry) { return entry.tile_x == x && entry.tile_y == y; });
+        if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, style});
+        else saved->style = style;
+    };
     const auto editable_ground = [&](const int x, const int y) {
         if (!active_map_doc) return false;
         const auto tile = active_map_doc->get_terrain_at(x, y);
         const std::string style = tile ? tile->terrain_definition : "grass";
         return style == "grass" || style == "sand" || style == "sand_center" ||
-               style == "sand_wet" || style == "ground_dirt_path";
+               style == "sand_wet" || style == "ground_dirt_path" ||
+                style == "water_shallow" || style == "water_deep";
     };
     const auto restore_grass = [&](const int x, const int y) {
         if (!active_map_doc) return false;
         const auto tile = active_map_doc->get_terrain_at(x, y);
         if (!tile || tile->terrain_definition == "grass" || !editable_ground(x, y)) return false;
         active_map_doc->paint_terrain_at(x, y, "grass", "");
-        const auto saved = std::find_if(terrain_paint.begin(), terrain_paint.end(),
-            [x, y](const TerrainPaintTile& entry) { return entry.tile_x == x && entry.tile_y == y; });
-        if (saved == terrain_paint.end()) terrain_paint.push_back({x, y, "grass"});
-        else saved->style = "grass";
+        record_terrain_paint(x, y, "grass");
         return true;
     };
     const auto begin_decoration_mode = [&]() {
@@ -2137,8 +2155,8 @@ int main() {
             for (const TerrainPaintTile& tile : terrain_paint) {
                 if (!active_map_doc || !lands.is_tile_owned(tile.tile_x, tile.tile_y)) continue;
                 const std::string path = tile.style == "sand" ? "assets/terrain/sand_isometric_01.png" : "";
-                active_map_doc->paint_terrain_at(tile.tile_x, tile.tile_y,
-                                                 tile.style == "sand" ? "sand_center" : "grass", path);
+                const std::string terrain_id = tile.style == "sand" ? "sand_center" : tile.style;
+                active_map_doc->paint_terrain_at(tile.tile_x, tile.tile_y, terrain_id, path);
             }
             power.rebuild(buildings, catalog);
             status = "LOAD COMPLETE: " + result.message;
@@ -2800,7 +2818,7 @@ int main() {
                 }
                 const auto raw_clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-                const auto clicked_tile = (land_mode || road_removal_mode || sidewalk_mode) ? raw_clicked_tile :
+                const auto clicked_tile = (land_mode || road_removal_mode || sidewalk_mode || !water_terrain_id.empty()) ? raw_clicked_tile :
                     nearest_owned_tile(raw_clicked_tile, lands);
                 if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
                     land_mode = false;
@@ -2812,6 +2830,10 @@ int main() {
                     road_mode = false;
                     road_removal_mode = false;
                     status = "ROAD MODE CANCELLED";
+                    (void)play_sound(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && !water_terrain_id.empty()) {
+                    water_terrain_id.clear();
+                    status = "WATER MODE CANCELLED";
                     (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && sidewalk_mode) {
                     sidewalk_mode = false;
@@ -2857,6 +2879,30 @@ int main() {
                             status = "LAND PURCHASE FAILED";
                             (void)play_sound(SoundEvent::ui_error);
                         }
+                    } else if (!water_terrain_id.empty()) {
+                        const int x = clicked_tile.first;
+                        const int y = clicked_tile.second;
+                        const ch::TerrainSemanticsDefinition* definition =
+                            ch::TerrainSemanticsCatalog::global_instance().find(water_terrain_id);
+                        const auto current = active_map_doc->get_terrain_at(x, y);
+                        if (!lands.is_tile_owned(x, y)) {
+                            status = "WATER REQUIRES OWNED LAND";
+                        } else if (!inspect_map_tile(buildings, roads, sidewalks, farming, x, y).is_empty_terrain()) {
+                            status = "WATER TILE IS OCCUPIED";
+                        } else if (!editable_ground(x, y)) {
+                            status = "TERRAIN CANNOT BE REPLACED";
+                        } else if (current && current->terrain_definition == water_terrain_id) {
+                            status = "WATER ALREADY PLACED";
+                        } else if (definition == nullptr || !economy.try_spend(definition->build_cost)) {
+                            status = "NOT ENOUGH FUNDS FOR WATER";
+                        } else {
+                            active_map_doc->paint_terrain_at(x, y, water_terrain_id, "");
+                            record_terrain_paint(x, y, water_terrain_id);
+                            status = definition->display_name + " PLACED: " + format_money(definition->build_cost);
+                            (void)play_sound(SoundEvent::ui_confirm);
+                        }
+                        if (status != "WATER ALREADY PLACED" && status.find(" PLACED: ") == std::string::npos)
+                            (void)play_sound(SoundEvent::ui_error);
                     } else if (road_mode && road_removal_mode) {
                         demolition_dragging = true;
                         demolition_drag_start = {clicked_tile.first, clicked_tile.second};
@@ -3223,6 +3269,10 @@ int main() {
                             land_mode = false;
                             status = "LAND MODE CANCELLED";
                             (void)play_sound(SoundEvent::ui_back);
+                        } else if (!water_terrain_id.empty()) {
+                            water_terrain_id.clear();
+                            status = "WATER MODE CANCELLED";
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (road_mode) {
                             road_dragging = false;
                             demolition_dragging = false;
@@ -3260,6 +3310,8 @@ int main() {
                     case SDL_SCANCODE_B:
                         open_build_panel();
                         break;
+                    case SDL_SCANCODE_1: begin_water_mode("water_shallow"); break;
+                    case SDL_SCANCODE_2: begin_water_mode("water_deep"); break;
                     case SDL_SCANCODE_V:
                         begin_road_mode();
                         break;
@@ -3610,7 +3662,8 @@ int main() {
                 asset_root,
                 cs,
                 static_cast<float>(viewport_width),
-                static_cast<float>(viewport_height)
+                static_cast<float>(viewport_height),
+                static_cast<float>(SDL_GetTicks() % 2000U) / 1000.0F
             );
         } else {
             render_map(renderer, grass, scenario_terrain_textures, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));

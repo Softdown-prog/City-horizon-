@@ -13,6 +13,10 @@ import numpy as np
 from PIL import Image
 
 KINDS = ("water_shallow", "water_deep")
+GAMEPLAY = {
+    "water_shallow": {"displayName": "Água rasa", "buildCost": 50},
+    "water_deep": {"displayName": "Água profunda", "buildCost": 100},
+}
 SIZE = 256
 FRAMES = 16
 DURATION_MS = 125
@@ -72,6 +76,8 @@ def promote(kind, continuous, output, tables):
     Image.fromarray(atlas, "RGBA").save(output / f"{kind}_glint_cycle_atlas.png")
 
     return {
+        "id": kind,
+        **GAMEPLAY[kind],
         "base": f"assets/terrain/water/{kind}_world.png",
         "originalOverlay": f"assets/terrain/water/{kind}_glint_overlay.png",
         "indexedOverlay": f"assets/terrain/water/{kind}_glint_indices.png",

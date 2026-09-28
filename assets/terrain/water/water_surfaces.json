@@ -6181,12 +6181,18 @@
   },
   "surfaces": {
     "water_shallow": {
+      "id": "water_shallow",
+      "displayName": "\u00c1gua rasa",
+      "buildCost": 50,
       "base": "assets/terrain/water/water_shallow_world.png",
       "originalOverlay": "assets/terrain/water/water_shallow_glint_overlay.png",
       "indexedOverlay": "assets/terrain/water/water_shallow_glint_indices.png",
       "rgbaFrameAtlas": "assets/terrain/water/water_shallow_glint_cycle_atlas.png"
     },
     "water_deep": {
+      "id": "water_deep",
+      "displayName": "\u00c1gua profunda",
+      "buildCost": 100,
       "base": "assets/terrain/water/water_deep_world.png",
       "originalOverlay": "assets/terrain/water/water_deep_glint_overlay.png",
       "indexedOverlay": "assets/terrain/water/water_deep_glint_indices.png",

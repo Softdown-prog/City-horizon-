@@ -1,6 +1,7 @@
 #ifndef CITY_HORIZON_CH_CORE_TERRAIN_SEMANTICS_CATALOG_H
 #define CITY_HORIZON_CH_CORE_TERRAIN_SEMANTICS_CATALOG_H
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -16,6 +17,8 @@ struct TerrainSemanticsDefinition {
     bool water = false;
     bool pedestrian_traversable = false;
     std::string navigation_type = "none"; // "none", "pedestrian", "water"
+    std::string display_name;
+    std::int64_t build_cost = 0; // Whole dollars per tile when painted by the player.
 };
 
 class TerrainSemanticsCatalog {

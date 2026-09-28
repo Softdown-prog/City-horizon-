@@ -8,7 +8,7 @@
 struct TerrainPaintTile {
     int tile_x = 0;
     int tile_y = 0;
-    std::string style; // grass or sand
+    std::string style; // grass, sand, water_shallow, water_deep
 };
 
 class BuildingCatalog;

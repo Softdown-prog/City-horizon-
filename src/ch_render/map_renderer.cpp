@@ -259,6 +259,36 @@ void MapRenderer::render_water_caustics_overlay_tile(SDL_Renderer* renderer, con
     (void)SDL_RenderGeometry(renderer, overlay.texture, vertices, 4, indices, 6);
 }
 
+void MapRenderer::render_water_surface_tile(SDL_Renderer* renderer, const TextureAsset& texture,
+                                            const int x, const int y, const CameraState& camera,
+                                            const float viewport_width, const float viewport_height,
+                                            const int frame) {
+    if (renderer == nullptr || texture.texture == nullptr) return;
+    constexpr float period = 4.0F;
+    constexpr float cell = 256.0F;
+    constexpr float stride = 258.0F;  // 256 source pixels plus one wrapped gutter per side.
+    const float u = std::fmod(std::fmod(static_cast<float>(x), period) + period, period);
+    const float v = std::fmod(std::fmod(static_cast<float>(y), period) + period, period);
+    const auto uv = [&](const float world_u, const float world_v) {
+        if (frame < 0) return SDL_FPoint{world_u / period, world_v / period};
+        const float source_x = static_cast<float>(frame % 4) * stride + 1.0F + world_u * (cell / period);
+        const float source_y = static_cast<float>(frame / 4) * stride + 1.0F + world_v * (cell / period);
+        return SDL_FPoint{source_x / texture.source_width, source_y / texture.source_height};
+    };
+    SDL_Vertex vertices[4] = {};
+    const ScreenPoint top = world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, viewport_width, viewport_height);
+    const ScreenPoint right = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), camera, viewport_width, viewport_height);
+    const ScreenPoint bottom = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
+    const ScreenPoint left = world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), camera, viewport_width, viewport_height);
+    vertices[0].position = {top.x, top.y};       vertices[0].tex_coord = uv(u, v);
+    vertices[1].position = {right.x, right.y};   vertices[1].tex_coord = uv(u + 1.0F, v);
+    vertices[2].position = {bottom.x, bottom.y}; vertices[2].tex_coord = uv(u + 1.0F, v + 1.0F);
+    vertices[3].position = {left.x, left.y};     vertices[3].tex_coord = uv(u, v + 1.0F);
+    for (SDL_Vertex& vertex : vertices) vertex.color = {1.0F, 1.0F, 1.0F, 1.0F};
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, texture.texture, vertices, 4, indices, 6);
+}
+
 void MapRenderer::render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                             const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
                             const CameraState& camera, const float viewport_width, const float viewport_height) {
@@ -382,10 +412,14 @@ void MapRenderer::render_world_terrain_and_water(
         }
     }
 
-    const TextureAsset* water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_01.png");
-    if (water_caustics == nullptr) {
-        water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_overlay_01.png");
-    }
+    const TextureAsset* shallow_surface = water_tiles.empty() ? nullptr :
+        find_texture("assets/terrain/water/water_shallow_world.png");
+    const TextureAsset* deep_surface = water_tiles.empty() ? nullptr :
+        find_texture("assets/terrain/water/water_deep_world.png");
+    const TextureAsset* shallow_glint = water_tiles.empty() ? nullptr :
+        find_texture("assets/terrain/water/water_shallow_glint_cycle_atlas.png");
+    const TextureAsset* deep_glint = water_tiles.empty() ? nullptr :
+        find_texture("assets/terrain/water/water_deep_glint_cycle_atlas.png");
 
     // Canonical Layer Execution:
     // 1. Terrain Base
@@ -406,20 +440,41 @@ void MapRenderer::render_world_terrain_and_water(
         }
     }
 
-    // 2. Water Base (Shallow / Deep)
-    constexpr SDL_FColor kDeepBase = {108.0F / 255.0F, 196.0F / 255.0F, 207.0F / 255.0F, 1.0F};
+    // Opaque coverage owns every shared raster edge; texture and glint follow
+    // logical world coordinates through all four camera rotations.
+    constexpr SDL_FColor kDeepBase = {80.0F / 255.0F, 163.0F / 255.0F, 194.0F / 255.0F, 1.0F};
     constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};
     for (const auto& tile : water_tiles) {
         render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,
                          tile.shallow ? kShallowBase : kDeepBase);
     }
 
-    // 3. Continuous Caustics Overlay
-    if (water_caustics != nullptr) {
-        for (const auto& tile : water_tiles) {
-            render_water_caustics_overlay_tile(renderer, *water_caustics, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+    SDL_TextureAddressMode previous_u = SDL_TEXTURE_ADDRESS_AUTO;
+    SDL_TextureAddressMode previous_v = SDL_TEXTURE_ADDRESS_AUTO;
+    const bool restore_address = SDL_GetRenderTextureAddressMode(renderer, &previous_u, &previous_v);
+    (void)SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_WRAP, SDL_TEXTURE_ADDRESS_WRAP);
+    for (const auto& tile : water_tiles) {
+        const TextureAsset* base = tile.shallow ? shallow_surface : deep_surface;
+        if (base != nullptr) {
+            render_water_surface_tile(renderer, *base, tile.tile_x, tile.tile_y,
+                                      camera, viewport_width, viewport_height);
         }
     }
+
+    // Every atlas frame already contains the approved moving overlay. Drawing
+    // the separate original overlay here would double its brightness.
+    (void)SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
+    const int frame = std::clamp(static_cast<int>(std::floor(std::fmod(std::max(0.0F, render_time), 2.0F) * 8.0F)), 0, 15);
+    for (const auto& tile : water_tiles) {
+        const TextureAsset* glint = tile.shallow ? shallow_glint : deep_glint;
+        if (glint != nullptr) {
+            render_water_surface_tile(renderer, *glint, tile.tile_x, tile.tile_y,
+                                      camera, viewport_width, viewport_height, frame);
+        }
+    }
+    (void)SDL_SetRenderTextureAddressMode(renderer,
+        restore_address ? previous_u : SDL_TEXTURE_ADDRESS_AUTO,
+        restore_address ? previous_v : SDL_TEXTURE_ADDRESS_AUTO);
 
     // 4. Shoreline Edges / Corners
     for (const auto& overlay : shoreline_overlays) {
@@ -1239,7 +1294,8 @@ void MapForgeNativeViewport::render_frame() {
                 asset_root_,
                 camera_,
                 vw,
-                vh
+                vh,
+                static_cast<float>(SDL_GetTicks() % 2000U) / 1000.0F
             );
 
             for (const auto& r : current_document_->roads()) {

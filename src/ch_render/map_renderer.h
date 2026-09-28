@@ -111,6 +111,12 @@ public:
                                                    const CameraState& camera, float viewport_width, float viewport_height,
                                                    float world_period = 16.0F);
 
+    // Samples a four-tile periodic water sheet in logical world coordinates.
+    // frame < 0 selects the opaque base; 0..15 selects a padded glint atlas cell.
+    static void render_water_surface_tile(SDL_Renderer* renderer, const TextureAsset& texture, int x, int y,
+                                          const CameraState& camera, float viewport_width, float viewport_height,
+                                          int frame = -1);
+
     static void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
                            const CameraState& camera, float viewport_width, float viewport_height);

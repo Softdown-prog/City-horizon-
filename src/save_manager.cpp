@@ -444,7 +444,8 @@ template <typename Number>
         const auto x = json_number<int>(terrain, "tileX");
         const auto y = json_number<int>(terrain, "tileY");
         const auto style = json_string(terrain, "style");
-        if (!x || !y || !style || (*style != "grass" && *style != "sand")) {
+        if (!x || !y || !style || (*style != "grass" && *style != "sand" &&
+            *style != "water_shallow" && *style != "water_deep")) {
             error = "terrain paint entry is invalid";
             return false;
         }

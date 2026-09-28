@@ -13,4 +13,4 @@ python tools/tycoon_photo_studio/promote_water_surface.py \
   --continuous out/water/continuous --output assets/terrain/water
 ```
 
-Promocao visual: artefato `City-Horizon-Water-3D-to-2D-PNGs` do workflow `Tycoon Water Surface Bake`, run 36481392330. Os arquivos estao prontos para consumo pelo renderer; conectar e conferir no mapa sera uma etapa posterior. O atlas RGBA permite animacao sem depender de suporte a texturas indexadas em cada backend SDL. A costa continua independente desta superficie.
+Promocao visual: artefato `City-Horizon-Water-3D-to-2D-PNGs` do workflow `Tycoon Water Surface Bake`, run 36481392330. Os IDs `water_shallow` (Água rasa, $50 por tile) e `water_deep` (Água profunda, $100 por tile) estão ligados ao renderer do jogo e do MapForge. No jogo, 1 seleciona água rasa e 2 água profunda; clique coloca em terreno próprio e livre, botão direito/Esc cancela. O gasto ocorre apenas quando a troca é válida. O estado é salvo como terreno pintado. A revisão visual dentro do jogo ainda não foi executada. O atlas RGBA permite animacao sem depender de suporte a texturas indexadas em cada backend SDL. A costa continua independente desta superficie.

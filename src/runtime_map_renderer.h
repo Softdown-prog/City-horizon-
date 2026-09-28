@@ -233,7 +233,6 @@ public:
         const std::filesystem::path& asset_root, const CameraState& camera,
         const float viewport_width, const float viewport_height, const float render_time = 0.0F) {
         (void)asset_root;
-        (void)render_time;
         if (renderer == nullptr) return;
 
         const runtime_render_detail::TileCullBounds visible =
@@ -329,26 +328,40 @@ public:
             }
         }
 
-        constexpr SDL_FColor kDeepBase = {108.0F / 255.0F, 196.0F / 255.0F, 207.0F / 255.0F, 1.0F};
+        constexpr SDL_FColor kDeepBase = {80.0F / 255.0F, 163.0F / 255.0F, 194.0F / 255.0F, 1.0F};
         constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};
         for (const auto& tile : water_tiles) {
             MapRenderer::render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera,
                                           viewport_width, viewport_height,
                                           tile.shallow ? kShallowBase : kDeepBase);
         }
-
-        const TextureAsset* water_caustics = nullptr;
         if (!water_tiles.empty()) {
-            water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_01.png");
-            if (water_caustics == nullptr) {
-                water_caustics = find_texture("assets/terrain/coast_adjusted/water_caustics_overlay_01.png");
-            }
-        }
-        if (water_caustics != nullptr) {
+            const TextureAsset* shallow = find_texture("assets/terrain/water/water_shallow_world.png");
+            const TextureAsset* deep = find_texture("assets/terrain/water/water_deep_world.png");
+            const TextureAsset* shallow_glint = find_texture("assets/terrain/water/water_shallow_glint_cycle_atlas.png");
+            const TextureAsset* deep_glint = find_texture("assets/terrain/water/water_deep_glint_cycle_atlas.png");
+            SDL_TextureAddressMode previous_u = SDL_TEXTURE_ADDRESS_AUTO;
+            SDL_TextureAddressMode previous_v = SDL_TEXTURE_ADDRESS_AUTO;
+            const bool restore_address = SDL_GetRenderTextureAddressMode(renderer, &previous_u, &previous_v);
+            (void)SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_WRAP, SDL_TEXTURE_ADDRESS_WRAP);
             for (const auto& tile : water_tiles) {
-                MapRenderer::render_water_caustics_overlay_tile(renderer, *water_caustics,
-                    tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+                const TextureAsset* texture = tile.shallow ? shallow : deep;
+                if (texture != nullptr)
+                    MapRenderer::render_water_surface_tile(renderer, *texture, tile.tile_x, tile.tile_y,
+                                                           camera, viewport_width, viewport_height);
             }
+            (void)SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
+            const int frame = std::clamp(static_cast<int>(
+                std::floor(std::fmod(std::max(0.0F, render_time), 2.0F) * 8.0F)), 0, 15);
+            for (const auto& tile : water_tiles) {
+                const TextureAsset* texture = tile.shallow ? shallow_glint : deep_glint;
+                if (texture != nullptr)
+                    MapRenderer::render_water_surface_tile(renderer, *texture, tile.tile_x, tile.tile_y,
+                                                           camera, viewport_width, viewport_height, frame);
+            }
+            (void)SDL_SetRenderTextureAddressMode(renderer,
+                restore_address ? previous_u : SDL_TEXTURE_ADDRESS_AUTO,
+                restore_address ? previous_v : SDL_TEXTURE_ADDRESS_AUTO);
         }
 
         for (const auto& overlay : shoreline_overlays) {

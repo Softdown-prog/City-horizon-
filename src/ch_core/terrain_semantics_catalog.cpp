@@ -1,4 +1,6 @@
 #include "terrain_semantics_catalog.h"
+#include <charconv>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -46,6 +48,20 @@ std::optional<bool> get_json_bool(const std::string_view json, const std::string
     }
     return std::nullopt;
 }
+std::optional<std::int64_t> get_json_int64(const std::string_view json, const std::string_view key) {
+    const std::string key_pattern = "\"" + std::string(key) + "\"";
+    const std::size_t pos = json.find(key_pattern);
+    if (pos == std::string_view::npos) return std::nullopt;
+    const std::size_t colon = json.find(':', pos + key_pattern.size());
+    if (colon == std::string_view::npos) return std::nullopt;
+    const char* begin = json.data() + colon + 1;
+    const char* end = json.data() + json.size();
+    while (begin < end && (*begin == ' ' || *begin == '\t' || *begin == '\n')) ++begin;
+    std::int64_t value = 0;
+    const auto [after, error] = std::from_chars(begin, end, value);
+    if (error != std::errc{} || after == begin || value < 0) return std::nullopt;
+    return value;
+}
 } // namespace
 
 const TerrainSemanticsCatalog& TerrainSemanticsCatalog::global_instance() {
@@ -75,6 +91,18 @@ const TerrainSemanticsCatalog& TerrainSemanticsCatalog::global_instance() {
         o_d.id = "ocean_deep"; o_d.surface = "water"; o_d.buildable = false; o_d.water = true; o_d.pedestrian_traversable = false; o_d.navigation_type = "water";
         g_global_catalog.catalog_["ocean_deep"] = o_d;
 
+        TerrainSemanticsDefinition shallow;
+        shallow.id = "water_shallow"; shallow.surface = "water"; shallow.buildable = false;
+        shallow.water = true; shallow.navigation_type = "water";
+        shallow.display_name = "AGUA RASA"; shallow.build_cost = 50;
+        g_global_catalog.catalog_[shallow.id] = shallow;
+
+        TerrainSemanticsDefinition deep;
+        deep.id = "water_deep"; deep.surface = "water"; deep.buildable = false;
+        deep.water = true; deep.navigation_type = "water";
+        deep.display_name = "AGUA PROFUNDA"; deep.build_cost = 100;
+        g_global_catalog.catalog_[deep.id] = deep;
+
         g_has_global = true;
     }
     return g_global_catalog;
@@ -101,7 +129,8 @@ bool TerrainSemanticsCatalog::load_manifest(const std::filesystem::path& manifes
 
         // Parse definitions block
         std::vector<std::string> known_ids = {
-            "grass", "cement_path", "sand_center", "sand_wet", "ocean_shallow", "ocean_deep"
+            "grass", "cement_path", "sand_center", "sand_wet", "ocean_shallow", "ocean_deep",
+            "water_shallow", "water_deep"
         };
 
         for (const auto& id : known_ids) {
@@ -119,6 +148,9 @@ bool TerrainSemanticsCatalog::load_manifest(const std::filesystem::path& manifes
                     def.water = get_json_bool(sub, "water").value_or(false);
                     def.pedestrian_traversable = get_json_bool(sub, "pedestrianTraversable").value_or(false);
                     def.navigation_type = get_json_string(sub, "navigationType").value_or("none");
+                    def.display_name = get_json_string(sub, "displayName").value_or(id);
+                    const std::int64_t default_cost = id == "water_shallow" ? 50 : id == "water_deep" ? 100 : 0;
+                    def.build_cost = get_json_int64(sub, "buildCost").value_or(default_cost);
 
                     catalog_[id] = def;
                 }
