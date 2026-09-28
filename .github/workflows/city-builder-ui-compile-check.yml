@@ -22,6 +22,7 @@ on:
       - "src/building_visit_runtime.h"
       - "src/navigation_network.cpp"
       - "src/navigation_network.h"
+      - "src/park_fence_runtime.h"
       - "src/pedestrian_system.cpp"
       - "src/pedestrian_system.h"
       - "src/land_system.cpp"
