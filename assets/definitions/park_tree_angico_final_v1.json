@@ -23,8 +23,8 @@
   },
   "playerBuildable": true,
   "productionStatus": "runtime_authored_2d_reference",
-  "sourceRecipe": "tools/visitor_forge_2d/examples/park_tree_angico_open_v1.json",
-  "reproductionStatus": "visual_target_pending_exact_forge_match",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/park_tree_angico_golden_v1.json",
+  "reproductionStatus": "golden_visual_target_pending_exact_forge_match",
   "exportTool": "approved_2d_reference_normalization",
   "cameraContract": "CH_CAMERA_V1"
 }
