@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
-  "pipelineRevision": 8,
+  "pipelineRevision": 9,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
@@ -35,9 +35,9 @@
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "branchGroupsPerTier": 7,
+    "branchGroupsPerTier": 8,
     "clustersPerBranch": 5,
-    "clusterScale": 0.19,
+    "clusterScale": 0.21,
     "preserveOpenings": true,
     "silhouetteSource": "branch_clusters"
   },
@@ -46,33 +46,31 @@
     "trunk_top": "#946037",
     "trunk_bottom": "#4A2D1C",
     "trunk_light": "#C98749",
-    "back_top": "#66703B",
-    "back_bottom": "#303A25",
-    "mid_top": "#A98B43",
-    "mid_bottom": "#626037",
-    "front_top": "#D7A34B",
-    "front_bottom": "#8D7136",
-    "highlight": "#F0C86C",
-    "occlusion": "#394128"
+    "back_top": "#68713D",
+    "back_bottom": "#343D28",
+    "mid_top": "#A58945",
+    "mid_bottom": "#67603A",
+    "front_top": "#CFA04E",
+    "front_bottom": "#8F743C",
+    "highlight": "#EAC56A",
+    "occlusion": "#3A422A"
   },
   "raster": {
-    "shadowDabs": 38,
-    "highlightDabs": 72,
+    "shadowDabs": 30,
+    "highlightDabs": 58,
     "needleStrokes": 0,
-    "finalGrain": 24,
+    "finalGrain": 16,
     "finalNeedles": 0
   },
   "trunkBranches": [
-    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 123], "w0": 17, "w1": 9},
-    {"p0": [96, 188], "p1": [84, 160], "p2": [67, 139], "w0": 8, "w1": 4},
-    {"p0": [97, 181], "p1": [110, 152], "p2": [128, 135], "w0": 8, "w1": 4}
+    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 122], "w0": 17, "w1": 9},
+    {"p0": [96, 188], "p1": [83, 159], "p2": [66, 137], "w0": 8, "w1": 4},
+    {"p0": [97, 181], "p1": [111, 151], "p2": [130, 134], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 67,  "span": 34, "thickness": 40, "skew": -3, "lobes": 18},
-    {"y": 88,  "span": 49, "thickness": 44, "skew": 4,  "lobes": 19},
-    {"y": 110, "span": 62, "thickness": 47, "skew": -4, "lobes": 20},
-    {"y": 133, "span": 71, "thickness": 50, "skew": 2,  "lobes": 20},
-    {"y": 155, "span": 67, "thickness": 47, "skew": -3, "lobes": 20},
-    {"y": 176, "span": 56, "thickness": 43, "skew": 4,  "lobes": 19}
+    {"y": 70,  "span": 43, "thickness": 66, "skew": -5, "lobes": 19},
+    {"y": 105, "span": 67, "thickness": 78, "skew": 4,  "lobes": 20},
+    {"y": 140, "span": 75, "thickness": 82, "skew": -3, "lobes": 21},
+    {"y": 171, "span": 61, "thickness": 68, "skew": 5,  "lobes": 20}
   ]
 }
