@@ -17,6 +17,7 @@ on:
       - 'tools/visitor_forge_2d/tests/test_workers.py'
       - 'tools/visitor_forge_2d/tests/test_art_author.py'
       - 'tools/visitor_forge_2d/examples/park_tree_broadleaf_early_autumn_v1.json'
+      - 'tools/visitor_forge_2d/examples/park_tree_angico_*.json'
       - 'tools/visitor_forge_2d/examples/briefs/*.json'
 
 permissions:
