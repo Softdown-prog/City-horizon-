@@ -1,7 +1,7 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "repositoryFile": "assets/roads/premium_01/road_10.png"
+    "repositoryFile": "assets/tree/park_tree_angico_final_v1.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -11,43 +11,35 @@
     "canvas": {
       "width": 1024,
       "height": 768,
-      "background": "#313934"
+      "background": "#283b31"
     },
     "camera": {
       "zoom": 0.92,
-      "focusTile": [-13.5, 0.5],
-      "focusScreen": [0.5, 0.58]
+      "focusTile": [0.0, 0.0],
+      "focusScreen": [0.5, 0.72]
     },
     "stage": {
-      "minTile": -18,
+      "minTile": -6,
       "maxTile": 6,
-      "groundColor": "#708963",
-      "alternateGroundColor": "#768f69",
-      "gridColor": "#3e4f3b",
+      "groundColor": "#668458",
+      "alternateGroundColor": "#6d8c5f",
+      "gridColor": "#40563c",
       "drawGrid": true,
       "drawGrassTexture": true,
-      "grassSpeckleColor": "#5f7f50"
+      "grassSpeckleColor": "#557449"
     },
     "candidate": {
-      "tile": [-16, 0],
-      "tiles": [[-16, 0], [-15, 0], [-14, 0], [-13, 0], [-12, 0], [-11, 0]],
+      "tile": [0, 0],
       "footprint": [1, 1],
       "scale": 1.0,
       "offsetPixels": [0, 0],
-      "showFootprint": false,
-      "showAnchor": false,
-      "renderAsGroundTile": true
+      "showFootprint": true,
+      "showAnchor": true,
+      "renderAsGroundTile": false,
+      "footprintColor": "#f6c448"
     },
     "portal": {
-      "enabled": true,
-      "tile": [-16, 0],
-      "color": "#ffc03e",
-      "drawApproach": true,
-      "signLabel": "CITY HORIZON",
-      "signDetail": "ENTRADA DA CIDADE",
-      "showTutorialLabel": true,
-      "label": "CONEXAO RODOVIARIA",
-      "detail": "LIGUE SUA PRIMEIRA RUA A ESTA ENTRADA"
+      "enabled": false
     }
   }
 }
