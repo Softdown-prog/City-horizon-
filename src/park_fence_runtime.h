@@ -114,13 +114,19 @@ public:
 
     [[nodiscard]] bool is_connected(const NavigationTile tile,
                                     const CardinalDirection direction) const override {
+        const TileOffset offset = direction_offset(direction);
+        const NavigationTile other{tile.x + offset.x, tile.y + offset.y};
+
+        // Defense in depth: NavigationNetwork::can_move already validates both
+        // endpoints, but is_connected is also used as a public graph primitive.
+        // Never report an edge through a building even if a future caller asks
+        // is_connected directly instead of going through can_move.
+        if (!is_navigable(tile) || !is_navigable(other)) return false;
         if (!base_.is_connected(tile, direction)) return false;
         if (fences().blocks_tile_crossing(tile.x, tile.y, direction)) return false;
 
         if (fences().is_open_gate_crossing(tile.x, tile.y, direction)) {
-            const TileOffset offset = direction_offset(direction);
-            const NavigationTile other{tile.x + offset.x, tile.y + offset.y};
-            return is_navigable(tile) && is_navigable(other);
+            return true;
         }
         return true;
     }
