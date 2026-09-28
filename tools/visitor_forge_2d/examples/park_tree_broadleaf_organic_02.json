@@ -5,7 +5,7 @@
   "anchor": [96, 239],
   "seed": 73129,
   "crownStyle": "broadleaf",
-  "crownCx": 98,
+  "crownCx": 96,
   "trunkWidth": 18,
   "trunkTopY": 126,
   "shadowWidth": 102,
@@ -39,10 +39,10 @@
     "finalNeedles": 200
   },
   "tiers": [
-    {"y": 55,  "span": 31, "thickness": 31, "skew": -4, "lobes": 21},
-    {"y": 88,  "span": 49, "thickness": 40, "skew": 3,  "lobes": 22},
-    {"y": 124, "span": 67, "thickness": 47, "skew": -5, "lobes": 20},
-    {"y": 160, "span": 72, "thickness": 49, "skew": 4,  "lobes": 19},
-    {"y": 188, "span": 53, "thickness": 36, "skew": -2, "lobes": 18}
+    {"y": 55,  "span": 30, "thickness": 31, "skew": -4, "lobes": 21},
+    {"y": 88,  "span": 47, "thickness": 40, "skew": 3,  "lobes": 22},
+    {"y": 124, "span": 60, "thickness": 47, "skew": -4, "lobes": 20},
+    {"y": 160, "span": 62, "thickness": 49, "skew": 3,  "lobes": 19},
+    {"y": 188, "span": 48, "thickness": 36, "skew": -2, "lobes": 18}
   ]
 }
