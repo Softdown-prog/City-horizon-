@@ -75,3 +75,9 @@ tools/
 ```
 
 A migração física dos scripts existentes deve ser incremental: documentação/entrada primeiro, depois mover scripts por domínio atualizando imports e workflows juntos. Isso evita quebrar Actions que já estão em produção.
+
+## Piloto de água contínua
+
+Água é terreno semântico raso/profundo. As receitas Blender em `tools/tycoon_photo_studio/assets/water_surface_*_01.json` produzem a fonte visual; `.github/workflows/tycoon-water-bake.yml` exporta as quatro vistas 128×64 e os mosaicos de diagnóstico. Esses PNGs isolados não devem ser promovidos como tiles repetidos: as bordas alfa e as fases diferentes criam linhas e blocos visíveis.
+
+`tools/tycoon_photo_studio/prepare_water_world_preview.py` usa esses bakes como fonte artística para uma textura periódica amostrada no espaço do mundo, com base rasa/profunda e quatro prévias de rotação sobre uma região 5×5. As prévias mostram a continuidade sem exigir uma praia complexa. Antes da promoção ao runtime, verificar visualmente o artefato no tamanho do jogo e adaptar a amostragem contínua já prevista em `src/ch_render/map_renderer.cpp`; animação e margem simples ficam como passos separados. A família N/E/S/W de 16 máscaras deste documento pertence aos caminhos, não à superfície da água.
