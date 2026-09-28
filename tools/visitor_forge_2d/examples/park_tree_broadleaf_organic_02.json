@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
-  "pipelineRevision": 5,
+  "pipelineRevision": 6,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
@@ -30,14 +30,14 @@
   },
   "lightingIntent": {
     "top": "early_autumn_gold_sunlit",
-    "front": "yellow_orange_exposed_foliage",
-    "base": "deep_olive_brown_self_shadow",
+    "front": "amber_orange_exposed_foliage",
+    "base": "deep_olive_green_brown_self_shadow",
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "branchGroupsPerTier": 8,
-    "clustersPerBranch": 7,
-    "clusterScale": 0.29,
+    "branchGroupsPerTier": 10,
+    "clustersPerBranch": 8,
+    "clusterScale": 0.34,
     "preserveOpenings": true,
     "silhouetteSource": "branch_clusters"
   },
@@ -46,34 +46,33 @@
     "trunk_top": "#9A6030",
     "trunk_bottom": "#4A2B17",
     "trunk_light": "#D08A47",
-    "back_top": "#6E6530",
-    "back_bottom": "#38341F",
-    "mid_top": "#B07A35",
-    "mid_bottom": "#665027",
-    "front_top": "#D99A3C",
-    "front_bottom": "#8E6330",
-    "highlight": "#F0C45D",
-    "occlusion": "#4A3A21"
+    "back_top": "#5B6130",
+    "back_bottom": "#303820",
+    "mid_top": "#A57435",
+    "mid_bottom": "#5F5929",
+    "front_top": "#D58E32",
+    "front_bottom": "#8C5D2B",
+    "highlight": "#F2BC4F",
+    "occlusion": "#473A21"
   },
   "raster": {
-    "shadowDabs": 74,
-    "highlightDabs": 140,
+    "shadowDabs": 82,
+    "highlightDabs": 150,
     "needleStrokes": 0,
-    "finalGrain": 64,
+    "finalGrain": 68,
     "finalNeedles": 0
   },
   "trunkBranches": [
-    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 126], "w0": 18, "w1": 9},
-    {"p0": [96, 188], "p1": [84, 163], "p2": [68, 145], "w0": 8, "w1": 4},
-    {"p0": [97, 181], "p1": [110, 155], "p2": [126, 139], "w0": 8, "w1": 4}
+    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 123], "w0": 18, "w1": 9},
+    {"p0": [96, 188], "p1": [84, 160], "p2": [67, 139], "w0": 8, "w1": 4},
+    {"p0": [97, 181], "p1": [110, 152], "p2": [128, 135], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 56,  "span": 30, "thickness": 34, "skew": -2, "lobes": 20},
-    {"y": 76,  "span": 44, "thickness": 38, "skew": 3,  "lobes": 21},
-    {"y": 97,  "span": 58, "thickness": 42, "skew": -4, "lobes": 22},
-    {"y": 119, "span": 68, "thickness": 45, "skew": 2,  "lobes": 23},
-    {"y": 142, "span": 71, "thickness": 46, "skew": -2, "lobes": 23},
-    {"y": 163, "span": 65, "thickness": 43, "skew": 4,  "lobes": 22},
-    {"y": 181, "span": 52, "thickness": 38, "skew": -1, "lobes": 21}
+    {"y": 72,  "span": 43, "thickness": 62, "skew": -2, "lobes": 20},
+    {"y": 91,  "span": 58, "thickness": 68, "skew": 3,  "lobes": 21},
+    {"y": 111, "span": 70, "thickness": 72, "skew": -4, "lobes": 22},
+    {"y": 132, "span": 76, "thickness": 74, "skew": 2,  "lobes": 23},
+    {"y": 153, "span": 70, "thickness": 70, "skew": -2, "lobes": 23},
+    {"y": 171, "span": 57, "thickness": 62, "skew": 4,  "lobes": 22}
   ]
 }
