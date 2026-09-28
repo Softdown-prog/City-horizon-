@@ -1,8 +1,9 @@
 """Compatibility launcher for the classic tree baker against the GAP2 scene API.
 
-The generic baker now requires configure_scene(studio, src_resolution, output_dir).
-The classic tree baker still calls the previous two-argument form.  This launcher
-adapts that call without weakening the new generic baker API.
+Historical classic-tree revisions called ``configure_scene(studio, output_dir)`` while
+newer revisions call ``configure_scene(studio, src_resolution, output_dir)``.  This
+launcher accepts both shapes and resolves the dynamic source/final resolution from the
+asset before delegating to the current generic scene API.
 """
 
 from __future__ import annotations
@@ -33,13 +34,29 @@ def _arg_value(name: str) -> str:
 _original_configure_scene = build_scene.configure_scene
 
 
-def _configure_scene_compat(studio, output_dir):
+def _configure_scene_compat(studio, *args):
+    """Accept both classic 2-arg and current 3-arg configure_scene call shapes."""
+    if len(args) == 1:
+        output_dir = args[0]
+    elif len(args) == 2:
+        # Newer classic baker already supplies a source resolution.  We deliberately
+        # recompute it here from the asset so GAP2 dynamic sizing remains authoritative.
+        _legacy_src_resolution, output_dir = args
+    else:
+        raise TypeError(
+            "classic configure_scene compatibility expects "
+            "(studio, output_dir) or (studio, src_resolution, output_dir)"
+        )
+
     asset_path = _arg_value("--asset-config")
     asset = json.loads(Path(asset_path).read_text(encoding="utf-8"))
     src_resolution, final_resolution = build_scene.compute_dynamic_resolution(asset, studio)
     scene = _original_configure_scene(studio, src_resolution, output_dir)
-    # Keep the resolved final size available to callers that still read the studio object.
-    studio.setdefault("render", {})["finalResolution"] = list(final_resolution)
+
+    # Keep the resolved sizes available to classic callers and metadata writers.
+    studio.setdefault("render", {})["srcResolution"] = list(src_resolution)
+    studio["render"]["sourceResolution"] = list(src_resolution)
+    studio["render"]["finalResolution"] = list(final_resolution)
     return scene
 
 
