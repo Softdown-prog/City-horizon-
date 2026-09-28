@@ -82,6 +82,27 @@ jobs:
           print('palette:', data['leafCards']['materials'])
           PY
 
+      - name: Prepare classic-tree compatible studio preset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/tree_warm
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          source = Path('tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json')
+          target = Path('out/tree_warm/ch_tycoon_studio_v1.classic_compat.json')
+          data = json.loads(source.read_text())
+          render = data['render']
+          assert 'sourceResolution' in render
+          render['srcResolution'] = list(render['sourceResolution'])
+          target.write_text(json.dumps(data, indent=2) + '\n')
+          print('classicStudioCompatibility: PASS')
+          print('sourceResolution:', render['sourceResolution'])
+          print('srcResolution:', render['srcResolution'])
+          PY
+          echo "CLASSIC_STUDIO_PRESET=$PWD/out/tree_warm/ch_tycoon_studio_v1.classic_compat.json" >> "$GITHUB_ENV"
+
       - name: Download pinned Blender
         shell: bash
         run: |
@@ -106,7 +127,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a "$BLENDER_EXE" --background --factory-startup \
             --python tools/tycoon_photo_studio/run_classic_tree_compat.py -- \
             --asset-config "$TREE_SOURCE" \
-            --studio-preset "$STUDIO_PRESET" \
+            --studio-preset "$CLASSIC_STUDIO_PRESET" \
             --output "$PWD/out/tree_warm/source"
 
           python - <<'PY'
