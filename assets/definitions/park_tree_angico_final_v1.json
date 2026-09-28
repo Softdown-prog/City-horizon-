@@ -19,7 +19,7 @@
   "artScale": 1.0,
   "anchor": {
     "x": 0.5,
-    "y": 0.975
+    "y": 0.971875
   },
   "playerBuildable": true,
   "productionStatus": "runtime_authored_2d_reference",
