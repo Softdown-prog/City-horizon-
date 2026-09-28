@@ -10,10 +10,7 @@ on:
       - "tools/visitor_forge_2d/examples/finish/park_tree_broadleaf_organic_*.json"
       - "tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py"
       - "tools/visitor_forge_2d/src/visitor_forge_2d/core/render_finish.py"
-      - "tools/visitor_forge_2d/finish_organic_asset.py"
-      - "tools/visitor_forge_2d/build_rotation_bundle.py"
       - "tools/visitor_forge_2d/tests/test_organic_scenery.py"
-      - "tools/visitor_forge_2d/tests/test_rotation_bundle.py"
 
 permissions:
   contents: read
@@ -35,11 +32,8 @@ jobs:
           python -m pip install -e tools/visitor_forge_2d
           python -m pip install pytest
 
-      - name: Test organic scenery and rotation bundle
-        run: |
-          python -m pytest -q \
-            tools/visitor_forge_2d/tests/test_organic_scenery.py \
-            tools/visitor_forge_2d/tests/test_rotation_bundle.py
+      - name: Test organic scenery
+        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py
 
       - name: Render deterministic broadleaf family
         shell: bash
@@ -50,13 +44,28 @@ jobs:
             python -m visitor_forge_2d.core.organic_scenery \
               --recipe "$recipe" \
               --output out/visitor_forge_2d/broadleaf_family
-            python tools/visitor_forge_2d/finish_organic_asset.py \
-              --recipe "$recipe" \
-              --output out/visitor_forge_2d/broadleaf_family
-            python tools/visitor_forge_2d/build_rotation_bundle.py \
-              --recipe "$recipe" \
-              --output out/visitor_forge_2d/broadleaf_family
           done
+
+      - name: Verify canonical broadleaf four-view bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=out/visitor_forge_2d/broadleaf_family/park_tree_broadleaf_organic_02
+          test -f "${base}_south.png"
+          test -f "${base}_west.png"
+          test -f "${base}_north.png"
+          test -f "${base}_east.png"
+          test -f "${base}_rotation.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/visitor_forge_2d/broadleaf_family/park_tree_broadleaf_organic_02_rotation.json')
+          data = json.loads(p.read_text())
+          assert data['mode'] == 'procedural_quarter_turns'
+          assert set(data['views']) == {'south', 'west', 'north', 'east'}
+          hashes = {v['sha256'] for v in data['views'].values()}
+          assert len(hashes) >= 2, 'four-view generator emitted identical slots'
+          PY
 
       - name: Upload broadleaf tree review
         uses: actions/upload-artifact@v4
