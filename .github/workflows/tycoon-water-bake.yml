@@ -8,6 +8,7 @@ on:
       - "tools/tycoon_photo_studio/assets/water_surface_shallow_01.json"
       - "tools/tycoon_photo_studio/build_scene.py"
       - "tools/tycoon_photo_studio/export_water_tiles.py"
+      - "tools/tycoon_photo_studio/prepare_water_world_preview.py"
       - "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json"
       - ".github/workflows/tycoon-water-bake.yml"
 permissions:
@@ -26,7 +27,7 @@ jobs:
       - name: Install bake dependencies
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pillow
+          python -m pip install --upgrade pillow numpy
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0
       - name: Validate water source contracts
@@ -102,11 +103,17 @@ jobs:
               canvas.save(output / f'{variant}_repeat_5x5.png')
           print('waterRepeatPreview: PASS')
           PY
+      - name: Capture continuous shallow and deep water in four rotations
+        run: |
+          python tools/tycoon_photo_studio/prepare_water_world_preview.py \
+            --tile-dir out/water/tiles \
+            --output out/water/continuous
       - uses: actions/upload-artifact@v4
         with:
           name: City-Horizon-Water-3D-to-2D-PNGs
           path: |
             out/water/tiles
+            out/water/continuous
             out/water/deep/source/studio_metadata.json
             out/water/shallow/source/studio_metadata.json
           if-no-files-found: error
