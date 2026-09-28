@@ -7,6 +7,7 @@
   "crownStyle": "broadleaf",
   "crownCx": 96,
   "shadowWidth": 96,
+  "finishRecipe": "tools/visitor_forge_2d/examples/finish/park_tree_broadleaf_organic_02.json",
   "camera": {
     "contract": "CH_CAMERA_V1",
     "projection": "orthographic_dimetric",
