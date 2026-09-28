@@ -17,7 +17,7 @@
     "worldHeightScreenVertical": true
   },
   "rotation": {
-    "mode": "camera_invariant",
+    "mode": "procedural_quarter_turns",
     "lightingSpace": "screen_camera_relative",
     "views": ["south", "west", "north", "east"],
     "yawDeg": {
@@ -32,6 +32,13 @@
     "front": "brightest_foliage",
     "base": "deep_olive_self_shadow",
     "rotationSpace": "screen_camera_relative"
+  },
+  "broadleafStructure": {
+    "branchGroupsPerTier": 5,
+    "clustersPerBranch": 5,
+    "clusterScale": 0.24,
+    "preserveOpenings": true,
+    "silhouetteSource": "branch_clusters"
   },
   "palette": {
     "ground_shadow": "#292B1C",
@@ -48,10 +55,10 @@
     "occlusion": "#414A2A"
   },
   "raster": {
-    "shadowDabs": 70,
-    "highlightDabs": 120,
+    "shadowDabs": 55,
+    "highlightDabs": 105,
     "needleStrokes": 0,
-    "finalGrain": 90,
+    "finalGrain": 52,
     "finalNeedles": 0
   },
   "trunkBranches": [
@@ -60,9 +67,9 @@
     {"p0": [97, 178], "p1": [108, 156], "p2": [122, 143], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 68,  "span": 43, "thickness": 38, "skew": -5, "lobes": 22},
-    {"y": 103, "span": 61, "thickness": 48, "skew": 4,  "lobes": 23},
+    {"y": 68, "span": 43, "thickness": 38, "skew": -5, "lobes": 22},
+    {"y": 103, "span": 61, "thickness": 48, "skew": 4, "lobes": 23},
     {"y": 139, "span": 68, "thickness": 52, "skew": -3, "lobes": 22},
-    {"y": 174, "span": 61, "thickness": 46, "skew": 5,  "lobes": 21}
+    {"y": 174, "span": 61, "thickness": 46, "skew": 5, "lobes": 21}
   ]
 }
