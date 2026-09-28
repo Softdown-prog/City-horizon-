@@ -3,12 +3,10 @@
   "id": "park_tree_broadleaf_organic_02",
   "canvas": [192, 256],
   "anchor": [96, 239],
-  "seed": 73129,
+  "seed": 84317,
   "crownStyle": "broadleaf",
   "crownCx": 96,
-  "trunkWidth": 18,
-  "trunkTopY": 126,
-  "shadowWidth": 102,
+  "shadowWidth": 96,
   "camera": {
     "contract": "CH_CAMERA_V1",
     "projection": "orthographic_dimetric",
@@ -19,30 +17,34 @@
   },
   "palette": {
     "ground_shadow": "#1B2720",
-    "trunk_top": "#80532C",
-    "trunk_bottom": "#412815",
-    "trunk_light": "#B97A4A",
-    "back_top": "#315D36",
-    "back_bottom": "#173B23",
-    "mid_top": "#55824A",
-    "mid_bottom": "#2D5938",
-    "front_top": "#6B9B55",
-    "front_bottom": "#3C6C42",
-    "highlight": "#A9C779",
-    "occlusion": "#1B4129"
+    "trunk_top": "#8A5A32",
+    "trunk_bottom": "#4A2D18",
+    "trunk_light": "#C18453",
+    "back_top": "#315F39",
+    "back_bottom": "#1B3E27",
+    "mid_top": "#4F824E",
+    "mid_bottom": "#2D5B3B",
+    "front_top": "#6B9C5A",
+    "front_bottom": "#416F47",
+    "highlight": "#A3C77A",
+    "occlusion": "#21452E"
   },
   "raster": {
-    "shadowDabs": 240,
-    "highlightDabs": 220,
-    "needleStrokes": 300,
-    "finalGrain": 360,
-    "finalNeedles": 200
+    "shadowDabs": 110,
+    "highlightDabs": 130,
+    "needleStrokes": 0,
+    "finalGrain": 150,
+    "finalNeedles": 0
   },
+  "trunkBranches": [
+    {"p0": [96, 239], "p1": [94, 190], "p2": [97, 132], "w0": 18, "w1": 10},
+    {"p0": [96, 186], "p1": [86, 163], "p2": [72, 147], "w0": 9, "w1": 4},
+    {"p0": [97, 178], "p1": [108, 156], "p2": [122, 143], "w0": 8, "w1": 4}
+  ],
   "tiers": [
-    {"y": 55,  "span": 30, "thickness": 31, "skew": -4, "lobes": 21},
-    {"y": 88,  "span": 47, "thickness": 40, "skew": 3,  "lobes": 22},
-    {"y": 124, "span": 60, "thickness": 47, "skew": -4, "lobes": 20},
-    {"y": 160, "span": 62, "thickness": 49, "skew": 3,  "lobes": 19},
-    {"y": 188, "span": 48, "thickness": 36, "skew": -2, "lobes": 18}
+    {"y": 68,  "span": 43, "thickness": 38, "skew": -5, "lobes": 22},
+    {"y": 103, "span": 61, "thickness": 48, "skew": 4,  "lobes": 23},
+    {"y": 139, "span": 68, "thickness": 52, "skew": -3, "lobes": 22},
+    {"y": 174, "span": 61, "thickness": 46, "skew": 5,  "lobes": 21}
   ]
 }
