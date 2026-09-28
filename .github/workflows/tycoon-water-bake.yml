@@ -47,19 +47,10 @@ jobs:
               assert part['material'] == material
           print('waterSourceGate: PASS')
           PY
-      - name: Download pinned Blender
-        run: |
-          set -euo pipefail
-          version="4.2.3"
-          archive="$RUNNER_TEMP/blender-$version-linux-x64.tar.xz"
-          destination="$RUNNER_TEMP/blender"
-          curl --fail --location --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.2/blender-$version-linux-x64.tar.xz" --output "$archive"
-          mkdir -p "$destination"
-          tar -xf "$archive" -C "$destination"
-          blender_exe="$(find "$destination" -type f -name blender | head -n 1)"
-          test -n "$blender_exe"
-          chmod +x "$blender_exe"
-          echo "BLENDER_EXE=$blender_exe" >> "$GITHUB_ENV"
+      - name: Setup shared CH Blender
+        uses: ./.github/actions/setup-ch-blender
+      - name: Verify CH Blender contract
+        run: python tools/ch_blender/ch_blender_cli.py doctor
       - name: Bake canonical 3D water surfaces
         run: |
           set -euo pipefail
@@ -88,6 +79,28 @@ jobs:
                   assert image.getpixel((0, 0))[3] == 0
                   assert image.getpixel((127, 0))[3] == 0
           print('waterTileGeometryGate: PASS')
+          PY
+      - name: Preview shallow and deep water as connected terrain
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+
+          output = Path('out/water/tiles')
+          count = 5
+          for variant in ('water_shallow', 'water_deep'):
+              tiles = {
+                  (dx, dy): Image.open(output / f'{variant}_{dx}{dy}.png').convert('RGBA')
+                  for dx in (0, 1) for dy in (0, 1)
+              }
+              canvas = Image.new('RGBA', (640, 320), (32, 45, 50, 255))
+              for x, y in sorted(((x, y) for x in range(count) for y in range(count)),
+                                 key=lambda point: (sum(point), point[0])):
+                  px = (count - 1) * 64 + (x - y) * 64
+                  py = (x + y) * 32
+                  canvas.alpha_composite(tiles[x % 2, y % 2], (px, py))
+              canvas.save(output / f'{variant}_repeat_5x5.png')
+          print('waterRepeatPreview: PASS')
           PY
       - uses: actions/upload-artifact@v4
         with:
