@@ -1,0 +1,36 @@
+{
+  "id": "park_tree_early_autumn_01",
+  "name": "Árvore folhosa de outono",
+  "category": "decor",
+  "texture": "assets/tree/park_tree_early_autumn_01_south.png",
+  "sprites": {
+    "0": "assets/tree/park_tree_early_autumn_01_south.png",
+    "1": "assets/tree/park_tree_early_autumn_01_west.png",
+    "2": "assets/tree/park_tree_early_autumn_01_north.png",
+    "3": "assets/tree/park_tree_early_autumn_01_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 55,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.93359375
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_procedural_2d",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/briefs/park_tree_early_autumn.json",
+  "exportTool": "visitor_forge_2d author-art",
+  "cameraContract": "CH_CAMERA_V1",
+  "rotationContract": "CH_2D_ROTATION_BUNDLE_V1"
+}
