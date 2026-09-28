@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
-  "pipelineRevision": 3,
+  "pipelineRevision": 4,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
@@ -29,37 +29,37 @@
     }
   },
   "lightingIntent": {
-    "top": "warm_sunlit",
-    "front": "brightest_foliage",
-    "base": "deep_olive_self_shadow",
+    "top": "early_autumn_gold_sunlit",
+    "front": "yellow_orange_exposed_foliage",
+    "base": "deep_olive_brown_self_shadow",
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "branchGroupsPerTier": 5,
-    "clustersPerBranch": 5,
-    "clusterScale": 0.24,
+    "branchGroupsPerTier": 6,
+    "clustersPerBranch": 6,
+    "clusterScale": 0.21,
     "preserveOpenings": true,
     "silhouetteSource": "branch_clusters"
   },
   "palette": {
-    "ground_shadow": "#292B1C",
-    "trunk_top": "#985F31",
-    "trunk_bottom": "#4B2C18",
-    "trunk_light": "#D08C4C",
-    "back_top": "#566B36",
-    "back_bottom": "#293D26",
-    "mid_top": "#748344",
-    "mid_bottom": "#425A32",
-    "front_top": "#93994F",
-    "front_bottom": "#596C39",
-    "highlight": "#CFB46A",
-    "occlusion": "#414A2A"
+    "ground_shadow": "#302719",
+    "trunk_top": "#9A6030",
+    "trunk_bottom": "#4A2B17",
+    "trunk_light": "#D08A47",
+    "back_top": "#6B6630",
+    "back_bottom": "#34351F",
+    "mid_top": "#97823B",
+    "mid_bottom": "#5B5528",
+    "front_top": "#C89A45",
+    "front_bottom": "#806832",
+    "highlight": "#E6BD67",
+    "occlusion": "#4A4124"
   },
   "raster": {
-    "shadowDabs": 55,
-    "highlightDabs": 105,
+    "shadowDabs": 68,
+    "highlightDabs": 128,
     "needleStrokes": 0,
-    "finalGrain": 52,
+    "finalGrain": 58,
     "finalNeedles": 0
   },
   "trunkBranches": [
@@ -68,9 +68,9 @@
     {"p0": [97, 178], "p1": [108, 156], "p2": [122, 143], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 68, "span": 43, "thickness": 38, "skew": -5, "lobes": 22},
-    {"y": 103, "span": 61, "thickness": 48, "skew": 4, "lobes": 23},
-    {"y": 139, "span": 68, "thickness": 52, "skew": -3, "lobes": 22},
-    {"y": 174, "span": 61, "thickness": 46, "skew": 5, "lobes": 21}
+    {"y": 66,  "span": 44, "thickness": 39, "skew": -5, "lobes": 22},
+    {"y": 101, "span": 62, "thickness": 49, "skew": 4,  "lobes": 23},
+    {"y": 138, "span": 69, "thickness": 53, "skew": -3, "lobes": 22},
+    {"y": 174, "span": 62, "thickness": 47, "skew": 5,  "lobes": 21}
   ]
 }
