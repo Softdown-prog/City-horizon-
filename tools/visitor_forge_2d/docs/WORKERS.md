@@ -33,3 +33,8 @@ as renderizações em cada push.
 
 São workers determinísticos da ferramenta, sem serviços de IA, credenciais ou
 gerações de imagem externas. A decisão artística continua com a revisão humana.
+
+Para **criar** a receita a partir de uma intenção, use `author-art` antes de
+`run-workers`. O autor escolhe uma receita de referência, aplica controles
+artísticos versionados e roda estes workers em seguida. Famílias suportadas,
+limites de interpretação e revisão: [ART_AUTHOR.md](ART_AUTHOR.md).

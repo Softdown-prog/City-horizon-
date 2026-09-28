@@ -1,5 +1,10 @@
 # CH Visitor Forge 2D
 
+Para autoria reproduzível de receitas por intenção curta (`author-art`), veja
+[`docs/ART_AUTHOR.md`](docs/ART_AUTHOR.md). O estudo da árvore outonal usa
+uma copa contínua e passa pelo mesmo renderizador, auditoria e pranchas do
+Forge. A revisão de arte em tamanho de jogo ainda é necessária.
+
 Ferramenta dedicada para gerar visitantes 2D estilizados para o City Horizon.
 
 **Para continuar o visitante atual em outro chat:** leia primeiro

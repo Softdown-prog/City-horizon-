@@ -18,6 +18,7 @@ from .character.gait_warp import render_directional_gait
 from .character.preview_audit import audit_preview
 from .core.shape_recipe import export_palette_family, export_shape_recipe
 from .workers import run_workers
+from .art_author import CONTRACT as ART_BRIEF_CONTRACT, run_art_author
 from .core import LayerComposer, alpha_safe_resize, export_frame, load_character_definition, load_pose
 
 
@@ -100,6 +101,16 @@ def command_draw_recipe(args: argparse.Namespace) -> int:
 def command_run_workers(args: argparse.Namespace) -> int:
     result = run_workers(Path(args.recipe), Path(args.output))
     print(json.dumps(result, indent=2))
+    return 0
+
+
+def command_author_art(args: argparse.Namespace) -> int:
+    if args.brief:
+        brief = json.loads(Path(args.brief).read_text(encoding="utf-8"))
+    else:
+        brief = {"contract": ART_BRIEF_CONTRACT, "id": args.id, "prompt": args.prompt}
+    result = run_art_author(brief, Path(args.output))
+    print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -398,6 +409,16 @@ def build_parser() -> argparse.ArgumentParser:
     workers.add_argument("--recipe", required=True, help="Shape or organic scenery JSON")
     workers.add_argument("--output", required=True, help="Root for isolated review outputs")
     workers.set_defaults(func=command_run_workers)
+
+    author = subparsers.add_parser(
+        "author-art", help="author a reproducible recipe from a bounded 2D art brief and render review artifacts",
+    )
+    source = author.add_mutually_exclusive_group(required=True)
+    source.add_argument("--brief", help="CH_2D_ART_BRIEF_V1 JSON file")
+    source.add_argument("--prompt", help="Controlled-language prompt for a supported family")
+    author.add_argument("--id", help="Required with --prompt; safe candidate ID")
+    author.add_argument("--output", required=True, help="Root for authored recipe, PNG and review boards")
+    author.set_defaults(func=command_author_art)
 
     render = subparsers.add_parser("render", help="compose and export one or more V1 poses")
     render.add_argument("--definition", required=True)

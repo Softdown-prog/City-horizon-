@@ -311,6 +311,74 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
     return back, core, mid, front, cluster_dark, cluster_light
 
 
+def _mix_color(a, b, amount):
+    amount = max(0.0, min(1.0, amount))
+    return "#" + "".join(f"{round(x * (1 - amount) + y * amount):02X}"
+                         for x, y in zip(_hex(a), _hex(b)))
+
+
+def _paint_broadleaf_volume(work, recipe, rng, palette, W, H, view):
+    """Paint separate leaf mounds across one crown envelope, not tier shelves.
+
+    This is opt-in: older broadleaf recipes keep their exact raster output.
+    Rotations shift the mound positions in world space; light stays upper-left
+    in the camera. Every mound has a local shadow and clipped sunlit cap.
+    """
+    cfg = recipe.get("broadleafStructure", {})
+    center = cfg.get("center", [recipe.get("crownCx", 96), 119])
+    radius = cfg.get("radius", [71, 76])
+    cx, cy = map(float, center)
+    rx, ry = map(float, radius)
+    phase = VIEW_PHASE[view]
+    base = Image.new("L", (W, H))
+    _irregular_blob(base, rng, cx, cy, rx * .91, ry * .91, 31, 255, .10)
+    _composite(work, base, palette["back_top"], palette["back_bottom"], right_shade=.12)
+
+    # A staggered canopy makes occupancy predictable at 1x; jitter keeps it
+    # organic. Overlapping mounds remain individually shaded after compositing.
+    rows = (-.75, -.52, -.28, -.04, .20, .44, .68)
+    masses = max(1, min(90, int(cfg.get("masses", 43))))
+    placed = []
+    for row in rows:
+        half = math.sqrt(max(0.0, 1.0 - row * row))
+        count = max(3, round(masses * (1.0 + .23 * half) / len(rows)))
+        for index in range(count):
+            x_norm = ((index + .5 + (.24 if row > 0 else -.18)) / count * 2 - 1) * half
+            x_norm += rng.uniform(-.11, .11)
+            y_norm = row + rng.uniform(-.095, .095)
+            # The world-space phase moves identifiable groups between views.
+            x_norm += .035 * math.sin(phase + index * .8)
+            px = cx + rx * x_norm
+            py = cy + ry * y_norm
+            size = rng.uniform(.78, 1.16)
+            placed.append((py, px, 10.5 * size, 9.1 * size, y_norm))
+    placed.sort()
+
+    for py, px, sx, sy, vertical in placed:
+        leaf = Image.new("L", (W, H))
+        _leaf_cluster(leaf, rng, px, py, sx, sy, 11, .20, 2)
+        # Olive undersides anchor the canopy; warm patches occupy the lighted
+        # tops, leaving gaps and darker interior between discrete masses.
+        autumn = rng.uniform(.66, .97) if vertical < -.18 else (
+            rng.uniform(.40, .78) if vertical < .30 else rng.uniform(.20, .52))
+        upper = _mix_color(palette["mid_top"], palette["front_top"], autumn)
+        lower = _mix_color(palette["mid_bottom"], palette["front_bottom"], autumn * .76)
+        _composite(work, leaf, upper, lower, right_shade=.08)
+
+        shade = Image.new("L", (W, H))
+        _irregular_blob(shade, rng, px + sx * .30, py + sy * .39,
+                        sx * .66, sy * .42, 9, 95, .19)
+        shade = ImageChops.multiply(shade, leaf)
+        _composite(work, shade, palette["occlusion"], palette["back_bottom"])
+
+        if rng.random() < (.72 if vertical < .18 else .38):
+            light = Image.new("L", (W, H))
+            _irregular_blob(light, rng, px - sx * .24, py - sy * .39,
+                            sx * .62, sy * .39, 9, 130, .17)
+            light = ImageChops.multiply(light, leaf)
+            _composite(work, light, palette["highlight"], upper)
+
+
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
     bbox = mask.getbbox()
     if not bbox:
@@ -432,6 +500,19 @@ def render(recipe, view="south"):
     _draw_trunk_and_bark(work, recipe, palette, W, H)
 
     crown_style = recipe.get("crownStyle", "conifer")
+    if crown_style == "broadleaf" and recipe.get("broadleafStructure", {}).get("layout") == "continuous":
+        _paint_broadleaf_volume(work, recipe, rng, palette, W, H, view)
+        frame = _alpha_safe_resize(work, tuple(canvas))
+        frame = _final_raster_pass(frame, rng, palette, recipe)
+        bounds = frame.getchannel("A").getbbox()
+        return frame, {
+            "contract": CONTRACT, "id": recipe["id"], "canvas": canvas,
+            "anchor": anchor, "bounds": list(bounds), "seed": seed,
+            "crownStyle": crown_style, "view": view,
+            "yawDeg": int(recipe.get("rotation", {}).get("yawDeg", {}).get(view, DEFAULT_YAWS[view])),
+            "camera": recipe["camera"], "raster": recipe.get("raster", {}),
+            "runtimePromotion": False, "artApproved": False,
+        }
     cluster_dark = cluster_light = None
     if crown_style == "broadleaf":
         back, core, mid, front, cluster_dark, cluster_light = _crown_masks_broadleaf(recipe, rng, W, H, view)

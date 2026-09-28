@@ -3,6 +3,11 @@
 `CH_2D_ORGANIC_SCENERY_V1` extends Visitor Forge 2D for foliage and other
 organic props that do not read well as stacks of rigid polygons.
 
+For deciduous trees, `broadleafStructure.layout: "continuous"` opts into a
+single irregular canopy envelope with separately shaded leaf clusters. Set
+`center`, `radius` and `masses` on that object; the legacy tier renderer is
+preserved when `layout` is absent. See the early-autumn study in `examples/`.
+
 The renderer is `core/organic_scenery.py`. It is deterministic: the JSON recipe,
 palette and integer `seed` reproduce the same PNG without an image model or a
 hidden raster source.
