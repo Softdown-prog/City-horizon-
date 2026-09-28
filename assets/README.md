@@ -59,6 +59,8 @@ As três novas árvores aprovadas para o runtime são `pine_small_v1`, `pine_tal
 
 As novas árvores decíduas ramificadas aprovadas para o runtime de decor são `broadleaf_zoo_forked_v1` e `broadleaf_zoo_tall_v1`. Geradas proceduralmente via `build_tycoon_tree_2d.py` com copas multi-cluster e troncos ramificados em V, seus PNGs transparentes estão integrados em `assets/tree/` com definições 1×1 em `assets/definitions/` (`category: decor`, pivôs normalizados `[96,248]` em 192×256 e `[112,278]` em 224×288 na câmera `CH_CAMERA_V1`).
 
+A água rasa e profunda aprovada está em `assets/terrain/water/`, com bases periódicas, overlays originais, mapas de índices e atlas de brilho com ciclo de paletas. O manifesto `water_surfaces.json` e o README da pasta descrevem as coordenadas e o tempo dos quadros. A fonte permanece no bake CH Blender e nos scripts de preparação e promoção de água. A ligação do atlas ao renderer ainda é uma etapa separada.
+
 Água/costa, pedra, decoração, farming, construções, props, veículos, parques, ruas, calçadas e demais bibliotecas visuais antigas removidas devem voltar somente pelo pipeline atual e pelo gate de validação correspondente.
 
 ## Regra para novos assets
