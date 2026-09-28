@@ -3,10 +3,10 @@
 import argparse
 from pathlib import Path
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 PERIOD = 256
-BASE = {"water_shallow": np.array([115, 200, 210]), "water_deep": np.array([108, 196, 207])}
+BASE = {"water_shallow": np.array([115, 200, 210]), "water_deep": np.array([80, 163, 194])}
 
 
 def source_square(path):
@@ -41,23 +41,47 @@ def build_world(variant, tile_dir, output_dir):
     return world
 
 
-def capture(world, variant, turn, output_dir):
+def capture(world, variant, turn, output_dir, glint=None, phase=0.0):
     h, w = 320, 640
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     a = (xx - 320) / 64
     b = yy / 32
     gx, gy = (a + b) / 2, (b - a) / 2
-    inside = (gx >= 0) & (gx < 5) & (gy >= 0) & (gy < 5)
     transforms = ((gx, gy), (gy, 5 - gx), (5 - gx, 5 - gy), (5 - gy, gx))
     wx, wy = transforms[turn]
     sx = np.floor(wx * 64).astype(int) % PERIOD
     sy = np.floor(wy * 64).astype(int) % PERIOD
-    pixels = np.zeros((h, w, 3), np.uint8)
-    pixels[:] = (32, 45, 50)
-    pixels[inside] = world[sy[inside], sx[inside]]
-    result = Image.fromarray(pixels, "RGB")
-    result.save(output_dir / f"{variant}_rotation_{turn * 90:03d}.png")
+    pixels = world[sy, sx].copy()
+    if glint is not None:
+        shifted_x = (sx + round(5 * np.sin(phase))) % PERIOD
+        shifted_y = (sy + round(5 * np.cos(phase))) % PERIOD
+        alpha = glint[shifted_y, shifted_x][..., None] / 255.0
+        pixels = np.clip(pixels * (1 - alpha) + np.array([220, 245, 249]) * alpha, 0, 255).astype(np.uint8)
+    # Supersample just the outer water boundary; do not blur the interior art.
+    silhouette = Image.new("L", (w * 4, h * 4), 0)
+    ImageDraw.Draw(silhouette).polygon([(w * 2, 0), (w * 4 - 1, h * 2),
+                                        (w * 2, h * 4 - 1), (0, h * 2)], fill=255)
+    silhouette = silhouette.resize((w, h), Image.Resampling.LANCZOS)
+    result = Image.composite(Image.fromarray(pixels, "RGB"),
+                             Image.new("RGB", (w, h), (32, 45, 50)), silhouette)
+    if glint is None:
+        result.save(output_dir / f"{variant}_rotation_{turn * 90:03d}.png")
     return result
+
+
+def build_glint(world, output_dir, variant):
+    # A light-only overlay. The water colour remains entirely in the base.
+    luma = (world.astype(np.float32) * np.array([.22, .68, .10])).sum(axis=2)
+    # Blur a tiled copy so the highlight remains periodic at texture boundaries.
+    repeated = np.tile(luma.astype(np.uint8), (3, 3))
+    soft_full = np.asarray(Image.fromarray(repeated).filter(ImageFilter.GaussianBlur(8)), dtype=np.float32)
+    soft = soft_full[PERIOD:2 * PERIOD, PERIOD:2 * PERIOD]
+    light = np.clip((luma - soft - 1.2) * 2.5, 0, 44).astype(np.uint8)
+    rgba = np.empty((PERIOD, PERIOD, 4), dtype=np.uint8)
+    rgba[:, :, :3] = (220, 245, 249)
+    rgba[:, :, 3] = light
+    Image.fromarray(rgba, "RGBA").save(output_dir / f"{variant}_glint_overlay.png")
+    return light
 
 
 def main():
@@ -69,6 +93,7 @@ def main():
 
     for kind in BASE:
         texture = build_world(kind, args.tile_dir, args.output)
+        glint = build_glint(texture, args.output, kind)
         board = Image.new("RGB", (1304, 712), (32, 45, 50))
         pen = ImageDraw.Draw(board)
         for quarter_turn in range(4):
@@ -78,6 +103,10 @@ def main():
             pen.text((12 + col * 648, 8 + row * 344),
                      f"{kind} | view {quarter_turn * 90} deg", fill=(235, 245, 247))
         board.save(args.output / f"{kind}_4_rotations.png")
+        frames = [capture(texture, kind, 0, args.output, glint, 2 * np.pi * step / 16)
+                  for step in range(16)]
+        frames[0].save(args.output / f"{kind}_motion_preview.gif", save_all=True,
+                       append_images=frames[1:], duration=125, loop=0, optimize=True)
     print("waterContinuousPreview: PASS")
 
 
