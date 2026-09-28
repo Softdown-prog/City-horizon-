@@ -1,0 +1,30 @@
+{
+  "id": "park_tree_angico_final_v1",
+  "name": "Angico",
+  "category": "decor",
+  "texture": "assets/tree/park_tree_angico_final_v1.png",
+  "rotatable": false,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 85,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.975
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_authored_2d_reference",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/park_tree_angico_open_v1.json",
+  "reproductionStatus": "visual_target_pending_exact_forge_match",
+  "exportTool": "approved_2d_reference_normalization",
+  "cameraContract": "CH_CAMERA_V1"
+}
