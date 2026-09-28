@@ -8,7 +8,9 @@ on:
     paths:
       - "tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json"
       - "tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py"
+      - "tools/visitor_forge_2d/build_rotation_bundle.py"
       - "tools/visitor_forge_2d/tests/test_organic_scenery.py"
+      - "tools/visitor_forge_2d/tests/test_rotation_bundle.py"
 
 permissions:
   contents: read
@@ -30,8 +32,11 @@ jobs:
           python -m pip install -e tools/visitor_forge_2d
           python -m pip install pytest
 
-      - name: Test organic scenery renderer
-        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py
+      - name: Test organic scenery and rotation bundle
+        run: |
+          python -m pytest -q \
+            tools/visitor_forge_2d/tests/test_organic_scenery.py \
+            tools/visitor_forge_2d/tests/test_rotation_bundle.py
 
       - name: Render deterministic broadleaf family
         shell: bash
@@ -40,6 +45,9 @@ jobs:
           mkdir -p out/visitor_forge_2d/broadleaf_family
           for recipe in tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json; do
             python -m visitor_forge_2d.core.organic_scenery \
+              --recipe "$recipe" \
+              --output out/visitor_forge_2d/broadleaf_family
+            python tools/visitor_forge_2d/build_rotation_bundle.py \
               --recipe "$recipe" \
               --output out/visitor_forge_2d/broadleaf_family
           done
