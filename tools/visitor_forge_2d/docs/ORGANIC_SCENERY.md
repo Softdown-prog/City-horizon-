@@ -8,6 +8,15 @@ single irregular canopy envelope with separately shaded leaf clusters. Set
 `center`, `radius` and `masses` on that object; the legacy tier renderer is
 preserved when `layout` is absent. See the early-autumn study in `examples/`.
 
+`layout: "crown_groups"` is a separate opt-in shape vocabulary. `profile:
+"domed"` paints a connected umbrella crown with broad overlapping foliage;
+`profile: "branching"` follows authored `trunkBranches` and leaves open gaps.
+Both use `center`, `radius`, and `density`, and the same deterministic seed.
+The four complete named palettes in `examples/palettes/organic_canopy_v1.json`
+can be selected through an art brief. The oiti and angico v2 examples exercise
+these profiles; existing approved sprites and continuous recipes retain their
+original painter.
+
 The renderer is `core/organic_scenery.py`. It is deterministic: the JSON recipe,
 palette and integer `seed` reproduce the same PNG without an image model or a
 hidden raster source.

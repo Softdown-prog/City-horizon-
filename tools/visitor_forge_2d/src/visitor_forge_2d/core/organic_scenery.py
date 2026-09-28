@@ -379,6 +379,96 @@ def _paint_broadleaf_volume(work, recipe, rng, palette, W, H, view):
             _composite(work, light, palette["highlight"], upper)
 
 
+def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
+    """Paint a few overlapping foliage groups instead of isolated leaf balls.
+
+    `domed` has a continuous dark interior and irregular lit crown lobes;
+    `branching` follows the authored branches and preserves open sky gaps.
+    Existing layouts never enter this opt-in painter.
+    """
+    cfg = recipe["broadleafStructure"]
+    cx, cy = map(float, cfg["center"])
+    rx, ry = map(float, cfg["radius"])
+    profile = cfg.get("profile", "domed")
+    if profile not in ("domed", "branching"):
+        raise ValueError("crown_groups profile must be domed or branching")
+    phase = VIEW_PHASE[view]
+
+    if profile == "domed":
+        interior = Image.new("L", (W, H))
+        _irregular_blob(interior, rng, cx, cy, rx * .93, ry * .86, 29, 255, .13)
+        _composite(work, interior, palette["back_top"], palette["back_bottom"], right_shade=.12)
+        # Staggered lobes overlap the dark crown. They read as several large
+        # organic volumes rather than a uniform grid of tiny circular leaves.
+        rows = ((-.55, 3), (-.18, 4), (.19, 4), (.53, 3))
+        groups = []
+        for row_index, (height, count) in enumerate(rows):
+            extent = math.sqrt(1.0 - height * height)
+            for index in range(count):
+                x = ((index + .5 + (.20 if row_index % 2 else -.12)) / count * 2 - 1) * extent
+                x += rng.uniform(-.13, .13) + .045 * math.sin(phase + index)
+                y = height + rng.uniform(-.12, .12)
+                scale = rng.uniform(.84, 1.23)
+                groups.append((cx + rx * x, cy + ry * y, rx * .34 * scale,
+                               ry * .24 * scale, y))
+    else:
+        branches = recipe.get("trunkBranches", [])[1:]
+        if not branches:
+            raise ValueError("branching crown_groups needs authored trunkBranches")
+        groups = []
+        for branch in branches:
+            tip_x, tip_y = map(float, branch["p2"])
+            root_x, root_y = map(float, branch["p0"])
+            dx, dy = tip_x - root_x, tip_y - root_y
+            for along in (.70, .92, 1.10):
+                x = root_x + dx * along + rng.uniform(-7, 7)
+                y = root_y + dy * along + rng.uniform(-9, 9)
+                x += 2.5 * math.sin(phase + along * 5)
+                scale = rng.uniform(.82, 1.16)
+                groups.append((x, y, rx * .25 * scale, ry * .17 * scale,
+                               (y - cy) / ry))
+        # A few interior leaf groups connect the fork visually without
+        # painting an opaque ball across the negative spaces.
+        for _ in range(3):
+            groups.append((cx + rng.uniform(-rx * .35, rx * .35),
+                           cy + rng.uniform(-ry * .18, ry * .34),
+                           rx * .20, ry * .14, .25))
+
+    density = max(.55, min(1.45, float(cfg.get("density", 1.0))))
+    groups.sort(key=lambda group: group[1])
+    for gx, gy, gw, gh, vertical in groups:
+        gw *= math.sqrt(density)
+        gh *= math.sqrt(density)
+        # A lumpy underpainting remains visible at the lower/right edge.
+        mask = Image.new("L", (W, H))
+        _leaf_cluster(mask, rng, gx, gy, gw, gh, 21, .23, 3)
+        warmth = (.61 if vertical < 0 else .40) + rng.uniform(-.14, .14)
+        top = _mix_color(palette["mid_top"], palette["front_top"], warmth)
+        bottom = _mix_color(palette["mid_bottom"], palette["front_bottom"], warmth * .72)
+        _composite(work, mask, top, bottom, right_shade=.10)
+
+        shade = Image.new("L", (W, H))
+        _irregular_blob(shade, rng, gx + gw * .30, gy + gh * .38,
+                        gw * .60, gh * .38, 13, 52, .25)
+        shade = ImageChops.multiply(shade, mask)
+        _composite(work, shade, palette["occlusion"], palette["back_bottom"])
+
+        highlight = Image.new("L", (W, H))
+        if rng.random() < .72:
+            _irregular_blob(highlight, rng, gx - gw * .30, gy - gh * .35,
+                            gw * .47, gh * .38, 15, 62 if vertical > .42 else 86, .26)
+        highlight = ImageChops.multiply(highlight, mask)
+        _composite(work, highlight, palette["highlight"], top)
+
+        # Small, low-contrast leaf strokes live inside each mass. They give
+        # the painterly surface texture without a repeated ring of bubbles.
+        texture = Image.new("RGBA", (W, H))
+        count = round((14 if profile == "domed" else 20) * density)
+        _scatter_texture(texture, rng, mask, palette["highlight"], count,
+                         (14, 36), (.7, 1.8), 1.5)
+        work.alpha_composite(texture)
+
+
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
     bbox = mask.getbbox()
     if not bbox:
@@ -500,8 +590,10 @@ def render(recipe, view="south"):
     _draw_trunk_and_bark(work, recipe, palette, W, H)
 
     crown_style = recipe.get("crownStyle", "conifer")
-    if crown_style == "broadleaf" and recipe.get("broadleafStructure", {}).get("layout") == "continuous":
-        _paint_broadleaf_volume(work, recipe, rng, palette, W, H, view)
+    layout = recipe.get("broadleafStructure", {}).get("layout")
+    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups"):
+        painter = _paint_broadleaf_volume if layout == "continuous" else _paint_broadleaf_groups
+        painter(work, recipe, rng, palette, W, H, view)
         frame = _alpha_safe_resize(work, tuple(canvas))
         frame = _final_raster_pass(frame, rng, palette, recipe)
         bounds = frame.getchannel("A").getbbox()

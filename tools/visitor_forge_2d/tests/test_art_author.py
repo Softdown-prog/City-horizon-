@@ -40,6 +40,20 @@ def test_author_routes_other_families_without_guessing() -> None:
     assert custom["broadleafStructure"]["masses"] == 52
 
 
+def test_organic_styles_choose_distinct_canopies_and_named_palettes() -> None:
+    oiti, _ = author_recipe({"contract": CONTRACT, "id": "oiti_study",
+                             "prompt": "oiti de copa fechada, verde fresco", "seed": 11})
+    angico, _ = author_recipe({"contract": CONTRACT, "id": "angico_study",
+                               "prompt": "angico de copa aberta, verde profundo", "seed": 11})
+    assert oiti["broadleafStructure"]["profile"] == "domed"
+    assert angico["broadleafStructure"]["profile"] == "branching"
+    assert oiti["palette"]["highlight"] != angico["palette"]["highlight"]
+    assert oiti["camera"] == angico["camera"]
+    with pytest.raises(ValueError, match="unknown organic palette"):
+        author_recipe({"contract": CONTRACT, "id": "bad_palette", "subject": "broadleaf",
+                       "palette": "neon"})
+
+
 def test_unknown_subject_and_protected_contract_are_rejected() -> None:
     with pytest.raises(ValueError, match="unsupported"):
         author_recipe({"contract": CONTRACT, "id": "rocket", "prompt": "uma nave espacial"})

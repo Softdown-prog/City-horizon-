@@ -26,14 +26,20 @@ TEMPLATES = {
     "flower_bed": "flower_bed_01.json",
     "sign": "park_wayfinding_sign.json",
 }
+BROADLEAF_STYLES = {
+    "rounded": "park_tree_broadleaf_early_autumn_v1.json",
+    "umbrella": "park_tree_oiti_groups_v2.json",
+    "open_branching": "park_tree_angico_branches_v2.json",
+}
+PALETTE_LIBRARY = "palettes/organic_canopy_v1.json"
 TERMS = {
     "conifer": ("pinheiro", "pine", "conifer", "abeto"),
-    "broadleaf": ("broadleaf", "folhosa", "arvore", "tree", "decidua"),
+    "broadleaf": ("broadleaf", "folhosa", "arvore", "tree", "decidua", "oiti", "angico"),
     "flower_bed": ("canteiro", "flower bed", "flores", "flowerbed"),
     "sign": ("placa", "sinalizacao", "wayfinding sign", "sign"),
 }
 ALLOWED = {
-    "broadleaf": {"season", "silhouette", "density", "palette", "seed"},
+    "broadleaf": {"season", "style", "silhouette", "density", "palette", "seed"},
     "conifer": {"silhouette", "density", "palette", "seed"},
     "flower_bed": {"palette", "seed"},
     "sign": {"palette", "seed"},
@@ -60,6 +66,18 @@ def interpret_prompt(prompt: str) -> dict:
     result = {"subject": family}
     if any(term in words for term in ("outono", "autumn", "amarel", "alaranj")):
         result["season"] = "early_autumn"
+    if any(term in words for term in ("angico", "copa aberta", "open branching", "galhos aparentes")):
+        result["style"] = "open_branching"
+    elif any(term in words for term in ("oiti", "copa guarda-chuva", "umbrella canopy", "copa fechada")):
+        result["style"] = "umbrella"
+    if any(term in words for term in ("verde claro", "verde fresco", "spring green")):
+        result["palette"] = "spring_lime"
+    elif any(term in words for term in ("verde escuro", "verde profundo", "deep green")):
+        result["palette"] = "summer_deep"
+    elif any(term in words for term in ("oliva", "olive")):
+        result["palette"] = "dry_olive"
+    elif any(term in words for term in ("ambar", "amber")):
+        result["palette"] = "autumn_amber"
     if any(term in words for term in ("arredond", "rounded", "redonda")):
         result["silhouette"] = "rounded"
     elif any(term in words for term in ("larga", "wide", "broad")):
@@ -106,7 +124,7 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         raise ValueError(f"unsupported subject {subject!r}; available: {', '.join(TEMPLATES)}, custom")
     if parsed and parsed["subject"] != subject:
         raise ValueError("prompt subject and structured subject disagree")
-    intent = {**parsed, **{key: brief[key] for key in ("season", "silhouette", "density", "palette", "seed") if key in brief}}
+    intent = {**parsed, **{key: brief[key] for key in ("season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
     unknown = set(intent) - ALLOWED.get(subject, {"seed"}) - {"subject"}
     if unknown:
         raise ValueError(f"{subject} does not support {', '.join(sorted(unknown))}; use a custom recipe")
@@ -116,7 +134,9 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         if not isinstance(filename, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*\.json", filename):
             raise ValueError("custom subject requires a versioned JSON filename under examples/")
     else:
-        filename = TEMPLATES[subject]
+        filename = BROADLEAF_STYLES.get(intent.get("style", "rounded")) if subject == "broadleaf" else TEMPLATES[subject]
+        if filename is None:
+            raise ValueError(f"unknown broadleaf style {intent['style']!r}; choose {', '.join(BROADLEAF_STYLES)}")
     recipe = copy.deepcopy(json.loads((examples / filename).read_text(encoding="utf-8")))
     recipe["id"] = asset_id
     if "seed" in intent:
@@ -129,28 +149,50 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
 
     decisions = [f"template={filename}", f"seed={recipe['seed']}"]
     if subject == "broadleaf":
-        season = intent.get("season", "early_autumn")
+        style = intent.get("style", "rounded")
+        season = intent.get("season", "early_autumn" if style == "rounded" else "summer")
         if season not in ("early_autumn", "summer"):
             raise ValueError("broadleaf supports early_autumn or summer; other seasons need a new palette recipe")
-        if season == "summer":
+        palette_id = intent.get("palette")
+        if palette_id is not None:
+            palettes = json.loads((examples / PALETTE_LIBRARY).read_text(encoding="utf-8"))["palettes"]
+            if palette_id not in palettes:
+                raise ValueError(f"unknown organic palette {palette_id!r}; choose {', '.join(palettes)}")
+            recipe["palette"].update(palettes[palette_id])
+            decisions.append(f"palette={palette_id}")
+        elif season == "summer" and style == "rounded":
+            # Preserve the established default summer rendering for old briefs.
             recipe["palette"].update({
                 "back_top": "#3C6542", "back_bottom": "#243E2B",
                 "mid_top": "#60844D", "mid_bottom": "#37583A",
                 "front_top": "#83A65C", "front_bottom": "#4F7342",
                 "highlight": "#A5C774", "occlusion": "#263D2C",
             })
-        decisions.append(f"season={season}")
+        elif season == "early_autumn" and style != "rounded":
+            palettes = json.loads((examples / PALETTE_LIBRARY).read_text(encoding="utf-8"))["palettes"]
+            recipe["palette"].update(palettes["autumn_amber"])
+            decisions.append("palette=autumn_amber")
+        decisions.extend((f"style={style}", f"season={season}"))
         density = intent.get("density", "balanced")
         if density not in ("sparse", "balanced", "dense"):
             raise ValueError("density must be sparse, balanced or dense")
-        recipe["broadleafStructure"]["masses"] = {"sparse": 35, "balanced": 48, "dense": 59}[density]
+        structure = recipe["broadleafStructure"]
+        if structure.get("layout") == "continuous":
+            structure["masses"] = {"sparse": 35, "balanced": 48, "dense": 59}[density]
+        else:
+            structure["density"] = {"sparse": .72, "balanced": 1.0, "dense": 1.28}[density]
         decisions.append(f"density={density}")
         silhouette = intent.get("silhouette", "rounded")
         if silhouette not in ("rounded", "wide", "tall"):
             raise ValueError("silhouette must be rounded, wide or tall")
-        recipe["broadleafStructure"]["radius"] = {
-            "rounded": [68, 72], "wide": [78, 64], "tall": [60, 78],
-        }[silhouette]
+        if structure.get("layout") == "continuous":
+            structure["radius"] = {
+                "rounded": [68, 72], "wide": [78, 64], "tall": [60, 78],
+            }[silhouette]
+        elif "silhouette" in intent:
+            width, height = structure["radius"]
+            scale = {"rounded": (.94, 1.03), "wide": (1.07, .92), "tall": (.88, 1.12)}[silhouette]
+            structure["radius"] = [round(width * scale[0]), round(height * scale[1])]
         decisions.append(f"silhouette={silhouette}")
     elif subject == "conifer":
         if "palette" in intent and intent["palette"] != "evergreen":
@@ -178,8 +220,6 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
     else:
         if "palette" in intent:
             raise ValueError(f"{subject} palette variants require a custom recipe or the draw-recipe palette CLI")
-    if "palette" in intent and subject == "broadleaf":
-        raise ValueError("choose broadleaf colors with season, or author a custom palette recipe")
 
     if "recipeUpdates" in brief:
         _apply_updates(recipe, brief["recipeUpdates"])
@@ -208,7 +248,10 @@ def _mechanical_review(recipe: dict, png: Path) -> dict:
         longest = max((len(part) for part in "".join("1" if v else "0" for v in occupied).split("1")), default=0)
         result["canopyEmptyRowRunPx"] = longest
         if longest >= 5:
-            result["observations"].append("canopy has a horizontal gap; inspect crown continuity")
+            if recipe["broadleafStructure"].get("profile") == "branching":
+                result["observations"].append("open branch gap; inspect foliage support and readability")
+            else:
+                result["observations"].append("canopy has a horizontal gap; inspect crown continuity")
     return result
 
 

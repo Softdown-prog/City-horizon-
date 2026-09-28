@@ -25,14 +25,15 @@ O `CH_2D_ART_BRIEF_V1` aceita `id` seguro e `subject`. Campos específicos:
 
 | Família | Receita de referência | Controles do autor |
 | --- | --- | --- |
-| `broadleaf` | `park_tree_broadleaf_early_autumn_v1.json` | `season`: `early_autumn`/`summer`; `silhouette`: `rounded`/`wide`/`tall`; `density`: `sparse`/`balanced`/`dense`; `seed` |
+| `broadleaf` | outonal, oiti e angico sob `examples/` | `style`: `rounded`/`umbrella`/`open_branching`; `palette`: `spring_lime`/`summer_deep`/`dry_olive`/`autumn_amber`; `season`: `early_autumn`/`summer`; `silhouette`: `rounded`/`wide`/`tall`; `density`: `sparse`/`balanced`/`dense`; `seed` |
 | `conifer` | `pine_small_v1.json` e variantes | `silhouette`: `rounded`/`wide`/`tall`; `density`; `seed` |
 | `flower_bed` | `flower_bed_01.json` | `seed` |
 | `sign` | `park_wayfinding_sign.json` | `seed` |
 | `custom` | `template`: nome de outro JSON sob `examples/` | `seed`; `recipeUpdates` para parâmetros existentes |
 
-O prompt curto reconhece o tema (árvore folhosa, pinheiro, canteiro, placa),
-outono, copa arredondada/larga/alta e densidade rala/densa em português ou
+O prompt curto reconhece o tema (árvore folhosa, oiti, angico, pinheiro,
+canteiro, placa), copa aberta/fechada, quatro cores nomeadas, outono,
+copa arredondada/larga/alta e densidade rala/densa em português ou
 inglês. Ele **não interpreta todas as palavras livres**. Use os campos JSON
 para decisões precisas. `custom` permite que outro agente versiona uma nova
 golden recipe e entregue edições explícitas como:
@@ -69,3 +70,21 @@ grupo com luz local, sombra inferior e variação de oliva, amarelo e âmbar.
 Isso evita que as quatro faixas da receita `organic_02` sejam fundidas em
 prateleiras planas. As receitas antigas continuam usando seu desenho anterior.
 A candidata deve ser comparada em 1x e na grade antes de qualquer promoção.
+
+## Copas de oiti e angico
+
+`examples/park_tree_oiti_groups_v2.json` usa `crown_groups` com perfil
+`domed`: interior contínuo e massas achatadas sobrepostas para uma copa larga.
+`examples/park_tree_angico_branches_v2.json` usa `branching`: as massas seguem
+as pontas dos galhos e deixam espaços entre ramos. A cor vem de
+`examples/palettes/organic_canopy_v1.json`; o brief pode escolher outra das
+quatro paletas sem alterar a geometria nem a câmera. Reproduza os estudos por:
+
+```bash
+PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
+  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_study_v2.json \
+  --output out/visitor_forge_2d/author
+```
+
+Use o brief correspondente `park_tree_angico_study_v2.json` para o angico.
+São candidatos para inspeção visual, sem promoção automática a `assets/`.
