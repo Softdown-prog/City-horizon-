@@ -1,0 +1,55 @@
+{
+  "contract": "CITY_HORIZON_APARTMENT_V1",
+  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "assetId": "residential_modern_apartment_4x4_01",
+  "assetType": "residential_building",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "designIntent": {
+    "summary": "Five-storey contemporary apartment building matching the supplied reference: warm cream concrete, charcoal vertical bays, timber accents, stacked glass balconies, warm windows and a detailed flat rooftop plant zone.",
+    "readOrder": ["stacked_glass_balconies", "cream_and_charcoal_facade", "warm_windows", "flat_parapet_roof", "rooftop_hvac", "timber_accents"],
+    "rules": [
+      "match the visible SOUTH reference silhouette and facade rhythm closely",
+      "keep all authored building parts under AssetRoot so four-direction rotation remains deterministic",
+      "do not bake public sidewalk, curb, road, bench or street trees into the asset",
+      "private entrance steps and compact building-owned planters are allowed",
+      "large landscaping remains a separate runtime asset",
+      "warm window emission must remain readable at gameplay scale"
+    ]
+  },
+  "footprint": {"widthTiles": 4, "depthTiles": 4},
+  "dimensions": {
+    "bodyWidth": 8.4,
+    "bodyDepth": 7.0,
+    "foundationHeight": 0.24,
+    "floorHeight": 2.0,
+    "floors": 5,
+    "parapetHeight": 0.38
+  },
+  "materials": {
+    "cream": {"name":"ApartmentWarmCream","rgba":[0.78,0.70,0.59,1.0],"roughness":0.82,"recipe":"plaster","seed":101,"strength":0.07},
+    "creamLight": {"name":"ApartmentCreamHighlight","rgba":[0.90,0.84,0.74,1.0],"roughness":0.80,"recipe":"plaster","seed":103,"strength":0.04},
+    "charcoal": {"name":"ApartmentCharcoal","rgba":[0.14,0.15,0.17,1.0],"roughness":0.72,"recipe":"solid","seed":107,"strength":0.02},
+    "charcoalMid": {"name":"ApartmentCharcoalMid","rgba":[0.24,0.25,0.27,1.0],"roughness":0.74,"recipe":"solid","seed":109,"strength":0.02},
+    "wood": {"name":"ApartmentWarmTimber","rgba":[0.34,0.19,0.10,1.0],"roughness":0.72,"recipe":"timber","seed":113,"strength":0.10},
+    "frame": {"name":"ApartmentWindowFrame","rgba":[0.055,0.065,0.075,1.0],"roughness":0.62,"recipe":"solid","seed":127,"strength":0.01},
+    "glass": {"name":"ApartmentWarmGlass","rgba":[0.90,0.55,0.22,1.0],"roughness":0.18,"recipe":"solid","seed":131,"strength":0.01,"emission":0.72},
+    "railGlass": {"name":"ApartmentRailGlass","rgba":[0.18,0.28,0.34,0.42],"roughness":0.16,"recipe":"solid","seed":137,"strength":0.01},
+    "roof": {"name":"ApartmentRoofMembrane","rgba":[0.27,0.28,0.30,1.0],"roughness":0.90,"recipe":"concrete","seed":139,"strength":0.08},
+    "metal": {"name":"ApartmentHVACMetal","rgba":[0.38,0.41,0.44,1.0],"roughness":0.50,"metallic":0.45,"recipe":"solid","seed":149,"strength":0.02},
+    "darkMetal": {"name":"ApartmentDarkMetal","rgba":[0.10,0.12,0.14,1.0],"roughness":0.48,"metallic":0.35,"recipe":"solid","seed":151,"strength":0.01},
+    "concrete": {"name":"ApartmentFoundation","rgba":[0.56,0.53,0.48,1.0],"roughness":0.91,"recipe":"concrete","seed":157,"strength":0.08},
+    "green": {"name":"ApartmentPlantGreen","rgba":[0.17,0.39,0.10,1.0],"roughness":0.82,"recipe":"solid","seed":163,"strength":0.01},
+    "greenLight": {"name":"ApartmentPlantLight","rgba":[0.38,0.58,0.16,1.0],"roughness":0.82,"recipe":"solid","seed":167,"strength":0.01},
+    "pot": {"name":"ApartmentPlanterPot","rgba":[0.36,0.39,0.39,1.0],"roughness":0.80,"recipe":"solid","seed":173,"strength":0.01}
+  },
+  "buildingPostProcess": {
+    "profile": "modern_apartment_game_first_v1",
+    "paletteColors": 176,
+    "paletteDither": false,
+    "posterizeBitsPerChannel": 7,
+    "contrastMultiplier": 1.03,
+    "saturationMultiplier": 1.02,
+    "outlineAlpha": 42,
+    "internalEdgeAlpha": 10
+  }
+}
