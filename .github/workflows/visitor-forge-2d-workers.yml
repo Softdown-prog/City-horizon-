@@ -65,3 +65,29 @@ jobs:
           path: out/visitor_forge_2d/workers/
           retention-days: 14
           if-no-files-found: error
+
+  author-briefs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e tools/visitor_forge_2d
+      - name: Author and render versioned art briefs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/visitor_forge_2d/author
+          for brief in tools/visitor_forge_2d/examples/briefs/*.json; do
+            python -m visitor_forge_2d author-art \
+              --brief "$brief" \
+              --output out/visitor_forge_2d/author
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Visitor-Forge-2D-Art-Author-${{ github.run_number }}
+          path: out/visitor_forge_2d/author/
+          retention-days: 14
+          if-no-files-found: error
