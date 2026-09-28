@@ -26,9 +26,15 @@ ASSET_ID = "ride.coaster.track_v0"
 TILE = 3.0
 HEIGHT_STEP = 0.75
 GAUGE = 0.95
-RAIL_RADIUS = 0.08
+RAIL_RADIUS = 0.06
 RAIL_Z = 0.48
 TIE_SPACING = 0.36
+TIE_HALF_WIDTH = 0.62
+TIE_HALF_DEPTH = 0.055
+TIE_HALF_HEIGHT = 0.04
+SUPPORT_LATERAL = 0.42
+SUPPORT_HALF_WIDTH = 0.055
+SUPPORT_BEAM_Z_OFFSET = 0.22
 VALID_PIECES = ("straight", "curve_left", "curve_right", "slope_up", "slope_down")
 
 
@@ -115,6 +121,34 @@ def add_box(name, location, scale, material, role, yaw=0.0, pitch=0.0):
     return obj
 
 
+def build_support_frame(authored, name_prefix, point, track_tangent, material):
+    lateral = lateral_from_tangent(track_tangent)
+    yaw = math.atan2(track_tangent.y, track_tangent.x) - math.pi * 0.5
+    beam_z = max(0.18, point.z - SUPPORT_BEAM_Z_OFFSET)
+
+    beam = add_box(
+        f"{name_prefix}_Beam",
+        (point.x, point.y, beam_z),
+        (TIE_HALF_WIDTH * 0.92, SUPPORT_HALF_WIDTH, 0.045),
+        material,
+        "coaster.support.beam",
+        yaw=yaw,
+    )
+    authored.append(beam)
+
+    for side, sign in (("L", 1.0), ("R", -1.0)):
+        foot = point + lateral * (SUPPORT_LATERAL * sign)
+        post_height = max(0.12, beam_z)
+        post = add_box(
+            f"{name_prefix}_Post_{side}",
+            (foot.x, foot.y, post_height * 0.5),
+            (SUPPORT_HALF_WIDTH, SUPPORT_HALF_WIDTH, post_height * 0.5),
+            material,
+            "coaster.support.post",
+        )
+        authored.append(post)
+
+
 def build_piece(piece: str):
     steel = bs.make_material("TrackSteel", (0.18, 0.22, 0.24, 1.0), 0.38, 0.34)
     ties_mat = bs.make_material("TrackTies", (0.23, 0.19, 0.16, 1.0), 0.72)
@@ -147,17 +181,26 @@ def build_piece(piece: str):
         t = tangent(centerline, idx)
         yaw = math.atan2(t.y, t.x) - math.pi * 0.5
         pitch = math.atan2(t.z, math.hypot(t.x, t.y))
-        tie = add_box(f"Tie_{n:02d}", (p.x, p.y, p.z - 0.12),
-                      (0.72, 0.07, 0.05), ties_mat, "coaster.tie", yaw=yaw, pitch=pitch)
+        tie = add_box(
+            f"Tie_{n:02d}",
+            (p.x, p.y, p.z - 0.11),
+            (TIE_HALF_WIDTH, TIE_HALF_DEPTH, TIE_HALF_HEIGHT),
+            ties_mat,
+            "coaster.tie",
+            yaw=yaw,
+            pitch=pitch,
+        )
         authored.append(tie)
 
     support_indices = sorted(set((0, len(centerline) // 2, len(centerline) - 1)))
     for n, idx in enumerate(support_indices):
-        p = centerline[idx]
-        height = max(0.15, p.z - 0.18)
-        support = add_box(f"Support_{n:02d}", (p.x, p.y, height * 0.5),
-                          (0.08, 0.08, height * 0.5), support_mat, "coaster.support")
-        authored.append(support)
+        build_support_frame(
+            authored,
+            f"Support_{n:02d}",
+            centerline[idx],
+            tangent(centerline, idx),
+            support_mat,
+        )
 
     return authored, centerline
 
