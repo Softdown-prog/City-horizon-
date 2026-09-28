@@ -171,33 +171,56 @@ def _crown_masks_conifer(recipe, rng, W, H):
     return back, core, mid, front
 
 
-def _leaf_cluster(mask, rng, cx, cy, rx, ry, lobes=11, jitter=.24, satellites=3):
-    """Paint one foliage cluster as a main leaf mass plus smaller satellites."""
+def _leaf_cluster(mask, rng, cx, cy, rx, ry, lobes=11, jitter=.24, satellites=3, light_mask=None, dark_mask=None):
+    """Paint one foliage cluster plus local highlight/shadow submasses.
+
+    The broadleaf painter previously merged every cluster into one layer mask,
+    which erased internal structure and produced flat foliage plates.  The
+    optional accent masks preserve a readable hierarchy inside each cluster
+    while keeping the silhouette deterministic and alpha-safe.
+    """
     _irregular_blob(mask, rng, cx, cy, rx, ry, lobes, 255, jitter)
+
+    if dark_mask is not None:
+        _irregular_blob(
+            dark_mask, rng,
+            cx + rx * rng.uniform(.10, .26),
+            cy + ry * rng.uniform(.12, .28),
+            rx * rng.uniform(.34, .50),
+            ry * rng.uniform(.24, .38),
+            max(7, lobes - 3), 175, jitter + .03,
+        )
+    if light_mask is not None:
+        _irregular_blob(
+            light_mask, rng,
+            cx - rx * rng.uniform(.08, .24),
+            cy - ry * rng.uniform(.12, .30),
+            rx * rng.uniform(.28, .46),
+            ry * rng.uniform(.20, .34),
+            max(7, lobes - 4), 155, jitter + .02,
+        )
+
     for _ in range(satellites):
         angle = rng.uniform(0, math.tau)
         distance = rng.uniform(.24, .62)
         sx = cx + math.cos(angle) * rx * distance
         sy = cy + math.sin(angle) * ry * distance
-        _irregular_blob(
-            mask, rng, sx, sy,
-            rx * rng.uniform(.24, .42),
-            ry * rng.uniform(.24, .44),
-            max(7, lobes - 3), 255, jitter + .04,
-        )
+        srx = rx * rng.uniform(.24, .42)
+        sry = ry * rng.uniform(.24, .44)
+        _irregular_blob(mask, rng, sx, sy, srx, sry, max(7, lobes - 3), 255, jitter + .04)
+        if light_mask is not None and sy < cy and rng.random() < .58:
+            _irregular_blob(light_mask, rng, sx, sy, srx * .52, sry * .42, max(6, lobes - 5), 125, jitter + .04)
+        if dark_mask is not None and sy >= cy and rng.random() < .62:
+            _irregular_blob(dark_mask, rng, sx, sy, srx * .58, sry * .46, max(6, lobes - 5), 135, jitter + .04)
 
 
-def _broadleaf_branch_group(mask, rng, root, tip, width, cluster_scale, density, view_phase, layer_bias=0.0):
-    """Lay leaf clusters along an implied deciduous branch without painting a foliage ribbon."""
+def _broadleaf_branch_group(mask, rng, root, tip, width, cluster_scale, density, view_phase, layer_bias=0.0, light_mask=None, dark_mask=None):
+    """Lay discrete leaf clusters along an implied deciduous branch."""
     rx, ry = root
     tx, ty = tip
     lateral = math.sin(view_phase + rng.uniform(-.35, .35)) * cluster_scale * .22
     ctrl = (_lerp(rx, tx, .52) + lateral, _lerp(ry, ty, .48) - cluster_scale * .10 + layer_bias)
 
-    # Do not paint the branch axis into the foliage mask.  The old broadleaf
-    # implementation did that with a thick tapered stroke, which visually
-    # fused each tier into a horizontal ribbon.  Wood is authored separately;
-    # this mask is foliage only.
     for j in range(1, density + 1):
         t = j / (density + 1)
         cx, cy = _quad(root, ctrl, tip, t)
@@ -211,17 +234,19 @@ def _broadleaf_branch_group(mask, rng, root, tip, width, cluster_scale, density,
             spread * rng.uniform(.58, .82),
             spread * rng.uniform(.44, .68),
             rng.randint(9, 13), .24, rng.randint(3, 5),
+            light_mask=light_mask, dark_mask=dark_mask,
         )
     _leaf_cluster(
         mask, rng, tx, ty,
         cluster_scale * rng.uniform(.74, .96),
         cluster_scale * rng.uniform(.58, .76),
         rng.randint(10, 14), .25, 5,
+        light_mask=light_mask, dark_mask=dark_mask,
     )
 
 
 def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
-    """Build a rounded deciduous crown from branch-scaffolded leaf clusters."""
+    """Build a rounded deciduous crown with preserved internal leaf groups."""
     tiers = recipe["tiers"]
     cx = float(recipe.get("crownCx", 96))
     phase = VIEW_PHASE.get(view, 0.0)
@@ -233,6 +258,8 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
     core = Image.new("L", (W, H))
     mid = Image.new("L", (W, H))
     front = Image.new("L", (W, H))
+    cluster_light = Image.new("L", (W, H))
+    cluster_dark = Image.new("L", (W, H))
 
     for tier_index, tier in enumerate(tiers):
         y = float(tier["y"])
@@ -241,9 +268,7 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
         skew = float(tier.get("skew", 0))
         tcx = cx + skew
 
-        # Core clusters overlap vertically to make one organism, but remain
-        # narrower than the visible crown so they cannot define a shelf edge.
-        _leaf_cluster(core, rng, tcx, y + thick * .24, span * .24, thick * .34, 13, .17, 4)
+        _leaf_cluster(core, rng, tcx, y + thick * .24, span * .22, thick * .31, 13, .17, 4)
 
         for group in range(branch_groups):
             angle_phase = phase + tier_index * .51 + group * (math.tau / branch_groups)
@@ -252,8 +277,6 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
             lateral = math.cos(angle_phase)
             visible_span = span * (.48 + .30 * abs(lateral))
             tip_x = tcx + side * visible_span * rng.uniform(.76, 1.02)
-            # Rear clusters rise, front clusters hang slightly lower. This is
-            # the 30-degree dimetric depth cue; it is not a front-view shelf.
             tip_y = y + thick * (.18 + .28 * ((depth + 1) * .5)) + rng.uniform(-2.2, 2.2)
             root = (tcx + rng.uniform(-span * .07, span * .07), y + thick * .28)
             scale = max(6.0, min(span, thick) * cluster_factor * rng.uniform(.88, 1.20))
@@ -261,10 +284,10 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
             _broadleaf_branch_group(
                 target, rng, root, (tip_x, tip_y), max(1.4, thick * .045),
                 scale, branch_density, phase, layer_bias=depth * 1.8,
+                light_mask=cluster_light if depth >= -.12 else None,
+                dark_mask=cluster_dark if depth >= -.35 else None,
             )
 
-        # Free clusters bridge neighboring branch groups and tiers so the
-        # broadleaf crown reads as a rounded cloud instead of stacked bands.
         bridge_count = max(4, branch_groups // 2)
         for _ in range(bridge_count):
             ox = rng.uniform(-span * .50, span * .50)
@@ -272,16 +295,20 @@ def _crown_masks_broadleaf(recipe, rng, W, H, view="south"):
             target = back if oy < 0 else front if oy > thick * .22 else mid
             _leaf_cluster(
                 target, rng, tcx + ox, y + oy,
-                span * rng.uniform(.10, .17),
-                thick * rng.uniform(.14, .23),
+                span * rng.uniform(.09, .15),
+                thick * rng.uniform(.12, .20),
                 rng.randint(9, 13), .25, rng.randint(2, 4),
+                light_mask=cluster_light if oy >= 0 else None,
+                dark_mask=cluster_dark,
             )
 
     core = core.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.045 * WORK_SCALE))
     back = back.filter(ImageFilter.GaussianBlur(.020 * WORK_SCALE))
     mid = mid.filter(ImageFilter.GaussianBlur(.018 * WORK_SCALE))
     front = front.filter(ImageFilter.GaussianBlur(.016 * WORK_SCALE))
-    return back, core, mid, front
+    cluster_light = cluster_light.filter(ImageFilter.GaussianBlur(.010 * WORK_SCALE))
+    cluster_dark = cluster_dark.filter(ImageFilter.GaussianBlur(.012 * WORK_SCALE))
+    return back, core, mid, front, cluster_dark, cluster_light
 
 
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
@@ -405,8 +432,9 @@ def render(recipe, view="south"):
     _draw_trunk_and_bark(work, recipe, palette, W, H)
 
     crown_style = recipe.get("crownStyle", "conifer")
+    cluster_dark = cluster_light = None
     if crown_style == "broadleaf":
-        back, core, mid, front = _crown_masks_broadleaf(recipe, rng, W, H, view)
+        back, core, mid, front, cluster_dark, cluster_light = _crown_masks_broadleaf(recipe, rng, W, H, view)
     elif crown_style == "conifer":
         back, core, mid, front = _crown_masks_conifer(recipe, rng, W, H)
     else:
@@ -419,6 +447,23 @@ def render(recipe, view="south"):
     _scatter_texture(texture, rng, mid, palette.get("occlusion", "#123B30"), int(recipe.get("raster", {}).get("shadowDabs", 300)), (10, 34), (.5, 1.8), 2.3)
     work.alpha_composite(texture)
     _composite(work, front, palette["front_top"], palette["front_bottom"], right_shade=.16, highlight=(.27, .36, .48, .14))
+
+    if cluster_dark is not None:
+        _composite(
+            work, cluster_dark,
+            palette.get("leaf_shadow_top", palette.get("mid_bottom", palette["back_top"])),
+            palette.get("leaf_shadow_bottom", palette.get("occlusion", palette["back_bottom"])),
+            right_shade=.10,
+        )
+    if cluster_light is not None:
+        _composite(
+            work, cluster_light,
+            palette.get("leaf_light_top", palette["highlight"]),
+            palette.get("leaf_light_bottom", palette.get("front_top", palette["highlight"])),
+            right_shade=.06,
+            highlight=(.26, .30, .34, .08),
+        )
+
     highlights = Image.new("RGBA", (W, H))
     _scatter_texture(highlights, rng, front, palette["highlight"], int(recipe.get("raster", {}).get("highlightDabs", 260)), (8, 30), (.45, 1.45), 2.4)
     work.alpha_composite(highlights)
