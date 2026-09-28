@@ -1,13 +1,13 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
-  "pipelineRevision": 7,
+  "pipelineRevision": 8,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
   "crownStyle": "broadleaf",
   "crownCx": 96,
-  "shadowWidth": 96,
+  "shadowWidth": 94,
   "finishRecipe": "tools/visitor_forge_2d/examples/finish/park_tree_broadleaf_organic_02.json",
   "camera": {
     "contract": "CH_CAMERA_V1",
@@ -30,49 +30,49 @@
   },
   "lightingIntent": {
     "top": "early_autumn_gold_sunlit",
-    "front": "amber_orange_exposed_foliage",
-    "base": "deep_olive_green_brown_self_shadow",
+    "front": "mixed_gold_amber_leaf_clusters",
+    "base": "deep_olive_green_self_shadow",
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "branchGroupsPerTier": 5,
-    "clustersPerBranch": 4,
-    "clusterScale": 0.27,
+    "branchGroupsPerTier": 7,
+    "clustersPerBranch": 5,
+    "clusterScale": 0.19,
     "preserveOpenings": true,
     "silhouetteSource": "branch_clusters"
   },
   "palette": {
-    "ground_shadow": "#302719",
-    "trunk_top": "#9A6030",
-    "trunk_bottom": "#4A2B17",
-    "trunk_light": "#D08A47",
-    "back_top": "#596331",
-    "back_bottom": "#2E3821",
-    "mid_top": "#A57735",
-    "mid_bottom": "#5B5228",
-    "front_top": "#D99137",
-    "front_bottom": "#895D2C",
-    "highlight": "#F3BF50",
-    "occlusion": "#443820"
+    "ground_shadow": "#2B281B",
+    "trunk_top": "#946037",
+    "trunk_bottom": "#4A2D1C",
+    "trunk_light": "#C98749",
+    "back_top": "#66703B",
+    "back_bottom": "#303A25",
+    "mid_top": "#A98B43",
+    "mid_bottom": "#626037",
+    "front_top": "#D7A34B",
+    "front_bottom": "#8D7136",
+    "highlight": "#F0C86C",
+    "occlusion": "#394128"
   },
   "raster": {
-    "shadowDabs": 95,
-    "highlightDabs": 165,
+    "shadowDabs": 38,
+    "highlightDabs": 72,
     "needleStrokes": 0,
-    "finalGrain": 72,
+    "finalGrain": 24,
     "finalNeedles": 0
   },
   "trunkBranches": [
-    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 123], "w0": 18, "w1": 9},
+    {"p0": [96, 239], "p1": [94, 192], "p2": [97, 123], "w0": 17, "w1": 9},
     {"p0": [96, 188], "p1": [84, 160], "p2": [67, 139], "w0": 8, "w1": 4},
     {"p0": [97, 181], "p1": [110, 152], "p2": [128, 135], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 72,  "span": 43, "thickness": 56, "skew": -2, "lobes": 20},
-    {"y": 94,  "span": 58, "thickness": 60, "skew": 3,  "lobes": 21},
-    {"y": 116, "span": 70, "thickness": 64, "skew": -4, "lobes": 22},
-    {"y": 138, "span": 75, "thickness": 64, "skew": 2,  "lobes": 23},
-    {"y": 159, "span": 68, "thickness": 60, "skew": -2, "lobes": 23},
-    {"y": 177, "span": 55, "thickness": 54, "skew": 4,  "lobes": 22}
+    {"y": 67,  "span": 34, "thickness": 40, "skew": -3, "lobes": 18},
+    {"y": 88,  "span": 49, "thickness": 44, "skew": 4,  "lobes": 19},
+    {"y": 110, "span": 62, "thickness": 47, "skew": -4, "lobes": 20},
+    {"y": 133, "span": 71, "thickness": 50, "skew": 2,  "lobes": 20},
+    {"y": 155, "span": 67, "thickness": 47, "skew": -3, "lobes": 20},
+    {"y": 176, "span": 56, "thickness": 43, "skew": 4,  "lobes": 19}
   ]
 }
