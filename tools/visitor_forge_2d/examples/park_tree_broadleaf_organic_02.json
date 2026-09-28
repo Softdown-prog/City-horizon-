@@ -1,6 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
+  "pipelineRevision": 2,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
