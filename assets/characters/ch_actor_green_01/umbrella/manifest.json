@@ -1,0 +1,17 @@
+{
+  "contract": "CH_ACTOR_UMBRELLA_OVERLAY_V1",
+  "assetId": "character.ch_actor_green_01.umbrella_canopy_study",
+  "sourceWorkflowRun": 36358804067,
+  "sourceJob": "character.actor_umbrella.final.001",
+  "approvedProxySha256": "033dc0c609e3c76c2782cd0812002d09b99d6ad04880dfb4569922e9ccfee8c0",
+  "frameSize": [48, 64],
+  "groundAnchor": [24, 60],
+  "directions": ["south", "east", "west", "north"],
+  "posesPerDirection": 9,
+  "mask": {
+    "R": "alternating_color_gore_selection_255",
+    "B": "baked_fabric_shade",
+    "A": "overlay_alpha",
+    "unselected": "white_fabric_and_fixed_details"
+  }
+}
