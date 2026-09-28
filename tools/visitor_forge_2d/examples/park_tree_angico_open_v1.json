@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_angico_open_v1",
-  "pipelineRevision": 2,
+  "pipelineRevision": 3,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 17631,
@@ -35,10 +35,10 @@
   },
   "broadleafStructure": {
     "center": [96, 88],
-    "radius": [82, 64],
-    "clustersPerBranch": 3,
-    "branchGroupsPerTier": 4,
-    "clusterScale": 0.18
+    "radius": [86, 66],
+    "clustersPerBranch": 4,
+    "branchGroupsPerTier": 5,
+    "clusterScale": 0.17
   },
   "palette": {
     "ground_shadow": "#272A20",
@@ -59,22 +59,23 @@
     "leaf_light_bottom": "#6F995A"
   },
   "raster": {
-    "shadowDabs": 28,
-    "highlightDabs": 42,
+    "shadowDabs": 24,
+    "highlightDabs": 36,
     "needleStrokes": 0,
-    "finalGrain": 34,
+    "finalGrain": 28,
     "finalNeedles": 0
   },
   "trunkBranches": [
     {"p0": [96, 239], "p1": [95, 181], "p2": [94, 111], "w0": 15, "w1": 6},
-    {"p0": [95, 160], "p1": [80, 133], "p2": [53, 105], "w0": 8, "w1": 3},
-    {"p0": [96, 158], "p1": [113, 129], "p2": [143, 101], "w0": 8, "w1": 3},
-    {"p0": [94, 136], "p1": [82, 111], "p2": [68, 83], "w0": 6, "w1": 2.5},
-    {"p0": [95, 132], "p1": [109, 107], "p2": [126, 79], "w0": 6, "w1": 2.5}
+    {"p0": [95, 160], "p1": [77, 129], "p2": [46, 96], "w0": 8, "w1": 3},
+    {"p0": [96, 158], "p1": [116, 126], "p2": [150, 93], "w0": 8, "w1": 3},
+    {"p0": [94, 136], "p1": [80, 105], "p2": [64, 70], "w0": 6, "w1": 2.5},
+    {"p0": [95, 132], "p1": [112, 103], "p2": [132, 68], "w0": 6, "w1": 2.5}
   ],
   "tiers": [
-    {"y": 54, "span": 58, "thickness": 34, "skew": 3, "lobes": 18},
-    {"y": 82, "span": 77, "thickness": 40, "skew": -3, "lobes": 20},
-    {"y": 111, "span": 82, "thickness": 44, "skew": 1, "lobes": 20}
+    {"y": 50, "span": 68, "thickness": 32, "skew": 2, "lobes": 18},
+    {"y": 76, "span": 86, "thickness": 38, "skew": -3, "lobes": 20},
+    {"y": 103, "span": 90, "thickness": 42, "skew": 1, "lobes": 20},
+    {"y": 127, "span": 76, "thickness": 34, "skew": -1, "lobes": 18}
   ]
 }
