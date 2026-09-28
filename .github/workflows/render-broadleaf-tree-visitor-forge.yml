@@ -1,0 +1,53 @@
+name: Render Broadleaf Tree Visitor Forge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json"
+      - "tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py"
+      - "tools/visitor_forge_2d/tests/test_organic_scenery.py"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Visitor Forge 2D
+        run: |
+          python -m pip install -e tools/visitor_forge_2d
+          python -m pip install pytest
+
+      - name: Test organic scenery renderer
+        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py
+
+      - name: Render deterministic broadleaf family
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/visitor_forge_2d/broadleaf_family
+          for recipe in tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_*.json; do
+            python -m visitor_forge_2d.core.organic_scenery \
+              --recipe "$recipe" \
+              --output out/visitor_forge_2d/broadleaf_family
+          done
+
+      - name: Upload broadleaf tree review
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Broadleaf-Tree-Visitor-Forge-${{ github.run_number }}
+          path: out/visitor_forge_2d/broadleaf_family
+          retention-days: 14
+          if-no-files-found: error
