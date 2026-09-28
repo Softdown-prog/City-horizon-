@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_angico_open_v1",
-  "pipelineRevision": 1,
+  "pipelineRevision": 2,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 17631,
@@ -34,6 +34,8 @@
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
+    "center": [96, 88],
+    "radius": [82, 64],
     "clustersPerBranch": 3,
     "branchGroupsPerTier": 4,
     "clusterScale": 0.18
