@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_02",
-  "pipelineRevision": 6,
+  "pipelineRevision": 7,
   "canvas": [192, 256],
   "anchor": [96, 239],
   "seed": 84317,
@@ -35,9 +35,9 @@
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "branchGroupsPerTier": 10,
-    "clustersPerBranch": 8,
-    "clusterScale": 0.34,
+    "branchGroupsPerTier": 5,
+    "clustersPerBranch": 4,
+    "clusterScale": 0.27,
     "preserveOpenings": true,
     "silhouetteSource": "branch_clusters"
   },
@@ -46,20 +46,20 @@
     "trunk_top": "#9A6030",
     "trunk_bottom": "#4A2B17",
     "trunk_light": "#D08A47",
-    "back_top": "#5B6130",
-    "back_bottom": "#303820",
-    "mid_top": "#A57435",
-    "mid_bottom": "#5F5929",
-    "front_top": "#D58E32",
-    "front_bottom": "#8C5D2B",
-    "highlight": "#F2BC4F",
-    "occlusion": "#473A21"
+    "back_top": "#596331",
+    "back_bottom": "#2E3821",
+    "mid_top": "#A57735",
+    "mid_bottom": "#5B5228",
+    "front_top": "#D99137",
+    "front_bottom": "#895D2C",
+    "highlight": "#F3BF50",
+    "occlusion": "#443820"
   },
   "raster": {
-    "shadowDabs": 82,
-    "highlightDabs": 150,
+    "shadowDabs": 95,
+    "highlightDabs": 165,
     "needleStrokes": 0,
-    "finalGrain": 68,
+    "finalGrain": 72,
     "finalNeedles": 0
   },
   "trunkBranches": [
@@ -68,11 +68,11 @@
     {"p0": [97, 181], "p1": [110, 152], "p2": [128, 135], "w0": 8, "w1": 4}
   ],
   "tiers": [
-    {"y": 72,  "span": 43, "thickness": 62, "skew": -2, "lobes": 20},
-    {"y": 91,  "span": 58, "thickness": 68, "skew": 3,  "lobes": 21},
-    {"y": 111, "span": 70, "thickness": 72, "skew": -4, "lobes": 22},
-    {"y": 132, "span": 76, "thickness": 74, "skew": 2,  "lobes": 23},
-    {"y": 153, "span": 70, "thickness": 70, "skew": -2, "lobes": 23},
-    {"y": 171, "span": 57, "thickness": 62, "skew": 4,  "lobes": 22}
+    {"y": 72,  "span": 43, "thickness": 56, "skew": -2, "lobes": 20},
+    {"y": 94,  "span": 58, "thickness": 60, "skew": 3,  "lobes": 21},
+    {"y": 116, "span": 70, "thickness": 64, "skew": -4, "lobes": 22},
+    {"y": 138, "span": 75, "thickness": 64, "skew": 2,  "lobes": 23},
+    {"y": 159, "span": 68, "thickness": 60, "skew": -2, "lobes": 23},
+    {"y": 177, "span": 55, "thickness": 54, "skew": 4,  "lobes": 22}
   ]
 }
