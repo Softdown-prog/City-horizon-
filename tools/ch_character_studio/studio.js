@@ -39,6 +39,7 @@
   const shapeScale = document.getElementById("shapeScale");
   const shapeScaleLabel = document.getElementById("shapeScaleLabel");
   const templateSelect = document.getElementById("templateSelect");
+  const outlineColor = document.getElementById("outlineColor");
 
   function setStatus(msg) { status.textContent = msg; }
   function canvasFor(name) { return buffers.get(name); }
@@ -216,6 +217,64 @@
     setStatus(`${template.label} aplicado: ${applied} peças artísticas · pose e movimento preservados.`);
   }
 
+  function hexToRgba(hex) {
+    const value = hex.replace("#", "");
+    return [
+      parseInt(value.slice(0,2), 16),
+      parseInt(value.slice(2,4), 16),
+      parseInt(value.slice(4,6), 16),
+      255
+    ];
+  }
+
+  function generateOutline() {
+    const coverage = new Uint8Array(W * H);
+    for (const name of LAYERS) {
+      if (name === "outline") continue;
+      const data = canvasFor(name).getContext("2d").getImageData(0, 0, W, H).data;
+      for (let i = 0; i < W * H; i++) if (data[i * 4 + 3] > 0) coverage[i] = 1;
+    }
+
+    const out = canvasFor("outline");
+    const ctx = out.getContext("2d");
+    const image = ctx.createImageData(W, H);
+    const rgba = hexToRgba(outlineColor.value);
+    let count = 0;
+    const neighbors = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const index = y * W + x;
+        if (coverage[index]) continue;
+        let adjacent = false;
+        for (const [dx, dy] of neighbors) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+          if (coverage[ny * W + nx]) { adjacent = true; break; }
+        }
+        if (!adjacent) continue;
+        const p = index * 4;
+        image.data[p] = rgba[0];
+        image.data[p + 1] = rgba[1];
+        image.data[p + 2] = rgba[2];
+        image.data[p + 3] = rgba[3];
+        count += 1;
+      }
+    }
+    ctx.clearRect(0, 0, W, H);
+    ctx.putImageData(image, 0, 0);
+    visibility.set("outline", true);
+    activeLayer = "outline";
+    buildLayerList();
+    redraw();
+    setStatus(`Outline dilatado 1 px gerado: ${count} pixels · base CH Blender ignorada.`);
+  }
+
+  function clearOutline() {
+    canvasFor("outline").getContext("2d").clearRect(0, 0, W, H);
+    redraw();
+    setStatus("Outline limpo.");
+  }
+
   function setTool(next) {
     tool = next;
     for (const [id, name] of [["brushBtn","brush"],["eraserBtn","eraser"],["shapeBtn","shape"]]) {
@@ -248,6 +307,8 @@
     setStatus(`Camada ${activeLayer} limpa.`);
   });
   document.getElementById("applyTemplate").addEventListener("click", applyTemplate);
+  document.getElementById("generateOutline").addEventListener("click", generateOutline);
+  document.getElementById("clearOutline").addEventListener("click", clearOutline);
   brushSize.addEventListener("input", () => sizeLabel.textContent = brushSize.value);
   shapeScale.addEventListener("input", () => shapeScaleLabel.textContent = Number(shapeScale.value).toFixed(2));
   shapeSelect.addEventListener("change", () => {
@@ -315,7 +376,8 @@
         palette:{skin:PALETTE[0],hair:PALETTE[1],primary:PALETTE[2],secondary:PALETTE[3],shoes:PALETTE[4]},
         layers:LAYERS.map(name => ({name, enabled:visibility.get(name), opacity:1.0})),
         smartShapes:{library:"CH_CHARACTER_SHAPES_V0", directionAware:true},
-        template:templateSelect.value || null
+        template:templateSelect.value || null,
+        outline:{mode:"dilated_1px", color:outlineColor.value, excludesBlenderUnderlay:true}
       }
     };
     const blob = new Blob([JSON.stringify(spec,null,2)+"\n"],{type:"application/json"});
