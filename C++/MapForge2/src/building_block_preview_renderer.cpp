@@ -1,5 +1,6 @@
 #include "building_block_preview_renderer.h"
 
+#include "authoring_projection.h"
 #include "building_facade_renderer.h"
 #include "building_procedural_variation.h"
 #include "src/ch_core/contracts.h"
@@ -18,12 +19,12 @@ struct WorldPoint { float x = 0.0F; float y = 0.0F; };
 struct PlacedBuilding { WorldPoint position; BuildingComposerSpec spec; bool focus = false; };
 
 QPointF project(const WorldPoint point, const QSize canvas) {
-    const float half_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
-    const float half_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
-    return {
-        static_cast<float>(canvas.width()) * 0.5F + (point.x - point.y) * half_w,
-        118.0F + (point.x + point.y) * half_h,
-    };
+    return projectAuthoringGround(
+        point.x,
+        point.y,
+        0,
+        QSizeF(canvas),
+        QPointF(static_cast<qreal>(canvas.width()) * 0.5, 118.0));
 }
 
 QPolygonF quad(float x0, float y0, float x1, float y1, const QSize canvas) {
