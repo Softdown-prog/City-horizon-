@@ -73,18 +73,20 @@ A candidata deve ser comparada em 1x e na grade antes de qualquer promoção.
 
 ## Copas de oiti e angico
 
-`examples/park_tree_oiti_groups_v2.json` usa `crown_groups` com perfil
-`domed`: interior contínuo e massas achatadas sobrepostas para uma copa larga.
-`examples/park_tree_angico_branches_v2.json` usa `branching`: as massas seguem
-as pontas dos galhos e deixam espaços entre ramos. A cor vem de
-`examples/palettes/organic_canopy_v1.json`; o brief pode escolher outra das
-quatro paletas sem alterar a geometria nem a câmera. Reproduza os estudos por:
+`examples/park_tree_oiti_groups_v3.json` usa `painted_canopy` com perfil
+`domed`: uma silhueta irregular contínua recebe folhas pequenas e sobrepostas.
+`examples/park_tree_angico_branches_v3.json` usa `branching`: volumes folhosos
+acompanham os galhos em alturas diferentes, com espaços entre os ramos. A cor vem de
+`examples/palettes/organic_canopy_v2.json`; o brief pode escolher outra das
+quatro paletas sem alterar a geometria nem a câmera. O layout anterior
+`crown_groups` permanece disponível para reproduzir as receitas v2. Reproduza
+os estudos novos por:
 
 ```bash
 PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
-  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_study_v2.json \
+  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_study_v3.json \
   --output out/visitor_forge_2d/author
 ```
 
-Use o brief correspondente `park_tree_angico_study_v2.json` para o angico.
+Use o brief correspondente `park_tree_angico_study_v3.json` para o angico.
 São candidatos para inspeção visual, sem promoção automática a `assets/`.

@@ -28,10 +28,10 @@ TEMPLATES = {
 }
 BROADLEAF_STYLES = {
     "rounded": "park_tree_broadleaf_early_autumn_v1.json",
-    "umbrella": "park_tree_oiti_groups_v2.json",
-    "open_branching": "park_tree_angico_branches_v2.json",
+    "umbrella": "park_tree_oiti_groups_v3.json",
+    "open_branching": "park_tree_angico_branches_v3.json",
 }
-PALETTE_LIBRARY = "palettes/organic_canopy_v1.json"
+PALETTE_LIBRARY = "palettes/organic_canopy_v2.json"
 TERMS = {
     "conifer": ("pinheiro", "pine", "conifer", "abeto"),
     "broadleaf": ("broadleaf", "folhosa", "arvore", "tree", "decidua", "oiti", "angico"),

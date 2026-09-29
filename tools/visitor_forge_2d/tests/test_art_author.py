@@ -47,6 +47,8 @@ def test_organic_styles_choose_distinct_canopies_and_named_palettes() -> None:
                                "prompt": "angico de copa aberta, verde profundo", "seed": 11})
     assert oiti["broadleafStructure"]["profile"] == "domed"
     assert angico["broadleafStructure"]["profile"] == "branching"
+    assert oiti["broadleafStructure"]["layout"] == "painted_canopy"
+    assert angico["broadleafStructure"]["layout"] == "painted_canopy"
     assert oiti["palette"]["highlight"] != angico["palette"]["highlight"]
     assert oiti["camera"] == angico["camera"]
     with pytest.raises(ValueError, match="unknown organic palette"):

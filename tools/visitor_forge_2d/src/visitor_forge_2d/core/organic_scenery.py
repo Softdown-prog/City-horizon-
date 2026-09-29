@@ -379,7 +379,7 @@ def _paint_broadleaf_volume(work, recipe, rng, palette, W, H, view):
             _composite(work, light, palette["highlight"], upper)
 
 
-def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
+def _paint_broadleaf_groups_legacy(work, recipe, rng, palette, W, H, view):
     """Paint a few overlapping foliage groups instead of isolated leaf balls.
 
     `domed` has a continuous dark interior and irregular lit crown lobes;
@@ -467,6 +467,117 @@ def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
         _scatter_texture(texture, rng, mask, palette["highlight"], count,
                          (14, 36), (.7, 1.8), 1.5)
         work.alpha_composite(texture)
+
+
+def _cloud_mask(size, rng, cx, cy, rx, ry, scallops=11):
+    """A fused, softly scalloped leaf envelope; no polygon facets or rows."""
+    mask = Image.new("L", size)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse(((cx - rx * .84) * WORK_SCALE, (cy - ry * .85) * WORK_SCALE,
+                  (cx + rx * .84) * WORK_SCALE, (cy + ry * .85) * WORK_SCALE), fill=255)
+    for i in range(scallops):
+        angle = math.tau * (i + rng.uniform(-.32, .32)) / scallops
+        x = cx + math.cos(angle) * rx * rng.uniform(.64, .78)
+        y = cy + math.sin(angle) * ry * rng.uniform(.67, .83)
+        sx = rx * rng.uniform(.23, .37)
+        sy = ry * rng.uniform(.20, .34)
+        draw.ellipse(((x - sx) * WORK_SCALE, (y - sy) * WORK_SCALE,
+                      (x + sx) * WORK_SCALE, (y + sy) * WORK_SCALE), fill=255)
+    # Fuse the joins at working resolution, then restore a clean alpha edge.
+    return mask.filter(ImageFilter.GaussianBlur(1.0 * WORK_SCALE)).point(
+        lambda alpha: 255 if alpha > 92 else 0)
+
+
+def _foliage_paint(work, mask, rng, palette, center, radius, *, open_crown=False):
+    """Layer foliage strokes within a shared silhouette, not shaded balls."""
+    cx, cy = center
+    rx, ry = radius
+    W, H = mask.size
+    _composite(work, mask, palette["mid_top"], palette["mid_bottom"], right_shade=.13)
+    # Large, transparent underpaint establishes volumes without drawing a
+    # circular border around each patch. Top left receives the warmest light.
+    shade = Image.new("L", (W, H))
+    light = Image.new("L", (W, H))
+    for i in range(16 if not open_crown else 5):
+        x = cx + rng.uniform(-.80, .80) * rx
+        y = cy + rng.uniform(-.68, .68) * ry
+        sx = rx * rng.uniform(.17, .35)
+        sy = ry * rng.uniform(.16, .31)
+        target = light if x < cx + rx * .15 and y < cy + ry * .20 and i % 3 else shade
+        _irregular_blob(target, rng, x, y, sx, sy, 13, rng.randint(75, 125), .23)
+    _composite(work, ImageChops.multiply(shade, mask), palette["occlusion"], palette["mid_bottom"])
+    _composite(work, ImageChops.multiply(light, mask), palette["front_top"], palette["mid_top"])
+
+    # Irregular overlapping leaflets are painted with low contrast and no
+    # per-leaf dark ring. Their scale is small enough to survive gameplay 1x.
+    patches = Image.new("RGBA", (W, H))
+    draw = ImageDraw.Draw(patches, "RGBA")
+    count = 560 if not open_crown else 100
+    colors = [palette["mid_top"], palette["front_top"], palette["front_bottom"],
+              palette["highlight"], palette["mid_bottom"]]
+    alpha = mask.load()
+    for _ in range(count):
+        x = cx + rng.uniform(-.97, .97) * rx
+        y = cy + rng.uniform(-.96, .96) * ry
+        px, py = round(x * WORK_SCALE), round(y * WORK_SCALE)
+        if not 0 <= px < W or not 0 <= py < H or alpha[px, py] < 200:
+            continue
+        sx = rng.uniform(3.5, 10.0) * (1.05 if not open_crown else .90)
+        sy = sx * rng.uniform(.48, .86)
+        choice = rng.randrange(len(colors))
+        if choice == 3 and (y > cy or x > cx + rx * .35):
+            choice = 0
+        points = [((x + math.cos(a) * sx * rng.uniform(.72, 1.15)) * WORK_SCALE,
+                   (y + math.sin(a) * sy * rng.uniform(.72, 1.15)) * WORK_SCALE)
+                  for a in (0, .95, 2.2, 3.4, 4.7, 5.5)]
+        draw.polygon(points, fill=(*_hex(colors[choice]), rng.randint(165, 235)))
+    clipped = ImageChops.multiply(patches.getchannel("A"), mask)
+    patches.putalpha(clipped)
+    work.alpha_composite(patches)
+
+
+def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
+    """A dense domed canopy or separate branch borne leaf clouds."""
+    cfg = recipe["broadleafStructure"]
+    cx, cy = map(float, cfg["center"])
+    rx, ry = map(float, cfg["radius"])
+    profile = cfg.get("profile", "domed")
+    if profile not in ("domed", "branching"):
+        raise ValueError("crown_groups profile must be domed or branching")
+    phase = VIEW_PHASE[view]
+    density = max(.55, min(1.45, float(cfg.get("density", 1.0))))
+    if profile == "domed":
+        mask = _cloud_mask((W, H), rng, cx, cy, rx * math.sqrt(density),
+                           ry * math.sqrt(density), scallops=24)
+        _foliage_paint(work, mask, rng, palette, (cx, cy), (rx, ry))
+        return
+
+    branches = recipe.get("trunkBranches", [])[1:]
+    if not branches:
+        raise ValueError("branching crown_groups needs authored trunkBranches")
+    interior = _cloud_mask((W, H), rng, cx, cy + ry * .02,
+                           rx * .50 * math.sqrt(density), ry * .55 * math.sqrt(density),
+                           scallops=13)
+    _foliage_paint(work, interior, rng, palette, (cx, cy + ry * .02),
+                   (rx * .50, ry * .55), open_crown=True)
+    # Each branch ends in its own leaf volume. The open sky between volumes
+    # and the tapered wood below them make the structure readable at 1x.
+    groups = []
+    for index, branch in enumerate(branches):
+        root = tuple(map(float, branch["p0"]))
+        control = tuple(map(float, branch["p1"]))
+        tip = tuple(map(float, branch["p2"]))
+        for step, along in enumerate((.62, 1.0)):
+            x, y = _quad(root, control, tip, along)
+            x += math.sin(phase + index * 1.9 + step) * 2.7 + rng.uniform(-4, 4)
+            y += math.cos(phase + index * 1.1 + step) * 1.6 + rng.uniform(-4, 4)
+            size = (.91 + rng.uniform(-.16, .16)) * math.sqrt(density)
+            groups.append((x, y, (22 + (index % 3) * 2) * size,
+                           (18 + (index % 2) * 2) * size))
+    groups.sort(key=lambda group: group[1])
+    for x, y, sx, sy in groups:
+        mask = _cloud_mask((W, H), rng, x, y, sx, sy, scallops=10)
+        _foliage_paint(work, mask, rng, palette, (x, y), (sx, sy), open_crown=True)
 
 
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
@@ -591,8 +702,10 @@ def render(recipe, view="south"):
 
     crown_style = recipe.get("crownStyle", "conifer")
     layout = recipe.get("broadleafStructure", {}).get("layout")
-    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups"):
-        painter = _paint_broadleaf_volume if layout == "continuous" else _paint_broadleaf_groups
+    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups", "painted_canopy"):
+        painter = {"continuous": _paint_broadleaf_volume,
+                   "crown_groups": _paint_broadleaf_groups_legacy,
+                   "painted_canopy": _paint_broadleaf_groups}[layout]
         painter(work, recipe, rng, palette, W, H, view)
         frame = _alpha_safe_resize(work, tuple(canvas))
         frame = _final_raster_pass(frame, rng, palette, recipe)
