@@ -25,7 +25,7 @@ O `CH_2D_ART_BRIEF_V1` aceita `id` seguro e `subject`. Campos específicos:
 
 | Família | Receita de referência | Controles do autor |
 | --- | --- | --- |
-| `broadleaf` | outonal, oiti e angico sob `examples/` | `species`: `oiti`/`angico`; `style`: `rounded`/`umbrella`/`open_branching`; `palette`: quatro paletas gerais mais `oiti_evergreen`/`angico_feather`; `season`: `early_autumn`/`summer`; `silhouette`: `rounded`/`wide`/`tall`; `density`: `sparse`/`balanced`/`dense`; `seed` |
+| `broadleaf` | outonal, oiti e angico sob `examples/` | `species`: `oiti`/`angico`; `leaf_detail`: `painted`/`defined`; `style`: `rounded`/`umbrella`/`open_branching`; paleta, estação, silhueta, densidade e `seed` |
 | `conifer` | `pine_small_v1.json` e variantes | `silhouette`: `rounded`/`wide`/`tall`; `density`; `seed` |
 | `flower_bed` | `flower_bed_01.json` | `seed` |
 | `sign` | `park_wayfinding_sign.json` | `seed` |
@@ -96,6 +96,23 @@ PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
 
 Use `park_tree_angico_study_v4.json` para a outra espécie. São estudos para
 inspeção em 1x, sem promoção automática a `assets/`.
+
+### Folhas com forma definida (v5 opt-in)
+
+`leaf_detail: "defined"` seleciona `park_tree_oiti_leaves_v5.json` ou
+`park_tree_angico_leaves_v5.json` conforme a espécie. O oiti desenha pequenas
+folhas afiladas em grupos. O angico adiciona pares de folíolos aos volumes da
+copa. A base sombreada continua presente para não abrir buracos na escala de
+gameplay. `leaf_detail: "painted"` mantém a v4 como padrão. A v5 é candidata
+visual, reproduzível por:
+
+```bash
+PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
+  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_leaves_study_v5.json \
+  --output out/visitor_forge_2d/author
+```
+
+Há um brief equivalente para `park_tree_angico_leaves_study_v5.json`.
 
 ## Histórico dos perfis anteriores
 

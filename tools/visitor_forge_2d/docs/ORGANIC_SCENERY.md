@@ -25,6 +25,11 @@ Changing a seed varies the foliage; the angico's primary branch skeleton is
 still authored in `trunkBranches` rather than randomly regenerated. These
 are individual tree assets for groves and forestry as well as park placement.
 
+`layout: "leaf_canopy"` is an opt-in v5 renderer. It shades the crown first,
+then draws tapered simple leaves for oiti or paired leaflets for angico at 4x
+before alpha-safe downsampling. The density, seed, four views and camera remain
+the same contract. Existing v4 `species_canopy` sprites are not repainted.
+
 The renderer is `core/organic_scenery.py`. It is deterministic: the JSON recipe,
 palette and integer `seed` reproduce the same PNG without an image model or a
 hidden raster source.

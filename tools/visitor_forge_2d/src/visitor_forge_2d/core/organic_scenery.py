@@ -488,7 +488,8 @@ def _cloud_mask(size, rng, cx, cy, rx, ry, scallops=11):
         lambda alpha: 255 if alpha > 92 else 0)
 
 
-def _foliage_paint(work, mask, rng, palette, center, radius, *, open_crown=False):
+def _foliage_paint(work, mask, rng, palette, center, radius, *, open_crown=False,
+                   patch_count=None, patch_alpha=(165, 235), patch_shape="mound"):
     """Layer foliage strokes within a shared silhouette, not shaded balls."""
     cx, cy = center
     rx, ry = radius
@@ -512,7 +513,7 @@ def _foliage_paint(work, mask, rng, palette, center, radius, *, open_crown=False
     # per-leaf dark ring. Their scale is small enough to survive gameplay 1x.
     patches = Image.new("RGBA", (W, H))
     draw = ImageDraw.Draw(patches, "RGBA")
-    count = 560 if not open_crown else 100
+    count = patch_count if patch_count is not None else (560 if not open_crown else 100)
     colors = [palette["mid_top"], palette["front_top"], palette["front_bottom"],
               palette["highlight"], palette["mid_bottom"]]
     alpha = mask.load()
@@ -527,10 +528,18 @@ def _foliage_paint(work, mask, rng, palette, center, radius, *, open_crown=False
         choice = rng.randrange(len(colors))
         if choice == 3 and (y > cy or x > cx + rx * .35):
             choice = 0
-        points = [((x + math.cos(a) * sx * rng.uniform(.72, 1.15)) * WORK_SCALE,
-                   (y + math.sin(a) * sy * rng.uniform(.72, 1.15)) * WORK_SCALE)
-                  for a in (0, .95, 2.2, 3.4, 4.7, 5.5)]
-        draw.polygon(points, fill=(*_hex(colors[choice]), rng.randint(165, 235)))
+        if patch_shape == "simple_leaves":
+            for leaf in range(3):
+                lx = x + rng.uniform(-sx * .52, sx * .52)
+                ly = y + rng.uniform(-sy * .72, sy * .72)
+                _draw_leaflet(draw, lx, ly, rng.uniform(5.6, 8.8),
+                              rng.uniform(2.2, 3.5), rng.uniform(-1.15, 1.0),
+                              colors[choice], rng.randint(*patch_alpha))
+        else:
+            points = [((x + math.cos(a) * sx * rng.uniform(.72, 1.15)) * WORK_SCALE,
+                       (y + math.sin(a) * sy * rng.uniform(.72, 1.15)) * WORK_SCALE)
+                      for a in (0, .95, 2.2, 3.4, 4.7, 5.5)]
+            draw.polygon(points, fill=(*_hex(colors[choice]), rng.randint(*patch_alpha)))
     clipped = ImageChops.multiply(patches.getchannel("A"), mask)
     patches.putalpha(clipped)
     work.alpha_composite(patches)
@@ -546,6 +555,7 @@ def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
         raise ValueError("crown_groups profile must be domed or branching")
     phase = VIEW_PHASE[view]
     density = max(.55, min(1.45, float(cfg.get("density", 1.0))))
+    leaf_detail = cfg.get("layout") == "leaf_canopy"
     if profile == "domed":
         mask = _cloud_mask((W, H), rng, cx, cy, rx * math.sqrt(density),
                            ry * math.sqrt(density), scallops=24)
@@ -559,7 +569,9 @@ def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
                            rx * .50 * math.sqrt(density), ry * .55 * math.sqrt(density),
                            scallops=13)
     _foliage_paint(work, interior, rng, palette, (cx, cy + ry * .02),
-                   (rx * .50, ry * .55), open_crown=True)
+                   (rx * .50, ry * .55), open_crown=True,
+                   patch_count=65 if leaf_detail else None,
+                   patch_alpha=(140, 205) if leaf_detail else (165, 235))
     # Each branch ends in its own leaf volume. The open sky between volumes
     # and the tapered wood below them make the structure readable at 1x.
     groups = []
@@ -577,7 +589,9 @@ def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
     groups.sort(key=lambda group: group[1])
     for x, y, sx, sy in groups:
         mask = _cloud_mask((W, H), rng, x, y, sx, sy, scallops=10)
-        _foliage_paint(work, mask, rng, palette, (x, y), (sx, sy), open_crown=True)
+        _foliage_paint(work, mask, rng, palette, (x, y), (sx, sy), open_crown=True,
+                       patch_count=65 if leaf_detail else None,
+                       patch_alpha=(140, 205) if leaf_detail else (165, 235))
 
 
 def _draw_leaflet(draw, x, y, length, width, angle, color, opacity):
@@ -595,7 +609,7 @@ def _draw_leaflet(draw, x, y, length, width, angle, color, opacity):
     draw.polygon(points, fill=(*_hex(color), opacity))
 
 
-def _paint_species_foliage(work, mask, rng, palette, center, radius, species):
+def _paint_species_foliage(work, mask, rng, palette, center, radius, species, *, strong=False):
     """Species leaf detail on top of a readable shaded canopy volume."""
     cx, cy = center
     rx, ry = radius
@@ -622,11 +636,11 @@ def _paint_species_foliage(work, mask, rng, palette, center, radius, species):
     else:
         # Paired leaflets along fine curved sprays suggest the bipinnate leaf
         # without drawing subpixel botanical detail that disappears at 1x.
-        for _ in range(13):
+        for _ in range(18 if strong else 13):
             x = cx + rng.uniform(-.65, .65) * rx
             y = cy + rng.uniform(-.62, .62) * ry
             theta = rng.uniform(-2.8, .2)
-            length = rng.uniform(8.0, 14.0)
+            length = rng.uniform(10.0, 17.0) if strong else rng.uniform(8.0, 14.0)
             dx, dy = math.cos(theta), math.sin(theta)
             endpoint = (x + dx * length, y + dy * length)
             twig = _hex(palette["mid_bottom"])
@@ -641,9 +655,11 @@ def _paint_species_foliage(work, mask, rng, palette, center, radius, species):
                     lit = leaf_x < cx + rx * .12 and leaf_y < cy + ry * .10
                     color = (palette["highlight"] if lit and rng.random() < .18 else
                              palette["front_top"] if lit else palette["mid_top"])
-                    _draw_leaflet(draw, leaf_x, leaf_y, rng.uniform(2.8, 4.2),
-                                  rng.uniform(.72, 1.15), theta + side * 1.15,
-                                  color, rng.randint(90, 160))
+                    _draw_leaflet(draw, leaf_x, leaf_y,
+                                  rng.uniform(3.8, 5.3) if strong else rng.uniform(2.8, 4.2),
+                                  rng.uniform(.95, 1.4) if strong else rng.uniform(.72, 1.15),
+                                  theta + side * 1.15, color,
+                                  rng.randint(150, 210) if strong else rng.randint(90, 160))
     layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
     work.alpha_composite(layer)
 
@@ -684,6 +700,48 @@ def _paint_species_canopy(work, recipe, rng, palette, W, H, view):
                          (cx + rx * .43, cy - ry * .06, rx * .45, ry * .50)):
         _paint_species_foliage(work, occupied, detail_rng, palette,
                                (x, y), (sx, sy), species)
+
+
+def _paint_defined_leaves(work, mask, rng, palette, center, radius, species):
+    """Readably shaped simple leaves within a shaded evergreen mass."""
+    if species != "oiti":
+        raise ValueError("defined simple leaves require oiti")
+    _foliage_paint(work, mask, rng, palette, center, radius,
+                   patch_count=150, patch_alpha=(65, 110))
+    _foliage_paint(work, mask, rng, palette, center, radius,
+                   patch_count=430, patch_alpha=(185, 240),
+                   patch_shape="simple_leaves")
+
+
+def _paint_leaf_canopy(work, recipe, rng, palette, W, H, view):
+    """A leaf-shaped opt-in canopy for the two documented tree species."""
+    cfg = recipe["broadleafStructure"]
+    species = cfg.get("species")
+    if species not in ("oiti", "angico"):
+        raise ValueError("leaf_canopy requires species oiti or angico")
+    cx, cy = map(float, cfg["center"])
+    rx, ry = map(float, cfg["radius"])
+    density = max(.55, min(1.45, float(cfg.get("density", 1.0))))
+    phase = VIEW_PHASE[view]
+    if species == "oiti":
+        cx += rng.uniform(-3.5, 3.5) + math.cos(phase + .35) * 3.4
+        cy += rng.uniform(-2.5, 2.5) + math.sin(phase + .35) * 2.0
+        rx *= rng.uniform(.94, 1.04) * (1 + .027 * math.cos(phase + .8)) * math.sqrt(density)
+        ry *= rng.uniform(.96, 1.05) * (1 + .023 * math.sin(phase + .4)) * math.sqrt(density)
+        mask = _cloud_mask((W, H), rng, cx, cy, rx, ry, 19)
+        _paint_defined_leaves(work, mask, rng, palette, (cx, cy), (rx, ry), species)
+        return
+
+    if not recipe.get("trunkBranches", [])[1:]:
+        raise ValueError("angico leaf_canopy needs authored trunkBranches")
+    _paint_species_canopy(work, recipe, rng, palette, W, H, view)
+    occupied = work.getchannel("A")
+    detail_rng = random.Random(int(recipe["seed"]) ^ (0x5EED5 + round(phase * 100)))
+    for x, y, sx, sy in ((cx - rx * .43, cy - ry * .10, rx * .45, ry * .51),
+                         (cx + rx * .03, cy - ry * .29, rx * .43, ry * .48),
+                         (cx + rx * .43, cy - ry * .06, rx * .45, ry * .50)):
+        _paint_species_foliage(work, occupied, detail_rng, palette,
+                               (x, y), (sx, sy), species, strong=True)
 
 
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
@@ -808,11 +866,12 @@ def render(recipe, view="south"):
 
     crown_style = recipe.get("crownStyle", "conifer")
     layout = recipe.get("broadleafStructure", {}).get("layout")
-    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups", "painted_canopy", "species_canopy"):
+    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups", "painted_canopy", "species_canopy", "leaf_canopy"):
         painter = {"continuous": _paint_broadleaf_volume,
                    "crown_groups": _paint_broadleaf_groups_legacy,
                    "painted_canopy": _paint_broadleaf_groups,
-                   "species_canopy": _paint_species_canopy}[layout]
+                   "species_canopy": _paint_species_canopy,
+                   "leaf_canopy": _paint_leaf_canopy}[layout]
         painter(work, recipe, rng, palette, W, H, view)
         frame = _alpha_safe_resize(work, tuple(canvas))
         frame = _final_raster_pass(frame, rng, palette, recipe)

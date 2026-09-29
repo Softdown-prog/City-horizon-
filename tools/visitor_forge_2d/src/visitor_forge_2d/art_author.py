@@ -32,6 +32,10 @@ BROADLEAF_STYLES = {
     "open_branching": "park_tree_angico_species_v4.json",
 }
 BROADLEAF_SPECIES = {"oiti": "umbrella", "angico": "open_branching"}
+BROADLEAF_DEFINED_LEAVES = {
+    "oiti": "park_tree_oiti_leaves_v5.json",
+    "angico": "park_tree_angico_leaves_v5.json",
+}
 PALETTE_LIBRARY = "palettes/organic_canopy_v3.json"
 TERMS = {
     "conifer": ("pinheiro", "pine", "conifer", "abeto"),
@@ -40,7 +44,7 @@ TERMS = {
     "sign": ("placa", "sinalizacao", "wayfinding sign", "sign"),
 }
 ALLOWED = {
-    "broadleaf": {"species", "season", "style", "silhouette", "density", "palette", "seed"},
+    "broadleaf": {"species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed"},
     "conifer": {"silhouette", "density", "palette", "seed"},
     "flower_bed": {"palette", "seed"},
     "sign": {"palette", "seed"},
@@ -75,6 +79,8 @@ def interpret_prompt(prompt: str) -> dict:
         result["species"] = "angico"
     elif "oiti" in words:
         result["species"] = "oiti"
+    if any(term in words for term in ("folhas definidas", "folhas individuais", "defined leaves")):
+        result["leaf_detail"] = "defined"
     if any(term in words for term in ("verde claro", "verde fresco", "spring green")):
         result["palette"] = "spring_lime"
     elif any(term in words for term in ("verde escuro", "verde profundo", "deep green")):
@@ -129,7 +135,7 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         raise ValueError(f"unsupported subject {subject!r}; available: {', '.join(TEMPLATES)}, custom")
     if parsed and parsed["subject"] != subject:
         raise ValueError("prompt subject and structured subject disagree")
-    intent = {**parsed, **{key: brief[key] for key in ("species", "season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
+    intent = {**parsed, **{key: brief[key] for key in ("species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
     unknown = set(intent) - ALLOWED.get(subject, {"seed"}) - {"subject"}
     if unknown:
         raise ValueError(f"{subject} does not support {', '.join(sorted(unknown))}; use a custom recipe")
@@ -145,13 +151,20 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         species_for_style = {style: species for species, style in BROADLEAF_SPECIES.items()}
         if intent.get("style") in species_for_style:
             intent["species"] = species_for_style[intent["style"]]
+    if subject == "broadleaf" and intent.get("leaf_detail", "painted") not in ("painted", "defined"):
+        raise ValueError("leaf_detail must be painted or defined")
+    if subject == "broadleaf" and intent.get("leaf_detail") == "defined" and "species" not in intent:
+        raise ValueError("defined leaves require species oiti or angico")
 
     if subject == "custom":
         filename = brief.get("template")
         if not isinstance(filename, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*\.json", filename):
             raise ValueError("custom subject requires a versioned JSON filename under examples/")
     else:
-        filename = BROADLEAF_STYLES.get(intent.get("style", "rounded")) if subject == "broadleaf" else TEMPLATES[subject]
+        if subject == "broadleaf" and intent.get("leaf_detail") == "defined":
+            filename = BROADLEAF_DEFINED_LEAVES[intent["species"]]
+        else:
+            filename = BROADLEAF_STYLES.get(intent.get("style", "rounded")) if subject == "broadleaf" else TEMPLATES[subject]
         if filename is None:
             raise ValueError(f"unknown broadleaf style {intent['style']!r}; choose {', '.join(BROADLEAF_STYLES)}")
     recipe = copy.deepcopy(json.loads((examples / filename).read_text(encoding="utf-8")))
@@ -194,6 +207,7 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         decisions.extend((f"style={style}", f"season={season}"))
         if "species" in intent:
             decisions.append(f"species={intent['species']}")
+            decisions.append(f"leaf_detail={intent.get('leaf_detail', 'painted')}")
         density = intent.get("density", "balanced")
         if density not in ("sparse", "balanced", "dense"):
             raise ValueError("density must be sparse, balanced or dense")
