@@ -34,6 +34,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Validate Audio Lab scripts
+        shell: bash
+        run: |
+          python -m py_compile \
+            tools/ch_audio_lab/ch_audio_lab.py \
+            tools/ch_audio_lab/providers/stability_audio.py \
+            tools/audio_asset_worker.py
+
       - name: Install FFmpeg
         shell: bash
         run: |
