@@ -4,19 +4,21 @@
 
 The reusable runtime infrastructure is available in `src/ui_nine_slice.h`.
 
-The construction-catalog pilot now uses the V2 reference-derived skin:
+The V2 reference-derived skin is now promoted from a catalog-only asset to the reusable window pilot:
 
-- skin: `assets/ui/chrome/panel_build_catalog_9slice_v2.png`;
+- skin: `assets/ui/chrome/panel_window_9slice_v2.png`;
 - source size: 192x192;
 - insets: 32 / 32 / 32 / 32 pixels;
 - center patch: transparent, so runtime content and the procedural fallback remain visible;
 - filtering: nearest-neighbor for this skin to avoid an extra blur pass;
-- runtime hook: `src/ui_build_panel_nine_slice.inl`;
-- registry entry: `panel_build_catalog_nine_slice` in `assets/ui/ui_asset_catalog.json`.
+- construction catalog hook: `src/ui_build_panel_nine_slice.inl`;
+- modal hook: `src/ui_window_nine_slice.inl`;
+- first modal migration: Pause, Settings and Administration;
+- registry entry: `panel_window_nine_slice` in `assets/ui/ui_asset_catalog.json`.
 
-V1 remains in the repository as the original minimal pilot and rollback point. V2 preserves the heavier frame, bevels and four decorated corners from the supplied visual reference while keeping the center free for catalog content.
+The original V1 and build-catalog V2 files remain in the repository as rollback/reference points. Runtime rendering now uses the generic `panel_window_9slice_v2.png` asset so the same authored corners and borders are not maintained in multiple places.
 
-This remains an incremental migration. The construction-catalog skin is integrated but is not yet promoted as the universal UI frame until an in-game/runtime capture is reviewed at gameplay scale.
+This remains an incremental migration. The procedural SDL panel stays underneath every migrated window. A missing or invalid skin therefore leaves the interface usable instead of removing the window background.
 
 ## Why nine-slice
 
@@ -44,16 +46,20 @@ The source insets are supplied as left/top/right/bottom pixel margins. If invali
 
 Do not convert every UI element at once.
 
-1. Validate the construction-catalog pilot at normal gameplay scale.
-2. Adjust only its skin/insets if a concrete visual defect appears.
+1. Validate the construction catalog plus Pause, Settings and Administration at normal gameplay scale.
+2. Adjust only the shared skin/insets if a concrete visual defect appears in all migrated windows.
 3. Keep the current procedural panel as fallback while the skin remains a pilot.
-4. After approval, promote the same frame to compatible dialogs/cards.
+4. After approval, extend the same frame to Reports, Save/Load, Main Menu and confirmation dialogs where their proportions remain compatible.
 5. Only then consider specialized variants for HUD, compact controls or themed panels.
 
 Use nine-slice for resizable panels and dialogs. Fixed-height controls that only change width may later use the same infrastructure as a three-slice by setting unused margins to zero rather than introducing a second renderer.
 
-## Tests
+## Tests and visual proof
 
 `src/ui_manager_test.cpp` verifies normal nine-slice geometry and compact destinations where borders must compress and the center collapses.
 
-Geometry tests do not approve artwork. The V2 construction-catalog skin still requires an actual runtime/gameplay-scale capture before its visual status changes from `pilot_v2` to `approved`.
+`src/ui_visual_capture.cpp` covers the existing catalog/settings interaction proof.
+
+`src/ui_modal_visual_capture.cpp` renders deterministic Pause, Settings and Administration screenshots through the production `GameplayUi` renderer. The focused Windows workflow requires all modal captures before publishing the `City-Builder-UI-Visual-Proof` artifact.
+
+Geometry and file-existence checks do not approve artwork. The shared V2 skin remains `pilot_v2` until the generated gameplay-scale captures are visually reviewed.
