@@ -35,7 +35,7 @@
       "canvas": [1280, 960]
     },
     "new_city_controls": {
-      "path": "assets/ui/atlas/new_city_setup_controls_v1.png",
+      "path": "assets/ui/atlas/new_city_controls_v1.png",
       "role": "new_city_setup_controls_atlas",
       "canvas": [1280, 960]
     },
