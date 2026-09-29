@@ -1,0 +1,13 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"accessories_front"},
+  "operations":[
+    {"type":"ellipse","box":[18,25,22,29],"color":"#f4f2e3"},
+    {"type":"ellipse","box":[26,25,30,29],"color":"#fffdf3"},
+    {"type":"ellipse","box":[21,25,27,30],"color":"#ebe7d7"},
+    {"type":"ellipse","box":[22,28,26,32],"color":"#8b5cf6"},
+    {"type":"pixel","x":23,"y":29,"color":"#b9a0ff"},
+    {"type":"pixel","x":25,"y":30,"color":"#5e3dbd"}
+  ]
+}
