@@ -1,0 +1,4 @@
+CH_RUNTIME_COLOR_MASK_PROMOTION_V1
+artifact=11041162241
+run=36584187772
+asset=building.residential_popular_house.01
