@@ -100,6 +100,38 @@
         "highlight": "orange_red",
         "wood": "gray_warm_brown"
       }
+    },
+    "yellow_flowering_open_canopy": {
+      "useFor": ["ipe_amarelo", "golden_flowering_broadleaf"],
+      "authoring": {
+        "subject": "custom",
+        "template": "park_tree_ipe_amarelo_01.json"
+      },
+      "silhouette": {
+        "shape": "broad_open_rounded",
+        "widthToHeight": 1.05,
+        "negativeSpace": "medium",
+        "edgeRhythm": "many_small_flowering_clusters"
+      },
+      "branching": {
+        "visibleWood": 0.34,
+        "primaryForks": 4,
+        "secondaryForks": 10,
+        "branchArc": "outward_upward_open"
+      },
+      "foliage": {
+        "macroMasses": 12,
+        "midClustersPerMass": [5, 9],
+        "microLeafBrush": "flower_cluster_small_round",
+        "secondaryBrush": "leaf_cluster_broadleaf",
+        "highlightPattern": "sunlit_lemon_top_front"
+      },
+      "paletteIntent": {
+        "interior": "deep_warm_gold",
+        "mid": "saturated_golden_yellow",
+        "highlight": "lemon_yellow",
+        "wood": "warm_medium_brown"
+      }
     }
   }
 }
