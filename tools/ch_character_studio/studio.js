@@ -4,9 +4,11 @@
     "silhouette","skin","hair","face","upper_clothing","lower_clothing",
     "footwear","accessories_back","accessories_front","paint_over","outline"
   ];
+  const ANIMATION_FRAMES = ["idle","walk_00","walk_01","walk_02","walk_03","walk_04","walk_05","walk_06","walk_07"];
   const PALETTE = ["#f6c29e","#d43b2f","#f2d744","#2b71c9","#26313a","#ffffff","#1f2937","#8b5cf6","#ef4444","#22c55e"];
   const SHAPES = window.CH_CHARACTER_SHAPES || [];
   const TEMPLATES = window.CH_CHARACTER_TEMPLATES || [];
+  const POSE_TRANSFER = window.CH_POSE_TRANSFER || null;
 
   const view = document.getElementById("view");
   const vctx = view.getContext("2d");
@@ -32,6 +34,8 @@
   let tool = "brush";
   let drawing = false;
   let lastPoint = null;
+  let landmarksPackage = null;
+  let referenceArt = null;
 
   const color = document.getElementById("color");
   const brushSize = document.getElementById("brushSize");
@@ -44,11 +48,16 @@
   const shapeScaleLabel = document.getElementById("shapeScaleLabel");
   const templateSelect = document.getElementById("templateSelect");
   const outlineColor = document.getElementById("outlineColor");
+  const landmarksFile = document.getElementById("landmarksFile");
+  const referenceStatus = document.getElementById("referenceStatus");
+  const applyReferenceBtn = document.getElementById("applyReference");
+  const propagateDirectionBtn = document.getElementById("propagateDirection");
 
   function setStatus(msg) { status.textContent = msg; }
   function canvasFor(name) { return buffers.get(name); }
   function currentDirection() { return directionSelect.value; }
   function currentFrameKey() { return `${directionSelect.value}:${frameSelect.value}`; }
+  function keyDirection(key) { return String(key).split(":", 1)[0]; }
 
   function redraw() {
     vctx.clearRect(0, 0, W, H);
@@ -62,10 +71,32 @@
     return canvas.getContext("2d").getImageData(0, 0, W, H);
   }
 
-  function saveLoadedFrame() {
+  function cloneImageData(image) {
+    if (POSE_TRANSFER) return POSE_TRANSFER.cloneImageData(image);
+    return new ImageData(new Uint8ClampedArray(image.data), image.width, image.height);
+  }
+
+  function blankImageData() {
+    return POSE_TRANSFER ? POSE_TRANSFER.blankImageData() : new ImageData(W, H);
+  }
+
+  function snapshotLayers() {
     const layers = {};
     for (const name of LAYERS) layers[name] = snapshotCanvas(canvasFor(name));
-    frameStore.set(loadedFrameKey, {base:snapshotCanvas(base), layers});
+    return layers;
+  }
+
+  function cloneLayers(layers) {
+    const cloned = {};
+    for (const name of LAYERS) cloned[name] = layers[name] ? cloneImageData(layers[name]) : blankImageData();
+    return cloned;
+  }
+
+  function saveLoadedFrame() {
+    frameStore.set(loadedFrameKey, {
+      base: snapshotCanvas(base),
+      layers: snapshotLayers()
+    });
   }
 
   function clearWorkingCanvases() {
@@ -257,24 +288,17 @@
     setStatus(`${template.label} aplicado: ${applied} peças artísticas · pose e movimento preservados.`);
   }
 
-  function hexToRgba(hex) {
-    const value = hex.replace("#", "");
-    return [parseInt(value.slice(0,2),16),parseInt(value.slice(2,4),16),parseInt(value.slice(4,6),16),255];
-  }
-
-  function generateOutline() {
+  function fallbackOutline(layers) {
     const coverage = new Uint8Array(W * H);
     for (const name of LAYERS) {
       if (name === "outline") continue;
-      const data = canvasFor(name).getContext("2d").getImageData(0, 0, W, H).data;
-      for (let i = 0; i < W * H; i++) if (data[i * 4 + 3] > 0) coverage[i] = 1;
+      const image = layers[name];
+      if (!image) continue;
+      for (let i = 0; i < W * H; i++) if (image.data[i * 4 + 3] > 0) coverage[i] = 1;
     }
-
-    const out = canvasFor("outline");
-    const ctx = out.getContext("2d");
-    const image = ctx.createImageData(W, H);
-    const rgba = hexToRgba(outlineColor.value);
-    let count = 0;
+    const out = blankImageData();
+    const value = outlineColor.value.replace("#", "");
+    const rgba = [parseInt(value.slice(0,2),16),parseInt(value.slice(2,4),16),parseInt(value.slice(4,6),16),255];
     const neighbors = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -283,21 +307,32 @@
         let adjacent = false;
         for (const [dx, dy] of neighbors) {
           const nx = x + dx, ny = y + dy;
-          if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-          if (coverage[ny * W + nx]) { adjacent = true; break; }
+          if (nx >= 0 && nx < W && ny >= 0 && ny < H && coverage[ny * W + nx]) { adjacent = true; break; }
         }
         if (!adjacent) continue;
         const p = index * 4;
-        image.data[p] = rgba[0]; image.data[p+1] = rgba[1]; image.data[p+2] = rgba[2]; image.data[p+3] = rgba[3];
-        count += 1;
+        out.data[p] = rgba[0]; out.data[p+1] = rgba[1]; out.data[p+2] = rgba[2]; out.data[p+3] = 255;
       }
     }
-    ctx.clearRect(0, 0, W, H);
-    ctx.putImageData(image, 0, 0);
+    return out;
+  }
+
+  function outlineForLayers(layers) {
+    return POSE_TRANSFER
+      ? POSE_TRANSFER.buildOutline(layers, outlineColor.value, LAYERS)
+      : fallbackOutline(layers);
+  }
+
+  function generateOutline() {
+    const layers = snapshotLayers();
+    const image = outlineForLayers(layers);
+    canvasFor("outline").getContext("2d").putImageData(image, 0, 0);
     visibility.set("outline", true);
     activeLayer = "outline";
     buildLayerList();
     redraw();
+    let count = 0;
+    for (let i = 3; i < image.data.length; i += 4) if (image.data[i]) count += 1;
     setStatus(`Outline dilatado 1 px gerado: ${count} pixels · base CH Blender ignorada.`);
   }
 
@@ -314,6 +349,96 @@
     }
     const labels = {brush:"Pincel", eraser:"Borracha", shape:"Forma inteligente"};
     setStatus(`${labels[tool]} ativo.`);
+  }
+
+  function landmarkFrame(key) {
+    return landmarksPackage?.frames?.[key] || null;
+  }
+
+  function refreshReferenceUi() {
+    const ready = Boolean(referenceArt && landmarksPackage && POSE_TRANSFER);
+    applyReferenceBtn.disabled = !ready;
+    propagateDirectionBtn.disabled = !ready;
+    if (!referenceArt) {
+      referenceStatus.textContent = landmarksPackage
+        ? "Landmarks carregados. Marque um frame artístico como referência."
+        : "Nenhuma referência marcada.";
+      return;
+    }
+    referenceStatus.textContent = `Referência: ${referenceArt.key.replace(":", " / ")} · ${ready ? "pronta para propagação" : "aguardando landmarks"}.`;
+  }
+
+  function markReference() {
+    if (!POSE_TRANSFER) {
+      setStatus("Módulo CH_CHARACTER_POSE_TRANSFER_V0 não foi carregado.");
+      return;
+    }
+    if (!landmarksPackage) {
+      setStatus("Carregue landmarks.json do CH Blender antes de marcar a referência.");
+      return;
+    }
+    const key = currentFrameKey();
+    if (!landmarkFrame(key)) {
+      setStatus(`Landmarks não contêm ${key}.`);
+      return;
+    }
+    saveLoadedFrame();
+    referenceArt = {key, layers: cloneLayers(frameStore.get(key).layers)};
+    refreshReferenceUi();
+    setStatus(`Frame ${key.replace(":", " / ")} congelado como referência artística.`);
+  }
+
+  function transferredLayersFor(targetKey) {
+    if (!referenceArt || !landmarksPackage || !POSE_TRANSFER) throw new Error("referência/landmarks indisponíveis");
+    if (keyDirection(referenceArt.key) !== keyDirection(targetKey)) {
+      throw new Error("propagação automática só é permitida dentro da mesma direção");
+    }
+    const sourceFrame = landmarkFrame(referenceArt.key);
+    const targetFrame = landmarkFrame(targetKey);
+    if (!sourceFrame || !targetFrame) throw new Error(`landmarks ausentes para ${targetKey}`);
+    const layers = targetKey === referenceArt.key
+      ? cloneLayers(referenceArt.layers)
+      : POSE_TRANSFER.transferLayers(referenceArt.layers, sourceFrame, targetFrame, LAYERS);
+    layers.outline = outlineForLayers(layers);
+    return layers;
+  }
+
+  function applyReferenceToCurrent() {
+    const targetKey = currentFrameKey();
+    try {
+      const layers = transferredLayersFor(targetKey);
+      for (const name of LAYERS) canvasFor(name).getContext("2d").putImageData(layers[name] || blankImageData(), 0, 0);
+      saveLoadedFrame();
+      redraw();
+      setStatus(`Aparência de ${referenceArt.key.replace(":", " / ")} adaptada para ${targetKey.replace(":", " / ")} por landmarks.`);
+    } catch (error) {
+      setStatus(`Propagação recusada: ${error.message}`);
+    }
+  }
+
+  function propagateReferenceDirection() {
+    if (!referenceArt) return;
+    const direction = keyDirection(referenceArt.key);
+    saveLoadedFrame();
+    let generated = 0;
+    try {
+      for (const frame of ANIMATION_FRAMES) {
+        const targetKey = `${direction}:${frame}`;
+        const existing = frameStore.get(targetKey);
+        const layers = transferredLayersFor(targetKey);
+        frameStore.set(targetKey, {
+          base: existing?.base ? cloneImageData(existing.base) : blankImageData(),
+          layers,
+          generatedFrom: referenceArt.key
+        });
+        generated += 1;
+      }
+      if (currentDirection() === direction) loadFrameState(currentFrameKey());
+      refreshReferenceUi();
+      setStatus(`${generated} frames de ${direction} receberam a aparência da referência ${referenceArt.key.replace(":", " / ")} · outline recalculado.`);
+    } catch (error) {
+      setStatus(`Propagação recusada: ${error.message}`);
+    }
   }
 
   view.addEventListener("pointerdown", ev => {
@@ -343,6 +468,9 @@
   document.getElementById("applyTemplate").addEventListener("click", applyTemplate);
   document.getElementById("generateOutline").addEventListener("click", generateOutline);
   document.getElementById("clearOutline").addEventListener("click", clearOutline);
+  document.getElementById("markReference").addEventListener("click", markReference);
+  applyReferenceBtn.addEventListener("click", applyReferenceToCurrent);
+  propagateDirectionBtn.addEventListener("click", propagateReferenceDirection);
   brushSize.addEventListener("input", () => sizeLabel.textContent = brushSize.value);
   shapeScale.addEventListener("input", () => shapeScaleLabel.textContent = Number(shapeScale.value).toFixed(2));
   shapeSelect.addEventListener("change", () => {
@@ -365,11 +493,28 @@
       bctx.clearRect(0,0,W,H);
       bctx.imageSmoothingEnabled = false;
       bctx.drawImage(img, 0, 0, W, H);
+      saveLoadedFrame();
       redraw();
       setStatus(`Passe base carregado em ${currentFrameKey()}: ${file.name}`);
       URL.revokeObjectURL(img.src);
     };
     img.src = URL.createObjectURL(file);
+  });
+
+  landmarksFile.addEventListener("change", async ev => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      landmarksPackage = POSE_TRANSFER ? POSE_TRANSFER.validateLandmarks(parsed) : parsed;
+      const count = Object.keys(landmarksPackage.frames || {}).length;
+      refreshReferenceUi();
+      setStatus(`Landmarks CH Blender carregados: ${count} estados · ${file.name}.`);
+    } catch (error) {
+      landmarksPackage = null;
+      refreshReferenceUi();
+      setStatus(`Falha ao carregar landmarks: ${error.message}`);
+    }
   });
 
   function downloadCanvas(canvas, name) {
@@ -413,6 +558,13 @@
         smartShapes:{library:"CH_CHARACTER_SHAPES_V0", directionAware:true},
         template:templateSelect.value || null,
         outline:{mode:"dilated_1px", color:outlineColor.value, excludesBlenderUnderlay:true},
+        poseTransfer:{
+          contract:"CH_CHARACTER_POSE_TRANSFER_V0",
+          landmarksContract:"CH_CHARACTER_LANDMARKS_V0",
+          landmarksLoaded:Boolean(landmarksPackage),
+          referenceFrame:referenceArt?.key || null,
+          sameDirectionOnly:true
+        },
         editedFrames:[...frameStore.keys()].sort()
       }
     };
@@ -428,5 +580,6 @@
   buildSwatches();
   buildShapeSelect();
   buildTemplateSelect();
+  refreshReferenceUi();
   redraw();
 })();
