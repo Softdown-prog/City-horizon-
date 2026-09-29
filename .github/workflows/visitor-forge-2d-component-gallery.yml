@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/visitor-forge-2d-component-gallery.yml'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/component_gallery.py'
-      - 'tools/visitor_forge_2d/examples/component_gallery/reusable_components_v1.json'
+      - 'tools/visitor_forge_2d/examples/component_gallery/reusable_components_*.json'
       - 'tools/visitor_forge_2d/tests/test_component_gallery.py'
 
 permissions:
