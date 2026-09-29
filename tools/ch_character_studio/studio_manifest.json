@@ -16,7 +16,8 @@
     "ch_blender_pose_landmarks",
     "paint_layers",
     "landmark_pose_transfer",
-    "color_masks",
+    "character_color_masks",
+    "optional_held_object_socket",
     "outline_and_readability",
     "preview",
     "spritesheet_export"
@@ -52,11 +53,52 @@
     "crossDirectionAutomaticTransfer": false,
     "mayModifyApprovedMotion": false
   },
-  "colorMaskRoles": {
-    "R": "primary_clothing",
-    "G": "secondary_clothing",
-    "B": "hair_or_accessory",
-    "A": "coverage"
+  "colorMasks": {
+    "contract": "CH_CHARACTER_COLOR_MASK_V0",
+    "extends": "CH_COLOR_MASK_V1",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_color_mask_v0.json",
+    "packedFormat": "PNG_RGBA",
+    "alphaMeaning": "coverage_only",
+    "banks": {
+      "appearance": {
+        "R": "skin",
+        "G": "hair",
+        "B": "appearance_accent"
+      },
+      "clothing": {
+        "R": "primary_clothing",
+        "G": "secondary_clothing",
+        "B": "clothing_accent"
+      },
+      "held_object": {
+        "R": "object_primary",
+        "G": "object_secondary",
+        "B": "object_accent"
+      }
+    },
+    "rules": {
+      "separateBankPngs": true,
+      "lightingInMask": false,
+      "ambientOcclusionInMask": false,
+      "outlineInMask": false,
+      "ditherInMask": false,
+      "alphaAsFourthTintChannel": false
+    }
+  },
+  "heldObjects": {
+    "contract": "CH_CHARACTER_HAND_SOCKET_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_hand_socket_v0.json",
+    "defaultEnabled": false,
+    "sockets": {
+      "left_hand": "hand_L",
+      "right_hand": "hand_R"
+    },
+    "socketVisibility": "editor_debug_only",
+    "depthModes": ["auto", "back", "front"],
+    "followsApprovedHandLandmark": true,
+    "visualAndMaskShareTransform": true,
+    "fallbackObjectMask": "opaque_pixels_to_R_object_primary",
+    "examples": ["balloon", "broom", "tool", "prop"]
   },
   "lockedRules": {
     "frameSize": [48, 64],
@@ -66,7 +108,8 @@
     "cameraPitchDegrees": 30,
     "cameraYawDegrees": 45,
     "artMayChangeMotion": false,
-    "artMayChangeGroundAnchor": false
+    "artMayChangeGroundAnchor": false,
+    "heldObjectMayChangeMotion": false
   },
-  "designPrinciple": "Blender solves spatial consistency. Studio Art owns the final visible character style."
+  "designPrinciple": "Blender solves spatial consistency. Studio Art owns the final visible character style, recolor masks and optional hand props."
 }
