@@ -1,0 +1,35 @@
+name: CH Procedural Road Priority Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-procedural-road-priority-check.yml"
+      - "src/procedural_road_priority_control_test.cpp"
+      - "src/procedural_road_traffic.h"
+      - "src/procedural_road_vehicle_follower.h"
+      - "src/procedural_road_vehicle_render_adapter.h"
+      - "src/procedural_road_route_sampler.h"
+      - "src/procedural_road_lane_connector.h"
+      - "src/procedural_road_navigation.h"
+      - "src/road_system.h"
+      - "src/mobile_entity.h"
+      - "docs/CH_PROCEDURAL_ROAD_PRIORITY_CONTROL_V1.md"
+
+jobs:
+  priority-control:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile focused traffic gate
+        run: >-
+          g++ -std=c++20 -O0 -g -Isrc
+          src/procedural_road_priority_control_test.cpp
+          -o procedural_road_priority_control_test
+
+      - name: Run focused traffic gate
+        run: ./procedural_road_priority_control_test
