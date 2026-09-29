@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from .core import flower_bed_scenery, organic_scenery, red_mapple_scenery, shape_recipe
+from .core import flower_bed_scenery, flower_bed_scenery_v2, organic_scenery, red_mapple_scenery, shape_recipe
 
 SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
@@ -43,6 +43,10 @@ def validate_recipe(recipe: dict) -> str:
         raise ValueError("organic scenery requires CH_CAMERA_V1, 128x64, yaw 45 and elevation 30")
     if recipe.get("sceneryType") == "flower_bed":
         return "flower_bed"
+    if recipe.get("sceneryType") == "flower_bed_v2":
+        if not isinstance(recipe.get("flowerStyle"), dict):
+            raise ValueError("flower_bed_v2 requires flowerStyle")
+        return "flower_bed_v2"
     if recipe.get("sceneryType") == "red_mapple":
         if recipe.get("crownStyle") != "broadleaf":
             raise ValueError("red_mapple scenery requires crownStyle broadleaf")
@@ -91,6 +95,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
         result = shape_recipe.export_shape_recipe(recipe_path, folder)
     elif kind == "flower_bed":
         result = flower_bed_scenery.export(recipe_path, folder)
+    elif kind == "flower_bed_v2":
+        result = flower_bed_scenery_v2.export(recipe_path, folder)
     elif kind == "red_mapple":
         result = red_mapple_scenery.export(recipe_path, folder)
     else:
