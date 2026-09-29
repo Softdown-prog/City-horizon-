@@ -1,10 +1,10 @@
 """Scene Composer V4: painterly finish and visual critic.
 
 V4 reuses the bounded V3 scene graph, then applies deterministic edge breakup,
-surface brush variation and a small gameplay critic.  It also expands authored
-smooth closed silhouettes to bounded spline polygons before V3 validation, so
-boats, signs, rocks, piers and decorations are not limited to ruler-straight
-polygon edges.
+surface variation, localized material wear and a gameplay critic. It also
+expands authored smooth closed silhouettes to bounded spline polygons before V3
+validation, so boats, signs, rocks, piers and decorations are not limited to
+ruler-straight polygon edges.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
-from . import scene_composer_v3, smooth_geometry
+from . import localized_finish, scene_composer_v3, smooth_geometry
 from .exporter import alpha_safe_resize
 
 CONTRACT = "CH_2D_SCENE_RECIPE_V4"
@@ -33,6 +33,7 @@ def _legacy_recipe(recipe: dict) -> dict:
     legacy = deepcopy(recipe)
     legacy["contract"] = scene_composer_v3.CONTRACT
     legacy.pop("finish", None)
+    legacy.pop("finishRegions", None)
     return smooth_geometry.expand_recipe(legacy)
 
 
@@ -53,6 +54,7 @@ def validate_recipe(recipe: dict) -> None:
     stamps = finish.get("brushStamps", 28)
     if type(stamps) is not int or not 0 <= stamps <= 160:
         raise ValueError("finish.brushStamps must be 0..160")
+    localized_finish.validate_regions(recipe.get("finishRegions"))
 
 
 def _edge_breakup(frame: Image.Image, seed: int, amount: float) -> Image.Image:
@@ -144,9 +146,16 @@ def render_scene(recipe: dict) -> tuple[Image.Image, dict]:
     finish = recipe.get("finish", {})
     frame = _edge_breakup(frame, seed, _num(finish.get("edgeBreakupPx", 0.65), "finish.edgeBreakupPx"))
     frame = _surface_finish(frame, seed, finish)
+    frame = localized_finish.apply_regions(frame, recipe.get("finishRegions"), seed)
     frame = alpha_safe_resize(frame, tuple(recipe["canvas"]))
     bounds = frame.getchannel("A").getbbox()
-    metadata.update({"contract": CONTRACT, "bounds": list(bounds), "finish": finish, "critic": critic(frame, recipe)})
+    metadata.update({
+        "contract": CONTRACT,
+        "bounds": list(bounds),
+        "finish": finish,
+        "finishRegionCount": len(recipe.get("finishRegions") or []),
+        "critic": critic(frame, recipe),
+    })
     return frame, metadata
 
 
