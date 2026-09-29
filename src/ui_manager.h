@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "ui_nine_slice.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
