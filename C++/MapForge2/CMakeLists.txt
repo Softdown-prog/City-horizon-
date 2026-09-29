@@ -27,6 +27,8 @@ get_filename_component(CH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 add_library(mapforge2_canonical STATIC
     ${CH_ROOT}/src/ch_core/projection.cpp
     ${CH_ROOT}/src/ch_core/terrain_heightfield.cpp
+    ${CH_ROOT}/src/ch_core/terrain_semantics.cpp
+    ${CH_ROOT}/src/ch_core/terrain_semantics_catalog.cpp
     ${CH_ROOT}/src/ch_core/map_document.cpp
     ${CH_ROOT}/src/ch_core/validation.cpp
     ${CH_ROOT}/src/ch_core/semantic_grid.cpp
