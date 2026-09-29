@@ -13,8 +13,6 @@
     "tools/tycoon_photo_studio/assets/residential_popular_house_3x3_01.house.json",
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
-    "--approval-proxy-sha",
-    "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956",
     "--output",
     "out/ch_blender_agent/residential.popular_house_3x3_01.final.001"
   ],
