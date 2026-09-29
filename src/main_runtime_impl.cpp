@@ -4,6 +4,7 @@
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/terrain_heightfield.h"
 #include "src/ch_core/terrain_semantics_catalog.h"
 #include "src/ch_core/validation.h"
 #include "src/ch_render/map_renderer.h"
@@ -1422,7 +1423,7 @@ void render_ui(SDL_Renderer* renderer, int viewport_width, const CityEconomy& ec
             draw_text(renderer, 22.0F, 310.0F, "SPRITE: " + debug_definition->texture_path_for(debug_rotation));
             draw_text(renderer, 22.0F, 328.0F, access_points_label(*debug_definition, debug_rotation));
         }
-        draw_text(renderer, 22.0F, 364.0F, "COMMA/PERIOD CAMERA | HOME RESET | F5 SAVE | F9 LOAD | F1 DEBUG | Q QUIT");
+        draw_text(renderer, 22.0F, 364.0F, "H RAISE | J LOWER | N SMOOTH | COMMA/PERIOD CAMERA | F5 SAVE | F9 LOAD | F1 DEBUG | Q QUIT");
     }
 
     if (placement_definition != nullptr) {
@@ -1827,7 +1828,10 @@ int main() {
     bool planting_dragging = false;
     bool camera_dragging = false;
     bool land_mode = false;
+    std::optional<ch::TerrainBrushMode> terrain_relief_mode;
+    bool terrain_relief_dragging = false;
     std::vector<TerrainPaintTile> terrain_paint;
+    std::vector<ch::TerrainHeightSample> terrain_height_samples;
     bool sidewalk_mode = false;
     std::string sidewalk_style = "dirt_path";
     std::string water_terrain_id;
@@ -1977,6 +1981,8 @@ int main() {
         preparation_dragging = false;
         planting_dragging = false;
         land_mode = false;
+        terrain_relief_mode.reset();
+        terrain_relief_dragging = false;
         sidewalk_mode = false;
         water_terrain_id.clear();
         agriculture_mode = false;
@@ -2038,6 +2044,16 @@ int main() {
         status = "LAND MODE: SELECT A NEIGHBORING PARCEL";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
+    const auto begin_terrain_relief_mode = [&](const ch::TerrainBrushMode mode) {
+        clear_map_modes();
+        build_panel_open = false;
+        terrain_relief_mode = mode;
+        selected_instance_id.reset();
+        const char* label = mode == ch::TerrainBrushMode::raise ? "RAISE" :
+            (mode == ch::TerrainBrushMode::lower ? "LOWER" : "SMOOTH");
+        status = std::string("TERRAIN ") + label + ": DRAG LMB | RIGHT/ESC CANCEL";
+        (void)play_sound(SoundEvent::ui_select);
+    };
     const auto begin_sidewalk_mode = [&]() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
         status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
@@ -2067,6 +2083,33 @@ int main() {
         return style == "grass" || style == "sand" || style == "sand_center" ||
                style == "sand_wet" || style == "ground_dirt_path" ||
                 style == "water_shallow" || style == "water_deep";
+    };
+    const auto sync_terrain_height_samples = [&]() {
+        terrain_height_samples = active_map_doc
+            ? active_map_doc->terrain_height_samples()
+            : std::vector<ch::TerrainHeightSample>{};
+    };
+    const auto apply_terrain_relief = [&](const int x, const int y) {
+        if (!terrain_relief_mode || !active_map_doc || !lands.is_tile_owned(x, y)) {
+            status = "TERRAIN REQUIRES OWNED LAND";
+            return false;
+        }
+        const auto tile = active_map_doc->get_terrain_at(x, y);
+        const std::string style = tile ? tile->terrain_definition : "grass";
+        if (!editable_ground(x, y) || style == "water_shallow" || style == "water_deep" ||
+            roads.is_road(x, y) || sidewalks.is_sidewalk(x, y) ||
+            buildings.is_occupied(x, y) || farming.is_occupied(x, y)) {
+            status = "TERRAIN RELIEF REQUIRES EMPTY GROUND";
+            return false;
+        }
+        const float strength = *terrain_relief_mode == ch::TerrainBrushMode::smooth ? 0.35F : 0.25F;
+        active_map_doc->apply_terrain_brush(static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F,
+                                            2.5F, strength, *terrain_relief_mode);
+        sync_terrain_height_samples();
+        const char* label = *terrain_relief_mode == ch::TerrainBrushMode::raise ? "RAISE" :
+            (*terrain_relief_mode == ch::TerrainBrushMode::lower ? "LOWER" : "SMOOTH");
+        status = std::string("TERRAIN ") + label + " | H/J/N | DRAG TO SCULPT";
+        return true;
     };
     const auto restore_grass = [&](const int x, const int y) {
         if (!active_map_doc) return false;
@@ -2131,9 +2174,10 @@ int main() {
         }
     };
     const auto save_current_city = [&]() {
+        sync_terrain_height_samples();
         const SaveOperationResult result = save_manager.save(save_path, economy, simulation_clock, buildings, roads,
                                                              sidewalks, farming, lands, population, &service_vehicles, &mission_manager,
-                                                             &terrain_paint);
+                                                             &terrain_paint, &terrain_height_samples);
         status = result.success ? "SAVE COMPLETE" : "SAVE FAILED: " + result.message;
         (void)play_sound(result.success ? SoundEvent::ui_confirm : SoundEvent::ui_error);
         return result.success;
@@ -2141,7 +2185,7 @@ int main() {
     const auto load_current_city = [&](const bool keep_paused) {
         const SaveOperationResult result = save_manager.load(save_path, catalog, economy, simulation_clock, buildings, roads,
                                                              sidewalks, farming, lands, population, &service_vehicle_catalog,
-                                                             &service_vehicles, &mission_manager, &terrain_paint);
+                                                             &service_vehicles, &mission_manager, &terrain_paint, &terrain_height_samples);
         if (result.success) {
             pedestrians.clear();
             automatic_pedestrian = actor_ready;
@@ -2157,6 +2201,9 @@ int main() {
                 const std::string path = tile.style == "sand" ? "assets/terrain/sand_isometric_01.png" : "";
                 const std::string terrain_id = tile.style == "sand" ? "sand_center" : tile.style;
                 active_map_doc->paint_terrain_at(tile.tile_x, tile.tile_y, terrain_id, path);
+            }
+            for (const ch::TerrainHeightSample& sample : terrain_height_samples) {
+                if (active_map_doc) active_map_doc->set_terrain_height_at(sample.x, sample.y, sample.height);
             }
             power.rebuild(buildings, catalog);
             status = "LOAD COMPLETE: " + result.message;
@@ -2786,6 +2833,12 @@ int main() {
                     clamp_camera_to_owned_land(camera, lands, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
                     continue;
                 }
+                if (terrain_relief_mode && terrain_relief_dragging) {
+                    const auto tile = screen_to_tile(event.motion.x, event.motion.y, camera,
+                                                     static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                    (void)apply_terrain_relief(tile.first, tile.second);
+                    continue;
+                }
                 gameplay_ui.handle_mouse_motion(event.motion.x, event.motion.y);
             } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
                 float wheel_mouse_x = 0.0F;
@@ -2818,11 +2871,17 @@ int main() {
                 }
                 const auto raw_clicked_tile = screen_to_tile(event.button.x, event.button.y, camera,
                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-                const auto clicked_tile = (land_mode || road_removal_mode || sidewalk_mode || !water_terrain_id.empty()) ? raw_clicked_tile :
+                const auto clicked_tile = (land_mode || road_removal_mode || sidewalk_mode ||
+                                           terrain_relief_mode || !water_terrain_id.empty()) ? raw_clicked_tile :
                     nearest_owned_tile(raw_clicked_tile, lands);
                 if (event.button.button == SDL_BUTTON_RIGHT && land_mode) {
                     land_mode = false;
                     status = "LAND MODE CANCELLED";
+                    (void)play_sound(SoundEvent::ui_back);
+                } else if (event.button.button == SDL_BUTTON_RIGHT && terrain_relief_mode) {
+                    terrain_relief_dragging = false;
+                    terrain_relief_mode.reset();
+                    status = "TERRAIN RELIEF CANCELLED";
                     (void)play_sound(SoundEvent::ui_back);
                 } else if (event.button.button == SDL_BUTTON_RIGHT && road_mode) {
                     road_dragging = false;
@@ -2879,6 +2938,8 @@ int main() {
                             status = "LAND PURCHASE FAILED";
                             (void)play_sound(SoundEvent::ui_error);
                         }
+                    } else if (terrain_relief_mode) {
+                        terrain_relief_dragging = apply_terrain_relief(clicked_tile.first, clicked_tile.second);
                     } else if (!water_terrain_id.empty()) {
                         const int x = clicked_tile.first;
                         const int y = clicked_tile.second;
@@ -3029,6 +3090,7 @@ int main() {
                     harvest_dragging = false;
                     preparation_dragging = false;
                     planting_dragging = false;
+                    terrain_relief_dragging = false;
                     continue;
                 }
                 if (event.button.button != SDL_BUTTON_LEFT) {
@@ -3036,6 +3098,11 @@ int main() {
                 }
                 const auto released_tile = screen_to_tile(event.button.x, event.button.y, camera,
                                                           static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                if (terrain_relief_mode && terrain_relief_dragging) {
+                    terrain_relief_dragging = false;
+                    (void)play_sound(SoundEvent::ui_confirm);
+                    continue;
+                }
                 if (road_mode && road_removal_mode && demolition_dragging) {
                     const int min_x = std::max(kMapMin, std::min(demolition_drag_start.x, released_tile.first));
                     const int max_x = std::min(kMapMax, std::max(demolition_drag_start.x, released_tile.first));
@@ -3269,6 +3336,11 @@ int main() {
                             land_mode = false;
                             status = "LAND MODE CANCELLED";
                             (void)play_sound(SoundEvent::ui_back);
+                        } else if (terrain_relief_mode) {
+                            terrain_relief_dragging = false;
+                            terrain_relief_mode.reset();
+                            status = "TERRAIN RELIEF CANCELLED";
+                            (void)play_sound(SoundEvent::ui_back);
                         } else if (!water_terrain_id.empty()) {
                             water_terrain_id.clear();
                             status = "WATER MODE CANCELLED";
@@ -3310,6 +3382,9 @@ int main() {
                     case SDL_SCANCODE_B:
                         open_build_panel();
                         break;
+                    case SDL_SCANCODE_H: begin_terrain_relief_mode(ch::TerrainBrushMode::raise); break;
+                    case SDL_SCANCODE_J: begin_terrain_relief_mode(ch::TerrainBrushMode::lower); break;
+                    case SDL_SCANCODE_N: begin_terrain_relief_mode(ch::TerrainBrushMode::smooth); break;
                     case SDL_SCANCODE_1: begin_water_mode("water_shallow"); break;
                     case SDL_SCANCODE_2: begin_water_mode("water_deep"); break;
                     case SDL_SCANCODE_V:

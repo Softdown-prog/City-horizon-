@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "src/ch_core/terrain_heightfield.h"
+
 struct TerrainPaintTile {
     int tile_x = 0;
     int tile_y = 0;
@@ -39,7 +41,7 @@ class MissionManager;
 // file format, version checks and user-data paths remain centralized here.
 class SaveManager {
 public:
-    static constexpr int kSaveVersion = 11;
+    static constexpr int kSaveVersion = 12;
 
     [[nodiscard]] static std::filesystem::path default_save_path();
     // Reserved path for a later timer-driven autosave; no automatic writes yet.
@@ -52,7 +54,8 @@ public:
                                            const LandManager& lands, const PopulationSystem& population,
                                            const ServiceVehicleManager* vehicles = nullptr,
                                            const MissionManager* missions = nullptr,
-                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr) const;
+                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr,
+                                           const std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const;
     [[nodiscard]] SaveOperationResult load(const std::filesystem::path& path,
                                            const BuildingCatalog& catalog, CityEconomy& economy,
                                            SimulationClock& clock, BuildingManager& buildings,
@@ -61,5 +64,6 @@ public:
                                            const ServiceVehicleCatalog* vehicle_catalog = nullptr,
                                            ServiceVehicleManager* vehicles = nullptr,
                                            MissionManager* missions = nullptr,
-                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr) const;
+                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr,
+                                           std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const;
 };

@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -45,6 +46,7 @@ struct SaveSnapshot {
     std::vector<ServiceVehicleInstance> vehicles;
     std::vector<std::string> completed_missions;
     std::vector<TerrainPaintTile> terrain_paint;
+    std::vector<ch::TerrainHeightSample> terrain_heights;
 };
 
 [[nodiscard]] std::string read_file(const std::filesystem::path& path) {
@@ -86,6 +88,17 @@ template <typename Number>
     const char* last = json.data() + json.size();
     const auto parsed = std::from_chars(first, last, result);
     return parsed.ec == std::errc{} && parsed.ptr != first ? std::optional(result) : std::nullopt;
+}
+
+[[nodiscard]] std::optional<float> json_float(const std::string_view json, const std::string_view key) {
+    const auto position = value_position(json, key);
+    if (!position || *position >= json.size()) {
+        return std::nullopt;
+    }
+    const std::string token(json.substr(*position));
+    char* end = nullptr;
+    const float result = std::strtof(token.c_str(), &end);
+    return end != token.c_str() && std::isfinite(result) ? std::optional(result) : std::nullopt;
 }
 
 [[nodiscard]] std::optional<std::string> json_string(const std::string_view json, const std::string_view key) {
@@ -346,6 +359,7 @@ template <typename Number>
     const auto saved_inventory = *version >= 5 ? json_object_array(json, "agriculturalInventory") : empty_array;
     const auto saved_vehicles = *version >= 7 ? json_object_array(json, "serviceVehicles") : empty_array;
     const auto saved_terrain_paint = *version >= 11 ? json_object_array(json, "terrainPaint") : empty_array;
+    const auto saved_terrain_heights = *version >= 12 ? json_object_array(json, "terrainHeights") : empty_array;
     const auto saved_missions = json_string_array(json, "completedMissions");
     if (saved_missions) {
         for (const std::string& m : *saved_missions) {
@@ -357,7 +371,7 @@ template <typename Number>
         error = "buildings array is invalid";
         return false;
     }
-    if (!saved_roads || !saved_sidewalks || !saved_farming_tiles || !saved_inventory || !saved_vehicles || !saved_terrain_paint) {
+    if (!saved_roads || !saved_sidewalks || !saved_farming_tiles || !saved_inventory || !saved_vehicles || !saved_terrain_paint || !saved_terrain_heights) {
         error = "roads array is invalid";
         return false;
     }
@@ -451,6 +465,16 @@ template <typename Number>
         }
         snapshot.terrain_paint.push_back({*x, *y, *style});
     }
+    for (const std::string_view height : *saved_terrain_heights) {
+        const auto x = json_number<int>(height, "x");
+        const auto y = json_number<int>(height, "y");
+        const auto value = json_float(height, "height");
+        if (!x || !y || !value || !std::isfinite(*value)) {
+            error = "terrain height entry is invalid";
+            return false;
+        }
+        snapshot.terrain_heights.push_back({*x, *y, *value});
+    }
     for (const std::string_view sidewalk : *saved_sidewalks) {
         const auto tile_x = json_number<int>(sidewalk, "tileX"); const auto tile_y = json_number<int>(sidewalk, "tileY");
         const auto style = json_string(sidewalk, "styleId");
@@ -524,7 +548,8 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
                                       const LandManager& lands,
                                        const PopulationSystem& population, const ServiceVehicleManager* vehicles,
                                        const MissionManager* missions,
-                                       const std::vector<TerrainPaintTile>* terrain_paint) const {
+                                       const std::vector<TerrainPaintTile>* terrain_paint,
+                                       const std::vector<ch::TerrainHeightSample>* terrain_heights) const {
     std::error_code error;
     std::filesystem::create_directories(path.parent_path(), error);
     if (error) {
@@ -620,6 +645,16 @@ SaveOperationResult SaveManager::save(const std::filesystem::path& path, const C
                    << (index + 1U == terrain_paint->size() ? "\n" : ",\n");
         }
     }
+    output << "  ],\n  \"terrainHeights\": [\n";
+    if (terrain_heights != nullptr) {
+        output << std::setprecision(9);
+        for (std::size_t index = 0; index < terrain_heights->size(); ++index) {
+            const ch::TerrainHeightSample& sample = (*terrain_heights)[index];
+            output << "    { \"x\": " << sample.x << ", \"y\": " << sample.y
+                   << ", \"height\": " << sample.height << " }"
+                   << (index + 1U == terrain_heights->size() ? "\n" : ",\n");
+        }
+    }
     output << "  ],\n  \"completedMissions\": [\n";
     if (missions != nullptr) {
         const auto completed = missions->completed_mission_ids();
@@ -639,7 +674,8 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
                                       RoadManager& roads, SidewalkManager& sidewalks, FarmingSystem& farming,
                                       LandManager& lands, PopulationSystem& population, const ServiceVehicleCatalog* vehicle_catalog,
                                       ServiceVehicleManager* vehicles, MissionManager* missions,
-                                      std::vector<TerrainPaintTile>* terrain_paint) const {
+                                      std::vector<TerrainPaintTile>* terrain_paint,
+                                      std::vector<ch::TerrainHeightSample>* terrain_heights) const {
     const std::string serialized = read_file(path);
     if (serialized.empty()) {
         return {false, "save file does not exist or is empty"};
@@ -667,6 +703,7 @@ SaveOperationResult SaveManager::load(const std::filesystem::path& path, const B
     if (vehicles != nullptr) vehicles->clear();
     if (missions != nullptr) missions->restore_completed_missions(snapshot.completed_missions);
     if (terrain_paint != nullptr) *terrain_paint = std::move(snapshot.terrain_paint);
+    if (terrain_heights != nullptr) *terrain_heights = std::move(snapshot.terrain_heights);
 
     for (const BuildingInstance& saved : snapshot.buildings) {
         const BuildingDefinition* definition = catalog.find(saved.definition_id);
