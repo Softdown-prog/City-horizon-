@@ -73,12 +73,16 @@ int main(int argc, char** argv) {
     // Inline raw JSON MapDocument verification
     std::string test_json = R"({
         "terrain": [{"tileX": 0, "tileY": 0, "texture": "grass"}],
+        "terrainHeights": [{"x": 0, "y": 0, "height": 1.5}, {"x": 1, "y": 0, "height": -0.5}],
         "buildings": [{"instanceId": 1, "definitionId": "bakery", "tileX": 1, "tileY": 1, "rotation": 0}],
         "roads": [{"tileX": 2, "tileY": 2}]
     })";
 
     ch::MapDocument inline_doc(test_json);
     assert(inline_doc.terrain_tiles().size() == 1);
+    assert(std::abs(inline_doc.terrain_height_at(0, 0) - 1.5F) < 0.001F);
+    assert(std::abs(inline_doc.terrain_height_at(1, 0) + 0.5F) < 0.001F);
+    assert(std::abs(inline_doc.terrain_heightfield().sample(0.5F, 0.0F) - 0.5F) < 0.001F);
     assert(inline_doc.buildings().size() == 1);
     assert(inline_doc.roads().size() == 1);
 
