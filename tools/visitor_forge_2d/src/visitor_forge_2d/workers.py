@@ -20,11 +20,13 @@ from .core import (
     organic_scenery,
     red_mapple_scenery,
     scene_composer,
+    scene_composer_v2,
     shape_recipe,
 )
 
 SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
 SCENE_CONTRACT = "CH_2D_SCENE_RECIPE_V1"
+SCENE_V2_CONTRACT = "CH_2D_SCENE_RECIPE_V2"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
 FENCE_CONTRACT = "CH_2D_FENCE_SCENERY_V1"
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
@@ -40,7 +42,7 @@ def _validate_camera(recipe: dict, label: str) -> None:
 
 def validate_recipe(recipe: dict) -> str:
     """Recipe worker: reject invalid IDs, geometry and camera before writing."""
-    supported = (SHAPE_CONTRACT, SCENE_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT)
+    supported = (SHAPE_CONTRACT, SCENE_CONTRACT, SCENE_V2_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT)
     if not isinstance(recipe, dict) or recipe.get("contract") not in supported:
         raise ValueError("worker needs a supported 2D shape, scene, organic scenery or fence recipe")
     asset_id = recipe.get("id")
@@ -60,6 +62,10 @@ def validate_recipe(recipe: dict) -> str:
         _validate_camera(recipe, "scene recipe")
         scene_composer._validate_recipe(recipe)
         return "scene"
+    if recipe["contract"] == SCENE_V2_CONTRACT:
+        _validate_camera(recipe, "scene v2 recipe")
+        scene_composer_v2.validate_recipe(recipe)
+        return "scene_v2"
     if recipe["contract"] == FENCE_CONTRACT:
         fence_scenery.validate_recipe(recipe)
         return "fence"
@@ -126,6 +132,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
         result = shape_recipe.export_shape_recipe(recipe_path, folder)
     elif kind == "scene":
         result = scene_composer.export(recipe_path, folder)
+    elif kind == "scene_v2":
+        result = scene_composer_v2.export(recipe_path, folder)
     elif kind == "fence":
         result = fence_scenery.export_fence_scenery(recipe_path, folder)
     elif kind == "flower_bed":
