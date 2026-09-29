@@ -38,6 +38,12 @@ struct MobileEntitySpatialState {
     float visual_world_x = 0.0F;
     float visual_world_y = 0.0F;
 
+    // Optional world elevation. Existing tile-bound actors keep the default
+    // zero value; procedural roads/bridges can provide continuous Z without
+    // changing their canonical XY position.
+    float logical_world_z = 0.0F;
+    float visual_world_z = 0.0F;
+
     MobileEntityDirection direction = MobileEntityDirection::south;
     // Contact point inside the logical tile, used for isometric placement and
     // depth sorting. A centred entity therefore uses (0.5, 0.5).
