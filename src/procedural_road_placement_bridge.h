@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -104,6 +105,44 @@ public:
         return result;
     }
 
+    // Rebuild is the safe synchronization primitive for load and demolition
+    // while legacy RoadManager remains authoritative. Only E/S neighbors are
+    // emitted after all nodes exist, so every logical adjacency becomes one
+    // undirected procedural edge exactly once.
+    [[nodiscard]] bool rebuild_from_legacy_tiles(
+        const std::vector<RoadTile>& tiles,
+        const ProceduralRoadClass road_class = ProceduralRoadClass::local,
+        const float elevation = 0.0F) {
+        if (road_class == ProceduralRoadClass::unspecified || !std::isfinite(elevation)) return false;
+
+        clear();
+        if (tiles.empty()) return true;
+
+        std::unordered_set<std::uint64_t> occupied;
+        occupied.reserve(tiles.size() * 2U);
+        for (const RoadTile& tile : tiles) {
+            occupied.insert(tile_key(tile.tile_x, tile.tile_y));
+            if (!mirror_tile_segment({TileCoordinate{tile.tile_x, tile.tile_y}}, road_class, elevation)) {
+                clear();
+                return false;
+            }
+        }
+
+        for (const RoadTile& tile : tiles) {
+            for (const TileCoordinate neighbor : {
+                     TileCoordinate{tile.tile_x + 1, tile.tile_y},
+                     TileCoordinate{tile.tile_x, tile.tile_y + 1}}) {
+                if (!occupied.contains(tile_key(neighbor.x, neighbor.y))) continue;
+                if (!mirror_tile_segment(
+                        {TileCoordinate{tile.tile_x, tile.tile_y}, neighbor}, road_class, elevation)) {
+                    clear();
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     [[nodiscard]] bool set_existing_edge_class(
         const ProceduralRoadSegmentId segment_id,
         const ProceduralRoadClass road_class) {
@@ -171,6 +210,11 @@ private:
         const ProceduralRoadNodeId a,
         const ProceduralRoadNodeId b) {
         return a < b ? EdgeKey{a, b} : EdgeKey{b, a};
+    }
+
+    [[nodiscard]] static std::uint64_t tile_key(const int x, const int y) {
+        return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32U) |
+               static_cast<std::uint64_t>(static_cast<std::uint32_t>(y));
     }
 
     ProceduralRoadGraph graph_;
