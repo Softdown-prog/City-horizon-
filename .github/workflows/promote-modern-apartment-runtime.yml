@@ -1,0 +1,146 @@
+name: Promote Modern Apartment Runtime
+
+on:
+  push:
+    paths:
+      - 'tools/ch_blender/promotions/residential_modern_apartment_4x4_01.runtime.json'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Promote approved CH Blender artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          ARTIFACT_ID=11017046910
+          RUN_ID=36533006623
+          SOURCE_COMMIT=baadb81b207df0266e087d00b2ca815f841b7b7d
+          APPROVED_PROXY_SHA=3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18
+          SRC_SUBDIR='residential.modern_apartment_4x4_01.final.002'
+          DEST='assets/buildings/residential_modern_apartment_4x4_01'
+
+          mkdir -p "$RUNNER_TEMP/ch_apartment_artifact" "$DEST"
+          curl --fail-with-body -L \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o "$RUNNER_TEMP/ch_apartment.zip"
+          unzip -q "$RUNNER_TEMP/ch_apartment.zip" -d "$RUNNER_TEMP/ch_apartment_artifact"
+
+          find "$RUNNER_TEMP/ch_apartment_artifact" -maxdepth 3 -type f -print
+
+          SRC="$RUNNER_TEMP/ch_apartment_artifact/$SRC_SUBDIR"
+          test -d "$SRC"
+
+          SOUTH="$SRC/residential_modern_apartment_4x4_01_south_color_source.png"
+          WEST="$SRC/residential_modern_apartment_4x4_01_west_color_source.png"
+          NORTH="$SRC/residential_modern_apartment_4x4_01_north_color_source.png"
+          EAST="$SRC/residential_modern_apartment_4x4_01_east_color_source.png"
+
+          test "$(sha256sum "$SOUTH" | awk '{print $1}')" = '99787e972ad72e1d75cd056079dd1317613c27099141633b0589d50d145ddedd'
+          test "$(sha256sum "$WEST" | awk '{print $1}')" = 'aa9c43714a3905f21bcb60a614014aa64e9383290808664b3fd0ebf37c386d36'
+          test "$(sha256sum "$NORTH" | awk '{print $1}')" = '651dec2830b3460ee6796638b491ff1cd05879573ed838d53379ab450eedc1ac'
+          test "$(sha256sum "$EAST" | awk '{print $1}')" = 'f8110aeb5b473981943901dcf5b9835ef4a68f4c7e29835aeb8f4e07ef4ecc3'
+
+          cp "$SOUTH" "$DEST/residential_modern_apartment_4x4_01_south.png"
+          cp "$WEST" "$DEST/residential_modern_apartment_4x4_01_west.png"
+          cp "$NORTH" "$DEST/residential_modern_apartment_4x4_01_north.png"
+          cp "$EAST" "$DEST/residential_modern_apartment_4x4_01_east.png"
+
+          cat > "$DEST/residential_modern_apartment_4x4_01_runtime_manifest.json" <<EOF
+          {
+            "contract": "CH_RUNTIME_BUILDING_V1",
+            "assetId": "building.residential_modern_apartment.01",
+            "source": "ch_blender",
+            "sourceWorkflowRun": ${RUN_ID},
+            "sourceArtifactId": ${ARTIFACT_ID},
+            "sourceCommit": "${SOURCE_COMMIT}",
+            "approvedProxySha256": "${APPROVED_PROXY_SHA}",
+            "renderer": "EEVEE_NEXT",
+            "frameSize": [1024, 1024],
+            "footprint": { "width": 4, "height": 4 },
+            "tileProjection": { "width": 128, "height": 64 },
+            "studioGroundOrigin": { "x": 512.0001, "y": 556.0492 },
+            "runtimeAnchorPixel": { "x": 512.0, "y": 684.0492 },
+            "runtimeAnchor": { "x": 0.5, "y": 0.668016796875 },
+            "rotationOrder": ["south", "west", "north", "east"],
+            "sprites": {
+              "south": { "path": "$DEST/residential_modern_apartment_4x4_01_south.png", "sha256": "99787e972ad72e1d75cd056079dd1317613c27099141633b0589d50d145ddedd" },
+              "west": { "path": "$DEST/residential_modern_apartment_4x4_01_west.png", "sha256": "aa9c43714a3905f21bcb60a614014aa64e9383290808664b3fd0ebf37c386d36" },
+              "north": { "path": "$DEST/residential_modern_apartment_4x4_01_north.png", "sha256": "651dec2830b3460ee6796638b491ff1cd05879573ed838d53379ab450eedc1ac" },
+              "east": { "path": "$DEST/residential_modern_apartment_4x4_01_east.png", "sha256": "f8110aeb5b473981943901dcf5b9835ef4a68f4c7e29835aeb8f4e07ef4ecc3" }
+            }
+          }
+          EOF
+
+          cat > assets/definitions/residential_modern_apartment_01.json <<'EOF'
+          {
+            "id": "residential_modern_apartment_01",
+            "name": "Prédio residencial moderno",
+            "category": "residential",
+            "texture": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_south.png",
+            "sprites": {
+              "0": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_south.png",
+              "1": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_west.png",
+              "2": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_north.png",
+              "3": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_east.png"
+            },
+            "spriteAnchors": {
+              "0": { "x": 0.5, "y": 0.668016796875 },
+              "1": { "x": 0.5, "y": 0.668016796875 },
+              "2": { "x": 0.5, "y": 0.668016796875 },
+              "3": { "x": 0.5, "y": 0.668016796875 }
+            },
+            "rotatable": true,
+            "requiresRoadAccess": true,
+            "roadAccessMode": "front_edge",
+            "frontEdge": "south",
+            "accessPoints": [
+              { "x": 1, "y": 3, "facing": "south" },
+              { "x": 2, "y": 3, "facing": "south" }
+            ],
+            "footprint": {
+              "width": 4,
+              "height": 4
+            },
+            "buildCost": 0,
+            "maintenancePerMonth": 0,
+            "taxRevenuePerMonth": 0,
+            "propertyTaxPerYear": 0,
+            "requiredPopulationForFullRevenue": 0,
+            "residentialCapacity": 20,
+            "powerConsumption": 0,
+            "artScale": 1.0,
+            "playerBuildable": true,
+            "productionStatus": "runtime_buildable",
+            "renderClass": "large_asset_1024",
+            "sourceAssetId": "building.residential_modern_apartment.01",
+            "runtimeManifest": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_runtime_manifest.json",
+            "sourceApprovedProxySha256": "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18"
+          }
+          EOF
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$DEST" assets/definitions/residential_modern_apartment_01.json
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Runtime asset is already promoted.'
+            exit 0
+          fi
+          git commit -m 'Add modern apartment to runtime'
+          git pull --rebase origin main
+          git push origin HEAD:main
