@@ -41,6 +41,26 @@ def test_scene_v4_finish_changes_v3_style() -> None:
     assert styled.tobytes() != plain.tobytes()
 
 
+def test_scene_v4_localized_finish_is_deterministic_and_masked() -> None:
+    recipe = _recipe()
+    recipe["finishRegions"] = [{
+        "style": "wood_wear",
+        "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 6, "tension": 0.42,
+                 "points": [[48,109],[67,84],[107,76],[172,73],[207,101],[182,145],[86,149],[58,130]]},
+        "stamps": 38,
+        "opacity": 0.16,
+        "angleDeg": -6
+    }]
+    first, meta1 = render_scene(recipe)
+    second, meta2 = render_scene(recipe)
+    assert first.tobytes() == second.tobytes()
+    assert meta1["finishRegionCount"] == 1 == meta2["finishRegionCount"]
+
+    recipe["finishRegions"] = []
+    plain, _ = render_scene(recipe)
+    assert first.tobytes() != plain.tobytes()
+
+
 def test_scene_v4_rejects_unbounded_finish_and_wrong_camera() -> None:
     recipe = _recipe()
     recipe["finish"]["brushStamps"] = 10000
@@ -49,6 +69,14 @@ def test_scene_v4_rejects_unbounded_finish_and_wrong_camera() -> None:
         assert False, "unbounded finish passed"
     except ValueError as exc:
         assert "brushStamps" in str(exc)
+
+    recipe = _recipe()
+    recipe["finishRegions"] = [{"style": "magic", "mask": {"primitive": "ellipse", "box": [1,1,4,4]}}]
+    try:
+        render_scene(recipe)
+        assert False, "unknown localized finish style passed"
+    except ValueError as exc:
+        assert ".style" in str(exc)
 
     recipe = _recipe()
     recipe["camera"]["elevationDeg"] = 35.264
