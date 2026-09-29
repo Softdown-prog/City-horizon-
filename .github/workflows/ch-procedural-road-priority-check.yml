@@ -9,9 +9,11 @@ on:
       - ".github/workflows/ch-procedural-road-priority-check.yml"
       - "src/procedural_road_priority_control_test.cpp"
       - "src/procedural_road_class_test.cpp"
+      - "src/procedural_road_construction_test.cpp"
       - "src/procedural_road_class.h"
       - "src/procedural_road_class_policy.h"
       - "src/procedural_road_classified_route.h"
+      - "src/procedural_road_construction.h"
       - "src/procedural_road_traffic.h"
       - "src/procedural_road_vehicle_follower.h"
       - "src/procedural_road_vehicle_render_adapter.h"
@@ -22,6 +24,7 @@ on:
       - "src/mobile_entity.h"
       - "docs/CH_PROCEDURAL_ROAD_PRIORITY_CONTROL_V1.md"
       - "docs/CH_PROCEDURAL_ROAD_CLASS_V1.md"
+      - "docs/CH_PROCEDURAL_ROAD_CONSTRUCTION_V1.md"
 
 jobs:
   priority-control:
@@ -47,3 +50,12 @@ jobs:
 
       - name: Run focused road class gate
         run: ./procedural_road_class_test
+
+      - name: Compile focused road construction gate
+        run: >-
+          g++ -std=c++20 -O0 -g -Isrc
+          src/procedural_road_construction_test.cpp
+          -o procedural_road_construction_test
+
+      - name: Run focused road construction gate
+        run: ./procedural_road_construction_test
