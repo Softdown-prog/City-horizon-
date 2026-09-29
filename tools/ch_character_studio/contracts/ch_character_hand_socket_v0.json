@@ -1,0 +1,39 @@
+{
+  "contract": "CH_CHARACTER_HAND_SOCKET_V0",
+  "version": "0.1",
+  "description": "Invisible hand attachment sockets for optional props carried by CH Character Studio actors.",
+  "sockets": {
+    "left_hand": {
+      "landmark": "hand_L",
+      "visible": false
+    },
+    "right_hand": {
+      "landmark": "hand_R",
+      "visible": false
+    }
+  },
+  "heldObject": {
+    "defaultEnabled": false,
+    "defaultSocket": "right_hand",
+    "defaultDepth": "auto",
+    "allowedDepth": ["auto", "back", "front"],
+    "gripAnchor": "pixel coordinate inside the held-object source image",
+    "offset": "additional integer [x,y] offset after socket alignment",
+    "visual": "optional RGBA PNG",
+    "mask": "optional CH_CHARACTER_COLOR_MASK_V0 held_object-bank PNG"
+  },
+  "autoDepth": {
+    "S": "front",
+    "E": "front",
+    "N": "back",
+    "W": "back"
+  },
+  "rules": [
+    "Sockets exist in every idle and walk frame even when no object is active.",
+    "An inactive socket renders no pixels and does not change the actor silhouette.",
+    "Held objects follow approved hand landmarks and never modify actor locomotion.",
+    "Visual and color-mask images use exactly the same socket, grip-anchor, offset and depth transform.",
+    "If an object has no authored mask, opaque visual pixels default to held_object.R (object_primary).",
+    "Socket debug markers are editor-only and must never be exported into runtime art."
+  ]
+}
