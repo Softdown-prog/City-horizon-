@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <optional>
 #include <string>
@@ -53,6 +54,24 @@ struct ProceduralRoadSignalState {
     ProceduralRoadSignalTiming timing{};
 };
 
+// CH_PROCEDURAL_ROAD_PRIORITY_CONTROL_V1
+//
+// Unsignalized junction approaches can be classified independently per axis.
+// Signal control, when present on the same node, always takes precedence.
+enum class ProceduralRoadApproachControl {
+    priority,
+    yield,
+    stop,
+};
+
+struct ProceduralRoadJunctionPriorityPolicy {
+    ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
+    ProceduralRoadApproachControl east_west = ProceduralRoadApproachControl::priority;
+    ProceduralRoadApproachControl north_south = ProceduralRoadApproachControl::yield;
+    float stop_hold_duration = 0.55F;
+    float stop_speed_threshold = 0.08F;
+};
+
 struct ProceduralRoadTrafficInstance {
     std::string vehicle_id;
     ProceduralRoadVehicleFollower follower;
@@ -63,6 +82,9 @@ struct ProceduralRoadTrafficInstance {
     ProceduralRoadNodeId reserved_junction = kInvalidProceduralRoadNodeId;
     ProceduralRoadNodeId blocked_junction = kInvalidProceduralRoadNodeId;
     ProceduralRoadNodeId signal_blocked_junction = kInvalidProceduralRoadNodeId;
+    ProceduralRoadNodeId priority_blocked_junction = kInvalidProceduralRoadNodeId;
+    ProceduralRoadNodeId stop_wait_junction = kInvalidProceduralRoadNodeId;
+    float stop_wait_elapsed = 0.0F;
 };
 
 struct ProceduralRoadJunctionReservation {
@@ -132,7 +154,7 @@ public:
                     follower_instance.movement));
         }
 
-        update_junction_reservations(external_speed_caps);
+        update_junction_reservations(external_speed_caps, tick_seconds);
 
         for (std::size_t index = 0U; index < instances_.size(); ++index) {
             instances_[index].follower.update(
@@ -156,6 +178,7 @@ public:
         instances_.clear();
         junction_reservations_.clear();
         signal_states_.clear();
+        priority_policies_.clear();
     }
 
     void set_following_config(const ProceduralRoadTrafficFollowingConfig& config) {
@@ -210,7 +233,7 @@ public:
         const ProceduralRoadSignalState* signal = signal_state(node_id);
         if (signal == nullptr) return true;
 
-        const bool east_west_approach = std::fabs(forward.x) >= std::fabs(forward.y);
+        const bool east_west_approach = is_east_west_approach(forward);
         switch (signal->phase) {
             case ProceduralRoadSignalPhase::east_west_green:
                 return east_west_approach;
@@ -221,6 +244,44 @@ public:
                 return false;
         }
         return false;
+    }
+
+    [[nodiscard]] bool set_junction_priority_policy(const ProceduralRoadJunctionPriorityPolicy policy) {
+        if (policy.node_id == kInvalidProceduralRoadNodeId) return false;
+        const auto found = std::find_if(priority_policies_.begin(), priority_policies_.end(), [&](const auto& item) {
+            return item.node_id == policy.node_id;
+        });
+        if (found == priority_policies_.end()) priority_policies_.push_back(policy);
+        else *found = policy;
+        return true;
+    }
+
+    [[nodiscard]] bool remove_junction_priority_policy(const ProceduralRoadNodeId node_id) {
+        const auto found = std::find_if(priority_policies_.begin(), priority_policies_.end(), [&](const auto& policy) {
+            return policy.node_id == node_id;
+        });
+        if (found == priority_policies_.end()) return false;
+        priority_policies_.erase(found);
+        for (ProceduralRoadTrafficInstance& instance : instances_) {
+            if (instance.stop_wait_junction == node_id) {
+                instance.stop_wait_junction = kInvalidProceduralRoadNodeId;
+                instance.stop_wait_elapsed = 0.0F;
+            }
+        }
+        return true;
+    }
+
+    [[nodiscard]] const ProceduralRoadJunctionPriorityPolicy* junction_priority_policy(
+        const ProceduralRoadNodeId node_id) const {
+        return priority_policy(node_id);
+    }
+
+    [[nodiscard]] std::optional<ProceduralRoadApproachControl> junction_approach_control(
+        const ProceduralRoadNodeId node_id,
+        const RoadWorldPoint3 forward) const {
+        const ProceduralRoadJunctionPriorityPolicy* policy = priority_policy(node_id);
+        if (policy == nullptr) return std::nullopt;
+        return is_east_west_approach(forward) ? policy->east_west : policy->north_south;
     }
 
     [[nodiscard]] std::string_view junction_owner(const ProceduralRoadNodeId node_id) const {
@@ -252,6 +313,9 @@ public:
     [[nodiscard]] bool empty() const { return instances_.empty(); }
     [[nodiscard]] const std::vector<ProceduralRoadTrafficInstance>& instances() const { return instances_; }
     [[nodiscard]] const std::vector<ProceduralRoadSignalState>& signal_states() const { return signal_states_; }
+    [[nodiscard]] const std::vector<ProceduralRoadJunctionPriorityPolicy>& priority_policies() const {
+        return priority_policies_;
+    }
 
 private:
     struct LeaderObservation {
@@ -265,6 +329,7 @@ private:
         ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
         float distance = std::numeric_limits<float>::infinity();
         bool inside = false;
+        int priority_rank = 0;
     };
 
     [[nodiscard]] LeaderObservation find_leader(
@@ -331,17 +396,22 @@ private:
         return std::clamp(proportional_cap, 0.0F, std::max(0.0F, movement.cruise_speed));
     }
 
-    void update_junction_reservations(std::vector<float>& external_speed_caps) {
+    void update_junction_reservations(
+        std::vector<float>& external_speed_caps,
+        const float tick_seconds) {
         for (ProceduralRoadTrafficInstance& instance : instances_) {
             instance.reserved_junction = kInvalidProceduralRoadNodeId;
             instance.blocked_junction = kInvalidProceduralRoadNodeId;
             instance.signal_blocked_junction = kInvalidProceduralRoadNodeId;
+            instance.priority_blocked_junction = kInvalidProceduralRoadNodeId;
         }
         if (!junctions_.enabled) {
             junction_reservations_.clear();
+            reset_stop_waits();
             return;
         }
 
+        update_stop_waits(external_speed_caps, tick_seconds);
         reconcile_junction_reservations();
         allocate_junction_reservations();
 
@@ -368,12 +438,66 @@ private:
                 continue;
             }
 
+            if (!upcoming->inside && !is_signalized_junction(upcoming->node_id)) {
+                const auto control = junction_approach_control(
+                    upcoming->node_id, instance.follower.pose().forward);
+                if (control == ProceduralRoadApproachControl::stop &&
+                    !stop_requirement_satisfied(instance, upcoming->node_id)) {
+                    instance.blocked_junction = upcoming->node_id;
+                    instance.priority_blocked_junction = upcoming->node_id;
+                    external_speed_caps[index] = std::min(
+                        external_speed_caps[index],
+                        junction_stop_speed_cap(upcoming->distance, instance.movement));
+                    continue;
+                }
+            }
+
             if (owner.empty()) continue;
 
             instance.blocked_junction = upcoming->node_id;
+            if (!is_signalized_junction(upcoming->node_id) && priority_policy(upcoming->node_id) != nullptr) {
+                instance.priority_blocked_junction = upcoming->node_id;
+            }
             external_speed_caps[index] = std::min(
                 external_speed_caps[index],
                 junction_stop_speed_cap(upcoming->distance, instance.movement));
+        }
+    }
+
+    void update_stop_waits(std::vector<float>& external_speed_caps, const float tick_seconds) {
+        const float lookahead = std::max(0.0F, junctions_.request_lookahead);
+        const float stop_zone = std::max(0.0F, junctions_.stop_buffer) + 0.10F;
+
+        for (std::size_t index = 0U; index < instances_.size(); ++index) {
+            ProceduralRoadTrafficInstance& instance = instances_[index];
+            const auto upcoming = instance.follower.upcoming_junction(lookahead);
+            if (!upcoming || upcoming->inside || is_signalized_junction(upcoming->node_id)) {
+                reset_stop_wait(instance);
+                continue;
+            }
+
+            const ProceduralRoadJunctionPriorityPolicy* policy = priority_policy(upcoming->node_id);
+            const auto control = junction_approach_control(upcoming->node_id, instance.follower.pose().forward);
+            if (policy == nullptr || control != ProceduralRoadApproachControl::stop) {
+                reset_stop_wait(instance);
+                continue;
+            }
+
+            if (instance.stop_wait_junction != upcoming->node_id) {
+                instance.stop_wait_junction = upcoming->node_id;
+                instance.stop_wait_elapsed = 0.0F;
+            }
+
+            external_speed_caps[index] = std::min(
+                external_speed_caps[index],
+                junction_stop_speed_cap(upcoming->distance, instance.movement));
+
+            const float threshold = std::max(0.0F, policy->stop_speed_threshold);
+            if (upcoming->distance <= stop_zone && instance.follower.pose().speed <= threshold) {
+                instance.stop_wait_elapsed += tick_seconds;
+            } else if (upcoming->distance > stop_zone + 0.10F) {
+                instance.stop_wait_elapsed = 0.0F;
+            }
         }
     }
 
@@ -400,11 +524,26 @@ private:
                 !junction_signal_allows(upcoming->node_id, instances_[index].follower.pose().forward)) {
                 continue;
             }
-            requests.push_back({index, upcoming->node_id, upcoming->distance, upcoming->inside});
+
+            int priority_rank = 0;
+            if (!upcoming->inside && !is_signalized_junction(upcoming->node_id)) {
+                const auto control = junction_approach_control(
+                    upcoming->node_id, instances_[index].follower.pose().forward);
+                if (control == ProceduralRoadApproachControl::stop &&
+                    !stop_requirement_satisfied(instances_[index], upcoming->node_id)) {
+                    continue;
+                }
+                priority_rank = approach_priority_rank(control);
+            }
+
+            requests.push_back({index, upcoming->node_id, upcoming->distance, upcoming->inside, priority_rank});
         }
 
         std::sort(requests.begin(), requests.end(), [&](const JunctionRequest& a, const JunctionRequest& b) {
             if (a.inside != b.inside) return a.inside > b.inside;
+            if (a.node_id == b.node_id && a.priority_rank != b.priority_rank) {
+                return a.priority_rank < b.priority_rank;
+            }
             if (std::fabs(a.distance - b.distance) > 0.0001F) return a.distance < b.distance;
             return instances_[a.instance_index].vehicle_id < instances_[b.instance_index].vehicle_id;
         });
@@ -463,6 +602,54 @@ private:
         return found == signal_states_.end() ? nullptr : &*found;
     }
 
+    [[nodiscard]] ProceduralRoadJunctionPriorityPolicy* priority_policy(const ProceduralRoadNodeId node_id) {
+        const auto found = std::find_if(priority_policies_.begin(), priority_policies_.end(), [&](const auto& policy) {
+            return policy.node_id == node_id;
+        });
+        return found == priority_policies_.end() ? nullptr : &*found;
+    }
+
+    [[nodiscard]] const ProceduralRoadJunctionPriorityPolicy* priority_policy(
+        const ProceduralRoadNodeId node_id) const {
+        const auto found = std::find_if(priority_policies_.begin(), priority_policies_.end(), [&](const auto& policy) {
+            return policy.node_id == node_id;
+        });
+        return found == priority_policies_.end() ? nullptr : &*found;
+    }
+
+    [[nodiscard]] bool stop_requirement_satisfied(
+        const ProceduralRoadTrafficInstance& instance,
+        const ProceduralRoadNodeId node_id) const {
+        const ProceduralRoadJunctionPriorityPolicy* policy = priority_policy(node_id);
+        if (policy == nullptr) return true;
+        return instance.stop_wait_junction == node_id &&
+               instance.stop_wait_elapsed + 0.0001F >= std::max(0.0F, policy->stop_hold_duration);
+    }
+
+    [[nodiscard]] static int approach_priority_rank(
+        const std::optional<ProceduralRoadApproachControl> control) {
+        if (!control) return 0;
+        switch (*control) {
+            case ProceduralRoadApproachControl::priority: return 0;
+            case ProceduralRoadApproachControl::yield: return 1;
+            case ProceduralRoadApproachControl::stop: return 2;
+        }
+        return 0;
+    }
+
+    [[nodiscard]] static bool is_east_west_approach(const RoadWorldPoint3 forward) {
+        return std::fabs(forward.x) >= std::fabs(forward.y);
+    }
+
+    void reset_stop_wait(ProceduralRoadTrafficInstance& instance) {
+        instance.stop_wait_junction = kInvalidProceduralRoadNodeId;
+        instance.stop_wait_elapsed = 0.0F;
+    }
+
+    void reset_stop_waits() {
+        for (ProceduralRoadTrafficInstance& instance : instances_) reset_stop_wait(instance);
+    }
+
     [[nodiscard]] float junction_stop_speed_cap(
         const float distance_to_junction,
         const ProceduralRoadVehicleFollowerConfig& movement) const {
@@ -479,4 +666,5 @@ private:
     ProceduralRoadJunctionReservationConfig junctions_{};
     std::vector<ProceduralRoadJunctionReservation> junction_reservations_;
     std::vector<ProceduralRoadSignalState> signal_states_;
+    std::vector<ProceduralRoadJunctionPriorityPolicy> priority_policies_;
 };
