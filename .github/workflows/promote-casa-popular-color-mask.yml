@@ -1,0 +1,170 @@
+name: Promote Casa Popular color masks
+
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-casa-popular-color-mask.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ARTIFACT_ID: '11041162241'
+  SOURCE_RUN_ID: '36584187772'
+  SOURCE_COMMIT: 'e7aa71410908a1b8ceac9142303935a3e61d6292'
+  SOURCE_ARTIFACT_DIGEST: 'sha256:ffe93a5874f55dc8bd83527b1f816ebd311e7dd10607263ba224a2036e8db2fd'
+  APPROVED_PROXY_SHA: '62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download validated CH Blender artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/casa-popular-mask"
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o "$RUNNER_TEMP/casa-popular-mask/artifact.zip"
+          unzip -q "$RUNNER_TEMP/casa-popular-mask/artifact.zip" -d "$RUNNER_TEMP/casa-popular-mask/artifact"
+
+      - name: Validate and promote masks
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import struct
+          from pathlib import Path
+          from shutil import copy2
+
+          root = Path(os.environ['RUNNER_TEMP']) / 'casa-popular-mask' / 'artifact'
+          source = root / 'residential.popular_house_3x3_01.mask.003'
+          report_path = source / 'color_mask_report.json'
+          if not report_path.is_file():
+              raise SystemExit(f'missing {report_path}')
+          report = json.loads(report_path.read_text(encoding='utf-8'))
+          if report.get('contract') != 'CH_COLOR_MASK_V1':
+              raise SystemExit('unexpected color-mask contract')
+          if report.get('assetId') != 'building.residential_popular_house.01':
+              raise SystemExit('unexpected assetId')
+          if report.get('approvedProxySha256') != os.environ['APPROVED_PROXY_SHA']:
+              raise SystemExit('approved proxy SHA mismatch')
+          if report.get('frameSize') != [256, 256] or report.get('alpha') != 'coverage':
+              raise SystemExit('unexpected mask frame/alpha contract')
+          if report.get('channels') != {'R': 'wall', 'G': 'roof', 'B': 'trim'}:
+              raise SystemExit('unexpected authored RGB channels')
+
+          destination = Path('assets/buildings/residential_popular_house_3x3_01')
+          destination.mkdir(parents=True, exist_ok=True)
+          expected = {
+              'south': '0ce598a90d0ffb457f3ddd248c747d24d8628ec075ac643808decde927e2ca69',
+              'west':  '0cc44431cbdafed9c39537fe6b55a2c4a27be9f9ac1744a7533c8c05d8befa6c',
+              'north': '09084b280d1f555193b67ffa51b064623f9a3ee1c8830ff4ec0b5a66d77cb00e',
+              'east':  'ef510a79cd95d20f37e0297ddf0ea98554e652f8113797b2fe6ea5536657b007',
+          }
+
+          def png_size(path: Path):
+              data = path.read_bytes()[:24]
+              if data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+                  raise SystemExit(f'not a PNG: {path}')
+              return struct.unpack('>II', data[16:24])
+
+          promoted = {}
+          for direction in ('south', 'west', 'north', 'east'):
+              filename = f'residential_popular_house_3x3_01_{direction}_mask.png'
+              src = source / filename
+              if not src.is_file():
+                  raise SystemExit(f'missing {src}')
+              digest = hashlib.sha256(src.read_bytes()).hexdigest()
+              if digest != expected[direction]:
+                  raise SystemExit(f'{direction} SHA mismatch: {digest}')
+              if png_size(src) != (256, 256):
+                  raise SystemExit(f'{direction} is not 256x256')
+              dst = destination / filename
+              copy2(src, dst)
+              promoted[direction] = {'path': dst.as_posix(), 'sha256': digest}
+
+          definition_path = Path('assets/definitions/residential_popular_house_01.json')
+          definition = json.loads(definition_path.read_text(encoding='utf-8'))
+          definition['colorMask'] = {
+              'contract': 'CH_COLOR_MASK_V1',
+              'enabled': True,
+              # The current City Horizon runtime consumes R/G independently.
+              # B=trim remains authored in the same PNG and is recorded below
+              # for a future contract extension without requiring a re-render.
+              'channels': {'R': 'wall', 'G': 'roof'},
+              'alpha': 'coverage',
+              'sprites': {
+                  '0': promoted['south']['path'],
+                  '1': promoted['west']['path'],
+                  '2': promoted['north']['path'],
+                  '3': promoted['east']['path'],
+              },
+          }
+          definition_path.write_text(json.dumps(definition, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          manifest_path = destination / 'residential_popular_house_3x3_01_runtime_manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['colorMask'] = {
+              'contract': 'CH_COLOR_MASK_V1',
+              'sourceWorkflowRun': int(os.environ['SOURCE_RUN_ID']),
+              'sourceArtifactId': int(os.environ['ARTIFACT_ID']),
+              'sourceCommit': os.environ['SOURCE_COMMIT'],
+              'sourceArtifactDigest': os.environ['SOURCE_ARTIFACT_DIGEST'],
+              'approvedProxySha256': os.environ['APPROVED_PROXY_SHA'],
+              'alpha': 'coverage',
+              'authoredChannels': {'R': 'wall', 'G': 'roof', 'B': 'trim'},
+              'runtimeActiveChannels': {'R': 'wall', 'G': 'roof'},
+              'rotationOrder': ['south', 'west', 'north', 'east'],
+              'sprites': promoted,
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+
+      - name: Verify runtime definition contract
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('assets/definitions/residential_popular_house_01.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          cm = d['colorMask']
+          assert cm['contract'] == 'CH_COLOR_MASK_V1'
+          assert cm['enabled'] is True
+          assert cm['channels'] == {'R': 'wall', 'G': 'roof'}
+          assert list(cm['sprites']) == ['0', '1', '2', '3']
+          for path in cm['sprites'].values():
+              assert Path(path).is_file(), path
+          print('Casa Popular CH_COLOR_MASK_V1 runtime registration: OK')
+          PY
+
+      - name: Commit promoted runtime masks
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            assets/definitions/residential_popular_house_01.json \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_*_mask.png \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_runtime_manifest.json
+          if git diff --cached --quiet; then
+            echo 'Nothing to promote.'
+            exit 0
+          fi
+          git commit -m "Add Casa Popular color masks to runtime"
+          git pull --rebase origin main
+          git push origin HEAD:main
