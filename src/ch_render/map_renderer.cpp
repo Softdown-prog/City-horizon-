@@ -362,7 +362,11 @@ void MapRenderer::render_map(SDL_Renderer* renderer, const TextureAsset* grass,
             const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) |
                                       static_cast<std::uint32_t>(y);
             const auto it = scenario_terrain_textures.find(key);
-            const bool deform = document != nullptr && !document->terrain_heightfield().empty();
+            const bool deform = document != nullptr && (
+                document->terrain_height_at(x, y) != 0.0F ||
+                document->terrain_height_at(x + 1, y) != 0.0F ||
+                document->terrain_height_at(x + 1, y + 1) != 0.0F ||
+                document->terrain_height_at(x, y + 1) != 0.0F);
             if (it != scenario_terrain_textures.end() && it->second != nullptr) {
                 if (deform) {
                     render_heightfield_terrain_tile(renderer, *it->second, x, y, *document,
