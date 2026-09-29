@@ -7,12 +7,15 @@
     "manifest": "tools/ch_blender/ch_blender_manifest.json",
     "cameraContract": "CH_ACTOR_CAMERA_V1",
     "frameContract": "CH_ACTOR_V1",
-    "motionSource": "approved_actor_motion_only"
+    "motionSource": "approved_actor_motion_only",
+    "landmarksContract": "CH_CHARACTER_LANDMARKS_V0"
   },
   "pipeline": [
     "character_spec",
     "ch_blender_base_passes",
+    "ch_blender_pose_landmarks",
     "paint_layers",
+    "landmark_pose_transfer",
     "color_masks",
     "outline_and_readability",
     "preview",
@@ -39,6 +42,16 @@
     "shadow",
     "ambient_occlusion"
   ],
+  "poseTransfer": {
+    "contract": "CH_CHARACTER_POSE_TRANSFER_V0",
+    "source": "one approved art frame per direction",
+    "targets": "idle_plus_8_walk_frames_same_direction",
+    "method": "semantic_layer_landmark_weighted_deformation",
+    "derivedOutline": "rebuild_dilated_1px_after_transfer",
+    "copyBlenderUnderlay": false,
+    "crossDirectionAutomaticTransfer": false,
+    "mayModifyApprovedMotion": false
+  },
   "colorMaskRoles": {
     "R": "primary_clothing",
     "G": "secondary_clothing",
