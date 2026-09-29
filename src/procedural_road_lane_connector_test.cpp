@@ -99,6 +99,27 @@ std::vector<ProceduralRoadRoutePoint> build_straight_vehicle_route(const float z
     return route;
 }
 
+std::vector<ProceduralRoadRoutePoint> build_crossing_vehicle_route(
+    const bool horizontal,
+    const ProceduralRoadNodeId junction_node = 77) {
+    std::vector<ProceduralRoadRoutePoint> route;
+    for (int step = 0; step <= 30; ++step) {
+        const float coordinate = -3.0F + static_cast<float>(step) * 0.2F;
+        const bool in_junction = std::fabs(coordinate) <= 0.4001F;
+        route.push_back({
+            horizontal ? RoadWorldPoint3{coordinate, 0.0F, 0.0F}
+                       : RoadWorldPoint3{0.0F, coordinate, 0.0F},
+            in_junction ? ProceduralRoadRoutePointKind::junction_connector
+                        : ProceduralRoadRoutePointKind::lane,
+            in_junction ? kInvalidProceduralRoadSegmentId
+                        : static_cast<ProceduralRoadSegmentId>(horizontal ? 10 : 20),
+            in_junction ? junction_node : kInvalidProceduralRoadNodeId,
+            ProceduralRoadTurnKind::straight,
+        });
+    }
+    return route;
+}
+
 ProceduralRoadVehicleVisual test_vehicle_visual() {
     ProceduralRoadVehicleVisual visual;
     visual.sprite_south = "south.png";
@@ -187,6 +208,16 @@ void test_vehicle_follower_honors_external_speed_cap() {
     follower.update(1.0F, config, 0.25F);
     assert(near_value(follower.pose().speed, 0.25F));
     assert(near_value(follower.pose().route_distance, 0.25F));
+}
+
+void test_vehicle_follower_reports_upcoming_junction() {
+    ProceduralRoadVehicleFollower follower;
+    assert(follower.set_route(build_crossing_vehicle_route(true, 91)));
+    const auto upcoming = follower.upcoming_junction(3.0F);
+    assert(upcoming);
+    assert(upcoming->node_id == 91);
+    assert(!upcoming->inside);
+    assert(near_value(upcoming->distance, 2.6F, 0.01F));
 }
 
 void test_vehicle_render_adapter_preserves_pose_and_logical_direction() {
@@ -340,6 +371,74 @@ void test_procedural_traffic_does_not_follow_vehicle_on_other_elevation() {
     assert(std::isinf(ground->leader_gap));
 }
 
+void test_procedural_traffic_reserves_shared_junction_without_overlap() {
+    constexpr ProceduralRoadNodeId junction = 101;
+    ProceduralRoadTrafficManager traffic;
+
+    ProceduralRoadTrafficFollowingConfig following;
+    following.enabled = false;
+    traffic.set_following_config(following);
+
+    ProceduralRoadJunctionReservationConfig junction_config;
+    junction_config.request_lookahead = 3.0F;
+    junction_config.stop_buffer = 0.25F;
+    traffic.set_junction_reservation_config(junction_config);
+
+    ProceduralRoadVehicleFollowerConfig movement;
+    movement.cruise_speed = 1.0F;
+    movement.junction_speed = 0.75F;
+    movement.turn_speed = 0.70F;
+    movement.acceleration = 4.0F;
+    movement.braking = 4.0F;
+
+    assert(traffic.add("car.a", build_crossing_vehicle_route(true, junction), test_vehicle_visual(), movement));
+    assert(traffic.add("car.b", build_crossing_vehicle_route(false, junction), test_vehicle_visual(), movement));
+
+    traffic.update_tick(0.05F);
+    assert(traffic.junction_reservation_count() == 1U);
+    assert(traffic.junction_owner(junction) == "car.a");
+    const auto* initially_blocked = traffic.find("car.b");
+    assert(initially_blocked != nullptr);
+    assert(initially_blocked->blocked_junction == junction);
+
+    bool saw_a_inside = false;
+    bool saw_b_waiting = false;
+    bool reservation_transferred = false;
+    bool saw_b_inside = false;
+
+    for (int step = 0; step < 600; ++step) {
+        traffic.update_tick(0.05F);
+        const auto* a = traffic.find("car.a");
+        const auto* b = traffic.find("car.b");
+        assert(a != nullptr && b != nullptr);
+
+        const bool a_inside = a->follower.pose().kind == ProceduralRoadRoutePointKind::junction_connector;
+        const bool b_inside = b->follower.pose().kind == ProceduralRoadRoutePointKind::junction_connector;
+        assert(!(a_inside && b_inside));
+
+        if (a_inside) {
+            saw_a_inside = true;
+            assert(traffic.junction_owner(junction) == "car.a");
+        }
+        if (b->blocked_junction == junction && b->follower.pose().speed < 0.10F) {
+            saw_b_waiting = true;
+        }
+        if (traffic.junction_owner(junction) == "car.b") {
+            reservation_transferred = true;
+        }
+        if (b_inside) {
+            saw_b_inside = true;
+            assert(traffic.junction_owner(junction) == "car.b");
+            break;
+        }
+    }
+
+    assert(saw_a_inside);
+    assert(saw_b_waiting);
+    assert(reservation_transferred);
+    assert(saw_b_inside);
+}
+
 void test_reverse_route_is_continuous() {
     ProceduralRoadGraph graph;
     const auto west = graph.add_node({-4.0F, 0.0F, 0.0F});
@@ -383,10 +482,12 @@ int main() {
     test_continuous_route_across_two_junctions();
     test_vehicle_follower_moves_continuously_and_slows_for_turns();
     test_vehicle_follower_honors_external_speed_cap();
+    test_vehicle_follower_reports_upcoming_junction();
     test_vehicle_render_adapter_preserves_pose_and_logical_direction();
     test_procedural_traffic_manager_owns_and_renders_followers();
     test_procedural_traffic_follows_slower_leader_with_safe_gap();
     test_procedural_traffic_does_not_follow_vehicle_on_other_elevation();
+    test_procedural_traffic_reserves_shared_junction_without_overlap();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
