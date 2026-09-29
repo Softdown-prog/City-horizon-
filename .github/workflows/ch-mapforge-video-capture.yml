@@ -1,0 +1,124 @@
+name: CH MapForge Video Capture
+
+# Deterministic CH Video Lab proof using the first-party MapForge renderer.
+# This is intentionally path-scoped: only explicit video jobs spend the
+# Windows/Qt build minutes. Ordinary source and asset commits do not trigger it.
+on:
+  workflow_dispatch:
+    inputs:
+      job_path:
+        description: "CH_VIDEO_SCENARIO_V1 JSON path"
+        required: true
+        default: "tools/animation_preview/examples/mapforge_candidate_motion.json"
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/animation_preview/mapforge_jobs/*.json"
+
+jobs:
+  capture-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve video job
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $jobPath = "${{ inputs.job_path }}"
+          } else {
+            $jobPath = git diff-tree --no-commit-id --name-only -r HEAD |
+              Where-Object { $_ -like "tools/animation_preview/mapforge_jobs/*.json" } |
+              Select-Object -First 1
+          }
+          if ([string]::IsNullOrWhiteSpace($jobPath)) { throw "No MapForge video job found" }
+          if (-not (Test-Path $jobPath)) { throw "MapForge video job does not exist: $jobPath" }
+          "CH_VIDEO_JOB=$jobPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install media and Qt dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip pillow aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg -y --no-progress
+          }
+          ffmpeg -version | Select-Object -First 1
+          ffprobe -version | Select-Object -First 1
+
+      - name: Configure MapForge capture renderer
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/ch-mapforge-video -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build MapForge2CLI
+        shell: pwsh
+        run: cmake --build build/ch-mapforge-video --config Release --target MapForge2CLI --parallel
+
+      - name: Resolve deterministic scenario
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out/ch-mapforge-video | Out-Null
+          $job = Get-Content $env:CH_VIDEO_JOB -Raw | ConvertFrom-Json
+          if ($job.contract -ne "CH_VIDEO_SCENARIO_V1") { throw "Unsupported video scenario contract" }
+
+          $candidate = $job.mapforgeCandidateFile
+          if ([string]::IsNullOrWhiteSpace($candidate)) { throw "MapForge scenario requires mapforgeCandidateFile" }
+          if (-not (Test-Path $candidate)) { throw "Candidate PNG does not exist: $candidate" }
+
+          $baseRequest = $job.mapforgeBaseRequestFile
+          if ([string]::IsNullOrWhiteSpace($baseRequest)) {
+            $baseRequest = "C++/MapForge2/examples/map_capture/capture_request.json"
+          }
+          if (-not (Test-Path $baseRequest)) { throw "Base capture request does not exist: $baseRequest" }
+
+          $cli = (Resolve-Path "build/ch-mapforge-video/Release/MapForge2CLI.exe").Path
+          $candidate = (Resolve-Path $candidate).Path
+          $baseRequest = (Resolve-Path $baseRequest).Path
+          $repoRoot = (Resolve-Path ".").Path
+          $output = (Resolve-Path "out/ch-mapforge-video").Path
+
+          $job.baseRequestFile = $baseRequest
+          $job.outputDir = $output
+          $job.renderer = [pscustomobject]@{
+            cwd = $repoRoot
+            command = @($cli, "capture", "{output}", $candidate, "{request}")
+          }
+          $resolved = "out/ch-mapforge-video-job-resolved.json"
+          $job | ConvertTo-Json -Depth 32 | Set-Content -Path $resolved -Encoding utf8
+          "CH_VIDEO_RESOLVED_JOB=$resolved" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Render frames and encode review media
+        shell: pwsh
+        run: python tools/animation_preview/run_video_scenario.py --scenario $env:CH_VIDEO_RESOLVED_JOB
+
+      - name: Validate video proof
+        shell: pwsh
+        run: |
+          $reportPath = "out/ch-mapforge-video/scenario_report.json"
+          if (-not (Test-Path $reportPath)) { throw "Scenario report missing" }
+          $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+          if ($report.contract -ne "CH_VIDEO_SCENARIO_V1" -or $report.status -ne "ok") {
+            throw "MapForge video scenario failed"
+          }
+          $videos = Get-ChildItem "out/ch-mapforge-video" -Filter *.mp4 -File -ErrorAction SilentlyContinue
+          if ($null -eq $videos -or $videos.Count -lt 1) { throw "No MP4 proof was produced" }
+          if ($report.frameCount -lt 2) { throw "Scenario produced too few frames" }
+
+      - name: Upload CH Video Lab proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Video-Validation
+          path: |
+            out/ch-mapforge-video/**
+            out/ch-mapforge-video-job-resolved.json
+          if-no-files-found: error
+          retention-days: 14
