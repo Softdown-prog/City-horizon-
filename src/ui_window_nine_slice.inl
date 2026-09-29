@@ -1,4 +1,4 @@
-// Reusable nine-slice window frame for the modal migration.
+// CH_WINDOW_FRAME_V2 is the canonical resizable-window frame for City Horizon.
 // The existing procedural panel stays underneath as the fallback/background;
 // this pass only replaces the authored chrome around supported windows.
 if (renderer != nullptr && overlay_bounds_ &&
@@ -11,22 +11,11 @@ if (renderer != nullptr && overlay_bounds_ &&
      model_.overlay == UiOverlay::quit_confirm)) {
     const UiRect& panel = *overlay_bounds_;
     const auto* skin = thumbnail_for(
-        renderer, ui_chrome_path("panel_window_9slice_v2"));
-
-    constexpr ch::ui::NineSliceInsets kWindowInsets = {
-        32.0F,
-        32.0F,
-        32.0F,
-        32.0F,
-    };
-    constexpr float kMinimumWindowSkinWidth =
-        kWindowInsets.left + kWindowInsets.right;
-    constexpr float kMinimumWindowSkinHeight =
-        kWindowInsets.top + kWindowInsets.bottom;
+        renderer, ui_chrome_path(ch::ui::kWindowFrameV2AssetStem));
 
     if (skin != nullptr && skin->texture != nullptr &&
-        skin->width >= kMinimumWindowSkinWidth &&
-        skin->height >= kMinimumWindowSkinHeight) {
+        skin->width >= ch::ui::kWindowFrameV2MinimumWidth &&
+        skin->height >= ch::ui::kWindowFrameV2MinimumHeight) {
         SDL_SetTextureScaleMode(skin->texture, SDL_SCALEMODE_NEAREST);
 
         const SDL_FRect destination = {
@@ -41,6 +30,6 @@ if (renderer != nullptr && overlay_bounds_ &&
             skin->width,
             skin->height,
             destination,
-            kWindowInsets);
+            ch::ui::kWindowFrameV2Insets);
     }
 }
