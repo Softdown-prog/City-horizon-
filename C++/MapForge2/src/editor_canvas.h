@@ -30,6 +30,7 @@ enum class EditorTool {
     Inspect,
     Terrain,
     Road,
+    Fence,
     Erase,
 };
 
@@ -81,6 +82,9 @@ private:
     void beginStroke(const QPoint& tile);
     void updateStroke(const QPoint& tile);
     void endStroke();
+    void beginFenceDrag(const QPoint& vertex);
+    void updateFenceDrag(const QPoint& vertex);
+    void endFenceDrag(bool commit);
     void paintBrushAt(const QPoint& tile);
     void mutateTile(int x, int y);
     void panBy(float dx, float dy);
@@ -100,6 +104,9 @@ private:
     std::optional<QPoint> last_stroke_tile_;
     std::unordered_map<std::uint64_t, TileChange> active_changes_;
     bool stroke_active_ = false;
+    bool fence_drag_active_ = false;
+    std::optional<QPoint> fence_drag_start_;
+    std::optional<QPoint> fence_drag_current_;
     bool pan_active_ = false;
     QPointF last_pan_position_;
 };
