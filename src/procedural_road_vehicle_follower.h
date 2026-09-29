@@ -35,6 +35,7 @@ struct ProceduralRoadVehiclePose {
     ProceduralRoadTurnKind turn = ProceduralRoadTurnKind::straight;
     ProceduralRoadNodeId junction_node = kInvalidProceduralRoadNodeId;
     bool finished = false;
+    ProceduralRoadClass road_class = ProceduralRoadClass::unspecified;
 };
 
 struct ProceduralRoadUpcomingJunction {
@@ -158,6 +159,7 @@ public:
         result.kind = route_[next_index].kind;
         result.turn = route_[next_index].turn;
         result.junction_node = route_[next_index].junction_node;
+        result.road_class = route_[next_index].road_class;
         result.finished = d >= total - 0.00001F;
         return result;
     }
@@ -189,6 +191,10 @@ private:
     [[nodiscard]] static float local_speed_limit(const ProceduralRoadVehiclePose& pose,
                                                  const ProceduralRoadVehicleFollowerConfig& config) {
         float limit = std::max(0.0F, config.cruise_speed);
+        const ProceduralRoadClassProfile class_profile = procedural_road_class_profile(pose.road_class);
+        if (std::isfinite(class_profile.speed_limit)) {
+            limit = std::min(limit, std::max(0.0F, class_profile.speed_limit));
+        }
         if (pose.kind == ProceduralRoadRoutePointKind::junction_connector) {
             limit = std::min(limit, std::max(0.0F, config.junction_speed));
             if (pose.turn == ProceduralRoadTurnKind::left || pose.turn == ProceduralRoadTurnKind::right ||
