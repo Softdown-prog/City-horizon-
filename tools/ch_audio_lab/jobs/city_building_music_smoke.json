@@ -1,0 +1,29 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "city_building_music_smoke",
+  "attempt": 1,
+  "kind": "music",
+  "prompt": "Música ambiente calma para construção de cidade, instrumental, contemplativa, discreta, sem voz, apropriada para ficar ao fundo durante planejamento urbano.",
+  "negativePrompt": "sem voz, sem bateria agressiva, sem transientes fortes, sem clipping",
+  "durationSeconds": 8.0,
+  "tags": ["music", "city-building", "ambient", "validation"],
+  "provider": {
+    "type": "synthetic_smoke",
+    "profile": "ambient_pad",
+    "seed": 20260929,
+    "channels": 2
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -16.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.4,
+    "fadeOutSeconds": 0.8,
+    "channels": 2,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "replace"
+  }
+}
