@@ -1,8 +1,8 @@
 """Guarded CH Blender prototype for a vertical roller-coaster loop.
 
 CH_COASTER_LOOP_V0 reuses the existing CH coaster rail/tie/support vocabulary,
-while defining a deterministic teardrop vertical-plane centerline with smooth
-flat approach/exit connectors. Runtime remains pre-rendered 2D.
+while defining a deterministic symmetric vertical oval with smooth flat
+approach/exit connectors. Runtime remains pre-rendered 2D.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import build_coaster_track_guarded as base  # noqa: E402
 ASSET_ID = "ride.coaster.track_v0"
 PIECE = "vertical_loop"
 LOOP_HALF_WIDTH = base.TILE * 1.25
-LOOP_HEIGHT = base.TILE * 3.0
+LOOP_HEIGHT = base.TILE * 2.65
 APPROACH_LENGTH = base.TILE * 1.15
 FOOTPRINT = {"widthTiles": 3, "depthTiles": 4}
 
@@ -45,10 +45,6 @@ def parse_args():
     return parser.parse_args(argv)
 
 
-def smoothstep(t: float) -> float:
-    return t * t * (3.0 - 2.0 * t)
-
-
 def sample_centerline(approach_samples: int = 33, loop_samples: int = 161):
     points = []
 
@@ -58,20 +54,15 @@ def sample_centerline(approach_samples: int = 33, loop_samples: int = 161):
         y = -APPROACH_LENGTH + APPROACH_LENGTH * t
         points.append(Vector((0.0, y, base.RAIL_Z)))
 
-    # Teardrop loop in Y/Z. Wider near the base and tighter near the crown.
+    # Symmetric vertical oval in the Y/Z plane.  Keeping a constant horizontal
+    # radius avoids the asymmetric-looking crown produced by the V2 teardrop
+    # taper once projected through the fixed 45-degree isometric camera.
     # theta=0 starts at the bottom heading +Y and returns with the same tangent.
     for i in range(1, loop_samples):
         t = i / (loop_samples - 1)
         theta = math.tau * t
-
-        # Narrow the horizontal radius toward the top to avoid a perfect circle.
-        crown = (1.0 - math.cos(theta)) * 0.5
-        width_scale = 1.0 - 0.34 * smoothstep(crown)
-        y = LOOP_HALF_WIDTH * width_scale * math.sin(theta)
-
-        # Smooth vertical profile; slightly taller than wide for a classic loop silhouette.
-        z_norm = (1.0 - math.cos(theta)) * 0.5
-        z = base.RAIL_Z + LOOP_HEIGHT * z_norm
+        y = LOOP_HALF_WIDTH * math.sin(theta)
+        z = base.RAIL_Z + LOOP_HEIGHT * ((1.0 - math.cos(theta)) * 0.5)
         points.append(Vector((0.0, y, z)))
 
     # Flat exit continues forward from the bottom tangent.
@@ -85,6 +76,8 @@ def sample_centerline(approach_samples: int = 33, loop_samples: int = 161):
 
 def frame(points, index: int):
     tangent = base.tangent(points, index)
+    # The loop remains planar and untwisted; a fixed X lateral axis keeps both
+    # rails parallel while the tangent traverses the vertical oval.
     right = Vector((1.0, 0.0, 0.0))
     up = right.cross(tangent).normalized()
     return tangent, right, up
@@ -155,9 +148,10 @@ def build_piece():
             support_mat,
         )
 
-    # Side supports sit outside the train envelope and brace the lower loop quarters.
-    lower_z = base.RAIL_Z + LOOP_HEIGHT * 0.30
-    brace_y = LOOP_HALF_WIDTH * 0.72
+    # Keep the improved V2 support concept: braces remain outside the train
+    # envelope and support the lower quarters instead of standing in the loop.
+    lower_z = base.RAIL_Z + LOOP_HEIGHT * 0.28
+    brace_y = LOOP_HALF_WIDTH * 0.70
     post_x = base.GAUGE * 0.78
     for side_sign, side_name in ((-1.0, "L"), (1.0, "R")):
         add_vertical_post(authored, f"LoopBraceFront_{side_name}", side_sign * post_x, -brace_y, lower_z, support_mat)
@@ -172,7 +166,7 @@ def write_metadata(output: Path, centerline):
         "assetId": ASSET_ID,
         "piece": PIECE,
         "loopContract": "CH_COASTER_LOOP_V0",
-        "profile": "teardrop_v2",
+        "profile": "symmetric_oval_v3",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "halfWidth": LOOP_HALF_WIDTH,
