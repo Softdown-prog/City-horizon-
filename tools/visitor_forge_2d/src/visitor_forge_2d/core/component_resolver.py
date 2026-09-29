@@ -96,10 +96,13 @@ def _resolve_component(node: dict) -> dict:
     alias = node.get("material") or item["materials"][0]
     if alias not in item["materials"]:
         raise ValueError(f"material {alias!r} is not supported by {component_id}")
+    transform = deepcopy(node.get("transform", {}))
+    if "rotateDeg" not in transform:
+        transform["rotateDeg"] = item["orientationDeg"]
     shape = _shape_for(item, _material(alias), _effects(item, node.get("effects")), node.get("role"))
     return {
         "type": "group",
-        "transform": deepcopy(node.get("transform", {})),
+        "transform": transform,
         "children": [shape],
         "componentId": component_id,
     }
