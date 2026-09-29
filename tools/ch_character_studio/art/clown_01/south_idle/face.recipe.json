@@ -1,0 +1,18 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"face"},
+  "operations":[
+    {"type":"ellipse","box":[20,14,22,16],"color":"#2f2b29"},
+    {"type":"ellipse","box":[26,14,28,16],"color":"#2f2b29"},
+    {"type":"pixel","x":21,"y":14,"color":"#ffffff"},
+    {"type":"pixel","x":27,"y":14,"color":"#ffffff"},
+    {"type":"ellipse","box":[22,17,26,21],"color":"#df3b36"},
+    {"type":"pixel","x":23,"y":18,"color":"#ff8c7c"},
+    {"type":"line","points":[[20,22],[22,23],[24,24],[26,23],[28,22]],"color":"#a7373d","width":1},
+    {"type":"pixel","x":19,"y":20,"color":"#de6a6f"},
+    {"type":"pixel","x":29,"y":20,"color":"#de6a6f"},
+    {"type":"line","points":[[19,13],[21,12],[23,13]],"color":"#b94a44","width":1},
+    {"type":"line","points":[[25,13],[27,12],[29,13]],"color":"#b94a44","width":1}
+  ]
+}
