@@ -1,0 +1,37 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "local_steam_whistle_sa3_smoke",
+  "kind": "effect",
+  "prompt": "Single classic steam locomotive whistle, one clear sustained whistle blast from a vintage steam engine, realistic mechanical air and steam character, clean isolated game sound effect, no speech, no music, no background crowd",
+  "durationSeconds": 7.0,
+  "tags": ["train", "steam", "whistle", "sfx", "local-ai", "validation"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "20260929",
+      "--cfg", "1.0"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -18.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.02,
+    "fadeOutSeconds": 0.12,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
