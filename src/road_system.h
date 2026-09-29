@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -284,9 +285,16 @@ private:
     std::unordered_map<ProceduralRoadSegmentId, std::size_t> segment_indices_;
 };
 
+class ProceduralRoadPlacementBridge;
+
 class RoadManager {
 public:
     RoadManager(int map_min, int map_max);
+    ~RoadManager();
+    RoadManager(const RoadManager& other);
+    RoadManager& operator=(const RoadManager& other);
+    RoadManager(RoadManager&& other) noexcept;
+    RoadManager& operator=(RoadManager&& other) noexcept;
 
     [[nodiscard]] bool is_inside_map(int tile_x, int tile_y) const;
     [[nodiscard]] bool is_road(int tile_x, int tile_y) const;
@@ -331,13 +339,21 @@ public:
                                                 const BuildingDefinition& definition) const;
     [[nodiscard]] const std::vector<RoadTile>& tiles() const;
 
+    // Mirror-only migration surface. RoadManager remains authoritative for
+    // occupancy, save/load, economy and legacy routing; this accessor exposes the
+    // continuously synchronized procedural graph to gated render/traffic code.
+    [[nodiscard]] const ProceduralRoadPlacementBridge& procedural_mirror() const;
+
 private:
     [[nodiscard]] int tile_key(int tile_x, int tile_y) const;
     void refresh_connections_around(int tile_x, int tile_y);
     void refresh_connections(int tile_x, int tile_y);
+    void mirror_added_tile(int tile_x, int tile_y);
+    void rebuild_procedural_mirror();
 
     int map_min_;
     int map_max_;
     std::vector<RoadTile> tiles_;
     std::unordered_map<int, std::size_t> tile_indices_;
+    std::unique_ptr<ProceduralRoadPlacementBridge> procedural_mirror_;
 };
