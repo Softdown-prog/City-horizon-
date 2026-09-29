@@ -28,6 +28,7 @@
   let landmarks = null;
   let lastObjectRender = {front:HELD.blankFrame(), back:HELD.blankFrame(), mask:HELD.blankFrame(), placement:null};
   let maskTool = "paint";
+  let maskEditActive = false;
   let maskDrawing = false;
   let lastMaskPoint = null;
 
@@ -80,6 +81,12 @@
     ctx.clearRect(0, 0, W, H);
     if (image) ctx.putImageData(image, 0, 0);
   }
+  function canvasFromImageData(image) {
+    const canvas=document.createElement("canvas");
+    canvas.width=image.width; canvas.height=image.height;
+    canvas.getContext("2d").putImageData(image,0,0);
+    return canvas;
+  }
 
   function saveMasks() {
     maskStore.set(loadedMaskKey, {
@@ -103,6 +110,16 @@
     return snapshot(maskCanvas(bankSelect.value));
   }
 
+  function leaveMaskEditing() {
+    maskEditActive = false;
+    maskDrawing = false;
+    lastMaskPoint = null;
+    maskPaintBtn.classList.remove("active");
+    maskEraseBtn.classList.remove("active");
+    maskView.style.pointerEvents = "none";
+    renderMaskPreview();
+  }
+
   function rebuildChannelOptions() {
     const bank = MASKS.banks[bankSelect.value];
     channelSelect.innerHTML = "";
@@ -117,6 +134,7 @@
     maskEraseBtn.disabled = objectBank;
     maskFillVisible.disabled = objectBank;
     maskClear.disabled = objectBank;
+    if (objectBank) leaveMaskEditing();
     maskStatus.textContent = objectBank
       ? "A máscara do objeto acompanha o PNG importado; sem máscara, pixels opacos usam R automaticamente."
       : `${bank.label}: pinte R/G/B sem luz, AO, outline ou dithering.`;
@@ -139,11 +157,10 @@
     const canvas = maskCanvas(bankSelect.value);
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const size = 1;
-    if (maskTool === "erase") ctx.clearRect(point.x, point.y, size, size);
+    if (maskTool === "erase") ctx.clearRect(point.x, point.y, 1, 1);
     else {
       ctx.fillStyle = channelColor();
-      ctx.fillRect(point.x, point.y, size, size);
+      ctx.fillRect(point.x, point.y, 1, 1);
     }
   }
 
@@ -164,11 +181,13 @@
   function setMaskTool(next) {
     if (bankSelect.value === "held_object") return;
     maskTool = next;
+    maskEditActive = true;
     maskPaintBtn.classList.toggle("active", next === "paint");
     maskEraseBtn.classList.toggle("active", next === "erase");
     maskView.style.pointerEvents = "auto";
     maskPreview.checked = true;
     renderMaskPreview();
+    maskStatus.textContent = `${next === "paint" ? "Pintando" : "Apagando"} ${bankSelect.value}.${channelSelect.value}. Clique no pincel normal para sair da edição de máscara.`;
   }
 
   function fillVisibleAlpha() {
@@ -191,10 +210,10 @@
   function renderMaskPreview() {
     maskViewCtx.clearRect(0,0,W,H);
     if (maskPreview.checked) {
-      const image = selectedBankImage();
+      const preview = canvasFromImageData(selectedBankImage());
       maskViewCtx.save();
       maskViewCtx.globalAlpha = 0.58;
-      maskViewCtx.putImageData(image,0,0);
+      maskViewCtx.drawImage(preview,0,0);
       maskViewCtx.restore();
     }
     if (debugSocket.checked) drawSocketDebug();
@@ -249,11 +268,6 @@
     renderMaskPreview();
   }
 
-  function canvasFromImageData(image) {
-    const c=document.createElement("canvas"); c.width=image.width; c.height=image.height;
-    c.getContext("2d").putImageData(image,0,0); return c;
-  }
-
   function downloadImageData(image, name) {
     const canvas=canvasFromImageData(image);
     canvas.toBlob(blob => {
@@ -306,12 +320,12 @@
   }
 
   maskView.addEventListener("pointerdown", ev => {
-    if (bankSelect.value === "held_object") return;
+    if (!maskEditActive || bankSelect.value === "held_object") return;
     maskDrawing=true; maskView.setPointerCapture(ev.pointerId); lastMaskPoint=maskPoint(ev);
     maskSegment(lastMaskPoint,lastMaskPoint); renderMaskPreview();
   });
   maskView.addEventListener("pointermove", ev => {
-    if (!maskDrawing) return;
+    if (!maskDrawing || !maskEditActive) return;
     const point=maskPoint(ev); maskSegment(lastMaskPoint||point,point); lastMaskPoint=point; renderMaskPreview();
   });
   maskView.addEventListener("pointerup",()=>{maskDrawing=false;lastMaskPoint=null;});
@@ -321,10 +335,7 @@
   frame.addEventListener("change",()=>loadMasks(key()));
   bankSelect.addEventListener("change", rebuildChannelOptions);
   channelSelect.addEventListener("change", renderMaskPreview);
-  maskPreview.addEventListener("change",()=>{
-    maskView.style.pointerEvents = maskPreview.checked && bankSelect.value !== "held_object" ? "auto" : "none";
-    renderMaskPreview();
-  });
+  maskPreview.addEventListener("change",renderMaskPreview);
   maskPaintBtn.addEventListener("click",()=>setMaskTool("paint"));
   maskEraseBtn.addEventListener("click",()=>setMaskTool("erase"));
   maskFillVisible.addEventListener("click",fillVisibleAlpha);
@@ -334,6 +345,10 @@
   });
   maskExport.addEventListener("click",()=>exportBank(bankSelect.value));
   maskExportAll.addEventListener("click",()=>["appearance","clothing","held_object"].forEach(exportBank));
+
+  for (const id of ["brushBtn","eraserBtn","shapeBtn"]) {
+    document.getElementById(id).addEventListener("click",leaveMaskEditing);
+  }
 
   for (const element of [objectEnabled,objectId,objectSocket,objectDepth,gripX,gripY,offsetX,offsetY]) {
     element.addEventListener("input",syncObjectInputs);
@@ -346,7 +361,9 @@
       objectState.visual=await fileToImageData(file); objectState.visualName=file.name;
       gripX.value=Math.floor(objectState.visual.width/2); gripY.value=Math.floor(objectState.visual.height/2);
       objectState.gripAnchor=[Number(gripX.value),Number(gripY.value)];
-      if (objectState.mask && (objectState.mask.width!==objectState.visual.width || objectState.mask.height!==objectState.visual.height)) objectState.mask=null;
+      if (objectState.mask && (objectState.mask.width!==objectState.visual.width || objectState.mask.height!==objectState.visual.height)) {
+        objectState.mask=null; objectState.maskName=null;
+      }
       renderObject();
     } catch(error) { objectStatus.textContent=`Falha ao carregar objeto: ${error.message}`; }
   });
