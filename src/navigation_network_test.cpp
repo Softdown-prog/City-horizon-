@@ -1,8 +1,10 @@
 #include "crosswalk_system.h"
 #include "navigation_network.h"
 #include "park_fence_runtime.h"
+#include "procedural_road_junction.h"
 
 #include <cassert>
+#include <cmath>
 
 namespace {
 
@@ -12,6 +14,10 @@ void assert_path(const NavigationPathResult& result, const NavigationTile start,
     assert(result.tiles.size() == expected_length);
     assert(result.tiles.front() == start);
     assert(result.tiles.back() == goal);
+}
+
+bool near_value(const float left, const float right, const float epsilon = 0.0001F) {
+    return std::fabs(left - right) <= epsilon;
 }
 
 void test_roads() {
@@ -37,6 +43,76 @@ void test_roads() {
 
     assert(roads.remove_tile(0, 0));
     assert(find_navigation_path(network, {-1, 0}, {0, 1}).status == NavigationPathStatus::no_path);
+}
+
+void test_procedural_road_graph_and_junctions() {
+    ProceduralRoadGraph graph;
+    const ProceduralRoadNodeId center = graph.add_node({0.0F, 0.0F, 0.50F});
+    const ProceduralRoadNodeId east = graph.add_node({4.0F, 0.0F, 0.50F});
+    const ProceduralRoadNodeId west = graph.add_node({-4.0F, 0.0F, 0.50F});
+    const ProceduralRoadNodeId north = graph.add_node({0.0F, -4.0F, 0.50F});
+
+    const auto east_segment = graph.add_segment(center, east, {1.0F, 0.0F, 0.0F}, {-1.0F, 0.0F, 0.0F}, 0.80F, 2);
+    const auto west_segment = graph.add_segment(center, west, {-1.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F}, 0.80F, 2);
+    const auto north_segment = graph.add_segment(center, north, {0.0F, -1.0F, 0.0F}, {0.0F, 1.0F, 0.0F}, 0.80F, 2);
+    assert(east_segment && west_segment && north_segment);
+    assert(graph.degree(center) == 3U);
+    assert(RoadJunctionBuilder::classify(graph, center) == ProceduralRoadJunctionKind::tee);
+
+    const RoadMesh tee_patch = RoadJunctionBuilder::build_patch(graph, center);
+    assert(!tee_patch.empty());
+    assert(tee_patch.vertices.size() == 7U); // center + two boundaries per arm
+    assert(tee_patch.indices.size() == 18U);
+    for (const RoadMeshVertex& vertex : tee_patch.vertices) assert(near_value(vertex.position.z, 0.50F));
+
+    const auto before_move = graph.spline_for(*east_segment);
+    assert(before_move);
+    assert(near_value(before_move->start.x, 0.0F));
+    assert(near_value(before_move->control_a.x, 1.0F));
+
+    assert(graph.set_node_position(center, {0.50F, 0.25F, 1.25F}));
+    const auto after_move = graph.spline_for(*east_segment);
+    assert(after_move);
+    assert(near_value(after_move->start.x, 0.50F));
+    assert(near_value(after_move->start.y, 0.25F));
+    assert(near_value(after_move->start.z, 1.25F));
+    assert(near_value(after_move->control_a.x, 1.50F));
+    assert(near_value(after_move->control_a.y, 0.25F));
+    assert(near_value(after_move->control_a.z, 1.25F));
+
+    const ProceduralRoadNodeId south = graph.add_node({0.50F, 4.0F, 1.25F});
+    const auto south_segment = graph.add_segment(center, south, {0.0F, 1.0F, 0.0F}, {0.0F, -1.0F, 0.0F}, 0.90F, 2);
+    assert(south_segment);
+    assert(graph.degree(center) == 4U);
+    assert(RoadJunctionBuilder::classify(graph, center) == ProceduralRoadJunctionKind::intersection);
+    const RoadMesh cross_patch = RoadJunctionBuilder::build_patch(graph, center);
+    assert(!cross_patch.empty());
+    assert(cross_patch.vertices.size() == 9U);
+    assert(cross_patch.indices.size() == 24U);
+    for (const RoadMeshVertex& vertex : cross_patch.vertices) assert(near_value(vertex.position.z, 1.25F));
+
+    // Geometric crossing is not topology. These two independent roads cross at
+    // XY=(0,0) but share no node, so they remain two degree-1 segments. This is
+    // the invariant that allows a future viaduct to pass over a ground road.
+    ProceduralRoadGraph crossing_graph;
+    const auto left = crossing_graph.add_node({-3.0F, 0.0F, 0.0F});
+    const auto right = crossing_graph.add_node({3.0F, 0.0F, 0.0F});
+    const auto top = crossing_graph.add_node({0.0F, -3.0F, 2.0F});
+    const auto bottom = crossing_graph.add_node({0.0F, 3.0F, 2.0F});
+    assert(crossing_graph.add_segment(left, right, {1.0F, 0.0F, 0.0F}, {-1.0F, 0.0F, 0.0F}));
+    assert(crossing_graph.add_segment(top, bottom, {0.0F, 1.0F, 0.0F}, {0.0F, -1.0F, 0.0F}));
+    assert(crossing_graph.degree(left) == 1U);
+    assert(crossing_graph.degree(right) == 1U);
+    assert(crossing_graph.degree(top) == 1U);
+    assert(crossing_graph.degree(bottom) == 1U);
+    assert(RoadJunctionBuilder::classify(crossing_graph, left) == ProceduralRoadJunctionKind::end);
+    assert(RoadJunctionBuilder::build_patch(crossing_graph, left).empty());
+
+    const ProceduralRoadNodeId highest_before_remove = south;
+    assert(graph.remove_node(center));
+    assert(graph.segments().empty());
+    const ProceduralRoadNodeId replacement = graph.add_node({8.0F, 8.0F, 0.0F});
+    assert(replacement > highest_before_remove); // compacting storage never reuses stable IDs
 }
 
 void test_pedestrian_lanes_derive_from_roads() {
@@ -194,6 +270,7 @@ void test_building_occupancy_blocks_pedestrian_tile() {
 
 int main() {
     test_roads();
+    test_procedural_road_graph_and_junctions();
     test_pedestrian_lanes_derive_from_roads();
     test_sidewalks();
     test_pedestrian_surface_route();
