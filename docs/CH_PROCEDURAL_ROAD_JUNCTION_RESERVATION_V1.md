@@ -6,6 +6,8 @@
 
 This is a traffic-arbitration layer for the experimental procedural road system. It remains parallel to the legacy tile-based traffic system and does not migrate or replace `TrafficVehicleManager`.
 
+Fixed-phase signal control is now layered above this contract by `CH_PROCEDURAL_ROAD_SIGNALS_V1`. Signals decide which approaches may request a junction; reservations still own the conservative one-vehicle conflict zone.
+
 ## Runtime components
 
 The contract is implemented by:
@@ -29,9 +31,9 @@ A reservation is keyed by `ProceduralRoadNodeId` and has one vehicle owner.
 
 The V1 rules are deliberately simple and deterministic:
 
-1. A vehicle already holding a reservation keeps it while that junction is still the current/upcoming junction on its route.
-2. If a junction has no owner, approaching vehicles inside `request_lookahead` may request it.
-3. A vehicle already inside an unowned junction has highest priority.
+1. A vehicle already holding a reservation keeps it while that junction is still the current/upcoming junction on its route, unless a signalized approach turns red before entry.
+2. If a junction has no owner, approaching vehicles inside `request_lookahead` may request it when any higher-level control policy permits them.
+3. A vehicle already inside an unowned junction has highest priority and may clear the conflict zone even if a signal phase changes.
 4. Otherwise the vehicle with the smallest route distance to the junction wins.
 5. Exact-distance ties are broken lexicographically by stable `vehicle_id`.
 6. Vehicles that do not own the junction receive an external speed cap that brings them to a stop before the connector.
@@ -81,24 +83,27 @@ and read-only inspection through:
 
 These fields are intended for tests, debugging and future runtime overlays; they are not save-game format yet.
 
+Signal-specific diagnostics and phase state are documented separately in `CH_PROCEDURAL_ROAD_SIGNALS_V1`.
+
 ## Current validation gate
 
-`src/procedural_road_lane_connector_test.cpp` now covers:
+`src/procedural_road_lane_connector_test.cpp` covers:
 
 - upcoming-junction lookup from a continuous route;
 - deterministic tie breaking between two equally distant vehicles;
 - one reservation owner per shared node;
 - the losing vehicle braking before the connector;
 - no simultaneous connector occupancy in the test crossing;
-- release and transfer of the reservation after the first vehicle exits.
+- release and transfer of the reservation after the first vehicle exits;
+- fixed-phase signal gating layered above the same reservation mechanism.
 
 A green build/test run is still required before this contract can be considered compile-validated on the project runner.
 
-## Explicit non-goals for V1
+## Explicit non-goals for reservation V1
 
-V1 does not yet implement:
+The reservation layer itself does not implement:
 
-- traffic lights;
+- adaptive traffic-light timing;
 - stop/yield sign policy;
 - road-class priority;
 - protected turn phases;
@@ -107,5 +112,7 @@ V1 does not yet implement:
 - emergency vehicle priority;
 - deadlock recovery across multiple adjacent junctions;
 - persistence in save/load.
+
+Fixed two-axis signal phases are now provided by `CH_PROCEDURAL_ROAD_SIGNALS_V1`; more advanced policies remain future layers.
 
 The conservative one-owner-per-node policy is intentional for the first playable proof. It can later be refined into movement-level conflict zones without changing the road graph or continuous vehicle follower contracts.
