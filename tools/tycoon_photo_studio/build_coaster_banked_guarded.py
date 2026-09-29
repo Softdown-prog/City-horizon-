@@ -48,7 +48,8 @@ def centerline_for(piece: str, samples: int = 49):
 
 def bank_angle(piece: str, t: float) -> float:
     # Zero roll at both connectors, peak roll at curve midpoint.
-    sign = -1.0 if piece == "banked_curve_left" else 1.0
+    # Left curves raise the outer/right rail; right curves mirror that handedness.
+    sign = 1.0 if piece == "banked_curve_left" else -1.0
     envelope = math.sin(math.pi * t)
     return math.radians(MAX_BANK_DEG) * sign * envelope
 
