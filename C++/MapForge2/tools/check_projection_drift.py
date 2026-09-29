@@ -29,12 +29,14 @@ MIGRATED_REQUIREMENTS = {
     "asset_grid_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "tile_surface_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "park_fence_renderer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
+    "building_block_preview_renderer.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "map_capture_service.cpp": ("tilePolygonAtElevation", "world_to_screen_point"),
     "procedural_road_preview_main.cpp": ("world_to_screen_point", "screen_to_world_point"),
 }
 
-# Strong indicators of a local isometric projection implementation. We deliberately
-# avoid generic x-y arithmetic so normal geometry code is not flagged.
+# Strong indicators of a local isometric projection implementation. Generic arithmetic
+# remains legal; these patterns look for the paired coordinate expressions normally used
+# to rebuild the CH 2:1 basis by hand.
 DRIFT_PATTERNS = (
     re.compile(r"half_tile_w\s*=", re.IGNORECASE),
     re.compile(r"half_tile_h\s*=", re.IGNORECASE),
@@ -42,6 +44,10 @@ DRIFT_PATTERNS = (
     re.compile(r"kTileHeight\s*=\s*64(?:\.0)?"),
     re.compile(r"\(\s*tile_x\s*-\s*tile_y\s*\)\s*\*"),
     re.compile(r"\(\s*tile_x\s*\+\s*tile_y\s*\)\s*\*"),
+    re.compile(r"\(\s*point\.x\s*-\s*point\.y\s*\)\s*\*"),
+    re.compile(r"\(\s*point\.x\s*\+\s*point\.y\s*\)\s*\*"),
+    re.compile(r"\(\s*rotated\.x\s*-\s*rotated\.y\s*\)\s*\*"),
+    re.compile(r"\(\s*rotated\.x\s*\+\s*rotated\.y\s*\)\s*\*"),
 )
 
 
