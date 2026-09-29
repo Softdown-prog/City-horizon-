@@ -1,10 +1,8 @@
-# CH runtime promotion v1
+# CH runtime promotion v2
 name: Promote Casa Popular color masks
 
 on:
   push:
-    paths:
-      - '.github/workflows/promote-casa-popular-color-mask.yml'
   workflow_dispatch:
 
 permissions:
