@@ -1,8 +1,9 @@
 """Guarded CH Blender prototype for roller-coaster corkscrew elements.
 
 CH_COASTER_CORKSCREW_V0 reuses the existing CH coaster rail/tie/support
-vocabulary while adding a deterministic 360-degree roll around a smooth 3D
-centerline. Runtime remains pre-rendered 2D; Blender is authoring only.
+vocabulary while defining one deterministic corkscrew inversion with flat
+approach/exit connectors. Runtime remains pre-rendered 2D; Blender is authoring
+only.
 """
 
 from __future__ import annotations
@@ -28,10 +29,11 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
-CORKSCREW_LENGTH = base.TILE * 3.0
-CORKSCREW_RADIUS = base.TILE * 0.65
+CORKSCREW_LENGTH = base.TILE * 3.4
+CORKSCREW_RADIUS = base.TILE * 0.58
+APPROACH_LENGTH = base.TILE * 0.70
 ROLL_DEGREES = 360.0
-FOOTPRINT = {"widthTiles": 3, "depthTiles": 4}
+FOOTPRINT = {"widthTiles": 3, "depthTiles": 5}
 
 
 def parse_args():
@@ -55,29 +57,72 @@ def handedness(piece: str) -> float:
     return 1.0 if piece == "corkscrew_left" else -1.0
 
 
-def sample_centerline(piece: str, samples: int = 193):
-    """Sample a forward-moving corkscrew with flat/tangent-safe connectors.
+def inversion_phase(piece: str, t: float) -> float:
+    return handedness(piece) * math.tau * smootherstep(t)
 
-    The transverse excursion fades to zero at both connectors.  This keeps the
-    entry and exit centered and tangent to +Y while the middle of the element
-    traces a full spatial roll around the forward axis.
+
+def sample_centerline(piece: str, approach_samples: int = 25, body_samples: int = 145):
+    """Build a single corkscrew with true flat tangent connectors.
+
+    V0 used an amplitude envelope over an already rotating centerline and then
+    applied another independent 360-degree rail roll. That double-twist made the
+    rails cross visually like a ribbon. V1 gives the centerline one helical
+    inversion only. The phase uses smootherstep so its angular velocity reaches
+    zero at both ends, making the body tangent match the flat approaches.
     """
-    sign = handedness(piece)
     points = []
-    for i in range(samples):
-        t = i / (samples - 1)
-        phase = sign * math.tau * t
-        envelope = math.sin(math.pi * t) ** 2
-        y = -CORKSCREW_LENGTH * 0.5 + CORKSCREW_LENGTH * t
-        x = CORKSCREW_RADIUS * envelope * math.sin(phase)
-        z = base.RAIL_Z + CORKSCREW_RADIUS * envelope * (1.0 - math.cos(phase))
+    body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
+    body_start_y = -body_length * 0.5
+    body_end_y = body_length * 0.5
+    sign = handedness(piece)
+
+    for i in range(approach_samples):
+        t = i / (approach_samples - 1)
+        y = -CORKSCREW_LENGTH * 0.5 + APPROACH_LENGTH * t
+        points.append(Vector((0.0, y, base.RAIL_Z)))
+
+    for i in range(1, body_samples):
+        t = i / (body_samples - 1)
+        phase = inversion_phase(piece, t)
+        y = body_start_y + body_length * t
+        x = sign * CORKSCREW_RADIUS * math.sin(abs(phase))
+        z = base.RAIL_Z + CORKSCREW_RADIUS * (1.0 - math.cos(abs(phase)))
         points.append(Vector((x, y, z)))
+
+    for i in range(1, approach_samples):
+        t = i / (approach_samples - 1)
+        y = body_end_y + APPROACH_LENGTH * t
+        points.append(Vector((0.0, y, base.RAIL_Z)))
+
     return points
 
 
-def roll_angle(piece: str, t: float) -> float:
-    # A full 360-degree roll with zero angular velocity at both connectors.
-    return math.radians(ROLL_DEGREES * handedness(piece) * smootherstep(t))
+def phase_for_centerline_index(piece: str, index: int, count: int) -> float:
+    approach_samples = 25
+    body_samples = 145
+    body_first = approach_samples - 1
+    body_last = body_first + body_samples - 1
+    if index <= body_first:
+        return 0.0
+    if index >= body_last:
+        return handedness(piece) * math.tau
+    t = (index - body_first) / (body_samples - 1)
+    return inversion_phase(piece, t)
+
+
+def track_frame(points, index: int, phase: float):
+    """One synchronized roll frame, projected perpendicular to the centerline."""
+    tangent = base.tangent(points, index)
+    sign = 1.0 if phase >= 0.0 else -1.0
+    a = abs(phase)
+
+    desired_right = Vector((math.cos(a), 0.0, -sign * math.sin(a)))
+    right = desired_right - tangent * desired_right.dot(tangent)
+    if right.length < 1e-6:
+        right = Vector((1.0, 0.0, 0.0)) - tangent * tangent.x
+    right.normalize()
+    up = right.cross(tangent).normalized()
+    return tangent, right, up
 
 
 def build_piece(piece: str):
@@ -86,16 +131,14 @@ def build_piece(piece: str):
     support_mat = bs.make_material("TrackSupports", (0.31, 0.35, 0.36, 1.0), 0.52, 0.18)
 
     centerline = sample_centerline(piece)
-    last = len(centerline) - 1
     frames = []
     left = []
     right_rail = []
 
     for i, point in enumerate(centerline):
-        t = i / last
-        roll = roll_angle(piece, t)
-        tangent, right, up = banked.track_frame(centerline, i, roll)
-        frames.append((tangent, right, up, roll))
+        phase = phase_for_centerline_index(piece, i, len(centerline))
+        tangent, right, up = track_frame(centerline, i, phase)
+        frames.append((tangent, right, up, phase))
         left.append(point - right * (base.GAUGE * 0.5))
         right_rail.append(point + right * (base.GAUGE * 0.5))
 
@@ -119,8 +162,10 @@ def build_piece(piece: str):
             up,
         ))
 
-    # Keep supports world-vertical and out of the central inversion envelope.
-    support_indices = sorted(set((0, last // 4, (last * 3) // 4, last)))
+    # Ground the straight connectors and lower shoulders. Keep posts outside the
+    # central upside-down section so the inversion silhouette remains readable.
+    last = len(centerline) - 1
+    support_indices = sorted(set((0, len(centerline) // 5, (len(centerline) * 4) // 5, last)))
     for n, idx in enumerate(support_indices):
         base.build_support_frame(
             authored,
@@ -139,11 +184,12 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_roll_v0",
+        "profile": "single_inversion_v1",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
         "radius": CORKSCREW_RADIUS,
+        "approachLength": APPROACH_LENGTH,
         "rollDegrees": ROLL_DEGREES,
         "rollSamplesDegrees": [round(math.degrees(frame[3]), 6) for frame in frames],
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
