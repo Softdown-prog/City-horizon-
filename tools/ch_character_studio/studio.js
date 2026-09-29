@@ -6,6 +6,7 @@
   ];
   const PALETTE = ["#f6c29e","#d43b2f","#f2d744","#2b71c9","#26313a","#ffffff","#1f2937","#8b5cf6","#ef4444","#22c55e"];
   const SHAPES = window.CH_CHARACTER_SHAPES || [];
+  const TEMPLATES = window.CH_CHARACTER_TEMPLATES || [];
 
   const view = document.getElementById("view");
   const vctx = view.getContext("2d");
@@ -37,9 +38,11 @@
   const shapeSelect = document.getElementById("shapeSelect");
   const shapeScale = document.getElementById("shapeScale");
   const shapeScaleLabel = document.getElementById("shapeScaleLabel");
+  const templateSelect = document.getElementById("templateSelect");
 
   function setStatus(msg) { status.textContent = msg; }
   function canvasFor(name) { return buffers.get(name); }
+  function currentDirection() { return document.getElementById("direction").value; }
 
   function redraw() {
     vctx.clearRect(0, 0, W, H);
@@ -108,6 +111,16 @@
     }
   }
 
+  function buildTemplateSelect() {
+    templateSelect.innerHTML = "";
+    for (const template of TEMPLATES) {
+      const option = document.createElement("option");
+      option.value = template.id;
+      option.textContent = template.label;
+      templateSelect.appendChild(option);
+    }
+  }
+
   function pointFromEvent(ev) {
     const r = view.getBoundingClientRect();
     return {
@@ -154,6 +167,17 @@
     return SHAPES.find(shape => shape.id === shapeSelect.value) || null;
   }
 
+  function drawShape(shape, x, y, fill, scale) {
+    if (!shape || !buffers.has(shape.layer)) return false;
+    visibility.set(shape.layer, true);
+    const ctx = canvasFor(shape.layer).getContext("2d");
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    shape.draw(ctx, x, y, fill, scale, currentDirection());
+    ctx.restore();
+    return true;
+  }
+
   function stampSmartShape(ev) {
     const shape = selectedShape();
     if (!shape) {
@@ -161,21 +185,35 @@
       return;
     }
     const {x, y} = pointFromEvent(ev);
-    if (!buffers.has(shape.layer)) {
+    if (!drawShape(shape, x, y, color.value, Number(shapeScale.value))) {
       setStatus(`Forma ${shape.label} pediu camada desconhecida: ${shape.layer}`);
       return;
     }
     activeLayer = shape.layer;
-    visibility.set(activeLayer, true);
-    const ctx = canvasFor(activeLayer).getContext("2d");
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const direction = document.getElementById("direction").value;
-    shape.draw(ctx, x, y, color.value, Number(shapeScale.value), direction);
-    ctx.restore();
     buildLayerList();
     redraw();
-    setStatus(`${shape.label} aplicado em ${activeLayer} · direção ${direction} · ${shapeScale.value}×`);
+    setStatus(`${shape.label} aplicado em ${activeLayer} · direção ${currentDirection()} · ${shapeScale.value}×`);
+  }
+
+  function clearArtLayers() {
+    for (const name of LAYERS) canvasFor(name).getContext("2d").clearRect(0, 0, W, H);
+  }
+
+  function applyTemplate() {
+    const template = TEMPLATES.find(item => item.id === templateSelect.value);
+    if (!template) return;
+    clearArtLayers();
+    const palette = template.palette || {};
+    let applied = 0;
+    for (const placement of template.placements || []) {
+      const shape = SHAPES.find(item => item.id === placement.shape);
+      const fill = palette[placement.color] || placement.color || color.value;
+      if (drawShape(shape, placement.x, placement.y, fill, placement.scale || 1)) applied += 1;
+    }
+    activeLayer = "paint_over";
+    buildLayerList();
+    redraw();
+    setStatus(`${template.label} aplicado: ${applied} peças artísticas · pose e movimento preservados.`);
   }
 
   function setTool(next) {
@@ -209,6 +247,7 @@
     redraw();
     setStatus(`Camada ${activeLayer} limpa.`);
   });
+  document.getElementById("applyTemplate").addEventListener("click", applyTemplate);
   brushSize.addEventListener("input", () => sizeLabel.textContent = brushSize.value);
   shapeScale.addEventListener("input", () => shapeScaleLabel.textContent = Number(shapeScale.value).toFixed(2));
   shapeSelect.addEventListener("change", () => {
@@ -249,7 +288,7 @@
   }
 
   document.getElementById("exportLayer").addEventListener("click", () => {
-    const dir = document.getElementById("direction").value.toLowerCase();
+    const dir = currentDirection().toLowerCase();
     const frame = document.getElementById("frame").value;
     downloadCanvas(canvasFor(activeLayer), `${dir}_${frame}_${activeLayer}.png`);
   });
@@ -260,7 +299,7 @@
     const ctx = out.getContext("2d");
     ctx.drawImage(base,0,0);
     for (const name of LAYERS) if (visibility.get(name)) ctx.drawImage(canvasFor(name),0,0);
-    const dir = document.getElementById("direction").value.toLowerCase();
+    const dir = currentDirection().toLowerCase();
     const frame = document.getElementById("frame").value;
     downloadCanvas(out, `${dir}_${frame}_character.png`);
   });
@@ -275,7 +314,8 @@
       appearance:{
         palette:{skin:PALETTE[0],hair:PALETTE[1],primary:PALETTE[2],secondary:PALETTE[3],shoes:PALETTE[4]},
         layers:LAYERS.map(name => ({name, enabled:visibility.get(name), opacity:1.0})),
-        smartShapes:{library:"CH_CHARACTER_SHAPES_V0", directionAware:true}
+        smartShapes:{library:"CH_CHARACTER_SHAPES_V0", directionAware:true},
+        template:templateSelect.value || null
       }
     };
     const blob = new Blob([JSON.stringify(spec,null,2)+"\n"],{type:"application/json"});
@@ -289,5 +329,6 @@
   buildLayerList();
   buildSwatches();
   buildShapeSelect();
+  buildTemplateSelect();
   redraw();
 })();
