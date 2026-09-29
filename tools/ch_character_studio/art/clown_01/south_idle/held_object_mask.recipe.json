@@ -1,0 +1,6 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"maskBank","name":"held_object"},
+  "operations":[]
+}
