@@ -8,20 +8,94 @@
   "sourceCommit": "75cec1730bab45df52d8cfb9d40002dea07782e9",
   "approvedProxySha256": "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956",
   "renderer": "CYCLES",
-  "frameSize": [256, 256],
-  "footprint": { "width": 3, "height": 3 },
-  "tileProjection": { "width": 128, "height": 64 },
-  "studioGroundOrigin": { "x": 512.0001, "y": 603.7992 },
-  "runtimeAnchor": { "x": 0.5, "y": 0.68339765625 },
-  "rotationOrder": ["south", "west", "north", "east"],
+  "frameSize": [
+    256,
+    256
+  ],
+  "footprint": {
+    "width": 3,
+    "height": 3
+  },
+  "tileProjection": {
+    "width": 128,
+    "height": 64
+  },
+  "studioGroundOrigin": {
+    "x": 512.0001,
+    "y": 603.7992
+  },
+  "runtimeAnchor": {
+    "x": 0.5,
+    "y": 0.68339765625
+  },
+  "rotationOrder": [
+    "south",
+    "west",
+    "north",
+    "east"
+  ],
   "sprites": {
-    "south": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south.png", "sha256": "bab352e7ed393bb9eec630e6c3179e20442ea4c954192bfc94f8482db4975da9" },
-    "west": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west.png", "sha256": "8f423a33ae90699c864534590280f1e55d1cd6bc13d80f74fb889176ca827660" },
-    "north": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north.png", "sha256": "a3d9446e861641a50b2e941f9c8ae9804b2edddbb4487b5f487c4df2f7e9275e" },
-    "east": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east.png", "sha256": "5d2d396cd26cc8cd2daf2932d80e43ee25a183249e758abd84392be77836c35d" }
+    "south": {
+      "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south.png",
+      "sha256": "bab352e7ed393bb9eec630e6c3179e20442ea4c954192bfc94f8482db4975da9"
+    },
+    "west": {
+      "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west.png",
+      "sha256": "8f423a33ae90699c864534590280f1e55d1cd6bc13d80f74fb889176ca827660"
+    },
+    "north": {
+      "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north.png",
+      "sha256": "a3d9446e861641a50b2e941f9c8ae9804b2edddbb4487b5f487c4df2f7e9275e"
+    },
+    "east": {
+      "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east.png",
+      "sha256": "5d2d396cd26cc8cd2daf2932d80e43ee25a183249e758abd84392be77836c35d"
+    }
   },
   "postProcess": "CH_TYCOON_STUDIO_V1 full-frame LANCZOS downsample to 256x256; indexed 256-color runtime PNG",
   "approvedForRuntimeArt": true,
   "runtimeGameplayDefinitionRegistered": true,
-  "runtimeGameplayDefinition": "assets/definitions/residential_popular_house_01.json"
+  "runtimeGameplayDefinition": "assets/definitions/residential_popular_house_01.json",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "sourceWorkflowRun": 36584187772,
+    "sourceArtifactId": 11041162241,
+    "sourceCommit": "e7aa71410908a1b8ceac9142303935a3e61d6292",
+    "sourceArtifactDigest": "sha256:ffe93a5874f55dc8bd83527b1f816ebd311e7dd10607263ba224a2036e8db2fd",
+    "approvedProxySha256": "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956",
+    "alpha": "coverage",
+    "authoredChannels": {
+      "R": "wall",
+      "G": "roof",
+      "B": "trim"
+    },
+    "runtimeActiveChannels": {
+      "R": "wall",
+      "G": "roof"
+    },
+    "rotationOrder": [
+      "south",
+      "west",
+      "north",
+      "east"
+    ],
+    "sprites": {
+      "south": {
+        "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south_mask.png",
+        "sha256": "0ce598a90d0ffb457f3ddd248c747d24d8628ec075ac643808decde927e2ca69"
+      },
+      "west": {
+        "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west_mask.png",
+        "sha256": "0cc44431cbdafed9c39537fe6b55a2c4a27be9f9ac1744a7533c8c05d8befa6c"
+      },
+      "north": {
+        "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north_mask.png",
+        "sha256": "09084b280d1f555193b67ffa51b064623f9a3ee1c8830ff4ec0b5a66d77cb00e"
+      },
+      "east": {
+        "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east_mask.png",
+        "sha256": "ef510a79cd95d20f37e0297ddf0ea98554e652f8113797b2fe6ea5536657b007"
+      }
+    }
+  }
 }
