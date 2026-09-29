@@ -13,7 +13,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 include(FetchContent)
 set(SDL_TESTS OFF CACHE BOOL "Disable SDL tests for the Studio build" FORCE)
-set(SDL_EXAMPLES OFF CACHE BOOL "Disable SDL examples for the Studio build" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "Disable SDL examples" FORCE)
 FetchContent_Declare(
     SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -161,9 +161,11 @@ add_executable(CityHorizonAssetEditor WIN32
 )
 target_include_directories(CityHorizonAssetEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CH_ROOT}
 )
 target_link_libraries(CityHorizonAssetEditor PRIVATE
     mapforge2_asset_document
+    mapforge2_canonical
     Qt6::Widgets
     Qt6::Gui
 )
