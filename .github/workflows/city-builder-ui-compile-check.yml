@@ -12,6 +12,7 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/runtime_video_capture.h"
       - "src/audio_manager.cpp"
       - "src/audio_manager.h"
       - "src/runtime_view_state.h"
