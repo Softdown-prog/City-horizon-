@@ -6,7 +6,7 @@ uses the approved CH Actor / CH Blender contracts for camera, pose and depth.
 
 Commands:
   validate-spec  validate an editable character art specification
-  make-job       create a guarded CH Blender base-pass job
+  make-job       create a guarded CH Blender base-pass + landmarks job
   compose        combine Blender base pass + paint layers into a preview PNG
 """
 from __future__ import annotations
@@ -26,6 +26,7 @@ JOB_CONTRACT = "CH_BLENDER_AGENT_JOB_V1"
 FRAME = (48, 64)
 GROUND_ANCHOR = [24, 60]
 DIRECTIONS = ["S", "E", "N", "W"]
+ANIMATION_FRAMES = ["idle"] + [f"walk_{index:02d}" for index in range(8)]
 LAYER_ORDER = [
     "silhouette",
     "skin",
@@ -91,14 +92,25 @@ def validate_spec(path: Path) -> dict:
     return data
 
 
-def make_job(spec_path: Path, output_path: Path, stage: str) -> dict:
+def make_job(
+    spec_path: Path,
+    output_path: Path,
+    stage: str,
+    direction: str,
+    frame: str,
+) -> dict:
     spec = validate_spec(spec_path)
     if stage not in {"preflight", "proxy", "final"}:
         raise StudioError("stage must be preflight, proxy or final")
+    if direction not in DIRECTIONS:
+        raise StudioError(f"direction must be one of {DIRECTIONS}")
+    if frame not in ANIMATION_FRAMES:
+        raise StudioError(f"frame must be one of {ANIMATION_FRAMES}")
 
     character_id = spec["characterId"]
-    output_dir = f"out/ch_character_studio/{character_id}/{stage}"
-    job_id = f"character.{character_id}.studio.{stage}.001"
+    pose_id = f"{direction.lower()}_{frame}"
+    output_dir = f"out/ch_character_studio/{character_id}/{stage}/{pose_id}"
+    job_id = f"character.{character_id}.studio.{stage}.{pose_id}.001"
     job = {
         "contract": JOB_CONTRACT,
         "jobId": job_id,
@@ -110,8 +122,17 @@ def make_job(spec_path: Path, output_path: Path, stage: str) -> dict:
             spec_path.relative_to(REPO_ROOT).as_posix(),
             "--output",
             output_dir,
+            "--direction",
+            direction,
+            "--frame",
+            frame,
         ],
         "outputDir": output_dir,
+        "expectedOutputs": [
+            f"{output_dir}/base.png",
+            f"{output_dir}/landmarks.json",
+            f"{output_dir}/character_base_report.json",
+        ],
     }
     if stage == "final":
         approval = spec.get("approval") or {}
@@ -180,6 +201,8 @@ def main() -> int:
     p_job = sub.add_parser("make-job")
     p_job.add_argument("--spec", type=Path, required=True)
     p_job.add_argument("--stage", choices=("preflight", "proxy", "final"), required=True)
+    p_job.add_argument("--direction", choices=DIRECTIONS, default="S")
+    p_job.add_argument("--frame", choices=ANIMATION_FRAMES, default="idle")
     p_job.add_argument("--out", type=Path, required=True)
 
     p_compose = sub.add_parser("compose")
@@ -196,8 +219,13 @@ def main() -> int:
         elif args.cmd == "make-job":
             spec = (REPO_ROOT / args.spec).resolve() if not args.spec.is_absolute() else args.spec
             out = (REPO_ROOT / args.out).resolve() if not args.out.is_absolute() else args.out
-            job = make_job(spec, out, args.stage)
-            emit({"contract": "CH_CHARACTER_STUDIO_JOB_V0", "status": "ok", "job": job})
+            job = make_job(spec, out, args.stage, args.direction, args.frame)
+            emit({
+                "contract": "CH_CHARACTER_STUDIO_JOB_V0",
+                "status": "ok",
+                "pose": {"direction": args.direction, "frame": args.frame},
+                "job": job,
+            })
         elif args.cmd == "compose":
             spec = (REPO_ROOT / args.spec).resolve() if not args.spec.is_absolute() else args.spec
             base = (REPO_ROOT / args.base).resolve() if not args.base.is_absolute() else args.base
