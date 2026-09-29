@@ -22,11 +22,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 STUDIO_DIR = REPO_ROOT / "tools/ch_character_studio"
 MANIFEST_PATH = STUDIO_DIR / "studio_manifest.json"
 SPEC_CONTRACT = "CH_CHARACTER_ART_SPEC_V0"
+COLOR_MASK_CONTRACT = "CH_CHARACTER_COLOR_MASK_V0"
+HAND_SOCKET_CONTRACT = "CH_CHARACTER_HAND_SOCKET_V0"
 JOB_CONTRACT = "CH_BLENDER_AGENT_JOB_V1"
 FRAME = (48, 64)
 GROUND_ANCHOR = [24, 60]
 DIRECTIONS = ["S", "E", "N", "W"]
 ANIMATION_FRAMES = ["idle"] + [f"walk_{index:02d}" for index in range(8)]
+HAND_SOCKETS = {"left_hand", "right_hand"}
+OBJECT_DEPTHS = {"auto", "back", "front"}
+MASK_BANKS = {
+    "appearance": {"R": "skin", "G": "hair", "B": "appearance_accent"},
+    "clothing": {"R": "primary_clothing", "G": "secondary_clothing", "B": "clothing_accent"},
+    "held_object": {"R": "object_primary", "G": "object_secondary", "B": "object_accent"},
+}
 LAYER_ORDER = [
     "silhouette",
     "skin",
@@ -53,6 +62,14 @@ def read_json(path: Path) -> dict:
         raise StudioError(f"file not found: {path}") from exc
     except json.JSONDecodeError as exc:
         raise StudioError(f"invalid JSON: {path}: {exc}") from exc
+
+
+def _is_number_pair(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == 2
+        and all(isinstance(item, (int, float)) for item in value)
+    )
 
 
 def validate_spec(path: Path) -> dict:
@@ -86,6 +103,41 @@ def validate_spec(path: Path) -> dict:
     unknown = sorted(set(names) - set(LAYER_ORDER))
     if unknown:
         errors.append(f"unknown art layer(s): {', '.join(unknown)}")
+
+    color_masks = data.get("colorMasks")
+    if color_masks is not None:
+        if not isinstance(color_masks, dict):
+            errors.append("colorMasks must be an object")
+        else:
+            if color_masks.get("contract") != COLOR_MASK_CONTRACT:
+                errors.append(f"colorMasks.contract must be {COLOR_MASK_CONTRACT}")
+            if color_masks.get("alpha") != "coverage":
+                errors.append("colorMasks.alpha must be coverage")
+            banks = color_masks.get("banks") or {}
+            for bank_name, expected_channels in MASK_BANKS.items():
+                actual = banks.get(bank_name)
+                if actual != expected_channels:
+                    errors.append(
+                        f"colorMasks.banks.{bank_name} must be {expected_channels}"
+                    )
+
+    held_object = data.get("heldObject")
+    if held_object is not None:
+        if not isinstance(held_object, dict):
+            errors.append("heldObject must be an object")
+        else:
+            if held_object.get("contract") != HAND_SOCKET_CONTRACT:
+                errors.append(f"heldObject.contract must be {HAND_SOCKET_CONTRACT}")
+            if held_object.get("socket") not in HAND_SOCKETS:
+                errors.append(f"heldObject.socket must be one of {sorted(HAND_SOCKETS)}")
+            if held_object.get("depth") not in OBJECT_DEPTHS:
+                errors.append(f"heldObject.depth must be one of {sorted(OBJECT_DEPTHS)}")
+            if not _is_number_pair(held_object.get("gripAnchor")):
+                errors.append("heldObject.gripAnchor must be numeric [x,y]")
+            if not _is_number_pair(held_object.get("offset")):
+                errors.append("heldObject.offset must be numeric [x,y]")
+            if "enabled" in held_object and not isinstance(held_object.get("enabled"), bool):
+                errors.append("heldObject.enabled must be boolean")
 
     if errors:
         raise StudioError("; ".join(errors))
