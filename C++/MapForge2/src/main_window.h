@@ -37,6 +37,7 @@ private:
     QAction* inspect_action_ = nullptr;
     QAction* terrain_action_ = nullptr;
     QAction* road_action_ = nullptr;
+    QAction* fence_action_ = nullptr;
     QAction* erase_action_ = nullptr;
     QLabel* tile_status_ = nullptr;
     QLabel* map_status_ = nullptr;
