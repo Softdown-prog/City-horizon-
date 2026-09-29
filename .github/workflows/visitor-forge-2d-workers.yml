@@ -11,6 +11,7 @@ on:
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/prop_grammar.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/prop_sign_grammar.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/prop_street_grammar.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/component_gallery.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/prop_cli.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/cli.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/fence_connectivity.py'
@@ -28,13 +29,16 @@ on:
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/scene_composer_v2.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/scene_composer_v3.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/scene_composer_v4.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/component_resolver.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/smooth_geometry.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/localized_finish.py'
+      - 'tools/visitor_forge_2d/examples/component_gallery/reusable_components_*.json'
       - 'tools/visitor_forge_2d/examples/pine_*.json'
       - 'tools/visitor_forge_2d/examples/flower_bed_*.json'
       - 'tools/visitor_forge_2d/examples/park_*fence_*.json'
       - 'tools/visitor_forge_2d/examples/park_wayfinding_sign.json'
       - 'tools/visitor_forge_2d/examples/prop_*_scene_*.json'
+      - 'tools/visitor_forge_2d/examples/prop_component_gallery_demo_v1.json'
       - 'tools/visitor_forge_2d/examples/prop_briefs/*.json'
       - 'tools/visitor_forge_2d/examples/park_tree_red_mapple_*.json'
       - 'tools/visitor_forge_2d/examples/park_tree_flowering_*.json'
@@ -88,6 +92,7 @@ jobs:
           - park_wayfinding_sign
           - prop_rowboat_scene_v4
           - prop_pier_scene_v4
+          - prop_component_gallery_demo_v1
           - park_iron_fence_01
           - park_chainlink_fence_01
           - park_wood_fence_01
