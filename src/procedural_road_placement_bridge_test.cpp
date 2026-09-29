@@ -98,6 +98,51 @@ void test_existing_edge_class_can_be_reprofiled_explicitly() {
     assert(bridge.classes().road_class(bridge.graph(), segment_id) == ProceduralRoadClass::arterial);
 }
 
+void test_rebuild_from_legacy_tiles_restores_topology_after_demolition() {
+    ProceduralRoadPlacementBridge bridge;
+    const std::vector<RoadTile> crossing = {
+        {-1, 0, 0}, {0, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0},
+    };
+    assert(bridge.rebuild_from_legacy_tiles(crossing));
+    assert(bridge.graph().nodes().size() == 5U);
+    assert(bridge.graph().segments().size() == 4U);
+
+    ProceduralRoadNodeId center = kInvalidProceduralRoadNodeId;
+    for (const ProceduralRoadNode& node : bridge.graph().nodes()) {
+        if (node.position.x == 0.5F && node.position.y == 0.5F) center = node.id;
+    }
+    assert(center != kInvalidProceduralRoadNodeId);
+    assert(bridge.graph().degree(center) == 4U);
+
+    const std::vector<RoadTile> after_demolition = {
+        {-1, 0, 0}, {0, 0, 0}, {1, 0, 0}, {0, -1, 0},
+    };
+    assert(bridge.rebuild_from_legacy_tiles(after_demolition));
+    assert(bridge.graph().nodes().size() == 4U);
+    assert(bridge.graph().segments().size() == 3U);
+
+    center = kInvalidProceduralRoadNodeId;
+    for (const ProceduralRoadNode& node : bridge.graph().nodes()) {
+        if (node.position.x == 0.5F && node.position.y == 0.5F) center = node.id;
+    }
+    assert(center != kInvalidProceduralRoadNodeId);
+    assert(bridge.graph().degree(center) == 3U);
+    for (const ProceduralRoadGraphSegment& segment : bridge.graph().segments()) {
+        assert(bridge.classes().road_class(bridge.graph(), segment.id) == ProceduralRoadClass::local);
+    }
+}
+
+void test_rebuild_can_restore_legacy_network_at_one_elevation() {
+    ProceduralRoadPlacementBridge bridge;
+    const std::vector<RoadTile> tiles = {{4, 7, 0}, {5, 7, 0}};
+    assert(bridge.rebuild_from_legacy_tiles(tiles, ProceduralRoadClass::collector, 1.5F));
+    assert(bridge.graph().nodes().size() == 2U);
+    assert(bridge.graph().segments().size() == 1U);
+    for (const ProceduralRoadNode& node : bridge.graph().nodes()) assert(node.position.z == 1.5F);
+    const auto& segment = bridge.graph().segments().front();
+    assert(bridge.classes().road_class(bridge.graph(), segment.id) == ProceduralRoadClass::collector);
+}
+
 } // namespace
 
 int main() {
@@ -106,4 +151,6 @@ int main() {
     test_repeated_identical_segment_reuses_nodes_and_edges();
     test_invalid_non_adjacent_tile_path_is_rejected_without_mutation();
     test_existing_edge_class_can_be_reprofiled_explicitly();
+    test_rebuild_from_legacy_tiles_restores_topology_after_demolition();
+    test_rebuild_can_restore_legacy_network_at_one_elevation();
 }
