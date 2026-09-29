@@ -17,7 +17,8 @@ CH Character Studio Art separates **appearance authoring** from **approved chara
 character spec
   -> CH Blender canonical base + 36-state landmarks
   -> ground / foot-anchor / footprint validation
-  -> Studio layers or deterministic drawing CLI
+  -> Studio semantic layers / deterministic drawing CLI
+  -> Photoshop-reference pixel tools + advanced layer stack + art tools
   -> landmark pose transfer
   -> appearance + clothing + held-object RGB masks
   -> optional hand-held prop sockets
@@ -32,6 +33,26 @@ character spec
 `index.html` provides native 48x64 editing with pixel brush/eraser, smart shapes, character templates, semantic layers, broad palette families, frame/direction storage, pose propagation, mask painting, held-object sockets and spatial debug overlays.
 
 The spatial overlay can show the canonical ground anchor, left/right foot anchors, selected support foot, projected character footprint and left/right hand sockets. These overlays never enter exported character PNGs.
+
+## Photoshop-reference tools
+
+The Studio uses selected Photoshop-style concepts without trying to clone Photoshop itself.
+
+Stage 1 (`CH_CHARACTER_PHOTOSHOP_TOOLS_V0`) provides rectangular/lasso selection, move/free-transform, eyedropper, paint bucket, fill/delete selection, per-frame undo/redo, opacity and blend modes.
+
+Stage 2 (`CH_CHARACTER_LAYER_STACK_V0`) provides layer groups, layer masks, clipping masks, non-destructive transform state, duplicate layer, safe merge/flatten, source restore, per-frame stack state and advanced composite export.
+
+Stage 3 (`CH_CHARACTER_ART_TOOLS_V0`) provides:
+
+- brush presets: Pixel 1, Pixel 2, Hard Round, Marker, Dither and Airbrush;
+- brush size, spacing, opacity and flow;
+- vertical, horizontal and quad symmetry;
+- linear/radial two-color gradients preserving existing alpha;
+- Levels;
+- piecewise-linear Curves at 0/64/128/192/255;
+- Hue/Saturation/Lightness adjustment.
+
+Stage 3 works on authoritative semantic art layers such as `skin`, `hair`, clothing and `paint_over`. If an advanced duplicate/merged/flattened entry is selected, it refuses to silently edit a different source layer.
 
 ## Palette library
 
@@ -117,4 +138,4 @@ Alpha is coverage only. Masks never contain lighting, AO, outline or dithering.
 
 ## Design rule
 
-**Blender solves spatial consistency. Character Studio owns final visible style. Inspection tooling may explore freely but may never rewrite the canonical runtime contract.**
+**Blender solves spatial consistency. Character Studio owns final visible style. Inspection and Photoshop-reference tooling may explore/edit appearance freely but may never rewrite the canonical runtime contract.**
