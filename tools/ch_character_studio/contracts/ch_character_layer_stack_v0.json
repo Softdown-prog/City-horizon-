@@ -1,0 +1,62 @@
+{
+  "contract": "CH_CHARACTER_LAYER_STACK_V0",
+  "product": "CH Character Studio Art",
+  "reference": "Photoshop-style layer workflow adapted to City Horizon character art",
+  "scope": "appearance_authoring_only",
+  "frame": [48, 64],
+  "features": {
+    "groups": true,
+    "layerMasks": true,
+    "clippingMasks": true,
+    "nonDestructiveTransform": true,
+    "duplicateLayer": true,
+    "safeMerge": true,
+    "safeFlatten": true,
+    "perFrameStackState": true,
+    "stackUndoRedo": true
+  },
+  "transform": {
+    "filter": "nearest_neighbor",
+    "controls": ["x", "y", "scale", "rotation", "flipH", "flipV"],
+    "destructiveByDefault": false,
+    "mayMoveGroundAnchor": false,
+    "mayModifyApprovedPose": false
+  },
+  "layerMask": {
+    "format": "8bit_grayscale_semantics_on_rgba_canvas",
+    "white": "visible",
+    "black": "hidden",
+    "linkedToLayerTransform": true,
+    "creationModes": ["white", "source_alpha"],
+    "editableBrushValues": [0, 255]
+  },
+  "clippingMask": {
+    "source": "current_layer",
+    "clipTo": "immediately_previous_visible_stack_entry",
+    "usesAlphaOnly": true
+  },
+  "groups": {
+    "properties": ["name", "visibility", "opacity"],
+    "membership": "per_stack_entry"
+  },
+  "safeRasterOperations": {
+    "merge": "creates_new_raster_layer_and_hides_sources",
+    "flatten": "creates_new_flattened_art_layer_and_hides_sources",
+    "sourceSemanticLayersPreserved": true,
+    "restoreSourceLayersSupported": true
+  },
+  "canonicalProtection": {
+    "semanticLayersRemainAuthoritative": true,
+    "approvedMotionLocked": true,
+    "groundAnchorLocked": [24, 60],
+    "canonicalCameraLocked": "CH_ACTOR_CAMERA_V1",
+    "colorMaskBanksUnaffected": true,
+    "heldObjectSocketsUnaffected": true
+  },
+  "export": {
+    "compositeIncludesAdvancedStack": true,
+    "heldObjectCompositeIncludesAdvancedStack": true,
+    "stackMetadataJson": true,
+    "runtimePromotionRequiresRasterValidation": true
+  }
+}
