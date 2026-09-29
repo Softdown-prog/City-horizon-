@@ -10,8 +10,9 @@ This directory is the agent-facing entry point for City Horizon character art. D
 4. `contracts/ch_character_hand_socket_v0.json`
 5. `contracts/ch_character_photoshop_tools_v0.json`
 6. `contracts/ch_character_layer_stack_v0.json`
-7. `palettes/ch_character_palette_v1.json`
-8. `workers/ch_character_workers_v0.json`
+7. `contracts/ch_character_art_tools_v0.json`
+8. `palettes/ch_character_palette_v1.json`
+9. `workers/ch_character_workers_v0.json`
 
 Canonical runtime frame: `48x64`. Canonical ground anchor: `[24,60]`. Canonical runtime camera remains `CH_ACTOR_CAMERA_V1`.
 
@@ -59,7 +60,32 @@ The compatibility bridge keeps the main visible canvas equal to base + advanced 
 
 Canonical semantic layers remain authoritative. Do not permanently collapse `skin`, `hair`, clothing or other semantic layers merely to simplify a one-off art operation. Use safe merge/flatten for review and raster validation while preserving the source stack.
 
-Stage 3 remains reserved for brush presets, brush spacing/flow, symmetry, gradients and tonal/color adjustments.
+### Stage 3 — brushes and color/tonal tools
+
+Implemented through `CH_CHARACTER_ART_TOOLS_V0` and `photoshop_art_v3.js`.
+
+Brush engine:
+
+- presets: `pixel_1`, `pixel_2`, `hard_round`, `marker`, `dither`, `airbrush`;
+- brush size from 1 to 12 px;
+- spacing from 5% to 200%;
+- stroke opacity and flow as separate controls;
+- vertical, horizontal and quad symmetry around the locked 48x64 frame center;
+- deterministic checker dither;
+- no spatial image smoothing.
+
+Gradient and adjustments:
+
+- linear and radial two-color gradients;
+- gradient opacity while preserving existing layer alpha;
+- Levels with input black/white, gamma and output black/white;
+- Curves using output values for fixed input points 0/64/128/192/255 with piecewise-linear interpolation;
+- Hue, Saturation and Lightness adjustment;
+- alpha is preserved by Levels, Curves and Hue/Saturation.
+
+Stage 3 tools write only to the selected canonical semantic art layer. If a duplicate, merged or flattened raster entry is selected in the Stage 2 stack, Stage 3 must refuse the edit instead of silently modifying a different semantic layer. Select `skin`, `hair`, clothing, `paint_over`, etc. first.
+
+Every Stage 3 raster edit creates a Studio history checkpoint. These tools may improve color, shading, edge treatment or local paint, but they must never paint around a bad pose to hide an anchor/contact/landmark problem. Fix spatial problems in the CH Actor/CH Blender source instead.
 
 ## Deterministic workers / subagent handoff
 
@@ -161,4 +187,6 @@ Stop and report instead of improvising if:
 - a Photoshop-reference transform is being used to alter body pose instead of appearance;
 - a selection/transform operation writes outside the active art layer;
 - a layer mask is mistaken for an appearance/clothing/object recolor mask;
-- safe merge/flatten is used as a reason to delete the canonical semantic source layers.
+- safe merge/flatten is used as a reason to delete the canonical semantic source layers;
+- a Stage 3 brush or tonal adjustment is used to paint over a spatial/pose defect that belongs in CH Actor/CH Blender;
+- Stage 3 is asked to edit a duplicate/merged/flattened raster entry without first selecting an authoritative semantic source layer.
