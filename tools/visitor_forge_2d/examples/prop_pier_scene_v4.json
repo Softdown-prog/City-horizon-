@@ -6,48 +6,53 @@
   "seed": 211,
   "camera": {"contract": "CH_CAMERA_V1", "tile": [128, 64], "yawDeg": 45, "elevationDeg": 30, "projection": "orthographic_dimetric"},
   "lighting": {"direction": [-1, -1], "shadowOffset": [4, 6]},
-  "finish": {"edgeBreakupPx": 0.55, "surfaceVariation": 0.045, "brushStamps": 18, "brushOpacity": 0.06},
-  "validation": {"minimumOpaqueHeightPx": 54, "maximumOpaqueHeightPx": 176},
+  "finish": {"edgeBreakupPx": 0.42, "surfaceVariation": 0.04, "brushStamps": 14, "brushOpacity": 0.055},
+  "validation": {"minimumOpaqueHeightPx": 58, "maximumOpaqueHeightPx": 176},
   "symbols": {
-    "post": [
-      {"type": "shape", "primitive": "rounded_rect", "box": [-4, -25, 4, 7], "radius": 2,
-       "material": {"type": "wood", "light": "#B77946", "dark": "#5A321F", "grainAngleDeg": 88, "grainSpacing": 4.2, "grainColor": "#2D180F42"},
-       "effects": {"ambientOcclusion": {"width": 1.6, "strength": 0.22}, "bevel": {"width": 1.0, "strength": 0.28}, "outline": {"width": 0.38, "color": "#372116B0"}}}
+    "support_post": [
+      {"type": "shape", "primitive": "rounded_rect", "box": [-4, -22, 4, 8], "radius": 1.8,
+       "material": {"type": "wood", "light": "#A9693E", "dark": "#4C2B1C", "grainAngleDeg": 88, "grainSpacing": 4.0, "grainColor": "#26140D46"},
+       "effects": {"ambientOcclusion": {"width": 1.5, "strength": 0.24}, "bevel": {"width": 0.9, "strength": 0.28}, "outline": {"width": 0.38, "color": "#321D14B8"}}}
     ],
     "cleat": [
       {"type": "shape", "primitive": "capsule", "box": [-5, -1.5, 5, 1.5], "radius": 1.5,
-       "material": {"type": "painted_metal", "base": "#596269", "highlight": "#BCC5C8"},
-       "effects": {"bevel": {"width": 0.55, "strength": 0.24}, "outline": {"width": 0.3, "color": "#2B3034A0"}}}
+       "material": {"type": "painted_metal", "base": "#596269", "highlight": "#C0C8CB"},
+       "effects": {"bevel": {"width": 0.55, "strength": 0.25}, "outline": {"width": 0.28, "color": "#2B30349A"}}}
     ]
   },
   "layers": [
-    {"type": "shape", "primitive": "ellipse", "box": [40, 137, 220, 180], "material": {"type": "solid", "color": "#11192340"}},
-    {"type": "shape", "primitive": "polygon", "points": [[51,112],[88,93],[211,132],[170,158]],
-     "material": {"type": "wood", "light": "#754125", "dark": "#351E15", "grainAngleDeg": 17, "grainSpacing": 5.5, "grainColor": "#21110938"},
-     "effects": {"shadow": {"offset": [4,7], "blur": 3, "color": "#10151B78"}, "ambientOcclusion": {"width": 2.5, "strength": 0.24}, "outline": {"width": 0.46, "color": "#2E1A12C0"}}},
-    {"type": "symbol", "symbol": "post", "transform": {"translate": [63,121]}},
-    {"type": "symbol", "symbol": "post", "transform": {"translate": [164,153]}},
-    {"type": "symbol", "symbol": "post", "transform": {"translate": [202,132]}},
-    {"type": "shape", "primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28,
-     "points": [[48,104],[84,84],[210,124],[168,150]],
-     "material": {"type": "wood", "light": "#C58A53", "dark": "#704126", "grainAngleDeg": 17, "grainSpacing": 4.7, "grainColor": "#3B211542"},
-     "effects": {"ambientOcclusion": {"width": 2.2, "strength": 0.18}, "bevel": {"width": 1.15, "strength": 0.30}, "outline": {"width": 0.45, "color": "#3A2418B8"}}},
+    {"type": "shape", "primitive": "ellipse", "box": [34, 137, 226, 181], "material": {"type": "solid", "color": "#1119233E"}},
+    {"type": "symbol", "symbol": "support_post", "transform": {"translate": [55,120]}},
+    {"type": "symbol", "symbol": "support_post", "transform": {"translate": [169,157]}},
+    {"type": "symbol", "symbol": "support_post", "transform": {"translate": [208,134]}},
+    {"type": "shape", "primitive": "polygon", "points": [[42,104],[173,149],[173,158],[42,113]],
+     "material": {"type": "wood", "light": "#8A5533", "dark": "#432519", "grainAngleDeg": 18, "grainSpacing": 5.1, "grainColor": "#22120C40"},
+     "effects": {"shadow": {"offset": [4,7], "blur": 3, "color": "#10151B78"}, "ambientOcclusion": {"width": 2.3, "strength": 0.24}, "outline": {"width": 0.42, "color": "#2E1A12B8"}}},
+    {"type": "shape", "primitive": "polygon", "points": [[173,149],[214,125],[214,133],[173,158]],
+     "material": {"type": "wood", "light": "#9C6139", "dark": "#4B2A1B", "grainAngleDeg": -30, "grainSpacing": 4.8, "grainColor": "#27150D3A"},
+     "effects": {"ambientOcclusion": {"width": 2.0, "strength": 0.22}, "outline": {"width": 0.4, "color": "#2F1A12B0"}}},
+    {"type": "shape", "primitive": "polygon", "points": [[42,104],[82,83],[214,125],[173,149]],
+     "material": {"type": "wood", "light": "#C58A53", "dark": "#744329", "grainAngleDeg": -46, "grainSpacing": 4.5, "grainColor": "#3B211542"},
+     "effects": {"ambientOcclusion": {"width": 1.7, "strength": 0.16}, "bevel": {"width": 0.9, "strength": 0.27}, "outline": {"width": 0.42, "color": "#3A2418B0"}}},
     {"type": "clip_group",
-     "clip": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]},
+     "clip": {"primitive": "polygon", "points": [[44,103],[83,85],[211,125],[172,147]]},
      "children": [
-       {"type": "shape", "primitive": "line", "points": [[59,100],[179,138]], "width": 0.7, "material": {"type": "solid", "color": "#F1C18836"}},
-       {"type": "shape", "primitive": "line", "points": [[68,94],[187,132]], "width": 0.6, "material": {"type": "solid", "color": "#3A201628"}}
+       {"type": "shape", "primitive": "line", "points": [[54,100],[182,141]], "width": 0.65, "material": {"type": "solid", "color": "#F1C18830"}},
+       {"type": "shape", "primitive": "line", "points": [[68,92],[196,133]], "width": 0.55, "material": {"type": "solid", "color": "#3A201624"}}
      ]},
-    {"type": "shape", "primitive": "cubic", "points": [[61,100],[88,90],[174,122],[201,116]], "width": 2.4,
-     "material": {"type": "rope", "light": "#DEC889", "dark": "#7C6034", "twistSpacing": 4.0},
-     "effects": {"outline": {"width": 0.28, "color": "#4C3A22A0"}, "bevel": {"width": 0.5, "strength": 0.20}}},
-    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [103,102], "rotateDeg": 17}},
-    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [173,124], "rotateDeg": 17}}
+    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [93,99], "rotateDeg": 18}},
+    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [177,126], "rotateDeg": 18}},
+    {"type": "shape", "primitive": "line", "points": [[205,126],[214,151]], "width": 2.0,
+     "material": {"type": "painted_metal", "base": "#596269", "highlight": "#BBC3C6"}, "effects": {"outline": {"width": 0.25, "color": "#30363A96"}}},
+    {"type": "shape", "primitive": "line", "points": [[211,124],[220,147]], "width": 2.0,
+     "material": {"type": "painted_metal", "base": "#596269", "highlight": "#BBC3C6"}, "effects": {"outline": {"width": 0.25, "color": "#30363A96"}}},
+    {"type": "shape", "primitive": "line", "points": [[208,134],[216,132]], "width": 1.2, "material": {"type": "painted_metal", "base": "#5C666C", "highlight": "#C2C8CA"}},
+    {"type": "shape", "primitive": "line", "points": [[211,142],[219,140]], "width": 1.2, "material": {"type": "painted_metal", "base": "#5C666C", "highlight": "#C2C8CA"}}
   ],
   "finishRegions": [
-    {"style": "plank_seams", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]}, "stamps": 9, "opacity": 0.16, "angleDeg": 17},
-    {"style": "wood_wear", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]}, "stamps": 38, "opacity": 0.10, "angleDeg": 17},
-    {"style": "edge_wear", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[48,104],[84,84],[210,124],[168,150]]}, "stamps": 28, "opacity": 0.12, "angleDeg": 0},
-    {"style": "grime", "mask": {"primitive": "polygon", "points": [[49,113],[88,94],[211,133],[169,158]]}, "stamps": 16, "opacity": 0.07, "angleDeg": 0}
+    {"style": "plank_seams", "mask": {"primitive": "polygon", "points": [[44,103],[83,85],[211,125],[172,147]]}, "stamps": 13, "opacity": 0.18, "angleDeg": -46},
+    {"style": "wood_wear", "mask": {"primitive": "polygon", "points": [[44,103],[83,85],[211,125],[172,147]]}, "stamps": 34, "opacity": 0.09, "angleDeg": -46},
+    {"style": "edge_wear", "mask": {"primitive": "polygon", "points": [[42,104],[82,83],[214,125],[173,149]]}, "stamps": 24, "opacity": 0.10, "angleDeg": 0},
+    {"style": "grime", "mask": {"primitive": "polygon", "points": [[42,104],[173,149],[173,158],[42,113]]}, "stamps": 12, "opacity": 0.075, "angleDeg": 0}
   ]
 }
