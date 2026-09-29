@@ -30,17 +30,12 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
 CORKSCREW_LENGTH = base.TILE * 5.8
-HORIZONTAL_RADIUS = base.TILE * 0.58
-VERTICAL_RADIUS = base.TILE * 0.32
+LATERAL_SWEEP = base.TILE * 0.72
+VERTICAL_LIFT = base.TILE * 0.30
 APPROACH_LENGTH = base.TILE * 1.05
 ROLL_DEGREES = 360.0
-ENTRY_END = 0.30
-EXIT_START = 0.70
-ENTRY_PHASE_SHARE = 0.22
-CORE_PHASE_SHARE = 0.56
-ENTRY_Y_SHARE = 0.20
-CORE_Y_SHARE = 0.60
-FOOTPRINT = {"widthTiles": 3, "depthTiles": 8}
+ROLL_RAMP = 0.22
+FOOTPRINT = {"widthTiles": 4, "depthTiles": 8}
 
 
 def parse_args():
@@ -64,44 +59,31 @@ def handedness(piece: str) -> float:
     return 1.0 if piece == "corkscrew_left" else -1.0
 
 
-def staged_progress(t: float, entry_share: float, core_share: float) -> float:
-    """Three-stage monotonic mapping with an expanded middle section.
-
-    The first and last shoulders get shorter shares while the central inversion
-    gets most of the available progress. Linear local motion avoids the old
-    phase pinch while the stage boundaries remain deterministic and symmetric.
-    """
+def eased_roll_progress(t: float) -> float:
+    """One full roll with soft shoulders and a steady middle section."""
     t = max(0.0, min(1.0, t))
-    exit_share = 1.0 - entry_share - core_share
-    if t <= ENTRY_END:
-        u = t / ENTRY_END
-        return entry_share * u
-    if t < EXIT_START:
-        u = (t - ENTRY_END) / (EXIT_START - ENTRY_END)
-        return entry_share + core_share * u
-    u = (t - EXIT_START) / (1.0 - EXIT_START)
-    return entry_share + core_share + exit_share * u
+    r = ROLL_RAMP
+    total = 1.0 - r
+    if t < r:
+        u = t / r
+        return (r * (u ** 3 - 0.5 * u ** 4)) / total
+    if t > 1.0 - r:
+        return 1.0 - eased_roll_progress(1.0 - t)
+    return (0.5 * r + (t - r)) / total
 
 
-def phase_progress(t: float) -> float:
-    return staged_progress(t, ENTRY_PHASE_SHARE, CORE_PHASE_SHARE)
-
-
-def longitudinal_progress(t: float) -> float:
-    return staged_progress(t, ENTRY_Y_SHARE, CORE_Y_SHARE)
-
-
-def inversion_phase(piece: str, t: float) -> float:
-    return handedness(piece) * math.tau * phase_progress(t)
+def roll_angle(piece: str, t: float) -> float:
+    return handedness(piece) * math.tau * eased_roll_progress(t)
 
 
 def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int = 241):
-    """Build a three-stage corkscrew: entry shoulder, open core, exit shoulder.
+    """Build an open S-curve centerline; the inversion comes from deck roll.
 
-    Unlike V1-V7, the body no longer relies on one globally warped helix. The
-    central 40% of parameter time receives 60% of longitudinal travel and 56%
-    of the inversion phase, so the middle moves decisively forward/back instead
-    of collapsing into a near-vertical wall in isometric projection.
+    V9 intentionally stops wrapping the centerline itself around an ellipse.
+    Instead, the train path sweeps laterally in a broad S and rises through a
+    shallow arch while the local track frame performs exactly one 360-degree
+    roll. This removes the persistent isometric 'vertical wall' caused by the
+    old helical centerline while preserving a true corkscrew visual motion.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -116,15 +98,12 @@ def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int 
 
     for i in range(1, body_samples):
         t = i / (body_samples - 1)
-        phase = abs(inversion_phase(piece, t))
-        y_t = longitudinal_progress(t)
-        y = body_start_y + body_length * y_t
-
-        # Keep the shoulders restrained and let the center read wider. This is
-        # intentionally not one constant-radius helix anymore.
-        core_envelope = 0.88 + 0.12 * math.sin(math.pi * t) ** 2
-        x = sign * HORIZONTAL_RADIUS * core_envelope * math.sin(phase)
-        z = base.RAIL_Z + VERTICAL_RADIUS * (1.0 - math.cos(phase))
+        y = body_start_y + body_length * t
+        # Broad S: zero lateral offset at both connectors, opposite lobes around
+        # the two quarter points, and a clean crossing at the inversion center.
+        x = sign * LATERAL_SWEEP * math.sin(math.tau * t)
+        # Shallow arch keeps the element dynamic without reading as a loop.
+        z = base.RAIL_Z + VERTICAL_LIFT * (math.sin(math.pi * t) ** 2)
         points.append(Vector((x, y, z)))
 
     for i in range(1, approach_samples):
@@ -135,7 +114,7 @@ def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int 
     return points
 
 
-def phase_for_centerline_index(piece: str, index: int) -> float:
+def roll_for_centerline_index(piece: str, index: int) -> float:
     approach_samples = 37
     body_samples = 241
     body_first = approach_samples - 1
@@ -145,30 +124,7 @@ def phase_for_centerline_index(piece: str, index: int) -> float:
     if index >= body_last:
         return handedness(piece) * math.tau
     t = (index - body_first) / (body_samples - 1)
-    return inversion_phase(piece, t)
-
-
-def elliptical_track_frame(points, index: int, point: Vector):
-    """Orient the deck from the local inversion geometry itself."""
-    tangent = base.tangent(points, index)
-    axis_z = base.RAIL_Z + VERTICAL_RADIUS
-    x = point.x
-    z = point.z - axis_z
-    inward = Vector((
-        -x / (HORIZONTAL_RADIUS * HORIZONTAL_RADIUS),
-        0.0,
-        -z / (VERTICAL_RADIUS * VERTICAL_RADIUS),
-    ))
-    up = inward - tangent * inward.dot(tangent)
-    if up.length < 1e-6:
-        up = Vector((0.0, 0.0, 1.0)) - tangent * tangent.z
-    up.normalize()
-    right = tangent.cross(up)
-    if right.length < 1e-6:
-        right = Vector((1.0, 0.0, 0.0))
-    right.normalize()
-    up = right.cross(tangent).normalized()
-    return tangent, right, up
+    return roll_angle(piece, t)
 
 
 def build_piece(piece: str):
@@ -182,9 +138,9 @@ def build_piece(piece: str):
     right_rail = []
 
     for i, point in enumerate(centerline):
-        phase = phase_for_centerline_index(piece, i)
-        tangent, right, up = elliptical_track_frame(centerline, i, point)
-        frames.append((tangent, right, up, phase))
+        roll = roll_for_centerline_index(piece, i)
+        tangent, right, up = banked.track_frame(centerline, i, roll)
+        frames.append((tangent, right, up, roll))
         left.append(point - right * (base.GAUGE * 0.5))
         right_rail.append(point + right * (base.GAUGE * 0.5))
 
@@ -204,9 +160,15 @@ def build_piece(piece: str):
         ))
 
     last = len(centerline) - 1
-    support_indices = sorted(set((0, len(centerline) // 8, len(centerline) // 4,
-                                  (len(centerline) * 3) // 4,
-                                  (len(centerline) * 7) // 8, last)))
+    # Keep support frames away from the most inverted central span.
+    support_indices = sorted(set((
+        0,
+        len(centerline) // 10,
+        len(centerline) // 5,
+        (len(centerline) * 4) // 5,
+        (len(centerline) * 9) // 10,
+        last,
+    )))
     for n, idx in enumerate(support_indices):
         base.build_support_frame(authored, f"Support_{n:03d}", centerline[idx],
                                  base.tangent(centerline, idx), support_mat)
@@ -220,20 +182,15 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v7_three_stage_open_core",
+        "profile": "single_inversion_v9_rolled_s_curve",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
-        "horizontalRadius": HORIZONTAL_RADIUS,
-        "verticalRadius": VERTICAL_RADIUS,
+        "lateralSweep": LATERAL_SWEEP,
+        "verticalLift": VERTICAL_LIFT,
         "approachLength": APPROACH_LENGTH,
         "rollDegrees": ROLL_DEGREES,
-        "entryEnd": ENTRY_END,
-        "exitStart": EXIT_START,
-        "entryPhaseShare": ENTRY_PHASE_SHARE,
-        "corePhaseShare": CORE_PHASE_SHARE,
-        "entryYShare": ENTRY_Y_SHARE,
-        "coreYShare": CORE_Y_SHARE,
+        "rollRamp": ROLL_RAMP,
         "rollSamplesDegrees": [round(math.degrees(frame[3]), 6) for frame in frames],
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
