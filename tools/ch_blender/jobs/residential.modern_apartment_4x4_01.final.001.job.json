@@ -5,7 +5,8 @@
   "script": "tools/tycoon_photo_studio/refine_residential_modern_apartment_v2.py",
   "qualityStage": "final",
   "approval": {
-    "proxyReviewed": true
+    "proxyReviewed": true,
+    "approvedProxySha256": "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18"
   },
   "args": [
     "--recipe",
