@@ -24,6 +24,10 @@
     visibility.set(name, true);
   }
 
+  const directionSelect = document.getElementById("direction");
+  const frameSelect = document.getElementById("frame");
+  const frameStore = new Map();
+  let loadedFrameKey = `${directionSelect.value}:${frameSelect.value}`;
   let activeLayer = "paint_over";
   let tool = "brush";
   let drawing = false;
@@ -43,7 +47,8 @@
 
   function setStatus(msg) { status.textContent = msg; }
   function canvasFor(name) { return buffers.get(name); }
-  function currentDirection() { return document.getElementById("direction").value; }
+  function currentDirection() { return directionSelect.value; }
+  function currentFrameKey() { return `${directionSelect.value}:${frameSelect.value}`; }
 
   function redraw() {
     vctx.clearRect(0, 0, W, H);
@@ -51,6 +56,41 @@
     for (const name of LAYERS) {
       if (visibility.get(name)) vctx.drawImage(canvasFor(name), 0, 0);
     }
+  }
+
+  function snapshotCanvas(canvas) {
+    return canvas.getContext("2d").getImageData(0, 0, W, H);
+  }
+
+  function saveLoadedFrame() {
+    const layers = {};
+    for (const name of LAYERS) layers[name] = snapshotCanvas(canvasFor(name));
+    frameStore.set(loadedFrameKey, {base:snapshotCanvas(base), layers});
+  }
+
+  function clearWorkingCanvases() {
+    bctx.clearRect(0, 0, W, H);
+    for (const name of LAYERS) canvasFor(name).getContext("2d").clearRect(0, 0, W, H);
+  }
+
+  function loadFrameState(key) {
+    clearWorkingCanvases();
+    const state = frameStore.get(key);
+    if (state) {
+      bctx.putImageData(state.base, 0, 0);
+      for (const name of LAYERS) {
+        if (state.layers[name]) canvasFor(name).getContext("2d").putImageData(state.layers[name], 0, 0);
+      }
+    }
+    loadedFrameKey = key;
+    redraw();
+    setStatus(`Frame ativo: ${key.replace(":", " / ")}${state ? " · arte restaurada" : " · novo"}.`);
+  }
+
+  function switchFrame() {
+    if (drawing) { drawing = false; lastPoint = null; }
+    saveLoadedFrame();
+    loadFrameState(currentFrameKey());
   }
 
   function buildLayerList() {
@@ -219,12 +259,7 @@
 
   function hexToRgba(hex) {
     const value = hex.replace("#", "");
-    return [
-      parseInt(value.slice(0,2), 16),
-      parseInt(value.slice(2,4), 16),
-      parseInt(value.slice(4,6), 16),
-      255
-    ];
+    return [parseInt(value.slice(0,2),16),parseInt(value.slice(2,4),16),parseInt(value.slice(4,6),16),255];
   }
 
   function generateOutline() {
@@ -253,10 +288,7 @@
         }
         if (!adjacent) continue;
         const p = index * 4;
-        image.data[p] = rgba[0];
-        image.data[p + 1] = rgba[1];
-        image.data[p + 2] = rgba[2];
-        image.data[p + 3] = rgba[3];
+        image.data[p] = rgba[0]; image.data[p+1] = rgba[1]; image.data[p+2] = rgba[2]; image.data[p+3] = rgba[3];
         count += 1;
       }
     }
@@ -298,6 +330,8 @@
   view.addEventListener("pointerup", () => { drawing = false; lastPoint = null; });
   view.addEventListener("pointercancel", () => { drawing = false; lastPoint = null; });
 
+  directionSelect.addEventListener("change", switchFrame);
+  frameSelect.addEventListener("change", switchFrame);
   document.getElementById("brushBtn").addEventListener("click", () => setTool("brush"));
   document.getElementById("eraserBtn").addEventListener("click", () => setTool("eraser"));
   document.getElementById("shapeBtn").addEventListener("click", () => setTool("shape"));
@@ -332,7 +366,7 @@
       bctx.imageSmoothingEnabled = false;
       bctx.drawImage(img, 0, 0, W, H);
       redraw();
-      setStatus(`Passe base carregado: ${file.name}`);
+      setStatus(`Passe base carregado em ${currentFrameKey()}: ${file.name}`);
       URL.revokeObjectURL(img.src);
     };
     img.src = URL.createObjectURL(file);
@@ -350,7 +384,7 @@
 
   document.getElementById("exportLayer").addEventListener("click", () => {
     const dir = currentDirection().toLowerCase();
-    const frame = document.getElementById("frame").value;
+    const frame = frameSelect.value;
     downloadCanvas(canvasFor(activeLayer), `${dir}_${frame}_${activeLayer}.png`);
   });
 
@@ -361,11 +395,12 @@
     ctx.drawImage(base,0,0);
     for (const name of LAYERS) if (visibility.get(name)) ctx.drawImage(canvasFor(name),0,0);
     const dir = currentDirection().toLowerCase();
-    const frame = document.getElementById("frame").value;
+    const frame = frameSelect.value;
     downloadCanvas(out, `${dir}_${frame}_character.png`);
   });
 
   document.getElementById("exportSpec").addEventListener("click", () => {
+    saveLoadedFrame();
     const spec = {
       contract: "CH_CHARACTER_ART_SPEC_V0",
       characterId: "character_new",
@@ -377,7 +412,8 @@
         layers:LAYERS.map(name => ({name, enabled:visibility.get(name), opacity:1.0})),
         smartShapes:{library:"CH_CHARACTER_SHAPES_V0", directionAware:true},
         template:templateSelect.value || null,
-        outline:{mode:"dilated_1px", color:outlineColor.value, excludesBlenderUnderlay:true}
+        outline:{mode:"dilated_1px", color:outlineColor.value, excludesBlenderUnderlay:true},
+        editedFrames:[...frameStore.keys()].sort()
       }
     };
     const blob = new Blob([JSON.stringify(spec,null,2)+"\n"],{type:"application/json"});
