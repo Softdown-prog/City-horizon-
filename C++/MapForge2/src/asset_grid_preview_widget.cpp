@@ -1,5 +1,7 @@
 #include "asset_grid_preview_widget.h"
 
+#include "authoring_projection.h"
+
 #include <QPainter>
 #include <QPaintEvent>
 #include <QPen>
@@ -7,12 +9,6 @@
 #include <algorithm>
 
 namespace ch::studio {
-namespace {
-
-constexpr qreal kTileWidth = 128.0;
-constexpr qreal kTileHeight = 64.0;
-
-} // namespace
 
 AssetGridPreviewWidget::AssetGridPreviewWidget(QWidget* parent)
     : QWidget(parent) {
@@ -47,10 +43,12 @@ void AssetGridPreviewWidget::setDirectionLabel(const QString& direction_label) {
 
 QPointF AssetGridPreviewWidget::projectTile(const qreal tile_x, const qreal tile_y) const {
     const QPointF origin(width() * 0.5, height() * 0.58);
-    return {
-        origin.x() + (tile_x - tile_y) * (kTileWidth * 0.5),
-        origin.y() + (tile_x + tile_y) * (kTileHeight * 0.5),
-    };
+    return projectAuthoringGround(
+        static_cast<float>(tile_x),
+        static_cast<float>(tile_y),
+        0,
+        QSizeF(size()),
+        origin);
 }
 
 void AssetGridPreviewWidget::paintEvent(QPaintEvent* event) {
