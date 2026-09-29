@@ -29,13 +29,13 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
-CORKSCREW_LENGTH = base.TILE * 4.8
-HORIZONTAL_RADIUS = base.TILE * 0.62
-VERTICAL_RADIUS = base.TILE * 0.44
-APPROACH_LENGTH = base.TILE * 0.95
+CORKSCREW_LENGTH = base.TILE * 5.6
+HORIZONTAL_RADIUS = base.TILE * 0.52
+VERTICAL_RADIUS = base.TILE * 0.32
+APPROACH_LENGTH = base.TILE * 1.10
 ROLL_DEGREES = 360.0
-PHASE_RAMP = 0.16
-FOOTPRINT = {"widthTiles": 3, "depthTiles": 7}
+PHASE_RAMP = 0.20
+FOOTPRINT = {"widthTiles": 3, "depthTiles": 8}
 
 
 def parse_args():
@@ -60,7 +60,7 @@ def handedness(piece: str) -> float:
 
 
 def phase_progress(t: float) -> float:
-    """Nearly constant-speed phase with short eased connector ramps."""
+    """Nearly constant-speed phase with long eased connector ramps."""
     t = max(0.0, min(1.0, t))
     r = PHASE_RAMP
     total = 1.0 - r
@@ -76,14 +76,13 @@ def inversion_phase(piece: str, t: float) -> float:
     return handedness(piece) * math.tau * phase_progress(t)
 
 
-def sample_centerline(piece: str, approach_samples: int = 33, body_samples: int = 201):
-    """Build a wide, low corkscrew with flat tangent-safe connectors.
+def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int = 241):
+    """Build a low, stretched corkscrew with flat tangent-safe connectors.
 
-    V4 deliberately uses an elliptical helix rather than a circular one. The
-    horizontal radius is larger than the vertical radius, opening the silhouette
-    and preventing the lower shoulder from pinching into a near-vertical stalk.
-    Longer flat connectors also make the entry and exit read as part of the same
-    continuous track element.
+    V5 keeps the same deterministic elliptical helix, but gives the inversion
+    more longitudinal pitch and less vertical/lateral excursion. This prevents
+    the alternate camera directions from reading as a large loop or a vertical
+    U-shaped wall while preserving one complete 360-degree inversion.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -113,8 +112,8 @@ def sample_centerline(piece: str, approach_samples: int = 33, body_samples: int 
 
 
 def phase_for_centerline_index(piece: str, index: int) -> float:
-    approach_samples = 33
-    body_samples = 201
+    approach_samples = 37
+    body_samples = 241
     body_first = approach_samples - 1
     body_last = body_first + body_samples - 1
     if index <= body_first:
@@ -191,7 +190,14 @@ def build_piece(piece: str):
         ))
 
     last = len(centerline) - 1
-    support_indices = sorted(set((0, len(centerline) // 7, (len(centerline) * 6) // 7, last)))
+    support_indices = sorted(set((
+        0,
+        len(centerline) // 8,
+        len(centerline) // 4,
+        (len(centerline) * 3) // 4,
+        (len(centerline) * 7) // 8,
+        last,
+    )))
     for n, idx in enumerate(support_indices):
         base.build_support_frame(
             authored,
@@ -210,7 +216,7 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v3_wide_elliptical_frame",
+        "profile": "single_inversion_v4_low_stretched_elliptical_frame",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
