@@ -1,4 +1,4 @@
-"""Guarded CH Blender prototype for a banked ascending roller-coaster helix.
+"""Guarded CH Blender prototype for banked ascending roller-coaster helices.
 
 Reuses CH_COASTER_TRACK_V0 geometry plus CH_COASTER_BANK_V0 local frames.
 Runtime remains pre-rendered 2D; Blender is deterministic authoring only.
@@ -26,7 +26,7 @@ import build_coaster_track_guarded as base  # noqa: E402
 import build_coaster_banked_guarded as banked  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
-PIECE = "helix_up_left"
+VALID_PIECES = ("helix_up_left", "helix_up_right")
 HELIX_RADIUS = base.TILE * 1.5
 HELIX_RISE = base.HEIGHT_STEP * 1.5
 HELIX_TURNS = 1.0
@@ -39,7 +39,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--studio-preset", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--piece", choices=(PIECE,), default=PIECE)
+    parser.add_argument("--piece", choices=VALID_PIECES, required=True)
     parser.add_argument("--stage", choices=("preflight", "proxy", "final"), default="preflight")
     parser.add_argument("--preflight-profile", default=None)
     parser.add_argument("--approval-proxy-sha", default=None)
@@ -51,7 +51,7 @@ def smoothstep(t: float) -> float:
 
 
 def bank_envelope(t: float) -> float:
-    # Ease from flat connector into a sustained left-bank, then return to flat.
+    # Ease from flat connector into sustained banking, then return to flat.
     ramp = 0.16
     if t < ramp:
         return smoothstep(t / ramp)
@@ -60,11 +60,16 @@ def bank_envelope(t: float) -> float:
     return 1.0
 
 
-def sample_centerline(samples: int = 161):
+def handedness(piece: str) -> float:
+    return 1.0 if piece == "helix_up_left" else -1.0
+
+
+def sample_centerline(piece: str, samples: int = 161):
     points = []
+    turn_sign = handedness(piece)
     for i in range(samples):
         t = i / (samples - 1)
-        angle = -math.pi * 0.5 + math.tau * HELIX_TURNS * t
+        angle = -math.pi * 0.5 + turn_sign * math.tau * HELIX_TURNS * t
         x = HELIX_RADIUS * math.cos(angle)
         y = HELIX_RADIUS * math.sin(angle)
         z = base.RAIL_Z + HELIX_RISE * t
@@ -72,20 +77,21 @@ def sample_centerline(samples: int = 161):
     return points
 
 
-def build_piece():
+def build_piece(piece: str):
     steel = bs.make_material("TrackSteel", (0.18, 0.22, 0.24, 1.0), 0.38, 0.34)
     ties_mat = bs.make_material("TrackTies", (0.23, 0.19, 0.16, 1.0), 0.72)
     support_mat = bs.make_material("TrackSupports", (0.31, 0.35, 0.36, 1.0), 0.52, 0.18)
 
-    centerline = sample_centerline()
+    centerline = sample_centerline(piece)
     last = len(centerline) - 1
     frames = []
     left = []
     right_rail = []
+    bank_sign = handedness(piece)
 
     for i, point in enumerate(centerline):
         t = i / last
-        bank_rad = math.radians(MAX_BANK_DEG * bank_envelope(t))
+        bank_rad = math.radians(MAX_BANK_DEG * bank_envelope(t) * bank_sign)
         tangent, right, up = banked.track_frame(centerline, i, bank_rad)
         frames.append((tangent, right, up, bank_rad))
         left.append(point - right * (base.GAUGE * 0.5))
@@ -125,11 +131,11 @@ def payload_endpoint(points, index):
     return base.payload_endpoint(points, index)
 
 
-def write_metadata(output: Path, centerline, frames):
+def write_metadata(output: Path, piece: str, centerline, frames):
     payload = {
         "contract": "CH_COASTER_TRACK_V0",
         "assetId": ASSET_ID,
-        "piece": PIECE,
+        "piece": piece,
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "turns": HELIX_TURNS,
@@ -156,9 +162,9 @@ def main():
     scene.render.film_transparent = True
     scene.render.image_settings.color_mode = "RGBA"
 
-    authored, centerline, frames = build_piece()
+    authored, centerline, frames = build_piece(args.piece)
     root = bs.create_asset_root(authored)
-    root["assetId"] = f"{ASSET_ID}.{PIECE}"
+    root["assetId"] = f"{ASSET_ID}.{args.piece}"
     root["cameraContract"] = "CH_CAMERA_V1"
     root["studioPreset"] = "CH_TYCOON_STUDIO_V1"
     root["trackContract"] = "CH_COASTER_TRACK_V0"
@@ -170,13 +176,13 @@ def main():
     bs.set_direction(root, bs.DIRECTIONS[0])
     bpy.context.view_layer.update()
 
-    write_metadata(output, centerline, frames)
+    write_metadata(output, args.piece, centerline, frames)
     report = scene_gate.run_preflight(
         scene=scene,
         authored=authored,
         footprint=FOOTPRINT,
         profile=profile,
-        asset_id=f"{ASSET_ID}.{PIECE}",
+        asset_id=f"{ASSET_ID}.{args.piece}",
         report_path=output / "preflight_report.json",
     )
     scene_gate.require_pass(report)
@@ -187,7 +193,7 @@ def main():
             authored=authored,
             output_path=output / "proxy_south.png",
             profile=profile,
-            asset_id=f"{ASSET_ID}.{PIECE}",
+            asset_id=f"{ASSET_ID}.{args.piece}",
             direction="south",
         )
         (output / "proxy_report.json").write_text(json.dumps(proxy, indent=2), encoding="utf-8")
@@ -196,7 +202,7 @@ def main():
             raise ValueError("The final bake requires the reviewed SOUTH proxy SHA-256")
         (output / "proxy_approval.json").write_text(json.dumps({
             "contract": "CH_PROXY_APPROVAL_V1",
-            "assetId": f"{ASSET_ID}.{PIECE}",
+            "assetId": f"{ASSET_ID}.{args.piece}",
             "reviewed": True,
             "proxySha256": args.approval_proxy_sha,
         }, indent=2), encoding="utf-8")
@@ -207,7 +213,7 @@ def main():
                 authored=authored,
                 output_path=output / f"track_{direction['id']}.png",
                 profile=profile,
-                asset_id=f"{ASSET_ID}.{PIECE}",
+                asset_id=f"{ASSET_ID}.{args.piece}",
                 direction=direction["id"],
             )
 
