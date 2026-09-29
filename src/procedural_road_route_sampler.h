@@ -1,5 +1,6 @@
 #pragma once
 
+#include "procedural_road_class.h"
 #include "procedural_road_lane_connector.h"
 
 #include <algorithm>
@@ -24,6 +25,7 @@ struct ProceduralRoadRoutePoint {
     ProceduralRoadSegmentId segment_id = kInvalidProceduralRoadSegmentId;
     ProceduralRoadNodeId junction_node = kInvalidProceduralRoadNodeId;
     ProceduralRoadTurnKind turn = ProceduralRoadTurnKind::straight;
+    ProceduralRoadClass road_class = ProceduralRoadClass::unspecified;
 };
 
 class ProceduralRoadRouteSampler {
