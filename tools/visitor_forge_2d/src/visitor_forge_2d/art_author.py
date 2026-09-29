@@ -17,6 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 from .workers import run_workers, validate_recipe
+from .visual_profiles import apply_profile_defaults, resolve_visual_profile
 
 CONTRACT = "CH_2D_ART_BRIEF_V1"
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
@@ -44,10 +45,11 @@ TERMS = {
     "sign": ("placa", "sinalizacao", "wayfinding sign", "sign"),
 }
 ALLOWED = {
-    "broadleaf": {"species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed"},
+    "broadleaf": {"species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed", "visualProfile"},
     "conifer": {"silhouette", "density", "palette", "seed"},
     "flower_bed": {"palette", "seed"},
     "sign": {"palette", "seed"},
+    "custom": {"seed", "visualProfile"},
 }
 
 
@@ -64,7 +66,6 @@ def interpret_prompt(prompt: str) -> dict:
     matches = [family for family, aliases in TERMS.items() if any(term in words for term in aliases)]
     if not matches:
         raise ValueError("unsupported subject; choose broadleaf, conifer, flower_bed or sign, or write a custom recipe")
-    # 'Tree' can accompany 'pine'; an explicit specialist wins.
     family = "conifer" if "conifer" in matches else matches[0]
     if len(set(matches) - {"broadleaf", "conifer"}) or ("broadleaf" in matches and "conifer" not in matches and len(matches) > 1):
         raise ValueError("prompt mentions multiple asset families; submit one asset at a time")
@@ -129,13 +130,19 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
     if not isinstance(brief, dict) or brief.get("contract") != CONTRACT:
         raise ValueError(f"art brief requires {CONTRACT}")
     asset_id = _safe_id(brief.get("id"))
+
+    profile = None
+    if "visualProfile" in brief:
+        profile = resolve_visual_profile(examples, brief["visualProfile"])
+        brief = apply_profile_defaults(brief, profile)
+
     parsed = interpret_prompt(brief["prompt"]) if "prompt" in brief else {}
     subject = brief.get("subject", parsed.get("subject"))
     if subject not in TEMPLATES and subject != "custom":
         raise ValueError(f"unsupported subject {subject!r}; available: {', '.join(TEMPLATES)}, custom")
     if parsed and parsed["subject"] != subject:
         raise ValueError("prompt subject and structured subject disagree")
-    intent = {**parsed, **{key: brief[key] for key in ("species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
+    intent = {**parsed, **{key: brief[key] for key in ("species", "leaf_detail", "season", "style", "silhouette", "density", "palette", "seed", "visualProfile") if key in brief}}
     unknown = set(intent) - ALLOWED.get(subject, {"seed"}) - {"subject"}
     if unknown:
         raise ValueError(f"{subject} does not support {', '.join(sorted(unknown))}; use a custom recipe")
@@ -178,6 +185,16 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         recipe["seed"] = int.from_bytes(hashlib.sha256(fingerprint.encode()).digest()[:4], "big")
 
     decisions = [f"template={filename}", f"seed={recipe['seed']}"]
+    if profile is not None:
+        recipe["visualProfile"] = brief["visualProfile"]
+        recipe["visualProfileData"] = {
+            "silhouette": profile.get("silhouette", {}),
+            "branching": profile.get("branching", {}),
+            "foliage": profile.get("foliage", {}),
+            "paletteIntent": profile.get("paletteIntent", {}),
+        }
+        decisions.append(f"visualProfile={brief['visualProfile']}")
+
     if subject == "broadleaf":
         style = intent.get("style", "rounded")
         season = intent.get("season", "early_autumn" if style == "rounded" else "summer")
@@ -193,7 +210,6 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
             recipe["palette"].update(palettes[palette_id])
             decisions.append(f"palette={palette_id}")
         elif season == "summer" and style == "rounded":
-            # Preserve the established default summer rendering for old briefs.
             recipe["palette"].update({
                 "back_top": "#3C6542", "back_bottom": "#243E2B",
                 "mid_top": "#60844D", "mid_bottom": "#37583A",
@@ -246,7 +262,6 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
             density = intent["density"]
             if density not in ("sparse", "balanced", "dense"):
                 raise ValueError("density must be sparse, balanced or dense")
-            # Tier geometry stays stable; raster density is the safe variation.
             factor = {"sparse": .70, "balanced": 1.0, "dense": 1.28}[density]
             for key in ("shadowDabs", "highlightDabs", "needleStrokes", "finalGrain", "finalNeedles"):
                 if key in recipe.get("raster", {}):
@@ -272,21 +287,22 @@ def _mechanical_review(recipe: dict, png: Path) -> dict:
         image = source.convert("RGBA")
     bounds = image.getchannel("A").getbbox()
     result = {"opaqueBounds": list(bounds), "status": "human_visual_review_required", "observations": []}
-    if recipe.get("crownStyle") == "broadleaf":
-        center = recipe["broadleafStructure"]["center"]
-        radius = recipe["broadleafStructure"]["radius"]
-        top = max(0, round(center[1] - radius[1] * .8))
-        bottom = min(image.height, round(center[1] + radius[1] * .8))
-        alpha = image.getchannel("A")
-        occupied = [any(alpha.getpixel((x, y)) > 160 for x in range(max(0, center[0] - radius[0]),
-                         min(image.width, center[0] + radius[0]))) for y in range(top, bottom)]
-        longest = max((len(part) for part in "".join("1" if v else "0" for v in occupied).split("1")), default=0)
-        result["canopyEmptyRowRunPx"] = longest
-        if longest >= 5:
-            if recipe["broadleafStructure"].get("profile") == "branching":
-                result["observations"].append("open branch gap; inspect foliage support and readability")
-            else:
-                result["observations"].append("canopy has a horizontal gap; inspect crown continuity")
+    if recipe.get("crownStyle") == "broadleaf" and isinstance(recipe.get("broadleafStructure"), dict):
+        center = recipe["broadleafStructure"].get("center")
+        radius = recipe["broadleafStructure"].get("radius")
+        if center and radius:
+            top = max(0, round(center[1] - radius[1] * .8))
+            bottom = min(image.height, round(center[1] + radius[1] * .8))
+            alpha = image.getchannel("A")
+            occupied = [any(alpha.getpixel((x, y)) > 160 for x in range(max(0, center[0] - radius[0]),
+                             min(image.width, center[0] + radius[0]))) for y in range(top, bottom)]
+            longest = max((len(part) for part in "".join("1" if v else "0" for v in occupied).split("1")), default=0)
+            result["canopyEmptyRowRunPx"] = longest
+            if longest >= 5:
+                if recipe["broadleafStructure"].get("profile") == "branching":
+                    result["observations"].append("open branch gap; inspect foliage support and readability")
+                else:
+                    result["observations"].append("canopy has a horizontal gap; inspect crown continuity")
     return result
 
 
