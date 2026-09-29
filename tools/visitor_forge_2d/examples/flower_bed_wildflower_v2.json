@@ -1,11 +1,12 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "flower_bed_wildflower_v2",
-  "sceneryType": "flower_bed",
+  "sceneryType": "flower_bed_v2",
   "canvas": [160, 144],
   "anchor": [80, 118],
   "seed": 73,
   "camera": {"contract": "CH_CAMERA_V1", "tile": [128, 64]},
+  "flowerStyle": {"flowerBrush": "flower_star", "budChance": 0.24},
   "palette": {
     "ground_shadow": "#17301F",
     "border_top": "#AFA47A",
@@ -19,6 +20,7 @@
     "stem": "#205F38",
     "stem_light": "#4B8050",
     "flower_yellows": ["#F9E36B", "#FFF1B0", "#F3A7B7", "#E97A9D", "#FFE07C"],
+    "flower_center": "#C38C31",
     "glints": ["#4B8D59", "#6AA26B", "#8AAF78", "#D8B77A", "#E6A3B8"],
     "grain": ["#123F2B", "#1E5A39", "#34794A", "#69976A", "#C79D78"]
   },
