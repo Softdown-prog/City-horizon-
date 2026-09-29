@@ -1,0 +1,49 @@
+{
+  "contract": "CH_CHARACTER_ART_SPEC_V0",
+  "characterId": "clown_01",
+  "baseActor": "ch_actor_green_01",
+  "frame": {
+    "size": [48, 64],
+    "groundAnchor": [24, 60]
+  },
+  "directions": ["S", "E", "N", "W"],
+  "motion": {
+    "source": "approved_ch_actor",
+    "walkFrames": 8,
+    "allowArtToModifyPose": false
+  },
+  "appearance": {
+    "body": {
+      "height": 1.0,
+      "headScale": 1.08,
+      "shoulderWidth": 1.0,
+      "torsoWidth": 1.0,
+      "legWidth": 1.0
+    },
+    "palette": {
+      "skin": "#f6c29e",
+      "hair": "#d43b2f",
+      "primary": "#f2d744",
+      "secondary": "#2b71c9",
+      "shoes": "#26313a"
+    },
+    "layers": [
+      {"name": "skin", "enabled": true, "opacity": 1.0},
+      {"name": "hair", "enabled": true, "opacity": 1.0},
+      {"name": "face", "enabled": true, "opacity": 1.0},
+      {"name": "upper_clothing", "enabled": true, "opacity": 1.0},
+      {"name": "lower_clothing", "enabled": true, "opacity": 1.0},
+      {"name": "footwear", "enabled": true, "opacity": 1.0},
+      {"name": "accessories_front", "enabled": true, "opacity": 1.0},
+      {"name": "paint_over", "enabled": true, "opacity": 1.0},
+      {"name": "outline", "enabled": true, "opacity": 1.0}
+    ]
+  },
+  "style": {
+    "target": "classic_tycoon_prerendered_character",
+    "pixelReadable": true,
+    "paintedForms": true,
+    "avoidFlatVectorLook": true,
+    "avoidPhotorealism": true
+  }
+}
