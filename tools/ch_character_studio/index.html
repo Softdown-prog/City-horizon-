@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CH Character Studio Art V0</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#15231f; color:#eef5f1; }
+    header { height:52px; display:flex; align-items:center; gap:12px; padding:0 16px; background:#0f1916; border-bottom:1px solid #2e433b; }
+    header strong { color:#f4d35e; }
+    .app { display:grid; grid-template-columns:240px minmax(520px,1fr) 280px; height:calc(100vh - 52px); }
+    aside { padding:14px; overflow:auto; background:#13201c; }
+    aside.left { border-right:1px solid #2e433b; }
+    aside.right { border-left:1px solid #2e433b; }
+    main { display:flex; align-items:center; justify-content:center; overflow:auto; padding:24px; background:#20332d; }
+    .panel { margin-bottom:18px; }
+    .panel h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:#a9c5ba; }
+    button, select, input[type=file]::file-selector-button { background:#29443a; color:#fff; border:1px solid #45665a; border-radius:6px; padding:8px 10px; cursor:pointer; }
+    button.active { background:#d6ae39; color:#172019; border-color:#f2d35d; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .stack { display:grid; gap:8px; }
+    .canvas-wrap { position:relative; box-shadow:0 12px 40px #07110db0; background-image:linear-gradient(45deg,#30453d 25%,transparent 25%),linear-gradient(-45deg,#30453d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#30453d 75%),linear-gradient(-45deg,transparent 75%,#30453d 75%); background-size:24px 24px; background-position:0 0,0 12px,12px -12px,-12px 0; }
+    canvas { width:480px; height:640px; image-rendering:pixelated; display:block; cursor:crosshair; }
+    .layer { display:grid; grid-template-columns:24px 1fr 58px; align-items:center; gap:8px; padding:7px; border:1px solid #2f4a40; border-radius:6px; margin-bottom:6px; cursor:pointer; }
+    .layer.selected { border-color:#e1c04a; background:#263d35; }
+    .layer small { opacity:.65; }
+    .swatches { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+    .swatch { height:30px; border:2px solid #ffffff33; border-radius:5px; cursor:pointer; }
+    .swatch.active { outline:2px solid #fff; }
+    label { font-size:12px; color:#bdd0c8; }
+    input[type=range] { width:100%; }
+    input[type=color] { width:42px; height:32px; padding:0; border:0; background:none; }
+    .status { font-size:12px; line-height:1.5; color:#aac0b7; background:#0f1916; border:1px solid #2b4239; padding:8px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>CH Character Studio Art</strong>
+    <span>V0 · CH Blender underlay</span>
+    <span style="margin-left:auto">48×64 · anchor 24,60 · S/E/N/W</span>
+  </header>
+  <div class="app">
+    <aside class="left">
+      <div class="panel">
+        <h3>Frame</h3>
+        <div class="stack">
+          <select id="direction"><option>S</option><option>E</option><option>N</option><option>W</option></select>
+          <select id="frame"><option>idle</option><option>walk_00</option><option>walk_01</option><option>walk_02</option><option>walk_03</option><option>walk_04</option><option>walk_05</option><option>walk_06</option><option>walk_07</option></select>
+          <label>Base CH Blender <input id="baseFile" type="file" accept="image/png" /></label>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Ferramentas</h3>
+        <div class="row">
+          <button id="brushBtn" class="active">Pincel</button>
+          <button id="eraserBtn">Borracha</button>
+          <button id="clearBtn">Limpar</button>
+        </div>
+        <div style="margin-top:10px">
+          <label>Tamanho <span id="sizeLabel">1</span> px</label>
+          <input id="brushSize" type="range" min="1" max="8" value="1" />
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label>Cor</label><input id="color" type="color" value="#f2d744" />
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Paleta</h3>
+        <div id="swatches" class="swatches"></div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="canvas-wrap"><canvas id="view" width="48" height="64"></canvas></div>
+    </main>
+
+    <aside class="right">
+      <div class="panel">
+        <h3>Camadas</h3>
+        <div id="layers"></div>
+      </div>
+      <div class="panel">
+        <h3>Exportar</h3>
+        <div class="stack">
+          <button id="exportLayer">PNG da camada</button>
+          <button id="exportComposite">PNG composto</button>
+          <button id="exportSpec">JSON do personagem</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Status</h3>
+        <div id="status" class="status">Studio pronto. Importe um passe base do CH Blender ou pinte diretamente.</div>
+      </div>
+    </aside>
+  </div>
+  <script src="studio.js"></script>
+</body>
+</html>
