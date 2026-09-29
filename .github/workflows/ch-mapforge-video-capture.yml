@@ -65,16 +65,15 @@ jobs:
         shell: pwsh
         run: cmake --build build/ch-mapforge-video --config Release --target MapForge2CLI --parallel
 
-      - name: Deploy Qt image plugins for CLI
+      - name: Validate Qt runtime for CLI
         shell: pwsh
         run: |
+          $qtRoot = "C:/Qt/6.8.3/msvc2022_64"
           $release = "build/ch-mapforge-video/Release"
-          $imageformats = Join-Path $release "imageformats"
-          New-Item -ItemType Directory -Force -Path $imageformats | Out-Null
-          Copy-Item "C:/Qt/6.8.3/msvc2022_64/plugins/imageformats/qpng.dll" $imageformats -Force
-          Copy-Item "C:/Qt/6.8.3/msvc2022_64/bin/Qt6Core.dll" $release -Force
-          Copy-Item "C:/Qt/6.8.3/msvc2022_64/bin/Qt6Gui.dll" $release -Force
-          if (-not (Test-Path (Join-Path $imageformats "qpng.dll"))) { throw "qpng.dll deployment failed" }
+          if (-not (Test-Path "$qtRoot/bin/Qt6Core.dll")) { throw "Qt6Core.dll missing" }
+          if (-not (Test-Path "$qtRoot/bin/Qt6Gui.dll")) { throw "Qt6Gui.dll missing" }
+          if (-not (Test-Path "$qtRoot/plugins")) { throw "Qt plugins directory missing" }
+          if (-not (Test-Path "$release/MapForge2CLI.exe")) { throw "MapForge2CLI.exe missing" }
 
       - name: Resolve deterministic scenario
         shell: pwsh
@@ -113,7 +112,7 @@ jobs:
       - name: Render frames and encode review media
         shell: pwsh
         env:
-          QT_PLUGIN_PATH: ${{ github.workspace }}/build/ch-mapforge-video/Release
+          QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
         run: python tools/animation_preview/run_video_scenario.py --scenario $env:CH_VIDEO_RESOLVED_JOB
 
       - name: Validate video proof
