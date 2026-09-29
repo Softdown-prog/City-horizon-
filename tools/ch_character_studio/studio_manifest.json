@@ -16,6 +16,7 @@
     "ch_blender_pose_landmarks",
     "spatial_anchor_and_footprint_validation",
     "paint_layers",
+    "photoshop_reference_editing",
     "landmark_pose_transfer",
     "character_color_masks",
     "optional_held_object_socket",
@@ -113,6 +114,32 @@
     "externalAgentsConsumeWorkPackets": true,
     "claimsToSpawnRemoteAgents": false
   },
+  "photoshopReferenceTools": {
+    "contract": "CH_CHARACTER_PHOTOSHOP_TOOLS_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_photoshop_tools_v0.json",
+    "implementation": "tools/ch_character_studio/photoshop_tools.js",
+    "studioApi": "CH_CHARACTER_STUDIO_API_V0",
+    "stage1": [
+      "rectangular_selection",
+      "lasso_selection",
+      "move_selection",
+      "free_transform_selection",
+      "eyedropper",
+      "paint_bucket",
+      "fill_selection",
+      "delete_selection",
+      "undo_redo",
+      "layer_opacity",
+      "layer_blend_mode"
+    ],
+    "stage2": ["layer_groups", "layer_masks", "clipping_masks", "non_destructive_transform_state", "duplicate_merge_flatten_layers"],
+    "stage3": ["brush_presets", "brush_spacing", "brush_opacity_flow", "symmetry", "gradient", "curves_levels_hue_saturation"],
+    "historyLimitPerFrame": 50,
+    "selectionTransformScope": "active_art_layer_pixels_only",
+    "imageSmoothing": false,
+    "mayChangeApprovedMotion": false,
+    "mayMoveGroundAnchor": false
+  },
   "lockedRules": {
     "frameSize": [48, 64],
     "groundAnchor": [24, 60],
@@ -123,7 +150,9 @@
     "artMayChangeMotion": false,
     "artMayChangeGroundAnchor": false,
     "heldObjectMayChangeMotion": false,
-    "inspectionCameraMayBecomeRuntimeCamera": false
+    "inspectionCameraMayBecomeRuntimeCamera": false,
+    "photoshopReferenceToolsMayChangeMotion": false,
+    "photoshopReferenceToolsMayMoveGroundAnchor": false
   },
-  "designPrinciple": "Blender solves spatial consistency. Studio Art owns final visible style; inspection tools may explore freely but never rewrite canonical export contracts."
+  "designPrinciple": "Blender solves spatial consistency. Studio Art owns final visible style; inspection and Photoshop-reference tools may edit appearance freely but never rewrite canonical motion, anchor or export-camera contracts."
 }
