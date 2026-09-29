@@ -1,6 +1,7 @@
 #include "procedural_road_lane_connector.h"
 #include "procedural_road_route_sampler.h"
 #include "procedural_road_vehicle_follower.h"
+#include "procedural_road_vehicle_render_adapter.h"
 
 #include <cassert>
 #include <cmath>
@@ -146,6 +147,46 @@ void test_vehicle_follower_moves_continuously_and_slows_for_turns() {
     assert(near_value(follower.pose().route_distance, follower.pose().route_length, 0.001F));
 }
 
+void test_vehicle_render_adapter_preserves_pose_and_logical_direction() {
+    assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({1.0F, 0.2F, 0.0F}) == MobileEntityDirection::east);
+    assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({-1.0F, 0.2F, 0.0F}) == MobileEntityDirection::west);
+    assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({0.2F, 1.0F, 0.0F}) == MobileEntityDirection::south);
+    assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({0.2F, -1.0F, 0.0F}) == MobileEntityDirection::north);
+
+    ProceduralRoadVehicleVisual visual;
+    visual.sprite_south = "south.png";
+    visual.sprite_east = "east.png";
+    visual.sprite_north = "north.png";
+    visual.sprite_west = "west.png";
+    visual.animation_set_id = "vehicle.test";
+    visual.art_scale = 0.42F;
+    visual.sprite_anchor_x = 0.50F;
+    visual.sprite_anchor_y = 0.91F;
+
+    ProceduralRoadVehiclePose pose;
+    pose.position = {3.25F, 5.75F, 1.60F};
+    pose.forward = {0.9F, 0.1F, 0.0F};
+    pose.speed = 1.0F;
+
+    const MobileEntityRenderData entity = ProceduralRoadVehicleRenderAdapter::make_render_data(pose, visual);
+    assert(entity.spatial.direction == MobileEntityDirection::east);
+    assert(entity.sprite_asset == "east.png");
+    assert(entity.animation_set_id == "vehicle.test");
+    assert(entity.logical_state == "moving");
+    assert(near_value(entity.spatial.logical_world_x, 3.25F));
+    assert(near_value(entity.spatial.logical_world_y, 5.75F));
+    assert(near_value(entity.spatial.logical_world_z, 1.60F));
+    assert(near_value(entity.spatial.visual_world_x, 3.25F));
+    assert(near_value(entity.spatial.visual_world_y, 5.75F));
+    assert(near_value(entity.spatial.visual_world_z, 1.60F));
+    assert(entity.spatial.logical_tile_x == 3);
+    assert(entity.spatial.logical_tile_y == 5);
+    assert(near_value(entity.spatial.ground_anchor_x, 0.0F));
+    assert(near_value(entity.spatial.ground_anchor_y, 0.0F));
+    assert(near_value(entity.art_scale, 0.42F));
+    assert(near_value(entity.sprite_anchor_y, 0.91F));
+}
+
 void test_reverse_route_is_continuous() {
     ProceduralRoadGraph graph;
     const auto west = graph.add_node({-4.0F, 0.0F, 0.0F});
@@ -188,6 +229,7 @@ int main() {
     test_explicit_junction_connectors();
     test_continuous_route_across_two_junctions();
     test_vehicle_follower_moves_continuously_and_slows_for_turns();
+    test_vehicle_render_adapter_preserves_pose_and_logical_direction();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
