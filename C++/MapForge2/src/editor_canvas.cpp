@@ -1,5 +1,6 @@
 #include "editor_canvas.h"
 #include "canonical_viewport.h"
+#include "engine_projection_adapter.h"
 
 #include "src/ch_core/contracts.h"
 #include "src/ch_core/map_document.h"
@@ -195,6 +196,16 @@ void EditorCanvas::centerCamera() {
 void EditorCanvas::panBy(const float dx, const float dy) {
     camera_.pan_x += dx * coordinateScale();
     camera_.pan_y += dy * coordinateScale();
+    update();
+}
+
+void EditorCanvas::rotateCamera(const bool clockwise) {
+    const int current = static_cast<int>(camera_.rotation);
+    const int next = clockwise ? (current + 1) % 4 : (current + 3) % 4;
+    const QSizeF viewport(viewportWidth(), viewportHeight());
+    const QPointF screenFocus(viewport.width() * 0.5, viewport.height() * 0.5);
+    camera_ = ch::studio::EngineProjectionAdapter::rotatePreservingScreenPoint(
+        camera_, static_cast<ch::CameraRotation>(next), screenFocus, viewport);
     update();
 }
 
@@ -534,6 +545,14 @@ void EditorCanvas::keyPressEvent(QKeyEvent* event) {
         case Qt::Key_Down:
         case Qt::Key_S:
             panBy(0.0F, step);
+            event->accept();
+            return;
+        case Qt::Key_Z:
+            rotateCamera(false);
+            event->accept();
+            return;
+        case Qt::Key_X:
+            rotateCamera(true);
             event->accept();
             return;
         case Qt::Key_Plus:
