@@ -272,24 +272,56 @@ public:
 private:
     struct UiThumbnail {
         SDL_Texture* texture = nullptr;
-        float source_width = 0.0F;
-        float source_height = 0.0F;
-        int frame_count = 1;
+        float width = 0.0F;
+        float height = 0.0F;
     };
-    [[nodiscard]] UiThumbnail* ensure_thumbnail(SDL_Renderer* renderer, const std::string& path, int frame_count) const;
-    void render_button(SDL_Renderer* renderer, const UiButton& button) const;
-    void render_panel(SDL_Renderer* renderer, const UiRect& panel) const;
-    void render_text(SDL_Renderer* renderer, const std::string& value, float x, float y, Uint8 r = 238,
-                     Uint8 g = 244, Uint8 b = 238) const;
-    void render_centered_text(SDL_Renderer* renderer, const std::string& value, float center_x, float y,
-                              Uint8 r = 238, Uint8 g = 244, Uint8 b = 238) const;
 
+    enum class SettingsDragTarget : std::uint8_t {
+        none,
+        master,
+        effects,
+    };
+
+    void add_button(UiRect bounds, std::string label, UiAction action, bool enabled = true,
+                    bool active = false, std::string payload = {});
+    void add_build_card(UiRect bounds, const UiBuildItem& item, bool active,
+                        UiAction action = UiAction::select_building);
+    void add_panel(UiRect bounds);
+    void update_settings_draft_from_pointer(SettingsDragTarget target, float mouse_x);
+    [[nodiscard]] const UiThumbnail* thumbnail_for(SDL_Renderer* renderer, const std::string& path) const;
+    void render_build_card(SDL_Renderer* renderer, const UiButton& button) const;
+    [[nodiscard]] static UiButtonState state_for(const UiButton& button, float mouse_x, float mouse_y,
+                                                  bool pressed);
+
+    // Internal names used by the compatibility implementation. Public entry
+    // points sanitize removed energy presentation and add runtime tools before
+    // delegating to the established layout/input implementation.
+    void update_layout_legacy(int viewport_width, int viewport_height, const GameplayUiModel& model);
+    void handle_mouse_motion_legacy(float mouse_x, float mouse_y);
+    [[nodiscard]] UiInputResult handle_mouse_button_down_legacy(float mouse_x, float mouse_y,
+                                                                 bool primary_button);
+    void handle_mouse_button_up_legacy(float mouse_x, float mouse_y);
+    void render_legacy(SDL_Renderer* renderer) const;
+
+    GameplayUiModel model_;
     std::vector<UiButton> buttons_;
     std::vector<UiRect> panels_;
-    GameplayUiModel model_;
+    float mouse_x_ = -1.0F;
+    float mouse_y_ = -1.0F;
+    bool primary_pressed_ = false;
+    std::optional<UiRect> build_panel_bounds_;
+    std::optional<UiRect> placement_preview_bounds_;
+    std::optional<UiRect> overlay_bounds_;
+    std::optional<UiRect> settings_master_slider_bounds_;
+    std::optional<UiRect> settings_effects_slider_bounds_;
+    SettingsDragTarget settings_drag_target_ = SettingsDragTarget::none;
+    int settings_draft_master_percent_ = 100;
+    int settings_draft_effects_percent_ = 100;
+    int viewport_width_ = 1;
+    int viewport_height_ = 1;
+    float build_scroll_offset_ = 0.0F;
+    float build_scroll_max_ = 0.0F;
+    float build_panel_header_height_ = 42.0F;
+    std::string build_category_filter_ = "TODOS";
     mutable std::unordered_map<std::string, UiThumbnail> thumbnails_;
-    float mouse_x_ = -1000.0F;
-    float mouse_y_ = -1000.0F;
-    float build_scroll_y_ = 0.0F;
-    float farming_scroll_y_ = 0.0F;
 };
