@@ -50,10 +50,20 @@
       "manifest": "assets/ui/icons/service/service_icons_v1.json"
     },
     "panel_window_nine_slice": {
+      "contract_id": "CH_WINDOW_FRAME_V2",
       "path": "assets/ui/chrome/panel_window_9slice_v2.png",
-      "role": "runtime_resizable_window_nine_slice_v2",
+      "role": "canonical_runtime_resizable_window_frame",
       "insets": [32, 32, 32, 32],
       "source_size": [192, 192],
+      "default_for": [
+        "instructions",
+        "help",
+        "information",
+        "tutorial",
+        "alerts",
+        "standard_dialogs",
+        "standard_resizable_windows"
+      ],
       "usages": [
         "construction_catalog",
         "pause",
@@ -67,6 +77,7 @@
       "status": "runtime_v2"
     },
     "panel_build_catalog_nine_slice": {
+      "contract_id": "CH_WINDOW_FRAME_V2",
       "path": "assets/ui/chrome/panel_window_9slice_v2.png",
       "role": "construction_catalog_alias_to_runtime_window_skin",
       "insets": [32, 32, 32, 32],
