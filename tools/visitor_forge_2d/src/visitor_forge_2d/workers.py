@@ -19,19 +19,30 @@ from .core import (
     flowering_tree_scenery,
     organic_scenery,
     red_mapple_scenery,
+    scene_composer,
     shape_recipe,
 )
 
 SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
+SCENE_CONTRACT = "CH_2D_SCENE_RECIPE_V1"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
 FENCE_CONTRACT = "CH_2D_FENCE_SCENERY_V1"
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 
 
+def _validate_camera(recipe: dict, label: str) -> None:
+    camera = recipe.get("camera", {})
+    if (not isinstance(camera, dict) or camera.get("contract") != "CH_CAMERA_V1" or
+        camera.get("tile") != [128, 64] or
+        camera.get("yawDeg", 45) != 45 or camera.get("elevationDeg", 30) != 30):
+        raise ValueError(f"{label} requires CH_CAMERA_V1, 128x64, yaw 45 and elevation 30")
+
+
 def validate_recipe(recipe: dict) -> str:
     """Recipe worker: reject invalid IDs, geometry and camera before writing."""
-    if not isinstance(recipe, dict) or recipe.get("contract") not in (SHAPE_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT):
-        raise ValueError("worker needs a supported 2D shape, organic scenery or fence recipe")
+    supported = (SHAPE_CONTRACT, SCENE_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT)
+    if not isinstance(recipe, dict) or recipe.get("contract") not in supported:
+        raise ValueError("worker needs a supported 2D shape, scene, organic scenery or fence recipe")
     asset_id = recipe.get("id")
     if not isinstance(asset_id, str) or not _SAFE_ID.fullmatch(asset_id):
         raise ValueError("recipe id must use lowercase letters, digits, _ or -")
@@ -45,14 +56,14 @@ def validate_recipe(recipe: dict) -> str:
         raise ValueError("anchor must lie within the canvas")
     if recipe["contract"] == SHAPE_CONTRACT:
         return "shape"
+    if recipe["contract"] == SCENE_CONTRACT:
+        _validate_camera(recipe, "scene recipe")
+        scene_composer.validate_recipe(recipe)
+        return "scene"
     if recipe["contract"] == FENCE_CONTRACT:
         fence_scenery.validate_recipe(recipe)
         return "fence"
-    camera = recipe.get("camera", {})
-    if (not isinstance(camera, dict) or camera.get("contract") != "CH_CAMERA_V1" or
-        camera.get("tile") != [128, 64] or
-        camera.get("yawDeg", 45) != 45 or camera.get("elevationDeg", 30) != 30):
-        raise ValueError("organic scenery requires CH_CAMERA_V1, 128x64, yaw 45 and elevation 30")
+    _validate_camera(recipe, "organic scenery")
     if recipe.get("sceneryType") == "flower_bed":
         return "flower_bed"
     if recipe.get("sceneryType") == "flower_bed_v2":
@@ -113,6 +124,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
     folder = output_root / recipe["id"]
     if kind == "shape":
         result = shape_recipe.export_shape_recipe(recipe_path, folder)
+    elif kind == "scene":
+        result = scene_composer.export(recipe_path, folder)
     elif kind == "fence":
         result = fence_scenery.export_fence_scenery(recipe_path, folder)
     elif kind == "flower_bed":
