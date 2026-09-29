@@ -72,8 +72,6 @@ jobs:
           - flower_bed_01
           - park_tree_flowering_open_v1
           - park_wayfinding_sign
-          - prop_rowboat_scene_v1
-          - prop_rowboat_scene_v2
           - prop_rowboat_scene_v3
           - park_iron_fence_01
           - park_chainlink_fence_01
