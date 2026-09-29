@@ -104,3 +104,13 @@
   }
   render();
 })();
+
+(() => {
+  if (window.CH_PHOTOSHOP_LAYER_STACK || document.querySelector('script[data-ch-photoshop-layers-v2]')) return;
+  const script = document.createElement('script');
+  script.src = 'photoshop_layers_v2.js';
+  script.dataset.chPhotoshopLayersV2 = 'true';
+  script.async = false;
+  script.onerror = () => console.error('Falha ao carregar photoshop_layers_v2.js');
+  document.body.appendChild(script);
+})();
