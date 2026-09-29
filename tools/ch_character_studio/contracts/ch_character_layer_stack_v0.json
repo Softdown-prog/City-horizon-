@@ -23,12 +23,14 @@
     "mayModifyApprovedPose": false
   },
   "layerMask": {
-    "format": "8bit_grayscale_semantics_on_rgba_canvas",
-    "white": "visible",
-    "black": "hidden",
+    "storage": "rgba_canvas_with_visibility_encoded_in_alpha",
+    "white": "alpha_255_visible",
+    "black": "alpha_0_hidden",
     "linkedToLayerTransform": true,
     "creationModes": ["white", "source_alpha"],
-    "editableBrushValues": [0, 255]
+    "editableBrushValues": [0, 255],
+    "preview": "hidden_regions_red_overlay",
+    "exportPng": true
   },
   "clippingMask": {
     "source": "current_layer",
@@ -56,6 +58,7 @@
   "export": {
     "compositeIncludesAdvancedStack": true,
     "heldObjectCompositeIncludesAdvancedStack": true,
+    "layerMaskPng": true,
     "stackMetadataJson": true,
     "runtimePromotionRequiresRasterValidation": true
   }
