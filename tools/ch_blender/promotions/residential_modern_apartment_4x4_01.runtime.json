@@ -7,5 +7,6 @@
   "approvedProxySha256": "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18",
   "runtimeDirectory": "assets/buildings/residential_modern_apartment_4x4_01",
   "definition": "assets/definitions/residential_modern_apartment_01.json",
-  "status": "approved_for_runtime"
+  "status": "approved_for_runtime",
+  "promotionAttempt": 2
 }
