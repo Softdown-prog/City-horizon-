@@ -4,9 +4,12 @@
 #include "procedural_road_vehicle_follower.h"
 #include "procedural_road_vehicle_render_adapter.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <limits>
+#include <vector>
 
 namespace {
 
@@ -82,6 +85,18 @@ std::vector<ProceduralRoadRoutePoint> build_sampled_vehicle_route() {
     const auto sampled = ProceduralRoadRouteSampler::sample_right_hand_route(graph, *route, 0.18F, 24, 12);
     assert(sampled && !sampled->empty());
     return *sampled;
+}
+
+std::vector<ProceduralRoadRoutePoint> build_straight_vehicle_route(const float z = 0.0F) {
+    std::vector<ProceduralRoadRoutePoint> route;
+    for (int step = 0; step <= 32; ++step) {
+        route.push_back({{static_cast<float>(step) * 0.5F, 0.0F, z},
+                         ProceduralRoadRoutePointKind::lane,
+                         1,
+                         kInvalidProceduralRoadNodeId,
+                         ProceduralRoadTurnKind::straight});
+    }
+    return route;
 }
 
 ProceduralRoadVehicleVisual test_vehicle_visual() {
@@ -161,6 +176,19 @@ void test_vehicle_follower_moves_continuously_and_slows_for_turns() {
     assert(near_value(follower.pose().route_distance, follower.pose().route_length, 0.001F));
 }
 
+void test_vehicle_follower_honors_external_speed_cap() {
+    ProceduralRoadVehicleFollower follower;
+    assert(follower.set_route(build_straight_vehicle_route()));
+    ProceduralRoadVehicleFollowerConfig config;
+    config.cruise_speed = 2.0F;
+    config.acceleration = 10.0F;
+    config.braking = 10.0F;
+
+    follower.update(1.0F, config, 0.25F);
+    assert(near_value(follower.pose().speed, 0.25F));
+    assert(near_value(follower.pose().route_distance, 0.25F));
+}
+
 void test_vehicle_render_adapter_preserves_pose_and_logical_direction() {
     assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({1.0F, 0.2F, 0.0F}) == MobileEntityDirection::east);
     assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({-1.0F, 0.2F, 0.0F}) == MobileEntityDirection::west);
@@ -236,6 +264,82 @@ void test_procedural_traffic_manager_owns_and_renders_followers() {
     assert(traffic.empty());
 }
 
+void test_procedural_traffic_follows_slower_leader_with_safe_gap() {
+    ProceduralRoadTrafficManager traffic;
+    ProceduralRoadTrafficFollowingConfig following;
+    following.lookahead_distance = 3.0F;
+    following.minimum_gap = 0.65F;
+    following.time_headway = 0.85F;
+    following.lane_tolerance = 0.20F;
+    following.elevation_tolerance = 0.40F;
+    traffic.set_following_config(following);
+
+    ProceduralRoadVehicleFollowerConfig leader_config;
+    leader_config.cruise_speed = 0.55F;
+    leader_config.acceleration = 3.0F;
+    leader_config.braking = 5.0F;
+
+    ProceduralRoadVehicleFollowerConfig follower_config;
+    follower_config.cruise_speed = 1.55F;
+    follower_config.acceleration = 3.0F;
+    follower_config.braking = 5.0F;
+
+    assert(traffic.add("leader", build_straight_vehicle_route(), test_vehicle_visual(), leader_config));
+    for (int step = 0; step < 70; ++step) traffic.update_tick(0.05F);
+    const auto* leader_before_spawn = traffic.find("leader");
+    assert(leader_before_spawn != nullptr);
+    assert(leader_before_spawn->follower.pose().route_distance > 1.5F);
+
+    assert(traffic.add("follower", build_straight_vehicle_route(), test_vehicle_visual(), follower_config));
+
+    bool saw_leader = false;
+    bool saw_speed_reduction = false;
+    float minimum_observed_gap = std::numeric_limits<float>::infinity();
+    for (int step = 0; step < 500; ++step) {
+        traffic.update_tick(0.05F);
+        const auto* leader = traffic.find("leader");
+        const auto* follower = traffic.find("follower");
+        assert(leader != nullptr && follower != nullptr);
+        assert(follower->follower.pose().route_distance <= leader->follower.pose().route_distance + 0.05F);
+
+        if (follower->leader_vehicle_id == "leader") {
+            saw_leader = true;
+            minimum_observed_gap = std::min(minimum_observed_gap, follower->leader_gap);
+            if (follower->follower.pose().speed < follower_config.cruise_speed - 0.10F) {
+                saw_speed_reduction = true;
+            }
+        }
+        if (leader->follower.pose().route_distance > 9.0F) break;
+    }
+
+    assert(saw_leader);
+    assert(saw_speed_reduction);
+    assert(minimum_observed_gap >= following.minimum_gap - 0.10F);
+}
+
+void test_procedural_traffic_does_not_follow_vehicle_on_other_elevation() {
+    ProceduralRoadTrafficManager traffic;
+    ProceduralRoadTrafficFollowingConfig following;
+    following.lookahead_distance = 4.0F;
+    following.elevation_tolerance = 0.40F;
+    traffic.set_following_config(following);
+
+    ProceduralRoadVehicleFollowerConfig config;
+    config.cruise_speed = 0.8F;
+    config.acceleration = 3.0F;
+    config.braking = 5.0F;
+
+    assert(traffic.add("bridge", build_straight_vehicle_route(2.0F), test_vehicle_visual(), config));
+    for (int step = 0; step < 50; ++step) traffic.update_tick(0.05F);
+    assert(traffic.add("ground", build_straight_vehicle_route(0.0F), test_vehicle_visual(), config));
+    traffic.update_tick(0.05F);
+
+    const auto* ground = traffic.find("ground");
+    assert(ground != nullptr);
+    assert(ground->leader_vehicle_id.empty());
+    assert(std::isinf(ground->leader_gap));
+}
+
 void test_reverse_route_is_continuous() {
     ProceduralRoadGraph graph;
     const auto west = graph.add_node({-4.0F, 0.0F, 0.0F});
@@ -278,8 +382,11 @@ int main() {
     test_explicit_junction_connectors();
     test_continuous_route_across_two_junctions();
     test_vehicle_follower_moves_continuously_and_slows_for_turns();
+    test_vehicle_follower_honors_external_speed_cap();
     test_vehicle_render_adapter_preserves_pose_and_logical_direction();
     test_procedural_traffic_manager_owns_and_renders_followers();
+    test_procedural_traffic_follows_slower_leader_with_safe_gap();
+    test_procedural_traffic_does_not_follow_vehicle_on_other_elevation();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
