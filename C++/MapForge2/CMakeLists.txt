@@ -225,7 +225,7 @@ add_executable(MapForge2CLI
     src/mapforge_cli_main.cpp
 )
 target_include_directories(MapForge2CLI PRIVATE ${CH_ROOT})
-target_link_libraries(MapForge2CLI PRIVATE mapforge2_canonical mapforge2_capture Qt6::Core)
+target_link_libraries(MapForge2CLI PRIVATE mapforge2_canonical mapforge2_capture Qt6::Core Qt6::Gui)
 
 if(MSVC)
     target_compile_options(mapforge2_canonical PRIVATE /W4 /permissive- /utf-8)
