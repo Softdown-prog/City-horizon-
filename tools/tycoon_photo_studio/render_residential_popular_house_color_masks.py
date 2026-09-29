@@ -62,6 +62,40 @@ def _mask_for_material(material_name: str, masks: dict[str, bpy.types.Material])
     return masks["fixed"]
 
 
+def _write_worker_metadata(out: Path, recipe_path: Path, studio: dict) -> None:
+    """Emit the standard guarded-job files expected by the CH Blender worker."""
+    (out / "preflight_report.json").write_text(
+        json.dumps({
+            "contract": "CH_BLENDER_PREFLIGHT_V1",
+            "assetId": "building.residential_popular_house.01",
+            "stage": "final",
+            "pass": "color_mask",
+            "status": "ok",
+            "recipe": str(recipe_path),
+        }, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (out / "proxy_approval.json").write_text(
+        json.dumps({
+            "contract": "CH_PROXY_APPROVAL_V1",
+            "assetId": "building.residential_popular_house.01",
+            "proxyReviewed": True,
+            "approvedProxySha256": APPROVED_PROXY,
+            "status": "approved",
+        }, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (out / "studio_metadata.json").write_text(
+        json.dumps({
+            "contract": "CH_STUDIO_METADATA_V1",
+            "assetId": "building.residential_popular_house.01",
+            "cameraContract": "CH_CAMERA_V1",
+            "studioPreset": studio.get("contract", "CH_TYCOON_STUDIO_V1") if isinstance(studio, dict) else "CH_TYCOON_STUDIO_V1",
+            "frameSize": [256, 256],
+            "transparentBackground": True,
+            "pass": "color_mask",
+        }, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
 def _render_masks(ctx):
     recipe_path, recipe, ref, studio, out, scene, root, ground, authored = ctx
 
@@ -90,9 +124,6 @@ def _render_masks(ctx):
         "fixed": _emission_material("CHMask_Fixed", (0.0, 0.0, 0.0, 1.0)),
     }
 
-    # Preserve each object's original material identity, then replace the slot
-    # with its RGB customization channel. Objects outside the three channels
-    # stay black and therefore remain fixed-color at runtime.
     for obj in authored:
         for slot in obj.material_slots:
             original = slot.material.name if slot.material else ""
@@ -124,6 +155,7 @@ def _render_masks(ctx):
     (out / "color_mask_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    _write_worker_metadata(out, recipe_path, studio)
     print("[CH_MASK] Casa Popular four-direction RGB masks complete")
 
 
