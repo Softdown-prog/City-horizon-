@@ -5,6 +5,14 @@
   "template": "park_tree_red_mapple_golden_v1.json",
   "seed": 41527,
   "recipeUpdates": {
+    "mapleStyle": {
+      "center": [128, 126],
+      "crownRadius": [86, 101],
+      "leafScalePx": [3.0, 5.5],
+      "branchLeafSteps": [0.58, 0.82, 1.03],
+      "definedLeaves": true,
+      "preserveBranchGaps": true
+    },
     "broadleafStructure": {
       "layout": "painted_canopy",
       "profile": "branching",
