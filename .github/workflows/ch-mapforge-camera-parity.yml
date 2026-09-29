@@ -10,9 +10,19 @@ on:
       - "src/ch_core/projection.h"
       - "src/ch_core/projection.cpp"
       - "src/runtime_view_state.h"
+      - "C++/MapForge2/CMakeLists.txt"
       - "C++/MapForge2/src/engine_projection_adapter.h"
       - "C++/MapForge2/src/engine_projection_adapter.cpp"
+      - "C++/MapForge2/src/authoring_projection.h"
       - "C++/MapForge2/src/mapforge_camera_parity_test.cpp"
+      - "C++/MapForge2/src/mapforge_authoring_projection_test.cpp"
+      - "C++/MapForge2/src/asset_grid_preview_widget.h"
+      - "C++/MapForge2/src/asset_grid_preview_widget.cpp"
+      - "C++/MapForge2/src/tile_surface_preview_widget.h"
+      - "C++/MapForge2/src/tile_surface_preview_widget.cpp"
+      - "C++/MapForge2/src/park_fence_renderer.h"
+      - "C++/MapForge2/src/park_fence_renderer.cpp"
+      - "C++/MapForge2/src/map_capture_service.cpp"
       - ".github/workflows/ch-mapforge-camera-parity.yml"
 
 jobs:
@@ -39,3 +49,24 @@ jobs:
 
       - name: Run MapForge camera parity gate
         run: /tmp/mapforge_camera_parity_test
+
+      - name: Compile MapForge authoring projection gate
+        run: |
+          g++ -std=c++20 -Wall -Wextra -Wpedantic \
+            -I. -I"C++/MapForge2/src" \
+            "C++/MapForge2/src/mapforge_authoring_projection_test.cpp" \
+            "src/ch_core/projection.cpp" \
+            $(pkg-config --cflags --libs Qt6Core Qt6Gui) \
+            -o /tmp/mapforge_authoring_projection_test
+
+      - name: Run MapForge authoring projection gate
+        run: /tmp/mapforge_authoring_projection_test
+
+      - name: Compile migrated authoring and capture sources
+        run: |
+          CFLAGS="-std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -IC++/MapForge2/src"
+          QT_CFLAGS="$(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets)"
+          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/asset_grid_preview_widget.cpp" -o /tmp/asset_grid_preview_widget.o
+          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/tile_surface_preview_widget.cpp" -o /tmp/tile_surface_preview_widget.o
+          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/park_fence_renderer.cpp" -o /tmp/park_fence_renderer.o
+          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/map_capture_service.cpp" -o /tmp/map_capture_service.o
