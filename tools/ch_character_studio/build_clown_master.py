@@ -18,6 +18,8 @@ from character_draw_cli import load_json, render
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRAME = (48, 64)
 ART_ROOT = Path(__file__).resolve().parent / "art" / "clown_01" / "south_idle"
+ART_SUPERSAMPLE = 4
+OUTLINE_ALPHA_THRESHOLD = 48
 LAYER_RECIPES = [
     ("skin", "skin.recipe.json"),
     ("hair", "hair.recipe.json"),
@@ -42,10 +44,9 @@ def sha256(path: Path) -> str:
 def alpha_union(images: list[Image.Image]) -> list[int]:
     coverage = [0] * (FRAME[0] * FRAME[1])
     for image in images:
-        alpha = image.getchannel("A")
-        values = list(alpha.getdata())
+        values = list(image.getchannel("A").getdata())
         for i, value in enumerate(values):
-            if value:
+            if value >= OUTLINE_ALPHA_THRESHOLD:
                 coverage[i] = 1
     return coverage
 
@@ -95,7 +96,9 @@ def main() -> int:
     outputs: dict[str, dict[str, str]] = {"layers": {}, "masks": {}}
 
     for name, filename in LAYER_RECIPES:
-        image = render(load_json(ART_ROOT / filename), args.seed)
+        recipe = load_json(ART_ROOT / filename)
+        recipe["supersample"] = ART_SUPERSAMPLE
+        image = render(recipe, args.seed)
         path = layer_dir / f"{name}.png"
         image.save(path, optimize=False, compress_level=9)
         rendered_layers.append(image)
@@ -114,7 +117,9 @@ def main() -> int:
     composite.save(composite_path, optimize=False, compress_level=9)
 
     for name, filename in MASK_RECIPES:
-        image = render(load_json(ART_ROOT / filename), args.seed)
+        recipe = load_json(ART_ROOT / filename)
+        recipe["supersample"] = 1
+        image = render(recipe, args.seed)
         path = mask_dir / f"{name}.png"
         image.save(path, optimize=False, compress_level=9)
         outputs["masks"][name] = sha256(path)
@@ -132,6 +137,8 @@ def main() -> int:
         "frameSize": list(FRAME),
         "groundAnchor": [24, 60],
         "seed": args.seed,
+        "artSupersample": ART_SUPERSAMPLE,
+        "maskSupersample": 1,
         "motionModified": False,
         "canonicalCameraModified": False,
         "composite": {"path": str(composite_path), "sha256": sha256(composite_path)},
