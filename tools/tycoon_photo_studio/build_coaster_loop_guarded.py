@@ -54,7 +54,7 @@ def sample_centerline(approach_samples: int = 33, loop_samples: int = 161):
         y = -APPROACH_LENGTH + APPROACH_LENGTH * t
         points.append(Vector((0.0, y, base.RAIL_Z)))
 
-    # Symmetric vertical oval in the Y/Z plane.  Keeping a constant horizontal
+    # Symmetric vertical oval in the Y/Z plane. Keeping a constant horizontal
     # radius avoids the asymmetric-looking crown produced by the V2 teardrop
     # taper once projected through the fixed 45-degree isometric camera.
     # theta=0 starts at the bottom heading +Y and returns with the same tangent.
@@ -179,6 +179,19 @@ def write_metadata(output: Path, centerline):
     (output / "track_metadata.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def write_studio_metadata(output: Path, args):
+    payload = {
+        "contract": "CH_STUDIO_METADATA_V1",
+        "assetId": f"{ASSET_ID}.{PIECE}",
+        "cameraContract": "CH_CAMERA_V1",
+        "studioPreset": str(args.studio_preset),
+        "qualityStage": args.stage,
+        "directions": [direction["id"] for direction in bs.DIRECTIONS],
+        "runtimeRepresentation": "2D_RGBA_pre_rendered",
+    }
+    (output / "studio_metadata.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def main():
     args = parse_args()
     studio = bs.load_json(args.studio_preset)
@@ -234,6 +247,7 @@ def main():
             "reviewed": True,
             "proxySha256": args.approval_proxy_sha,
         }, indent=2), encoding="utf-8")
+        write_studio_metadata(output, args)
         for direction in bs.DIRECTIONS:
             bs.set_direction(root, direction)
             scene_gate.render_proxy(
