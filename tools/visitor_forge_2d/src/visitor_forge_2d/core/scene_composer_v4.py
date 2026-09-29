@@ -1,9 +1,10 @@
 """Scene Composer V4: painterly finish and visual critic.
 
 V4 reuses the bounded V3 scene graph, then applies deterministic edge breakup,
-surface brush variation and a small gameplay critic.  It is intentionally a
-finish pass, so signs, boats, piers and decorations can share it without each
-needing a bespoke renderer.
+surface brush variation and a small gameplay critic.  It also expands authored
+smooth closed silhouettes to bounded spline polygons before V3 validation, so
+boats, signs, rocks, piers and decorations are not limited to ruler-straight
+polygon edges.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
-from . import scene_composer_v3
+from . import scene_composer_v3, smooth_geometry
 from .exporter import alpha_safe_resize
 
 CONTRACT = "CH_2D_SCENE_RECIPE_V4"
@@ -28,12 +29,17 @@ def _num(value, label):
     return float(value)
 
 
+def _legacy_recipe(recipe: dict) -> dict:
+    legacy = deepcopy(recipe)
+    legacy["contract"] = scene_composer_v3.CONTRACT
+    legacy.pop("finish", None)
+    return smooth_geometry.expand_recipe(legacy)
+
+
 def validate_recipe(recipe: dict) -> None:
     if not isinstance(recipe, dict) or recipe.get("contract") != CONTRACT:
         raise ValueError(f"scene recipe must declare {CONTRACT}")
-    legacy = deepcopy(recipe)
-    legacy["contract"] = scene_composer_v3.CONTRACT
-    scene_composer_v3.validate_recipe(legacy)
+    scene_composer_v3.validate_recipe(_legacy_recipe(recipe))
     finish = recipe.get("finish", {})
     if not isinstance(finish, dict):
         raise ValueError("finish must be an object")
@@ -54,13 +60,10 @@ def _edge_breakup(frame: Image.Image, seed: int, amount: float) -> Image.Image:
         return frame
     rng = random.Random(seed ^ 0xA13F)
     rgba = frame.convert("RGBA")
-    alpha = rgba.getchannel("A")
     w, h = rgba.size
     out = Image.new("RGBA", rgba.size)
     src = rgba.load(); dst = out.load()
     max_shift = max(1, round(amount))
-    # Very low-frequency row warp: removes ruler-straight silhouettes without
-    # changing the authored anchor or turning the asset into noisy jelly.
     phase = rng.random() * math.tau
     for y in range(h):
         envelope = math.sin(math.pi * y / max(1, h - 1))
@@ -86,16 +89,12 @@ def _surface_finish(frame: Image.Image, seed: int, finish: dict) -> Image.Image:
         x = rng.randrange(w); y = rng.randrange(h)
         rx = rng.randint(2, 9); ry = rng.randint(1, 5)
         light = rng.random() > 0.46
-        if light:
-            color = (255, 229, 190, round(255 * opacity * rng.uniform(0.35, 1.0)))
-        else:
-            color = (56, 38, 29, round(255 * opacity * rng.uniform(0.35, 1.0)))
+        color = ((255, 229, 190) if light else (56, 38, 29)) + (round(255 * opacity * rng.uniform(0.35, 1.0)),)
         d.ellipse((x-rx, y-ry, x+rx, y+ry), fill=color)
     layer = layer.filter(ImageFilter.GaussianBlur(1.15))
     layer.putalpha(ImageChops.multiply(layer.getchannel("A"), alpha))
     image = Image.alpha_composite(image, layer)
     if variation > 0:
-        # Low-frequency tonal field.  Kept subtle to survive 1x downsampling.
         small = Image.new("L", (max(2, w//14), max(2, h//14)))
         p = small.load()
         for yy in range(small.height):
@@ -119,7 +118,6 @@ def critic(frame: Image.Image, recipe: dict) -> dict:
     extrema = stat.extrema
     contrast = sum((hi - lo) for lo, hi in extrema) / (3 * 255)
     occupancy = (bounds[2]-bounds[0]) * (bounds[3]-bounds[1]) / max(1, frame.width * frame.height)
-    # Edge complexity from alpha perimeter relative to occupied area.
     edge = ImageChops.difference(alpha, alpha.filter(ImageFilter.MinFilter(3)))
     edge_pixels = sum(1 for v in edge.getdata() if v > 18)
     opaque = sum(1 for v in alpha.getdata() if v > 18)
@@ -141,14 +139,11 @@ def critic(frame: Image.Image, recipe: dict) -> dict:
 
 def render_scene(recipe: dict) -> tuple[Image.Image, dict]:
     validate_recipe(recipe)
-    legacy = deepcopy(recipe); legacy["contract"] = scene_composer_v3.CONTRACT
-    legacy.pop("finish", None)
-    frame, metadata = scene_composer_v3.render_scene(legacy)
+    frame, metadata = scene_composer_v3.render_scene(_legacy_recipe(recipe))
     seed = recipe.get("seed", 0)
     finish = recipe.get("finish", {})
     frame = _edge_breakup(frame, seed, _num(finish.get("edgeBreakupPx", 0.65), "finish.edgeBreakupPx"))
     frame = _surface_finish(frame, seed, finish)
-    # Re-assert authored canvas and premultiplied-alpha-safe output.
     frame = alpha_safe_resize(frame, tuple(recipe["canvas"]))
     bounds = frame.getchannel("A").getbbox()
     metadata.update({"contract": CONTRACT, "bounds": list(bounds), "finish": finish, "critic": critic(frame, recipe)})
