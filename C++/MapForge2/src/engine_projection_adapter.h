@@ -10,14 +10,30 @@ namespace ch::studio {
 
 class EngineProjectionAdapter final {
 public:
-    static constexpr const char* kVersion = "engine_projection_adapter_2";
+    static constexpr const char* kVersion = "engine_projection_adapter_3";
     static constexpr const char* kCanonicalSourceFile = "src/ch_core/projection.cpp";
     static constexpr const char* kCanonicalFunction = "ch::world_to_screen_point";
+    static constexpr const char* kCanonicalInverseFunction = "ch::screen_to_world_point";
 
     static QPointF worldToScreen(float world_x,
                                  float world_y,
                                  const ch::CameraState& camera,
                                  const QSizeF& viewport);
+
+    static QPointF worldToScreen(float world_x,
+                                 float world_y,
+                                 float world_z,
+                                 const ch::CameraState& camera,
+                                 const QSizeF& viewport);
+
+    static QPointF screenToWorld(const QPointF& screen,
+                                 const ch::CameraState& camera,
+                                 const QSizeF& viewport);
+
+    static ch::CameraState rotatePreservingScreenPoint(const ch::CameraState& camera,
+                                                       ch::CameraRotation next_rotation,
+                                                       const QPointF& screen,
+                                                       const QSizeF& viewport);
 
     static QPointF worldDeltaToScreen(float delta_world_x,
                                       float delta_world_y,
