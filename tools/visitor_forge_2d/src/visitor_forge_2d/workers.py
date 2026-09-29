@@ -58,7 +58,7 @@ def validate_recipe(recipe: dict) -> str:
         return "shape"
     if recipe["contract"] == SCENE_CONTRACT:
         _validate_camera(recipe, "scene recipe")
-        scene_composer.validate_recipe(recipe)
+        scene_composer._validate_recipe(recipe)
         return "scene"
     if recipe["contract"] == FENCE_CONTRACT:
         fence_scenery.validate_recipe(recipe)
