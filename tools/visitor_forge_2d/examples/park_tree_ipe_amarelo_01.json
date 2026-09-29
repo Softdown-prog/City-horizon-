@@ -71,7 +71,10 @@
   "validation": {
     "minimumOpaqueHeightPx": 220,
     "maximumOpaqueHeightPx": 300,
-    "footprint": [1, 1]
+    "footprint": [1, 1],
+    "visualApproval": "approved",
+    "approvedViews": ["south", "west", "north", "east"],
+    "approvedFor": ["runtime_promotion", "forge_derivation"]
   },
   "derivation": {
     "sourceType": "approved_2d_master",
