@@ -1,0 +1,89 @@
+name: CH Procedural Road Proof
+
+# Focused visual/compile gate for CH_PROCEDURAL_ROAD_MESH_V1.
+# Keep this path-scoped so unrelated City Horizon commits do not spend Windows/Qt minutes.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-procedural-road-proof.yml"
+      - "src/road_system.h"
+      - "src/road_system.cpp"
+      - "src/ch_core/projection.h"
+      - "src/ch_core/projection.cpp"
+      - "src/ch_render/procedural_road_renderer.h"
+      - "C++/MapForge2/CMakeLists.txt"
+      - "C++/MapForge2/src/procedural_road_preview_main.cpp"
+      - "tools/ch_math_worker/**"
+      - "docs/CH_PROCEDURAL_ROAD_MESH_V1.md"
+
+jobs:
+  proof-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate CH Math Worker
+        shell: pwsh
+        run: |
+          python tools/ch_math_worker/worker.py --self-test
+          New-Item -ItemType Directory -Force -Path out/ch-procedural-road | Out-Null
+          python tools/ch_math_worker/worker.py tools/ch_math_worker/jobs/procedural_road_probe.job.json --output out/ch-procedural-road/math_report.json
+
+      - name: Install Qt
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Configure focused MapForge build
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/ch-procedural-road -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build procedural road preview only
+        shell: pwsh
+        run: cmake --build build/ch-procedural-road --config Release --target MapForge2ProceduralRoadPreview --parallel
+
+      - name: Render procedural road proof
+        shell: pwsh
+        env:
+          QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
+        run: |
+          $exe = (Resolve-Path "build/ch-procedural-road/Release/MapForge2ProceduralRoadPreview.exe").Path
+          & $exe "out/ch-procedural-road/procedural_road_preview.png"
+          if ($LASTEXITCODE -ne 0) { throw "Procedural road preview failed with exit code $LASTEXITCODE" }
+
+      - name: Validate proof outputs
+        shell: pwsh
+        run: |
+          $png = "out/ch-procedural-road/procedural_road_preview.png"
+          $report = "out/ch-procedural-road/math_report.json"
+          if (-not (Test-Path $png)) { throw "Procedural road PNG missing" }
+          if ((Get-Item $png).Length -lt 1024) { throw "Procedural road PNG is unexpectedly small" }
+          if (-not (Test-Path $report)) { throw "CH Math Worker report missing" }
+          $json = Get-Content $report -Raw | ConvertFrom-Json
+          if ($json.contract -ne "CH_MATH_REPORT_V1" -or $json.status -ne "ok") {
+            throw "CH Math Worker report did not pass"
+          }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $png))
+          $signature = @(137,80,78,71,13,10,26,10)
+          for ($i = 0; $i -lt 8; $i++) {
+            if ($bytes[$i] -ne $signature[$i]) { throw "Preview output is not a valid PNG" }
+          }
+
+      - name: Upload procedural road proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Procedural-Road-Proof
+          path: out/ch-procedural-road/**
+          if-no-files-found: error
+          retention-days: 14
