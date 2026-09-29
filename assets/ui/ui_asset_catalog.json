@@ -27,34 +27,22 @@
     "pause_controls": {
       "path": "assets/ui/atlas/pause_controls_v1.png",
       "role": "pause_menu_controls_atlas",
-      "canvas": [
-        1280,
-        960
-      ]
+      "canvas": [1280, 960]
     },
     "land_expansion_controls": {
       "path": "assets/ui/atlas/land_expansion_controls_v1.png",
       "role": "land_expansion_controls_atlas",
-      "canvas": [
-        1280,
-        960
-      ]
+      "canvas": [1280, 960]
     },
     "new_city_controls": {
-      "path": "assets/ui/atlas/new_city_controls_v1.png",
+      "path": "assets/ui/atlas/new_city_setup_controls_v1.png",
       "role": "new_city_setup_controls_atlas",
-      "canvas": [
-        1280,
-        960
-      ]
+      "canvas": [1280, 960]
     },
     "save_load_controls": {
       "path": "assets/ui/atlas/save_load_controls_v1.png",
       "role": "save_load_controls_atlas",
-      "canvas": [
-        1280,
-        960
-      ]
+      "canvas": [1280, 960]
     },
     "service_icons": {
       "path": "assets/ui/icons/service",
@@ -63,39 +51,27 @@
     },
     "panel_window_nine_slice": {
       "path": "assets/ui/chrome/panel_window_9slice_v2.png",
-      "role": "reusable_resizable_window_nine_slice_v2",
-      "insets": [
-        32,
-        32,
-        32,
-        32
-      ],
-      "source_size": [
-        192,
-        192
-      ],
+      "role": "runtime_resizable_window_nine_slice_v2",
+      "insets": [32, 32, 32, 32],
+      "source_size": [192, 192],
       "usages": [
         "construction_catalog",
         "pause",
         "settings",
-        "administration"
+        "administration",
+        "reports",
+        "save_load",
+        "main_menu",
+        "quit_confirm"
       ],
-      "status": "pilot_v2"
+      "status": "runtime_v2"
     },
     "panel_build_catalog_nine_slice": {
       "path": "assets/ui/chrome/panel_window_9slice_v2.png",
-      "role": "construction_catalog_alias_to_reusable_window_skin",
-      "insets": [
-        32,
-        32,
-        32,
-        32
-      ],
-      "source_size": [
-        192,
-        192
-      ],
-      "status": "pilot_v2"
+      "role": "construction_catalog_alias_to_runtime_window_skin",
+      "insets": [32, 32, 32, 32],
+      "source_size": [192, 192],
+      "status": "runtime_v2"
     }
   }
 }
