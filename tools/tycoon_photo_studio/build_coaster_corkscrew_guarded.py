@@ -136,11 +136,11 @@ def elliptical_track_frame(points, index: int, point: Vector):
     axis_z = base.RAIL_Z + VERTICAL_RADIUS
     x = point.x
     z = point.z - axis_z
-    inward = Vector(
-        (-x / (HORIZONTAL_RADIUS * HORIZONTAL_RADIUS)),
+    inward = Vector((
+        -x / (HORIZONTAL_RADIUS * HORIZONTAL_RADIUS),
         0.0,
-        (-z / (VERTICAL_RADIUS * VERTICAL_RADIUS)),
-    )
+        -z / (VERTICAL_RADIUS * VERTICAL_RADIUS),
+    ))
     up = inward - tangent * inward.dot(tangent)
     if up.length < 1e-6:
         up = Vector((0.0, 0.0, 1.0)) - tangent * tangent.z
@@ -190,8 +190,6 @@ def build_piece(piece: str):
             up,
         ))
 
-    # Ground only the connectors and lower shoulders. The inversion body stays
-    # visually clear so the open corkscrew silhouette is not blocked by posts.
     last = len(centerline) - 1
     support_indices = sorted(set((0, len(centerline) // 7, (len(centerline) * 6) // 7, last)))
     for n, idx in enumerate(support_indices):
