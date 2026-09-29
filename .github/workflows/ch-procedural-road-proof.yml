@@ -1,6 +1,6 @@
 name: CH Procedural Road Proof
 
-# Focused visual/compile gate for CH_PROCEDURAL_ROAD_MESH_V1.
+# Focused visual/compile gate for the procedural-road authoring proof.
 # Keep this path-scoped so unrelated City Horizon commits do not spend Windows/Qt minutes.
 on:
   workflow_dispatch:
@@ -11,6 +11,8 @@ on:
       - ".github/workflows/ch-procedural-road-proof.yml"
       - "src/road_system.h"
       - "src/road_system.cpp"
+      - "src/procedural_road_class.h"
+      - "src/procedural_road_construction.h"
       - "src/ch_core/projection.h"
       - "src/ch_core/projection.cpp"
       - "src/ch_render/procedural_road_renderer.h"
@@ -18,6 +20,8 @@ on:
       - "C++/MapForge2/src/procedural_road_preview_main.cpp"
       - "tools/ch_math_worker/**"
       - "docs/CH_PROCEDURAL_ROAD_MESH_V1.md"
+      - "docs/CH_PROCEDURAL_ROAD_CLASS_V1.md"
+      - "docs/CH_PROCEDURAL_ROAD_CONSTRUCTION_V1.md"
 
 jobs:
   proof-windows:
