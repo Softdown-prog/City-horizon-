@@ -488,6 +488,10 @@ private:
                 instance.stop_wait_elapsed = 0.0F;
             }
 
+            // Once this STOP-controlled vehicle owns the node, release the
+            // approach braking cap so it can leave the stop line and enter.
+            if (junction_owner(upcoming->node_id) == instance.vehicle_id) continue;
+
             external_speed_caps[index] = std::min(
                 external_speed_caps[index],
                 junction_stop_speed_cap(upcoming->distance, instance.movement));
