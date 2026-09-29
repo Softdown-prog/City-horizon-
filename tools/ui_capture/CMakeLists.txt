@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CITY_HORIZON_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
+# UI capture only needs the production UI/runtime code. Visitor Forge preview
+# packaging is unrelated and can fail when the root project is configured as a
+# subdirectory because CMAKE_SOURCE_DIR points at tools/ui_capture.
+set(CH_VISITOR_FORGE_PREVIEW OFF CACHE BOOL "Disable Visitor Forge packaging for UI capture" FORCE)
 add_subdirectory("${CITY_HORIZON_ROOT}" "${CMAKE_BINARY_DIR}/city-horizon-root")
 
 add_executable(city_builder_ui_capture
