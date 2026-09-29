@@ -6,10 +6,11 @@
   "seed": 41527,
   "recipeUpdates": {
     "broadleafStructure": {
-      "layout": "continuous",
-      "center": [128, 118],
-      "radius": [74, 88],
-      "masses": 62
+      "layout": "painted_canopy",
+      "profile": "branching",
+      "center": [128, 126],
+      "radius": [82, 96],
+      "density": 1.16
     },
     "shadowWidth": 92
   }
