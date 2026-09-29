@@ -10,7 +10,7 @@ import math
 import random
 from typing import Iterable
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 WORK_SCALE = 4
 
@@ -135,6 +135,12 @@ def leaf_cluster_maple(
         size = rng.uniform(2.7, 5.1)
         points = maple_leaf_points(x, y, size, rng.uniform(-.58, .58))
         draw.polygon(points, fill=(*_hex(color), rng.randint(178, 242)))
+
+    # Individual leaf polygons can extend beyond their sampled centre. Clip the
+    # final alpha to the authored group mask so species renderers can rely on
+    # hard silhouette ownership and brushes remain composable.
+    clipped_alpha = ImageChops.multiply(layer.getchannel("A"), mask)
+    layer.putalpha(clipped_alpha)
 
 
 def branch_tapered(
