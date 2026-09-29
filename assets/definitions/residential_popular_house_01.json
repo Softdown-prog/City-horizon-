@@ -1,0 +1,43 @@
+{
+  "id": "residential_popular_house_01",
+  "name": "Casa popular",
+  "category": "residential",
+  "texture": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south.png",
+  "sprites": {
+    "0": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south.png",
+    "1": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west.png",
+    "2": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north.png",
+    "3": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east.png"
+  },
+  "spriteAnchors": {
+    "0": { "x": 0.5, "y": 0.68339765625 },
+    "1": { "x": 0.5, "y": 0.68339765625 },
+    "2": { "x": 0.5, "y": 0.68339765625 },
+    "3": { "x": 0.5, "y": 0.68339765625 }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "accessPoints": [
+    { "x": 1, "y": 2, "facing": "south" }
+  ],
+  "footprint": {
+    "width": 3,
+    "height": 3
+  },
+  "buildCost": 4000,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "residentialCapacity": 5,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable",
+  "renderClass": "building_256",
+  "sourceAssetId": "building.residential_popular_house.01",
+  "runtimeManifest": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_runtime_manifest.json",
+  "sourceApprovedProxySha256": "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956"
+}

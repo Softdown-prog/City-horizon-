@@ -1,0 +1,27 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.residential_popular_house.01",
+  "displayName": "Casa popular",
+  "source": "ch_blender",
+  "sourceWorkflowRun": 36572696008,
+  "sourceArtifactId": 11036351367,
+  "sourceCommit": "75cec1730bab45df52d8cfb9d40002dea07782e9",
+  "approvedProxySha256": "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956",
+  "renderer": "CYCLES",
+  "frameSize": [256, 256],
+  "footprint": { "width": 3, "height": 3 },
+  "tileProjection": { "width": 128, "height": 64 },
+  "studioGroundOrigin": { "x": 512.0001, "y": 603.7992 },
+  "runtimeAnchor": { "x": 0.5, "y": 0.68339765625 },
+  "rotationOrder": ["south", "west", "north", "east"],
+  "sprites": {
+    "south": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south.png", "sha256": "bab352e7ed393bb9eec630e6c3179e20442ea4c954192bfc94f8482db4975da9" },
+    "west": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west.png", "sha256": "8f423a33ae90699c864534590280f1e55d1cd6bc13d80f74fb889176ca827660" },
+    "north": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north.png", "sha256": "a3d9446e861641a50b2e941f9c8ae9804b2edddbb4487b5f487c4df2f7e9275e" },
+    "east": { "path": "assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east.png", "sha256": "5d2d396cd26cc8cd2daf2932d80e43ee25a183249e758abd84392be77836c35d" }
+  },
+  "postProcess": "CH_TYCOON_STUDIO_V1 full-frame LANCZOS downsample to 256x256; indexed 256-color runtime PNG",
+  "approvedForRuntimeArt": true,
+  "runtimeGameplayDefinitionRegistered": true,
+  "runtimeGameplayDefinition": "assets/definitions/residential_popular_house_01.json"
+}
