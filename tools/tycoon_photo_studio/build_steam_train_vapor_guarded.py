@@ -1,12 +1,7 @@
 """Guarded CH Blender authoring for the City Horizon steam-train vapor overlay.
 
-The vapor is authored as a separate animated 2D RGBA overlay aligned to the
-approved steam-train canvas.  The train geometry is rebuilt only as a visual
-reference and to reproduce its exact CH_CAMERA_V1 framing.  Final overlay
-frames contain vapor only.
-
-Mandatory quality flow:
-    preflight -> SOUTH composite proxy -> human review -> final 4-dir overlay
+The train is rebuilt only as a framing/reference layer. Final frames contain
+only the animated vapor and share the parent train world origin and canvas.
 """
 from __future__ import annotations
 
@@ -22,10 +17,9 @@ import bpy
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 CH_BLENDER = REPO_ROOT / "tools" / "ch_blender"
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
-if str(CH_BLENDER) not in sys.path:
-    sys.path.insert(0, str(CH_BLENDER))
+for path in (HERE, CH_BLENDER):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 import build_scene as bs  # noqa: E402
 import build_steam_train_guarded as train_builder  # noqa: E402
@@ -62,25 +56,23 @@ def _empty(name: str, parent=None):
 
 
 def _save_blend(path):
-    if not path:
-        return
-    target = Path(path).resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    bpy.ops.wm.save_as_mainfile(filepath=str(target))
+    if path:
+        target = Path(path).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        bpy.ops.wm.save_as_mainfile(filepath=str(target))
 
 
 def _vapor_material(name: str, alpha: float):
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    bsdf = nodes.get("Principled BSDF")
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf is None:
         raise RuntimeError("CH_VAPOR_MATERIAL_ERROR: Principled BSDF missing")
-    color = (0.88, 0.90, 0.88, max(0.0, min(1.0, alpha)))
-    bsdf.inputs["Base Color"].default_value = color
+    rgba = (0.88, 0.90, 0.88, alpha)
+    bsdf.inputs["Base Color"].default_value = rgba
     bsdf.inputs["Roughness"].default_value = 0.92
-    bsdf.inputs["Alpha"].default_value = color[3]
-    mat.diffuse_color = color
+    bsdf.inputs["Alpha"].default_value = alpha
+    mat.diffuse_color = rgba
     if hasattr(mat, "surface_render_method"):
         mat.surface_render_method = "DITHERED"
     if hasattr(mat, "use_transparency_overlap"):
@@ -104,8 +96,8 @@ def _puff(name: str, parent, radius: float, alpha: float):
 
 
 def _set_alpha(obj, alpha: float):
-    mat = obj.data.materials[0]
     alpha = max(0.0, min(1.0, alpha))
+    mat = obj.data.materials[0]
     mat.diffuse_color[3] = alpha
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf is not None:
@@ -117,10 +109,9 @@ def _smoothstep(t: float) -> float:
     return t * t * (3.0 - 2.0 * t)
 
 
-def _age_for(index: int, frame_index: int, count: int, frame_count: int) -> float:
-    # Stagger particles across the loop so frame 8 -> frame 1 is continuous.
-    phase = (frame_index / float(frame_count)) + (index / float(count))
-    return phase - math.floor(phase)
+def _age(index: int, frame_index: int, count: int, frame_count: int) -> float:
+    value = frame_index / float(frame_count) + index / float(count)
+    return value - math.floor(value)
 
 
 def build_vapor(root, recipe):
@@ -128,67 +119,51 @@ def build_vapor(root, recipe):
     overlay_root["contract"] = CONTRACT
     overlay_root["parentAssetId"] = PARENT_ASSET_ID
     overlay_root["runtimeRepresentation"] = "2D_RGBA_animated_overlay"
-
-    stack_cfg = recipe["emitters"]["stack"]
-    cyl_cfg = recipe["emitters"]["cylinders"]
+    stack = recipe["emitters"]["stack"]
+    cylinders = recipe["emitters"]["cylinders"]
     puffs = {"stack": [], "left": [], "right": []}
-
-    for i in range(int(stack_cfg["puffCount"])):
-        puffs["stack"].append(_puff(f"StackVapor_{i:02d}", overlay_root, float(stack_cfg["startRadius"]), 0.5))
-
-    per_side = int(cyl_cfg["puffCountPerSide"])
-    for i in range(per_side):
-        puffs["left"].append(_puff(f"CylinderVapor_L_{i:02d}", overlay_root, float(cyl_cfg["startRadius"]), 0.35))
-        puffs["right"].append(_puff(f"CylinderVapor_R_{i:02d}", overlay_root, float(cyl_cfg["startRadius"]), 0.35))
-
-    return overlay_root, puffs
+    for i in range(int(stack["puffCount"])):
+        puffs["stack"].append(_puff(f"StackVapor_{i:02d}", overlay_root, float(stack["startRadius"]), 0.5))
+    for i in range(int(cylinders["puffCountPerSide"])):
+        puffs["left"].append(_puff(f"CylinderVapor_L_{i:02d}", overlay_root, float(cylinders["startRadius"]), 0.35))
+        puffs["right"].append(_puff(f"CylinderVapor_R_{i:02d}", overlay_root, float(cylinders["startRadius"]), 0.35))
+    return puffs
 
 
 def set_vapor_frame(recipe, puffs, frame: int):
     animation = recipe["animation"]
-    frame_start = int(animation["frameStart"])
     frame_count = int(animation["frameCount"])
-    frame_index = (frame - frame_start) % frame_count
+    frame_index = (frame - int(animation["frameStart"])) % frame_count
 
     stack = recipe["emitters"]["stack"]
     ox, oy, oz = map(float, stack["origin"])
-    count = len(puffs["stack"])
     for i, obj in enumerate(puffs["stack"]):
-        age = _age_for(i, frame_index, count, frame_count)
+        age = _age(i, frame_index, len(puffs["stack"]), frame_count)
         eased = _smoothstep(age)
         radius = float(stack["startRadius"]) + (float(stack["endRadius"]) - float(stack["startRadius"])) * eased
         alpha = float(stack["startAlpha"]) + (float(stack["endAlpha"]) - float(stack["startAlpha"])) * eased
-        lateral = math.sin((i * 1.83) + age * math.tau) * float(stack["spreadY"]) * (0.25 + 0.75 * age)
-        obj.location = (
-            ox + float(stack["driftX"]) * age,
-            oy + lateral,
-            oz + float(stack["rise"]) * age,
-        )
+        lateral = math.sin(i * 1.83 + age * math.tau) * float(stack["spreadY"]) * (0.25 + 0.75 * age)
+        obj.location = (ox + float(stack["driftX"]) * age, oy + lateral, oz + float(stack["rise"]) * age)
         obj.scale = (radius, radius * (0.92 + 0.18 * age), radius * (1.05 + 0.35 * age))
         _set_alpha(obj, alpha)
 
-    cyl = recipe["emitters"]["cylinders"]
-    origins = cyl["origins"]
+    cylinders = recipe["emitters"]["cylinders"]
     for side_index, key in enumerate(("left", "right")):
-        sx, sy, sz = map(float, origins[side_index])
+        sx, sy, sz = map(float, cylinders["origins"][side_index])
         sign = -1.0 if side_index == 0 else 1.0
-        side_puffs = puffs[key]
-        for i, obj in enumerate(side_puffs):
-            # Offset alternate side by half a loop so the two cylinder exhausts
-            # feel mechanical rather than perfectly synchronized.
-            age = _age_for(i, (frame_index + (0 if side_index == 0 else frame_count // 2)) % frame_count,
-                           len(side_puffs), frame_count)
+        phase_frame = (frame_index + (0 if side_index == 0 else frame_count // 2)) % frame_count
+        for i, obj in enumerate(puffs[key]):
+            age = _age(i, phase_frame, len(puffs[key]), frame_count)
             eased = _smoothstep(age)
-            radius = float(cyl["startRadius"]) + (float(cyl["endRadius"]) - float(cyl["startRadius"])) * eased
-            alpha = float(cyl["startAlpha"]) + (float(cyl["endAlpha"]) - float(cyl["startAlpha"])) * eased
+            radius = float(cylinders["startRadius"]) + (float(cylinders["endRadius"]) - float(cylinders["startRadius"])) * eased
+            alpha = float(cylinders["startAlpha"]) + (float(cylinders["endAlpha"]) - float(cylinders["startAlpha"])) * eased
             obj.location = (
-                sx + float(cyl["driftX"]) * age,
-                sy + sign * float(cyl["outward"]) * age,
-                sz + float(cyl["rise"]) * age,
+                sx + float(cylinders["driftX"]) * age,
+                sy + sign * float(cylinders["outward"]) * age,
+                sz + float(cylinders["rise"]) * age,
             )
             obj.scale = (radius * 1.15, radius, radius * 0.86)
             _set_alpha(obj, alpha)
-
     bpy.context.view_layer.update()
 
 
@@ -223,33 +198,27 @@ def build_for_gate(args):
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
     root["parentAssetId"] = PARENT_ASSET_ID
 
-    train_mats = train_builder.materials()
-    train_builder.build_train(root, train_mats, train_recipe)
-
+    train_builder.build_train(root, train_builder.materials(), train_recipe)
     receiver = studio["shadowReceiver"]
     receiver_mat = bs.make_material("ShadowReceiver", receiver["materialColor"], float(receiver.get("roughness", 1.0)))
     ground = bs.add_box("ShadowReceiverPlane", receiver["location"], receiver["dimensions"], receiver_mat, 0.0)
 
-    # Match the parent train framing exactly: calibrate before vapor is added.
     train_authored = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and obj != ground]
     bs.calibrate_ortho_scale(scene, train_authored, safety_margin=0.16)
 
-    overlay_root, puffs = build_vapor(root, recipe)
+    puffs = build_vapor(root, recipe)
     set_vapor_frame(recipe, puffs, int(recipe["animation"]["frameStart"]))
     all_authored = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and obj != ground]
     vapor_authored = [obj for obj in all_authored if obj.get("runtimeLayer") == "steam_overlay"]
-
     bs.set_direction(root, bs.DIRECTIONS[0])
     bpy.context.view_layer.update()
-    return recipe, studio, scene, root, ground, train_authored, vapor_authored, all_authored, puffs, out
+    return recipe, scene, root, ground, train_authored, vapor_authored, all_authored, puffs, out
 
 
-def _render_overlay_only(scene, root, train_authored, vapor_authored, ground, recipe, puffs, out):
-    source_res = tuple(map(int, scene.render.resolution_x for _ in range(2)))
+def render_overlay_only(scene, root, train_authored, vapor_authored, ground, recipe, puffs, out):
     animation = recipe["animation"]
     frame_start = int(animation["frameStart"])
     frame_end = int(animation["frameEnd"])
-
     for obj in train_authored:
         obj.hide_render = True
     ground.hide_render = True
@@ -259,19 +228,14 @@ def _render_overlay_only(scene, root, train_authored, vapor_authored, ground, re
     directions_meta = []
     for direction in bs.DIRECTIONS:
         bs.set_direction(root, direction)
-        direction_frames = []
+        frames = []
         for frame in range(frame_start, frame_end + 1):
             set_vapor_frame(recipe, puffs, frame)
             filename = f"{ASSET_ID}_{direction['id']}_{frame:02d}_source.png"
-            target = out / filename
-            scene.render.filepath = str(target)
+            scene.render.filepath = str(out / filename)
             bpy.ops.render.render(write_still=True)
-            direction_frames.append(filename)
-        directions_meta.append({
-            "id": direction["id"],
-            "rotationDegrees": direction["rotationDegrees"],
-            "frames": direction_frames,
-        })
+            frames.append(filename)
+        directions_meta.append({"id": direction["id"], "rotationDegrees": direction["rotationDegrees"], "frames": frames})
 
     metadata = {
         "contract": "CH_STEAM_TRAIN_VAPOR_SOURCE_BAKE_V1",
@@ -279,9 +243,8 @@ def _render_overlay_only(scene, root, train_authored, vapor_authored, ground, re
         "parentAssetId": PARENT_ASSET_ID,
         "runtimeRepresentation": "2D_RGBA_animated_overlay",
         "cameraContract": "CH_CAMERA_V1",
-        "styleContract": "CH_STYLIZED_PRERENDER_V1",
         "transparentBackground": True,
-        "sourceResolution": [scene.render.resolution_x, scene.render.resolution_y],
+        "sourceResolution": [int(scene.render.resolution_x), int(scene.render.resolution_y)],
         "animation": animation,
         "directionOrder": [d["id"] for d in bs.DIRECTIONS],
         "anchorPolicy": "same_world_origin_and_canvas_as_parent_train",
@@ -293,8 +256,7 @@ def _render_overlay_only(scene, root, train_authored, vapor_authored, ground, re
 def main():
     args = parse_args()
     profile = scene_gate.load_profile(args.preflight_profile)
-    recipe, studio, scene, root, ground, train_authored, vapor_authored, all_authored, puffs, out = build_for_gate(args)
-
+    recipe, scene, root, ground, train_authored, vapor_authored, all_authored, puffs, out = build_for_gate(args)
     preflight_path = out / "preflight_report.json"
     preflight = scene_gate.run_preflight(
         scene=scene,
@@ -330,16 +292,14 @@ def main():
     approval = (args.approval_proxy_sha or "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", approval):
         raise RuntimeError("CH_FINAL_REQUIRES_APPROVED_PROXY: review proxy_south.png first and pass its SHA-256")
-
     (out / "proxy_approval.json").write_text(json.dumps({
         "contract": "CH_PROXY_APPROVAL_V1",
         "assetId": recipe["assetId"],
         "proxySha256": approval,
         "reviewed": True,
-        "runtimeTarget": "2D_RGBA_animated_overlay",
+        "runtimeTarget": "2D_RGBA_animated_overlay"
     }, indent=2), encoding="utf-8")
-
-    _render_overlay_only(scene, root, train_authored, vapor_authored, ground, recipe, puffs, out)
+    render_overlay_only(scene, root, train_authored, vapor_authored, ground, recipe, puffs, out)
     _save_blend(args.save_blend)
     print("[CH_GATE] steam vapor final 4-direction x 8-frame source bake complete")
 
