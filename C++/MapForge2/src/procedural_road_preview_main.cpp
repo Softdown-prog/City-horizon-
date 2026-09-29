@@ -17,12 +17,12 @@
 #include <QWindow>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
 
 #include "src/ch_core/projection.h"
+#include "src/procedural_road_junction.h"
 #include "src/road_system.h"
 
 namespace {
@@ -48,9 +48,9 @@ RoadSplineSegment default_segment() {
 
 ch::CameraState default_camera() {
     ch::CameraState camera;
-    camera.zoom = 0.76F;
-    camera.pan_x = -70.0F;
-    camera.pan_y = -15.0F;
+    camera.zoom = 0.70F;
+    camera.pan_x = -120.0F;
+    camera.pan_y = -20.0F;
     return camera;
 }
 
@@ -74,6 +74,48 @@ RoadWorldPoint3* editable_handle(RoadSplineSegment& segment, const int index) {
     }
 }
 
+RoadWorldPoint3 subtract_points(const RoadWorldPoint3& point, const RoadWorldPoint3& origin) {
+    return {point.x - origin.x, point.y - origin.y, point.z - origin.z};
+}
+
+struct DemoRoadNetwork {
+    ProceduralRoadGraph graph;
+    ProceduralRoadNodeId junction = kInvalidProceduralRoadNodeId;
+};
+
+DemoRoadNetwork build_demo_network(const RoadSplineSegment& editable) {
+    DemoRoadNetwork demo;
+    const ProceduralRoadNodeId start = demo.graph.add_node(editable.start);
+    demo.junction = demo.graph.add_node(editable.end);
+
+    const auto incoming = demo.graph.add_segment(
+        start,
+        demo.junction,
+        subtract_points(editable.control_a, editable.start),
+        subtract_points(editable.control_b, editable.end),
+        editable.width,
+        2);
+    if (incoming) {
+        if (ProceduralRoadGraphSegment* segment = demo.graph.segment(*incoming)) {
+            segment->subdivisions = editable.subdivisions;
+            segment->texture_repeat_world_units = editable.texture_repeat_world_units;
+        }
+    }
+
+    const float branch_length = 4.0F;
+    const float z = editable.end.z;
+    const ProceduralRoadNodeId east = demo.graph.add_node({editable.end.x + branch_length, editable.end.y, z});
+    const ProceduralRoadNodeId south = demo.graph.add_node({editable.end.x, editable.end.y + branch_length, z});
+    const ProceduralRoadNodeId north = demo.graph.add_node({editable.end.x, editable.end.y - branch_length, z});
+    (void)demo.graph.add_segment(demo.junction, east,
+                                 {1.2F, 0.0F, 0.0F}, {-1.2F, 0.0F, 0.0F}, editable.width, 2);
+    (void)demo.graph.add_segment(demo.junction, south,
+                                 {0.0F, 1.2F, 0.0F}, {0.0F, -1.2F, 0.0F}, editable.width, 2);
+    (void)demo.graph.add_segment(demo.junction, north,
+                                 {0.0F, -1.2F, 0.0F}, {0.0F, 1.2F, 0.0F}, editable.width, 2);
+    return demo;
+}
+
 void draw_ground(QPainter& painter, const ch::CameraState& camera,
                  const float viewport_width, const float viewport_height) {
     const QColor grass_a(101, 137, 92);
@@ -82,8 +124,8 @@ void draw_ground(QPainter& painter, const ch::CameraState& camera,
     edge_pen.setWidthF(0.8);
     painter.setPen(edge_pen);
 
-    for (int y = -10; y <= 10; ++y) {
-        for (int x = -12; x <= 17; ++x) {
+    for (int y = -12; y <= 12; ++y) {
+        for (int x = -12; x <= 19; ++x) {
             QPolygonF diamond;
             diamond << to_qpoint(ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera,
                                                            viewport_width, viewport_height))
@@ -120,12 +162,10 @@ void draw_support(QPainter& painter, const RoadWorldPoint3& point, const ch::Cam
 }
 
 void draw_mesh(QPainter& painter, const RoadMesh& mesh, const ch::CameraState& camera,
-               const float viewport_width, const float viewport_height) {
+               const float viewport_width, const float viewport_height, const bool show_triangle_edges = false) {
     if (mesh.empty()) return;
     painter.setBrush(QColor(52, 57, 60));
-    QPen edge_pen(QColor(34, 38, 40));
-    edge_pen.setWidthF(0.8);
-    painter.setPen(edge_pen);
+    painter.setPen(show_triangle_edges ? QPen(QColor(34, 38, 40), 0.8) : Qt::NoPen);
 
     for (std::size_t index = 0; index + 2 < mesh.indices.size(); index += 3) {
         QPolygonF triangle;
@@ -142,7 +182,7 @@ void draw_mesh(QPainter& painter, const RoadMesh& mesh, const ch::CameraState& c
 void draw_centerline(QPainter& painter, const RoadSplineSegment& segment, const ch::CameraState& camera,
                      const float viewport_width, const float viewport_height) {
     QPainterPath path;
-    constexpr int kSamples = 96;
+    constexpr int kSamples = 64;
     for (int index = 0; index <= kSamples; ++index) {
         const float t = static_cast<float>(index) / static_cast<float>(kSamples);
         const RoadWorldPoint3 point = RoadMeshBuilder::sample_cubic(segment, t);
@@ -158,6 +198,31 @@ void draw_centerline(QPainter& painter, const RoadSplineSegment& segment, const 
     painter.setPen(lane_pen);
     painter.setBrush(Qt::NoBrush);
     painter.drawPath(path);
+}
+
+void draw_network(QPainter& painter, const DemoRoadNetwork& demo, const ch::CameraState& camera,
+                  const float viewport_width, const float viewport_height) {
+    for (const ProceduralRoadGraphSegment& graph_segment : demo.graph.segments()) {
+        const auto spline = demo.graph.spline_for(graph_segment.id);
+        if (!spline) continue;
+        if (spline->start.z > 0.12F || spline->end.z > 0.12F) {
+            for (const float t : {0.25F, 0.50F, 0.75F}) {
+                draw_support(painter, RoadMeshBuilder::sample_cubic(*spline, t), camera,
+                             viewport_width, viewport_height);
+            }
+        }
+        draw_mesh(painter, RoadMeshBuilder::build_cubic(*spline), camera, viewport_width, viewport_height);
+    }
+
+    // The central patch is drawn after approaches so it owns the seam and hides
+    // any fractional-pixel gap between independently sampled road ribbons.
+    draw_mesh(painter, RoadJunctionBuilder::build_patch(demo.graph, demo.junction),
+              camera, viewport_width, viewport_height);
+
+    for (const ProceduralRoadGraphSegment& graph_segment : demo.graph.segments()) {
+        const auto spline = demo.graph.spline_for(graph_segment.id);
+        if (spline) draw_centerline(painter, *spline, camera, viewport_width, viewport_height);
+    }
 }
 
 void draw_handles(QPainter& painter, const RoadSplineSegment& segment, const ch::CameraState& camera,
@@ -193,11 +258,12 @@ void draw_overlay(QPainter& painter, const RoadSplineSegment& segment, const int
                   const int viewport_width, const int viewport_height) {
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(24, 30, 33, 205));
-    painter.drawRoundedRect(QRectF(18.0, 18.0, 455.0, 92.0), 8.0, 8.0);
+    painter.drawRoundedRect(QRectF(18.0, 18.0, 555.0, 112.0), 8.0, 8.0);
     painter.setPen(QColor(235, 242, 244));
-    painter.drawText(QPointF(34.0, 43.0), "CH_PROCEDURAL_ROAD_MESH_V1 — interactive MapForge pilot");
-    painter.drawText(QPointF(34.0, 65.0), "Drag handles: XY  |  PageUp/PageDown: Z  |  1-4: camera rotation");
-    painter.drawText(QPointF(34.0, 87.0), "R: reset  |  RMB/MMB: pan  |  wheel: zoom  |  Esc: deselect");
+    painter.drawText(QPointF(34.0, 43.0), "CH road pilot — spline + graph + live 4-way junction");
+    painter.drawText(QPointF(34.0, 65.0), "Handle 3 is the graph junction: drag XY or change Z and all 3 branches follow");
+    painter.drawText(QPointF(34.0, 87.0), "Drag handles: XY  |  PageUp/PageDown: Z  |  1-4: camera rotation");
+    painter.drawText(QPointF(34.0, 109.0), "R: reset  |  RMB/MMB: pan  |  wheel: zoom  |  Esc: deselect");
 
     if (selected_handle >= 0) {
         const RoadWorldPoint3& p = handle_point(segment, selected_handle);
@@ -218,11 +284,8 @@ void render_scene(QPainter& painter, const RoadSplineSegment& segment, const ch:
     const float height = static_cast<float>(viewport_height);
 
     draw_ground(painter, camera, width, height);
-    for (const float t : {0.25F, 0.50F, 0.75F}) {
-        draw_support(painter, RoadMeshBuilder::sample_cubic(segment, t), camera, width, height);
-    }
-    draw_mesh(painter, RoadMeshBuilder::build_cubic(segment), camera, width, height);
-    draw_centerline(painter, segment, camera, width, height);
+    const DemoRoadNetwork demo = build_demo_network(segment);
+    draw_network(painter, demo, camera, width, height);
     draw_handles(painter, segment, camera, selected_handle, width, height);
     draw_overlay(painter, segment, selected_handle, viewport_width, viewport_height);
 }
@@ -242,7 +305,7 @@ class RoadPilotWindow final : public QWindow {
 public:
     RoadPilotWindow()
         : backing_store_(this), segment_(default_segment()), camera_(default_camera()) {
-        setTitle(QStringLiteral("City Horizon — Procedural Road Pilot"));
+        setTitle(QStringLiteral("City Horizon — Procedural Road Network Pilot"));
         resize(kPreviewWidth, kPreviewHeight);
     }
 
@@ -374,9 +437,8 @@ private:
 } // namespace
 
 int main(int argc, char** argv) {
-    // Preserve the original deterministic/headless mode used by CI and agents:
-    // passing an output path writes one gameplay-scale PNG and exits without
-    // constructing a GUI application.
+    // Preserve deterministic/headless mode for CI and agents. Passing an output
+    // path writes one gameplay-scale PNG and exits without constructing a GUI.
     if (argc > 1) {
         const std::filesystem::path output = argv[1];
         if (!render_png(output)) {
