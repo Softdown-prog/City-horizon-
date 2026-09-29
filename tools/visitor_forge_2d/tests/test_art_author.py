@@ -40,7 +40,7 @@ def test_author_routes_other_families_without_guessing() -> None:
     assert custom["broadleafStructure"]["masses"] == 52
 
 
-def test_visual_profiles_route_known_tree_grammars() -> None:
+def test_visual_profiles_route_known_tree_and_flower_grammars() -> None:
     tropical, report = author_recipe({
         "contract": CONTRACT,
         "id": "mango_profile_study",
@@ -64,6 +64,18 @@ def test_visual_profiles_route_known_tree_grammars() -> None:
     assert maple["visualProfile"] == "red_mapple_open_branching"
     assert maple["visualProfileData"]["foliage"]["microLeafBrush"] == "leaf_cluster_maple"
     assert maple_report["subject"] == "custom"
+
+    daisy, daisy_report = author_recipe({
+        "contract": CONTRACT,
+        "id": "daisy_profile_study",
+        "visualProfile": "flower_bed_daisy_clustered",
+        "seed": 61,
+    })
+    assert daisy["sceneryType"] == "flower_bed_v2"
+    assert daisy["visualProfile"] == "flower_bed_daisy_clustered"
+    assert daisy["visualProfileData"]["foliage"]["flowerBrush"] == "flower_rosette"
+    assert daisy["flowerStyle"]["flowerBrush"] == "flower_rosette"
+    assert daisy_report["subject"] == "custom"
 
     with pytest.raises(ValueError, match="unknown visualProfile"):
         author_recipe({"contract": CONTRACT, "id": "bad_profile", "visualProfile": "missing_profile"})
