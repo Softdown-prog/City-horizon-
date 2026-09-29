@@ -45,6 +45,39 @@ Produced by `tools/ch_audio_lab/ch_audio_lab.py`. It links the original prompt, 
 
 ## Providers
 
+### Stable Audio production provider
+
+`tools/ch_audio_lab/providers/stability_audio.py` is the first production text-to-audio adapter. It calls Stability AI's official Stable Audio text-to-audio API and requests a WAV master, which is then passed through the normal City Horizon mastering and validation path.
+
+The adapter defaults to `stable-audio-2.5` and intentionally reads credentials only from the environment:
+
+```text
+STABILITY_API_KEY
+```
+
+Never put an API key in a job JSON, commit, command argument, report, or catalog.
+
+Production review jobs are kept under:
+
+```text
+tools/ch_audio_lab/jobs/production/
+```
+
+Current reference jobs:
+
+- `steam_whistle_stable_audio.json` — clean steam locomotive whistle SFX;
+- `city_building_music_stable_audio.json` — calm city-builder/tycoon background music.
+
+These production jobs are **manual review jobs**. They live in a nested directory so normal pushes do not automatically spend provider credits.
+
+To run one in GitHub Actions, configure the repository Actions secret `STABILITY_API_KEY`, open the `CH Audio Lab` workflow, choose **Run workflow**, and provide a production job path such as:
+
+```text
+tools/ch_audio_lab/jobs/production/steam_whistle_stable_audio.json
+```
+
+The generated provider master is never registered in the game automatically. The job keeps `target.register` set to `false`, producing a review artifact first.
+
 ### `synthetic_smoke`
 
 Deterministic built-in generator used to validate the pipeline without external credentials. It is **not** intended to replace a production generative-audio model.
@@ -100,7 +133,9 @@ Example:
 }
 ```
 
-A provider wrapper may call a hosted model/API or a local model such as MusicGen/AudioCraft. The CH Audio Lab contract does not depend on one vendor.
+A provider wrapper may call a hosted model/API or a local model. The CH Audio Lab contract does not depend on one vendor.
+
+Do not make AudioCraft/MusicGen/AudioGen the default production provider without separately resolving their model-weight licensing for the intended game use. Provider licensing must be recorded and reviewed before generated assets are promoted.
 
 ## Review first, promote second
 
@@ -137,8 +172,17 @@ Normalization is opt-in. Jobs can override channel count, quality, LUFS, true pe
 
 ## Local usage
 
+Synthetic/offline validation:
+
 ```bash
 python tools/ch_audio_lab/ch_audio_lab.py tools/ch_audio_lab/jobs/steam_hiss_smoke.json
+```
+
+Production provider example:
+
+```bash
+export STABILITY_API_KEY="..."
+python tools/ch_audio_lab/ch_audio_lab.py tools/ch_audio_lab/jobs/production/steam_whistle_stable_audio.json
 ```
 
 The default output goes to `out/ch-audio-lab/<job-id>/` and contains:
@@ -151,5 +195,7 @@ asset_report.json
 review.ogg
 audio_lab_report.json
 ```
+
+Production adapters may also emit provider-specific provenance such as `provider_report.json`.
 
 The GitHub Actions workflow `CH Audio Lab` runs explicit jobs and uploads the complete review package as an artifact.
