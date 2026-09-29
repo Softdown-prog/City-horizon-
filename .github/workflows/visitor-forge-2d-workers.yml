@@ -12,9 +12,13 @@ on:
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/brushes.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/red_mapple_scenery.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/flower_bed_scenery.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/flower_bed_scenery_v2.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/flower_brushes.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/fence_scenery.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/shape_recipe.py'
       - 'tools/visitor_forge_2d/examples/pine_*.json'
-      - 'tools/visitor_forge_2d/examples/flower_bed_01.json'
+      - 'tools/visitor_forge_2d/examples/flower_bed_*.json'
+      - 'tools/visitor_forge_2d/examples/park_*fence_*.json'
       - 'tools/visitor_forge_2d/examples/park_wayfinding_sign.json'
       - 'tools/visitor_forge_2d/examples/park_tree_red_mapple_*.json'
       - 'tools/visitor_forge_2d/tests/test_workers.py'
@@ -53,6 +57,9 @@ jobs:
           - pine_robust_v1
           - flower_bed_01
           - park_wayfinding_sign
+          - park_iron_fence_01
+          - park_chainlink_fence_01
+          - park_wood_fence_01
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
