@@ -2,7 +2,7 @@
   "contract": "CH_VIDEO_SCENARIO_V1",
   "id": "mapforge.road.runtime_smoke_01",
   "reviewOnly": true,
-  "attempt": 2,
+  "attempt": 3,
   "fps": 15,
   "durationSeconds": 5,
   "mapforgeCandidateFile": "assets/roads/premium_01/road_10.png",
