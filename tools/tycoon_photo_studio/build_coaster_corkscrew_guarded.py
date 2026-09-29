@@ -30,11 +30,11 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
 CORKSCREW_LENGTH = base.TILE * 5.6
-HORIZONTAL_RADIUS = base.TILE * 0.52
+HORIZONTAL_RADIUS = base.TILE * 0.58
 VERTICAL_RADIUS = base.TILE * 0.32
 APPROACH_LENGTH = base.TILE * 1.10
 ROLL_DEGREES = 360.0
-PHASE_RAMP = 0.20
+PHASE_RAMP = 0.24
 FOOTPRINT = {"widthTiles": 3, "depthTiles": 8}
 
 
@@ -60,7 +60,7 @@ def handedness(piece: str) -> float:
 
 
 def phase_progress(t: float) -> float:
-    """Nearly constant-speed phase with long eased connector ramps."""
+    """Nearly constant-speed phase with longer eased connector ramps."""
     t = max(0.0, min(1.0, t))
     r = PHASE_RAMP
     total = 1.0 - r
@@ -79,10 +79,10 @@ def inversion_phase(piece: str, t: float) -> float:
 def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int = 241):
     """Build a low, stretched corkscrew with flat tangent-safe connectors.
 
-    V5 keeps the same deterministic elliptical helix, but gives the inversion
-    more longitudinal pitch and less vertical/lateral excursion. This prevents
-    the alternate camera directions from reading as a large loop or a vertical
-    U-shaped wall while preserving one complete 360-degree inversion.
+    V6 keeps the V5 longitudinal pitch and low vertical profile, but opens the
+    lateral sweep while extending the phase easing. This strengthens the visual
+    read of a corkscrew without increasing the element height or returning to a
+    loop-like silhouette in alternate camera directions.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -216,7 +216,7 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v4_low_stretched_elliptical_frame",
+        "profile": "single_inversion_v5_open_low_elliptical_frame",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
