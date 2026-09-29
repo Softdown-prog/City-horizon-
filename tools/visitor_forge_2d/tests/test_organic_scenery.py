@@ -1,6 +1,8 @@
 import json
+import hashlib
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from visitor_forge_2d.core.organic_scenery import export, render
@@ -112,6 +114,25 @@ def test_broadleaf_crown_is_deterministic_and_differs_from_conifer(tmp_path: Pat
     conifer_frame, conifer_meta = render(conifer_recipe)
     assert conifer_meta["crownStyle"] == "conifer"
     assert first.tobytes() != conifer_frame.tobytes(), "broadleaf and conifer produced identical pixels"
+
+
+def test_authored_oiti_study_has_four_stable_views_and_source_provenance() -> None:
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    recipe = json.loads((examples / "park_tree_oiti_authored_v6_study.json").read_text())
+    hashes = set()
+    for view in ("south", "west", "north", "east"):
+        frame, meta = render(recipe, view=view, source_root=examples)
+        repeat, _ = render(recipe, view=view, source_root=examples)
+        assert frame.tobytes() == repeat.tobytes()
+        assert _anchor_has_contact(frame, recipe["anchor"])
+        assert frame.getchannel("A").getbbox() == tuple(meta["bounds"])
+        assert [layer["name"] for layer in meta["sourceLayers"]] == ["wood", "foliage"]
+        hashes.add(hashlib.sha256(frame.tobytes()).hexdigest())
+    assert len(hashes) == 4
+
+    recipe["sourceArt"]["layersByView"]["south"][0]["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="hash mismatch"):
+        render(recipe, source_root=examples)
 
     source = tmp_path / "broadleaf.json"
     source.write_text(json.dumps(recipe), encoding="utf-8")

@@ -832,7 +832,57 @@ def _draw_trunk_and_bark(work, recipe, palette, W, H):
     work.alpha_composite(bark)
 
 
-def render(recipe, view="south"):
+def _render_authored_view(recipe, view, source_root, shadow):
+    """Composite immutable source layers before one alpha-safe downsample."""
+    if source_root is None:
+        raise ValueError("authored source art requires the recipe directory")
+    config = recipe["sourceArt"]
+    layers = config.get("layersByView", {}).get(view)
+    if not layers or [layer.get("name") for layer in layers] != ["wood", "foliage"]:
+        raise ValueError(f"authored view {view} requires wood and foliage layers")
+    source_size = tuple(config.get("sourceCanvas", [512, 640]))
+    if len(source_size) != 2 or min(source_size) <= 0:
+        raise ValueError("sourceCanvas must be a positive width and height")
+    composed = Image.new("RGBA", source_size)
+    provenance = []
+    tint = float(config.get("foliageVariation", 0))
+    if not 0 <= tint <= .06:
+        raise ValueError("foliageVariation must be between 0 and 0.06")
+    variation = random.Random(int(recipe.get("seed", 1)))
+    factors = [1 + variation.uniform(-tint, tint) for _ in range(3)]
+    for layer in layers:
+        relative = Path(layer["path"])
+        if relative.is_absolute():
+            raise ValueError("authored layer paths must be relative to the recipe")
+        source = (source_root / relative).resolve()
+        raw = source.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != layer.get("sha256"):
+            raise ValueError(f"authored layer hash mismatch: {relative}")
+        with Image.open(source) as opened:
+            piece = opened.convert("RGBA")
+        if piece.size != source_size:
+            raise ValueError(f"authored layer {relative} must be {source_size}")
+        if layer["name"] == "foliage" and tint:
+            channels = piece.split()
+            piece = Image.merge("RGBA", tuple(channel.point(
+                lambda value, factor=factor: min(255, round(value * factor)))
+                for channel, factor in zip(channels[:3], factors)) + (channels[3],))
+        composed.alpha_composite(piece)
+        provenance.append({"name": layer["name"], "path": str(relative), "sha256": digest})
+    canvas = tuple(recipe.get("canvas", [192, 256]))
+    frame = _alpha_safe_resize(shadow, canvas)
+    # The blurred contact shadow must not create a one-alpha strip at the
+    # bottom of the sprite canvas or falsify the occupied bounds.
+    shadow_alpha = frame.getchannel("A")
+    cutoff = min(canvas[1], int(recipe["anchor"][1]) + 7)
+    ImageDraw.Draw(shadow_alpha).rectangle((0, cutoff, canvas[0], canvas[1]), fill=0)
+    frame.putalpha(shadow_alpha)
+    frame.alpha_composite(_alpha_safe_resize(composed, canvas))
+    return frame, provenance
+
+
+def render(recipe, view="south", source_root=None):
     if recipe.get("contract") != CONTRACT:
         raise ValueError(f"recipe must declare {CONTRACT}")
     if recipe.get("camera", {}).get("contract") != CAMERA_CONTRACT:
@@ -861,6 +911,18 @@ def render(recipe, view="south"):
     sh = Image.new("RGBA", (W, H), (*_hex(palette["ground_shadow"]), 0))
     sh.putalpha(shadow)
     work.alpha_composite(sh)
+
+    if "sourceArt" in recipe:
+        frame, provenance = _render_authored_view(recipe, view, source_root, work)
+        bounds = frame.getchannel("A").getbbox()
+        return frame, {
+            "contract": CONTRACT, "id": recipe["id"], "canvas": canvas,
+            "anchor": anchor, "bounds": list(bounds), "seed": seed,
+            "crownStyle": recipe.get("crownStyle", "broadleaf"), "view": view,
+            "yawDeg": int(recipe.get("rotation", {}).get("yawDeg", {}).get(view, DEFAULT_YAWS[view])),
+            "camera": recipe["camera"], "authoringMode": "layered_source_art",
+            "sourceLayers": provenance, "runtimePromotion": False, "artApproved": False,
+        }
 
     _draw_trunk_and_bark(work, recipe, palette, W, H)
 
@@ -1005,7 +1067,7 @@ def export(recipe_path, output_dir):
     slots = {}
     first_meta = None
     for view in views:
-        frame, meta = render(recipe, view=view)
+        frame, meta = render(recipe, view=view, source_root=recipe_path.parent)
         first_meta = first_meta or meta
         source = output_dir / f"{stem}_{view}_source.png"
         final = output_dir / f"{stem}_{view}.png"

@@ -1,0 +1,131 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "park_tree_oiti_authored_v6_study",
+  "pipelineRevision": 4,
+  "canvas": [
+    256,
+    320
+  ],
+  "anchor": [
+    128,
+    311
+  ],
+  "seed": 29186,
+  "crownStyle": "broadleaf",
+  "crownCx": 128,
+  "shadowWidth": 114,
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric",
+    "tile": [
+      128,
+      64
+    ],
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "worldHeightScreenVertical": true
+  },
+  "rotation": {
+    "mode": "authored_quarter_turns_study",
+    "lightingSpace": "authored_screen_consistent_study",
+    "views": [
+      "south",
+      "west",
+      "north",
+      "east"
+    ],
+    "yawDeg": {
+      "south": 45,
+      "west": 135,
+      "north": 225,
+      "east": 315
+    }
+  },
+  "lightingIntent": {
+    "top": "yellow-green foliage upper-left, deep cool green interior",
+    "front": "manually authored leaf and fork silhouettes",
+    "base": "continuous warm brown bark and root flare",
+    "rotationSpace": "authored directional source study; physical rotation not validated"
+  },
+  "broadleafStructure": {
+    "layout": "authored_layers",
+    "species": "oiti",
+    "profile": "domed"
+  },
+  "palette": {
+    "ground_shadow": "#26302B",
+    "trunk_top": "#6E6658",
+    "trunk_bottom": "#38392F",
+    "trunk_light": "#9A8B73",
+    "back_top": "#31563B",
+    "back_bottom": "#1D3929",
+    "mid_top": "#66874E",
+    "mid_bottom": "#365A3D",
+    "front_top": "#91AB6A",
+    "front_bottom": "#55774B",
+    "highlight": "#BDCD84",
+    "occlusion": "#1A362A"
+  },
+  "raster": {
+    "finalGrain": 0,
+    "finalNeedles": 0
+  },
+  "paletteId": "oiti_evergreen",
+  "sourceArt": {
+    "sourceCanvas": [
+      512,
+      640
+    ],
+    "foliageVariation": 0.025,
+    "layersByView": {
+      "south": [
+        {
+          "name": "wood",
+          "path": "../art/sources/oiti_layered_v6_study/south_wood.png",
+          "sha256": "1e7762e92fd6550ba0ef904b4e2b3125db016fe26b9b3799d1b7cd212a4ef07b"
+        },
+        {
+          "name": "foliage",
+          "path": "../art/sources/oiti_layered_v6_study/south_foliage.png",
+          "sha256": "0d2e108d7af820d74536751e5d9a2301ef6200012a4cc2603e433e06b2bdb519"
+        }
+      ],
+      "west": [
+        {
+          "name": "wood",
+          "path": "../art/sources/oiti_layered_v6_study/west_wood.png",
+          "sha256": "3b751373fcbe4da5111c512bda23d95fd42d7ea693c9f78b242884dd922dd38b"
+        },
+        {
+          "name": "foliage",
+          "path": "../art/sources/oiti_layered_v6_study/west_foliage.png",
+          "sha256": "75b45dcc3475681e7f9e0304c5a124cc13eb7c3c761e95bae0975d1a4820dfe4"
+        }
+      ],
+      "north": [
+        {
+          "name": "wood",
+          "path": "../art/sources/oiti_layered_v6_study/north_wood.png",
+          "sha256": "1b672a51de9fd6a95b03227a4320d901ee00f3dcd4c7d3542c9a76263bdedb62"
+        },
+        {
+          "name": "foliage",
+          "path": "../art/sources/oiti_layered_v6_study/north_foliage.png",
+          "sha256": "6f96b2699943881b731162925152dc68cfaa6e685cf465b94be1eee98209b241"
+        }
+      ],
+      "east": [
+        {
+          "name": "wood",
+          "path": "../art/sources/oiti_layered_v6_study/east_wood.png",
+          "sha256": "6282b382cfad108b7f180c5ff892af3f6357fe2549959e36c71d69eda83edeeb"
+        },
+        {
+          "name": "foliage",
+          "path": "../art/sources/oiti_layered_v6_study/east_foliage.png",
+          "sha256": "e603f2dd632e0c01d380ec73deeb38de98ad66bfe05be3c239414371b042dca0"
+        }
+      ]
+    }
+  }
+}
