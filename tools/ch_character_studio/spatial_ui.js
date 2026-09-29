@@ -106,20 +106,51 @@
 })();
 
 (() => {
-  if (window.CH_PHOTOSHOP_LAYER_STACK || document.querySelector('script[data-ch-photoshop-layers-v2]')) return;
-  const script = document.createElement('script');
-  script.src = 'photoshop_layers_v2.js';
-  script.dataset.chPhotoshopLayersV2 = 'true';
-  script.async = false;
-  script.onerror = () => console.error('Falha ao carregar photoshop_layers_v2.js');
-  script.onload = () => {
-    if (window.CH_PHOTOSHOP_LAYER_STACK_BRIDGE || document.querySelector('script[data-ch-photoshop-layers-v2-bridge]')) return;
+  function loadStage3() {
+    if (window.CH_PHOTOSHOP_ART_V3 || document.querySelector('script[data-ch-photoshop-art-v3]')) return;
+    const art = document.createElement('script');
+    art.src = 'photoshop_art_v3.js';
+    art.dataset.chPhotoshopArtV3 = 'true';
+    art.async = false;
+    art.onerror = () => console.error('Falha ao carregar photoshop_art_v3.js');
+    document.body.appendChild(art);
+  }
+
+  function loadBridgeThenStage3() {
+    if (window.CH_PHOTOSHOP_LAYER_STACK_BRIDGE) {
+      loadStage3();
+      return;
+    }
+    const existing = document.querySelector('script[data-ch-photoshop-layers-v2-bridge]');
+    if (existing) {
+      existing.addEventListener('load', loadStage3, {once:true});
+      return;
+    }
     const bridge = document.createElement('script');
     bridge.src = 'photoshop_layers_v2_bridge.js';
     bridge.dataset.chPhotoshopLayersV2Bridge = 'true';
     bridge.async = false;
     bridge.onerror = () => console.error('Falha ao carregar photoshop_layers_v2_bridge.js');
+    bridge.onload = loadStage3;
     document.body.appendChild(bridge);
-  };
+  }
+
+  if (window.CH_PHOTOSHOP_LAYER_STACK) {
+    loadBridgeThenStage3();
+    return;
+  }
+
+  const existing = document.querySelector('script[data-ch-photoshop-layers-v2]');
+  if (existing) {
+    existing.addEventListener('load', loadBridgeThenStage3, {once:true});
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'photoshop_layers_v2.js';
+  script.dataset.chPhotoshopLayersV2 = 'true';
+  script.async = false;
+  script.onerror = () => console.error('Falha ao carregar photoshop_layers_v2.js');
+  script.onload = loadBridgeThenStage3;
   document.body.appendChild(script);
 })();
