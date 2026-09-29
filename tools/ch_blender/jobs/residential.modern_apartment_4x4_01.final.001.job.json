@@ -2,7 +2,7 @@
   "contract": "CH_BLENDER_AGENT_JOB_V1",
   "jobId": "residential.modern_apartment_4x4_01.final.001",
   "operation": "guarded_blender_script",
-  "script": "tools/tycoon_photo_studio/build_residential_modern_apartment_guarded.py",
+  "script": "tools/tycoon_photo_studio/refine_residential_modern_apartment_v2.py",
   "qualityStage": "final",
   "args": [
     "--recipe",
@@ -14,7 +14,7 @@
     "--stage",
     "final",
     "--approval-proxy-sha",
-    "c3676fec1f88a5dbe8d892ceb8eb1ac14f6f61e6226869767fa5b66bb6b429b4"
+    "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18"
   ],
   "outputDir": "out/ch_blender_agent/residential.modern_apartment_4x4_01.final.001"
 }
