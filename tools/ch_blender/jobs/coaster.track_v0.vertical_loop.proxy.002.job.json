@@ -9,8 +9,6 @@
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
     "--piece",
     "vertical_loop",
-    "--stage",
-    "proxy",
     "--output",
     "out/ch_blender_agent/coaster.track_v0.vertical_loop.proxy.002"
   ],
