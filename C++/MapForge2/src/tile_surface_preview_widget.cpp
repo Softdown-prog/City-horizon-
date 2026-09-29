@@ -1,5 +1,8 @@
 #include "tile_surface_preview_widget.h"
 
+#include "authoring_projection.h"
+#include "src/ch_core/contracts.h"
+
 #include <QPainter>
 #include <QPaintEvent>
 #include <QPen>
@@ -7,12 +10,6 @@
 #include <algorithm>
 
 namespace ch::studio {
-namespace {
-
-constexpr qreal kTileWidth = 128.0;
-constexpr qreal kTileHeight = 64.0;
-
-} // namespace
 
 TileSurfacePreviewWidget::TileSurfacePreviewWidget(QWidget* parent)
     : QWidget(parent) {
@@ -66,10 +63,12 @@ QPointF TileSurfacePreviewWidget::projectTile(const qreal tile_x, const qreal ti
     const qreal span = std::max(repeat_x_, repeat_y_);
     const QPointF origin(width() * 0.5,
                          std::max(72.0, height() * 0.22 - span * 2.0));
-    return {
-        origin.x() + (tile_x - tile_y) * (kTileWidth * 0.5),
-        origin.y() + (tile_x + tile_y) * (kTileHeight * 0.5),
-    };
+    return projectAuthoringGround(
+        static_cast<float>(tile_x),
+        static_cast<float>(tile_y),
+        0,
+        QSizeF(size()),
+        origin);
 }
 
 void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
@@ -81,16 +80,18 @@ void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
     painter.fillRect(rect(), QColor(31, 31, 31));
 
     const QPixmap* selected = tileForMask(autotile_mask_);
+    const qreal tile_width = static_cast<qreal>(ch::contracts::kTileWidth);
+    const qreal tile_height = static_cast<qreal>(ch::contracts::kTileHeight);
 
     for (int y = 0; y < repeat_y_; ++y) {
         for (int x = 0; x < repeat_x_; ++x) {
             const QPointF north = projectTile(x, y);
             const QPointF east = projectTile(x + 1, y);
             const QPointF west = projectTile(x, y + 1);
-            const QPointF top_left(north.x() - kTileWidth * 0.5, north.y());
+            const QPointF top_left(north.x() - tile_width * 0.5, north.y());
 
             if (selected != nullptr) {
-                painter.drawPixmap(QRectF(top_left, QSizeF(kTileWidth, kTileHeight)), *selected, selected->rect());
+                painter.drawPixmap(QRectF(top_left, QSizeF(tile_width, tile_height)), *selected, selected->rect());
             }
 
             if (show_grid_) {
@@ -105,7 +106,9 @@ void TileSurfacePreviewWidget::paintEvent(QPaintEvent* event) {
 
     painter.setPen(QColor(220, 220, 220));
     painter.drawText(QRectF(12, 10, width() - 24, 22), Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("Tile/Surface continuity preview — 128×64 — repeat %1×%2 — mask %3")
+                     QStringLiteral("Tile/Surface continuity preview — %1×%2 — repeat %3×%4 — mask %5")
+                         .arg(ch::contracts::kTileWidth)
+                         .arg(ch::contracts::kTileHeight)
                          .arg(repeat_x_)
                          .arg(repeat_y_)
                          .arg(autotile_mask_, 2, 10, QLatin1Char('0')));
