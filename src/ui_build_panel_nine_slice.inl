@@ -1,10 +1,11 @@
-// Construction-catalog nine-slice pilot V2, derived from the approved visual
-// reference. The procedural SDL panel remains underneath as a safe fallback.
+// Construction-catalog nine-slice pilot V2. The frame is now the same reusable
+// window skin used by the first modal migration stage. The procedural SDL panel
+// remains underneath as a safe fallback/background.
 if (renderer != nullptr && model_.overlay == UiOverlay::none &&
     model_.build_panel_open && build_panel_bounds_) {
     const UiRect& panel = *build_panel_bounds_;
     const auto* skin = thumbnail_for(
-        renderer, ui_chrome_path("panel_build_catalog_9slice_v2"));
+        renderer, ui_chrome_path("panel_window_9slice_v2"));
 
     constexpr ch::ui::NineSliceInsets kInsets = {
         32.0F,
