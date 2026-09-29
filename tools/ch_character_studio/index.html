@@ -10,7 +10,7 @@
     body { margin:0; background:#15231f; color:#eef5f1; }
     header { height:52px; display:flex; align-items:center; gap:12px; padding:0 16px; background:#0f1916; border-bottom:1px solid #2e433b; }
     header strong { color:#f4d35e; }
-    .app { display:grid; grid-template-columns:292px minmax(520px,1fr) 320px; height:calc(100vh - 52px); }
+    .app { display:grid; grid-template-columns:292px minmax(520px,1fr) 340px; height:calc(100vh - 52px); }
     aside { padding:14px; overflow:auto; background:#13201c; }
     aside.left { border-right:1px solid #2e433b; }
     aside.right { border-left:1px solid #2e433b; }
@@ -26,6 +26,8 @@
     .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .row > label.grow { flex:1 1 110px; }
     .stack { display:grid; gap:8px; }
+    .tool-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+    .tool-grid button { width:100%; }
     .canvas-wrap { position:relative; width:480px; height:640px; box-shadow:0 12px 40px #07110db0; background-image:linear-gradient(45deg,#30453d 25%,transparent 25%),linear-gradient(-45deg,#30453d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#30453d 75%),linear-gradient(-45deg,transparent 75%,#30453d 75%); background-size:24px 24px; background-position:0 0,0 12px,12px -12px,-12px 0; }
     .canvas-wrap canvas { position:absolute; inset:0; width:480px; height:640px; image-rendering:pixelated; display:block; }
     #objectBackView { z-index:0; pointer-events:none; }
@@ -33,6 +35,7 @@
     #objectFrontView { z-index:2; pointer-events:none; }
     #maskView { z-index:3; pointer-events:none; cursor:crosshair; }
     #spatialView { z-index:4; pointer-events:none; }
+    #photoshopView { z-index:5; pointer-events:none; cursor:crosshair; }
     .layer { display:grid; grid-template-columns:24px 1fr 58px; align-items:center; gap:8px; padding:7px; border:1px solid #2f4a40; border-radius:6px; margin-bottom:6px; cursor:pointer; }
     .layer.selected { border-color:#e1c04a; background:#263d35; }
     .layer small { opacity:.65; }
@@ -46,6 +49,7 @@
     .status { font-size:12px; line-height:1.5; color:#aac0b7; background:#0f1916; border:1px solid #2b4239; padding:8px; border-radius:6px; }
     .reference { border-color:#6b6330; color:#d9ce8b; }
     .mask-note { border-color:#385d70; color:#a9cedd; }
+    .photoshop-note { border-color:#615a91; color:#c8c1ef; }
   </style>
 </head>
 <body>
@@ -116,10 +120,66 @@
         <canvas id="objectFrontView" width="48" height="64"></canvas>
         <canvas id="maskView" width="48" height="64"></canvas>
         <canvas id="spatialView" width="48" height="64"></canvas>
+        <canvas id="photoshopView" width="48" height="64"></canvas>
       </div>
     </main>
 
     <aside class="right">
+      <div class="panel">
+        <h3>Photoshop · Etapa 1</h3>
+        <div class="tool-grid">
+          <button id="psRectSelect">Seleção (M)</button>
+          <button id="psLasso">Laço (L)</button>
+          <button id="psMove">Mover (V)</button>
+          <button id="psEyedropper">Conta-gotas (I)</button>
+          <button id="psBucket">Balde (G)</button>
+          <button id="psDeselect">Desmarcar</button>
+          <button id="psUndo">Desfazer</button>
+          <button id="psRedo">Refazer</button>
+        </div>
+        <div class="stack" style="margin-top:10px">
+          <label>Tolerância do balde <input id="psTolerance" type="range" min="0" max="96" value="0" /></label>
+          <div class="row"><button id="psFillSelection">Preencher seleção</button><button id="psDeleteSelection">Apagar seleção</button></div>
+        </div>
+        <div class="hint">Atalhos: Ctrl+Z, Ctrl+Shift+Z, Ctrl+D e Delete. Seleções afetam somente pixels da camada artística ativa.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Transformar seleção</h3>
+        <div class="row">
+          <label class="grow">X <input id="psTransformX" type="number" step="1" value="0" /></label>
+          <label class="grow">Y <input id="psTransformY" type="number" step="1" value="0" /></label>
+        </div>
+        <div class="row">
+          <label class="grow">Escala % <input id="psTransformScale" type="number" step="5" value="100" /></label>
+          <label class="grow">Rotação ° <input id="psTransformRotate" type="number" step="15" value="0" /></label>
+        </div>
+        <div class="row"><label><input id="psFlipH" type="checkbox" /> Espelhar H</label><label><input id="psFlipV" type="checkbox" /> Espelhar V</label></div>
+        <button id="psApplyTransform" style="margin-top:8px;width:100%">Aplicar transformação</button>
+        <div class="hint">Nearest-neighbor obrigatório: a transformação não suaviza pixels nem altera pose/anchor.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Camada ativa</h3>
+        <div class="stack">
+          <label>Opacidade <span id="psLayerOpacityLabel">100</span>% <input id="psLayerOpacity" type="range" min="0" max="100" value="100" /></label>
+          <label>Blend mode
+            <select id="psLayerBlend">
+              <option value="source-over">Normal</option>
+              <option value="multiply">Multiply</option>
+              <option value="screen">Screen</option>
+              <option value="overlay">Overlay</option>
+              <option value="darken">Darken</option>
+              <option value="lighten">Lighten</option>
+              <option value="soft-light">Soft Light</option>
+              <option value="hard-light">Hard Light</option>
+              <option value="difference">Difference</option>
+            </select>
+          </label>
+        </div>
+        <div id="psStatus" class="status photoshop-note" style="margin-top:8px">Ferramentas de referência prontas.</div>
+      </div>
+
       <div class="panel">
         <h3>Validação espacial</h3>
         <div class="stack">
@@ -173,6 +233,7 @@
   <script src="color_masks.js"></script>
   <script src="held_objects.js"></script>
   <script src="studio.js"></script>
+  <script src="photoshop_tools.js"></script>
   <script src="palette_ui.js"></script>
   <script src="color_object_ui.js"></script>
   <script src="spatial_ui.js"></script>
