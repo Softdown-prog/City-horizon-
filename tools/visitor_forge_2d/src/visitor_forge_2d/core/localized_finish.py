@@ -73,8 +73,17 @@ def _expanded_mask_node(mask: dict) -> dict:
 
 
 def _mask(size: tuple[int, int], spec: dict, label: str) -> Image.Image:
+    """Raster a recipe-space mask with the same supersampling as the scene.
+
+    scene_composer_v3._shape_mask expects its target image to be SCALE times
+    larger than recipe coordinates. Localized finishes run after V3 has already
+    downsampled to gameplay resolution, so feeding the final frame size directly
+    would multiply coordinates twice and push most masks off-canvas.
+    """
     identity = {"translate": [0.0, 0.0], "scale": [1.0, 1.0], "rotateDeg": 0.0}
-    return scene_composer_v3._shape_mask(size, _expanded_mask_node(spec), identity, label)
+    high_size = (size[0] * scene_composer_v3.SCALE, size[1] * scene_composer_v3.SCALE)
+    high = scene_composer_v3._shape_mask(high_size, _expanded_mask_node(spec), identity, label)
+    return high.resize(size, Image.Resampling.LANCZOS)
 
 
 def _oriented_line(draw: ImageDraw.ImageDraw, cx: float, cy: float, angle: float,
