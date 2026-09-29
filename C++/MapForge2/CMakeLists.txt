@@ -32,6 +32,7 @@ add_library(mapforge2_canonical STATIC
     ${CH_ROOT}/src/ch_core/placement_engine.cpp
     ${CH_ROOT}/src/ch_core/transaction_manager.cpp
     ${CH_ROOT}/src/ch_core/shoreline_autotile.cpp
+    ${CH_ROOT}/src/fence_system.cpp
 )
 target_include_directories(mapforge2_canonical PUBLIC ${CH_ROOT})
 
@@ -81,6 +82,7 @@ add_library(mapforge2_asset_composer STATIC
     src/carousel_composer.cpp
     src/procedural_2d_primitives.cpp
     src/park_fence_renderer.cpp
+    src/fence_runtime_adapter.cpp
     src/building_composer.cpp
     src/building_footprint_model.cpp
     src/building_procedural_variation.cpp
