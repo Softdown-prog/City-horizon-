@@ -2,6 +2,7 @@
   "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
   "assetId": "vehicle.steam_train.cab_7coaches.01",
   "approved": true,
+  "promotionRevision": 2,
   "sourceCommit": "c0fe7bba9aaae6f18b398a873664fa1cd386d473",
   "sourceWorkflowRun": 36623049615,
   "sourceArtifactId": 11059113865,
