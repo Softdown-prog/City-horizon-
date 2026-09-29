@@ -1,0 +1,241 @@
+name: Promote Approved Steam Train Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/vehicle.steam_train.cab_7coaches.01.runtime.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-steam-train-runtime-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-steam-train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read promotion contract
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          path = Path('tools/ch_blender/promotions/vehicle.steam_train.cab_7coaches.01.runtime.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          assert data['contract'] == 'CH_RUNTIME_ASSET_PROMOTION_V1'
+          assert data['approved'] is True
+          assert data['assetId'] == 'vehicle.steam_train.cab_7coaches.01'
+          assert data['finalSize'] == [1024, 1024]
+          assert data['format'] == 'PNG_RGBA'
+          assert data['transparentBackground'] is True
+          assert data['directionOrder'] == ['south', 'east', 'west', 'north']
+          assert data['footprint'] == {'widthTiles': 13, 'depthTiles': 2}
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"run_id={data['sourceWorkflowRun']}\n")
+              output.write(f"artifact_id={data['sourceArtifactId']}\n")
+              output.write(f"source_dir={data['sourceDir']}\n")
+              output.write(f"destination={data['destination']}\n")
+          PY
+
+      - name: Download approved Stage 3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_promotion/source
+
+      - name: Canonical large-asset post-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="out/runtime_promotion/source/${{ steps.promotion.outputs.source_dir }}"
+          if [[ ! -d "$SOURCE" ]]; then
+            nested="$(find out/runtime_promotion/source -type d -name '${{ steps.promotion.outputs.source_dir }}' -print -quit)"
+            test -n "$nested"
+            SOURCE="$nested"
+          fi
+          python tools/tycoon_photo_studio/postprocess.py \
+            --input "$SOURCE" \
+            --output out/runtime_promotion/final \
+            --studio-preset tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json
+
+      - name: Validate and stage train runtime package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib
+          import json
+          import shutil
+
+          asset_id = 'vehicle.steam_train.cab_7coaches.01'
+          directions = ('south', 'east', 'west', 'north')
+          src = Path('out/runtime_promotion/final')
+          dst = Path('assets/vehicles/steam_train_cab_7coaches_01')
+          definition_path = Path('assets/definitions/steam_train_cab_7coaches_01.json')
+          promotion_path = Path('tools/ch_blender/promotions/vehicle.steam_train.cab_7coaches.01.runtime.json')
+          dst.mkdir(parents=True, exist_ok=True)
+
+          promotion = json.loads(promotion_path.read_text(encoding='utf-8'))
+          package_manifest_path = src / f'{asset_id}_manifest.json'
+          package_manifest = json.loads(package_manifest_path.read_text(encoding='utf-8'))
+          manifest_views = {view['direction']: view for view in package_manifest['views']}
+
+          views = {}
+          final_size = 1024
+          for direction in directions:
+              source = src / f'{asset_id}_{direction}.png'
+              target = dst / f'steam_train_{direction}.png'
+              image = Image.open(source)
+              if image.mode != 'RGBA':
+                  raise SystemExit(f'{source}: expected RGBA, got {image.mode}')
+              if image.size != (final_size, final_size):
+                  raise SystemExit(f'{source}: expected 1024x1024, got {image.size}')
+              alpha = image.getchannel('A')
+              lo, hi = alpha.getextrema()
+              if lo != 0 or hi != 255:
+                  raise SystemExit(f'{source}: invalid alpha range {(lo, hi)}')
+              for x, y in ((0, 0), (final_size - 1, 0), (0, final_size - 1), (final_size - 1, final_size - 1)):
+                  if alpha.getpixel((x, y)) != 0:
+                      raise SystemExit(f'{source}: background corner is not transparent')
+              shutil.copy2(source, target)
+              views[direction] = {
+                  'file': target.name,
+                  'pivot': manifest_views[direction]['pivot'],
+                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+              }
+
+          # The baker pivot is the train/world origin at the centre of the 13x2
+          # logical footprint. Building rendering is anchored to the front-most
+          # footprint corner. Convert that centre pivot to the runtime corner
+          # anchor under the canonical 128x64 CH_CAMERA_V1 projection.
+          footprint_w = int(promotion['footprint']['widthTiles'])
+          footprint_h = int(promotion['footprint']['depthTiles'])
+          tile_half_w = 64.0
+          tile_half_h = 32.0
+
+          def runtime_anchor(direction):
+              view = views[direction]
+              pivot = view['pivot']
+              if direction in ('east', 'west'):
+                  width, height = footprint_h, footprint_w
+              else:
+                  width, height = footprint_w, footprint_h
+              dx = (width * 0.5 - height * 0.5) * tile_half_w
+              dy = (width * 0.5 + height * 0.5) * tile_half_h
+              return {
+                  'x': round((float(pivot['x']) + dx) / final_size, 9),
+                  'y': round((float(pivot['y']) + dy) / final_size, 9),
+              }
+
+          anchors = {direction: runtime_anchor(direction) for direction in directions}
+
+          runtime_manifest = {
+              'contract': 'CH_RUNTIME_VEHICLE_TRAIN_V1',
+              'assetId': asset_id,
+              'assetType': 'vehicle_train',
+              'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'runtimeRepresentation': '2D_RGBA_pre_rendered_sprite',
+              'format': 'PNG_RGBA',
+              'frameSize': [final_size, final_size],
+              'transparentBackground': True,
+              'directionOrder': list(directions),
+              'footprint': promotion['footprint'],
+              'views': views,
+              'runtimeAnchors': anchors,
+              'futureLayers': {
+                  'steamOverlay': {'planned': True, 'enabled': False},
+                  'coachColorMask': {'planned': True, 'enabled': False, 'contract': 'CH_COLOR_MASK_V1'},
+              },
+              'sourceCommit': promotion['sourceCommit'],
+              'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+              'sourceArtifactId': promotion['sourceArtifactId'],
+              'approvedProxySha256': promotion['approvedProxySha256'],
+              'approvedForRuntime': True,
+          }
+          runtime_manifest_path = dst / 'steam_train_runtime.json'
+          runtime_manifest_path.write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+
+          # BuildingRotation order is SOUTH, WEST, NORTH, EAST. This definition
+          # intentionally exposes the approved consist as a placement/runtime
+          # validation asset now; rail-following simulation will consume the same
+          # visual package later instead of rebaking or duplicating art.
+          definition = {
+              'id': 'steam_train_cab_7coaches_01',
+              'name': 'Trem a Vapor - 7 Vagoes',
+              'category': 'transport',
+              'texture': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_south.png',
+              'sprites': {
+                  '0': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_south.png',
+                  '1': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_west.png',
+                  '2': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_north.png',
+                  '3': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_east.png',
+              },
+              'spriteAnchors': {
+                  '0': anchors['south'],
+                  '1': anchors['west'],
+                  '2': anchors['north'],
+                  '3': anchors['east'],
+              },
+              'rotatable': True,
+              'requiresRoadAccess': False,
+              'requiresRoadOrPathAccess': False,
+              'grassOnly': False,
+              'roadAccessMode': 'any_perimeter',
+              'footprint': {'width': footprint_w, 'height': footprint_h},
+              'buildCost': 0,
+              'maintenancePerMonth': 0,
+              'taxRevenuePerMonth': 0,
+              'powerConsumption': 0,
+              'artScale': 1.0,
+              'playerBuildable': True,
+              'productionStatus': 'runtime_vehicle_train_visual_approved',
+              'runtimeRole': 'vehicle_train_visual_validation',
+              'runtimeManifest': 'assets/vehicles/steam_train_cab_7coaches_01/steam_train_runtime.json',
+              'sourceApprovedProxySha256': promotion['approvedProxySha256'],
+          }
+          definition_path.write_text(json.dumps(definition, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          print(json.dumps(runtime_manifest, indent=2))
+          print(json.dumps(definition, indent=2, ensure_ascii=False))
+          PY
+
+      - name: Commit promoted train runtime asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/vehicles/steam_train_cab_7coaches_01 assets/definitions/steam_train_cab_7coaches_01.json
+          if git diff --cached --quiet; then
+            echo "Steam train runtime asset already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote approved steam train to runtime"
+          git push origin HEAD:main
