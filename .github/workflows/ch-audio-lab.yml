@@ -17,7 +17,7 @@ on:
       - "tools/ch_audio_lab/jobs/*.json"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-review-audio:
@@ -79,13 +79,10 @@ jobs:
           fi
           echo "CH_AUDIO_JOB=$JOB_PATH" >> "$GITHUB_ENV"
 
-      - name: Generate and master review audio
+      - name: Generate and master audio
         shell: bash
         env:
-          # Hosted API provider credential (optional).
           STABILITY_API_KEY: ${{ secrets.STABILITY_API_KEY }}
-          # Local Stable Audio 3 works anonymously. A free HF token is optional
-          # and only raises download limits / bandwidth; it does not pay for generation.
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python tools/ch_audio_lab/ch_audio_lab.py "$CH_AUDIO_JOB"
 
@@ -102,14 +99,11 @@ jobs:
           out_dir = Path(job.get("outputDir", f"out/ch-audio-lab/{job['id']}"))
           report_path = out_dir / "audio_lab_report.json"
           asset_report_path = out_dir / "asset_report.json"
-          review_path = out_dir / "review.ogg"
 
           if not report_path.is_file():
               raise SystemExit("audio_lab_report.json missing")
           if not asset_report_path.is_file():
               raise SystemExit("asset_report.json missing")
-          if not review_path.is_file() or review_path.stat().st_size == 0:
-              raise SystemExit("review.ogg missing or empty")
 
           report = json.loads(report_path.read_text(encoding="utf-8"))
           asset = json.loads(asset_report_path.read_text(encoding="utf-8"))
@@ -117,19 +111,61 @@ jobs:
               raise SystemExit("invalid CH Audio Lab report")
           if asset.get("contract") != "CH_AUDIO_ASSET_REPORT_V1" or asset.get("status") != "ok":
               raise SystemExit("invalid CH audio asset report")
+
+          output_path = Path(asset.get("output", ""))
+          if not output_path.is_file() or output_path.stat().st_size == 0:
+              raise SystemExit(f"mastered output missing or empty: {output_path}")
+
           probe = asset.get("probe", {})
           if probe.get("codec") != "vorbis" or probe.get("sampleRate") != 48000:
               raise SystemExit(f"unexpected mastered audio format: {probe}")
           if float(probe.get("durationSeconds", 0)) <= 0:
               raise SystemExit("mastered audio duration is zero")
+          if bool(job.get("target", {}).get("register", False)) != bool(asset.get("registered", False)):
+              raise SystemExit("registration state mismatch")
+
           print(json.dumps({
               "status": "ok",
               "job": job["id"],
-              "review": str(review_path),
+              "output": str(output_path),
+              "registered": asset.get("registered"),
               "probe": probe,
               "sha256": report.get("outputSha256"),
           }, ensure_ascii=False))
           PY
+
+      - name: Commit approved runtime audio
+        if: success()
+        shell: bash
+        run: |
+          REGISTER="$(python - <<'PY'
+          import json, os
+          from pathlib import Path
+          job = json.loads(Path(os.environ['CH_AUDIO_JOB']).read_text(encoding='utf-8'))
+          print('true' if job.get('target', {}).get('register', False) else 'false')
+          PY
+          )"
+          if [ "$REGISTER" != "true" ]; then
+            echo "Review-only job; nothing to promote."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/audio/
+          if git diff --cached --quiet; then
+            echo "No runtime audio changes to commit."
+            exit 0
+          fi
+          JOB_ID="$(python - <<'PY'
+          import json, os
+          from pathlib import Path
+          job = json.loads(Path(os.environ['CH_AUDIO_JOB']).read_text(encoding='utf-8'))
+          print(job['id'])
+          PY
+          )"
+          git commit -m "Promote approved audio: ${JOB_ID}"
+          git push origin HEAD:main
 
       - name: Upload CH Audio Lab proof
         uses: actions/upload-artifact@v4
