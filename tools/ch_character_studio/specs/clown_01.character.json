@@ -24,7 +24,10 @@
     "worldTranslationDuringSpriteCycle": false,
     "worldMovementOwner": "runtime",
     "landmarkGenerator": "tools/ch_character_studio/treadmill_landmarks.py",
-    "southWalkBuilder": "tools/ch_character_studio/build_clown_treadmill.py"
+    "southWalkBuilder": "tools/ch_character_studio/build_clown_treadmill.py",
+    "retargetPolicy": "approved_joint_deltas_onto_calibrated_art_landmarks",
+    "artSkinning": "rigid_segmented_bone_skinning",
+    "legacyWeightedLandmarkWarpAllowed": false
   },
   "authoring": {
     "paletteLibrary": "CH_CHARACTER_PALETTE_V1",
@@ -38,11 +41,12 @@
     "referenceDirection": "S",
     "referenceFrame": "idle",
     "root": "tools/ch_character_studio/art/clown_01/south_idle",
+    "authoringLandmarks": "tools/ch_character_studio/art/clown_01/south_idle/authoring_landmarks.json",
     "builder": "tools/ch_character_studio/build_clown_master.py",
     "buildCommand": "python tools/ch_character_studio/build_clown_master.py --seed 1337",
     "output": "out/ch_character_studio/clown_01/south_idle/clown_01_s_idle.png",
     "review": "out/ch_character_studio/clown_01/south_idle/clown_01_s_idle_review_8x.png",
-    "propagationPolicy": "approve_south_idle_then_landmark_transfer_to_south_walk_frames",
+    "propagationPolicy": "approve_south_idle_then_retarget_approved_walk_deltas_to_south_walk_frames",
     "crossDirectionAutoTransfer": false
   },
   "walkPreview": {
@@ -50,11 +54,15 @@
     "mode": "treadmill_in_place",
     "buildCommand": "python tools/ch_character_studio/build_clown_treadmill.py --seed 1337",
     "outputGif": "out/ch_character_studio/clown_01/south_walk/clown_01_s_walk_treadmill.gif",
+    "outputStrip": "out/ch_character_studio/clown_01/south_walk/clown_01_s_walk_strip.png",
+    "transferVersion": "CH_CLOWN_TREADMILL_WALK_V1",
     "requiredInvariants": [
       "all_8_frames_share_ground_anchor_24_60",
       "all_8_frames_have_root_translation_0_0",
       "sprite_does_not_advance_inside_frame",
-      "runtime_world_motion_is_separate"
+      "runtime_world_motion_is_separate",
+      "painted_limbs_are_rigid_segmented_not_rubber_warped",
+      "approved_actor_joint_deltas_remain_authoritative"
     ]
   },
   "appearance": {
