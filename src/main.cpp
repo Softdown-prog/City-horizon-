@@ -23,7 +23,6 @@
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
-// 19. Validation capture can run the real renderer with fixed-time PNG output for CH Video Lab.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -37,7 +36,6 @@
 #include "src/runtime_map_renderer.h"
 #include "src/runtime_game_state.h"
 #include "src/runtime_game_ui.h"
-#include "runtime_video_capture.h"
 
 #include <algorithm>
 #include <cmath>
@@ -96,21 +94,11 @@ public:
     }
 
     void set_speed(const SimulationSpeed speed) {
-        if (ch::runtime_game_state::game_over) return;
-        if (ch_runtime_video_capture_force_running() && speed == SimulationSpeed::paused) {
-            SimulationClock::set_speed(SimulationSpeed::speed1);
-            return;
-        }
-        SimulationClock::set_speed(speed);
+        if (!ch::runtime_game_state::game_over) SimulationClock::set_speed(speed);
     }
 
     void toggle_pause() {
-        if (ch::runtime_game_state::game_over) return;
-        if (ch_runtime_video_capture_force_running()) {
-            SimulationClock::set_speed(SimulationSpeed::speed1);
-            return;
-        }
-        SimulationClock::toggle_pause();
+        if (!ch::runtime_game_state::game_over) SimulationClock::toggle_pause();
     }
 
     [[nodiscard]] SimulationAdvance advance_seconds(const double real_seconds) {
@@ -288,12 +276,6 @@ public:
         return result;
     }
 
-    void render(SDL_Renderer* renderer) {
-        if (!ch_runtime_video_capture_hide_ui()) {
-            ChRuntimeGameplayUi::render(renderer);
-        }
-    }
-
 private:
     const PedestrianSystem* pedestrians_ = nullptr;
     const Camera* camera_ = nullptr;
@@ -382,28 +364,8 @@ private:
 
 #define selected_instance_id selected_instance_id; std::optional<std::uint64_t> selected_pedestrian_id
 
-// CH Video Lab hooks are scoped to main_runtime_impl.cpp. Normal interactive
-// execution falls straight through to SDL when validation capture is disabled.
-#define WeatherSystem ChCaptureWeatherSystem
-#define SDL_GetTicks() ch_runtime_video_capture_ticks()
-#define SDL_GetKeyboardState(count) ch_runtime_video_capture_keyboard_state((count))
-#define SDL_GetMouseState(x, y) ch_runtime_video_capture_mouse_state((x), (y))
-#define SDL_CreateWindow(title, width, height, flags) \
-    ch_runtime_video_capture_create_window((title), (width), (height), (flags))
-#define SDL_SetRenderVSync(renderer, vsync) ch_runtime_video_capture_set_vsync((renderer), (vsync))
-#define SDL_RenderPresent(renderer) ch_runtime_video_capture_present((renderer))
-#define main ch_city_runtime_main
-
 #include "main_runtime_impl.cpp"
 
-#undef main
-#undef SDL_RenderPresent
-#undef SDL_SetRenderVSync
-#undef SDL_CreateWindow
-#undef SDL_GetMouseState
-#undef SDL_GetKeyboardState
-#undef SDL_GetTicks
-#undef WeatherSystem
 #undef selected_instance_id
 #undef update_layout
 #undef GameplayUi
@@ -417,8 +379,3 @@ private:
 #undef SaveManager
 #undef PedestrianLaneNavigationNetwork
 #undef parcels
-
-int main(int argc, char** argv) {
-    if (!ch_runtime_video_capture_configure(argc, argv)) return 2;
-    return ch_city_runtime_main();
-}
