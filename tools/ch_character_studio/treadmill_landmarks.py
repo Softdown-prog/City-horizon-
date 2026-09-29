@@ -4,8 +4,9 @@
 The sprite walk is intentionally treadmill/in-place: the canonical ground anchor
 never moves. Runtime/world translation is a separate engine concern.
 
-V2 polish is deliberately conservative: preserve the approved stride timing and
-horizontal opening, while softening foot lift/contact, body bob and arm extremes.
+V3 keeps the approved stride timing and horizontal opening while applying a
+conservative character-art polish to vertical lift, body bob, arm extremes and,
+most importantly, ankle/toe travel for readable clown shoes.
 """
 from __future__ import annotations
 
@@ -22,21 +23,22 @@ SCALE = 52
 DIRECTIONS = (("S", 0.0), ("E", math.pi / 2), ("W", -math.pi / 2), ("N", math.pi))
 FRAMES = ("idle",) + tuple(f"walk_{i:02d}" for i in range(8))
 
-# Conservative walk-polish values. These do not change frame count, anchor,
-# treadmill behavior or horizontal stride range.
+# V2 body polish retained.
 LEG_VERTICAL_GAIN = 0.86
 KNEE_LIFT_GAIN = 0.88
 BODY_BOB_GAIN = 0.75
 ARM_EXTREME_GAIN = 0.92
 ARM_ELBOW_GAIN = 0.94
 
+# V3 feet: keep stride/depth, but reduce shoe lift and ankle pop independently.
+# The shoe renderer also limits visual shoe rotation; these values only shape
+# the approved locomotion landmarks used by the segmented art rig.
+ANKLE_LIFT_GAIN = 0.84
+FOOT_LIFT_GAIN = 0.74
+
 
 def smooth_positive(value: float) -> float:
-    """C1-smoothed positive half-wave in [0,1].
-
-    Replaces max(0, wave), whose slope changes abruptly at foot contact and can
-    read as a marching pop when sampled in only eight frames.
-    """
+    """C1-smoothed positive half-wave in [0,1]."""
     u = max(0.0, min(1.0, value))
     return u * u * (3.0 - 2.0 * u)
 
@@ -83,23 +85,22 @@ def pose_points(direction: float, phase: float, *, idle: bool = False) -> dict[s
 
         swing = sign * sine
         hip = (sign * .078, .405, 0)
-
-        # Keep the approved horizontal stride/depth path. Only vertical lift is
-        # softened so the clown no longer reads as high-stepping/marching.
         z = .145 * swing + .025 * sign * cosine
         swing_lift = smooth_positive(swing)
         transfer_lift = smooth_positive(sign * cosine)
-        lifted = LEG_VERTICAL_GAIN * (
-            swing_lift * .032 + transfer_lift * .012
-        )
-        foot_base = (sign * (.082 + .008 * abs(sine)), .035 + lifted, z)
+        lifted = LEG_VERTICAL_GAIN * (swing_lift * .032 + transfer_lift * .012)
+
+        # Hip/knee stay on the approved V2 path. Only ankle/toe vertical travel
+        # is damped further so the big clown shoe does not jump or stand upright.
         knee = (
             sign * .08,
             .225 + lifted * .33 * KNEE_LIFT_GAIN,
             z * .42 - .028 * KNEE_LIFT_GAIN * swing_lift,
         )
-        ankle = (foot_base[0], foot_base[1] + .055, foot_base[2] - .016)
-        toe = (foot_base[0], foot_base[1], foot_base[2] + .085)
+        base_x = sign * (.082 + .008 * abs(sine))
+        ankle = (base_x, .035 + lifted * ANKLE_LIFT_GAIN + .055, z - .016)
+        toe = (base_x, .035 + lifted * FOOT_LIFT_GAIN, z + .085)
+
         world[f"hip_{suffix}"] = hip
         world[f"knee_{suffix}"] = knee
         world[f"ankle_{suffix}"] = ankle
@@ -112,8 +113,6 @@ def frame_record(direction: float, phase: float, *, idle: bool = False) -> dict:
     points = pose_points(direction, phase, idle=idle)
     left = points["foot_L"]
     right = points["foot_R"]
-    # Screen-space lower foot is the support/contact candidate. This is only a
-    # debug label; it never changes the fixed runtime ground anchor.
     support_name = "left" if left[1] >= right[1] else "right"
     support = left if support_name == "left" else right
     footprint = [[20, 58], [24, 56], [28, 58], [24, 61]]
@@ -143,9 +142,11 @@ def build() -> dict:
         "source": "tools/ch_actor_lab/software_render.py approved 8-frame locomotion",
         "motionMode": "treadmill_in_place",
         "walkPolish": {
-            "version": "V2_conservative",
+            "version": "V3_foot_polish",
             "legVerticalGain": LEG_VERTICAL_GAIN,
             "kneeLiftGain": KNEE_LIFT_GAIN,
+            "ankleLiftGain": ANKLE_LIFT_GAIN,
+            "footLiftGain": FOOT_LIFT_GAIN,
             "bodyBobGain": BODY_BOB_GAIN,
             "armExtremeGain": ARM_EXTREME_GAIN,
             "armElbowGain": ARM_ELBOW_GAIN,
