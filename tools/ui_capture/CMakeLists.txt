@@ -13,26 +13,31 @@ set(CITY_HORIZON_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 set(CH_VISITOR_FORGE_PREVIEW OFF CACHE BOOL "Disable Visitor Forge packaging for UI capture" FORCE)
 add_subdirectory("${CITY_HORIZON_ROOT}" "${CMAKE_BINARY_DIR}/city-horizon-root")
 
-add_executable(city_builder_ui_capture
-    "${CITY_HORIZON_ROOT}/src/ui_visual_capture.cpp"
-    "${CITY_HORIZON_ROOT}/src/ui_manager.cpp"
-    "${CITY_HORIZON_ROOT}/src/fence_system.cpp"
-    "${CITY_HORIZON_ROOT}/src/fence_placement_controller.cpp"
-)
-target_include_directories(city_builder_ui_capture PRIVATE "${CITY_HORIZON_ROOT}")
-target_link_libraries(city_builder_ui_capture PRIVATE ch_core SDL3::SDL3)
+function(add_city_horizon_ui_capture target_name source_name)
+    add_executable(${target_name}
+        "${CITY_HORIZON_ROOT}/src/${source_name}"
+        "${CITY_HORIZON_ROOT}/src/ui_manager.cpp"
+        "${CITY_HORIZON_ROOT}/src/fence_system.cpp"
+        "${CITY_HORIZON_ROOT}/src/fence_placement_controller.cpp"
+    )
+    target_include_directories(${target_name} PRIVATE "${CITY_HORIZON_ROOT}")
+    target_link_libraries(${target_name} PRIVATE ch_core SDL3::SDL3)
 
-if(MSVC)
-    target_compile_options(city_builder_ui_capture PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(city_builder_ui_capture PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
 
-add_custom_command(TARGET city_builder_ui_capture POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:SDL3::SDL3-shared>"
-        "$<TARGET_FILE_DIR:city_builder_ui_capture>"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CITY_HORIZON_ROOT}/assets"
-        "$<TARGET_FILE_DIR:city_builder_ui_capture>/assets"
-)
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:SDL3::SDL3-shared>"
+            "$<TARGET_FILE_DIR:${target_name}>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CITY_HORIZON_ROOT}/assets"
+            "$<TARGET_FILE_DIR:${target_name}>/assets"
+    )
+endfunction()
+
+add_city_horizon_ui_capture(city_builder_ui_capture ui_visual_capture.cpp)
+add_city_horizon_ui_capture(city_builder_ui_modal_capture ui_modal_visual_capture.cpp)
