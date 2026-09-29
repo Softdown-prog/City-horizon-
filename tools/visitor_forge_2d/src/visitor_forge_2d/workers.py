@@ -12,7 +12,15 @@ from pathlib import Path
 
 from PIL import Image
 
-from .core import fence_scenery, flower_bed_scenery, flower_bed_scenery_v2, organic_scenery, red_mapple_scenery, shape_recipe
+from .core import (
+    fence_scenery,
+    flower_bed_scenery,
+    flower_bed_scenery_v2,
+    flowering_tree_scenery,
+    organic_scenery,
+    red_mapple_scenery,
+    shape_recipe,
+)
 
 SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
@@ -57,6 +65,14 @@ def validate_recipe(recipe: dict) -> str:
         if not isinstance(recipe.get("mapleStyle"), dict):
             raise ValueError("red_mapple scenery requires mapleStyle")
         return "red_mapple"
+    if recipe.get("sceneryType") == "flowering_tree":
+        if recipe.get("crownStyle") != "broadleaf":
+            raise ValueError("flowering_tree scenery requires crownStyle broadleaf")
+        if not isinstance(recipe.get("floweringStyle"), dict):
+            raise ValueError("flowering_tree scenery requires floweringStyle")
+        if not isinstance(recipe.get("trunkBranches"), list) or len(recipe["trunkBranches"]) < 2:
+            raise ValueError("flowering_tree scenery requires authored trunkBranches")
+        return "flowering_tree"
     if recipe.get("sceneryType") is not None:
         raise ValueError("unknown organic sceneryType")
     return "conifer_or_broadleaf"
@@ -105,6 +121,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
         result = flower_bed_scenery_v2.export(recipe_path, folder)
     elif kind == "red_mapple":
         result = red_mapple_scenery.export(recipe_path, folder)
+    elif kind == "flowering_tree":
+        result = flowering_tree_scenery.export(recipe_path, folder)
     else:
         result = organic_scenery.export(recipe_path, folder)
     audit = audit_export(recipe, result, kind)
