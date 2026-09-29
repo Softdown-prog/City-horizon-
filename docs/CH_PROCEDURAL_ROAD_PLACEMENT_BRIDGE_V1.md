@@ -71,21 +71,47 @@ An existing procedural edge is never silently upgraded merely because a repeated
 
 The bridge is designed to receive a segment only after the legacy placement layer has already decided that construction is valid.
 
+## Incremental placement versus rebuild
+
+V1 deliberately provides two synchronization paths.
+
+### Incremental placement
+
+After the existing runtime accepts a new road drag, `mirror_tile_segment(...)` can add only that accepted sequence to the procedural mirror.
+
+It reuses coincident same-elevation nodes and existing edges, so a new crossing automatically becomes an explicit procedural graph junction.
+
+### Full rebuild
+
+`rebuild_from_legacy_tiles(...)` clears the procedural mirror and deterministically reconstructs it from the complete legacy `RoadTile` collection.
+
+The rebuild:
+
+1. creates/reuses one node for every legacy road tile;
+2. scans only East and South neighbors after all nodes exist;
+3. emits every undirected logical adjacency exactly once;
+4. restores class/geometry through the canonical construction builder.
+
+This is the safe V1 synchronization primitive after save/load and demolition. Instead of trying to patch multiple procedural edges after a legacy tile disappears, the runtime can rebuild from the authoritative legacy network and cannot retain a procedural "ghost road".
+
+Because the legacy save format does not carry road class yet, a production rebuild should currently use `Local` as the compatibility class.
+
 ## Production runtime migration
 
 V1 integration order is deliberately conservative:
 
 1. player placement is validated by the existing legacy road system;
 2. economy/occupancy remains owned by `RoadManager`;
-3. after successful legacy placement, the accepted tile sequence can be mirrored into this bridge;
-4. procedural rendering/traffic can consume the mirrored graph behind their own gates;
-5. save/load authority remains legacy until procedural persistence is explicitly implemented.
+3. after successful legacy placement, the accepted tile sequence can be mirrored incrementally;
+4. after load or demolition, the mirror can be rebuilt from `RoadManager::tiles()`;
+5. procedural rendering/traffic can consume the mirrored graph behind their own gates;
+6. save/load authority remains legacy until procedural persistence is explicitly implemented.
 
 If procedural mirroring fails, production placement must not retroactively corrupt the accepted legacy road. The mirror is a migration/debug layer until it becomes authoritative.
 
 ## Load/rebuild rule
 
-Because procedural road classes are not yet persisted in the production save format, V1 may rebuild legacy roads as `Local` after loading a save.
+Because procedural road classes are not yet persisted in the production save format, V1 rebuilds legacy roads with one supplied compatibility class, expected to be `Local` in production.
 
 Collector/Arterial must not be exposed as durable player-facing runtime choices until class persistence exists. Doing so would make a save silently lose road hierarchy.
 
@@ -99,9 +125,14 @@ The focused placement test covers:
 - non-connection of an elevated crossing;
 - idempotent repeated mirroring;
 - rejection of non-adjacent input without mutation;
-- explicit edge re-profiling to Arterial.
+- explicit edge re-profiling to Arterial;
+- complete rebuild of a four-way legacy topology;
+- removal of a branch through rebuild after simulated demolition;
+- rebuild at a non-zero elevation and with a supplied compatibility class.
 
 The lightweight Ubuntu workflow `CH Procedural Road Priority Check` compiles and executes this gate together with the earlier priority, road-class and construction gates.
+
+GitHub Actions run `36623824882` completed successfully for the initial bridge gate. A subsequent run also covers the rebuild cases added afterward.
 
 ## Non-goals for V1
 
@@ -110,7 +141,7 @@ V1 does not yet provide:
 - procedural road save/load persistence;
 - player-facing Local/Collector/Arterial runtime selection;
 - freeform spline drawing in the production runtime;
-- procedural road deletion synchronized with legacy demolition;
+- incremental procedural edge deletion as the authoritative demolition path;
 - graph compression of straight degree-2 runs;
 - automatic terrain elevation sampling;
 - runtime procedural mesh drawing as the authoritative road visual.
