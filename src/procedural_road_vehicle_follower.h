@@ -33,7 +33,14 @@ struct ProceduralRoadVehiclePose {
     float route_length = 0.0F;
     ProceduralRoadRoutePointKind kind = ProceduralRoadRoutePointKind::lane;
     ProceduralRoadTurnKind turn = ProceduralRoadTurnKind::straight;
+    ProceduralRoadNodeId junction_node = kInvalidProceduralRoadNodeId;
     bool finished = false;
+};
+
+struct ProceduralRoadUpcomingJunction {
+    ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
+    float distance = std::numeric_limits<float>::infinity();
+    bool inside = false;
 };
 
 class ProceduralRoadVehicleFollower {
@@ -64,6 +71,43 @@ public:
 
     [[nodiscard]] bool valid() const { return valid_; }
     [[nodiscard]] const ProceduralRoadVehiclePose& pose() const { return pose_; }
+
+    [[nodiscard]] std::optional<ProceduralRoadUpcomingJunction> upcoming_junction(
+        const float lookahead_distance = std::numeric_limits<float>::infinity()) const {
+        if (!valid_ || pose_.finished || route_.size() < 2U) return std::nullopt;
+        const float lookahead = std::max(0.0F, lookahead_distance);
+        const float d = std::clamp(pose_.route_distance, 0.0F, route_length());
+
+        auto upper = std::upper_bound(cumulative_.begin(), cumulative_.end(), d);
+        std::size_t next_index = static_cast<std::size_t>(std::distance(cumulative_.begin(), upper));
+        if (next_index == 0U) next_index = 1U;
+        if (next_index >= route_.size()) next_index = route_.size() - 1U;
+        const std::size_t previous_index = next_index - 1U;
+
+        const auto& previous = route_[previous_index];
+        if (previous.kind == ProceduralRoadRoutePointKind::junction_connector &&
+            previous.junction_node != kInvalidProceduralRoadNodeId) {
+            return ProceduralRoadUpcomingJunction{previous.junction_node, 0.0F, true};
+        }
+        const auto& next = route_[next_index];
+        if (next.kind == ProceduralRoadRoutePointKind::junction_connector &&
+            next.junction_node != kInvalidProceduralRoadNodeId &&
+            d >= cumulative_[next_index] - 0.00001F) {
+            return ProceduralRoadUpcomingJunction{next.junction_node, 0.0F, true};
+        }
+
+        for (std::size_t index = next_index; index < route_.size(); ++index) {
+            const auto& point = route_[index];
+            if (point.kind != ProceduralRoadRoutePointKind::junction_connector ||
+                point.junction_node == kInvalidProceduralRoadNodeId) {
+                continue;
+            }
+            const float distance_to_junction = std::max(0.0F, cumulative_[index] - d);
+            if (distance_to_junction > lookahead) return std::nullopt;
+            return ProceduralRoadUpcomingJunction{point.junction_node, distance_to_junction, false};
+        }
+        return std::nullopt;
+    }
 
     void update(
         const float dt_seconds,
@@ -113,6 +157,7 @@ public:
         result.route_length = total;
         result.kind = route_[next_index].kind;
         result.turn = route_[next_index].turn;
+        result.junction_node = route_[next_index].junction_node;
         result.finished = d >= total - 0.00001F;
         return result;
     }
