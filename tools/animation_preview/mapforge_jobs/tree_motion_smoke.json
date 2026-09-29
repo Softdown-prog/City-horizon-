@@ -2,7 +2,7 @@
   "contract": "CH_VIDEO_SCENARIO_V1",
   "id": "mapforge.tree.motion_smoke",
   "reviewOnly": true,
-  "attempt": 5,
+  "attempt": 6,
   "fps": 15,
   "durationSeconds": 4,
   "mapforgeCandidateFile": "assets/tree/park_tree_angico_final_v1.png",
