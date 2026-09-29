@@ -2,8 +2,8 @@ name: City Builder Focused Compile Check
 
 # Focused validation for runtime/UI changes before local test builds.
 # Compile the real runtime from the repository root, exercise the pedestrian
-# navigation regression contract, then configure a separate capture build that
-# exercises the production GameplayUi without changing root CMAKE_SOURCE_DIR assumptions.
+# navigation regression contract, then configure deterministic UI captures that
+# exercise the production GameplayUi without changing root CMAKE_SOURCE_DIR assumptions.
 on:
   workflow_dispatch:
   push:
@@ -32,7 +32,15 @@ on:
       - "src/ui_manager.cpp"
       - "src/ui_manager.h"
       - "src/ui_manager_legacy_impl.inl"
+      - "src/ui_modal_polish.inl"
+      - "src/ui_modal_polish_base.inl"
+      - "src/ui_build_panel_nine_slice.inl"
+      - "src/ui_window_nine_slice.inl"
+      - "src/ui_nine_slice.h"
       - "src/ui_visual_capture.cpp"
+      - "src/ui_modal_visual_capture.cpp"
+      - "assets/ui/ui_asset_catalog.json"
+      - "assets/ui/chrome/panel_window_9slice_v2.png"
       - "tools/ui_capture/**"
       - "CMakeLists.txt"
       - ".github/workflows/city-builder-ui-compile-check.yml"
@@ -64,9 +72,13 @@ jobs:
         shell: pwsh
         run: cmake -S tools/ui_capture -B build/ui-capture-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF -DCH_VISITOR_FORGE_PREVIEW=OFF
 
-      - name: Build UI visual capture
+      - name: Build catalog UI visual capture
         shell: pwsh
         run: cmake --build build/ui-capture-check --config Release --target city_builder_ui_capture --parallel
+
+      - name: Build modal UI visual capture
+        shell: pwsh
+        run: cmake --build build/ui-capture-check --config Release --target city_builder_ui_modal_capture --parallel
 
       - name: Render UI visual proof
         shell: pwsh
@@ -77,6 +89,9 @@ jobs:
           & "build/ui-capture-check/Release/city_builder_ui_capture.exe" "out/ui-capture"
           if ($LASTEXITCODE -ne 0) { throw "city_builder_ui_capture failed" }
 
+          & "build/ui-capture-check/Release/city_builder_ui_modal_capture.exe" "out/ui-capture"
+          if ($LASTEXITCODE -ne 0) { throw "city_builder_ui_modal_capture failed" }
+
           $expected = @(
             "floor_catalog_idle.png",
             "floor_catalog_hover_sand.png",
@@ -85,7 +100,10 @@ jobs:
             "settings_idle.png",
             "settings_hover_apply.png",
             "settings_master_35.png",
-            "settings_defaults.png"
+            "settings_defaults.png",
+            "modal_pause.png",
+            "modal_settings.png",
+            "modal_administration.png"
           )
           foreach ($file in $expected) {
             $path = Join-Path "out/ui-capture" $file
