@@ -27,7 +27,7 @@
     "width": 4,
     "height": 4
   },
-  "buildCost": 0,
+  "buildCost": 15000,
   "maintenancePerMonth": 0,
   "taxRevenuePerMonth": 0,
   "propertyTaxPerYear": 0,
