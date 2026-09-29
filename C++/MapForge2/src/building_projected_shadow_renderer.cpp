@@ -1,6 +1,6 @@
 #include "building_projected_shadow_renderer.h"
 
-#include "src/ch_core/contracts.h"
+#include "authoring_projection.h"
 
 #include <QPainter>
 #include <QPolygonF>
@@ -31,33 +31,33 @@ constexpr int kPenumbraAlpha = 18;
 constexpr int kCoreAlpha = 46;
 constexpr int kNearFieldAlpha = 12;
 
-Point3 rotatePoint(const Point3 point, const BuildingView view) {
+int quarterTurns(const BuildingView view) {
     switch (view) {
-        case BuildingView::East: return {-point.y, point.x, point.z};
-        case BuildingView::North: return {-point.x, -point.y, point.z};
-        case BuildingView::West: return {point.y, -point.x, point.z};
-        case BuildingView::South: return point;
+        case BuildingView::South: return 0;
+        case BuildingView::East: return 1;
+        case BuildingView::North: return 2;
+        case BuildingView::West: return 3;
     }
-    return point;
+    return 0;
 }
 
 QPointF projectGroundPoint(const Point3 point, const BuildingView view, const QSize canvas) {
-    const Point3 rotated = rotatePoint(point, view);
-    const float half_tile_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
-    const float half_tile_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
-    const float center_x = static_cast<float>(canvas.width()) * 0.5F;
-    const float ground_y = static_cast<float>(canvas.height()) - 42.0F;
-    return {
-        center_x + (rotated.x - rotated.y) * half_tile_w,
-        ground_y + (rotated.x + rotated.y) * half_tile_h,
-    };
+    return projectAuthoringGround(
+        point.x,
+        point.y,
+        quarterTurns(view),
+        QSizeF(canvas),
+        QPointF(static_cast<qreal>(canvas.width()) * 0.5,
+                static_cast<qreal>(canvas.height()) - 42.0));
 }
 
 QPointF projectedShadowDirection(const BuildingView view) {
-    const Point3 world_direction{kShadowWorldX, kShadowWorldY, 0.0F};
-    const Point3 rotated = rotatePoint(world_direction, view);
-    const float dx = (rotated.x - rotated.y) * static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
-    const float dy = (rotated.x + rotated.y) * static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
+    const QPointF origin = projectAuthoringGround(
+        0.0F, 0.0F, quarterTurns(view), QSizeF(), QPointF());
+    const QPointF projected = projectAuthoringGround(
+        kShadowWorldX, kShadowWorldY, quarterTurns(view), QSizeF(), QPointF());
+    const float dx = static_cast<float>(projected.x() - origin.x());
+    const float dy = static_cast<float>(projected.y() - origin.y());
     const float length = std::hypot(dx, dy);
     if (length <= 0.001F) return {1.0, 0.0};
     return {dx / length, dy / length};
