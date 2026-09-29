@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include "src/ch_core/projection.h"
+#include "src/procedural_road_construction.h"
 #include "src/procedural_road_junction.h"
 #include "src/road_system.h"
 
@@ -34,15 +35,30 @@ QPointF to_qpoint(const ch::ScreenPoint point) {
     return {static_cast<qreal>(point.x), static_cast<qreal>(point.y)};
 }
 
+QString road_class_label(const ProceduralRoadClass road_class) {
+    switch (road_class) {
+        case ProceduralRoadClass::local: return QStringLiteral("LOCAL");
+        case ProceduralRoadClass::collector: return QStringLiteral("COLLECTOR");
+        case ProceduralRoadClass::arterial: return QStringLiteral("ARTERIAL");
+        case ProceduralRoadClass::unspecified: return QStringLiteral("UNSPECIFIED");
+    }
+    return QStringLiteral("UNSPECIFIED");
+}
+
+void apply_construction_profile(RoadSplineSegment& segment, const ProceduralRoadClass road_class) {
+    const ProceduralRoadConstructionProfile profile = procedural_road_construction_profile(road_class);
+    segment.width = profile.width;
+    segment.texture_repeat_world_units = profile.texture_repeat_world_units;
+    segment.subdivisions = profile.subdivisions;
+}
+
 RoadSplineSegment default_segment() {
     RoadSplineSegment segment;
     segment.start = {-5.0F, 0.0F, 0.0F};
     segment.control_a = {-1.0F, 3.4F, 0.0F};
     segment.control_b = {4.5F, -3.4F, 1.15F};
     segment.end = {9.0F, 0.0F, 1.35F};
-    segment.width = 0.78F;
-    segment.texture_repeat_world_units = 1.0F;
-    segment.subdivisions = 64;
+    apply_construction_profile(segment, ProceduralRoadClass::local);
     return segment;
 }
 
@@ -80,39 +96,35 @@ RoadWorldPoint3 subtract_points(const RoadWorldPoint3& point, const RoadWorldPoi
 
 struct DemoRoadNetwork {
     ProceduralRoadGraph graph;
+    ProceduralRoadClassCatalog classes;
     ProceduralRoadNodeId junction = kInvalidProceduralRoadNodeId;
 };
 
-DemoRoadNetwork build_demo_network(const RoadSplineSegment& editable) {
+DemoRoadNetwork build_demo_network(const RoadSplineSegment& editable, const ProceduralRoadClass road_class) {
     DemoRoadNetwork demo;
     const ProceduralRoadNodeId start = demo.graph.add_node(editable.start);
     demo.junction = demo.graph.add_node(editable.end);
 
-    const auto incoming = demo.graph.add_segment(
-        start,
-        demo.junction,
+    (void)ProceduralRoadConstructionBuilder::add_segment(
+        demo.graph, demo.classes, start, demo.junction, road_class,
         subtract_points(editable.control_a, editable.start),
-        subtract_points(editable.control_b, editable.end),
-        editable.width,
-        2);
-    if (incoming) {
-        if (ProceduralRoadGraphSegment* segment = demo.graph.segment(*incoming)) {
-            segment->subdivisions = editable.subdivisions;
-            segment->texture_repeat_world_units = editable.texture_repeat_world_units;
-        }
-    }
+        subtract_points(editable.control_b, editable.end));
 
     const float branch_length = 4.0F;
     const float z = editable.end.z;
     const ProceduralRoadNodeId east = demo.graph.add_node({editable.end.x + branch_length, editable.end.y, z});
     const ProceduralRoadNodeId south = demo.graph.add_node({editable.end.x, editable.end.y + branch_length, z});
     const ProceduralRoadNodeId north = demo.graph.add_node({editable.end.x, editable.end.y - branch_length, z});
-    (void)demo.graph.add_segment(demo.junction, east,
-                                 {1.2F, 0.0F, 0.0F}, {-1.2F, 0.0F, 0.0F}, editable.width, 2);
-    (void)demo.graph.add_segment(demo.junction, south,
-                                 {0.0F, 1.2F, 0.0F}, {0.0F, -1.2F, 0.0F}, editable.width, 2);
-    (void)demo.graph.add_segment(demo.junction, north,
-                                 {0.0F, -1.2F, 0.0F}, {0.0F, 1.2F, 0.0F}, editable.width, 2);
+
+    (void)ProceduralRoadConstructionBuilder::add_segment(
+        demo.graph, demo.classes, demo.junction, east, road_class,
+        {1.2F, 0.0F, 0.0F}, {-1.2F, 0.0F, 0.0F});
+    (void)ProceduralRoadConstructionBuilder::add_segment(
+        demo.graph, demo.classes, demo.junction, south, road_class,
+        {0.0F, 1.2F, 0.0F}, {0.0F, -1.2F, 0.0F});
+    (void)ProceduralRoadConstructionBuilder::add_segment(
+        demo.graph, demo.classes, demo.junction, north, road_class,
+        {0.0F, -1.2F, 0.0F}, {0.0F, 1.2F, 0.0F});
     return demo;
 }
 
@@ -162,7 +174,8 @@ void draw_support(QPainter& painter, const RoadWorldPoint3& point, const ch::Cam
 }
 
 void draw_mesh(QPainter& painter, const RoadMesh& mesh, const ch::CameraState& camera,
-               const float viewport_width, const float viewport_height, const bool show_triangle_edges = false) {
+               const float viewport_width, const float viewport_height,
+               const bool show_triangle_edges = false) {
     if (mesh.empty()) return;
     painter.setBrush(QColor(52, 57, 60));
     painter.setPen(show_triangle_edges ? QPen(QColor(34, 38, 40), 0.8) : Qt::NoPen);
@@ -187,8 +200,7 @@ void draw_centerline(QPainter& painter, const RoadSplineSegment& segment, const 
         const float t = static_cast<float>(index) / static_cast<float>(kSamples);
         const RoadWorldPoint3 point = RoadMeshBuilder::sample_cubic(segment, t);
         const QPointF screen = to_qpoint(ch::world_to_screen_point(
-            point.x, point.y, point.z + 0.012F,
-            camera, viewport_width, viewport_height));
+            point.x, point.y, point.z + 0.012F, camera, viewport_width, viewport_height));
         if (index == 0) path.moveTo(screen);
         else path.lineTo(screen);
     }
@@ -214,8 +226,6 @@ void draw_network(QPainter& painter, const DemoRoadNetwork& demo, const ch::Came
         draw_mesh(painter, RoadMeshBuilder::build_cubic(*spline), camera, viewport_width, viewport_height);
     }
 
-    // The central patch is drawn after approaches so it owns the seam and hides
-    // any fractional-pixel gap between independently sampled road ribbons.
     draw_mesh(painter, RoadJunctionBuilder::build_patch(demo.graph, demo.junction),
               camera, viewport_width, viewport_height);
 
@@ -254,29 +264,37 @@ void draw_handles(QPainter& painter, const RoadSplineSegment& segment, const ch:
     }
 }
 
-void draw_overlay(QPainter& painter, const RoadSplineSegment& segment, const int selected_handle,
+void draw_overlay(QPainter& painter, const RoadSplineSegment& segment,
+                  const ProceduralRoadClass road_class, const int selected_handle,
                   const int viewport_width, const int viewport_height) {
+    const ProceduralRoadConstructionProfile profile = procedural_road_construction_profile(road_class);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(24, 30, 33, 205));
-    painter.drawRoundedRect(QRectF(18.0, 18.0, 555.0, 112.0), 8.0, 8.0);
+    painter.setBrush(QColor(24, 30, 33, 215));
+    painter.drawRoundedRect(QRectF(18.0, 18.0, 620.0, 136.0), 8.0, 8.0);
     painter.setPen(QColor(235, 242, 244));
-    painter.drawText(QPointF(34.0, 43.0), "CH road pilot — spline + graph + live 4-way junction");
-    painter.drawText(QPointF(34.0, 65.0), "Handle 3 is the graph junction: drag XY or change Z and all 3 branches follow");
-    painter.drawText(QPointF(34.0, 87.0), "Drag handles: XY  |  PageUp/PageDown: Z  |  1-4: camera rotation");
-    painter.drawText(QPointF(34.0, 109.0), "R: reset  |  RMB/MMB: pan  |  wheel: zoom  |  Esc: deselect");
+    painter.drawText(QPointF(34.0, 43.0), "CH road pilot — class-aware construction + live 4-way junction");
+    painter.drawText(QPointF(34.0, 65.0),
+                     QString("Class: %1 | width %2 | lanes %3 | cost/unit %4")
+                         .arg(road_class_label(road_class))
+                         .arg(profile.width, 0, 'f', 2)
+                         .arg(profile.lane_count)
+                         .arg(profile.build_cost_per_world_unit));
+    painter.drawText(QPointF(34.0, 87.0), "5: Local  |  6: Collector  |  7: Arterial  |  1-4: camera rotation");
+    painter.drawText(QPointF(34.0, 109.0), "Drag handles: XY  |  PageUp/PageDown: Z  |  handle 3 moves the junction");
+    painter.drawText(QPointF(34.0, 131.0), "R: reset  |  RMB/MMB: pan  |  wheel: zoom  |  Esc: deselect");
 
     if (selected_handle >= 0) {
         const RoadWorldPoint3& p = handle_point(segment, selected_handle);
         painter.drawText(QPointF(34.0, static_cast<qreal>(viewport_height - 24)),
-                         QString("Selected handle %1 — world (%2, %3, %4), width %5")
+                         QString("Selected handle %1 — world (%2, %3, %4)")
                              .arg(selected_handle)
-                             .arg(p.x, 0, 'f', 2).arg(p.y, 0, 'f', 2).arg(p.z, 0, 'f', 2)
-                             .arg(segment.width, 0, 'f', 2));
+                             .arg(p.x, 0, 'f', 2).arg(p.y, 0, 'f', 2).arg(p.z, 0, 'f', 2));
     }
     (void)viewport_width;
 }
 
-void render_scene(QPainter& painter, const RoadSplineSegment& segment, const ch::CameraState& camera,
+void render_scene(QPainter& painter, const RoadSplineSegment& segment,
+                  const ProceduralRoadClass road_class, const ch::CameraState& camera,
                   const int selected_handle, const int viewport_width, const int viewport_height) {
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.fillRect(QRect(0, 0, viewport_width, viewport_height), QColor(71, 96, 76));
@@ -284,16 +302,17 @@ void render_scene(QPainter& painter, const RoadSplineSegment& segment, const ch:
     const float height = static_cast<float>(viewport_height);
 
     draw_ground(painter, camera, width, height);
-    const DemoRoadNetwork demo = build_demo_network(segment);
+    const DemoRoadNetwork demo = build_demo_network(segment, road_class);
     draw_network(painter, demo, camera, width, height);
     draw_handles(painter, segment, camera, selected_handle, width, height);
-    draw_overlay(painter, segment, selected_handle, viewport_width, viewport_height);
+    draw_overlay(painter, segment, road_class, selected_handle, viewport_width, viewport_height);
 }
 
 bool render_png(const std::filesystem::path& output) {
     QImage image(kPreviewWidth, kPreviewHeight, QImage::Format_ARGB32_Premultiplied);
     QPainter painter(&image);
-    render_scene(painter, default_segment(), default_camera(), -1, kPreviewWidth, kPreviewHeight);
+    render_scene(painter, default_segment(), ProceduralRoadClass::local,
+                 default_camera(), -1, kPreviewWidth, kPreviewHeight);
     painter.end();
 
     const std::filesystem::path parent = output.parent_path();
@@ -374,6 +393,7 @@ protected:
         }
         if (event->key() == Qt::Key_R) {
             segment_ = default_segment();
+            road_class_ = ProceduralRoadClass::local;
             camera_ = default_camera();
             selected_handle_ = -1;
             render_now();
@@ -381,6 +401,14 @@ protected:
         }
         if (event->key() >= Qt::Key_1 && event->key() <= Qt::Key_4) {
             camera_.rotation = static_cast<ch::CameraRotation>(event->key() - Qt::Key_1);
+            render_now();
+            return;
+        }
+        if (event->key() >= Qt::Key_5 && event->key() <= Qt::Key_7) {
+            road_class_ = event->key() == Qt::Key_5 ? ProceduralRoadClass::local
+                        : event->key() == Qt::Key_6 ? ProceduralRoadClass::collector
+                                                    : ProceduralRoadClass::arterial;
+            apply_construction_profile(segment_, road_class_);
             render_now();
             return;
         }
@@ -419,7 +447,7 @@ private:
         backing_store_.beginPaint(region);
         if (QPaintDevice* device = backing_store_.paintDevice()) {
             QPainter painter(device);
-            render_scene(painter, segment_, camera_, selected_handle_, width(), height());
+            render_scene(painter, segment_, road_class_, camera_, selected_handle_, width(), height());
         }
         backing_store_.endPaint();
         backing_store_.flush(region, this);
@@ -427,6 +455,7 @@ private:
 
     QBackingStore backing_store_;
     RoadSplineSegment segment_;
+    ProceduralRoadClass road_class_ = ProceduralRoadClass::local;
     ch::CameraState camera_;
     int selected_handle_ = -1;
     bool dragging_handle_ = false;
@@ -437,8 +466,6 @@ private:
 } // namespace
 
 int main(int argc, char** argv) {
-    // Preserve deterministic/headless mode for CI and agents. Passing an output
-    // path writes one gameplay-scale PNG and exits without constructing a GUI.
     if (argc > 1) {
         const std::filesystem::path output = argv[1];
         if (!render_png(output)) {
