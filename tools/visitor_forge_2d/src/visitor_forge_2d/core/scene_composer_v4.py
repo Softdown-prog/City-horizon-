@@ -2,9 +2,8 @@
 
 V4 reuses the bounded V3 scene graph, then applies deterministic edge breakup,
 surface variation, localized material wear and a gameplay critic. It also
-expands authored smooth closed silhouettes to bounded spline polygons before V3
-validation, so boats, signs, rocks, piers and decorations are not limited to
-ruler-straight polygon edges.
+expands authored smooth closed silhouettes and reusable component-gallery nodes
+before V3 validation, so props can be assembled from shared building blocks.
 """
 from __future__ import annotations
 
@@ -17,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
-from . import localized_finish, scene_composer_v3, smooth_geometry
+from . import component_resolver, localized_finish, scene_composer_v3, smooth_geometry
 from .exporter import alpha_safe_resize
 
 CONTRACT = "CH_2D_SCENE_RECIPE_V4"
@@ -34,6 +33,7 @@ def _legacy_recipe(recipe: dict) -> dict:
     legacy["contract"] = scene_composer_v3.CONTRACT
     legacy.pop("finish", None)
     legacy.pop("finishRegions", None)
+    legacy = component_resolver.expand_recipe(legacy)
     return smooth_geometry.expand_recipe(legacy)
 
 
@@ -141,6 +141,7 @@ def critic(frame: Image.Image, recipe: dict) -> dict:
 
 def render_scene(recipe: dict) -> tuple[Image.Image, dict]:
     validate_recipe(recipe)
+    usage = component_resolver.component_usage(recipe)
     frame, metadata = scene_composer_v3.render_scene(_legacy_recipe(recipe))
     seed = recipe.get("seed", 0)
     finish = recipe.get("finish", {})
@@ -154,6 +155,8 @@ def render_scene(recipe: dict) -> tuple[Image.Image, dict]:
         "bounds": list(bounds),
         "finish": finish,
         "finishRegionCount": len(recipe.get("finishRegions") or []),
+        "componentInstanceCount": usage["count"],
+        "componentIds": usage["componentIds"],
         "critic": critic(frame, recipe),
     })
     return frame, metadata
