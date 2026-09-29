@@ -61,18 +61,30 @@ ch::CameraRotation cameraRotationOr(const QJsonObject& cameraSpec) {
     return static_cast<ch::CameraRotation>(turns);
 }
 
-QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
-                      const int width, const int height) {
-    const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, width, height);
-    const auto b = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), camera, width, height);
-    const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), camera, width, height);
-    const auto d = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), camera, width, height);
+QPolygonF tilePolygonAtElevation(const int x, const int y, const float worldZ,
+                                 const ch::CameraState& camera,
+                                 const int width, const int height) {
+    const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), worldZ,
+                                             camera, static_cast<float>(width), static_cast<float>(height));
+    const auto b = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y), worldZ,
+                                             camera, static_cast<float>(width), static_cast<float>(height));
+    const auto c = ch::world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1), worldZ,
+                                             camera, static_cast<float>(width), static_cast<float>(height));
+    const auto d = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1), worldZ,
+                                             camera, static_cast<float>(width), static_cast<float>(height));
     return QPolygonF{QPointF(a.x, a.y), QPointF(b.x, b.y), QPointF(c.x, c.y), QPointF(d.x, d.y)};
 }
 
+QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
+                      const int width, const int height) {
+    return tilePolygonAtElevation(x, y, 0.0F, camera, width, height);
+}
+
 void drawGroundTileSprite(QPainter& painter, const QImage& sprite, const QPointF& tile,
-                          const ch::CameraState& camera, const int width, const int height) {
-    const QPolygonF polygon = tilePolygon(static_cast<int>(tile.x()), static_cast<int>(tile.y()), camera, width, height);
+                          const float worldZ, const ch::CameraState& camera,
+                          const int width, const int height) {
+    const QPolygonF polygon = tilePolygonAtElevation(
+        static_cast<int>(tile.x()), static_cast<int>(tile.y()), worldZ, camera, width, height);
     painter.save();
     QPainterPath clip;
     clip.addPolygon(polygon);
@@ -296,10 +308,11 @@ MapCaptureResult runMapCapture(const QString& output_path,
             if (coords.size() != 2) continue;
             drawGroundTileSprite(painter, candidate,
                                  QPointF(coords.at(0).toDouble(), coords.at(1).toDouble()),
-                                 camera, width, height);
+                                 candidateElevation, camera, width, height);
         }
     } else if (candidateSpec.value("renderAsGroundTile").toBool(false)) {
-        drawGroundTileSprite(painter, candidate, candidateTile, camera, width, height);
+        drawGroundTileSprite(painter, candidate, candidateTile, candidateElevation,
+                             camera, width, height);
     } else {
         drawAnchoredSprite(painter, candidate, candidateTile, candidateElevation,
                            camera, width, height, scale, offsetPixels);
