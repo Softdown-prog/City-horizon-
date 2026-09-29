@@ -1,7 +1,8 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_red_mapple_golden_v1",
-  "pipelineRevision": 3,
+  "pipelineRevision": 4,
+  "sceneryType": "red_mapple",
   "canvas": [256, 320],
   "anchor": [128, 308],
   "seed": 41527,
@@ -28,10 +29,18 @@
     }
   },
   "lightingIntent": {
-    "top": "small bright scarlet maple groups with warm orange-red tips",
-    "front": "many overlapping branch-borne leaf groups with visible wood between them",
+    "top": "small bright scarlet maple leaves with warm orange-red tips",
+    "front": "many branch-borne defined maple leaves with visible wood and negative space",
     "base": "deep crimson interior shadow around the main fork",
     "rotationSpace": "screen_camera_relative"
+  },
+  "mapleStyle": {
+    "center": [128, 126],
+    "crownRadius": [86, 101],
+    "leafScalePx": [3.0, 5.5],
+    "branchLeafSteps": [0.58, 0.82, 1.03],
+    "definedLeaves": true,
+    "preserveBranchGaps": true
   },
   "broadleafStructure": {
     "layout": "painted_canopy",
@@ -59,10 +68,10 @@
     "leaf_light_bottom": "#DD2930"
   },
   "raster": {
-    "shadowDabs": 14,
-    "highlightDabs": 24,
+    "shadowDabs": 8,
+    "highlightDabs": 12,
     "needleStrokes": 0,
-    "finalGrain": 18,
+    "finalGrain": 10,
     "finalNeedles": 0
   },
   "trunkBranches": [
