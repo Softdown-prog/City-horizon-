@@ -194,6 +194,16 @@ add_executable(MapForge2ParkFencePreview
 )
 target_link_libraries(MapForge2ParkFencePreview PRIVATE mapforge2_asset_composer Qt6::Gui)
 
+# Focused visual proof for CH_PROCEDURAL_ROAD_MESH_V1. This is intentionally a
+# small preview target rather than a new editor subsystem: it draws a straight
+# section, an S-curve and an elevated span using the canonical road mesh and
+# camera code, then writes one PNG for gameplay-scale inspection.
+add_executable(MapForge2ProceduralRoadPreview
+    src/procedural_road_preview_main.cpp
+)
+target_include_directories(MapForge2ProceduralRoadPreview PRIVATE ${CH_ROOT})
+target_link_libraries(MapForge2ProceduralRoadPreview PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
+
 add_executable(MapForge2UiPausePreview
     src/ui_pause_preview_main.cpp
 )
@@ -231,6 +241,7 @@ if(MSVC)
     target_compile_options(MapForge2ComposerPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ParkFencePreview PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2ProceduralRoadPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2UiPausePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2MapCapture PRIVATE /W4 /permissive- /utf-8)
@@ -249,6 +260,7 @@ else()
     target_compile_options(MapForge2ComposerPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ParkFencePreview PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2ProceduralRoadPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2UiPausePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2MapCapture PRIVATE -Wall -Wextra -Wpedantic)
