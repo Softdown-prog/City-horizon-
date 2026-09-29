@@ -16,9 +16,13 @@ on:
     paths:
       - "tools/ch_audio_lab/jobs/*.json"
 
+permissions:
+  contents: read
+
 jobs:
   generate-review-audio:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +62,10 @@ jobs:
 
       - name: Generate and master review audio
         shell: bash
+        env:
+          # Production providers read credentials from environment only.
+          # An unset repository secret becomes an empty value; smoke jobs do not need it.
+          STABILITY_API_KEY: ${{ secrets.STABILITY_API_KEY }}
         run: python tools/ch_audio_lab/ch_audio_lab.py "$CH_AUDIO_JOB"
 
       - name: Validate Audio Lab proof
