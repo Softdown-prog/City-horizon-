@@ -1,6 +1,6 @@
 {
   "contract": "CH_CHARACTER_DRAW_RECIPE_V0",
-  "version": "0.1",
+  "version": "0.2",
   "frameSize": [48, 64],
   "description": "Deterministic CLI drawing recipe for Character Studio layers and packed RGB masks.",
   "primitives": {
@@ -15,17 +15,26 @@
     "maskBank": "appearance|clothing|held_object",
     "maskChannel": "R|G|B"
   },
+  "supersampling": {
+    "artLayerAllowed": true,
+    "range": [1, 8],
+    "recommended": 4,
+    "downsample": "LANCZOS",
+    "outputResolutionAlways": [48, 64],
+    "maskBankForcedTo": 1,
+    "reason": "art may be antialiased for prerendered readability while semantic RGB channels remain exact"
+  },
   "determinism": {
     "seedRequiredForProceduralOps": true,
     "defaultSeed": 1337,
-    "nativeResolutionOnly": true,
-    "imageSmoothing": false,
+    "canonicalOutputResolution": [48, 64],
     "sameRecipeSameSeedSameBytes": true
   },
   "rules": [
     "Do not draw into the Blender underlay.",
     "Do not change the canonical ground anchor.",
     "Mask recipes contain semantic channel data only; no lighting, AO, outline or dithering.",
-    "All coordinates use top-left pixel origin at 48x64."
+    "Mask recipes must use supersample=1 so R/G/B semantic channels are never mixed by resampling.",
+    "All authoring coordinates use top-left pixel origin at 48x64 even when art is internally supersampled."
   ]
 }
