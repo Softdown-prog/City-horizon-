@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,6 +28,12 @@ struct ProceduralRoadTrafficFollowingConfig {
     float same_direction_cosine = 0.50F;
 };
 
+struct ProceduralRoadJunctionReservationConfig {
+    bool enabled = true;
+    float request_lookahead = 2.75F;
+    float stop_buffer = 0.30F;
+};
+
 struct ProceduralRoadTrafficInstance {
     std::string vehicle_id;
     ProceduralRoadVehicleFollower follower;
@@ -34,6 +41,13 @@ struct ProceduralRoadTrafficInstance {
     ProceduralRoadVehicleVisual visual{};
     std::string leader_vehicle_id;
     float leader_gap = std::numeric_limits<float>::infinity();
+    ProceduralRoadNodeId reserved_junction = kInvalidProceduralRoadNodeId;
+    ProceduralRoadNodeId blocked_junction = kInvalidProceduralRoadNodeId;
+};
+
+struct ProceduralRoadJunctionReservation {
+    ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
+    std::string vehicle_id;
 };
 
 class ProceduralRoadTrafficManager {
@@ -60,6 +74,9 @@ public:
         });
         if (found == instances_.end()) return false;
         instances_.erase(found);
+        std::erase_if(junction_reservations_, [&](const auto& reservation) {
+            return reservation.vehicle_id == vehicle_id;
+        });
         return true;
     }
 
@@ -86,10 +103,14 @@ public:
 
             follower_instance.leader_vehicle_id = instances_[leader.index].vehicle_id;
             follower_instance.leader_gap = leader.longitudinal_gap;
-            external_speed_caps[follower_index] = following_speed_cap(
-                snapshot[follower_index], snapshot[leader.index], leader.longitudinal_gap,
-                follower_instance.movement);
+            external_speed_caps[follower_index] = std::min(
+                external_speed_caps[follower_index],
+                following_speed_cap(
+                    snapshot[follower_index], snapshot[leader.index], leader.longitudinal_gap,
+                    follower_instance.movement));
         }
+
+        update_junction_reservations(external_speed_caps);
 
         for (std::size_t index = 0U; index < instances_.size(); ++index) {
             instances_[index].follower.update(
@@ -109,7 +130,10 @@ public:
         return result;
     }
 
-    void clear() { instances_.clear(); }
+    void clear() {
+        instances_.clear();
+        junction_reservations_.clear();
+    }
 
     void set_following_config(const ProceduralRoadTrafficFollowingConfig& config) {
         following_ = config;
@@ -117,6 +141,27 @@ public:
 
     [[nodiscard]] const ProceduralRoadTrafficFollowingConfig& following_config() const {
         return following_;
+    }
+
+    void set_junction_reservation_config(const ProceduralRoadJunctionReservationConfig& config) {
+        junctions_ = config;
+        if (!junctions_.enabled) junction_reservations_.clear();
+    }
+
+    [[nodiscard]] const ProceduralRoadJunctionReservationConfig& junction_reservation_config() const {
+        return junctions_;
+    }
+
+    [[nodiscard]] std::string_view junction_owner(const ProceduralRoadNodeId node_id) const {
+        const auto found = std::find_if(junction_reservations_.begin(), junction_reservations_.end(),
+                                        [&](const auto& reservation) {
+                                            return reservation.node_id == node_id;
+                                        });
+        return found == junction_reservations_.end() ? std::string_view{} : std::string_view(found->vehicle_id);
+    }
+
+    [[nodiscard]] std::size_t junction_reservation_count() const {
+        return junction_reservations_.size();
     }
 
     [[nodiscard]] bool contains(const std::string_view vehicle_id) const {
@@ -141,6 +186,13 @@ private:
         std::size_t index = 0U;
         float longitudinal_gap = std::numeric_limits<float>::infinity();
         bool valid = false;
+    };
+
+    struct JunctionRequest {
+        std::size_t instance_index = 0U;
+        ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
+        float distance = std::numeric_limits<float>::infinity();
+        bool inside = false;
     };
 
     [[nodiscard]] LeaderObservation find_leader(
@@ -207,6 +259,84 @@ private:
         return std::clamp(proportional_cap, 0.0F, std::max(0.0F, movement.cruise_speed));
     }
 
+    void update_junction_reservations(std::vector<float>& external_speed_caps) {
+        for (ProceduralRoadTrafficInstance& instance : instances_) {
+            instance.reserved_junction = kInvalidProceduralRoadNodeId;
+            instance.blocked_junction = kInvalidProceduralRoadNodeId;
+        }
+        if (!junctions_.enabled) {
+            junction_reservations_.clear();
+            return;
+        }
+
+        reconcile_junction_reservations();
+        allocate_junction_reservations();
+
+        const float lookahead = std::max(0.0F, junctions_.request_lookahead);
+        for (std::size_t index = 0U; index < instances_.size(); ++index) {
+            ProceduralRoadTrafficInstance& instance = instances_[index];
+            const auto upcoming = instance.follower.upcoming_junction(lookahead);
+            if (!upcoming) continue;
+
+            const std::string_view owner = junction_owner(upcoming->node_id);
+            if (owner == instance.vehicle_id) {
+                instance.reserved_junction = upcoming->node_id;
+                continue;
+            }
+            if (owner.empty()) continue;
+
+            instance.blocked_junction = upcoming->node_id;
+            external_speed_caps[index] = std::min(
+                external_speed_caps[index],
+                junction_stop_speed_cap(upcoming->distance, instance.movement));
+        }
+    }
+
+    void reconcile_junction_reservations() {
+        std::erase_if(junction_reservations_, [&](const ProceduralRoadJunctionReservation& reservation) {
+            const ProceduralRoadTrafficInstance* owner = find(reservation.vehicle_id);
+            if (owner == nullptr) return true;
+            const auto upcoming = owner->follower.upcoming_junction();
+            return !upcoming || upcoming->node_id != reservation.node_id;
+        });
+    }
+
+    void allocate_junction_reservations() {
+        const float lookahead = std::max(0.0F, junctions_.request_lookahead);
+        std::vector<JunctionRequest> requests;
+        requests.reserve(instances_.size());
+        for (std::size_t index = 0U; index < instances_.size(); ++index) {
+            const auto upcoming = instances_[index].follower.upcoming_junction(lookahead);
+            if (!upcoming || upcoming->node_id == kInvalidProceduralRoadNodeId) continue;
+            if (!junction_owner(upcoming->node_id).empty()) continue;
+            requests.push_back({index, upcoming->node_id, upcoming->distance, upcoming->inside});
+        }
+
+        std::sort(requests.begin(), requests.end(), [&](const JunctionRequest& a, const JunctionRequest& b) {
+            if (a.inside != b.inside) return a.inside > b.inside;
+            if (std::fabs(a.distance - b.distance) > 0.0001F) return a.distance < b.distance;
+            return instances_[a.instance_index].vehicle_id < instances_[b.instance_index].vehicle_id;
+        });
+
+        for (const JunctionRequest& request : requests) {
+            if (!junction_owner(request.node_id).empty()) continue;
+            junction_reservations_.push_back({request.node_id, instances_[request.instance_index].vehicle_id});
+        }
+    }
+
+    [[nodiscard]] float junction_stop_speed_cap(
+        const float distance_to_junction,
+        const ProceduralRoadVehicleFollowerConfig& movement) const {
+        const float stop_buffer = std::max(0.0F, junctions_.stop_buffer);
+        const float available_distance = distance_to_junction - stop_buffer;
+        if (!(available_distance > 0.0F)) return 0.0F;
+        const float braking = std::max(0.05F, movement.braking);
+        const float kinematic_cap = std::sqrt(2.0F * braking * available_distance);
+        return std::clamp(kinematic_cap, 0.0F, std::max(0.0F, movement.cruise_speed));
+    }
+
     std::vector<ProceduralRoadTrafficInstance> instances_;
     ProceduralRoadTrafficFollowingConfig following_{};
+    ProceduralRoadJunctionReservationConfig junctions_{};
+    std::vector<ProceduralRoadJunctionReservation> junction_reservations_;
 };
