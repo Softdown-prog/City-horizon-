@@ -14,11 +14,7 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
     "--output",
-    "out/ch_blender_agent/residential.modern_apartment_4x4_01.final.001",
-    "--stage",
-    "final",
-    "--approval-proxy-sha",
-    "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18"
+    "out/ch_blender_agent/residential.modern_apartment_4x4_01.final.001"
   ],
   "outputDir": "out/ch_blender_agent/residential.modern_apartment_4x4_01.final.001"
 }
