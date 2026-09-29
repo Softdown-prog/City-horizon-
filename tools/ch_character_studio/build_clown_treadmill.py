@@ -317,6 +317,7 @@ def main() -> int:
         "visualScaleDamping": VISUAL_SCALE_DAMPING,
         "visualScaleClamp": [VISUAL_SCALE_MIN, VISUAL_SCALE_MAX],
         "motionMode": "treadmill_in_place",
+        "walkPolish": landmarks.get("walkPolish"),
         "worldTranslationDuringSpriteCycle": False,
         "groundAnchor": list(ANCHOR),
         "anchorInvariantPassed": invariant_ok,
