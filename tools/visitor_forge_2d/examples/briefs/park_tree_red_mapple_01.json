@@ -1,0 +1,16 @@
+{
+  "contract": "CH_2D_ART_BRIEF_V1",
+  "id": "park_tree_red_mapple_01",
+  "subject": "custom",
+  "template": "park_tree_red_mapple_golden_v1.json",
+  "seed": 41527,
+  "recipeUpdates": {
+    "broadleafStructure": {
+      "layout": "continuous",
+      "center": [128, 118],
+      "radius": [74, 88],
+      "masses": 62
+    },
+    "shadowWidth": 92
+  }
+}
