@@ -68,19 +68,21 @@ public:
         if (!valid_ || pose_.finished || !(dt_seconds > 0.0F)) return;
 
         const float target_speed = local_speed_limit(pose_, config);
-        if (pose_.speed < target_speed) {
-            pose_.speed = std::min(target_speed, pose_.speed + std::max(0.0F, config.acceleration) * dt_seconds);
-        } else if (pose_.speed > target_speed) {
-            pose_.speed = std::max(target_speed, pose_.speed - std::max(0.0F, config.braking) * dt_seconds);
+        float next_speed = pose_.speed;
+        if (next_speed < target_speed) {
+            next_speed = std::min(target_speed, next_speed + std::max(0.0F, config.acceleration) * dt_seconds);
+        } else if (next_speed > target_speed) {
+            next_speed = std::max(target_speed, next_speed - std::max(0.0F, config.braking) * dt_seconds);
         }
 
-        const float next_distance = std::min(route_length(), pose_.route_distance + pose_.speed * dt_seconds);
-        pose_ = pose_at_distance(next_distance);
-        pose_.speed = std::min(pose_.speed, local_speed_limit(pose_, config));
+        const float next_distance = std::min(route_length(), pose_.route_distance + next_speed * dt_seconds);
+        ProceduralRoadVehiclePose next_pose = pose_at_distance(next_distance);
+        next_pose.speed = std::min(next_speed, local_speed_limit(next_pose, config));
         if (next_distance >= route_length() - 0.00001F) {
-            pose_.finished = true;
-            pose_.speed = 0.0F;
+            next_pose.finished = true;
+            next_pose.speed = 0.0F;
         }
+        pose_ = next_pose;
     }
 
     [[nodiscard]] ProceduralRoadVehiclePose pose_at_distance(const float requested_distance) const {
