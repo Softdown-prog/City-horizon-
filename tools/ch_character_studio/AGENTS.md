@@ -9,8 +9,9 @@ This directory is the agent-facing entry point for City Horizon character art. D
 3. `contracts/ch_character_color_mask_v0.json`
 4. `contracts/ch_character_hand_socket_v0.json`
 5. `contracts/ch_character_photoshop_tools_v0.json`
-6. `palettes/ch_character_palette_v1.json`
-7. `workers/ch_character_workers_v0.json`
+6. `contracts/ch_character_layer_stack_v0.json`
+7. `palettes/ch_character_palette_v1.json`
+8. `workers/ch_character_workers_v0.json`
 
 Canonical runtime frame: `48x64`. Canonical ground anchor: `[24,60]`. Canonical runtime camera remains `CH_ACTOR_CAMERA_V1`.
 
@@ -18,7 +19,9 @@ Canonical runtime frame: `48x64`. Canonical ground anchor: `[24,60]`. Canonical 
 
 The Studio borrows productive image-editing concepts from Photoshop, but it is not a UI clone and must remain character-production focused.
 
-Stage 1 is implemented through `CH_CHARACTER_PHOTOSHOP_TOOLS_V0` and `photoshop_tools.js`:
+### Stage 1 — pixel editing
+
+Implemented through `CH_CHARACTER_PHOTOSHOP_TOOLS_V0` and `photoshop_tools.js`:
 
 - rectangular selection (`M`);
 - lasso selection (`L`);
@@ -31,9 +34,32 @@ Stage 1 is implemented through `CH_CHARACTER_PHOTOSHOP_TOOLS_V0` and `photoshop_
 - layer opacity;
 - layer blend modes.
 
-Selections and transforms affect only the active art layer. They must never move the character ground anchor, edit CH Actor motion, modify Blender landmarks, or become a substitute for pose editing.
+Selections and destructive transforms affect only the active art layer. They must never move the character ground anchor, edit CH Actor motion, modify Blender landmarks, or become a substitute for pose editing.
 
-Stage 2 is reserved for groups, layer masks, clipping masks, non-destructive transform state and duplicate/merge/flatten operations. Stage 3 is reserved for advanced brushes, gradients and tonal/color adjustment tools.
+### Stage 2 — advanced layer stack
+
+Implemented through `CH_CHARACTER_LAYER_STACK_V0`, `photoshop_layers_v2.js` and `photoshop_layers_v2_bridge.js`.
+
+The advanced stack provides:
+
+- Photoshop-style layer groups with visibility and group opacity;
+- layer masks linked to the layer transform;
+- mask creation from white or source alpha;
+- black/white mask painting and mask inversion;
+- clipping mask to the immediately previous visible stack entry;
+- non-destructive X/Y, scale, rotation and H/V flip state;
+- layer duplication;
+- safe merge that creates a new raster layer and hides, rather than deletes, its sources;
+- safe flatten that creates a flattened art layer while preserving hidden semantic sources;
+- restore-source operation;
+- per-frame stack state and independent stack undo/redo;
+- layer-mask PNG export and stack-metadata JSON export.
+
+The compatibility bridge keeps the main visible canvas equal to base + advanced art. This is important because older tools such as eyedropper and color-mask coverage must continue reading the visible final character rather than only the Blender underlay.
+
+Canonical semantic layers remain authoritative. Do not permanently collapse `skin`, `hair`, clothing or other semantic layers merely to simplify a one-off art operation. Use safe merge/flatten for review and raster validation while preserving the source stack.
+
+Stage 3 remains reserved for brush presets, brush spacing/flow, symmetry, gradients and tonal/color adjustments.
 
 ## Deterministic workers / subagent handoff
 
@@ -117,7 +143,9 @@ Use stable IDs from `CH_CHARACTER_PALETTE_V1` when possible. Families include sk
 
 ## Mask rules
 
-There are three independent RGB banks: appearance, clothing and held object. Alpha is coverage only. Never put lighting, AO, outline or dithering into masks.
+There are three independent RGB recolor banks: appearance, clothing and held object. Alpha is coverage only. Never put lighting, AO, outline or dithering into those recolor masks.
+
+Layer masks are a separate Photoshop-reference concept. Their alpha represents visibility for one art layer and must never be confused with the RGB recolor-mask banks.
 
 ## Stop conditions
 
@@ -128,7 +156,9 @@ Stop and report instead of improvising if:
 - support foot is more than 10 px from the ground anchor without a justified airborne pose;
 - inspection output is being used as runtime output;
 - a worker packet asks an agent to edit outside its `mayEdit` scope;
-- mask and visual transforms differ;
+- recolor mask and visual transforms differ;
 - a held object changes approved hand motion;
 - a Photoshop-reference transform is being used to alter body pose instead of appearance;
-- a selection/transform operation writes outside the active art layer.
+- a selection/transform operation writes outside the active art layer;
+- a layer mask is mistaken for an appearance/clothing/object recolor mask;
+- safe merge/flatten is used as a reason to delete the canonical semantic source layers.
