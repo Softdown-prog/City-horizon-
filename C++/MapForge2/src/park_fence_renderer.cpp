@@ -1,5 +1,6 @@
 #include "park_fence_renderer.h"
 
+#include "authoring_projection.h"
 #include "procedural_2d_primitives.h"
 
 #include <QFont>
@@ -18,27 +19,21 @@ struct LocalPoint {
     qreal y = 0.0;
 };
 
-LocalPoint rotateLocal(LocalPoint point, const ParkFenceRotation rotation) {
-    switch (rotation) {
-        case ParkFenceRotation::South: return point;
-        case ParkFenceRotation::East: return {-point.y, point.x};
-        case ParkFenceRotation::North: return {-point.x, -point.y};
-        case ParkFenceRotation::West: return {point.y, -point.x};
-    }
-    return point;
-}
-
-QPointF projectLocal(const LocalPoint point, const qreal z_px, const QPointF& origin) {
-    return {
-        origin.x() + (point.x - point.y) * (ParkFenceRenderer::kTileWidthPx * 0.5),
-        origin.y() + (point.x + point.y) * (ParkFenceRenderer::kTileHeightPx * 0.5) - z_px,
-    };
+QPointF projectLocal(const LocalPoint point, const qreal z_px,
+                     const ParkFenceRotation rotation, const QPointF& origin) {
+    return projectAuthoringPixelElevation(
+        static_cast<float>(point.x),
+        static_cast<float>(point.y),
+        static_cast<float>(z_px),
+        static_cast<int>(rotation),
+        QSizeF(),
+        origin);
 }
 
 qreal screenLength(const LocalPoint a, const LocalPoint b,
                    const ParkFenceRotation rotation, const QPointF& origin) {
-    const QPointF pa = projectLocal(rotateLocal(a, rotation), 0.0, origin);
-    const QPointF pb = projectLocal(rotateLocal(b, rotation), 0.0, origin);
+    const QPointF pa = projectLocal(a, 0.0, rotation, origin);
+    const QPointF pb = projectLocal(b, 0.0, rotation, origin);
     return std::hypot(pb.x() - pa.x(), pb.y() - pa.y());
 }
 
@@ -46,11 +41,10 @@ LocalPoint lerpLocal(const LocalPoint a, const LocalPoint b, const qreal t) {
     return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
 }
 
-void drawPost(QPainter& painter, const ParkFenceSpec& spec, LocalPoint point,
+void drawPost(QPainter& painter, const ParkFenceSpec& spec, const LocalPoint point,
               const ParkFenceRotation rotation, const QPointF& origin) {
-    point = rotateLocal(point, rotation);
-    const QPointF ground = projectLocal(point, 0.0, origin);
-    const QPointF top = projectLocal(point, spec.post_height_px, origin);
+    const QPointF ground = projectLocal(point, 0.0, rotation, origin);
+    const QPointF top = projectLocal(point, spec.post_height_px, rotation, origin);
 
     using namespace procedural2d;
     const qreal width = spec.post_width_px;
@@ -80,9 +74,8 @@ void drawPost(QPainter& painter, const ParkFenceSpec& spec, LocalPoint point,
 void drawSpear(QPainter& painter, const ParkFenceSpec& spec, const LocalPoint point,
                const ParkFenceRotation rotation, const QPointF& origin,
                const qreal height_px) {
-    const LocalPoint rotated = rotateLocal(point, rotation);
-    const QPointF top = projectLocal(rotated, height_px, origin);
-    const QPointF tip = projectLocal(rotated, height_px + spec.spear_height_px, origin);
+    const QPointF top = projectLocal(point, height_px, rotation, origin);
+    const QPointF tip = projectLocal(point, height_px + spec.spear_height_px, rotation, origin);
     const qreal half = std::max<qreal>(1.4, spec.picket_width_px * 1.15);
 
     procedural2d::polygon(
@@ -96,23 +89,22 @@ void drawSpan(QPainter& painter, const ParkFenceSpec& spec, const LocalPoint a,
               const QPointF& origin, const qreal height_scale = 1.0) {
     using namespace procedural2d;
 
-    const LocalPoint ar = rotateLocal(a, rotation);
-    const LocalPoint br = rotateLocal(b, rotation);
     const qreal fence_h = spec.fence_height_px * height_scale;
 
-    const QPointF ground_a = projectLocal(ar, 0.0, origin);
-    const QPointF ground_b = projectLocal(br, 0.0, origin);
+    const QPointF ground_a = projectLocal(a, 0.0, rotation, origin);
+    const QPointF ground_b = projectLocal(b, 0.0, rotation, origin);
     polyline(painter,
              QPolygonF{ground_a + QPointF(3.0, 4.0), ground_b + QPointF(3.0, 4.0)},
              {spec.shadow, 5.0, Qt::RoundCap, Qt::RoundJoin});
 
     for (const qreal rail_z : {fence_h * 0.34, fence_h * 0.78}) {
         polyline(painter,
-                 QPolygonF{projectLocal(ar, rail_z, origin), projectLocal(br, rail_z, origin)},
+                 QPolygonF{projectLocal(a, rail_z, rotation, origin),
+                           projectLocal(b, rail_z, rotation, origin)},
                  {spec.metal_shadow, spec.rail_width_px + 1.25, Qt::RoundCap, Qt::RoundJoin});
         polyline(painter,
-                 QPolygonF{projectLocal(ar, rail_z + 0.8, origin),
-                           projectLocal(br, rail_z + 0.8, origin)},
+                 QPolygonF{projectLocal(a, rail_z + 0.8, rotation, origin),
+                           projectLocal(b, rail_z + 0.8, rotation, origin)},
                  {spec.metal_light, spec.rail_width_px * 0.55, Qt::RoundCap, Qt::RoundJoin});
     }
 
@@ -120,12 +112,12 @@ void drawSpan(QPainter& painter, const ParkFenceSpec& spec, const LocalPoint a,
     const int count = std::max(2, static_cast<int>(std::floor(length / spec.picket_spacing_px)));
     for (int index = 1; index < count; ++index) {
         const qreal t = static_cast<qreal>(index) / static_cast<qreal>(count);
-        const LocalPoint p = rotateLocal(lerpLocal(a, b, t), rotation);
-        const QPointF bottom = projectLocal(p, 3.5, origin);
-        const QPointF top = projectLocal(p, fence_h, origin);
+        const LocalPoint p = lerpLocal(a, b, t);
+        const QPointF bottom = projectLocal(p, 3.5, rotation, origin);
+        const QPointF top = projectLocal(p, fence_h, rotation, origin);
         capsule(painter, bottom, top, spec.picket_width_px * 0.5,
                 {spec.metal, {QColor(5, 18, 14, 210), 0.5}});
-        drawSpear(painter, spec, lerpLocal(a, b, t), rotation, origin, fence_h);
+        drawSpear(painter, spec, p, rotation, origin, fence_h);
     }
 }
 
@@ -151,10 +143,8 @@ void drawGate(QPainter& painter, const ParkFenceSpec& spec,
     drawPost(painter, spec, gate_b, rotation, origin);
     drawPost(painter, spec, outer_b, rotation, origin);
 
-    const QPointF latch_a = projectLocal(rotateLocal(leaf_a_end, rotation),
-                                         spec.fence_height_px * 0.43, origin);
-    const QPointF latch_b = projectLocal(rotateLocal(leaf_b_end, rotation),
-                                         spec.fence_height_px * 0.43, origin);
+    const QPointF latch_a = projectLocal(leaf_a_end, spec.fence_height_px * 0.43, rotation, origin);
+    const QPointF latch_b = projectLocal(leaf_b_end, spec.fence_height_px * 0.43, rotation, origin);
     procedural2d::circle(painter, latch_a, 1.9,
                          {QColor("#b39a58"), {QColor(70, 55, 27, 210), 0.6}});
     procedural2d::circle(painter, latch_b, 1.9,
@@ -163,7 +153,7 @@ void drawGate(QPainter& painter, const ParkFenceSpec& spec,
 
 void drawTee(QPainter& painter, const ParkFenceSpec& spec,
              const ParkFenceRotation rotation, const QPointF& origin) {
-    // Canonical tee connects West + East + South; rotation moves the open side.
+    // Canonical tee connects West + East + South; camera rotation moves the open side.
     const LocalPoint center{0.0, 0.0};
     const LocalPoint west{-0.50, 0.0};
     const LocalPoint east{0.50, 0.0};
@@ -191,6 +181,15 @@ void drawCross(QPainter& painter, const ParkFenceSpec& spec,
         drawPost(painter, spec, end, rotation, origin);
     }
     drawPost(painter, spec, center, rotation, origin);
+}
+
+QPolygonF canonicalTileDiamond(const QPointF& center) {
+    return QPolygonF{
+        projectLocal({-0.5, -0.5}, 0.0, ParkFenceRotation::South, center),
+        projectLocal({0.5, -0.5}, 0.0, ParkFenceRotation::South, center),
+        projectLocal({0.5, 0.5}, 0.0, ParkFenceRotation::South, center),
+        projectLocal({-0.5, 0.5}, 0.0, ParkFenceRotation::South, center),
+    };
 }
 
 const char* pieceLabel(const ParkFencePiece piece) {
@@ -307,13 +306,7 @@ QImage ParkFenceRenderer::renderReviewSheet(const ParkFenceSpec& spec, const QSi
                              ((row + column) & 1) ? QColor("#789c65") : QColor("#739660"));
 
             const QPointF center(cell_rect.center().x(), cell_rect.center().y() + 18.0);
-            const QPolygonF diamond{
-                center + QPointF(0.0, -32.0),
-                center + QPointF(64.0, 0.0),
-                center + QPointF(0.0, 32.0),
-                center + QPointF(-64.0, 0.0),
-            };
-            procedural2d::polygon(painter, diamond,
+            procedural2d::polygon(painter, canonicalTileDiamond(center),
                                   {QColor(126, 159, 101, 210),
                                    {QColor(73, 105, 63, 120), 1.0}});
 
