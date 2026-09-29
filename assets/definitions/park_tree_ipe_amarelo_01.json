@@ -1,0 +1,36 @@
+{
+  "id": "park_tree_ipe_amarelo_01",
+  "name": "Ipe Amarelo",
+  "category": "decor",
+  "texture": "assets/tree/park_tree_ipe_amarelo_01_south.png",
+  "sprites": {
+    "0": "assets/tree/park_tree_ipe_amarelo_01_south.png",
+    "1": "assets/tree/park_tree_ipe_amarelo_01_west.png",
+    "2": "assets/tree/park_tree_ipe_amarelo_01_north.png",
+    "3": "assets/tree/park_tree_ipe_amarelo_01_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 1,
+    "height": 1
+  },
+  "buildCost": 105,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.971875
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_authored_2d",
+  "sourceRecipe": "tools/visitor_forge_2d/examples/park_tree_ipe_amarelo_01.json",
+  "exportTool": "visitor_forge_2d.core.source_tree_converter",
+  "cameraContract": "CH_CAMERA_V1",
+  "rotationContract": "CH_2D_ROTATION_BUNDLE_V1"
+}
