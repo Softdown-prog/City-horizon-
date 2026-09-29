@@ -1,28 +1,59 @@
 # City Horizon UI Nine-Slice Contract
 
-## Status
+## Canonical window contract
 
-The reusable runtime infrastructure is available in `src/ui_nine_slice.h`.
+`CH_WINDOW_FRAME_V2` is the canonical resizable-window frame for City Horizon.
 
-The V2 reference-derived skin is now promoted from a catalog-only asset to the reusable window pilot:
+New standard UI windows should reference the contract instead of hard-coding the physical PNG name or border values. The runtime constants live in `src/ui_nine_slice.h`:
 
-- skin: `assets/ui/chrome/panel_window_9slice_v2.png`;
+- contract id: `CH_WINDOW_FRAME_V2`;
+- asset stem: `panel_window_9slice_v2`;
+- physical skin: `assets/ui/chrome/panel_window_9slice_v2.png`;
 - source size: 192x192;
 - insets: 32 / 32 / 32 / 32 pixels;
-- center patch: transparent, so runtime content and the procedural fallback remain visible;
-- filtering: nearest-neighbor for this skin to avoid an extra blur pass;
-- construction catalog hook: `src/ui_build_panel_nine_slice.inl`;
-- modal hook: `src/ui_window_nine_slice.inl`;
-- first modal migration: Pause, Settings and Administration;
-- registry entry: `panel_window_nine_slice` in `assets/ui/ui_asset_catalog.json`.
+- filtering: nearest-neighbor;
+- center patch: transparent, preserving runtime content and the procedural fallback beneath it.
 
-The original V1 and build-catalog V2 files remain in the repository as rollback/reference points. Runtime rendering now uses the generic `panel_window_9slice_v2.png` asset so the same authored corners and borders are not maintained in multiple places.
+The physical filename remains stable for compatibility, while `CH_WINDOW_FRAME_V2` is the semantic contract used by new UI work.
 
-This remains an incremental migration. The procedural SDL panel stays underneath every migrated window. A missing or invalid skin therefore leaves the interface usable instead of removing the window background.
+## Default usage
+
+Use `CH_WINDOW_FRAME_V2` by default for:
+
+- instruction windows;
+- help windows;
+- information screens presented as windows;
+- tutorial steps/cards that use a standard modal or resizable panel;
+- alerts and ordinary confirmation dialogs;
+- objectives/details windows;
+- standard reports and management windows;
+- other resizable modal windows that do not require a deliberately unique art direction.
+
+Existing runtime usages include the construction catalog, Pause, Settings, Administration, Reports, Save/Load, Main Menu and Quit Confirmation.
+
+Do **not** force this contract onto every UI element. HUD strips, compact tooltips, fixed-size buttons, loading screens, splash screens, credits and deliberately full-screen illustrated tutorials may use dedicated layouts. Standard windows/cards inside those screens may still use `CH_WINDOW_FRAME_V2`.
+
+## Runtime behavior
+
+The reusable renderer is available in `src/ui_nine_slice.h`.
+
+`ch::ui::make_nine_slice_regions(...)` calculates the nine source/destination rectangles and `ch::ui::render_nine_slice(...)` renders them through SDL3 `SDL_RenderTexture`.
+
+The canonical constants are:
+
+- `ch::ui::kWindowFrameV2ContractId`;
+- `ch::ui::kWindowFrameV2AssetStem`;
+- `ch::ui::kWindowFrameV2Insets`;
+- `ch::ui::kWindowFrameV2MinimumWidth`;
+- `ch::ui::kWindowFrameV2MinimumHeight`.
+
+`src/ui_build_panel_nine_slice.inl` and `src/ui_window_nine_slice.inl` consume these constants directly, so the runtime has one source of truth for the asset and border contract.
+
+The procedural SDL panel remains underneath migrated windows as a fallback/background. A missing or invalid skin therefore leaves the interface usable instead of removing the window background.
 
 ## Why nine-slice
 
-City Horizon uses panels, dialogs, catalog windows, contextual building cards and HUD elements whose dimensions vary with viewport size and content. Scaling one complete raster frame would distort corners, bevels and borders.
+City Horizon uses panels, dialogs, catalog windows, contextual building cards and other windows whose dimensions vary with viewport size and content. Scaling one complete raster frame would distort corners, bevels and borders.
 
 Nine-slice divides a source texture into a 3x3 grid:
 
@@ -34,32 +65,20 @@ BOTTOM_LEFT  BOTTOM    BOTTOM_RIGHT
 
 The four corners preserve their authored shape. Horizontal edges stretch only horizontally, vertical edges stretch only vertically, and the center fills the remaining space.
 
-## Runtime API
+If source margins exceed the source texture size, the renderer clamps them proportionally. If a destination becomes smaller than the combined border widths/heights, destination borders compress proportionally and the center safely collapses instead of producing negative rectangles.
 
-`ch::ui::make_nine_slice_regions(...)` calculates the nine source/destination rectangles.
+## Asset registry
 
-`ch::ui::render_nine_slice(...)` renders those regions with SDL3 `SDL_RenderTexture`.
+`assets/ui/ui_asset_catalog.json` registers `panel_window_nine_slice` with `contract_id: CH_WINDOW_FRAME_V2`, its runtime usages, and the categories for which it is the default frame.
 
-The source insets are supplied as left/top/right/bottom pixel margins. If invalid source margins exceed the source texture size, they are clamped proportionally. If a destination becomes smaller than the combined border widths/heights, the destination borders compress proportionally and the center safely collapses instead of producing negative rectangles.
-
-## Migration rule
-
-Do not convert every UI element at once.
-
-1. Validate the construction catalog plus Pause, Settings and Administration at normal gameplay scale.
-2. Adjust only the shared skin/insets if a concrete visual defect appears in all migrated windows.
-3. Keep the current procedural panel as fallback while the skin remains a pilot.
-4. After approval, extend the same frame to Reports, Save/Load, Main Menu and confirmation dialogs where their proportions remain compatible.
-5. Only then consider specialized variants for HUD, compact controls or themed panels.
-
-Use nine-slice for resizable panels and dialogs. Fixed-height controls that only change width may later use the same infrastructure as a three-slice by setting unused margins to zero rather than introducing a second renderer.
+The old construction-catalog entry remains as a compatibility alias to the same physical asset and contract.
 
 ## Tests and visual proof
 
 `src/ui_manager_test.cpp` verifies normal nine-slice geometry and compact destinations where borders must compress and the center collapses.
 
-`src/ui_visual_capture.cpp` covers the existing catalog/settings interaction proof.
+`src/ui_visual_capture.cpp` covers catalog/settings interaction proof.
 
-`src/ui_modal_visual_capture.cpp` renders deterministic Pause, Settings and Administration screenshots through the production `GameplayUi` renderer. The focused Windows workflow requires all modal captures before publishing the `City-Builder-UI-Visual-Proof` artifact.
+`src/ui_modal_visual_capture.cpp` renders deterministic modal screenshots through the production `GameplayUi` renderer. The focused Windows workflow publishes the `City-Builder-UI-Visual-Proof` artifact independently of the full runtime build, so unrelated runtime compile failures do not block UI visual validation.
 
-Geometry and file-existence checks do not approve artwork. The shared V2 skin remains `pilot_v2` until the generated gameplay-scale captures are visually reviewed.
+The V2 frame is a runtime-standard component. New screens using `CH_WINDOW_FRAME_V2` still require gameplay-scale visual review when their proportions or content layout are materially different from the already validated windows.
