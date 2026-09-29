@@ -29,10 +29,12 @@
     "artSkinning": "rigid_segmented_bone_skinning",
     "legacyWeightedLandmarkWarpAllowed": false,
     "walkPolish": {
-      "version": "V3_foot_polish",
-      "goal": "same approved walk with calmer clown shoes and smoother ground contact",
+      "version": "V4_leg_polish",
+      "goal": "keep V3 shoes while making thigh and shin articulation calmer and more natural",
       "legVerticalGain": 0.86,
-      "kneeLiftGain": 0.88,
+      "kneeLiftGain": 0.78,
+      "kneeDepthFollow": 0.34,
+      "kneeForwardBend": 0.020,
       "ankleLiftGain": 0.84,
       "footLiftGain": 0.74,
       "bodyBobGain": 0.75,
@@ -40,15 +42,16 @@
       "armElbowGain": 0.94,
       "footLiftEasing": "smoothstep_positive_half_wave",
       "horizontalStridePreserved": true,
+      "v3FootPathPreserved": true,
       "frameTimingPreserved": true,
       "anchorPreserved": true
     },
     "shoePolish": {
+      "renderer": "V3_rigid_shoe",
       "scale": 1.0,
       "rotationDamping": 0.28,
       "rotationLimitDeg": 16.0,
-      "pivot": "ankle",
-      "visualAndMaskShareTransform": true
+      "pivot": "ankle"
     }
   },
   "authoring": {
@@ -74,22 +77,22 @@
   "walkPreview": {
     "status": "candidate_for_visual_review",
     "mode": "treadmill_in_place",
-    "polish": "V3_foot_polish",
+    "polish": "V4_leg_polish",
     "buildCommand": "python tools/ch_character_studio/build_clown_treadmill_v3.py --seed 1337",
     "outputGif": "out/ch_character_studio/clown_01/south_walk_v3/clown_01_s_walk_foot_polish_v3.gif",
     "outputStrip": "out/ch_character_studio/clown_01/south_walk_v3/clown_01_s_walk_foot_polish_v3_strip.png",
-    "transferVersion": "CH_CLOWN_TREADMILL_WALK_V3",
+    "transferVersion": "segmented_body_with_V3_rigid_shoe_and_V4_leg_landmarks",
     "requiredInvariants": [
       "all_8_frames_share_ground_anchor_24_60",
       "all_8_frames_have_root_translation_0_0",
       "sprite_does_not_advance_inside_frame",
       "runtime_world_motion_is_separate",
       "painted_limbs_are_rigid_segmented_not_rubber_warped",
-      "approved_actor_joint_deltas_remain_authoritative",
+      "approved_actor_timing_remains_authoritative",
       "horizontal_stride_is_preserved",
-      "shoe_scale_remains_one",
-      "shoe_rotation_is_damped_and_limited",
-      "shoe_visual_and_clothing_mask_use_the_same_transform"
+      "v3_shoe_path_and_rotation_limits_are_preserved",
+      "knee_depth_excursion_is_reduced_without_shortening_foot_stride",
+      "knee_lift_is_lower_and_smoother"
     ]
   },
   "appearance": {
