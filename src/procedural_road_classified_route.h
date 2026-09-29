@@ -11,19 +11,12 @@
 // segment-id catalog. Existing unclassified route sampling remains unchanged.
 class ProceduralRoadClassifiedRouteSampler {
 public:
-    [[nodiscard]] static std::optional<std::vector<ProceduralRoadRoutePoint>> sample_right_hand_route(
+    static void annotate(
         const ProceduralRoadGraph& graph,
-        const ProceduralRoadRoute& route,
         const ProceduralRoadClassCatalog& classes,
-        const float lane_offset,
-        const int samples_per_segment = 24,
-        const int samples_per_connector = 12) {
-        auto sampled = ProceduralRoadRouteSampler::sample_right_hand_route(
-            graph, route, lane_offset, samples_per_segment, samples_per_connector);
-        if (!sampled) return std::nullopt;
-
+        std::vector<ProceduralRoadRoutePoint>& sampled) {
         ProceduralRoadClass incoming_class = ProceduralRoadClass::unspecified;
-        for (ProceduralRoadRoutePoint& point : *sampled) {
+        for (ProceduralRoadRoutePoint& point : sampled) {
             if (point.kind == ProceduralRoadRoutePointKind::lane &&
                 point.segment_id != kInvalidProceduralRoadSegmentId) {
                 incoming_class = classes.road_class(graph, point.segment_id);
@@ -38,6 +31,19 @@ public:
                 point.road_class = incoming_class;
             }
         }
+    }
+
+    [[nodiscard]] static std::optional<std::vector<ProceduralRoadRoutePoint>> sample_right_hand_route(
+        const ProceduralRoadGraph& graph,
+        const ProceduralRoadRoute& route,
+        const ProceduralRoadClassCatalog& classes,
+        const float lane_offset,
+        const int samples_per_segment = 24,
+        const int samples_per_connector = 12) {
+        auto sampled = ProceduralRoadRouteSampler::sample_right_hand_route(
+            graph, route, lane_offset, samples_per_segment, samples_per_connector);
+        if (!sampled) return std::nullopt;
+        annotate(graph, classes, *sampled);
         return sampled;
     }
 };
