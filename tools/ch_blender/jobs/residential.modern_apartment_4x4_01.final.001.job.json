@@ -4,6 +4,9 @@
   "operation": "guarded_blender_script",
   "script": "tools/tycoon_photo_studio/refine_residential_modern_apartment_v2.py",
   "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true
+  },
   "args": [
     "--recipe",
     "tools/tycoon_photo_studio/assets/residential_modern_apartment_4x4_01.apartment.json",
