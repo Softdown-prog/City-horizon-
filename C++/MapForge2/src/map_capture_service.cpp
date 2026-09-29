@@ -1,4 +1,6 @@
 #include "map_capture_service.h"
+#include "engine_projection_adapter.h"
+#include "src/ch_core/contracts.h"
 #include "src/ch_core/projection.h"
 
 #include <QColor>
@@ -54,6 +56,12 @@ QPointF pairOr(const QJsonObject& object, const char* key, const QPointF& fallba
     return QPointF(values.at(0).toDouble(fallback.x()), values.at(1).toDouble(fallback.y()));
 }
 
+ch::CameraRotation cameraRotationOr(const QJsonObject& cameraSpec) {
+    int turns = cameraSpec.value("rotationQuarterTurns").toInt(0) % 4;
+    if (turns < 0) turns += 4;
+    return static_cast<ch::CameraRotation>(turns);
+}
+
 QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
                       const int width, const int height) {
     const auto a = ch::world_to_screen_point(static_cast<float>(x), static_cast<float>(y), camera, width, height);
@@ -75,17 +83,20 @@ void drawGroundTileSprite(QPainter& painter, const QImage& sprite, const QPointF
 }
 
 void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const QPointF& tile,
-                       const ch::CameraState& camera, const int width, const int height,
+                       const float worldZ, const ch::CameraState& camera, const int width, const int height,
                        const float scale, const QPointF& offsetPixels) {
     const auto anchor = opaqueBottomAnchor(sprite);
     if (!anchor) return;
-    const auto ground = ch::world_to_screen_point(static_cast<float>(tile.x()) + 0.5F,
-                                                  static_cast<float>(tile.y()) + 0.5F,
-                                                  camera, width, height);
+    const QPointF ground = EngineProjectionAdapter::worldToScreen(
+        static_cast<float>(tile.x()) + 0.5F,
+        static_cast<float>(tile.y()) + 0.5F,
+        worldZ,
+        camera,
+        QSizeF(width, height));
     const QSizeF targetSize(sprite.width() * scale, sprite.height() * scale);
     const QPointF targetAnchor(anchor->x() * scale, anchor->y() * scale);
-    const QRectF target(QPointF(ground.x - targetAnchor.x() + offsetPixels.x(),
-                               ground.y - targetAnchor.y() + offsetPixels.y()), targetSize);
+    const QRectF target(QPointF(ground.x() - targetAnchor.x() + offsetPixels.x(),
+                               ground.y() - targetAnchor.y() + offsetPixels.y()), targetSize);
     painter.drawImage(target, sprite);
 }
 
@@ -97,9 +108,6 @@ void drawPortalMarker(QPainter& painter, const QJsonObject& portal,
     const int tileY = static_cast<int>(tile.y());
     const QColor accent = colorOr(portal, "color", QColor(255, 192, 62, 245));
 
-    // Show only a short approach outside the starter parcel. The road belongs to
-    // the world connection, not to the player's buildable land, so it never steals
-    // useful starter tiles or crosses locked expansion parcels.
     const bool drawApproach = portal.value("drawApproach").toBool(true);
     if (drawApproach) {
         const QPolygonF outside = tilePolygon(tileX - 1, tileY, camera, width, height);
@@ -113,9 +121,6 @@ void drawPortalMarker(QPainter& painter, const QJsonObject& portal,
         painter.drawLine(leftMid, rightMid);
     }
 
-    // Connection tile receives a restrained edge highlight rather than a debug
-    // crosshair. The highlight is useful in capture/tutorial material but reads
-    // as a gateway, not an editor gizmo.
     const QPolygonF polygon = tilePolygon(tileX, tileY, camera, width, height);
     QPen portalPen(accent);
     portalPen.setWidthF(2.2);
@@ -127,7 +132,6 @@ void drawPortalMarker(QPainter& painter, const QJsonObject& portal,
                                                    static_cast<float>(tile.y()) + 0.36F,
                                                    camera, width, height);
 
-    // Small roadside sign mounted just outside the parcel boundary.
     const QRectF sign(center.x - 78.0, center.y - 78.0, 156.0, 48.0);
     painter.setPen(QPen(QColor(216, 225, 218, 255), 2.0));
     painter.setBrush(QColor(28, 92, 79, 248));
@@ -198,6 +202,12 @@ MapCaptureResult runMapCapture(const QString& output_path,
     const QJsonObject candidateSpec = capture.value("candidate").toObject();
     const QJsonObject portalSpec = capture.value("portal").toObject();
 
+    const QString requestedCameraContract = cameraSpec.value("contract").toString();
+    if (!requestedCameraContract.isEmpty()
+        && requestedCameraContract != QString::fromLatin1(ch::contracts::kCameraContract)) {
+        return fail(8, QStringLiteral("capture camera contract mismatch: %1").arg(requestedCameraContract));
+    }
+
     const int width = std::clamp(canvas.value("width").toInt(1024), 320, 4096);
     const int height = std::clamp(canvas.value("height").toInt(768), 240, 4096);
     const QImage candidate(candidate_path);
@@ -208,7 +218,7 @@ MapCaptureResult runMapCapture(const QString& output_path,
 
     ch::CameraState camera{};
     camera.zoom = static_cast<float>(cameraSpec.value("zoom").toDouble(0.92));
-    camera.rotation = ch::CameraRotation::r0;
+    camera.rotation = cameraRotationOr(cameraSpec);
 
     const QPointF focusTile = pairOr(cameraSpec, "focusTile", QPointF(0.0, 0.0));
     const QPointF focusScreen = pairOr(cameraSpec, "focusScreen", QPointF(0.5, 0.57));
@@ -259,6 +269,7 @@ MapCaptureResult runMapCapture(const QString& output_path,
     const QPointF candidateTile = pairOr(candidateSpec, "tile", QPointF(0.0, 0.0));
     const QPointF footprint = pairOr(candidateSpec, "footprint", QPointF(1.0, 1.0));
     const QJsonArray tileList = candidateSpec.value("tiles").toArray();
+    const float candidateElevation = static_cast<float>(candidateSpec.value("elevationWorld").toDouble(0.0));
     const bool showFootprint = candidateSpec.value("showFootprint").toBool(true);
     if (showFootprint) {
         QPen footprintPen(colorOr(candidateSpec, "footprintColor", QColor(246, 196, 72, 210)));
@@ -289,17 +300,21 @@ MapCaptureResult runMapCapture(const QString& output_path,
     } else if (candidateSpec.value("renderAsGroundTile").toBool(false)) {
         drawGroundTileSprite(painter, candidate, candidateTile, camera, width, height);
     } else {
-        drawAnchoredSprite(painter, candidate, candidateTile, camera, width, height, scale, offsetPixels);
+        drawAnchoredSprite(painter, candidate, candidateTile, candidateElevation,
+                           camera, width, height, scale, offsetPixels);
     }
 
     drawPortalMarker(painter, portalSpec, camera, width, height);
 
     if (candidateSpec.value("showAnchor").toBool(true)) {
-        const auto ground = ch::world_to_screen_point(static_cast<float>(candidateTile.x()) + 0.5F,
-                                                      static_cast<float>(candidateTile.y()) + 0.5F,
-                                                      camera, width, height);
+        const QPointF ground = EngineProjectionAdapter::worldToScreen(
+            static_cast<float>(candidateTile.x()) + 0.5F,
+            static_cast<float>(candidateTile.y()) + 0.5F,
+            candidateElevation,
+            camera,
+            QSizeF(width, height));
         painter.setPen(colorOr(candidateSpec, "anchorColor", QColor(255, 214, 64, 230)));
-        painter.drawPoint(QPointF(ground.x, ground.y));
+        painter.drawPoint(ground);
     }
     painter.end();
 
