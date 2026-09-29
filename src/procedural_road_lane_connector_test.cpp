@@ -1,5 +1,6 @@
 #include "procedural_road_lane_connector.h"
 #include "procedural_road_route_sampler.h"
+#include "procedural_road_traffic.h"
 #include "procedural_road_vehicle_follower.h"
 #include "procedural_road_vehicle_render_adapter.h"
 
@@ -83,6 +84,19 @@ std::vector<ProceduralRoadRoutePoint> build_sampled_vehicle_route() {
     return *sampled;
 }
 
+ProceduralRoadVehicleVisual test_vehicle_visual() {
+    ProceduralRoadVehicleVisual visual;
+    visual.sprite_south = "south.png";
+    visual.sprite_east = "east.png";
+    visual.sprite_north = "north.png";
+    visual.sprite_west = "west.png";
+    visual.animation_set_id = "vehicle.test";
+    visual.art_scale = 0.42F;
+    visual.sprite_anchor_x = 0.50F;
+    visual.sprite_anchor_y = 0.91F;
+    return visual;
+}
+
 void test_continuous_route_across_two_junctions() {
     const auto sampled = build_sampled_vehicle_route();
 
@@ -153,16 +167,7 @@ void test_vehicle_render_adapter_preserves_pose_and_logical_direction() {
     assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({0.2F, 1.0F, 0.0F}) == MobileEntityDirection::south);
     assert(ProceduralRoadVehicleRenderAdapter::direction_from_forward({0.2F, -1.0F, 0.0F}) == MobileEntityDirection::north);
 
-    ProceduralRoadVehicleVisual visual;
-    visual.sprite_south = "south.png";
-    visual.sprite_east = "east.png";
-    visual.sprite_north = "north.png";
-    visual.sprite_west = "west.png";
-    visual.animation_set_id = "vehicle.test";
-    visual.art_scale = 0.42F;
-    visual.sprite_anchor_x = 0.50F;
-    visual.sprite_anchor_y = 0.91F;
-
+    const ProceduralRoadVehicleVisual visual = test_vehicle_visual();
     ProceduralRoadVehiclePose pose;
     pose.position = {3.25F, 5.75F, 1.60F};
     pose.forward = {0.9F, 0.1F, 0.0F};
@@ -185,6 +190,50 @@ void test_vehicle_render_adapter_preserves_pose_and_logical_direction() {
     assert(near_value(entity.spatial.ground_anchor_y, 0.0F));
     assert(near_value(entity.art_scale, 0.42F));
     assert(near_value(entity.sprite_anchor_y, 0.91F));
+}
+
+void test_procedural_traffic_manager_owns_and_renders_followers() {
+    ProceduralRoadTrafficManager traffic;
+    ProceduralRoadVehicleFollowerConfig config;
+    config.cruise_speed = 1.45F;
+    config.junction_speed = 0.82F;
+    config.turn_speed = 0.62F;
+    config.acceleration = 2.0F;
+    config.braking = 4.0F;
+
+    assert(traffic.add("car.1", build_sampled_vehicle_route(), test_vehicle_visual(), config));
+    assert(!traffic.add("car.1", build_sampled_vehicle_route(), test_vehicle_visual(), config));
+    assert(traffic.size() == 1U);
+    assert(traffic.contains("car.1"));
+    assert(traffic.find("car.1") != nullptr);
+
+    auto render = traffic.render_entities();
+    assert(render.size() == 1U);
+    assert(render.front().logical_state == "stopped");
+    assert(render.front().animation_set_id == "vehicle.test");
+
+    traffic.update_tick(0.10F);
+    render = traffic.render_entities();
+    assert(render.front().logical_state == "moving");
+
+    bool saw_elevation = false;
+    int guard = 0;
+    while (guard++ < 4000) {
+        traffic.update_tick(0.05F);
+        render = traffic.render_entities();
+        assert(render.size() == 1U);
+        if (render.front().spatial.visual_world_z > 1.0F) saw_elevation = true;
+        const auto* instance = traffic.find("car.1");
+        assert(instance != nullptr);
+        if (instance->follower.pose().finished) break;
+    }
+    assert(guard < 4000);
+    assert(saw_elevation);
+    render = traffic.render_entities();
+    assert(render.front().logical_state == "stopped");
+    assert(traffic.remove("car.1"));
+    assert(!traffic.remove("car.1"));
+    assert(traffic.empty());
 }
 
 void test_reverse_route_is_continuous() {
@@ -230,6 +279,7 @@ int main() {
     test_continuous_route_across_two_junctions();
     test_vehicle_follower_moves_continuously_and_slows_for_turns();
     test_vehicle_render_adapter_preserves_pose_and_logical_direction();
+    test_procedural_traffic_manager_owns_and_renders_followers();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
