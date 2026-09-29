@@ -1,0 +1,16 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"maskBank","name":"clothing"},
+  "operations":[
+    {"type":"polygon","points":[[18,26],[21,24],[27,24],[30,26],[31,38],[17,38]],"channel":"R"},
+    {"type":"polygon","points":[[29,28],[32,27],[35,31],[34,37],[30,37]],"channel":"R"},
+    {"type":"polygon","points":[[24,38],[30,38],[30,54],[25,54]],"channel":"R"},
+    {"type":"polygon","points":[[16,27],[19,28],[18,37],[14,37],[13,31]],"channel":"G"},
+    {"type":"polygon","points":[[18,38],[24,38],[23,54],[18,54]],"channel":"G"},
+    {"type":"ellipse","box":[18,24,30,30],"channel":"B"},
+    {"type":"ellipse","box":[22,28,26,32],"channel":"B"},
+    {"type":"ellipse","box":[14,35,18,40],"channel":"B"},
+    {"type":"ellipse","box":[30,35,34,40],"channel":"B"}
+  ]
+}
