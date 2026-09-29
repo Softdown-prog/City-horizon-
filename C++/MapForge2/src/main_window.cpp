@@ -42,7 +42,7 @@ MainWindow::MainWindow(QWidget* parent)
     statusBar()->addPermanentWidget(map_status_);
     statusBar()->addPermanentWidget(tile_status_);
     statusBar()->showMessage(
-        "Viewport ready. Drag with Inspect (or RMB/MMB) to move the map; WASD/arrows pan; wheel zooms.");
+        "Viewport ready. Inspect/RMB/MMB pans; Fence drag builds connected runs; WASD/arrows pan; wheel zooms.");
 
     canvas_->onHistoryChanged = [this]() { refreshHistoryActions(); };
     canvas_->onDocumentBoundsChanged = [this]() { refreshMapStatus(); };
@@ -158,7 +158,9 @@ void MainWindow::buildToolbar() {
     inspect_action_ = addTool("Inspect / Pan", QKeySequence("1"), EditorTool::Inspect, true);
     terrain_action_ = addTool("Terrain", QKeySequence("2"), EditorTool::Terrain);
     road_action_ = addTool("Road", QKeySequence("3"), EditorTool::Road);
-    erase_action_ = addTool("Erase", QKeySequence("4"), EditorTool::Erase);
+    fence_action_ = addTool("Fence", QKeySequence("4"), EditorTool::Fence);
+    fence_action_->setToolTip("Drag a connected fence run. Runtime N/E/S/W topology selects ends, straights, corners, tees and crosses.");
+    erase_action_ = addTool("Erase", QKeySequence("5"), EditorTool::Erase);
 
     toolbar->addSeparator();
     toolbar->addWidget(new QLabel("Terrain:", toolbar));
@@ -212,7 +214,7 @@ void MainWindow::buildDocks() {
     auto* terrainLayout = new QVBoxLayout(terrainPage);
     terrainLayout->addWidget(new QLabel(
         "Semantic terrain palette\n\n"
-        "Scratch-map authoring remains available for interaction testing. Scratch bounds can now grow/shrink while preserving in-bounds tiles. Canonical scenarios remain lossless-read-only until the mutable document gate is complete.",
+        "Scratch-map authoring remains available for interaction testing. Scratch bounds can grow/shrink while preserving in-bounds tiles and fence nodes. Canonical scenarios remain lossless-read-only until the mutable document gate is complete.",
         terrainPage));
     terrainLayout->addStretch(1);
     tabs->addTab(terrainPage, "Terrain");
@@ -221,7 +223,7 @@ void MainWindow::buildDocks() {
     auto* objectsLayout = new QVBoxLayout(objectsPage);
     objectsLayout->addWidget(new QLabel(
         "Object catalog migration target\n\n"
-        "Canonical scenario inspection now renders terrain, connectivity-aware roads and building definitions through ch_render. Placement/rotation editing comes after lossless mutation.",
+        "Fence scratch authoring now uses the canonical runtime FenceManager. Canonical scenario placement/rotation editing still waits for the lossless mutation gate.",
         objectsPage));
     objectsLayout->addStretch(1);
     tabs->addTab(objectsPage, "Objects");
@@ -236,6 +238,7 @@ void MainWindow::buildDocks() {
         "• physical-pixel DPR conversion is explicit\n"
         "• canonical viewport redraw work is dirty-gated\n"
         "• Inspect + left drag, RMB/MMB and WASD/arrows pan the map\n"
+        "• Fence drag uses runtime N/E/S/W topology; bends resolve automatically\n"
         "• scratch map bounds can be resized without moving their minimum coordinate\n"
         "• Building Composer V0 generates four bitmap views from one parametric definition\n"
         "• canonical scenario mode is still read-only until lossless serialization\n"
@@ -278,11 +281,15 @@ void MainWindow::setTool(const EditorTool tool) {
         return;
     }
     canvas_->setTool(tool);
+    if (tool == EditorTool::Fence) {
+        statusBar()->showMessage("Fence: drag from one grid point to another. The runtime resolver creates straight/corner/T/cross connections automatically.", 6000);
+    }
 }
 
 void MainWindow::setAuthoringEnabled(const bool enabled) {
     if (terrain_action_ != nullptr) terrain_action_->setEnabled(enabled);
     if (road_action_ != nullptr) road_action_->setEnabled(enabled);
+    if (fence_action_ != nullptr) fence_action_->setEnabled(enabled);
     if (erase_action_ != nullptr) erase_action_->setEnabled(enabled);
     if (terrain_combo_ != nullptr) terrain_combo_->setEnabled(enabled);
     if (brush_combo_ != nullptr) brush_combo_->setEnabled(enabled);
@@ -331,7 +338,7 @@ void MainWindow::resizeMapInteractive() {
         refreshHistoryActions();
         refreshMapStatus();
         statusBar()->showMessage(
-            QString("Map resized to %1×%2 tiles. Existing in-bounds terrain/roads were preserved; cropped cells were discarded.")
+            QString("Map resized to %1×%2 tiles. Existing in-bounds terrain, roads and fence nodes were preserved; cropped content was discarded.")
                 .arg(width).arg(height),
             7000);
     } else {
