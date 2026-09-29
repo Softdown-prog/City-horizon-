@@ -15,6 +15,22 @@ struct NineSliceInsets {
     float bottom = 0.0F;
 };
 
+// Canonical City Horizon resizable-window contract. New instruction, help,
+// information, alert and standard modal screens should reference this contract
+// instead of hard-coding the physical PNG name or border values.
+inline constexpr const char* kWindowFrameV2ContractId = "CH_WINDOW_FRAME_V2";
+inline constexpr const char* kWindowFrameV2AssetStem = "panel_window_9slice_v2";
+inline constexpr NineSliceInsets kWindowFrameV2Insets = {
+    32.0F,
+    32.0F,
+    32.0F,
+    32.0F,
+};
+inline constexpr float kWindowFrameV2MinimumWidth =
+    kWindowFrameV2Insets.left + kWindowFrameV2Insets.right;
+inline constexpr float kWindowFrameV2MinimumHeight =
+    kWindowFrameV2Insets.top + kWindowFrameV2Insets.bottom;
+
 enum class NineSlicePatch : std::size_t {
     top_left = 0,
     top,
