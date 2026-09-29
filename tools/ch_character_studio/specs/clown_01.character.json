@@ -24,15 +24,17 @@
     "worldTranslationDuringSpriteCycle": false,
     "worldMovementOwner": "runtime",
     "landmarkGenerator": "tools/ch_character_studio/treadmill_landmarks.py",
-    "southWalkBuilder": "tools/ch_character_studio/build_clown_treadmill.py",
+    "southWalkBuilder": "tools/ch_character_studio/build_clown_treadmill_v3.py",
     "retargetPolicy": "approved_joint_deltas_onto_calibrated_art_landmarks",
     "artSkinning": "rigid_segmented_bone_skinning",
     "legacyWeightedLandmarkWarpAllowed": false,
     "walkPolish": {
-      "version": "V2_conservative",
-      "goal": "same approved walk with less marching and smoother contact",
+      "version": "V3_foot_polish",
+      "goal": "same approved walk with calmer clown shoes and smoother ground contact",
       "legVerticalGain": 0.86,
       "kneeLiftGain": 0.88,
+      "ankleLiftGain": 0.84,
+      "footLiftGain": 0.74,
       "bodyBobGain": 0.75,
       "armExtremeGain": 0.92,
       "armElbowGain": 0.94,
@@ -40,6 +42,13 @@
       "horizontalStridePreserved": true,
       "frameTimingPreserved": true,
       "anchorPreserved": true
+    },
+    "shoePolish": {
+      "scale": 1.0,
+      "rotationDamping": 0.28,
+      "rotationLimitDeg": 16.0,
+      "pivot": "ankle",
+      "visualAndMaskShareTransform": true
     }
   },
   "authoring": {
@@ -65,11 +74,11 @@
   "walkPreview": {
     "status": "candidate_for_visual_review",
     "mode": "treadmill_in_place",
-    "polish": "V2_conservative",
-    "buildCommand": "python tools/ch_character_studio/build_clown_treadmill.py --seed 1337",
-    "outputGif": "out/ch_character_studio/clown_01/south_walk/clown_01_s_walk_treadmill.gif",
-    "outputStrip": "out/ch_character_studio/clown_01/south_walk/clown_01_s_walk_strip.png",
-    "transferVersion": "CH_CLOWN_TREADMILL_WALK_V1",
+    "polish": "V3_foot_polish",
+    "buildCommand": "python tools/ch_character_studio/build_clown_treadmill_v3.py --seed 1337",
+    "outputGif": "out/ch_character_studio/clown_01/south_walk_v3/clown_01_s_walk_foot_polish_v3.gif",
+    "outputStrip": "out/ch_character_studio/clown_01/south_walk_v3/clown_01_s_walk_foot_polish_v3_strip.png",
+    "transferVersion": "CH_CLOWN_TREADMILL_WALK_V3",
     "requiredInvariants": [
       "all_8_frames_share_ground_anchor_24_60",
       "all_8_frames_have_root_translation_0_0",
@@ -77,8 +86,10 @@
       "runtime_world_motion_is_separate",
       "painted_limbs_are_rigid_segmented_not_rubber_warped",
       "approved_actor_joint_deltas_remain_authoritative",
-      "leg_vertical_lift_is_polished_without_reducing_horizontal_stride",
-      "arm_extremes_are_softened_without_increasing_swing"
+      "horizontal_stride_is_preserved",
+      "shoe_scale_remains_one",
+      "shoe_rotation_is_damped_and_limited",
+      "shoe_visual_and_clothing_mask_use_the_same_transform"
     ]
   },
   "appearance": {
