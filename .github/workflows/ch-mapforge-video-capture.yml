@@ -101,6 +101,8 @@ jobs:
 
       - name: Render frames and encode review media
         shell: pwsh
+        env:
+          QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
         run: python tools/animation_preview/run_video_scenario.py --scenario $env:CH_VIDEO_RESOLVED_JOB
 
       - name: Validate video proof
