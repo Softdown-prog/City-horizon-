@@ -1,3 +1,4 @@
+# CH runtime promotion v1
 name: Promote Casa Popular color masks
 
 on:
@@ -102,9 +103,6 @@ jobs:
           definition['colorMask'] = {
               'contract': 'CH_COLOR_MASK_V1',
               'enabled': True,
-              # The current City Horizon runtime consumes R/G independently.
-              # B=trim remains authored in the same PNG and is recorded below
-              # for a future contract extension without requiring a re-render.
               'channels': {'R': 'wall', 'G': 'roof'},
               'alpha': 'coverage',
               'sprites': {
