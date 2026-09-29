@@ -11,6 +11,11 @@
 
 enum class PedestrianState { idle, walking, visiting, resting };
 
+enum class PedestrianProfession : std::uint8_t {
+    resident,
+    cleaner,
+};
+
 enum class PedestrianOutingPreference : std::uint8_t {
     balanced,
     outdoor_leisure,
@@ -51,6 +56,7 @@ struct PedestrianInstance {
     std::uint64_t id = 0;
     MobileEntitySpatialState spatial;
     PedestrianState state = PedestrianState::idle;
+    PedestrianProfession profession = PedestrianProfession::resident;
     std::vector<NavigationTile> route;
     std::size_t next_waypoint = 0;
     NavigationTile destination;
@@ -86,6 +92,7 @@ public:
 
     [[nodiscard]] bool set_visiting(std::uint64_t pedestrian_id, bool visiting);
     [[nodiscard]] bool face_pedestrian(std::uint64_t pedestrian_id, MobileEntityDirection direction);
+    [[nodiscard]] bool set_profession(std::uint64_t pedestrian_id, PedestrianProfession profession);
     [[nodiscard]] bool rest_at_home(std::uint64_t pedestrian_id, NavigationTile entrance);
     [[nodiscard]] bool rest_at_home(NavigationTile entrance);
     void wake_up(std::uint64_t pedestrian_id);

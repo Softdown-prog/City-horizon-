@@ -13,6 +13,10 @@ constexpr std::array<MobileClothingColor, 5> kPantsColors = {{{38, 89, 220}, {78
     {89, 102, 127}, {121, 86, 65}, {82, 113, 96}}};
 constexpr std::array<MobileClothingColor, 7> kUmbrellaColors = {{{208, 79, 77}, {225, 181, 66},
     {69, 151, 183}, {119, 102, 172}, {89, 164, 114}, {223, 122, 81}, {176, 86, 130}}};
+constexpr MobileClothingColor kCleanerJacket = {35, 132, 146};
+constexpr MobileClothingColor kCleanerPants = {31, 55, 72};
+constexpr std::string_view kApprovedActorAnimation = "ch_actor_green_01";
+constexpr std::string_view kCleanerBroomAnimation = "ch_actor_broom_01";
 
 [[nodiscard]] CardinalDirection topology_direction_to(const NavigationTile from, const NavigationTile to) {
     if (to.x > from.x) return CardinalDirection::east;
@@ -64,10 +68,24 @@ PedestrianInstance& PedestrianSystem::create_pedestrian(const NavigationTile at)
     pedestrian.id = next_id_++;
     pedestrian.animation.animation_set_id = visual_definition_.animation_set_id;
     pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
-    pedestrian.clothing.jacket = kJacketColors[
-        std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
-    pedestrian.clothing.pants = kPantsColors[
-        std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
+
+    // City Horizon currently has one production-quality walking human. Keep
+    // that locomotion immutable and specialize the first automatic CH Actor as
+    // the municipal cleaner through its existing color mask plus equipment.
+    // Additional actors remain residents unless a gameplay system explicitly
+    // assigns a profession with set_profession().
+    pedestrian.profession = visual_definition_.animation_set_id == kApprovedActorAnimation && instances_.empty()
+        ? PedestrianProfession::cleaner
+        : PedestrianProfession::resident;
+    if (pedestrian.profession == PedestrianProfession::cleaner) {
+        pedestrian.clothing.jacket = kCleanerJacket;
+        pedestrian.clothing.pants = kCleanerPants;
+    } else {
+        pedestrian.clothing.jacket = kJacketColors[
+            std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
+        pedestrian.clothing.pants = kPantsColors[
+            std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
+    }
     pedestrian.umbrella_color = kUmbrellaColors[
         std::uniform_int_distribution<std::size_t>{0, kUmbrellaColors.size() - 1}(clothing_rng_)];
     pedestrian.monthly_budget_capacity_cents = budget_capacity_for(pedestrian.id);
@@ -150,6 +168,22 @@ bool PedestrianSystem::face_pedestrian(const std::uint64_t pedestrian_id, const 
     PedestrianInstance* pedestrian = find_instance(pedestrian_id);
     if (pedestrian == nullptr || pedestrian->state == PedestrianState::walking) return false;
     pedestrian->spatial.direction = direction;
+    return true;
+}
+
+bool PedestrianSystem::set_profession(const std::uint64_t pedestrian_id, const PedestrianProfession profession) {
+    PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+    if (pedestrian == nullptr) return false;
+    pedestrian->profession = profession;
+    if (profession == PedestrianProfession::cleaner) {
+        pedestrian->clothing.jacket = kCleanerJacket;
+        pedestrian->clothing.pants = kCleanerPants;
+    } else {
+        pedestrian->clothing.jacket = kJacketColors[
+            std::uniform_int_distribution<std::size_t>{0, kJacketColors.size() - 1}(clothing_rng_)];
+        pedestrian->clothing.pants = kPantsColors[
+            std::uniform_int_distribution<std::size_t>{0, kPantsColors.size() - 1}(clothing_rng_)];
+    }
     return true;
 }
 
@@ -390,13 +424,15 @@ std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const Mobi
     std::vector<MobileEntityRenderData> entities;
     for (const PedestrianInstance& pedestrian : instances_) {
         if (pedestrian.state == PedestrianState::resting) continue;
+        const std::string_view logical_state = animation_state(pedestrian.state);
         const MobileAnimationClip* clip = animations.resolve_clip(pedestrian.animation.animation_set_id,
-                                                                   animation_state(pedestrian.state),
+                                                                   logical_state,
                                                                    pedestrian.spatial.direction);
         if (clip == nullptr || clip->frames.empty()) continue;
         const std::size_t frame_index = std::min(pedestrian.animation.frame_index, clip->frames.size() - 1);
         MobileEntityRenderData entity;
         entity.spatial = pedestrian.spatial;
+        entity.logical_state = std::string(logical_state);
         entity.animation_set_id = pedestrian.animation.animation_set_id;
         entity.animation_clip_id = pedestrian.animation.clip_id;
         entity.animation_frame_index = frame_index;
@@ -405,11 +441,32 @@ std::vector<MobileEntityRenderData> PedestrianSystem::render_entities(const Mobi
         entity.sprite_anchor_x = visual_definition_.sprite_anchor_x;
         entity.sprite_anchor_y = visual_definition_.sprite_anchor_y;
         entity.clothing = pedestrian.clothing;
-        entity.clothing.enabled = pedestrian.animation.animation_set_id == "ch_actor_green_01";
-        entity.umbrella.enabled = raining && pedestrian.animation.animation_set_id == "ch_actor_green_01" &&
+        const bool approved_actor = pedestrian.animation.animation_set_id == kApprovedActorAnimation;
+        entity.clothing.enabled = approved_actor;
+        entity.umbrella.enabled = raining && approved_actor &&
                                   pedestrian.state != PedestrianState::visiting && pedestrian.state != PedestrianState::resting;
         entity.umbrella.fabric = pedestrian.umbrella_color;
-        entities.push_back(std::move(entity));
+        entities.push_back(entity);
+
+        // Equipment is a second 48x64 mobile layer with the same ground anchor.
+        // Stable depth sorting therefore draws it immediately after the actor,
+        // while camera-relative animation selection keeps all four views aligned.
+        if (pedestrian.profession == PedestrianProfession::cleaner && approved_actor && !raining &&
+            pedestrian.state != PedestrianState::visiting) {
+            const MobileAnimationClip* broom_clip = animations.resolve_clip(
+                kCleanerBroomAnimation, logical_state, pedestrian.spatial.direction);
+            if (broom_clip != nullptr && !broom_clip->frames.empty()) {
+                MobileEntityRenderData equipment = entity;
+                const std::size_t equipment_frame = std::min(frame_index, broom_clip->frames.size() - 1);
+                equipment.animation_set_id = std::string(kCleanerBroomAnimation);
+                equipment.animation_clip_id = broom_clip->id;
+                equipment.animation_frame_index = equipment_frame;
+                equipment.sprite_asset = broom_clip->frames[equipment_frame];
+                equipment.clothing = {};
+                equipment.umbrella = {};
+                entities.push_back(std::move(equipment));
+            }
+        }
     }
     return entities;
 }
