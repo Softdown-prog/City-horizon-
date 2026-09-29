@@ -1,0 +1,37 @@
+{
+  "contract": "CH_ACTOR_BLENDER_CHARACTER_V1",
+  "assetId": "ch_actor_clown_01",
+  "motionContract": "tools/ch_actor_lab/motion/ch_actor_walk_v1.json",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeTarget": "2D_RGBA_pre_rendered_sprite",
+  "footprint": {"widthTiles": 1, "depthTiles": 1},
+  "style": {
+    "family": "classic_tycoon_pre_rendered",
+    "silhouette": "friendly_professional_clown",
+    "avoid": ["flat_mask_face", "painted_overlay_wig", "photorealism", "horror_clown"]
+  },
+  "palette": {
+    "skin": [0.96, 0.67, 0.50, 1.0],
+    "makeupWhite": [0.96, 0.95, 0.90, 1.0],
+    "wig": [0.78, 0.11, 0.035, 1.0],
+    "nose": [0.92, 0.035, 0.025, 1.0],
+    "eyeMakeup": [0.08, 0.38, 0.78, 1.0],
+    "jacketPrimary": [0.48, 0.06, 0.62, 1.0],
+    "jacketSecondary": [0.03, 0.60, 0.67, 1.0],
+    "shirt": [0.96, 0.90, 0.13, 1.0],
+    "pantsLeft": [0.96, 0.68, 0.03, 1.0],
+    "pantsRight": [0.02, 0.61, 0.69, 1.0],
+    "shoeLeft": [0.96, 0.68, 0.03, 1.0],
+    "shoeRight": [0.08, 0.16, 0.27, 1.0]
+  },
+  "geometry": {
+    "bodyScale": 2.15,
+    "headRadius": 0.18,
+    "wigPuffRadius": 0.105,
+    "limbRadius": 0.055,
+    "shoeLength": 0.28,
+    "shoeWidth": 0.14,
+    "shoeHeight": 0.10
+  },
+  "proxy": {"poseIndex": 2, "direction": "south"}
+}
