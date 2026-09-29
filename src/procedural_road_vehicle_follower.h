@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -64,10 +65,13 @@ public:
     [[nodiscard]] bool valid() const { return valid_; }
     [[nodiscard]] const ProceduralRoadVehiclePose& pose() const { return pose_; }
 
-    void update(const float dt_seconds, const ProceduralRoadVehicleFollowerConfig& config = {}) {
+    void update(
+        const float dt_seconds,
+        const ProceduralRoadVehicleFollowerConfig& config = {},
+        const float external_speed_cap = std::numeric_limits<float>::infinity()) {
         if (!valid_ || pose_.finished || !(dt_seconds > 0.0F)) return;
 
-        const float target_speed = local_speed_limit(pose_, config);
+        const float target_speed = effective_speed_limit(pose_, config, external_speed_cap);
         float next_speed = pose_.speed;
         if (next_speed < target_speed) {
             next_speed = std::min(target_speed, next_speed + std::max(0.0F, config.acceleration) * dt_seconds);
@@ -77,7 +81,7 @@ public:
 
         const float next_distance = std::min(route_length(), pose_.route_distance + next_speed * dt_seconds);
         ProceduralRoadVehiclePose next_pose = pose_at_distance(next_distance);
-        next_pose.speed = std::min(next_speed, local_speed_limit(next_pose, config));
+        next_pose.speed = std::min(next_speed, effective_speed_limit(next_pose, config, external_speed_cap));
         if (next_distance >= route_length() - 0.00001F) {
             next_pose.finished = true;
             next_pose.speed = 0.0F;
@@ -146,6 +150,17 @@ private:
                 pose.turn == ProceduralRoadTurnKind::u_turn) {
                 limit = std::min(limit, std::max(0.0F, config.turn_speed));
             }
+        }
+        return limit;
+    }
+
+    [[nodiscard]] static float effective_speed_limit(
+        const ProceduralRoadVehiclePose& pose,
+        const ProceduralRoadVehicleFollowerConfig& config,
+        const float external_speed_cap) {
+        float limit = local_speed_limit(pose, config);
+        if (std::isfinite(external_speed_cap)) {
+            limit = std::min(limit, std::max(0.0F, external_speed_cap));
         }
         return limit;
     }
