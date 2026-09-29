@@ -1,0 +1,110 @@
+name: CH Audio Lab
+
+# Generative/review audio pipeline for City Horizon.
+# Only explicit Audio Lab jobs trigger generation; normal project commits do not.
+on:
+  workflow_dispatch:
+    inputs:
+      job_path:
+        description: "CH_AUDIO_GENERATION_V1 JSON path"
+        required: true
+        default: "tools/ch_audio_lab/jobs/steam_hiss_smoke.json"
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/ch_audio_lab/jobs/*.json"
+
+jobs:
+  generate-review-audio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Resolve Audio Lab job
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            JOB_PATH="${{ inputs.job_path }}"
+          else
+            JOB_PATH="$(git diff --name-only HEAD^ HEAD | grep '^tools/ch_audio_lab/jobs/.*\.json$' | head -n 1 || true)"
+          fi
+          if [ -z "$JOB_PATH" ]; then
+            echo "No CH Audio Lab job found" >&2
+            exit 2
+          fi
+          if [ ! -f "$JOB_PATH" ]; then
+            echo "Audio Lab job does not exist: $JOB_PATH" >&2
+            exit 2
+          fi
+          echo "CH_AUDIO_JOB=$JOB_PATH" >> "$GITHUB_ENV"
+
+      - name: Generate and master review audio
+        shell: bash
+        run: python tools/ch_audio_lab/ch_audio_lab.py "$CH_AUDIO_JOB"
+
+      - name: Validate Audio Lab proof
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          job = json.loads(Path("${{ env.CH_AUDIO_JOB }}").read_text(encoding="utf-8"))
+          out_dir = Path(job.get("outputDir", f"out/ch-audio-lab/{job['id']}"))
+          report_path = out_dir / "audio_lab_report.json"
+          asset_report_path = out_dir / "asset_report.json"
+          review_path = out_dir / "review.ogg"
+
+          if not report_path.is_file():
+              raise SystemExit("audio_lab_report.json missing")
+          if not asset_report_path.is_file():
+              raise SystemExit("asset_report.json missing")
+          if not review_path.is_file() or review_path.stat().st_size == 0:
+              raise SystemExit("review.ogg missing or empty")
+
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          asset = json.loads(asset_report_path.read_text(encoding="utf-8"))
+          if report.get("contract") != "CH_AUDIO_LAB_REPORT_V1" or report.get("status") != "ok":
+              raise SystemExit("invalid CH Audio Lab report")
+          if asset.get("contract") != "CH_AUDIO_ASSET_REPORT_V1" or asset.get("status") != "ok":
+              raise SystemExit("invalid CH audio asset report")
+          probe = asset.get("probe", {})
+          if probe.get("codec") != "vorbis" or probe.get("sampleRate") != 48000:
+              raise SystemExit(f"unexpected mastered audio format: {probe}")
+          if float(probe.get("durationSeconds", 0)) <= 0:
+              raise SystemExit("mastered audio duration is zero")
+          print(json.dumps({
+              "status": "ok",
+              "job": job["id"],
+              "review": str(review_path),
+              "probe": probe,
+              "sha256": report.get("outputSha256"),
+          }, ensure_ascii=False))
+          PY
+
+      - name: Upload CH Audio Lab proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Audio-Lab-${{ github.run_number }}
+          path: |
+            out/ch-audio-lab/**
+          if-no-files-found: error
+          retention-days: 14
