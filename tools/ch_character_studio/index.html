@@ -32,6 +32,7 @@
     #view { z-index:1; cursor:crosshair; }
     #objectFrontView { z-index:2; pointer-events:none; }
     #maskView { z-index:3; pointer-events:none; cursor:crosshair; }
+    #spatialView { z-index:4; pointer-events:none; }
     .layer { display:grid; grid-template-columns:24px 1fr 58px; align-items:center; gap:8px; padding:7px; border:1px solid #2f4a40; border-radius:6px; margin-bottom:6px; cursor:pointer; }
     .layer.selected { border-color:#e1c04a; background:#263d35; }
     .layer small { opacity:.65; }
@@ -63,43 +64,26 @@
           <label>Base CH Blender <input id="baseFile" type="file" accept="image/png" /></label>
           <label>Landmarks CH Blender <input id="landmarksFile" type="file" accept="application/json,.json" /></label>
         </div>
-        <div class="hint">Um landmarks.json contém os 36 estados do personagem e só precisa ser carregado uma vez.</div>
+        <div class="hint">Um landmarks.json contém os 36 estados, anchors dos pés, sockets e footprint.</div>
       </div>
 
       <div class="panel">
         <h3>Ferramentas</h3>
-        <div class="row">
-          <button id="brushBtn" class="active">Pincel</button>
-          <button id="eraserBtn">Borracha</button>
-          <button id="shapeBtn">Forma inteligente</button>
-          <button id="clearBtn">Limpar</button>
-        </div>
-        <div style="margin-top:10px">
-          <label>Tamanho <span id="sizeLabel">1</span> px</label>
-          <input id="brushSize" type="range" min="1" max="8" value="1" />
-        </div>
-        <div class="row" style="margin-top:10px">
-          <label>Cor</label><input id="color" type="color" value="#f2d744" />
-        </div>
+        <div class="row"><button id="brushBtn" class="active">Pincel</button><button id="eraserBtn">Borracha</button><button id="shapeBtn">Forma inteligente</button><button id="clearBtn">Limpar</button></div>
+        <div style="margin-top:10px"><label>Tamanho <span id="sizeLabel">1</span> px</label><input id="brushSize" type="range" min="1" max="8" value="1" /></div>
+        <div class="row" style="margin-top:10px"><label>Cor</label><input id="color" type="color" value="#f2d744" /></div>
       </div>
 
       <div class="panel">
         <h3>Formas de personagem</h3>
-        <div class="stack">
-          <select id="shapeSelect"></select>
-          <label>Escala <span id="shapeScaleLabel">1.00</span>×</label>
-          <input id="shapeScale" type="range" min="0.50" max="2.00" step="0.25" value="1.00" />
-        </div>
-        <div class="hint">Escolha uma peça e clique no personagem. O Studio troca automaticamente para a camada semântica correta.</div>
+        <div class="stack"><select id="shapeSelect"></select><label>Escala <span id="shapeScaleLabel">1.00</span>×</label><input id="shapeScale" type="range" min="0.50" max="2.00" step="0.25" value="1.00" /></div>
+        <div class="hint">A peça vai automaticamente para sua camada semântica.</div>
       </div>
 
       <div class="panel">
         <h3>Molde de personagem</h3>
-        <div class="stack">
-          <select id="templateSelect"></select>
-          <button id="applyTemplate">Aplicar molde</button>
-        </div>
-        <div class="hint">Moldes são ponto de partida artístico; não alteram pose, caminhada, câmera ou ground anchor.</div>
+        <div class="stack"><select id="templateSelect"></select><button id="applyTemplate">Aplicar molde</button></div>
+        <div class="hint">Moldes não alteram pose, caminhada, câmera ou ground anchor.</div>
       </div>
 
       <div class="panel">
@@ -107,31 +91,21 @@
         <div class="stack">
           <label><input id="heldObjectEnabled" type="checkbox" /> Ativar objeto</label>
           <label>ID do objeto <input id="heldObjectId" type="text" value="held_object_new" /></label>
-          <label>Socket
-            <select id="heldObjectSocket"><option value="right_hand">Mão direita</option><option value="left_hand">Mão esquerda</option></select>
-          </label>
-          <label>Profundidade
-            <select id="heldObjectDepth"><option value="auto">Automática</option><option value="front">Frente</option><option value="back">Atrás</option></select>
-          </label>
+          <label>Socket <select id="heldObjectSocket"><option value="right_hand">Mão direita</option><option value="left_hand">Mão esquerda</option></select></label>
+          <label>Profundidade <select id="heldObjectDepth"><option value="auto">Automática</option><option value="front">Frente</option><option value="back">Atrás</option></select></label>
           <label>PNG visual <input id="heldObjectFile" type="file" accept="image/png" /></label>
           <label>PNG máscara RGB <input id="heldObjectMaskFile" type="file" accept="image/png" /></label>
-          <div class="row">
-            <label class="grow">Grip X <input id="heldGripX" type="number" step="1" value="0" /></label>
-            <label class="grow">Grip Y <input id="heldGripY" type="number" step="1" value="0" /></label>
-          </div>
-          <div class="row">
-            <label class="grow">Offset X <input id="heldOffsetX" type="number" step="1" value="0" /></label>
-            <label class="grow">Offset Y <input id="heldOffsetY" type="number" step="1" value="0" /></label>
-          </div>
+          <div class="row"><label class="grow">Grip X <input id="heldGripX" type="number" step="1" value="0" /></label><label class="grow">Grip Y <input id="heldGripY" type="number" step="1" value="0" /></label></div>
+          <div class="row"><label class="grow">Offset X <input id="heldOffsetX" type="number" step="1" value="0" /></label><label class="grow">Offset Y <input id="heldOffsetY" type="number" step="1" value="0" /></label></div>
           <label><input id="showHandSocket" type="checkbox" /> Mostrar socket invisível</label>
         </div>
         <div id="heldObjectStatus" class="status" style="margin-top:8px">Socket preparado, mas invisível.</div>
-        <div class="hint">Balão, vassoura, ferramenta ou outro prop usa o mesmo socket. Sem máscara própria, a cobertura do objeto vira automaticamente canal R.</div>
       </div>
 
       <div class="panel">
-        <h3>Paleta</h3>
-        <div id="swatches" class="swatches"></div>
+        <h3>Paleta ampla</h3>
+        <div class="stack"><select id="paletteFamily"></select><div id="swatches" class="swatches"></div></div>
+        <div class="hint">Biblioteca versionada CH_CHARACTER_PALETTE_V1: pele, cabelo, neutros, vivas, pastéis, terra, profundas, metais e fantasia.</div>
       </div>
     </aside>
 
@@ -141,85 +115,66 @@
         <canvas id="view" width="48" height="64"></canvas>
         <canvas id="objectFrontView" width="48" height="64"></canvas>
         <canvas id="maskView" width="48" height="64"></canvas>
+        <canvas id="spatialView" width="48" height="64"></canvas>
       </div>
     </main>
 
     <aside class="right">
       <div class="panel">
-        <h3>Propagação de aparência</h3>
+        <h3>Validação espacial</h3>
         <div class="stack">
-          <button id="markReference">Marcar frame atual como referência</button>
-          <button id="applyReference" disabled>Aplicar referência ao frame atual</button>
-          <button id="propagateDirection" disabled>Propagar nos 9 frames desta direção</button>
+          <label><input id="showGroundAnchor" type="checkbox" checked /> Ground anchor</label>
+          <label><input id="showFootAnchors" type="checkbox" checked /> Foot anchors / pé de apoio</label>
+          <label><input id="showFootprint" type="checkbox" checked /> Footprint</label>
+          <label><input id="showSockets" type="checkbox" /> Sockets das mãos</label>
         </div>
+        <div id="spatialStatus" class="status" style="margin-top:8px">Carregue landmarks para validar o contato com o chão.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Propagação de aparência</h3>
+        <div class="stack"><button id="markReference">Marcar frame atual como referência</button><button id="applyReference" disabled>Aplicar referência ao frame atual</button><button id="propagateDirection" disabled>Propagar nos 9 frames desta direção</button></div>
         <div id="referenceStatus" class="status reference" style="margin-top:8px">Nenhuma referência marcada.</div>
-        <div class="hint">A propagação usa landmarks da pose para deformar cada camada. Ela não copia o underlay do Blender e recalcula o outline.</div>
       </div>
 
       <div class="panel">
         <h3>Máscaras de cor</h3>
         <div class="stack">
-          <select id="maskBank">
-            <option value="appearance">Aparência</option>
-            <option value="clothing">Roupas</option>
-            <option value="held_object">Objeto na mão</option>
-          </select>
+          <select id="maskBank"><option value="appearance">Aparência</option><option value="clothing">Roupas</option><option value="held_object">Objeto na mão</option></select>
           <select id="maskChannel"></select>
           <label><input id="maskPreview" type="checkbox" /> Visualizar máscara sobre o personagem</label>
-          <div class="row">
-            <button id="maskPaintBtn">Pintar máscara</button>
-            <button id="maskEraseBtn">Apagar máscara</button>
-          </div>
-          <button id="maskFillVisible">Preencher cobertura visível no canal</button>
-          <button id="maskClear">Limpar banco atual</button>
-          <button id="exportMask">Exportar máscara atual</button>
-          <button id="exportAllMasks">Exportar 3 máscaras</button>
+          <div class="row"><button id="maskPaintBtn">Pintar máscara</button><button id="maskEraseBtn">Apagar máscara</button></div>
+          <button id="maskFillVisible">Preencher cobertura visível no canal</button><button id="maskClear">Limpar banco atual</button><button id="exportMask">Exportar máscara atual</button><button id="exportAllMasks">Exportar 3 máscaras</button>
         </div>
         <div id="maskStatus" class="status mask-note" style="margin-top:8px">Máscaras RGB prontas.</div>
-        <div class="hint">R/G/B são papéis semânticos. Alpha é somente cobertura. Máscara nunca recebe luz, AO, outline ou dithering.</div>
       </div>
 
-      <div class="panel">
-        <h3>Camadas</h3>
-        <div id="layers"></div>
-      </div>
+      <div class="panel"><h3>Camadas</h3><div id="layers"></div></div>
 
       <div class="panel">
         <h3>Acabamento</h3>
-        <div class="row">
-          <label>Outline</label><input id="outlineColor" type="color" value="#342e2b" />
-        </div>
-        <div class="stack" style="margin-top:8px">
-          <button id="generateOutline">Gerar outline 1 px</button>
-          <button id="clearOutline">Limpar outline</button>
-        </div>
-        <div class="hint">Dilatação de 1 px sobre a silhueta das camadas artísticas. O passe base do Blender não entra no cálculo.</div>
+        <div class="row"><label>Outline</label><input id="outlineColor" type="color" value="#342e2b" /></div>
+        <div class="stack" style="margin-top:8px"><button id="generateOutline">Gerar outline 1 px</button><button id="clearOutline">Limpar outline</button></div>
       </div>
 
       <div class="panel">
         <h3>Exportar</h3>
-        <div class="stack">
-          <button id="exportLayer">PNG da camada</button>
-          <button id="exportComposite">PNG composto</button>
-          <button id="exportCompositeObject">PNG composto + objeto</button>
-          <button id="exportSpec">JSON do personagem</button>
-          <button id="exportObjectConfig">JSON máscaras + objeto</button>
-        </div>
+        <div class="stack"><button id="exportLayer">PNG da camada</button><button id="exportComposite">PNG composto</button><button id="exportCompositeObject">PNG composto + objeto</button><button id="exportSpec">JSON do personagem</button><button id="exportObjectConfig">JSON máscaras + objeto</button></div>
       </div>
 
-      <div class="panel">
-        <h3>Status</h3>
-        <div id="status" class="status">Studio pronto. Importe o passe do CH Blender ou comece a desenhar.</div>
-      </div>
+      <div class="panel"><h3>Status</h3><div id="status" class="status">Studio pronto. Importe o passe do CH Blender ou comece a desenhar.</div></div>
     </aside>
   </div>
 
+  <script src="color_palettes.js"></script>
   <script src="smart_shapes.js"></script>
   <script src="character_templates.js"></script>
   <script src="pose_transfer.js"></script>
   <script src="color_masks.js"></script>
   <script src="held_objects.js"></script>
   <script src="studio.js"></script>
+  <script src="palette_ui.js"></script>
   <script src="color_object_ui.js"></script>
+  <script src="spatial_ui.js"></script>
 </body>
 </html>
