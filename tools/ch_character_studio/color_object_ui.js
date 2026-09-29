@@ -1,7 +1,9 @@
 (() => {
   const W = 48, H = 64;
+  const ANIMATION_FRAMES = ["idle","walk_00","walk_01","walk_02","walk_03","walk_04","walk_05","walk_06","walk_07"];
   const MASKS = window.CH_CHARACTER_COLOR_MASKS;
   const HELD = window.CH_HELD_OBJECTS;
+  const POSE = window.CH_POSE_TRANSFER || null;
   if (!MASKS || !HELD) return;
 
   const direction = document.getElementById("direction");
@@ -26,6 +28,7 @@
   const maskStore = new Map();
   let loadedMaskKey = `${direction.value}:${frame.value}`;
   let landmarks = null;
+  let maskReference = null;
   let lastObjectRender = {front:HELD.blankFrame(), back:HELD.blankFrame(), mask:HELD.blankFrame(), placement:null};
   let maskTool = "paint";
   let maskEditActive = false;
@@ -73,6 +76,7 @@
   const landmarksFile = document.getElementById("landmarksFile");
 
   function key() { return `${direction.value}:${frame.value}`; }
+  function keyDirection(value) { return String(value).split(":",1)[0]; }
   function currentFrameLandmarks() { return landmarks?.frames?.[key()] || null; }
   function maskCanvas(bank) { return maskCanvases.get(bank) || null; }
   function snapshot(canvas) { return canvas.getContext("2d").getImageData(0, 0, W, H); }
@@ -232,6 +236,64 @@
     maskViewCtx.restore();
   }
 
+  function markMaskReference() {
+    if (!POSE || !landmarks) return;
+    saveMasks();
+    const current = maskStore.get(key());
+    if (!current) return;
+    maskReference = {
+      key: key(),
+      appearance: MASKS.clone(current.appearance),
+      clothing: MASKS.clone(current.clothing)
+    };
+    maskStatus.textContent = `Máscaras de ${maskReference.key.replace(":"," / ")} congeladas junto com a referência artística.`;
+  }
+
+  function transferredMask(source, targetKey) {
+    if (!maskReference || !POSE || !landmarks) return MASKS.clone(source);
+    const sourceFrame = landmarks.frames?.[maskReference.key];
+    const targetFrame = landmarks.frames?.[targetKey];
+    if (!sourceFrame || !targetFrame) return MASKS.clone(source);
+    if (targetKey === maskReference.key) return MASKS.clone(source);
+    return POSE.transferLayer(source, "paint_over", sourceFrame, targetFrame);
+  }
+
+  function applyMaskReferenceCurrent() {
+    if (!maskReference || keyDirection(maskReference.key) !== direction.value) return;
+    const targetKey = key();
+    const state = {
+      appearance: transferredMask(maskReference.appearance, targetKey),
+      clothing: transferredMask(maskReference.clothing, targetKey)
+    };
+    maskStore.set(targetKey, state);
+    if (targetKey === loadedMaskKey) {
+      put(maskCanvas("appearance"), state.appearance);
+      put(maskCanvas("clothing"), state.clothing);
+      renderMaskPreview();
+    }
+    maskStatus.textContent = `Máscaras da referência adaptadas para ${targetKey.replace(":"," / ")} pelos landmarks.`;
+  }
+
+  function propagateMaskReferenceDirection() {
+    if (!maskReference || !POSE || !landmarks) return;
+    const dir = keyDirection(maskReference.key);
+    for (const animationFrame of ANIMATION_FRAMES) {
+      const targetKey = `${dir}:${animationFrame}`;
+      maskStore.set(targetKey, {
+        appearance: transferredMask(maskReference.appearance, targetKey),
+        clothing: transferredMask(maskReference.clothing, targetKey)
+      });
+    }
+    if (direction.value === dir) {
+      const state = maskStore.get(key());
+      put(maskCanvas("appearance"), state.appearance);
+      put(maskCanvas("clothing"), state.clothing);
+      loadedMaskKey = key();
+      renderMaskPreview();
+    }
+    maskStatus.textContent = `Máscaras appearance + clothing propagadas para os 9 frames de ${dir}.`;
+  }
+
   async function fileToImageData(file) {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -299,6 +361,7 @@
       colorMasks: {
         contract: MASKS.contract,
         banks: Object.fromEntries(Object.entries(MASKS.banks).map(([name,bank]) => [name,{channels:bank.channels}])),
+        referenceFrame: maskReference?.key || null,
         editedFrames: [...maskStore.keys()].sort()
       },
       heldObject: {
@@ -349,6 +412,9 @@
   for (const id of ["brushBtn","eraserBtn","shapeBtn"]) {
     document.getElementById(id).addEventListener("click",leaveMaskEditing);
   }
+  document.getElementById("markReference").addEventListener("click",markMaskReference);
+  document.getElementById("applyReference").addEventListener("click",applyMaskReferenceCurrent);
+  document.getElementById("propagateDirection").addEventListener("click",propagateMaskReferenceDirection);
 
   for (const element of [objectEnabled,objectId,objectSocket,objectDepth,gripX,gripY,offsetX,offsetY]) {
     element.addEventListener("input",syncObjectInputs);
@@ -376,8 +442,14 @@
   });
   landmarksFile.addEventListener("change",async ev=>{
     const file=ev.target.files?.[0]; if(!file)return;
-    try { landmarks=JSON.parse(await file.text()); renderObject(); }
-    catch(error) { landmarks=null; objectStatus.textContent=`Landmarks inválidos: ${error.message}`; }
+    try {
+      const parsed=JSON.parse(await file.text());
+      landmarks=POSE ? POSE.validateLandmarks(parsed) : parsed;
+      renderObject();
+    } catch(error) {
+      landmarks=null; maskReference=null;
+      objectStatus.textContent=`Landmarks inválidos: ${error.message}`;
+    }
   });
   exportCompositeObject.addEventListener("click",exportComposite);
   exportObjectConfig.addEventListener("click",exportConfig);
