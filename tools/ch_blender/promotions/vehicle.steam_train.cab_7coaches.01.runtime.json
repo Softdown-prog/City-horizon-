@@ -1,0 +1,20 @@
+{
+  "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
+  "assetId": "vehicle.steam_train.cab_7coaches.01",
+  "approved": true,
+  "sourceCommit": "c0fe7bba9aaae6f18b398a873664fa1cd386d473",
+  "sourceWorkflowRun": 36623049615,
+  "sourceArtifactId": 11059113865,
+  "sourceArtifactName": "CH-Blender-Agent-36623049615-1",
+  "sourceDir": "vehicle.steam_train.cab_7coaches.final.v3",
+  "destination": "assets/vehicles/steam_train_cab_7coaches_01",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [1024, 1024],
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "footprint": {
+    "widthTiles": 13,
+    "depthTiles": 2
+  },
+  "approvedProxySha256": "16befd244af17bad3fbfabf8533dcc4afde6db81562021e8881882df179ab7a6"
+}
