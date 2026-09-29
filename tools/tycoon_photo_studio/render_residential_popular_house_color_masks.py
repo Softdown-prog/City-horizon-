@@ -74,7 +74,10 @@ def _render_masks(ctx):
     scene.render.resolution_y = 256
     scene.render.resolution_percentage = 100
     scene.view_settings.view_transform = "Standard"
-    scene.view_settings.look = "Medium High Contrast" if "Medium High Contrast" in [i.name for i in bpy.types.ColorManagedViewSettings.bl_rna.properties['look'].enum_items] else scene.view_settings.look
+    try:
+        scene.view_settings.look = "None"
+    except TypeError:
+        pass
     scene.view_settings.exposure = 0.0
     scene.view_settings.gamma = 1.0
 
