@@ -112,5 +112,14 @@
   script.dataset.chPhotoshopLayersV2 = 'true';
   script.async = false;
   script.onerror = () => console.error('Falha ao carregar photoshop_layers_v2.js');
+  script.onload = () => {
+    if (window.CH_PHOTOSHOP_LAYER_STACK_BRIDGE || document.querySelector('script[data-ch-photoshop-layers-v2-bridge]')) return;
+    const bridge = document.createElement('script');
+    bridge.src = 'photoshop_layers_v2_bridge.js';
+    bridge.dataset.chPhotoshopLayersV2Bridge = 'true';
+    bridge.async = false;
+    bridge.onerror = () => console.error('Falha ao carregar photoshop_layers_v2_bridge.js');
+    document.body.appendChild(bridge);
+  };
   document.body.appendChild(script);
 })();
