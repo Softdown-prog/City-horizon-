@@ -5,7 +5,8 @@
   "script": "tools/tycoon_photo_studio/build_residential_popular_house_guarded.py",
   "qualityStage": "final",
   "approval": {
-    "proxyReviewed": true
+    "proxyReviewed": true,
+    "approvedProxySha256": "62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956"
   },
   "args": [
     "--recipe",
