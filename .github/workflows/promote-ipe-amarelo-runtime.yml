@@ -1,0 +1,79 @@
+name: Promote Ipe Amarelo Runtime
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/promote-ipe-amarelo-runtime.yml'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/source_tree_converter.py'
+      - 'tools/visitor_forge_2d/examples/park_tree_ipe_amarelo_01.json'
+      - 'tools/visitor_forge_2d/examples/Ipê_amarelo/file_00000000a020820eb84754a936d70bf5.png'
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install converter dependencies
+        run: python -m pip install --disable-pip-version-check pillow numpy
+
+      - name: Generate approved four-view runtime bundle
+        env:
+          PYTHONPATH: tools/visitor_forge_2d/src
+        run: |
+          python -m visitor_forge_2d.core.source_tree_converter \
+            'tools/visitor_forge_2d/examples/Ipê_amarelo/file_00000000a020820eb84754a936d70bf5.png' \
+            assets/tree \
+            --asset-id park_tree_ipe_amarelo_01
+
+      - name: Validate City Horizon sprite contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('assets/tree')
+          expected = ('south', 'west', 'north', 'east')
+          for view in expected:
+              path = root / f'park_tree_ipe_amarelo_01_{view}.png'
+              if not path.exists():
+                  raise SystemExit(f'missing runtime sprite: {path}')
+              image = Image.open(path)
+              if image.size != (256, 320):
+                  raise SystemExit(f'{path}: expected 256x320, got {image.size}')
+              if image.mode != 'RGBA':
+                  raise SystemExit(f'{path}: expected RGBA, got {image.mode}')
+              alpha = image.getchannel('A')
+              if alpha.getbbox() is None:
+                  raise SystemExit(f'{path}: empty alpha')
+              # Ground contact must reach the canonical y=311 anchor row.
+              if alpha.crop((0, 307, 256, 314)).getbbox() is None:
+                  raise SystemExit(f'{path}: no opaque ground contact near anchor y=311')
+          print('CH_CAMERA_V1 runtime bundle validated: 4 views, 256x320 RGBA, anchor 128,311')
+          PY
+
+      - name: Commit runtime assets
+        run: |
+          git add \
+            assets/tree/park_tree_ipe_amarelo_01_south.png \
+            assets/tree/park_tree_ipe_amarelo_01_west.png \
+            assets/tree/park_tree_ipe_amarelo_01_north.png \
+            assets/tree/park_tree_ipe_amarelo_01_east.png
+          if git diff --cached --quiet; then
+            echo 'Runtime sprites already match the approved source.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'assets: promote Ipe Amarelo four-view runtime bundle'
+          git push
