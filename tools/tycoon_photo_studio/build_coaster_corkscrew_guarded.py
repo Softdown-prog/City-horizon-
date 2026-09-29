@@ -29,11 +29,12 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
-CORKSCREW_LENGTH = base.TILE * 3.4
-CORKSCREW_RADIUS = base.TILE * 0.58
-APPROACH_LENGTH = base.TILE * 0.70
+CORKSCREW_LENGTH = base.TILE * 4.2
+CORKSCREW_RADIUS = base.TILE * 0.48
+APPROACH_LENGTH = base.TILE * 0.80
 ROLL_DEGREES = 360.0
-FOOTPRINT = {"widthTiles": 3, "depthTiles": 5}
+PHASE_RAMP = 0.18
+FOOTPRINT = {"widthTiles": 3, "depthTiles": 6}
 
 
 def parse_args():
@@ -48,27 +49,46 @@ def parse_args():
     return parser.parse_args(argv)
 
 
-def smootherstep(t: float) -> float:
+def smoothstep(t: float) -> float:
     t = max(0.0, min(1.0, t))
-    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+    return t * t * (3.0 - 2.0 * t)
 
 
 def handedness(piece: str) -> float:
     return 1.0 if piece == "corkscrew_left" else -1.0
 
 
+def phase_progress(t: float) -> float:
+    """Nearly constant-speed phase with only short eased connector ramps.
+
+    The old whole-piece smootherstep compressed most of the 360-degree turn into
+    the middle of the element. This integral of a short smoothstep speed ramp
+    keeps zero angular velocity at the connectors without creating a central
+    knot. The total unnormalised phase distance is (1 - PHASE_RAMP).
+    """
+    t = max(0.0, min(1.0, t))
+    r = PHASE_RAMP
+    total = 1.0 - r
+    if t < r:
+        u = t / r
+        # Integral from 0..u of smoothstep(s) ds = u^3 - 0.5*u^4.
+        return (r * (u ** 3 - 0.5 * u ** 4)) / total
+    if t > 1.0 - r:
+        return 1.0 - phase_progress(1.0 - t)
+    return (0.5 * r + (t - r)) / total
+
+
 def inversion_phase(piece: str, t: float) -> float:
-    return handedness(piece) * math.tau * smootherstep(t)
+    return handedness(piece) * math.tau * phase_progress(t)
 
 
-def sample_centerline(piece: str, approach_samples: int = 25, body_samples: int = 145):
-    """Build a single corkscrew with true flat tangent connectors.
+def sample_centerline(piece: str, approach_samples: int = 29, body_samples: int = 181):
+    """Build one open corkscrew with flat tangent-safe connectors.
 
-    V0 used an amplitude envelope over an already rotating centerline and then
-    applied another independent 360-degree rail roll. That double-twist made the
-    rails cross visually like a ribbon. V1 gives the centerline one helical
-    inversion only. The phase uses smootherstep so its angular velocity reaches
-    zero at both ends, making the body tangent match the flat approaches.
+    The centerline follows one circular helix around the forward Y axis. Short
+    phase-speed ramps provide flat/tangent-safe entry and exit while the main
+    inversion advances at almost constant angular speed, preventing the visual
+    pinch seen in V1.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -83,10 +103,10 @@ def sample_centerline(piece: str, approach_samples: int = 25, body_samples: int 
 
     for i in range(1, body_samples):
         t = i / (body_samples - 1)
-        phase = inversion_phase(piece, t)
+        phase = abs(inversion_phase(piece, t))
         y = body_start_y + body_length * t
-        x = sign * CORKSCREW_RADIUS * math.sin(abs(phase))
-        z = base.RAIL_Z + CORKSCREW_RADIUS * (1.0 - math.cos(abs(phase)))
+        x = sign * CORKSCREW_RADIUS * math.sin(phase)
+        z = base.RAIL_Z + CORKSCREW_RADIUS * (1.0 - math.cos(phase))
         points.append(Vector((x, y, z)))
 
     for i in range(1, approach_samples):
@@ -97,9 +117,9 @@ def sample_centerline(piece: str, approach_samples: int = 25, body_samples: int 
     return points
 
 
-def phase_for_centerline_index(piece: str, index: int, count: int) -> float:
-    approach_samples = 25
-    body_samples = 145
+def phase_for_centerline_index(piece: str, index: int) -> float:
+    approach_samples = 29
+    body_samples = 181
     body_first = approach_samples - 1
     body_last = body_first + body_samples - 1
     if index <= body_first:
@@ -110,16 +130,24 @@ def phase_for_centerline_index(piece: str, index: int, count: int) -> float:
     return inversion_phase(piece, t)
 
 
-def track_frame(points, index: int, phase: float):
-    """One synchronized roll frame, projected perpendicular to the centerline."""
-    tangent = base.tangent(points, index)
-    sign = 1.0 if phase >= 0.0 else -1.0
-    a = abs(phase)
+def radial_track_frame(points, index: int, point: Vector):
+    """Orient the deck from corkscrew geometry instead of applying a second roll.
 
-    desired_right = Vector((math.cos(a), 0.0, -sign * math.sin(a)))
-    right = desired_right - tangent * desired_right.dot(tangent)
+    The track 'up' points toward the helix axis in the X/Z cross-section. At the
+    bottom connectors that is world +Z, at the top it becomes -Z, so the train
+    naturally inverts exactly once. The vector is projected perpendicular to the
+    centerline tangent to keep a valid orthonormal frame.
+    """
+    tangent = base.tangent(points, index)
+    axis_z = base.RAIL_Z + CORKSCREW_RADIUS
+    toward_axis = Vector((-point.x, 0.0, axis_z - point.z))
+    up = toward_axis - tangent * toward_axis.dot(tangent)
+    if up.length < 1e-6:
+        up = Vector((0.0, 0.0, 1.0)) - tangent * tangent.z
+    up.normalize()
+    right = tangent.cross(up)
     if right.length < 1e-6:
-        right = Vector((1.0, 0.0, 0.0)) - tangent * tangent.x
+        right = Vector((1.0, 0.0, 0.0))
     right.normalize()
     up = right.cross(tangent).normalized()
     return tangent, right, up
@@ -136,8 +164,8 @@ def build_piece(piece: str):
     right_rail = []
 
     for i, point in enumerate(centerline):
-        phase = phase_for_centerline_index(piece, i, len(centerline))
-        tangent, right, up = track_frame(centerline, i, phase)
+        phase = phase_for_centerline_index(piece, i)
+        tangent, right, up = radial_track_frame(centerline, i, point)
         frames.append((tangent, right, up, phase))
         left.append(point - right * (base.GAUGE * 0.5))
         right_rail.append(point + right * (base.GAUGE * 0.5))
@@ -162,10 +190,10 @@ def build_piece(piece: str):
             up,
         ))
 
-    # Ground the straight connectors and lower shoulders. Keep posts outside the
-    # central upside-down section so the inversion silhouette remains readable.
+    # Ground the straight connectors and shoulders. Keep supports away from the
+    # central inverted span so the silhouette stays readable.
     last = len(centerline) - 1
-    support_indices = sorted(set((0, len(centerline) // 5, (len(centerline) * 4) // 5, last)))
+    support_indices = sorted(set((0, len(centerline) // 6, (len(centerline) * 5) // 6, last)))
     for n, idx in enumerate(support_indices):
         base.build_support_frame(
             authored,
@@ -184,13 +212,14 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v1",
+        "profile": "single_inversion_v2_open_radial_frame",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
         "radius": CORKSCREW_RADIUS,
         "approachLength": APPROACH_LENGTH,
         "rollDegrees": ROLL_DEGREES,
+        "phaseRamp": PHASE_RAMP,
         "rollSamplesDegrees": [round(math.degrees(frame[3]), 6) for frame in frames],
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
