@@ -63,14 +63,14 @@ def _mask_for_material(material_name: str, masks: dict[str, bpy.types.Material])
 
 
 def _write_worker_metadata(out: Path, recipe_path: Path, studio: dict) -> None:
-    """Emit the standard guarded-job files expected by the CH Blender worker."""
+    """Emit the guarded-job metadata required by CH Blender Agent Worker."""
     (out / "preflight_report.json").write_text(
         json.dumps({
-            "contract": "CH_BLENDER_PREFLIGHT_V1",
+            "contract": "CH_SCENE_PREFLIGHT_V1",
             "assetId": "building.residential_popular_house.01",
             "stage": "final",
             "pass": "color_mask",
-            "status": "ok",
+            "status": "pass",
             "recipe": str(recipe_path),
         }, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -78,8 +78,8 @@ def _write_worker_metadata(out: Path, recipe_path: Path, studio: dict) -> None:
         json.dumps({
             "contract": "CH_PROXY_APPROVAL_V1",
             "assetId": "building.residential_popular_house.01",
-            "proxyReviewed": True,
-            "approvedProxySha256": APPROVED_PROXY,
+            "reviewed": True,
+            "proxySha256": APPROVED_PROXY,
             "status": "approved",
         }, indent=2, ensure_ascii=False), encoding="utf-8"
     )
