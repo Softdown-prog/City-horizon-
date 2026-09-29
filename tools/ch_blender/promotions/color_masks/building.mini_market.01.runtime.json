@@ -21,5 +21,6 @@
   "blueChannel": "unused",
   "alpha": "coverage",
   "scope": "large_surfaces_only",
-  "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333"
+  "approvedProxySha256": "51e27249b92fe7f1b429e478d1929cab6dbbf3fcc32ad5734092b70acafc8333",
+  "relatedPromotions": ["building.residential_popular_house.01"]
 }
