@@ -106,7 +106,6 @@ jobs:
           directions = ('south', 'east', 'west', 'north')
           source_asset_id = 'commercial_mini_market_3x2_01'
 
-          # Mask-only means the already approved normal sprites are immutable.
           for direction in directions:
               view = runtime['views'][direction]
               normal = dst / view['file']
@@ -221,5 +220,122 @@ jobs:
             exit 0
           fi
           git commit -m "asset: promote mini market wall roof masks"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+  promote-casa-popular-color-mask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download approved Casa Popular CH Blender artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 36584187772
+          artifact-ids: 11041162241
+          path: out/casa_popular_mask/source
+
+      - name: Validate and stage Casa Popular masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, struct
+
+          root = Path('out/casa_popular_mask/source')
+          candidates = list(root.rglob('color_mask_report.json'))
+          if not candidates:
+              raise SystemExit('Casa Popular color_mask_report.json not found')
+          report_path = candidates[0]
+          source = report_path.parent
+          report = json.loads(report_path.read_text(encoding='utf-8'))
+          assert report['contract'] == 'CH_COLOR_MASK_V1'
+          assert report['assetId'] == 'building.residential_popular_house.01'
+          assert report['approvedProxySha256'] == '62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956'
+          assert report['frameSize'] == [256, 256]
+          assert report['alpha'] == 'coverage'
+          assert report['channels'] == {'R': 'wall', 'G': 'roof', 'B': 'trim'}
+
+          expected = {
+              'south': '0ce598a90d0ffb457f3ddd248c747d24d8628ec075ac643808decde927e2ca69',
+              'west': '0cc44431cbdafed9c39537fe6b55a2c4a27be9f9ac1744a7533c8c05d8befa6c',
+              'north': '09084b280d1f555193b67ffa51b064623f9a3ee1c8830ff4ec0b5a66d77cb00e',
+              'east': 'ef510a79cd95d20f37e0297ddf0ea98554e652f8113797b2fe6ea5536657b007',
+          }
+          dst = Path('assets/buildings/residential_popular_house_3x3_01')
+          promoted = {}
+          for direction in ('south', 'west', 'north', 'east'):
+              filename = f'residential_popular_house_3x3_01_{direction}_mask.png'
+              src = source / filename
+              if not src.is_file():
+                  raise SystemExit(f'missing {src}')
+              raw = src.read_bytes()
+              if hashlib.sha256(raw).hexdigest() != expected[direction]:
+                  raise SystemExit(f'{direction}: SHA mismatch')
+              if raw[:8] != b'\x89PNG\r\n\x1a\n' or raw[12:16] != b'IHDR' or struct.unpack('>II', raw[16:24]) != (256, 256):
+                  raise SystemExit(f'{direction}: invalid PNG size')
+              target = dst / filename
+              shutil.copyfile(src, target)
+              promoted[direction] = {'path': target.as_posix(), 'sha256': expected[direction]}
+
+          definition_path = Path('assets/definitions/residential_popular_house_01.json')
+          definition = json.loads(definition_path.read_text(encoding='utf-8'))
+          definition['colorMask'] = {
+              'contract': 'CH_COLOR_MASK_V1',
+              'enabled': True,
+              'channels': {'R': 'wall', 'G': 'roof'},
+              'alpha': 'coverage',
+              'sprites': {
+                  '0': promoted['south']['path'],
+                  '1': promoted['west']['path'],
+                  '2': promoted['north']['path'],
+                  '3': promoted['east']['path'],
+              },
+          }
+          definition_path.write_text(json.dumps(definition, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          manifest_path = dst / 'residential_popular_house_3x3_01_runtime_manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['colorMask'] = {
+              'contract': 'CH_COLOR_MASK_V1',
+              'sourceWorkflowRun': 36584187772,
+              'sourceArtifactId': 11041162241,
+              'sourceCommit': 'e7aa71410908a1b8ceac9142303935a3e61d6292',
+              'sourceArtifactDigest': 'sha256:ffe93a5874f55dc8bd83527b1f816ebd311e7dd10607263ba224a2036e8db2fd',
+              'approvedProxySha256': '62d823f3d0e64cd1778e007430340ae5ecee4211ea2a7f02293c50dd5e0f3956',
+              'alpha': 'coverage',
+              'authoredChannels': {'R': 'wall', 'G': 'roof', 'B': 'trim'},
+              'runtimeActiveChannels': {'R': 'wall', 'G': 'roof'},
+              'rotationOrder': ['south', 'west', 'north', 'east'],
+              'sprites': promoted,
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit Casa Popular masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            assets/definitions/residential_popular_house_01.json \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_south_mask.png \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_west_mask.png \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_north_mask.png \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_east_mask.png \
+            assets/buildings/residential_popular_house_3x3_01/residential_popular_house_3x3_01_runtime_manifest.json
+          if git diff --cached --quiet; then
+            echo "Casa Popular masks already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote Casa Popular color masks"
           git pull --rebase origin main
           git push origin HEAD:main
