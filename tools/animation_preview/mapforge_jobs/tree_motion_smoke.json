@@ -1,0 +1,69 @@
+{
+  "contract": "CH_VIDEO_SCENARIO_V1",
+  "id": "mapforge.tree.motion_smoke",
+  "reviewOnly": true,
+  "fps": 15,
+  "durationSeconds": 4,
+  "mapforgeCandidateFile": "assets/tree/park_tree_angico_final_v1.png",
+  "mapforgeBaseRequestFile": "C++/MapForge2/examples/map_capture/capture_request.json",
+  "baseRequestFile": "C++/MapForge2/examples/map_capture/capture_request.json",
+  "renderer": {
+    "cwd": ".",
+    "command": ["placeholder"]
+  },
+  "events": [
+    {
+      "time": 0,
+      "set": {
+        "capture.candidate.showFootprint": false,
+        "capture.candidate.showAnchor": false,
+        "capture.stage.drawGrid": true
+      }
+    },
+    {
+      "time": 3.2,
+      "set": {
+        "capture.stage.drawGrid": false
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "path": "capture.candidate.tile",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": [-2.0, 1.0]},
+        {"time": 2.0, "value": [0.0, 0.0]},
+        {"time": 4.0, "value": [2.0, -1.0]}
+      ]
+    },
+    {
+      "path": "capture.camera.focusTile",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": [-1.0, 0.5]},
+        {"time": 4.0, "value": [1.0, -0.5]}
+      ]
+    },
+    {
+      "path": "capture.camera.zoom",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": 0.82},
+        {"time": 2.0, "value": 1.02},
+        {"time": 4.0, "value": 0.92}
+      ]
+    }
+  ],
+  "gif": {
+    "enabled": true,
+    "durationMs": 67,
+    "output": "tree_motion_smoke.gif",
+    "contactSheet": "tree_motion_smoke_contact_sheet.png"
+  },
+  "video": {
+    "enabled": true,
+    "fps": 15,
+    "output": "tree_motion_smoke.mp4"
+  }
+}
