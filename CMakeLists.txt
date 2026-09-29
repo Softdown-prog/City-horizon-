@@ -160,6 +160,16 @@ if(BUILD_TESTING)
         NAME terrain_heightfield_test
         COMMAND terrain_heightfield_test
     )
+
+    add_executable(procedural_road_lane_connector_test
+        src/procedural_road_lane_connector_test.cpp
+    )
+    target_link_libraries(procedural_road_lane_connector_test PRIVATE ch_render ch_core SDL3::SDL3)
+    add_test(
+        NAME procedural_road_lane_connector_test
+        COMMAND procedural_road_lane_connector_test
+    )
+
     add_executable(building_system_test
         src/building_system_test.cpp
         src/building_system.cpp
@@ -455,87 +465,4 @@ if(BUILD_TESTING)
         NAME shoreline_autotile_test
         COMMAND shoreline_autotile_test
     )
-
-    add_executable(shoreline_pilot_runtime
-        src/shoreline_pilot_runtime.cpp
-    )
-    target_link_libraries(shoreline_pilot_runtime PRIVATE ch_core ch_render SDL3::SDL3)
-endif()
-
-if(MSVC)
-    target_compile_options(city_builder PRIVATE /W4 /permissive-)
-    target_compile_options(ch_core PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(city_builder PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(ch_core PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# Keep the runtime asset path independent from the IDE's working directory.
-add_custom_command(TARGET city_builder POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:SDL3::SDL3-shared>"
-        "$<TARGET_FILE_DIR:city_builder>"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/assets"
-        "$<TARGET_FILE_DIR:city_builder>/assets"
-)
-
-# Package the visual candidate for the explicit F7/F8 review. Keep its files
-# in tools/visitor_forge_2d rather than classifying them as approved assets.
-option(CH_VISITOR_FORGE_PREVIEW "Copy Visitor Forge preview frames for the F7/F8 pedestrian test" ON)
-if(CH_VISITOR_FORGE_PREVIEW)
-    target_compile_definitions(city_builder PRIVATE CH_VISITOR_FORGE_PREVIEW=1)
-    # A preview PNG can change without recompiling C++; refresh the packaged
-    # frames on every explicit city_builder build during visual iteration.
-    add_custom_target(visitor_forge_preview_copy
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/south_front_candidate_v1"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_south_front_candidate.json"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_south_front_candidate.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_full_pose_east_candidate.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/runtime_preview/visitor_male_01_structural_gait_v2_candidate.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/frames_preview"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/frames_preview"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/south_front_candidate_v1/south_idle.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/south_front_candidate_v1/south_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/south_front_candidate_v1/south_walk_b.png"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/south_front_candidate_v1"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/east_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/east_walk_b.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/north_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/north_walk_b.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/west_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1/west_walk_b.png"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v1"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1/east_walk_b.png"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/full_pose_east_candidate_v1"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/east_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/east_walk_b.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/north_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/north_walk_b.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/west_walk_a.png"
-            "${CMAKE_SOURCE_DIR}/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2/west_walk_b.png"
-            "$<TARGET_FILE_DIR:city_builder>/tools/visitor_forge_2d/art/concepts/directional_gait_candidate_v2"
-        COMMENT "Refreshing Visitor Forge review frames beside city_builder"
-    )
-    add_dependencies(city_builder visitor_forge_preview_copy)
 endif()
