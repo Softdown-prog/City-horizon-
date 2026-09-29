@@ -8,30 +8,58 @@
   "style": {
     "family": "classic_tycoon_pre_rendered",
     "silhouette": "friendly_professional_clown",
-    "avoid": ["flat_mask_face", "painted_overlay_wig", "photorealism", "horror_clown"]
+    "readabilityTarget": "gameplay_48x64",
+    "volumePriority": ["head", "wig", "jacket", "trousers", "shoes"],
+    "avoid": [
+      "flat_mask_face",
+      "painted_overlay_wig",
+      "uniform_repeated_hair_balls",
+      "oversized_red_nose",
+      "muddy_red_mouth_patch",
+      "flat_split_suit",
+      "photorealism",
+      "horror_clown"
+    ]
   },
   "palette": {
     "skin": [0.96, 0.67, 0.50, 1.0],
     "makeupWhite": [0.96, 0.95, 0.90, 1.0],
     "wig": [0.78, 0.11, 0.035, 1.0],
+    "wigHighlight": [0.94, 0.20, 0.06, 1.0],
     "nose": [0.92, 0.035, 0.025, 1.0],
+    "mouth": [0.62, 0.05, 0.07, 1.0],
     "eyeMakeup": [0.08, 0.38, 0.78, 1.0],
-    "jacketPrimary": [0.48, 0.06, 0.62, 1.0],
-    "jacketSecondary": [0.03, 0.60, 0.67, 1.0],
-    "shirt": [0.96, 0.90, 0.13, 1.0],
-    "pantsLeft": [0.96, 0.68, 0.03, 1.0],
-    "pantsRight": [0.02, 0.61, 0.69, 1.0],
-    "shoeLeft": [0.96, 0.68, 0.03, 1.0],
-    "shoeRight": [0.08, 0.16, 0.27, 1.0]
+    "ruff": [0.96, 0.95, 0.90, 1.0],
+    "buttons": [0.96, 0.82, 0.16, 1.0],
+    "jacketPrimary": [0.86, 0.10, 0.06, 1.0],
+    "jacketSecondary": [0.03, 0.50, 0.88, 1.0],
+    "pantsLeft": [0.03, 0.50, 0.88, 1.0],
+    "pantsRight": [0.86, 0.10, 0.06, 1.0],
+    "shoeLeft": [0.05, 0.12, 0.19, 1.0],
+    "shoeRight": [0.05, 0.12, 0.19, 1.0]
   },
   "geometry": {
     "bodyScale": 2.15,
     "headRadius": 0.18,
-    "wigPuffRadius": 0.105,
+    "faceAspect": [0.92, 1.08],
+    "noseRadius": 0.035,
+    "wigPuffRadius": 0.095,
+    "wigPuffCount": 8,
+    "wigAsymmetry": 0.18,
     "limbRadius": 0.055,
+    "jacketDepth": 0.035,
+    "ruffDepth": 0.028,
     "shoeLength": 0.28,
     "shoeWidth": 0.14,
     "shoeHeight": 0.10
   },
+  "detailRules": {
+    "face": "clean_white_makeup_with_small_bulb_nose_separate_smile_and_small_blue_eye_accents",
+    "wig": "irregular_asymmetric_tufts_with_highlight_and_inner_shadow",
+    "jacket": "red_blue_split_with_center_seam_lapel_highlights_white_ruff_and_two_gold_buttons",
+    "depth": "rear_and_outer_planes_darker_front_planes_lighter",
+    "locomotion": "never_modify_approved_walk_pose_phase_or_ground_anchor"
+  },
+  "overlaySource": "tools/ch_actor_lab/build_clown_costume.py",
   "proxy": {"poseIndex": 2, "direction": "south"}
 }
