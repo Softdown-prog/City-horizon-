@@ -1,0 +1,16 @@
+{
+  "contract": "CH_VISUAL_REFERENCE_DESCRIPTOR_V1",
+  "id": "residential_popular_house_01_reference",
+  "source": "user_supplied_chat_image",
+  "sourceSha256": "6a3f2c1bcd81423fcffee0503359faed20a4661b4d784256f8dca7ea527cf130",
+  "sourceSize": [1248, 1248],
+  "usage": "art_direction_only",
+  "notes": [
+    "Use only as broad art direction for an original City Horizon starter residence; do not trace or reconstruct literally.",
+    "Primary read: single-storey sage-green house, dark slate roof, cream trim, warm windows, front porch and attached one-car garage.",
+    "Secondary read: stone lower accents, brown front door, chimney, restrained private shrubs and flowers.",
+    "Do not bake public sidewalk, curb, road or a large tree into the building asset; those remain runtime systems/placeable vegetation.",
+    "Keep private entry steps and a short private driveway/path readable, but contained inside the building footprint.",
+    "Target classic tycoon miniature readability under CH_CAMERA_V1."
+  ]
+}
