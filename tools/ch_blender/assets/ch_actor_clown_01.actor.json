@@ -2,6 +2,7 @@
   "contract": "CH_ACTOR_BLENDER_CHARACTER_V1",
   "assetId": "ch_actor_clown_01",
   "motionContract": "tools/ch_actor_lab/motion/ch_actor_walk_v1.json",
+  "costumeContract": "CH_ACTOR_COSTUME_V3",
   "cameraContract": "CH_CAMERA_V1",
   "runtimeTarget": "2D_RGBA_pre_rendered_sprite",
   "footprint": {"widthTiles": 1, "depthTiles": 1},
@@ -9,7 +10,7 @@
     "family": "classic_tycoon_pre_rendered",
     "silhouette": "friendly_professional_clown",
     "readabilityTarget": "gameplay_48x64",
-    "volumePriority": ["head", "wig", "jacket", "trousers", "shoes"],
+    "volumePriority": ["head", "wig", "jacket", "sleeves", "trousers", "shoes"],
     "avoid": [
       "flat_mask_face",
       "painted_overlay_wig",
@@ -17,6 +18,8 @@
       "oversized_red_nose",
       "muddy_red_mouth_patch",
       "flat_split_suit",
+      "base_actor_sleeves_showing_through_costume",
+      "costume_tinted_shoes",
       "photorealism",
       "horror_clown"
     ]
@@ -30,6 +33,7 @@
     "mouth": [0.62, 0.05, 0.07, 1.0],
     "eyeMakeup": [0.08, 0.38, 0.78, 1.0],
     "ruff": [0.96, 0.95, 0.90, 1.0],
+    "gloves": [0.97, 0.97, 0.92, 1.0],
     "buttons": [0.96, 0.82, 0.16, 1.0],
     "jacketPrimary": [0.86, 0.10, 0.06, 1.0],
     "jacketSecondary": [0.03, 0.50, 0.88, 1.0],
@@ -46,7 +50,9 @@
     "wigPuffRadius": 0.095,
     "wigPuffCount": 8,
     "wigAsymmetry": 0.18,
+    "wigUnderMass": true,
     "limbRadius": 0.055,
+    "sleeveFollowsApprovedArmJoints": true,
     "jacketDepth": 0.035,
     "ruffDepth": 0.028,
     "shoeLength": 0.28,
@@ -55,10 +61,13 @@
   },
   "detailRules": {
     "face": "clean_white_makeup_with_small_bulb_nose_separate_smile_and_small_blue_eye_accents",
-    "wig": "irregular_asymmetric_tufts_with_highlight_and_inner_shadow",
-    "jacket": "red_blue_split_with_center_seam_lapel_highlights_white_ruff_and_two_gold_buttons",
-    "depth": "rear_and_outer_planes_darker_front_planes_lighter",
-    "locomotion": "never_modify_approved_walk_pose_phase_or_ground_anchor"
+    "wig": "connected_under_mass_with_irregular_asymmetric_tufts_highlight_and_sparse_curl_seams",
+    "jacket": "red_blue_split_with_center_seam_lit_front_planes_white_ruff_and_two_gold_buttons",
+    "arms": "dress_exact_approved_arm_joints_with_split_costume_sleeves_white_cuffs_and_white_gloves",
+    "back": "render_split_back_planes_and_back_ruff_instead_of_exposing_base_actor_costume",
+    "shoes": "fixed_dark_authored_art_outside_costume_tint_channels",
+    "depth": "far_arm_before_torso_near_arm_after_torso_rear_and_outer_planes_darker_front_planes_lighter",
+    "locomotion": "never_modify_approved_walk_pose_phase_frame_names_or_ground_anchor"
   },
   "overlaySource": "tools/ch_actor_lab/build_clown_costume.py",
   "proxy": {"poseIndex": 2, "direction": "south"}
