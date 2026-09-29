@@ -1,7 +1,7 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
   "source": {
-    "repositoryFile": "assets/tree/park_tree_angico_final_v1.png"
+    "repositoryFile": "assets/ui/chrome/panel_build_catalog_9slice_v1.png"
   },
   "output": {
     "file": "mapforge_asset_capture.png",
@@ -14,9 +14,9 @@
       "background": "#283b31"
     },
     "camera": {
-      "zoom": 0.92,
+      "zoom": 1.0,
       "focusTile": [0.0, 0.0],
-      "focusScreen": [0.5, 0.72]
+      "focusScreen": [0.5, 0.58]
     },
     "stage": {
       "minTile": -6,
@@ -31,10 +31,10 @@
     "candidate": {
       "tile": [0, 0],
       "footprint": [1, 1],
-      "scale": 1.0,
-      "offsetPixels": [0, 0],
-      "showFootprint": true,
-      "showAnchor": true,
+      "scale": 4.0,
+      "offsetPixels": [0, -72],
+      "showFootprint": false,
+      "showAnchor": false,
       "renderAsGroundTile": false,
       "footprintColor": "#f6c448"
     },
