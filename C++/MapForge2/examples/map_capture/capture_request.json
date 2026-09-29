@@ -1,5 +1,6 @@
 {
   "contract": "MAPFORGE_CAPTURE_REQUEST_V1",
+  "requestTag": "nine-slice-ui-pilot-mapforge-002",
   "source": {
     "repositoryFile": "assets/ui/chrome/panel_build_catalog_9slice_v1.png"
   },
