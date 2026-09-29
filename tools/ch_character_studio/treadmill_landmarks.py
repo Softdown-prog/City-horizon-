@@ -4,9 +4,10 @@
 The sprite walk is intentionally treadmill/in-place: the canonical ground anchor
 never moves. Runtime/world translation is a separate engine concern.
 
-V3 keeps the approved stride timing and horizontal opening while applying a
-conservative character-art polish to vertical lift, body bob, arm extremes and,
-most importantly, ankle/toe travel for readable clown shoes.
+V4 keeps the approved 8-frame timing, horizontal stride and V3 shoe path while
+polishing the leg chain itself: the knee follows less of the foot depth excursion,
+uses a lower lift, and bends through a smoother arc so the thigh/shin do not read
+as a stiff marching leg at extreme poses.
 """
 from __future__ import annotations
 
@@ -23,18 +24,20 @@ SCALE = 52
 DIRECTIONS = (("S", 0.0), ("E", math.pi / 2), ("W", -math.pi / 2), ("N", math.pi))
 FRAMES = ("idle",) + tuple(f"walk_{i:02d}" for i in range(8))
 
-# V2 body polish retained.
+# Conservative body polish retained from V2/V3.
 LEG_VERTICAL_GAIN = 0.86
-KNEE_LIFT_GAIN = 0.88
 BODY_BOB_GAIN = 0.75
 ARM_EXTREME_GAIN = 0.92
 ARM_ELBOW_GAIN = 0.94
 
-# V3 feet: keep stride/depth, but reduce shoe lift and ankle pop independently.
-# The shoe renderer also limits visual shoe rotation; these values only shape
-# the approved locomotion landmarks used by the segmented art rig.
+# V3 feet retained exactly: foot stride/depth remains unchanged.
 ANKLE_LIFT_GAIN = 0.84
 FOOT_LIFT_GAIN = 0.74
+
+# V4 legs: calm the knee without shortening the step.
+KNEE_LIFT_GAIN = 0.78
+KNEE_DEPTH_FOLLOW = 0.34
+KNEE_FORWARD_BEND = 0.020
 
 
 def smooth_positive(value: float) -> float:
@@ -85,18 +88,24 @@ def pose_points(direction: float, phase: float, *, idle: bool = False) -> dict[s
 
         swing = sign * sine
         hip = (sign * .078, .405, 0)
+
+        # Authoritative foot depth/stride path. V4 deliberately does not change
+        # this value, so the V3 shoe/contact work remains intact.
         z = .145 * swing + .025 * sign * cosine
         swing_lift = smooth_positive(swing)
         transfer_lift = smooth_positive(sign * cosine)
         lifted = LEG_VERTICAL_GAIN * (swing_lift * .032 + transfer_lift * .012)
 
-        # Hip/knee stay on the approved V2 path. Only ankle/toe vertical travel
-        # is damped further so the big clown shoe does not jump or stand upright.
+        # Knee motion is intentionally calmer than the foot. It follows only a
+        # portion of the foot depth excursion and uses a smaller forward-bend
+        # term. This lets the shin articulate while the thigh remains readable.
         knee = (
             sign * .08,
             .225 + lifted * .33 * KNEE_LIFT_GAIN,
-            z * .42 - .028 * KNEE_LIFT_GAIN * swing_lift,
+            z * KNEE_DEPTH_FOLLOW - KNEE_FORWARD_BEND * swing_lift,
         )
+
+        # V3 ankle/toe path is kept byte-for-byte in formula/coefficients.
         base_x = sign * (.082 + .008 * abs(sine))
         ankle = (base_x, .035 + lifted * ANKLE_LIFT_GAIN + .055, z - .016)
         toe = (base_x, .035 + lifted * FOOT_LIFT_GAIN, z + .085)
@@ -142,15 +151,18 @@ def build() -> dict:
         "source": "tools/ch_actor_lab/software_render.py approved 8-frame locomotion",
         "motionMode": "treadmill_in_place",
         "walkPolish": {
-            "version": "V3_foot_polish",
+            "version": "V4_leg_polish",
             "legVerticalGain": LEG_VERTICAL_GAIN,
             "kneeLiftGain": KNEE_LIFT_GAIN,
+            "kneeDepthFollow": KNEE_DEPTH_FOLLOW,
+            "kneeForwardBend": KNEE_FORWARD_BEND,
             "ankleLiftGain": ANKLE_LIFT_GAIN,
             "footLiftGain": FOOT_LIFT_GAIN,
             "bodyBobGain": BODY_BOB_GAIN,
             "armExtremeGain": ARM_EXTREME_GAIN,
             "armElbowGain": ARM_ELBOW_GAIN,
             "horizontalStridePreserved": True,
+            "v3FootPathPreserved": True,
             "footLiftEasing": "smoothstep_positive_half_wave",
         },
         "worldTranslation": "runtime_only_separate_from_sprite_cycle",
