@@ -43,6 +43,13 @@ QPolygonF tilePolygon(const int x, const int y, const ch::CameraState& camera,
     return QPolygonF{QPointF(a.x, a.y), QPointF(b.x, b.y), QPointF(c.x, c.y), QPointF(d.x, d.y)};
 }
 
+QPointF fenceVertexToScreen(const FenceVertex vertex, const ch::CameraState& camera,
+                            const float viewportW, const float viewportH) {
+    const auto screen = ch::world_to_screen_point(static_cast<float>(vertex.x), static_cast<float>(vertex.y),
+                                                   camera, viewportW, viewportH);
+    return QPointF(screen.x, screen.y);
+}
+
 } // namespace
 
 EditorCanvas::EditorCanvas(QWidget* parent)
@@ -107,6 +114,9 @@ bool EditorCanvas::loadCanonicalScenario(const std::string& path, std::string* e
     tool_ = EditorTool::Inspect;
     history_.clear();
     hover_tile_.reset();
+    fence_drag_active_ = false;
+    fence_drag_start_.reset();
+    fence_drag_current_.reset();
     camera_.zoom = 1.0F;
     centerCamera();
     render_timer_->start();
@@ -122,6 +132,9 @@ void EditorCanvas::newScratchMap(const int width, const int height) {
     document_.newEmpty(width, height);
     history_.clear();
     hover_tile_.reset();
+    fence_drag_active_ = false;
+    fence_drag_start_.reset();
+    fence_drag_current_.reset();
     tool_ = EditorTool::Inspect;
     camera_ = ch::CameraState{};
     camera_.zoom = 1.0F;
@@ -133,6 +146,7 @@ void EditorCanvas::newScratchMap(const int width, const int height) {
 bool EditorCanvas::resizeScratchMap(const int width, const int height) {
     if (canonical_mode_) return false;
     if (stroke_active_) endStroke();
+    if (fence_drag_active_) endFenceDrag(false);
 
     if (!document_.resize(width, height)) return false;
 
@@ -149,6 +163,7 @@ bool EditorCanvas::resizeScratchMap(const int width, const int height) {
 
 void EditorCanvas::setTool(const EditorTool tool) {
     if (stroke_active_) endStroke();
+    if (fence_drag_active_) endFenceDrag(false);
     tool_ = canonical_mode_ ? EditorTool::Inspect : tool;
     update();
 }
@@ -186,6 +201,7 @@ void EditorCanvas::panBy(const float dx, const float dy) {
 void EditorCanvas::undo() {
     if (canonical_mode_) return;
     if (stroke_active_) endStroke();
+    if (fence_drag_active_) endFenceDrag(false);
     if (history_.undo(document_)) {
         update();
         if (onHistoryChanged) onHistoryChanged();
@@ -195,6 +211,7 @@ void EditorCanvas::undo() {
 void EditorCanvas::redo() {
     if (canonical_mode_) return;
     if (stroke_active_) endStroke();
+    if (fence_drag_active_) endFenceDrag(false);
     if (history_.redo(document_)) {
         update();
         if (onHistoryChanged) onHistoryChanged();
@@ -257,7 +274,8 @@ std::vector<QPoint> EditorCanvas::bresenham(const QPoint& from, const QPoint& to
 }
 
 void EditorCanvas::beginStroke(const QPoint& tile) {
-    if (canonical_mode_ || tool_ == EditorTool::Inspect || !document_.inBounds(tile.x(), tile.y())) return;
+    if (canonical_mode_ || tool_ == EditorTool::Inspect || tool_ == EditorTool::Fence
+        || !document_.inBounds(tile.x(), tile.y())) return;
     stroke_active_ = true;
     active_changes_.clear();
     last_stroke_tile_ = tile;
@@ -289,6 +307,33 @@ void EditorCanvas::endStroke() {
     if (onHistoryChanged) onHistoryChanged();
 }
 
+void EditorCanvas::beginFenceDrag(const QPoint& vertex) {
+    if (canonical_mode_ || tool_ != EditorTool::Fence || !document_.inBounds(vertex.x(), vertex.y())) return;
+    fence_drag_active_ = true;
+    fence_drag_start_ = vertex;
+    fence_drag_current_ = vertex;
+    update();
+}
+
+void EditorCanvas::updateFenceDrag(const QPoint& vertex) {
+    if (!fence_drag_active_ || !document_.inBounds(vertex.x(), vertex.y())) return;
+    fence_drag_current_ = vertex;
+    update();
+}
+
+void EditorCanvas::endFenceDrag(const bool commit) {
+    if (!fence_drag_active_) return;
+    if (commit && fence_drag_start_ && fence_drag_current_) {
+        const FenceVertex start{fence_drag_start_->x(), fence_drag_start_->y()};
+        const FenceVertex end{fence_drag_current_->x(), fence_drag_current_->y()};
+        (void)document_.placeFenceDrag(start, end);
+    }
+    fence_drag_active_ = false;
+    fence_drag_start_.reset();
+    fence_drag_current_.reset();
+    update();
+}
+
 void EditorCanvas::paintBrushAt(const QPoint& tile) {
     const int radius = (brush_size_ - 1) / 2;
     for (int y = tile.y() - radius; y <= tile.y() + radius; ++y) {
@@ -317,6 +362,7 @@ void EditorCanvas::mutateTile(const int x, const int y) {
         case EditorTool::Erase:
             document_.setTile(x, y, TileState{});
             break;
+        case EditorTool::Fence:
         case EditorTool::Inspect:
             break;
     }
@@ -358,8 +404,39 @@ void EditorCanvas::paintEvent(QPaintEvent*) {
         }
     }
 
+    // Scratch preview draws the authoritative runtime segments themselves. Art
+    // selection is tested by FenceRuntimeAdapter/MapForge2ParkFencePreview; this
+    // line overlay intentionally keeps editor interaction cheap while dragging.
+    QPen fenceShadow(QColor(8, 15, 12, 130));
+    fenceShadow.setWidthF(5.0);
+    QPen fencePen(QColor(39, 77, 61));
+    fencePen.setWidthF(3.0);
+    for (const FenceSegment& segment : document_.fences().segments()) {
+        const QPointF a = fenceVertexToScreen(segment.from, camera_, viewportW, viewportH);
+        const QPointF b = fenceVertexToScreen(segment.to, camera_, viewportW, viewportH);
+        painter.setPen(fenceShadow);
+        painter.drawLine(a + QPointF(1.5, 2.5), b + QPointF(1.5, 2.5));
+        painter.setPen(segment.open_gate ? QPen(QColor(208, 172, 77), 3.0) : fencePen);
+        painter.drawLine(a, b);
+    }
+
+    if (fence_drag_active_ && fence_drag_start_ && fence_drag_current_) {
+        const auto preview = document_.fences().line_between(
+            {fence_drag_start_->x(), fence_drag_start_->y()},
+            {fence_drag_current_->x(), fence_drag_current_->y()});
+        QPen previewPen(QColor(255, 210, 72, 220));
+        previewPen.setWidthF(3.0);
+        previewPen.setStyle(Qt::DashLine);
+        painter.setPen(previewPen);
+        for (std::size_t index = 1; index < preview.size(); ++index) {
+            painter.drawLine(fenceVertexToScreen(preview[index - 1], camera_, viewportW, viewportH),
+                             fenceVertexToScreen(preview[index], camera_, viewportW, viewportH));
+        }
+    }
+
     if (hover_tile_) {
-        const int radius = tool_ == EditorTool::Inspect ? 0 : (brush_size_ - 1) / 2;
+        const int radius = (tool_ == EditorTool::Inspect || tool_ == EditorTool::Fence)
+            ? 0 : (brush_size_ - 1) / 2;
         QPen hoverPen(QColor(255, 210, 72));
         hoverPen.setWidthF(2.0);
         painter.setPen(hoverPen);
@@ -387,7 +464,8 @@ void EditorCanvas::mousePressEvent(QMouseEvent* event) {
     }
 
     if (event->button() == Qt::LeftButton && hover_tile_) {
-        beginStroke(*hover_tile_);
+        if (tool_ == EditorTool::Fence) beginFenceDrag(*hover_tile_);
+        else beginStroke(*hover_tile_);
     }
 }
 
@@ -400,13 +478,18 @@ void EditorCanvas::mouseMoveEvent(QMouseEvent* event) {
     }
 
     updateHover(event->position());
-    if (stroke_active_ && (event->buttons() & Qt::LeftButton) && hover_tile_) {
-        updateStroke(*hover_tile_);
+    if ((event->buttons() & Qt::LeftButton) && hover_tile_) {
+        if (fence_drag_active_) updateFenceDrag(*hover_tile_);
+        else if (stroke_active_) updateStroke(*hover_tile_);
     }
 }
 
 void EditorCanvas::mouseReleaseEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton && tool_ != EditorTool::Inspect) endStroke();
+    if (event->button() == Qt::LeftButton && tool_ == EditorTool::Fence) {
+        endFenceDrag(true);
+    } else if (event->button() == Qt::LeftButton && tool_ != EditorTool::Inspect) {
+        endStroke();
+    }
 
     if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton
         || (event->button() == Qt::LeftButton && tool_ == EditorTool::Inspect)) {
@@ -426,6 +509,13 @@ void EditorCanvas::wheelEvent(QWheelEvent* event) {
 void EditorCanvas::keyPressEvent(QKeyEvent* event) {
     const float step = (event->modifiers() & Qt::ShiftModifier) ? 96.0F : 48.0F;
     switch (event->key()) {
+        case Qt::Key_Escape:
+            if (fence_drag_active_) {
+                endFenceDrag(false);
+                event->accept();
+                return;
+            }
+            break;
         case Qt::Key_Left:
         case Qt::Key_A:
             panBy(-step, 0.0F);
@@ -466,6 +556,7 @@ void EditorCanvas::keyPressEvent(QKeyEvent* event) {
 void EditorCanvas::leaveEvent(QEvent*) {
     hover_tile_.reset();
     if (stroke_active_) endStroke();
+    if (fence_drag_active_) endFenceDrag(false);
     if (pan_active_) {
         pan_active_ = false;
         unsetCursor();
