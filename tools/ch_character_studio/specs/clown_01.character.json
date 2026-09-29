@@ -17,7 +17,14 @@
   "motion": {
     "source": "approved_ch_actor",
     "walkFrames": 8,
-    "allowArtToModifyPose": false
+    "allowArtToModifyPose": false,
+    "spriteMotionMode": "treadmill_in_place",
+    "rootTranslationPx": [0, 0],
+    "groundAnchorLocked": [24, 60],
+    "worldTranslationDuringSpriteCycle": false,
+    "worldMovementOwner": "runtime",
+    "landmarkGenerator": "tools/ch_character_studio/treadmill_landmarks.py",
+    "southWalkBuilder": "tools/ch_character_studio/build_clown_treadmill.py"
   },
   "authoring": {
     "paletteLibrary": "CH_CHARACTER_PALETTE_V1",
@@ -37,6 +44,18 @@
     "review": "out/ch_character_studio/clown_01/south_idle/clown_01_s_idle_review_8x.png",
     "propagationPolicy": "approve_south_idle_then_landmark_transfer_to_south_walk_frames",
     "crossDirectionAutoTransfer": false
+  },
+  "walkPreview": {
+    "status": "candidate_for_visual_review",
+    "mode": "treadmill_in_place",
+    "buildCommand": "python tools/ch_character_studio/build_clown_treadmill.py --seed 1337",
+    "outputGif": "out/ch_character_studio/clown_01/south_walk/clown_01_s_walk_treadmill.gif",
+    "requiredInvariants": [
+      "all_8_frames_share_ground_anchor_24_60",
+      "all_8_frames_have_root_translation_0_0",
+      "sprite_does_not_advance_inside_frame",
+      "runtime_world_motion_is_separate"
+    ]
   },
   "appearance": {
     "body": {
