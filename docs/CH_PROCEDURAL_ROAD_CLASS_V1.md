@@ -114,6 +114,8 @@ The focused source `src/procedural_road_class_test.cpp` covers:
 
 `.github/workflows/ch-procedural-road-priority-check.yml` compiles and executes this test together with the existing STOP/YIELD/priority gate using C++20 on the lightweight Ubuntu runner.
 
+The first class-aware validation run, GitHub Actions run `36621774227`, completed successfully. Both the existing priority-control compile/run steps and the new road-class compile/run steps passed.
+
 ## Explicit non-goals for V1
 
 V1 does not yet implement:
