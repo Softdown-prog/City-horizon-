@@ -1,0 +1,53 @@
+{
+  "contract": "CH_2D_SCENE_RECIPE_V4",
+  "id": "prop_pier_scene_v4",
+  "canvas": [256, 192],
+  "anchor": [128, 166],
+  "seed": 211,
+  "camera": {"contract": "CH_CAMERA_V1", "tile": [128, 64], "yawDeg": 45, "elevationDeg": 30, "projection": "orthographic_dimetric"},
+  "lighting": {"direction": [-1, -1], "shadowOffset": [4, 6]},
+  "finish": {"edgeBreakupPx": 0.55, "surfaceVariation": 0.045, "brushStamps": 18, "brushOpacity": 0.06},
+  "validation": {"minimumOpaqueHeightPx": 54, "maximumOpaqueHeightPx": 176},
+  "symbols": {
+    "post": [
+      {"type": "shape", "primitive": "rounded_rect", "box": [-4, -25, 4, 7], "radius": 2,
+       "material": {"type": "wood", "light": "#B77946", "dark": "#5A321F", "grainAngleDeg": 88, "grainSpacing": 4.2, "grainColor": "#2D180F42"},
+       "effects": {"ambientOcclusion": {"width": 1.6, "strength": 0.22}, "bevel": {"width": 1.0, "strength": 0.28}, "outline": {"width": 0.38, "color": "#372116B0"}}}
+    ],
+    "cleat": [
+      {"type": "shape", "primitive": "capsule", "box": [-5, -1.5, 5, 1.5], "radius": 1.5,
+       "material": {"type": "painted_metal", "base": "#596269", "highlight": "#BCC5C8"},
+       "effects": {"bevel": {"width": 0.55, "strength": 0.24}, "outline": {"width": 0.3, "color": "#2B3034A0"}}}
+    ]
+  },
+  "layers": [
+    {"type": "shape", "primitive": "ellipse", "box": [40, 137, 220, 180], "material": {"type": "solid", "color": "#11192340"}},
+    {"type": "shape", "primitive": "polygon", "points": [[51,112],[88,93],[211,132],[170,158]],
+     "material": {"type": "wood", "light": "#754125", "dark": "#351E15", "grainAngleDeg": 17, "grainSpacing": 5.5, "grainColor": "#21110938"},
+     "effects": {"shadow": {"offset": [4,7], "blur": 3, "color": "#10151B78"}, "ambientOcclusion": {"width": 2.5, "strength": 0.24}, "outline": {"width": 0.46, "color": "#2E1A12C0"}}},
+    {"type": "symbol", "symbol": "post", "transform": {"translate": [63,121]}},
+    {"type": "symbol", "symbol": "post", "transform": {"translate": [164,153]}},
+    {"type": "symbol", "symbol": "post", "transform": {"translate": [202,132]}},
+    {"type": "shape", "primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28,
+     "points": [[48,104],[84,84],[210,124],[168,150]],
+     "material": {"type": "wood", "light": "#C58A53", "dark": "#704126", "grainAngleDeg": 17, "grainSpacing": 4.7, "grainColor": "#3B211542"},
+     "effects": {"ambientOcclusion": {"width": 2.2, "strength": 0.18}, "bevel": {"width": 1.15, "strength": 0.30}, "outline": {"width": 0.45, "color": "#3A2418B8"}}},
+    {"type": "clip_group",
+     "clip": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]},
+     "children": [
+       {"type": "shape", "primitive": "line", "points": [[59,100],[179,138]], "width": 0.7, "material": {"type": "solid", "color": "#F1C18836"}},
+       {"type": "shape", "primitive": "line", "points": [[68,94],[187,132]], "width": 0.6, "material": {"type": "solid", "color": "#3A201628"}}
+     ]},
+    {"type": "shape", "primitive": "cubic", "points": [[61,100],[88,90],[174,122],[201,116]], "width": 2.4,
+     "material": {"type": "rope", "light": "#DEC889", "dark": "#7C6034", "twistSpacing": 4.0},
+     "effects": {"outline": {"width": 0.28, "color": "#4C3A22A0"}, "bevel": {"width": 0.5, "strength": 0.20}}},
+    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [103,102], "rotateDeg": 17}},
+    {"type": "symbol", "symbol": "cleat", "transform": {"translate": [173,124], "rotateDeg": 17}}
+  ],
+  "finishRegions": [
+    {"style": "plank_seams", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]}, "stamps": 9, "opacity": 0.16, "angleDeg": 17},
+    {"style": "wood_wear", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[50,104],[85,86],[206,124],[168,147]]}, "stamps": 38, "opacity": 0.10, "angleDeg": 17},
+    {"style": "edge_wear", "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.28, "points": [[48,104],[84,84],[210,124],[168,150]]}, "stamps": 28, "opacity": 0.12, "angleDeg": 0},
+    {"style": "grime", "mask": {"primitive": "polygon", "points": [[49,113],[88,94],[211,133],[169,158]]}, "stamps": 16, "opacity": 0.07, "angleDeg": 0}
+  ]
+}
