@@ -35,23 +35,32 @@ def parse_color(value: str) -> tuple[int, int, int, int]:
     return rgb + (alpha,)
 
 
-def draw_op(draw: ImageDraw.ImageDraw, op: dict, mask_mode: bool = False) -> None:
+def scale_box(box: list[int] | tuple[int, ...], scale: int) -> tuple[int, int, int, int]:
+    x0, y0, x1, y1 = map(int, box)
+    return (x0 * scale, y0 * scale, (x1 + 1) * scale - 1, (y1 + 1) * scale - 1)
+
+
+def draw_op(draw: ImageDraw.ImageDraw, op: dict, mask_mode: bool = False, scale: int = 1) -> None:
     kind = op.get("type")
     color = CHANNEL_RGB.get(op.get("channel")) if mask_mode else parse_color(op.get("color", "#FFFFFF"))
     if mask_mode and color is None:
         raise ValueError("mask operation requires channel R/G/B")
     if kind == "pixel":
-        draw.point((int(op["x"]), int(op["y"])), fill=color)
+        x, y = int(op["x"]), int(op["y"])
+        if scale == 1:
+            draw.point((x, y), fill=color)
+        else:
+            draw.rectangle((x * scale, y * scale, (x + 1) * scale - 1, (y + 1) * scale - 1), fill=color)
     elif kind == "rect":
-        draw.rectangle(tuple(map(int, op["box"])), fill=color)
+        draw.rectangle(scale_box(op["box"], scale), fill=color)
     elif kind == "ellipse":
-        draw.ellipse(tuple(map(int, op["box"])), fill=color)
+        draw.ellipse(scale_box(op["box"], scale), fill=color)
     elif kind == "polygon":
-        points = [tuple(map(int, p)) for p in op["points"]]
+        points = [(int(x) * scale, int(y) * scale) for x, y in op["points"]]
         draw.polygon(points, fill=color)
     elif kind == "line":
-        points = [tuple(map(int, p)) for p in op["points"]]
-        draw.line(points, fill=color, width=max(1, int(op.get("width", 1))), joint="curve")
+        points = [(int(x) * scale, int(y) * scale) for x, y in op["points"]]
+        draw.line(points, fill=color, width=max(1, int(op.get("width", 1)) * scale), joint="curve")
     else:
         raise ValueError(f"unsupported primitive: {kind}")
 
@@ -73,18 +82,25 @@ def validate_recipe(recipe: dict) -> None:
         raise ValueError("target.kind must be artLayer or maskBank")
     if not isinstance(recipe.get("operations"), list):
         raise ValueError("operations must be an array")
+    supersample = recipe.get("supersample", 1)
+    if not isinstance(supersample, int) or not 1 <= supersample <= 8:
+        raise ValueError("supersample must be an integer from 1 to 8")
+    if kind == "maskBank" and supersample != 1:
+        raise ValueError("maskBank recipes must use supersample=1 to keep RGB channels exact")
 
 
 def render(recipe: dict, seed: int) -> Image.Image:
     validate_recipe(recipe)
     rng = random.Random(seed)
-    image = Image.new("RGBA", FRAME, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
     mask_mode = recipe["target"]["kind"] == "maskBank"
+    supersample = 1 if mask_mode else int(recipe.get("supersample", 1))
+    working_frame = (FRAME[0] * supersample, FRAME[1] * supersample)
+    image = Image.new("RGBA", working_frame, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
     for raw in recipe["operations"]:
         op = dict(raw)
         # Optional deterministic jitter is deliberately tiny and opt-in. It is
-        # useful for painted texture tests without making normal vector recipes noisy.
+        # useful for painted texture tests without making normal recipes noisy.
         jitter = int(op.pop("jitterPx", 0) or 0)
         if jitter:
             dx, dy = rng.randint(-jitter, jitter), rng.randint(-jitter, jitter)
@@ -95,7 +111,9 @@ def render(recipe: dict, seed: int) -> Image.Image:
                 op["box"] = [x0 + dx, y0 + dy, x1 + dx, y1 + dy]
             if "points" in op:
                 op["points"] = [[int(x) + dx, int(y) + dy] for x, y in op["points"]]
-        draw_op(draw, op, mask_mode=mask_mode)
+        draw_op(draw, op, mask_mode=mask_mode, scale=supersample)
+    if supersample > 1:
+        image = image.resize(FRAME, Image.Resampling.LANCZOS)
     return image
 
 
@@ -119,6 +137,7 @@ def main() -> int:
             "seed": args.seed,
             "target": recipe["target"],
             "frameSize": list(FRAME),
+            "supersample": int(recipe.get("supersample", 1)),
             "output": str(out_path),
             "sha256": digest
         }
