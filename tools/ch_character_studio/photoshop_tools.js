@@ -136,13 +136,27 @@
     }
   }
 
+  function deactivateExternal(silent=true) {
+    if (!activeTool) return;
+    activeTool = null;
+    overlay.style.pointerEvents = "none";
+    for (const button of Object.values(toolButtons)) button?.classList.remove("active");
+    drawOverlay();
+    if (!silent) status("Ferramenta Photoshop desativada.");
+  }
+
   function setTool(name) {
-    activeTool = activeTool === name ? null : name;
-    API.setTool(activeTool ? "external" : "brush");
-    overlay.style.pointerEvents = activeTool ? "auto" : "none";
+    if (activeTool === name) {
+      deactivateExternal(false);
+      API.setTool("brush");
+      return;
+    }
+    activeTool = name;
+    API.setTool("external");
+    overlay.style.pointerEvents = "auto";
     for (const [key, button] of Object.entries(toolButtons)) if (button) button.classList.toggle("active", activeTool === key);
     const labels={rect:"Seleção retangular",lasso:"Laço",move:"Mover seleção",eyedropper:"Conta-gotas",bucket:"Balde"};
-    status(activeTool ? `${labels[activeTool]} ativo.` : "Ferramenta Photoshop desativada.");
+    status(`${labels[activeTool]} ativo.`);
     drawOverlay();
   }
 
@@ -186,7 +200,7 @@
       if (x>0) stack.push([x-1,y]); if (x<W-1) stack.push([x+1,y]);
       if (y>0) stack.push([x,y-1]); if (y<H-1) stack.push([x,y+1]);
     }
-    c.putImageData(image,0,0); API.redraw(); status(`Balde aplicado · tolerância ${tol}.`);
+    c.putImageData(image,0,0); API.redraw(); API.saveFrame(); status(`Balde aplicado · tolerância ${tol}.`);
   }
 
   function fillSelection() {
@@ -198,7 +212,7 @@
       if (selected && !selection[i]) continue;
       const p=i*4; image.data[p]=rgba[0]; image.data[p+1]=rgba[1]; image.data[p+2]=rgba[2]; image.data[p+3]=255;
     }
-    c.putImageData(image,0,0); API.redraw(); status(selected?"Seleção preenchida.":"Camada inteira preenchida.");
+    c.putImageData(image,0,0); API.redraw(); API.saveFrame(); status(selected?"Seleção preenchida.":"Camada inteira preenchida.");
   }
 
   function deleteSelection() {
@@ -207,7 +221,7 @@
     API.checkpoint("delete_selection");
     const c=canvas.getContext("2d"); const image=c.getImageData(0,0,W,H);
     for (let i=0;i<W*H;i++) if (selection[i]) image.data[i*4+3]=0;
-    c.putImageData(image,0,0); API.redraw(); status("Pixels selecionados apagados.");
+    c.putImageData(image,0,0); API.redraw(); API.saveFrame(); status("Pixels selecionados apagados.");
   }
 
   function selectionMaskCanvas() {
@@ -253,7 +267,7 @@
     const c=canvas.getContext("2d"); c.imageSmoothingEnabled=false; c.drawImage(transformed,0,0);
     const maskTransformed=transformedCanvas(mask,dx,dy,scale,angle,fh,fv).getContext("2d").getImageData(0,0,W,H).data;
     selection.fill(0); for (let i=0;i<W*H;i++) if (maskTransformed[i*4+3]) selection[i]=1;
-    API.redraw(); drawOverlay(); status(`Transform aplicado: Δ(${dx},${dy}) · ${Math.round(scale*100)}% · ${angle}°.`);
+    API.redraw(); API.saveFrame(); drawOverlay(); status(`Transform aplicado: Δ(${dx},${dy}) · ${Math.round(scale*100)}% · ${angle}°.`);
   }
 
   function syncLayerControls() {
@@ -299,6 +313,7 @@
   overlay.addEventListener("pointercancel",()=>{dragStart=dragPoint=null;lassoPoints=[];moving=false;drawOverlay();});
 
   for (const [name,button] of Object.entries(toolButtons)) if (button) button.addEventListener("click",()=>setTool(name));
+  for (const id of ["brushBtn","eraserBtn","shapeBtn"]) document.getElementById(id)?.addEventListener("click",()=>deactivateExternal(true));
   undoBtn?.addEventListener("click",()=>API.undo());
   redoBtn?.addEventListener("click",()=>API.redo());
   deselectBtn?.addEventListener("click",clearSelection);
@@ -309,11 +324,13 @@
     Math.max(.05,(Number(transformScale.value)||100)/100), Number(transformRotate.value)||0,
     Boolean(flipH.checked), Boolean(flipV.checked)
   ));
+  layerOpacity?.addEventListener("pointerdown",()=>API.checkpoint("layer_opacity"));
   layerOpacity?.addEventListener("input",()=>{
     const value=Math.max(0,Math.min(100,Number(layerOpacity.value)||0)); layerOpacityLabel.textContent=value;
-    API.setLayerOpacity(API.getActiveLayer(),value/100);
+    API.setLayerOpacity(API.getActiveLayer(),value/100); API.saveFrame();
   });
-  layerBlend?.addEventListener("change",()=>API.setLayerBlendMode(API.getActiveLayer(),layerBlend.value));
+  layerBlend?.addEventListener("focus",()=>API.checkpoint("layer_blend_mode"));
+  layerBlend?.addEventListener("change",()=>{API.setLayerBlendMode(API.getActiveLayer(),layerBlend.value);API.saveFrame();});
 
   window.addEventListener("ch-studio-layer-changed",syncLayerControls);
   window.addEventListener("ch-studio-frame-changed",()=>{clearSelection();syncLayerControls();});
@@ -325,6 +342,7 @@
     if ((ev.ctrlKey||ev.metaKey) && key==="z") { ev.preventDefault(); ev.shiftKey?API.redo():API.undo(); return; }
     if ((ev.ctrlKey||ev.metaKey) && key==="d") { ev.preventDefault(); clearSelection(); return; }
     if (ev.key==="Delete"||ev.key==="Backspace") { if (anySelection()) { ev.preventDefault(); deleteSelection(); } return; }
+    if (["b","e","s"].includes(key)) { deactivateExternal(true); return; }
     if (key==="m") setTool("rect");
     else if (key==="l") setTool("lasso");
     else if (key==="v") setTool("move");
