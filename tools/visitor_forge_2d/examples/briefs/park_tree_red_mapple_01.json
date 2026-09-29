@@ -9,8 +9,8 @@
       "layout": "painted_canopy",
       "profile": "branching",
       "center": [128, 126],
-      "radius": [82, 96],
-      "density": 1.16
+      "radius": [86, 101],
+      "density": 0.78
     },
     "shadowWidth": 92
   }
