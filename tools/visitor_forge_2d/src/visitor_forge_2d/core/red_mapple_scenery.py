@@ -1,9 +1,8 @@
 """Species renderer for the City Horizon Red Mapple family.
 
-The generic broadleaf painter is intentionally simple.  This opt-in renderer
-keeps the same CH_2D_ORGANIC_SCENERY_V1 recipe contract, but builds the crown
-from authored branch endpoints and many small maple-shaped leaves so visible
-wood, negative space and foliage hierarchy survive gameplay 1x.
+This renderer uses the shared Visitor Forge 2D brush library so the Red Mapple
+becomes the first production tree family built from reusable foliage, branch,
+occlusion and silhouette primitives instead of species-local drawing code.
 """
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
+from . import brushes
 from . import organic_scenery as organic
 
 CONTRACT = organic.CONTRACT
@@ -26,63 +26,67 @@ DEFAULT_YAWS = organic.DEFAULT_YAWS
 VIEW_PHASE = organic.VIEW_PHASE
 
 
-def _draw_maple_leaf(draw, x, y, size, angle, color, opacity):
-    """Draw one compact five-lobed maple silhouette at supersampled scale."""
-    # Alternating long and short radii make a readable maple/star leaf after
-    # the 4x -> 1x alpha-safe downsample without adding a dark outline.
-    radii = (1.00, .47, .84, .42, .73, .36, .73, .42, .84, .47)
-    points = []
-    for index, radius in enumerate(radii):
-        theta = angle - math.pi / 2 + index * math.tau / len(radii)
-        stretch_y = .86
-        points.append(((x + math.cos(theta) * size * radius) * WORK_SCALE,
-                       (y + math.sin(theta) * size * radius * stretch_y) * WORK_SCALE))
-    draw.polygon(points, fill=(*organic._hex(color), opacity))
-
-
 def _paint_leaf_group(work, rng, palette, center, radius, *, light_bias=0.0):
-    """Paint one shaded leaf cloud with many small defined maple leaves."""
+    """Paint one layered maple foliage group with shared Forge 2D brushes."""
     cx, cy = center
     rx, ry = radius
     W, H = work.size
-    mask = organic._cloud_mask((W, H), rng, cx, cy, rx, ry, scallops=12)
 
-    # Dark underpainting gives the crown depth while preserving gaps between
-    # neighbouring groups and between branch-borne volumes.
-    top = organic._mix_color(palette["mid_top"], palette["front_top"], .44 + light_bias)
-    bottom = organic._mix_color(palette["mid_bottom"], palette["back_bottom"], .34)
+    # 1) authored medium-scale foliage mass
+    mask = Image.new("L", (W, H))
+    brushes.leaf_cluster_broadleaf(
+        mask, rng, cx, cy, rx, ry,
+        satellites=5,
+        fill=255,
+    )
+
+    # 2) contour breakup + controlled negative space
+    brushes.edge_breakup_stamp(
+        mask, rng, cx, cy, max(rx, ry),
+        count=max(5, round((rx + ry) / 5)),
+        fill=255,
+    )
+    brushes.silhouette_gap_cutter(
+        mask, rng, cx, cy, rx, ry,
+        count=2 if rx < 15 else 3,
+    )
+
+    # Dark underpainting gives depth while preserving gaps between groups.
+    top = organic._mix_color(palette["mid_top"], palette["front_top"], .42 + light_bias)
+    bottom = organic._mix_color(palette["mid_bottom"], palette["back_bottom"], .36)
     organic._composite(work, mask, top, bottom, right_shade=.08)
 
+    # 3) reusable interior occlusion brush
     shade = Image.new("L", (W, H))
-    organic._irregular_blob(shade, rng, cx + rx * .24, cy + ry * .28,
-                            rx * .66, ry * .43, 11, 92, .20)
+    brushes.interior_occlusion_patch(
+        shade, rng,
+        cx + rx * .20,
+        cy + ry * .24,
+        rx * .62,
+        ry * .42,
+        strength=112,
+    )
     shade = ImageChops.multiply(shade, mask)
     organic._composite(work, shade, palette["occlusion"], palette["back_bottom"])
 
+    # 4) many small maple leaves constrained to the group silhouette
     leaves = Image.new("RGBA", (W, H))
-    draw = ImageDraw.Draw(leaves, "RGBA")
-    pixels = mask.load()
-    colors = (palette["mid_top"], palette["front_top"], palette["front_bottom"],
-              palette["highlight"], palette["leaf_shadow_top"])
-    count = max(34, round((rx * ry) / 5.6))
-    for _ in range(count):
-        x = cx + rng.uniform(-.93, .93) * rx
-        y = cy + rng.uniform(-.91, .91) * ry
-        ix, iy = round(x * WORK_SCALE), round(y * WORK_SCALE)
-        if not (0 <= ix < W and 0 <= iy < H) or pixels[ix, iy] < 210:
-            continue
-        lit = x < cx + rx * .18 and y < cy + ry * .12
-        roll = rng.random()
-        if lit and roll < .22:
-            color = colors[3]
-        elif lit and roll < .72:
-            color = colors[1]
-        elif y > cy + ry * .18 and roll < .44:
-            color = colors[4]
-        else:
-            color = colors[0] if roll < .62 else colors[2]
-        _draw_maple_leaf(draw, x, y, rng.uniform(3.0, 5.5),
-                         rng.uniform(-.55, .55), color, rng.randint(175, 238))
+    brushes.leaf_cluster_maple(
+        leaves,
+        rng,
+        mask,
+        (cx, cy),
+        (rx, ry),
+        (
+            palette["mid_top"],
+            palette["front_top"],
+            palette["front_bottom"],
+            palette["leaf_shadow_top"],
+        ),
+        count=max(42, round((rx * ry) / 4.5)),
+        highlight_color=palette["highlight"],
+        shadow_color=palette["leaf_shadow_bottom"],
+    )
     leaves.putalpha(ImageChops.multiply(leaves.getchannel("A"), mask))
     work.alpha_composite(leaves)
 
@@ -95,31 +99,67 @@ def _group_positions(recipe, rng, view):
     if not branches:
         raise ValueError("red_mapple renderer requires authored trunkBranches")
 
+    steps = tuple(float(v) for v in cfg.get("branchLeafSteps", [.58, .82, 1.03]))
     groups = []
     for index, branch in enumerate(branches):
         p0 = tuple(map(float, branch["p0"]))
         p1 = tuple(map(float, branch.get("p1", branch["p0"])))
         p2 = tuple(map(float, branch["p2"]))
-        for step, along in enumerate((.58, .82, 1.03)):
+        for step, along in enumerate(steps):
             x, y = organic._quad(p0, p1, p2, along)
-            x += math.sin(phase + index * 1.37 + step * .7) * 2.6 + rng.uniform(-2.4, 2.4)
-            y += math.cos(phase + index * .91 + step * .6) * 1.5 + rng.uniform(-2.0, 2.0)
-            size = rng.uniform(.86, 1.13)
-            # Upper twigs carry smaller groups; lower limbs carry broader ones.
-            height_factor = max(.72, min(1.12, (y - 58) / 120))
-            groups.append((y, x, 13.5 * size * height_factor,
-                           10.4 * size * height_factor))
+            x += math.sin(phase + index * 1.37 + step * .7) * 2.6 + rng.uniform(-2.2, 2.2)
+            y += math.cos(phase + index * .91 + step * .6) * 1.4 + rng.uniform(-1.8, 1.8)
+            size = rng.uniform(.88, 1.12)
+            height_factor = max(.70, min(1.12, (y - 54) / 120))
+            groups.append((
+                y,
+                x,
+                12.8 * size * height_factor,
+                9.6 * size * height_factor,
+            ))
 
-    # Interior connectors prevent a skeletal centre without turning the crown
-    # into one opaque generic blob.
-    interior = ((cx - 19, cy - 34, 17, 12), (cx + 5, cy - 39, 17, 12),
-                (cx + 23, cy - 20, 18, 13), (cx - 27, cy - 8, 18, 13),
-                (cx + 2, cy - 5, 19, 14), (cx - 9, cy + 17, 18, 13))
+    # Interior connector groups keep the crown readable as one tree without
+    # returning to the old opaque generic broadleaf blob.
+    interior = (
+        (cx - 20, cy - 38, 16, 11),
+        (cx + 2, cy - 43, 16, 11),
+        (cx + 23, cy - 23, 17, 12),
+        (cx - 28, cy - 10, 17, 12),
+        (cx + 1, cy - 8, 18, 13),
+        (cx - 11, cy + 15, 17, 12),
+        (cx + 19, cy + 12, 16, 11),
+    )
     for x, y, rx, ry in interior:
-        groups.append((y + math.sin(phase) * 1.2, x + math.cos(phase) * 1.8,
-                       rx * rng.uniform(.92, 1.08), ry * rng.uniform(.92, 1.08)))
+        groups.append((
+            y + math.sin(phase) * 1.2,
+            x + math.cos(phase) * 1.8,
+            rx * rng.uniform(.94, 1.06),
+            ry * rng.uniform(.94, 1.06),
+        ))
     groups.sort()
     return groups
+
+
+def _draw_visible_twigs(work, recipe, palette):
+    """Overlay a few thin shared-primitive twigs so wood survives dense foliage."""
+    W, H = work.size
+    mask = Image.new("L", (W, H))
+    branches = recipe.get("trunkBranches", [])[1:]
+    for index, branch in enumerate(branches):
+        if index % 2:
+            continue
+        p0 = tuple(map(float, branch["p0"]))
+        p1 = tuple(map(float, branch.get("p1", branch["p0"])))
+        p2 = tuple(map(float, branch["p2"]))
+        brushes.branch_tapered(
+            mask, p0, p1, p2,
+            max(1.2, float(branch.get("w0", 3.0)) * .52),
+            max(.55, float(branch.get("w1", 1.2)) * .72),
+            samples=36,
+            fill=120,
+        )
+    if mask.getbbox():
+        organic._composite(work, mask, palette["trunk_light"], palette["trunk_bottom"], right_shade=.10)
 
 
 def render(recipe, view="south"):
@@ -153,10 +193,12 @@ def render(recipe, view="south"):
     organic._draw_trunk_and_bark(work, recipe, palette, W, H)
 
     groups = _group_positions(recipe, rng, view)
-    for index, (y, x, rx, ry) in enumerate(groups):
-        # Upper-left groups receive slightly more warmth in camera space.
+    for y, x, rx, ry in groups:
         light_bias = .08 if x < canvas[0] * .50 and y < canvas[1] * .43 else 0.0
         _paint_leaf_group(work, rng, palette, (x, y), (rx, ry), light_bias=light_bias)
+
+    # A selective twig pass restores branch readability after foliage paint.
+    _draw_visible_twigs(work, recipe, palette)
 
     frame = organic._alpha_safe_resize(work, tuple(canvas))
     frame = organic._final_raster_pass(frame, rng, palette, recipe)
@@ -170,7 +212,15 @@ def render(recipe, view="south"):
         "seed": seed,
         "crownStyle": "broadleaf",
         "sceneryType": "red_mapple",
-        "authoringMode": "procedural_maple_leaf_groups",
+        "authoringMode": "shared_brush_maple_leaf_groups",
+        "brushes": [
+            "leaf_cluster_broadleaf",
+            "leaf_cluster_maple",
+            "branch_tapered",
+            "interior_occlusion_patch",
+            "edge_breakup_stamp",
+            "silhouette_gap_cutter",
+        ],
         "view": view,
         "yawDeg": int(recipe.get("rotation", {}).get("yawDeg", {}).get(view, DEFAULT_YAWS[view])),
         "camera": camera,
