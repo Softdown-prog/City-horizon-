@@ -1,7 +1,7 @@
 {
   "contract": "CH_AUDIO_GENERATION_V1",
   "id": "steam_hiss_smoke",
-  "attempt": 1,
+  "attempt": 2,
   "kind": "effect",
   "prompt": "Locomotiva a vapor clássica: escape contínuo de vapor pressurizado, encorpado, sem voz, sem música, limpo e utilizável como efeito de jogo.",
   "negativePrompt": "sem buzina, sem apito, sem fala, sem música, sem clipping",
