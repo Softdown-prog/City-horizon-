@@ -19,10 +19,12 @@ on:
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/flowering_tree_scenery.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/fence_scenery.py'
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/shape_recipe.py'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/scene_composer.py'
       - 'tools/visitor_forge_2d/examples/pine_*.json'
       - 'tools/visitor_forge_2d/examples/flower_bed_*.json'
       - 'tools/visitor_forge_2d/examples/park_*fence_*.json'
       - 'tools/visitor_forge_2d/examples/park_wayfinding_sign.json'
+      - 'tools/visitor_forge_2d/examples/prop_*_scene_*.json'
       - 'tools/visitor_forge_2d/examples/park_tree_red_mapple_*.json'
       - 'tools/visitor_forge_2d/examples/park_tree_flowering_*.json'
       - 'tools/visitor_forge_2d/examples/reference_profiles/tree_visual_profiles_v1.json'
@@ -30,6 +32,7 @@ on:
       - 'tools/visitor_forge_2d/tests/test_art_author.py'
       - 'tools/visitor_forge_2d/tests/test_brushes.py'
       - 'tools/visitor_forge_2d/tests/test_flowering_tree.py'
+      - 'tools/visitor_forge_2d/tests/test_scene_composer.py'
       - 'tools/visitor_forge_2d/tests/test_fence_connectivity.py'
       - 'tools/visitor_forge_2d/examples/park_tree_broadleaf_early_autumn_v1.json'
       - 'tools/visitor_forge_2d/examples/park_tree_angico_*.json'
@@ -49,7 +52,7 @@ jobs:
       - run: |
           python -m pip install -e tools/visitor_forge_2d
           python -m pip install pytest
-      - run: python -m pytest -q tools/visitor_forge_2d/tests/test_workers.py tools/visitor_forge_2d/tests/test_art_author.py tools/visitor_forge_2d/tests/test_brushes.py tools/visitor_forge_2d/tests/test_flowering_tree.py tools/visitor_forge_2d/tests/test_fence_connectivity.py
+      - run: python -m pytest -q tools/visitor_forge_2d/tests/test_workers.py tools/visitor_forge_2d/tests/test_art_author.py tools/visitor_forge_2d/tests/test_brushes.py tools/visitor_forge_2d/tests/test_flowering_tree.py tools/visitor_forge_2d/tests/test_scene_composer.py tools/visitor_forge_2d/tests/test_fence_connectivity.py
 
   render-and-audit:
     runs-on: ubuntu-24.04
@@ -65,6 +68,7 @@ jobs:
           - flower_bed_01
           - park_tree_flowering_open_v1
           - park_wayfinding_sign
+          - prop_rowboat_scene_v1
           - park_iron_fence_01
           - park_chainlink_fence_01
           - park_wood_fence_01
