@@ -48,7 +48,8 @@
     ],
     "WeatherThunder": [
       "weather/thunder.ogg"
-    ]
+    ],
+    "TrainSteamWhistle": []
   },
   "music": {
     "Loading": "music/loading_horizonte_de_sal.ogg"
