@@ -111,7 +111,7 @@ A geometric XY crossing without a shared graph node is not a junction and theref
 
 The source is intentionally standalone and uses manually sampled continuous routes so it tests traffic arbitration without depending on MapForge or visual assets.
 
-A project-runner compile/test result is still required before this contract is considered compile-validated.
+The focused GitHub Actions workflow `CH Procedural Road Priority Check` compile-validates this source directly with C++20 and executes the test binary. Run `36620550235` completed successfully on 2026-09-29.
 
 ## Explicit non-goals for V1
 
