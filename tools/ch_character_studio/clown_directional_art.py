@@ -33,9 +33,10 @@ def _profile(direction: str) -> list[dict]:
     if direction not in {"E", "W"}:
         raise ValueError(direction)
     east = direction == "E"
-    # Face points toward +screen X for E and -screen X for W.
+    # Face points toward +screen X for E and -screen X for W. Pixel coordinates
+    # mirror around the center between x=23 and x=24 in the 48px frame.
     def mx(x: int) -> int:
-        return x if east else 48 - x
+        return x if east else 47 - x
     def box(x0, y0, x1, y1):
         a, b = mx(x0), mx(x1)
         return [min(a, b), y0, max(a, b), y1]
