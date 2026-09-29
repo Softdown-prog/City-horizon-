@@ -1,4 +1,5 @@
 #include "road_system.h"
+#include "procedural_road_placement_bridge.h"
 
 #include <algorithm>
 #include <bit>
@@ -121,7 +122,31 @@ RoadMesh RoadMeshBuilder::build_cubic(const RoadSplineSegment& segment) {
 }
 
 RoadManager::RoadManager(const int map_min, const int map_max)
-    : map_min_(map_min), map_max_(map_max) {}
+    : map_min_(map_min), map_max_(map_max),
+      procedural_mirror_(std::make_unique<ProceduralRoadPlacementBridge>()) {}
+
+RoadManager::~RoadManager() = default;
+
+RoadManager::RoadManager(const RoadManager& other)
+    : map_min_(other.map_min_), map_max_(other.map_max_), tiles_(other.tiles_),
+      tile_indices_(other.tile_indices_),
+      procedural_mirror_(std::make_unique<ProceduralRoadPlacementBridge>()) {
+    rebuild_procedural_mirror();
+}
+
+RoadManager& RoadManager::operator=(const RoadManager& other) {
+    if (this == &other) return *this;
+    map_min_ = other.map_min_;
+    map_max_ = other.map_max_;
+    tiles_ = other.tiles_;
+    tile_indices_ = other.tile_indices_;
+    if (!procedural_mirror_) procedural_mirror_ = std::make_unique<ProceduralRoadPlacementBridge>();
+    rebuild_procedural_mirror();
+    return *this;
+}
+
+RoadManager::RoadManager(RoadManager&& other) noexcept = default;
+RoadManager& RoadManager::operator=(RoadManager&& other) noexcept = default;
 
 bool RoadManager::is_inside_map(const int tile_x, const int tile_y) const {
     return tile_x >= map_min_ && tile_x <= map_max_ && tile_y >= map_min_ && tile_y <= map_max_;
@@ -223,6 +248,7 @@ bool RoadManager::place_tile(const int tile_x, const int tile_y) {
     tile_indices_.emplace(tile_key(tile_x, tile_y), tiles_.size());
     tiles_.push_back({tile_x, tile_y, 0});
     refresh_connections_around(tile_x, tile_y);
+    mirror_added_tile(tile_x, tile_y);
     return true;
 }
 
@@ -250,12 +276,14 @@ bool RoadManager::remove_tile(const int tile_x, const int tile_y) {
     tiles_.pop_back();
     tile_indices_.erase(found);
     refresh_connections_around(tile_x, tile_y);
+    rebuild_procedural_mirror();
     return true;
 }
 
 void RoadManager::clear() {
     tiles_.clear();
     tile_indices_.clear();
+    if (procedural_mirror_) procedural_mirror_->clear();
 }
 
 bool RoadManager::overlaps_building_footprint(const BuildingDefinition& definition, const int tile_x, const int tile_y,
@@ -329,6 +357,10 @@ const std::vector<RoadTile>& RoadManager::tiles() const {
     return tiles_;
 }
 
+const ProceduralRoadPlacementBridge& RoadManager::procedural_mirror() const {
+    return *procedural_mirror_;
+}
+
 int RoadManager::tile_key(const int tile_x, const int tile_y) const {
     const int span = map_max_ - map_min_ + 1;
     return (tile_y - map_min_) * span + (tile_x - map_min_);
@@ -355,4 +387,31 @@ void RoadManager::refresh_connections(const int tile_x, const int tile_y) {
         }
     }
     tiles_[found->second].connections = mask;
+}
+
+void RoadManager::mirror_added_tile(const int tile_x, const int tile_y) {
+    if (!procedural_mirror_) procedural_mirror_ = std::make_unique<ProceduralRoadPlacementBridge>();
+
+    const TileCoordinate added{tile_x, tile_y};
+    if (!procedural_mirror_->mirror_tile_segment({added}, ProceduralRoadClass::local)) {
+        rebuild_procedural_mirror();
+        return;
+    }
+
+    for (const CardinalDirection direction : kCardinalDirections) {
+        const TileOffset offset = direction_offset(direction);
+        const TileCoordinate neighbor{tile_x + offset.x, tile_y + offset.y};
+        if (!is_road(neighbor.x, neighbor.y)) continue;
+        if (!procedural_mirror_->mirror_tile_segment({added, neighbor}, ProceduralRoadClass::local)) {
+            rebuild_procedural_mirror();
+            return;
+        }
+    }
+}
+
+void RoadManager::rebuild_procedural_mirror() {
+    if (!procedural_mirror_) procedural_mirror_ = std::make_unique<ProceduralRoadPlacementBridge>();
+    if (!procedural_mirror_->rebuild_from_legacy_tiles(tiles_, ProceduralRoadClass::local, 0.0F)) {
+        procedural_mirror_->clear();
+    }
 }
