@@ -61,9 +61,30 @@
       "role": "procedural_service_and_shop_icons",
       "manifest": "assets/ui/icons/service/service_icons_v1.json"
     },
+    "panel_window_nine_slice": {
+      "path": "assets/ui/chrome/panel_window_9slice_v2.png",
+      "role": "reusable_resizable_window_nine_slice_v2",
+      "insets": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "source_size": [
+        192,
+        192
+      ],
+      "usages": [
+        "construction_catalog",
+        "pause",
+        "settings",
+        "administration"
+      ],
+      "status": "pilot_v2"
+    },
     "panel_build_catalog_nine_slice": {
-      "path": "assets/ui/chrome/panel_build_catalog_9slice_v2.png",
-      "role": "construction_catalog_nine_slice_pilot_reference_v2",
+      "path": "assets/ui/chrome/panel_window_9slice_v2.png",
+      "role": "construction_catalog_alias_to_reusable_window_skin",
       "insets": [
         32,
         32,
