@@ -35,6 +35,7 @@ VERTICAL_RADIUS = base.TILE * 0.32
 APPROACH_LENGTH = base.TILE * 1.10
 ROLL_DEGREES = 360.0
 PHASE_RAMP = 0.24
+LONGITUDINAL_MID_BOOST = 0.45
 FOOTPRINT = {"widthTiles": 3, "depthTiles": 8}
 
 
@@ -72,17 +73,29 @@ def phase_progress(t: float) -> float:
     return (0.5 * r + (t - r)) / total
 
 
+def longitudinal_progress(t: float) -> float:
+    """Advance farther along the track during the middle of the inversion.
+
+    Endpoints remain exact while longitudinal speed is reduced near the two
+    connector shoulders and increased around t=0.5. This prevents an isometric
+    camera from compressing the middle of the helix into a narrow vertical wall.
+    """
+    t = max(0.0, min(1.0, t))
+    k = LONGITUDINAL_MID_BOOST
+    return t - (k / math.tau) * math.sin(math.tau * t)
+
+
 def inversion_phase(piece: str, t: float) -> float:
     return handedness(piece) * math.tau * phase_progress(t)
 
 
 def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int = 241):
-    """Build a low, stretched corkscrew with flat tangent-safe connectors.
+    """Build a low, stretched corkscrew with a longitudinally opened center.
 
-    V6 keeps the V5 longitudinal pitch and low vertical profile, but opens the
-    lateral sweep while extending the phase easing. This strengthens the visual
-    read of a corkscrew without increasing the element height or returning to a
-    loop-like silhouette in alternate camera directions.
+    V7 keeps V6 height, lateral radius and total footprint, but warps body
+    progress along Y so the middle of the 360-degree inversion advances farther
+    longitudinally. The shoulders advance more gently while the center gets more
+    front/back separation, reducing the vertical-wall read in isometric views.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -98,7 +111,8 @@ def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int 
     for i in range(1, body_samples):
         t = i / (body_samples - 1)
         phase = abs(inversion_phase(piece, t))
-        y = body_start_y + body_length * t
+        y_t = longitudinal_progress(t)
+        y = body_start_y + body_length * y_t
         x = sign * HORIZONTAL_RADIUS * math.sin(phase)
         z = base.RAIL_Z + VERTICAL_RADIUS * (1.0 - math.cos(phase))
         points.append(Vector((x, y, z)))
@@ -216,7 +230,7 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v5_open_low_elliptical_frame",
+        "profile": "single_inversion_v6_longitudinal_mid_boost",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
@@ -225,6 +239,7 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "approachLength": APPROACH_LENGTH,
         "rollDegrees": ROLL_DEGREES,
         "phaseRamp": PHASE_RAMP,
+        "longitudinalMidBoost": LONGITUDINAL_MID_BOOST,
         "rollSamplesDegrees": [round(math.degrees(frame[3]), 6) for frame in frames],
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
