@@ -1,5 +1,7 @@
 #pragma once
 
+#include "src/ch_core/contracts.h"
+
 #include <QColor>
 #include <QImage>
 #include <QSize>
@@ -43,8 +45,8 @@ struct ParkFenceSpec {
 class ParkFenceRenderer final {
 public:
     static constexpr const char* kStyleId = "city_park_classic_iron_v1";
-    static constexpr int kTileWidthPx = 128;
-    static constexpr int kTileHeightPx = 64;
+    static constexpr int kTileWidthPx = ch::contracts::kTileWidth;
+    static constexpr int kTileHeightPx = ch::contracts::kTileHeight;
 
     static QImage renderPiece(const ParkFenceSpec& spec,
                               ParkFencePiece piece,
