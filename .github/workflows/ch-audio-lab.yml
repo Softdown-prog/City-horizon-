@@ -22,7 +22,7 @@ permissions:
 jobs:
   generate-review-audio:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,12 +34,23 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Cache local Stable Audio CPU models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface/hub
+            ~/.cache/ch-audio-lab/stable-audio-3
+          key: ch-audio-sa3-cpu-${{ runner.os }}-3a82c807
+          restore-keys: |
+            ch-audio-sa3-cpu-${{ runner.os }}-
+
       - name: Validate Audio Lab scripts
         shell: bash
         run: |
           python -m py_compile \
             tools/ch_audio_lab/ch_audio_lab.py \
             tools/ch_audio_lab/providers/stability_audio.py \
+            tools/ch_audio_lab/providers/stable_audio_local.py \
             tools/audio_asset_worker.py
 
       - name: Install FFmpeg
@@ -71,9 +82,11 @@ jobs:
       - name: Generate and master review audio
         shell: bash
         env:
-          # Production providers read credentials from environment only.
-          # An unset repository secret becomes an empty value; smoke jobs do not need it.
+          # Hosted API provider credential (optional).
           STABILITY_API_KEY: ${{ secrets.STABILITY_API_KEY }}
+          # Local Stable Audio 3 works anonymously. A free HF token is optional
+          # and only raises download limits / bandwidth; it does not pay for generation.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python tools/ch_audio_lab/ch_audio_lab.py "$CH_AUDIO_JOB"
 
       - name: Validate Audio Lab proof
