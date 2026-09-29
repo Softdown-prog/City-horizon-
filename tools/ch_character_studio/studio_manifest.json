@@ -1,0 +1,59 @@
+{
+  "contract": "CH_CHARACTER_STUDIO_V0",
+  "productName": "CH Character Studio Art",
+  "purpose": "Author, paint and export City Horizon character appearance while reusing CH Blender for pose, camera, depth and render passes.",
+  "underlay": {
+    "engine": "CH Blender 4.2.3",
+    "manifest": "tools/ch_blender/ch_blender_manifest.json",
+    "cameraContract": "CH_ACTOR_CAMERA_V1",
+    "frameContract": "CH_ACTOR_V1",
+    "motionSource": "approved_actor_motion_only"
+  },
+  "pipeline": [
+    "character_spec",
+    "ch_blender_base_passes",
+    "paint_layers",
+    "color_masks",
+    "outline_and_readability",
+    "preview",
+    "spritesheet_export"
+  ],
+  "artLayers": [
+    "silhouette",
+    "skin",
+    "hair",
+    "face",
+    "upper_clothing",
+    "lower_clothing",
+    "footwear",
+    "accessories_back",
+    "accessories_front",
+    "paint_over",
+    "outline"
+  ],
+  "blenderPasses": [
+    "base_color",
+    "normal",
+    "depth",
+    "object_id",
+    "shadow",
+    "ambient_occlusion"
+  ],
+  "colorMaskRoles": {
+    "R": "primary_clothing",
+    "G": "secondary_clothing",
+    "B": "hair_or_accessory",
+    "A": "coverage"
+  },
+  "lockedRules": {
+    "frameSize": [48, 64],
+    "groundAnchor": [24, 60],
+    "directions": ["S", "E", "N", "W"],
+    "walkFrames": 8,
+    "cameraPitchDegrees": 30,
+    "cameraYawDegrees": 45,
+    "artMayChangeMotion": false,
+    "artMayChangeGroundAnchor": false
+  },
+  "designPrinciple": "Blender solves spatial consistency. Studio Art owns the final visible character style."
+}
