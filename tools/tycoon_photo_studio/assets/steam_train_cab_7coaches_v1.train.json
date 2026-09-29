@@ -1,0 +1,57 @@
+{
+  "contract": "CITY_HORIZON_STEAM_TRAIN_V1",
+  "assetId": "vehicle.steam_train.cab_7coaches.01",
+  "displayName": "Steam Train - Cab + 7 Coaches",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
+  "footprint": {
+    "widthTiles": 13,
+    "depthTiles": 2
+  },
+  "composition": {
+    "locomotiveCount": 1,
+    "passengerCoachCount": 7,
+    "tenderCount": 0,
+    "orientationAxis": "X",
+    "locomotiveAtNegativeX": true
+  },
+  "geometry": {
+    "locomotiveLength": 5.2,
+    "locomotiveWidth": 1.9,
+    "coachLength": 3.9,
+    "coachWidth": 1.82,
+    "coachGap": 0.42,
+    "wheelRadius": 0.46,
+    "wheelWidth": 0.20
+  },
+  "artDirection": {
+    "era": "classic_steam",
+    "silhouette": "compact_tycoon_readable",
+    "detailPriority": [
+      "boiler",
+      "smokestack",
+      "driver_cab",
+      "driving_wheels",
+      "coach_windows",
+      "couplers"
+    ],
+    "avoid": [
+      "photorealism",
+      "micro_detail_noise",
+      "runtime_3d_dependency"
+    ]
+  },
+  "futureLayers": {
+    "steamOverlay": {
+      "planned": true,
+      "enabled": false,
+      "contract": "TBD"
+    },
+    "coachColorMask": {
+      "planned": true,
+      "enabled": false,
+      "contract": "CH_COLOR_MASK_V1"
+    }
+  }
+}
