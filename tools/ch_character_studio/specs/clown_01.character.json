@@ -26,6 +26,18 @@
     "deterministicSeed": 1337,
     "inspectionCameraMayReplaceCanonicalCamera": false
   },
+  "masterArt": {
+    "status": "candidate_for_visual_review",
+    "referenceDirection": "S",
+    "referenceFrame": "idle",
+    "root": "tools/ch_character_studio/art/clown_01/south_idle",
+    "builder": "tools/ch_character_studio/build_clown_master.py",
+    "buildCommand": "python tools/ch_character_studio/build_clown_master.py --seed 1337",
+    "output": "out/ch_character_studio/clown_01/south_idle/clown_01_s_idle.png",
+    "review": "out/ch_character_studio/clown_01/south_idle/clown_01_s_idle_review_8x.png",
+    "propagationPolicy": "approve_south_idle_then_landmark_transfer_to_south_walk_frames",
+    "crossDirectionAutoTransfer": false
+  },
   "appearance": {
     "body": {
       "height": 1.0,
@@ -35,10 +47,11 @@
       "legWidth": 1.0
     },
     "palette": {
-      "skin": "#f6c29e",
+      "skin": "#f3ead7",
       "hair": "#d43b2f",
-      "primary": "#f2d744",
+      "primary": "#d43b2f",
       "secondary": "#2b71c9",
+      "accent": "#f2d744",
       "shoes": "#26313a"
     },
     "layers": [
@@ -80,6 +93,14 @@
     "pixelReadable": true,
     "paintedForms": true,
     "avoidFlatVectorLook": true,
-    "avoidPhotorealism": true
+    "avoidPhotorealism": true,
+    "southIdleReviewPriorities": [
+      "readable_face_makeup_without_oversized_features",
+      "hair_volume_with_small_highlight_shadow_variation",
+      "ruff_collar_not_flat_white_disc",
+      "asymmetric_clown_color_blocking",
+      "calm_old_tycoon_silhouette",
+      "one_pixel_outer_outline_only"
+    ]
   }
 }
