@@ -1,0 +1,28 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "steam_hiss_smoke",
+  "kind": "effect",
+  "prompt": "Locomotiva a vapor clássica: escape contínuo de vapor pressurizado, encorpado, sem voz, sem música, limpo e utilizável como efeito de jogo.",
+  "negativePrompt": "sem buzina, sem apito, sem fala, sem música, sem clipping",
+  "durationSeconds": 4.0,
+  "tags": ["train", "steam", "sfx", "validation"],
+  "provider": {
+    "type": "synthetic_smoke",
+    "profile": "steam_hiss",
+    "seed": 20260929,
+    "channels": 1
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -18.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.05,
+    "fadeOutSeconds": 0.12,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
