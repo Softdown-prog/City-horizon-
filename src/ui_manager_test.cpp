@@ -1,6 +1,8 @@
 #include "ui_manager.h"
+#include "ui_nine_slice.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -11,6 +13,10 @@ void require(bool condition, const char* message) {
         std::cerr << "ui manager test failed: " << message << '\n';
         std::exit(1);
     }
+}
+
+bool nearly_equal(const float lhs, const float rhs) {
+    return std::abs(lhs - rhs) < 0.001F;
 }
 
 GameplayUiModel base_model() {
@@ -39,6 +45,35 @@ int main() {
 
     require(UiRect{10, 10, 20, 20}.contains(10, 10), "rect hit-test includes edge");
     require(!UiRect{10, 10, 20, 20}.contains(31, 31), "rect hit-test excludes outside");
+
+    const ch::ui::NineSliceRegions nine_slice = ch::ui::make_nine_slice_regions(
+        48.0F, 48.0F, SDL_FRect{10.0F, 20.0F, 200.0F, 100.0F},
+        ch::ui::NineSliceInsets{8.0F, 8.0F, 8.0F, 8.0F});
+    const auto& top_left = nine_slice[static_cast<std::size_t>(ch::ui::NineSlicePatch::top_left)];
+    const auto& center = nine_slice[static_cast<std::size_t>(ch::ui::NineSlicePatch::center)];
+    const auto& bottom_right = nine_slice[static_cast<std::size_t>(ch::ui::NineSlicePatch::bottom_right)];
+    require(nearly_equal(top_left.source.w, 8.0F) && nearly_equal(top_left.destination.w, 8.0F),
+            "nine-slice preserves left corner width");
+    require(nearly_equal(center.source.x, 8.0F) && nearly_equal(center.source.w, 32.0F) &&
+                nearly_equal(center.destination.x, 18.0F) && nearly_equal(center.destination.w, 184.0F),
+            "nine-slice stretches center without changing source border");
+    require(nearly_equal(bottom_right.destination.x, 202.0F) &&
+                nearly_equal(bottom_right.destination.y, 112.0F) &&
+                nearly_equal(bottom_right.destination.w, 8.0F) &&
+                nearly_equal(bottom_right.destination.h, 8.0F),
+            "nine-slice preserves bottom-right corner");
+
+    const ch::ui::NineSliceRegions compact_slice = ch::ui::make_nine_slice_regions(
+        48.0F, 48.0F, SDL_FRect{0.0F, 0.0F, 10.0F, 6.0F},
+        ch::ui::NineSliceInsets{8.0F, 8.0F, 8.0F, 8.0F});
+    const auto& compact_top_left = compact_slice[static_cast<std::size_t>(ch::ui::NineSlicePatch::top_left)];
+    const auto& compact_center = compact_slice[static_cast<std::size_t>(ch::ui::NineSlicePatch::center)];
+    require(nearly_equal(compact_top_left.destination.w, 5.0F) &&
+                nearly_equal(compact_top_left.destination.h, 3.0F),
+            "nine-slice compresses borders proportionally for tiny panels");
+    require(nearly_equal(compact_center.destination.w, 0.0F) &&
+                nearly_equal(compact_center.destination.h, 0.0F),
+            "nine-slice collapses center safely when destination is smaller than borders");
 
     ui.handle_mouse_motion(40, 765);
     const auto build_button = std::find_if(ui.buttons().begin(), ui.buttons().end(), [](const UiButton& button) {
