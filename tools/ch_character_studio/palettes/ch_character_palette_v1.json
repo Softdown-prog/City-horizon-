@@ -1,0 +1,41 @@
+{
+  "contract": "CH_CHARACTER_PALETTE_V1",
+  "version": "1.0",
+  "colorSpace": "sRGB",
+  "description": "Broad named palette library for skin, hair, clothing, props, paint-over and masks. Values are stable IDs for deterministic agent work.",
+  "families": {
+    "skin": [
+      {"id":"skin_porcelain","hex":"#F6D7C3"},{"id":"skin_fair","hex":"#F4C7A8"},{"id":"skin_peach","hex":"#EFB58F"},{"id":"skin_warm","hex":"#D99A72"},{"id":"skin_tan","hex":"#C8875F"},{"id":"skin_olive","hex":"#B97855"},{"id":"skin_brown","hex":"#925F42"},{"id":"skin_deep","hex":"#704631"},{"id":"skin_dark","hex":"#503226"},{"id":"skin_umber","hex":"#38231C"}
+    ],
+    "hair": [
+      {"id":"hair_black","hex":"#201B1A"},{"id":"hair_soft_black","hex":"#342A27"},{"id":"hair_dark_brown","hex":"#4A3025"},{"id":"hair_brown","hex":"#6B4630"},{"id":"hair_chestnut","hex":"#824A32"},{"id":"hair_auburn","hex":"#9A4D32"},{"id":"hair_copper","hex":"#B9673F"},{"id":"hair_golden","hex":"#C99442"},{"id":"hair_blonde","hex":"#DDBD69"},{"id":"hair_light_blonde","hex":"#EAD89A"},{"id":"hair_gray","hex":"#8D8D8A"},{"id":"hair_silver","hex":"#C7C9C8"},{"id":"hair_white","hex":"#EAECEA"}
+    ],
+    "neutral": [
+      {"id":"ink","hex":"#202629"},{"id":"charcoal","hex":"#343B3E"},{"id":"slate","hex":"#526069"},{"id":"steel","hex":"#73828A"},{"id":"silver","hex":"#A9B1B4"},{"id":"mist","hex":"#D4D8D7"},{"id":"ivory","hex":"#F0ECE0"},{"id":"paper","hex":"#F7F5EC"},{"id":"warm_gray","hex":"#8D847B"},{"id":"taupe","hex":"#6E6258"}
+    ],
+    "vivid": [
+      {"id":"red","hex":"#D83A36"},{"id":"scarlet","hex":"#E6523F"},{"id":"orange","hex":"#E67E32"},{"id":"amber","hex":"#E4A62F"},{"id":"yellow","hex":"#E7C93E"},{"id":"lime","hex":"#86B83E"},{"id":"green","hex":"#3D9B55"},{"id":"emerald","hex":"#218B68"},{"id":"teal","hex":"#258A8B"},{"id":"cyan","hex":"#3A9DB7"},{"id":"sky","hex":"#4E9BD8"},{"id":"blue","hex":"#3E70C9"},{"id":"indigo","hex":"#4F56B7"},{"id":"violet","hex":"#7D52B8"},{"id":"purple","hex":"#944AA1"},{"id":"magenta","hex":"#C2478D"},{"id":"pink","hex":"#DE6792"}
+    ],
+    "pastel": [
+      {"id":"pastel_red","hex":"#E7A09B"},{"id":"pastel_orange","hex":"#EAB68F"},{"id":"pastel_yellow","hex":"#E9D995"},{"id":"pastel_green","hex":"#A9C99B"},{"id":"pastel_mint","hex":"#9FCFC0"},{"id":"pastel_cyan","hex":"#A5CED8"},{"id":"pastel_blue","hex":"#A8BFE0"},{"id":"pastel_lilac","hex":"#C1ADD8"},{"id":"pastel_pink","hex":"#DDB0C4"}
+    ],
+    "earth": [
+      {"id":"sand","hex":"#CDB58B"},{"id":"ochre","hex":"#B88A45"},{"id":"clay","hex":"#AA674A"},{"id":"brick","hex":"#964D3E"},{"id":"rust","hex":"#8B4935"},{"id":"leather","hex":"#704A32"},{"id":"bark","hex":"#55402F"},{"id":"moss","hex":"#66724A"},{"id":"olive","hex":"#777A43"},{"id":"forest","hex":"#36553E"}
+    ],
+    "deep": [
+      {"id":"burgundy","hex":"#672F3B"},{"id":"wine","hex":"#7A3447"},{"id":"deep_orange","hex":"#88472D"},{"id":"deep_green","hex":"#28513B"},{"id":"petrol","hex":"#214D55"},{"id":"navy","hex":"#273E62"},{"id":"deep_blue","hex":"#2F416E"},{"id":"deep_violet","hex":"#4B3868"},{"id":"deep_purple","hex":"#56355D"}
+    ],
+    "metal": [
+      {"id":"iron","hex":"#4B5356"},{"id":"gunmetal","hex":"#384246"},{"id":"steel_light","hex":"#8E9A9E"},{"id":"aluminum","hex":"#B9C0BF"},{"id":"gold","hex":"#C79B3E"},{"id":"brass","hex":"#A77B32"},{"id":"copper","hex":"#A96545"},{"id":"bronze","hex":"#7A5839"}
+    ],
+    "fantasy": [
+      {"id":"neon_green","hex":"#65D94D"},{"id":"neon_cyan","hex":"#46D4D7"},{"id":"electric_blue","hex":"#4A7BFF"},{"id":"hot_pink","hex":"#F05AA6"},{"id":"bright_purple","hex":"#A85CE3"},{"id":"festival_yellow","hex":"#F4D94E"},{"id":"clown_red","hex":"#E3473D"},{"id":"clown_blue","hex":"#3F80D2"}
+    ]
+  },
+  "determinism": {
+    "stableIds": true,
+    "sorting": "family_then_declared_order",
+    "randomSelectionRequiresSeed": true,
+    "defaultSeed": 1337
+  }
+}
