@@ -2,6 +2,11 @@ name: MapForge Capture
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "City Builder Focused Compile Check"
+    types:
+      - completed
   push:
     branches:
       - main
