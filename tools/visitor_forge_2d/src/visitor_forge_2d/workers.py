@@ -22,6 +22,7 @@ from .core import (
     scene_composer,
     scene_composer_v2,
     scene_composer_v3,
+    scene_composer_v4,
     shape_recipe,
 )
 
@@ -29,6 +30,7 @@ SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
 SCENE_CONTRACT = "CH_2D_SCENE_RECIPE_V1"
 SCENE_V2_CONTRACT = "CH_2D_SCENE_RECIPE_V2"
 SCENE_V3_CONTRACT = "CH_2D_SCENE_RECIPE_V3"
+SCENE_V4_CONTRACT = "CH_2D_SCENE_RECIPE_V4"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
 FENCE_CONTRACT = "CH_2D_FENCE_SCENERY_V1"
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
@@ -45,7 +47,7 @@ def _validate_camera(recipe: dict, label: str) -> None:
 def validate_recipe(recipe: dict) -> str:
     """Recipe worker: reject invalid IDs, geometry and camera before writing."""
     supported = (SHAPE_CONTRACT, SCENE_CONTRACT, SCENE_V2_CONTRACT, SCENE_V3_CONTRACT,
-                 ORGANIC_CONTRACT, FENCE_CONTRACT)
+                 SCENE_V4_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT)
     if not isinstance(recipe, dict) or recipe.get("contract") not in supported:
         raise ValueError("worker needs a supported 2D shape, scene, organic scenery or fence recipe")
     asset_id = recipe.get("id")
@@ -73,6 +75,10 @@ def validate_recipe(recipe: dict) -> str:
         _validate_camera(recipe, "scene v3 recipe")
         scene_composer_v3.validate_recipe(recipe)
         return "scene_v3"
+    if recipe["contract"] == SCENE_V4_CONTRACT:
+        _validate_camera(recipe, "scene v4 recipe")
+        scene_composer_v4.validate_recipe(recipe)
+        return "scene_v4"
     if recipe["contract"] == FENCE_CONTRACT:
         fence_scenery.validate_recipe(recipe)
         return "fence"
@@ -126,7 +132,8 @@ def audit_export(recipe: dict, result: dict, kind: str) -> dict:
         if metadata.get("camera", {}).get("contract") != "CH_CAMERA_V1":
             raise ValueError("isometric export lost its camera contract")
     return {"bounds": list(bounds), "opaqueHeightPx": height,
-            "cameraReview": result.get("isometricReview"), "alpha": "RGBA"}
+            "cameraReview": result.get("isometricReview"), "alpha": "RGBA",
+            "critic": metadata.get("critic")}
 
 
 def run_workers(recipe_path: Path, output_root: Path) -> dict:
@@ -143,6 +150,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
         result = scene_composer_v2.export(recipe_path, folder)
     elif kind == "scene_v3":
         result = scene_composer_v3.export(recipe_path, folder)
+    elif kind == "scene_v4":
+        result = scene_composer_v4.export(recipe_path, folder)
     elif kind == "fence":
         result = fence_scenery.export_fence_scenery(recipe_path, folder)
     elif kind == "flower_bed":
@@ -159,7 +168,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
     report = {
         "status": "review_ready", "id": recipe["id"], "kind": kind,
         "workers": ["recipe", "render", "alpha_anchor"] +
-                   (["camera_review"] if kind != "shape" else []) + ["provenance"],
+                   (["camera_review"] if kind != "shape" else []) +
+                   (["visual_critic"] if audit.get("critic") is not None else []) + ["provenance"],
         "recipe": str(recipe_path), "recipeSha256": hashlib.sha256(raw).hexdigest(),
         "png": result["png"], "review": result["review"],
         "isometricReview": result.get("isometricReview"),
