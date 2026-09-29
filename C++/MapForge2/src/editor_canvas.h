@@ -88,6 +88,7 @@ private:
     void paintBrushAt(const QPoint& tile);
     void mutateTile(int x, int y);
     void panBy(float dx, float dy);
+    void rotateCamera(bool clockwise);
 
     EditorDocument document_;
     EditorHistory history_;
