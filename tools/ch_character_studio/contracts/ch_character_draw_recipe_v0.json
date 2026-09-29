@@ -1,0 +1,31 @@
+{
+  "contract": "CH_CHARACTER_DRAW_RECIPE_V0",
+  "version": "0.1",
+  "frameSize": [48, 64],
+  "description": "Deterministic CLI drawing recipe for Character Studio layers and packed RGB masks.",
+  "primitives": {
+    "pixel": ["x", "y", "color"],
+    "rect": ["box", "color"],
+    "ellipse": ["box", "color"],
+    "polygon": ["points", "color"],
+    "line": ["points", "color", "width"]
+  },
+  "targets": {
+    "artLayer": "one canonical Studio art layer",
+    "maskBank": "appearance|clothing|held_object",
+    "maskChannel": "R|G|B"
+  },
+  "determinism": {
+    "seedRequiredForProceduralOps": true,
+    "defaultSeed": 1337,
+    "nativeResolutionOnly": true,
+    "imageSmoothing": false,
+    "sameRecipeSameSeedSameBytes": true
+  },
+  "rules": [
+    "Do not draw into the Blender underlay.",
+    "Do not change the canonical ground anchor.",
+    "Mask recipes contain semantic channel data only; no lighting, AO, outline or dithering.",
+    "All coordinates use top-left pixel origin at 48x64."
+  ]
+}
