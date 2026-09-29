@@ -8,10 +8,32 @@ This directory is the agent-facing entry point for City Horizon character art. D
 2. `contracts/ch_character_spatial_v0.json`
 3. `contracts/ch_character_color_mask_v0.json`
 4. `contracts/ch_character_hand_socket_v0.json`
-5. `palettes/ch_character_palette_v1.json`
-6. `workers/ch_character_workers_v0.json`
+5. `contracts/ch_character_photoshop_tools_v0.json`
+6. `palettes/ch_character_palette_v1.json`
+7. `workers/ch_character_workers_v0.json`
 
 Canonical runtime frame: `48x64`. Canonical ground anchor: `[24,60]`. Canonical runtime camera remains `CH_ACTOR_CAMERA_V1`.
+
+## Photoshop-reference editing tools
+
+The Studio borrows productive image-editing concepts from Photoshop, but it is not a UI clone and must remain character-production focused.
+
+Stage 1 is implemented through `CH_CHARACTER_PHOTOSHOP_TOOLS_V0` and `photoshop_tools.js`:
+
+- rectangular selection (`M`);
+- lasso selection (`L`);
+- move selected pixels (`V`);
+- nearest-neighbor transform with translation, scale, rotation and H/V flip;
+- eyedropper (`I`);
+- paint bucket with tolerance (`G`);
+- fill/delete selection;
+- per-frame undo/redo (`Ctrl+Z`, `Ctrl+Shift+Z`), capped at 50 checkpoints;
+- layer opacity;
+- layer blend modes.
+
+Selections and transforms affect only the active art layer. They must never move the character ground anchor, edit CH Actor motion, modify Blender landmarks, or become a substitute for pose editing.
+
+Stage 2 is reserved for groups, layer masks, clipping masks, non-destructive transform state and duplicate/merge/flatten operations. Stage 3 is reserved for advanced brushes, gradients and tonal/color adjustment tools.
 
 ## Deterministic workers / subagent handoff
 
@@ -107,4 +129,6 @@ Stop and report instead of improvising if:
 - inspection output is being used as runtime output;
 - a worker packet asks an agent to edit outside its `mayEdit` scope;
 - mask and visual transforms differ;
-- a held object changes approved hand motion.
+- a held object changes approved hand motion;
+- a Photoshop-reference transform is being used to alter body pose instead of appearance;
+- a selection/transform operation writes outside the active art layer.
