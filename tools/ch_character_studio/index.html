@@ -80,6 +80,14 @@
         <div class="hint">Escolha uma peça e clique no personagem. O Studio troca automaticamente para a camada semântica correta.</div>
       </div>
       <div class="panel">
+        <h3>Molde de personagem</h3>
+        <div class="stack">
+          <select id="templateSelect"></select>
+          <button id="applyTemplate">Aplicar molde</button>
+        </div>
+        <div class="hint">Moldes são ponto de partida artístico; não alteram pose, caminhada, câmera ou ground anchor.</div>
+      </div>
+      <div class="panel">
         <h3>Paleta</h3>
         <div id="swatches" class="swatches"></div>
       </div>
@@ -109,6 +117,7 @@
     </aside>
   </div>
   <script src="smart_shapes.js"></script>
+  <script src="character_templates.js"></script>
   <script src="studio.js"></script>
 </body>
 </html>
