@@ -1,0 +1,66 @@
+{
+  "contract": "CITY_HORIZON_STEAM_TRAIN_VAPOR_OVERLAY_V1",
+  "assetId": "effect.steam_train.vapor_overlay.01",
+  "parentAssetId": "vehicle.steam_train.cab_7coaches.01",
+  "displayName": "Steam Train Vapor Overlay",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeRepresentation": "2D_RGBA_animated_overlay",
+  "footprint": {
+    "widthTiles": 13,
+    "depthTiles": 2
+  },
+  "animation": {
+    "frameStart": 1,
+    "frameEnd": 8,
+    "frameCount": 8,
+    "fps": 8,
+    "looping": true
+  },
+  "emitters": {
+    "stack": {
+      "enabled": true,
+      "origin": [-17.62, 0.0, 3.24],
+      "puffCount": 7,
+      "rise": 2.15,
+      "driftX": 1.65,
+      "spreadY": 0.44,
+      "startRadius": 0.23,
+      "endRadius": 0.72,
+      "startAlpha": 0.72,
+      "endAlpha": 0.0
+    },
+    "cylinders": {
+      "enabled": true,
+      "origins": [
+        [-18.02, -0.98, 0.58],
+        [-18.02, 0.98, 0.58]
+      ],
+      "puffCountPerSide": 3,
+      "rise": 0.55,
+      "outward": 0.72,
+      "driftX": 0.52,
+      "startRadius": 0.16,
+      "endRadius": 0.42,
+      "startAlpha": 0.52,
+      "endAlpha": 0.0
+    }
+  },
+  "artDirection": {
+    "color": "warm_white_gray",
+    "density": "soft_readable_tycoon",
+    "avoid": [
+      "black_soot_cloud",
+      "photorealistic_volumetrics",
+      "hard_particle_edges",
+      "opaque_blob"
+    ]
+  },
+  "runtime": {
+    "blendMode": "alpha",
+    "activation": "train_moving_or_idling",
+    "stackLayerAlwaysEligible": true,
+    "cylinderLayerPreferredWhenMoving": true,
+    "anchorPolicy": "same_world_origin_and_canvas_as_parent_train"
+  }
+}
