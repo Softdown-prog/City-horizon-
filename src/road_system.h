@@ -3,7 +3,9 @@
 #include "building_system.h"
 #include "tile_topology.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -98,6 +100,188 @@ public:
     [[nodiscard]] static RoadWorldPoint3 sample_cubic(const RoadSplineSegment& segment, float t);
     [[nodiscard]] static RoadWorldPoint3 tangent_cubic(const RoadSplineSegment& segment, float t);
     [[nodiscard]] static RoadMesh build_cubic(const RoadSplineSegment& segment);
+};
+
+// CH_PROCEDURAL_ROAD_GRAPH_V1
+//
+// Graph topology sits beside the legacy RoadManager until the procedural-road
+// visual and editor gates pass. Nodes are shared anchors in world space. Segment
+// handles are stored relative to their endpoint nodes, so moving a junction
+// keeps every incident road attached while preserving the authored curve shape.
+// ID 0 is reserved as invalid; generated IDs are stable for the lifetime of the
+// graph and are never derived from vector indices.
+using ProceduralRoadNodeId = std::uint64_t;
+using ProceduralRoadSegmentId = std::uint64_t;
+inline constexpr ProceduralRoadNodeId kInvalidProceduralRoadNodeId = 0;
+inline constexpr ProceduralRoadSegmentId kInvalidProceduralRoadSegmentId = 0;
+
+struct ProceduralRoadNode {
+    ProceduralRoadNodeId id = kInvalidProceduralRoadNodeId;
+    RoadWorldPoint3 position{};
+};
+
+struct ProceduralRoadGraphSegment {
+    ProceduralRoadSegmentId id = kInvalidProceduralRoadSegmentId;
+    ProceduralRoadNodeId start_node = kInvalidProceduralRoadNodeId;
+    ProceduralRoadNodeId end_node = kInvalidProceduralRoadNodeId;
+    RoadWorldPoint3 start_handle{1.0F, 0.0F, 0.0F};
+    RoadWorldPoint3 end_handle{-1.0F, 0.0F, 0.0F};
+    float width = 0.72F;
+    float texture_repeat_world_units = 1.0F;
+    int subdivisions = 24;
+    std::uint8_t lane_count = 2;
+};
+
+class ProceduralRoadGraph {
+public:
+    [[nodiscard]] ProceduralRoadNodeId add_node(const RoadWorldPoint3 position) {
+        const ProceduralRoadNodeId id = next_node_id_++;
+        nodes_.push_back({id, position});
+        node_indices_.emplace(id, nodes_.size() - 1U);
+        return id;
+    }
+
+    [[nodiscard]] std::optional<ProceduralRoadSegmentId> add_segment(
+        const ProceduralRoadNodeId start_node,
+        const ProceduralRoadNodeId end_node,
+        const RoadWorldPoint3 start_handle = {1.0F, 0.0F, 0.0F},
+        const RoadWorldPoint3 end_handle = {-1.0F, 0.0F, 0.0F},
+        const float width = 0.72F,
+        const std::uint8_t lane_count = 2) {
+        if (start_node == end_node || node(start_node) == nullptr || node(end_node) == nullptr ||
+            !(width > 0.0F) || lane_count == 0) {
+            return std::nullopt;
+        }
+        const ProceduralRoadSegmentId id = next_segment_id_++;
+        segments_.push_back({id, start_node, end_node, start_handle, end_handle,
+                             width, 1.0F, 24, lane_count});
+        segment_indices_.emplace(id, segments_.size() - 1U);
+        return id;
+    }
+
+    [[nodiscard]] const ProceduralRoadNode* node(const ProceduralRoadNodeId id) const {
+        const auto found = node_indices_.find(id);
+        return found == node_indices_.end() ? nullptr : &nodes_[found->second];
+    }
+
+    [[nodiscard]] ProceduralRoadNode* node(const ProceduralRoadNodeId id) {
+        const auto found = node_indices_.find(id);
+        return found == node_indices_.end() ? nullptr : &nodes_[found->second];
+    }
+
+    [[nodiscard]] const ProceduralRoadGraphSegment* segment(const ProceduralRoadSegmentId id) const {
+        const auto found = segment_indices_.find(id);
+        return found == segment_indices_.end() ? nullptr : &segments_[found->second];
+    }
+
+    [[nodiscard]] ProceduralRoadGraphSegment* segment(const ProceduralRoadSegmentId id) {
+        const auto found = segment_indices_.find(id);
+        return found == segment_indices_.end() ? nullptr : &segments_[found->second];
+    }
+
+    [[nodiscard]] bool set_node_position(const ProceduralRoadNodeId id, const RoadWorldPoint3 position) {
+        ProceduralRoadNode* target = node(id);
+        if (target == nullptr) return false;
+        target->position = position;
+        return true;
+    }
+
+    [[nodiscard]] std::vector<ProceduralRoadSegmentId> connected_segments(const ProceduralRoadNodeId node_id) const {
+        std::vector<ProceduralRoadSegmentId> result;
+        if (node(node_id) == nullptr) return result;
+        for (const ProceduralRoadGraphSegment& item : segments_) {
+            if (item.start_node == node_id || item.end_node == node_id) result.push_back(item.id);
+        }
+        return result;
+    }
+
+    [[nodiscard]] std::size_t degree(const ProceduralRoadNodeId node_id) const {
+        if (node(node_id) == nullptr) return 0U;
+        return static_cast<std::size_t>(std::count_if(
+            segments_.begin(), segments_.end(), [node_id](const ProceduralRoadGraphSegment& item) {
+                return item.start_node == node_id || item.end_node == node_id;
+            }));
+    }
+
+    [[nodiscard]] std::optional<RoadSplineSegment> spline_for(const ProceduralRoadSegmentId id) const {
+        const ProceduralRoadGraphSegment* item = segment(id);
+        if (item == nullptr) return std::nullopt;
+        const ProceduralRoadNode* start = node(item->start_node);
+        const ProceduralRoadNode* end = node(item->end_node);
+        if (start == nullptr || end == nullptr) return std::nullopt;
+
+        RoadSplineSegment spline;
+        spline.start = start->position;
+        spline.control_a = add(start->position, item->start_handle);
+        spline.control_b = add(end->position, item->end_handle);
+        spline.end = end->position;
+        spline.width = item->width;
+        spline.texture_repeat_world_units = item->texture_repeat_world_units;
+        spline.subdivisions = item->subdivisions;
+        return spline;
+    }
+
+    [[nodiscard]] bool remove_segment(const ProceduralRoadSegmentId id) {
+        const auto found = segment_indices_.find(id);
+        if (found == segment_indices_.end()) return false;
+        erase_segment_at(found->second);
+        return true;
+    }
+
+    [[nodiscard]] bool remove_node(const ProceduralRoadNodeId id) {
+        const auto found = node_indices_.find(id);
+        if (found == node_indices_.end()) return false;
+
+        for (std::size_t index = segments_.size(); index > 0U; --index) {
+            const ProceduralRoadGraphSegment& item = segments_[index - 1U];
+            if (item.start_node == id || item.end_node == id) erase_segment_at(index - 1U);
+        }
+
+        const std::size_t index = found->second;
+        const std::size_t last = nodes_.size() - 1U;
+        if (index != last) {
+            nodes_[index] = nodes_[last];
+            node_indices_[nodes_[index].id] = index;
+        }
+        nodes_.pop_back();
+        node_indices_.erase(id);
+        return true;
+    }
+
+    void clear() {
+        nodes_.clear();
+        segments_.clear();
+        node_indices_.clear();
+        segment_indices_.clear();
+        next_node_id_ = 1;
+        next_segment_id_ = 1;
+    }
+
+    [[nodiscard]] const std::vector<ProceduralRoadNode>& nodes() const { return nodes_; }
+    [[nodiscard]] const std::vector<ProceduralRoadGraphSegment>& segments() const { return segments_; }
+
+private:
+    [[nodiscard]] static RoadWorldPoint3 add(const RoadWorldPoint3 point, const RoadWorldPoint3 delta) {
+        return {point.x + delta.x, point.y + delta.y, point.z + delta.z};
+    }
+
+    void erase_segment_at(const std::size_t index) {
+        const ProceduralRoadSegmentId removed_id = segments_[index].id;
+        const std::size_t last = segments_.size() - 1U;
+        if (index != last) {
+            segments_[index] = segments_[last];
+            segment_indices_[segments_[index].id] = index;
+        }
+        segments_.pop_back();
+        segment_indices_.erase(removed_id);
+    }
+
+    ProceduralRoadNodeId next_node_id_ = 1;
+    ProceduralRoadSegmentId next_segment_id_ = 1;
+    std::vector<ProceduralRoadNode> nodes_;
+    std::vector<ProceduralRoadGraphSegment> segments_;
+    std::unordered_map<ProceduralRoadNodeId, std::size_t> node_indices_;
+    std::unordered_map<ProceduralRoadSegmentId, std::size_t> segment_indices_;
 };
 
 class RoadManager {
