@@ -439,6 +439,94 @@ void test_procedural_traffic_reserves_shared_junction_without_overlap() {
     assert(saw_b_inside);
 }
 
+void test_signalized_junction_alternates_axis_priority() {
+    constexpr ProceduralRoadNodeId junction = 202;
+    ProceduralRoadTrafficManager traffic;
+
+    ProceduralRoadTrafficFollowingConfig following;
+    following.enabled = false;
+    traffic.set_following_config(following);
+
+    ProceduralRoadJunctionReservationConfig junction_config;
+    junction_config.request_lookahead = 3.0F;
+    junction_config.stop_buffer = 0.25F;
+    traffic.set_junction_reservation_config(junction_config);
+
+    ProceduralRoadSignalTiming signal_timing;
+    signal_timing.green_duration = 4.0F;
+    signal_timing.clearance_duration = 0.40F;
+    assert(traffic.add_signalized_junction(junction, signal_timing));
+    assert(!traffic.add_signalized_junction(junction, signal_timing));
+    assert(traffic.is_signalized_junction(junction));
+    assert(traffic.junction_signal_phase(junction) == ProceduralRoadSignalPhase::east_west_green);
+    assert(traffic.junction_signal_allows(junction, {1.0F, 0.0F, 0.0F}));
+    assert(!traffic.junction_signal_allows(junction, {0.0F, 1.0F, 0.0F}));
+
+    ProceduralRoadVehicleFollowerConfig movement;
+    movement.cruise_speed = 1.0F;
+    movement.junction_speed = 0.75F;
+    movement.turn_speed = 0.70F;
+    movement.acceleration = 4.0F;
+    movement.braking = 4.0F;
+
+    assert(traffic.add("car.ew", build_crossing_vehicle_route(true, junction), test_vehicle_visual(), movement));
+    assert(traffic.add("car.ns", build_crossing_vehicle_route(false, junction), test_vehicle_visual(), movement));
+
+    traffic.update_tick(0.05F);
+    assert(traffic.junction_owner(junction) == "car.ew");
+    const auto* ns_initial = traffic.find("car.ns");
+    assert(ns_initial != nullptr);
+    assert(ns_initial->signal_blocked_junction == junction);
+
+    bool saw_ew_inside = false;
+    bool saw_ns_waiting_on_red = false;
+    bool saw_all_red = false;
+    bool saw_ns_green = false;
+    bool saw_ns_inside = false;
+
+    for (int step = 0; step < 320; ++step) {
+        traffic.update_tick(0.05F);
+        const auto* ew = traffic.find("car.ew");
+        const auto* ns = traffic.find("car.ns");
+        assert(ew != nullptr && ns != nullptr);
+
+        const bool ew_inside = ew->follower.pose().kind == ProceduralRoadRoutePointKind::junction_connector;
+        const bool ns_inside = ns->follower.pose().kind == ProceduralRoadRoutePointKind::junction_connector;
+        assert(!(ew_inside && ns_inside));
+
+        const auto phase = traffic.junction_signal_phase(junction);
+        assert(phase);
+        if (*phase == ProceduralRoadSignalPhase::all_red_to_north_south ||
+            *phase == ProceduralRoadSignalPhase::all_red_to_east_west) {
+            saw_all_red = true;
+            assert(!ns_inside);
+        }
+        if (*phase == ProceduralRoadSignalPhase::north_south_green) {
+            saw_ns_green = true;
+        }
+
+        if (ew_inside) {
+            saw_ew_inside = true;
+            assert(traffic.junction_owner(junction) == "car.ew");
+        }
+        if (ns->signal_blocked_junction == junction && ns->follower.pose().speed < 0.10F) {
+            saw_ns_waiting_on_red = true;
+        }
+        if (ns_inside) {
+            saw_ns_inside = true;
+            assert(*phase == ProceduralRoadSignalPhase::north_south_green);
+            assert(traffic.junction_owner(junction) == "car.ns");
+            break;
+        }
+    }
+
+    assert(saw_ew_inside);
+    assert(saw_ns_waiting_on_red);
+    assert(saw_all_red);
+    assert(saw_ns_green);
+    assert(saw_ns_inside);
+}
+
 void test_reverse_route_is_continuous() {
     ProceduralRoadGraph graph;
     const auto west = graph.add_node({-4.0F, 0.0F, 0.0F});
@@ -488,6 +576,7 @@ int main() {
     test_procedural_traffic_follows_slower_leader_with_safe_gap();
     test_procedural_traffic_does_not_follow_vehicle_on_other_elevation();
     test_procedural_traffic_reserves_shared_junction_without_overlap();
+    test_signalized_junction_alternates_axis_priority();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
