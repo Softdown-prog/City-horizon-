@@ -1,10 +1,9 @@
 """High-level deterministic prop author for Visitor Forge 2D.
 
 A structured brief or controlled-language prompt is converted into a bounded
-parametric prop grammar and then into a CH_2D_SCENE_RECIPE_V4 scene.  The goal
-is to let agents ask for variants such as a long weathered pier, a small
-rowboat or a two-post metal sign without hand-authoring every coordinate, while
-keeping every decision explicit, deterministic and review-gated.
+parametric prop grammar and then into a CH_2D_SCENE_RECIPE_V4 scene. The author
+covers boats, piers, signs and reusable street/decor props while keeping every
+decision explicit, deterministic and review-gated.
 """
 from __future__ import annotations
 
@@ -16,16 +15,26 @@ from pathlib import Path
 
 from .prop_grammar import GRAMMAR_CONTRACT, build_pier_recipe, configure_rowboat_recipe
 from .prop_sign_grammar import build_sign_recipe
+from .prop_street_grammar import (
+    build_bench_recipe,
+    build_bollard_recipe,
+    build_planter_recipe,
+    build_trash_bin_recipe,
+)
 from .workers import run_workers, validate_recipe
 
 CONTRACT = "CH_2D_PROP_BRIEF_V1"
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
-ARCHETYPES = ("rowboat", "pier", "sign")
+ARCHETYPES = ("rowboat", "pier", "sign", "bench", "bollard", "planter", "trash_bin")
 TEMPLATES = {"rowboat": "prop_rowboat_scene_v4.json"}
 ALIASES = {
     "rowboat": ("barco", "barquinho", "boat", "rowboat", "bote"),
     "pier": ("pier", "píer", "cais", "doca", "dock"),
     "sign": ("placa", "sinalizacao", "sinalização", "sign", "wayfinding"),
+    "bench": ("banco de parque", "banco", "bench", "park bench"),
+    "bollard": ("bollard", "balizador", "balizador urbano", "poste baixo"),
+    "planter": ("vaso", "floreira", "planter", "flower pot"),
+    "trash_bin": ("lixeira", "trash bin", "waste bin", "garbage bin"),
 }
 CONDITIONS = {
     "pristine": ("novo", "nova", "limpo", "limpa", "pristine", "new", "clean"),
@@ -37,6 +46,10 @@ PARAM_FIELDS = {
     "pier": {"lengthTiles", "widthTiles", "ladder", "cleats", "railing"},
     "rowboat": {"size", "oar", "seats"},
     "sign": {"material", "boardShape", "posts", "arrow", "cap"},
+    "bench": {"material", "backrest", "armrests", "length"},
+    "bollard": {"material", "cap"},
+    "planter": {"material", "shape"},
+    "trash_bin": {"material", "lid"},
 }
 
 
@@ -56,9 +69,12 @@ def interpret_prop_prompt(prompt: str) -> dict:
         raise ValueError("prompt must be a non-empty string")
     text = _normalized(prompt)
     archetypes = [name for name, aliases in ALIASES.items() if any(_normalized(alias) in text for alias in aliases)]
+    # 'banco' may appear in rowboat prompts as seat; prefer rowboat when boat words are present.
+    if "rowboat" in archetypes and "bench" in archetypes:
+        archetypes.remove("bench")
     if len(archetypes) != 1:
         if not archetypes:
-            raise ValueError("unsupported prop; choose rowboat, pier or sign")
+            raise ValueError(f"unsupported prop; choose {', '.join(ARCHETYPES)}")
         raise ValueError("prompt mentions multiple prop archetypes; author one asset at a time")
     archetype = archetypes[0]
     result = {"archetype": archetype}
@@ -98,7 +114,7 @@ def interpret_prop_prompt(prompt: str) -> dict:
             result["seats"] = 1
         elif any(term in text for term in ("dois bancos", "2 bancos", "two seats")):
             result["seats"] = 2
-    else:
+    elif archetype == "sign":
         if any(term in text for term in ("metal", "metalica", "metalico", "metálica", "metálico")):
             result["material"] = "metal"
         elif any(term in text for term in ("madeira", "wood", "wooden")):
@@ -121,16 +137,42 @@ def interpret_prop_prompt(prompt: str) -> dict:
             result["boardShape"] = "rounded"
         if any(term in text for term in ("sem tampa", "sem topo", "no cap")):
             result["cap"] = False
+    elif archetype == "bench":
+        if "metal" in text:
+            result["material"] = "metal"
+        elif any(term in text for term in ("madeira", "wood", "wooden")):
+            result["material"] = "wood"
+        if any(term in text for term in ("sem encosto", "without backrest", "no backrest")):
+            result["backrest"] = False
+        if any(term in text for term in ("sem bracos", "sem braços", "without armrests", "no armrests")):
+            result["armrests"] = False
+        if any(term in text for term in ("curto", "short bench")):
+            result["length"] = "short"
+        elif any(term in text for term in ("longo", "comprido", "long bench")):
+            result["length"] = "long"
+    elif archetype == "bollard":
+        result["material"] = "stone" if any(term in text for term in ("pedra", "stone")) else "metal"
+        if any(term in text for term in ("topo reto", "flat cap", "flat top")):
+            result["cap"] = "flat"
+    elif archetype == "planter":
+        if "metal" in text:
+            result["material"] = "metal"
+        elif any(term in text for term in ("madeira", "wood", "wooden")):
+            result["material"] = "wood"
+        else:
+            result["material"] = "stone"
+        if any(term in text for term in ("quadrado", "quadrada", "square")):
+            result["shape"] = "square"
+    elif archetype == "trash_bin":
+        result["material"] = "wood" if any(term in text for term in ("madeira", "wood", "wooden")) else "metal"
+        if any(term in text for term in ("sem tampa", "without lid", "no lid")):
+            result["lid"] = False
     return result
 
 
 def _condition_scene(recipe: dict, condition: str) -> None:
     if condition not in ("pristine", "used", "weathered"):
         raise ValueError("condition must be pristine, used or weathered")
-    if recipe.get("contract") != "CH_2D_SCENE_RECIPE_V4":
-        if condition != "pristine":
-            raise ValueError("non-scene prop templates currently support only pristine condition")
-        return
     finish = recipe.setdefault("finish", {})
     regions = recipe.setdefault("finishRegions", [])
     if condition == "pristine":
@@ -152,6 +194,10 @@ def _merge_parameters(archetype: str, brief: dict, parsed: dict) -> dict:
         "pier": {"lengthTiles": 3, "widthTiles": 1, "ladder": True, "cleats": True, "railing": False},
         "rowboat": {"size": "medium", "oar": True, "seats": 2},
         "sign": {"material": "wood", "boardShape": "rounded", "posts": 1, "arrow": "right", "cap": True},
+        "bench": {"material": "wood", "backrest": True, "armrests": True, "length": "medium"},
+        "bollard": {"material": "metal", "cap": "round"},
+        "planter": {"material": "stone", "shape": "round"},
+        "trash_bin": {"material": "metal", "lid": True},
     }[archetype]
     params = dict(defaults)
     for key in PARAM_FIELDS[archetype]:
@@ -174,7 +220,7 @@ def author_prop_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, di
         raise ValueError(f"unsupported prop archetype {archetype!r}; choose {', '.join(ARCHETYPES)}")
     if parsed and parsed["archetype"] != archetype:
         raise ValueError("prompt archetype and structured archetype disagree")
-    condition = brief.get("condition", parsed.get("condition", "used" if archetype in ("rowboat", "pier") else "pristine"))
+    condition = brief.get("condition", parsed.get("condition", "pristine" if archetype == "sign" else "used"))
     if "condition" in parsed and "condition" in brief and parsed["condition"] != brief["condition"]:
         raise ValueError("prompt condition and structured condition disagree")
     unknown = set(brief) - COMMON_FIELDS - PARAM_FIELDS[archetype]
@@ -201,10 +247,23 @@ def author_prop_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, di
         recipe["id"] = asset_id
         recipe["seed"] = seed
         source = f"parametric:rowboat_v1<{filename}>"
-    else:
+    elif archetype == "sign":
         recipe = build_sign_recipe(asset_id, seed, material=params["material"], board_shape=params["boardShape"],
                                    posts=params["posts"], arrow=params["arrow"], cap=params["cap"])
         source = "parametric:sign_v1"
+    elif archetype == "bench":
+        recipe = build_bench_recipe(asset_id, seed, material=params["material"], backrest=params["backrest"],
+                                    armrests=params["armrests"], length=params["length"])
+        source = "parametric:bench_v1"
+    elif archetype == "bollard":
+        recipe = build_bollard_recipe(asset_id, seed, material=params["material"], cap=params["cap"])
+        source = "parametric:bollard_v1"
+    elif archetype == "planter":
+        recipe = build_planter_recipe(asset_id, seed, material=params["material"], shape=params["shape"])
+        source = "parametric:planter_v1"
+    else:
+        recipe = build_trash_bin_recipe(asset_id, seed, material=params["material"], lid=params["lid"])
+        source = "parametric:trash_bin_v1"
 
     _condition_scene(recipe, condition)
     recipe["authorIntent"] = {"archetype": archetype, "condition": condition, **params}
