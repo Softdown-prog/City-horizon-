@@ -10,7 +10,7 @@
     body { margin:0; background:#15231f; color:#eef5f1; }
     header { height:52px; display:flex; align-items:center; gap:12px; padding:0 16px; background:#0f1916; border-bottom:1px solid #2e433b; }
     header strong { color:#f4d35e; }
-    .app { display:grid; grid-template-columns:260px minmax(520px,1fr) 290px; height:calc(100vh - 52px); }
+    .app { display:grid; grid-template-columns:270px minmax(520px,1fr) 300px; height:calc(100vh - 52px); }
     aside { padding:14px; overflow:auto; background:#13201c; }
     aside.left { border-right:1px solid #2e433b; }
     aside.right { border-left:1px solid #2e433b; }
@@ -36,6 +36,7 @@
     input[type=color] { width:42px; height:32px; padding:0; border:0; background:none; }
     .hint { font-size:11px; color:#91aaa0; line-height:1.4; margin-top:8px; }
     .status { font-size:12px; line-height:1.5; color:#aac0b7; background:#0f1916; border:1px solid #2b4239; padding:8px; border-radius:6px; }
+    .reference { border-color:#6b6330; color:#d9ce8b; }
   </style>
 </head>
 <body>
@@ -52,7 +53,9 @@
           <select id="direction"><option>S</option><option>E</option><option>N</option><option>W</option></select>
           <select id="frame"><option>idle</option><option>walk_00</option><option>walk_01</option><option>walk_02</option><option>walk_03</option><option>walk_04</option><option>walk_05</option><option>walk_06</option><option>walk_07</option></select>
           <label>Base CH Blender <input id="baseFile" type="file" accept="image/png" /></label>
+          <label>Landmarks CH Blender <input id="landmarksFile" type="file" accept="application/json,.json" /></label>
         </div>
+        <div class="hint">Um landmarks.json contém os 36 estados do personagem e só precisa ser carregado uma vez.</div>
       </div>
       <div class="panel">
         <h3>Ferramentas</h3>
@@ -99,6 +102,16 @@
 
     <aside class="right">
       <div class="panel">
+        <h3>Propagação de aparência</h3>
+        <div class="stack">
+          <button id="markReference">Marcar frame atual como referência</button>
+          <button id="applyReference" disabled>Aplicar referência ao frame atual</button>
+          <button id="propagateDirection" disabled>Propagar nos 9 frames desta direção</button>
+        </div>
+        <div id="referenceStatus" class="status reference" style="margin-top:8px">Nenhuma referência marcada.</div>
+        <div class="hint">A propagação usa landmarks da pose para deformar cada camada. Ela não copia o underlay do Blender e recalcula o outline.</div>
+      </div>
+      <div class="panel">
         <h3>Camadas</h3>
         <div id="layers"></div>
       </div>
@@ -129,6 +142,7 @@
   </div>
   <script src="smart_shapes.js"></script>
   <script src="character_templates.js"></script>
+  <script src="pose_transfer.js"></script>
   <script src="studio.js"></script>
 </body>
 </html>
