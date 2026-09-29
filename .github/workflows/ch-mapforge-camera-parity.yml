@@ -1,0 +1,41 @@
+name: CH MapForge Camera Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/ch_core/contracts.h"
+      - "src/ch_core/projection.h"
+      - "src/ch_core/projection.cpp"
+      - "src/runtime_view_state.h"
+      - "C++/MapForge2/src/engine_projection_adapter.h"
+      - "C++/MapForge2/src/engine_projection_adapter.cpp"
+      - "C++/MapForge2/src/mapforge_camera_parity_test.cpp"
+      - ".github/workflows/ch-mapforge-camera-parity.yml"
+
+jobs:
+  camera-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt development headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev pkg-config
+
+      - name: Compile MapForge camera parity gate
+        run: |
+          g++ -std=c++20 -Wall -Wextra -Wpedantic \
+            -I. -I"C++/MapForge2/src" \
+            "C++/MapForge2/src/mapforge_camera_parity_test.cpp" \
+            "C++/MapForge2/src/engine_projection_adapter.cpp" \
+            "src/ch_core/projection.cpp" \
+            $(pkg-config --cflags --libs Qt6Core Qt6Gui) \
+            -o /tmp/mapforge_camera_parity_test
+
+      - name: Run MapForge camera parity gate
+        run: /tmp/mapforge_camera_parity_test
