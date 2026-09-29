@@ -65,9 +65,11 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          job = json.loads(Path("${{ env.CH_AUDIO_JOB }}").read_text(encoding="utf-8"))
+          job_path = Path(os.environ["CH_AUDIO_JOB"])
+          job = json.loads(job_path.read_text(encoding="utf-8"))
           out_dir = Path(job.get("outputDir", f"out/ch-audio-lab/{job['id']}"))
           report_path = out_dir / "audio_lab_report.json"
           asset_report_path = out_dir / "asset_report.json"
