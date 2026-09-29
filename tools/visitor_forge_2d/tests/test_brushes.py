@@ -2,7 +2,7 @@ import random
 
 from PIL import Image
 
-from visitor_forge_2d.core import brushes
+from visitor_forge_2d.core import brushes, flower_brushes
 
 
 def test_leaf_cluster_broadleaf_is_deterministic():
@@ -59,3 +59,29 @@ def test_branch_tapered_draws_continuous_branch():
     mask = Image.new("L", (256 * 4, 320 * 4))
     brushes.branch_tapered(mask, (128, 300), (118, 235), (92, 170), 14, 2.2)
     assert mask.getbbox() is not None
+
+
+def test_flower_rosette_is_deterministic():
+    a = Image.new("RGBA", (160 * 4, 144 * 4))
+    b = Image.new("RGBA", a.size)
+    flower_brushes.flower_rosette(a, random.Random(17), (80, 60), ("#FFF1D2", "#F7D95E"), "#D89D23")
+    flower_brushes.flower_rosette(b, random.Random(17), (80, 60), ("#FFF1D2", "#F7D95E"), "#D89D23")
+    assert a.tobytes() == b.tobytes()
+    assert a.getchannel("A").getbbox() is not None
+
+
+def test_flower_star_and_bud_are_visible():
+    layer = Image.new("RGBA", (160 * 4, 144 * 4))
+    flower_brushes.flower_star(layer, random.Random(4), (72, 54), "#EF7BA5", "#F3C64D")
+    flower_brushes.flower_bud(layer, (92, 58), "#F4A4C5")
+    assert layer.getchannel("A").getbbox() is not None
+
+
+def test_stem_and_leaf_pair_are_deterministic():
+    a = Image.new("RGBA", (160 * 4, 144 * 4))
+    b = Image.new("RGBA", a.size)
+    for layer in (a, b):
+        rng = random.Random(9)
+        flower_brushes.stem_curve(layer, (80, 100), (77, 78), (83, 48), "#27663C")
+        flower_brushes.leaf_pair_small(layer, rng, (79, 76), "#3F7C4A", angle=-1.4)
+    assert a.tobytes() == b.tobytes()
