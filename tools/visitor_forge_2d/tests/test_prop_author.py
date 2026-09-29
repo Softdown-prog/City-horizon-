@@ -15,6 +15,9 @@ def test_prop_prompt_routes_boat_pier_and_sign_with_parameters() -> None:
         "ladder": True, "railing": True
     }
     assert interpret_prop_prompt("placa nova") == {"archetype": "sign", "condition": "pristine"}
+    assert interpret_prop_prompt("placa metálica envelhecida com duas hastes e seta esquerda") == {
+        "archetype": "sign", "condition": "weathered", "material": "metal", "posts": 2, "arrow": "left"
+    }
 
 
 def test_prop_author_builds_weathered_parametric_pier_deterministically() -> None:
@@ -68,6 +71,25 @@ def test_prop_author_structured_pier_and_rowboat_parameters() -> None:
     assert boat_report["source"].startswith("parametric:rowboat_v1")
 
 
+def test_prop_author_builds_parametric_sign_and_weathering() -> None:
+    sign, report = author_prop_recipe({
+        "contract": CONTRACT, "id": "sign_variant", "archetype": "sign", "seed": 46,
+        "material": "metal", "boardShape": "rounded", "posts": 2,
+        "arrow": "left", "cap": True, "condition": "weathered",
+    })
+    assert sign["contract"] == "CH_2D_SCENE_RECIPE_V4"
+    assert sign["camera"]["contract"] == "CH_CAMERA_V1"
+    assert sign["propGrammar"]["parameters"] == {
+        "material": "metal", "boardShape": "rounded", "posts": 2, "arrow": "left", "cap": True
+    }
+    assert sum(node.get("role") == "sign_post" for node in sign["layers"]) == 2
+    assert any(node.get("role") == "direction_icon" for node in sign["layers"])
+    assert {region["style"] for region in sign["finishRegions"]} == {"paint_chips", "rust_bloom"}
+    assert sign["finish"]["brushStamps"] >= 34
+    assert report["source"] == "parametric:sign_v1"
+    assert report["grammarContract"] == "CH_2D_PROP_GRAMMAR_V1"
+
+
 def test_prop_author_runs_pier_through_workers(tmp_path: Path) -> None:
     result = run_prop_author({"contract": CONTRACT, "id": "pier_worker_study", "archetype": "pier", "seed": 77}, tmp_path)
     assert result["status"] == "review_ready"
@@ -84,7 +106,7 @@ def test_prop_author_rejects_ambiguous_conflicting_or_unsupported_requests() -> 
         interpret_prop_prompt("barco ao lado de um píer")
     with pytest.raises(ValueError, match="unsupported prop"):
         interpret_prop_prompt("um avião")
-    with pytest.raises(ValueError, match="only pristine"):
-        author_prop_recipe({"contract": CONTRACT, "id": "old_sign", "archetype": "sign", "condition": "weathered"})
+    with pytest.raises(ValueError, match="sign material"):
+        author_prop_recipe({"contract": CONTRACT, "id": "bad_sign", "archetype": "sign", "material": "plastic"})
     with pytest.raises(ValueError, match="disagree"):
         author_prop_recipe({"contract": CONTRACT, "id": "pier_conflict", "prompt": "píer longo", "lengthTiles": 2})
