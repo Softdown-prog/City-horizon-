@@ -96,8 +96,8 @@ def build_planter_recipe(asset_id: str, seed: int, *, material: str="stone", sha
     if prim=="rounded_rect": body["radius"]=5
     r["layers"]=[{"type":"shape","primitive":"ellipse","box":[52,150,140,178],"material":{"type":"solid","color":"#11192338"},"role":"ground_shadow"},body,
                  {"type":"shape","primitive":"ellipse","box":[66,113,126,135],"material":{"type":"solid","color":"#33261C"},"role":"soil"},
-                 {"type":"shape","primitive":"ellipse","box":[72,99,96,128],"material":{"type":"radial_gradient","center":"#7CC565","edge":"#2F6F3C"},"role":"foliage"},
-                 {"type":"shape","primitive":"ellipse","box":[93,96,119,128],"material":{"type":"radial_gradient","center":"#8BD36B","edge":"#326E3D"},"role":"foliage"}]
+                 {"type":"shape","primitive":"ellipse","box":[72,99,96,128],"material":{"type":"radial_gradient","inner":"#7CC565","outer":"#2F6F3C","center":[84,111],"radius":18},"role":"foliage"},
+                 {"type":"shape","primitive":"ellipse","box":[93,96,119,128],"material":{"type":"radial_gradient","inner":"#8BD36B","outer":"#326E3D","center":[106,109],"radius":18},"role":"foliage"}]
     r["finishRegions"]=[{"style":"grime","mask":{"primitive":prim,"box":[59,119,133,164],**({"radius":5} if prim=="rounded_rect" else {})},"stamps":12,"opacity":0.06,"angleDeg":0}]
     r["propGrammar"]={"contract":GRAMMAR_CONTRACT,"archetype":"planter","parameters":{"material":material,"shape":shape}}
     return r
