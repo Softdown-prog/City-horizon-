@@ -1,0 +1,17 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"hair"},
+  "operations":[
+    {"type":"ellipse","box":[14,9,20,16],"color":"#d43b2f"},
+    {"type":"ellipse","box":[12,12,19,19],"color":"#c72f2a"},
+    {"type":"ellipse","box":[28,9,34,16],"color":"#d43b2f"},
+    {"type":"ellipse","box":[29,12,36,19],"color":"#c72f2a"},
+    {"type":"ellipse","box":[16,7,22,13],"color":"#ea5144"},
+    {"type":"ellipse","box":[26,7,32,13],"color":"#ea5144"},
+    {"type":"pixel","x":15,"y":11,"color":"#f07867"},
+    {"type":"pixel","x":31,"y":10,"color":"#f07867"},
+    {"type":"pixel","x":13,"y":15,"color":"#98231f"},
+    {"type":"pixel","x":35,"y":15,"color":"#98231f"}
+  ]
+}
