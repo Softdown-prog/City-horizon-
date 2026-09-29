@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_red_mapple_golden_v1",
-  "pipelineRevision": 1,
+  "pipelineRevision": 2,
   "canvas": [256, 320],
   "anchor": [128, 308],
   "seed": 41527,
@@ -28,50 +28,55 @@
     }
   },
   "lightingIntent": {
-    "top": "bright warm scarlet highlights on upper canopy",
-    "front": "saturated red and orange-red maple clusters with readable branch gaps",
-    "base": "deep crimson and burgundy interior shadow",
+    "top": "bright warm scarlet highlights on small upper leaf groups",
+    "front": "layered red maple foliage with visible branching and breathing gaps",
+    "base": "deep crimson interior shadow around trunk forks",
     "rotationSpace": "screen_camera_relative"
   },
   "broadleafStructure": {
-    "layout": "continuous",
-    "center": [128, 118],
-    "radius": [74, 88],
-    "masses": 62
+    "layout": "painted_canopy",
+    "profile": "branching",
+    "center": [128, 126],
+    "radius": [82, 96],
+    "density": 1.16
   },
   "palette": {
     "ground_shadow": "#2A1C1C",
     "trunk_top": "#7D5B4B",
     "trunk_bottom": "#3B2B27",
     "trunk_light": "#B18B73",
-    "back_top": "#8A1830",
-    "back_bottom": "#4A1020",
-    "mid_top": "#C82332",
-    "mid_bottom": "#741622",
-    "front_top": "#F04432",
-    "front_bottom": "#B61D29",
-    "highlight": "#FF7050",
-    "occlusion": "#45121F",
-    "leaf_shadow_top": "#75152A",
-    "leaf_shadow_bottom": "#3F1020",
-    "leaf_light_top": "#FF6648",
-    "leaf_light_bottom": "#DD2A32"
+    "back_top": "#84152B",
+    "back_bottom": "#420D1B",
+    "mid_top": "#C52231",
+    "mid_bottom": "#72131F",
+    "front_top": "#F23D31",
+    "front_bottom": "#B91D27",
+    "highlight": "#FF6A4A",
+    "occlusion": "#42101D",
+    "leaf_shadow_top": "#701326",
+    "leaf_shadow_bottom": "#3B0D1B",
+    "leaf_light_top": "#FF6849",
+    "leaf_light_bottom": "#DE2930"
   },
   "raster": {
-    "shadowDabs": 26,
-    "highlightDabs": 42,
+    "shadowDabs": 18,
+    "highlightDabs": 30,
     "needleStrokes": 0,
-    "finalGrain": 38,
+    "finalGrain": 24,
     "finalNeedles": 0
   },
   "trunkBranches": [
-    {"p0": [128, 308], "p1": [127, 245], "p2": [126, 184], "w0": 15, "w1": 7},
-    {"p0": [126, 214], "p1": [107, 188], "p2": [87, 162], "w0": 8, "w1": 3.2},
-    {"p0": [130, 210], "p1": [151, 184], "p2": [171, 157], "w0": 8, "w1": 3.2},
-    {"p0": [121, 188], "p1": [101, 158], "p2": [77, 129], "w0": 6, "w1": 2.5},
-    {"p0": [135, 186], "p1": [157, 153], "p2": [181, 124], "w0": 6, "w1": 2.5},
-    {"p0": [125, 166], "p1": [112, 134], "p2": [105, 99], "w0": 4.8, "w1": 2.0},
-    {"p0": [132, 165], "p1": [145, 132], "p2": [152, 96], "w0": 4.8, "w1": 2.0}
+    {"p0": [128, 308], "p1": [127, 244], "p2": [127, 184], "w0": 15, "w1": 7},
+    {"p0": [126, 218], "p1": [109, 190], "p2": [84, 160], "w0": 8.2, "w1": 3.1},
+    {"p0": [130, 216], "p1": [149, 189], "p2": [175, 159], "w0": 8.2, "w1": 3.1},
+    {"p0": [122, 197], "p1": [99, 165], "p2": [69, 138], "w0": 6.5, "w1": 2.5},
+    {"p0": [134, 196], "p1": [158, 164], "p2": [188, 137], "w0": 6.5, "w1": 2.5},
+    {"p0": [124, 178], "p1": [108, 144], "p2": [101, 104], "w0": 5.4, "w1": 2.0},
+    {"p0": [132, 178], "p1": [148, 143], "p2": [157, 103], "w0": 5.4, "w1": 2.0},
+    {"p0": [125, 161], "p1": [117, 126], "p2": [119, 82], "w0": 4.4, "w1": 1.7},
+    {"p0": [131, 159], "p1": [139, 125], "p2": [141, 78], "w0": 4.4, "w1": 1.7},
+    {"p0": [112, 181], "p1": [91, 151], "p2": [58, 124], "w0": 4.8, "w1": 1.8},
+    {"p0": [144, 181], "p1": [166, 151], "p2": [199, 124], "w0": 4.8, "w1": 1.8}
   ],
   "tiers": [
     {"y": 61, "span": 48, "thickness": 31, "skew": -3, "lobes": 22},
