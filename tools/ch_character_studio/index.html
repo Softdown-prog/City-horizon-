@@ -10,7 +10,7 @@
     body { margin:0; background:#15231f; color:#eef5f1; }
     header { height:52px; display:flex; align-items:center; gap:12px; padding:0 16px; background:#0f1916; border-bottom:1px solid #2e433b; }
     header strong { color:#f4d35e; }
-    .app { display:grid; grid-template-columns:240px minmax(520px,1fr) 280px; height:calc(100vh - 52px); }
+    .app { display:grid; grid-template-columns:260px minmax(520px,1fr) 290px; height:calc(100vh - 52px); }
     aside { padding:14px; overflow:auto; background:#13201c; }
     aside.left { border-right:1px solid #2e433b; }
     aside.right { border-left:1px solid #2e433b; }
@@ -20,6 +20,7 @@
     button, select, input[type=file]::file-selector-button { background:#29443a; color:#fff; border:1px solid #45665a; border-radius:6px; padding:8px 10px; cursor:pointer; }
     button.active { background:#d6ae39; color:#172019; border-color:#f2d35d; }
     button:disabled { opacity:.45; cursor:not-allowed; }
+    select { width:100%; }
     .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .stack { display:grid; gap:8px; }
     .canvas-wrap { position:relative; box-shadow:0 12px 40px #07110db0; background-image:linear-gradient(45deg,#30453d 25%,transparent 25%),linear-gradient(-45deg,#30453d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#30453d 75%),linear-gradient(-45deg,transparent 75%,#30453d 75%); background-size:24px 24px; background-position:0 0,0 12px,12px -12px,-12px 0; }
@@ -33,13 +34,14 @@
     label { font-size:12px; color:#bdd0c8; }
     input[type=range] { width:100%; }
     input[type=color] { width:42px; height:32px; padding:0; border:0; background:none; }
+    .hint { font-size:11px; color:#91aaa0; line-height:1.4; margin-top:8px; }
     .status { font-size:12px; line-height:1.5; color:#aac0b7; background:#0f1916; border:1px solid #2b4239; padding:8px; border-radius:6px; }
   </style>
 </head>
 <body>
   <header>
     <strong>CH Character Studio Art</strong>
-    <span>V0 · CH Blender underlay</span>
+    <span>V0 · CH Blender underlay + Studio paint</span>
     <span style="margin-left:auto">48×64 · anchor 24,60 · S/E/N/W</span>
   </header>
   <div class="app">
@@ -57,6 +59,7 @@
         <div class="row">
           <button id="brushBtn" class="active">Pincel</button>
           <button id="eraserBtn">Borracha</button>
+          <button id="shapeBtn">Forma inteligente</button>
           <button id="clearBtn">Limpar</button>
         </div>
         <div style="margin-top:10px">
@@ -66,6 +69,15 @@
         <div class="row" style="margin-top:10px">
           <label>Cor</label><input id="color" type="color" value="#f2d744" />
         </div>
+      </div>
+      <div class="panel">
+        <h3>Formas de personagem</h3>
+        <div class="stack">
+          <select id="shapeSelect"></select>
+          <label>Escala <span id="shapeScaleLabel">1.00</span>×</label>
+          <input id="shapeScale" type="range" min="0.50" max="2.00" step="0.25" value="1.00" />
+        </div>
+        <div class="hint">Escolha uma peça e clique no personagem. O Studio troca automaticamente para a camada semântica correta.</div>
       </div>
       <div class="panel">
         <h3>Paleta</h3>
@@ -92,10 +104,11 @@
       </div>
       <div class="panel">
         <h3>Status</h3>
-        <div id="status" class="status">Studio pronto. Importe um passe base do CH Blender ou pinte diretamente.</div>
+        <div id="status" class="status">Studio pronto. Importe o passe do CH Blender ou comece a desenhar.</div>
       </div>
     </aside>
   </div>
+  <script src="smart_shapes.js"></script>
   <script src="studio.js"></script>
 </body>
 </html>
