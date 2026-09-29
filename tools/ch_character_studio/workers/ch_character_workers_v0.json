@@ -1,0 +1,69 @@
+{
+  "contract": "CH_CHARACTER_WORKERS_V0",
+  "version": "0.1",
+  "defaultSeed": 1337,
+  "determinism": {
+    "seedRequired": true,
+    "stableWorkerOrder": true,
+    "repositoryRelativeInputsOnly": true,
+    "noNetworkDuringWorkerExecution": true,
+    "jsonHandoffRequired": true,
+    "sameInputsSameSeedMustProduceSamePlan": true
+  },
+  "workers": [
+    {
+      "id": "spatial_guard",
+      "role": "Validate ground anchor, left/right foot contacts, support foot and footprint before art review.",
+      "inputs": ["character_spec", "landmarks", "spatial_contract"],
+      "outputs": ["spatial_report.json"],
+      "mayEdit": []
+    },
+    {
+      "id": "silhouette_artist",
+      "role": "Author or refine silhouette, hair mass, clothing volumes and accessories without changing approved motion.",
+      "inputs": ["character_spec", "base_pass", "landmarks", "palette_library"],
+      "outputs": ["art_recipe.json", "layer_pngs"],
+      "mayEdit": ["silhouette", "hair", "upper_clothing", "lower_clothing", "footwear", "accessories_back", "accessories_front"]
+    },
+    {
+      "id": "face_artist",
+      "role": "Author facial paint, skin accents and readable expression at gameplay scale.",
+      "inputs": ["character_spec", "base_pass", "landmarks", "palette_library"],
+      "outputs": ["face_recipe.json", "face_layer.png"],
+      "mayEdit": ["skin", "face", "paint_over"]
+    },
+    {
+      "id": "color_mask_artist",
+      "role": "Build appearance, clothing and held-object recolor masks under CH_CHARACTER_COLOR_MASKS_V0.",
+      "inputs": ["art_layers", "mask_contract", "palette_library"],
+      "outputs": ["appearance_mask.png", "clothing_mask.png", "held_object_mask.png", "mask_report.json"],
+      "mayEdit": ["masks"]
+    },
+    {
+      "id": "held_object_artist",
+      "role": "Prepare optional hand-held prop visual, grip anchor, depth and object mask without modifying hand motion.",
+      "inputs": ["held_object_contract", "landmarks", "palette_library"],
+      "outputs": ["held_object_recipe.json", "held_object_preview.png"],
+      "mayEdit": ["held_object"]
+    },
+    {
+      "id": "inspection_reviewer",
+      "role": "Request non-canonical rotated inspection renders and record visual findings. Never approve runtime export from inspection camera.",
+      "inputs": ["character_spec", "inspection_camera_contract"],
+      "outputs": ["inspection_request.json", "inspection_review.json"],
+      "mayEdit": []
+    },
+    {
+      "id": "production_qa",
+      "role": "Validate frame size, alpha, anchors, footprint, mask alignment, deterministic provenance and export readiness.",
+      "inputs": ["all_outputs", "studio_manifest"],
+      "outputs": ["production_gate.json"],
+      "mayEdit": []
+    }
+  ],
+  "handoff": {
+    "contract": "CH_CHARACTER_WORKER_HANDOFF_V0",
+    "required": ["contract", "workerId", "characterId", "seed", "inputHashes", "status", "outputs", "notes"],
+    "statusValues": ["planned", "ready", "blocked", "complete", "failed"]
+  }
+}
