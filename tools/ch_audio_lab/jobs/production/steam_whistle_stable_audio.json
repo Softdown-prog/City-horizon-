@@ -1,0 +1,36 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "steam_whistle_stable_audio",
+  "attempt": 1,
+  "kind": "effect",
+  "prompt": "Classic steam locomotive whistle for a historical city-building game. One strong clean whistle blast with a warm metal resonance, pressurized steam character, outdoor perspective, no speech, no music, no crowd, no background ambience. Designed as a reusable game sound effect.",
+  "negativePrompt": "speech, voice, music, crowd, traffic, clipping, distortion, long ambience",
+  "durationSeconds": 8.0,
+  "tags": ["train", "steam", "whistle", "sfx", "stable-audio", "production-review"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stability_audio.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "stable-audio-2.5",
+      "--seed", "20260929",
+      "--report", "out/ch-audio-lab/steam_whistle_stable_audio/provider_report.json"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -18.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.01,
+    "fadeOutSeconds": 0.15,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
