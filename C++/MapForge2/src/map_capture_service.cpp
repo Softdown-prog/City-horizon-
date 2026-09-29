@@ -1,5 +1,4 @@
 #include "map_capture_service.h"
-#include "engine_projection_adapter.h"
 #include "src/ch_core/contracts.h"
 #include "src/ch_core/projection.h"
 
@@ -87,12 +86,14 @@ void drawAnchoredSprite(QPainter& painter, const QImage& sprite, const QPointF& 
                        const float scale, const QPointF& offsetPixels) {
     const auto anchor = opaqueBottomAnchor(sprite);
     if (!anchor) return;
-    const QPointF ground = EngineProjectionAdapter::worldToScreen(
+    const auto projected = ch::world_to_screen_point(
         static_cast<float>(tile.x()) + 0.5F,
         static_cast<float>(tile.y()) + 0.5F,
         worldZ,
         camera,
-        QSizeF(width, height));
+        static_cast<float>(width),
+        static_cast<float>(height));
+    const QPointF ground(projected.x, projected.y);
     const QSizeF targetSize(sprite.width() * scale, sprite.height() * scale);
     const QPointF targetAnchor(anchor->x() * scale, anchor->y() * scale);
     const QRectF target(QPointF(ground.x() - targetAnchor.x() + offsetPixels.x(),
@@ -307,14 +308,15 @@ MapCaptureResult runMapCapture(const QString& output_path,
     drawPortalMarker(painter, portalSpec, camera, width, height);
 
     if (candidateSpec.value("showAnchor").toBool(true)) {
-        const QPointF ground = EngineProjectionAdapter::worldToScreen(
+        const auto projected = ch::world_to_screen_point(
             static_cast<float>(candidateTile.x()) + 0.5F,
             static_cast<float>(candidateTile.y()) + 0.5F,
             candidateElevation,
             camera,
-            QSizeF(width, height));
+            static_cast<float>(width),
+            static_cast<float>(height));
         painter.setPen(colorOr(candidateSpec, "anchorColor", QColor(255, 214, 64, 230)));
-        painter.drawPoint(ground);
+        painter.drawPoint(QPointF(projected.x, projected.y));
     }
     painter.end();
 
