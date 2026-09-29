@@ -18,23 +18,32 @@ def test_maple_brush_respects_group_mask():
     mask = Image.new("L", (256 * 4, 320 * 4))
     brushes.leaf_cluster_round(mask, random.Random(7), 128, 120, 32, 24)
     layer = Image.new("RGBA", mask.size)
-    brushes.leaf_cluster_maple(
-        layer,
-        random.Random(7),
-        mask,
-        (128, 120),
-        (32, 24),
-        ("#C42130", "#F33D31", "#B61B25"),
-        highlight_color="#FF694B",
-        shadow_color="#6B1123",
-    )
+    brushes.leaf_cluster_maple(layer, random.Random(7), mask, (128, 120), (32, 24), ("#C42130", "#F33D31", "#B61B25"), highlight_color="#FF694B", shadow_color="#6B1123")
     alpha = layer.getchannel("A")
     assert alpha.getbbox() is not None
-    # Every painted maple pixel must remain inside the authored cluster mask.
     leaked = Image.eval(alpha, lambda px: 255 if px else 0)
-    outside = Image.new("L", mask.size, 255)
     outside = Image.frombytes("L", mask.size, bytes(255 - value for value in mask.tobytes()))
     assert Image.composite(leaked, Image.new("L", mask.size), outside).getbbox() is None
+
+
+def test_lanceolate_brush_respects_group_mask():
+    mask = Image.new("L", (256 * 4, 320 * 4))
+    brushes.leaf_cluster_round(mask, random.Random(11), 128, 120, 36, 28)
+    layer = Image.new("RGBA", mask.size)
+    brushes.leaf_cluster_lanceolate(layer, random.Random(11), mask, (128, 120), (36, 28), ("#1C5A36", "#3C7D40", "#87B83E"), highlight_color="#C9D94A")
+    assert layer.getchannel("A").getbbox() is not None
+
+
+def test_rosette_droop_draws_radial_leaf_group():
+    layer = Image.new("RGBA", (256 * 4, 320 * 4))
+    brushes.leaf_rosette_droop(layer, random.Random(13), (128, 120), ("#235E39", "#4F8E42"), leaves=10, radius=10, highlight_color="#A9C94A")
+    assert layer.getchannel("A").getbbox() is not None
+
+
+def test_bark_highlight_strokes_follow_branch():
+    layer = Image.new("RGBA", (256 * 4, 320 * 4))
+    brushes.bark_highlight_strokes(layer, random.Random(17), (128, 300), (120, 240), (100, 180), "#D8A36A", strokes=4)
+    assert layer.getchannel("A").getbbox() is not None
 
 
 def test_gap_cutter_removes_alpha_from_existing_mass():
