@@ -40,8 +40,6 @@ jobs:
             -o "$RUNNER_TEMP/ch_apartment.zip"
           unzip -q "$RUNNER_TEMP/ch_apartment.zip" -d "$RUNNER_TEMP/ch_apartment_artifact"
 
-          find "$RUNNER_TEMP/ch_apartment_artifact" -maxdepth 3 -type f -print
-
           SRC="$RUNNER_TEMP/ch_apartment_artifact/$SRC_SUBDIR"
           test -d "$SRC"
 
@@ -50,10 +48,10 @@ jobs:
           NORTH="$SRC/residential_modern_apartment_4x4_01_north_color_source.png"
           EAST="$SRC/residential_modern_apartment_4x4_01_east_color_source.png"
 
-          test "$(sha256sum "$SOUTH" | awk '{print $1}')" = '99787e972ad72e1d75cd056079dd1317613c27099141633b0589d50d145ddedd'
-          test "$(sha256sum "$WEST" | awk '{print $1}')" = 'aa9c43714a3905f21bcb60a614014aa64e9383290808664b3fd0ebf37c386d36'
-          test "$(sha256sum "$NORTH" | awk '{print $1}')" = '651dec2830b3460ee6796638b491ff1cd05879573ed838d53379ab450eedc1ac'
-          test "$(sha256sum "$EAST" | awk '{print $1}')" = 'f8110aeb5b473981943901dcf5b9835ef4a68f4c7e29835aeb8f4e07ef4ecc3'
+          test "$(sha256sum "$SOUTH" | awk '{print $1}')" = 'b754dac33de84dbd96b83b5565b4dd0fe4e60b9ecc87f3d648f3068a0f067c91'
+          test "$(sha256sum "$WEST" | awk '{print $1}')" = '6f1f9bb8a0195fd50376a728920ca92ce5fe413deb22834700f3586d84c0d93b'
+          test "$(sha256sum "$NORTH" | awk '{print $1}')" = '9f9f258b913a07b76343c5d9f426bde7a4e81cd304416f403dd517290ec8ccfd'
+          test "$(sha256sum "$EAST" | awk '{print $1}')" = '7844fa6a2ce3a186581ea95493025ad8cdd02fdd0ac8edaf4dfad147cd560d9f'
 
           cp "$SOUTH" "$DEST/residential_modern_apartment_4x4_01_south.png"
           cp "$WEST" "$DEST/residential_modern_apartment_4x4_01_west.png"
@@ -78,10 +76,10 @@ jobs:
             "runtimeAnchor": { "x": 0.5, "y": 0.668016796875 },
             "rotationOrder": ["south", "west", "north", "east"],
             "sprites": {
-              "south": { "path": "$DEST/residential_modern_apartment_4x4_01_south.png", "sha256": "99787e972ad72e1d75cd056079dd1317613c27099141633b0589d50d145ddedd" },
-              "west": { "path": "$DEST/residential_modern_apartment_4x4_01_west.png", "sha256": "aa9c43714a3905f21bcb60a614014aa64e9383290808664b3fd0ebf37c386d36" },
-              "north": { "path": "$DEST/residential_modern_apartment_4x4_01_north.png", "sha256": "651dec2830b3460ee6796638b491ff1cd05879573ed838d53379ab450eedc1ac" },
-              "east": { "path": "$DEST/residential_modern_apartment_4x4_01_east.png", "sha256": "f8110aeb5b473981943901dcf5b9835ef4a68f4c7e29835aeb8f4e07ef4ecc3" }
+              "south": { "path": "$DEST/residential_modern_apartment_4x4_01_south.png", "sha256": "b754dac33de84dbd96b83b5565b4dd0fe4e60b9ecc87f3d648f3068a0f067c91" },
+              "west": { "path": "$DEST/residential_modern_apartment_4x4_01_west.png", "sha256": "6f1f9bb8a0195fd50376a728920ca92ce5fe413deb22834700f3586d84c0d93b" },
+              "north": { "path": "$DEST/residential_modern_apartment_4x4_01_north.png", "sha256": "9f9f258b913a07b76343c5d9f426bde7a4e81cd304416f403dd517290ec8ccfd" },
+              "east": { "path": "$DEST/residential_modern_apartment_4x4_01_east.png", "sha256": "7844fa6a2ce3a186581ea95493025ad8cdd02fdd0ac8edaf4dfad147cd560d9f" }
             }
           }
           EOF
