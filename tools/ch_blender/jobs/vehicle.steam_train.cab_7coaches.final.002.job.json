@@ -14,9 +14,7 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
     "--output",
-    "out/ch_blender_agent/vehicle.steam_train.cab_7coaches.final.v3",
-    "--approval-proxy-sha",
-    "16befd244af17bad3fbfabf8533dcc4afde6db81562021e8881882df179ab7a6"
+    "out/ch_blender_agent/vehicle.steam_train.cab_7coaches.final.v3"
   ],
   "outputDir": "out/ch_blender_agent/vehicle.steam_train.cab_7coaches.final.v3"
 }
