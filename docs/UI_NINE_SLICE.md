@@ -2,9 +2,19 @@
 
 ## Status
 
-Initial runtime infrastructure is available in `src/ui_nine_slice.h`.
+The reusable runtime infrastructure is available in `src/ui_nine_slice.h`.
 
-This is an incremental UI migration. Existing procedural SDL panels remain the visual fallback until a panel skin is authored and approved at gameplay scale.
+The first visual pilot is now wired to the construction catalog:
+
+- skin: `assets/ui/chrome/panel_build_catalog_9slice_v1.png`;
+- source size: 64x64;
+- insets: 10 / 10 / 10 / 10 pixels;
+- runtime hook: `src/ui_build_panel_nine_slice.inl`;
+- registry entry: `panel_build_catalog_nine_slice` in `assets/ui/ui_asset_catalog.json`.
+
+The pilot deliberately keeps the existing procedural SDL panel underneath it. The authored PNG has a transparent center, so if the skin fails to load the old panel remains usable, and while the pilot is under review only the frame/chrome is replaced.
+
+This is still an incremental migration. The construction-catalog skin is integrated but is not yet promoted as the universal UI frame until an in-game/runtime capture is reviewed at gameplay scale.
 
 ## Why nine-slice
 
@@ -32,11 +42,11 @@ The source insets are supplied as left/top/right/bottom pixel margins. If invali
 
 Do not convert every UI element at once.
 
-1. Author one approved panel frame under `assets/ui/`.
-2. Validate the frame at normal gameplay scale.
-3. Integrate it into one representative resizable panel.
-4. Keep the current procedural panel as fallback while the skin is unavailable.
-5. Only after the first panel is visually approved should the same skin be promoted to compatible dialogs/cards.
+1. Validate the construction-catalog pilot at normal gameplay scale.
+2. Adjust only its skin/insets if a concrete visual defect appears.
+3. Keep the current procedural panel as fallback while the skin remains a pilot.
+4. After approval, promote the same frame to compatible dialogs/cards.
+5. Only then consider specialized variants for HUD, compact controls or themed panels.
 
 Use nine-slice for resizable panels and dialogs. Fixed-height controls that only change width may later use the same infrastructure as a three-slice by setting unused margins to zero rather than introducing a second renderer.
 
@@ -44,4 +54,4 @@ Use nine-slice for resizable panels and dialogs. Fixed-height controls that only
 
 `src/ui_manager_test.cpp` verifies normal nine-slice geometry and compact destinations where borders must compress and the center collapses.
 
-Visual approval still requires an in-game/runtime capture after a real UI skin is connected; geometry tests alone do not approve the artwork.
+Geometry tests do not approve artwork. The first construction-catalog skin still requires an actual runtime/gameplay-scale capture before its visual status changes from `pilot` to `approved`.
