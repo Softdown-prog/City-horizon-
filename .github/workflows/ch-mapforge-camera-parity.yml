@@ -1,7 +1,7 @@
 name: CH MapForge Camera Parity
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   push:
     branches:
       - main
@@ -64,9 +64,7 @@ jobs:
 
       - name: Compile migrated authoring and capture sources
         run: |
-          CFLAGS="-std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -IC++/MapForge2/src"
-          QT_CFLAGS="$(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets)"
-          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/asset_grid_preview_widget.cpp" -o /tmp/asset_grid_preview_widget.o
-          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/tile_surface_preview_widget.cpp" -o /tmp/tile_surface_preview_widget.o
-          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/park_fence_renderer.cpp" -o /tmp/park_fence_renderer.o
-          g++ $CFLAGS $QT_CFLAGS -c "C++/MapForge2/src/map_capture_service.cpp" -o /tmp/map_capture_service.o
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -I"C++/MapForge2/src" $(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets) -c "C++/MapForge2/src/asset_grid_preview_widget.cpp" -o /tmp/asset_grid_preview_widget.o
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -I"C++/MapForge2/src" $(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets) -c "C++/MapForge2/src/tile_surface_preview_widget.cpp" -o /tmp/tile_surface_preview_widget.o
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -I"C++/MapForge2/src" $(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets) -c "C++/MapForge2/src/park_fence_renderer.cpp" -o /tmp/park_fence_renderer.o
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -fPIC -I. -I"C++/MapForge2/src" $(pkg-config --cflags Qt6Core Qt6Gui Qt6Widgets) -c "C++/MapForge2/src/map_capture_service.cpp" -o /tmp/map_capture_service.o
