@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Deterministic 48x64 drawing CLI for CH Character Studio."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import random
+import sys
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FRAME = (48, 64)
+CONTRACT = "CH_CHARACTER_DRAW_RECIPE_V0"
+ART_LAYERS = {
+    "silhouette", "skin", "hair", "face", "upper_clothing", "lower_clothing",
+    "footwear", "accessories_back", "accessories_front", "paint_over", "outline"
+}
+MASK_BANKS = {"appearance", "clothing", "held_object"}
+CHANNEL_RGB = {"R": (255, 0, 0, 255), "G": (0, 255, 0, 255), "B": (0, 0, 255, 255)}
+
+
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def parse_color(value: str) -> tuple[int, int, int, int]:
+    raw = str(value).lstrip("#")
+    if len(raw) not in {6, 8}:
+        raise ValueError(f"invalid color: {value}")
+    rgb = tuple(int(raw[i:i+2], 16) for i in (0, 2, 4))
+    alpha = int(raw[6:8], 16) if len(raw) == 8 else 255
+    return rgb + (alpha,)
+
+
+def draw_op(draw: ImageDraw.ImageDraw, op: dict, mask_mode: bool = False) -> None:
+    kind = op.get("type")
+    color = CHANNEL_RGB.get(op.get("channel")) if mask_mode else parse_color(op.get("color", "#FFFFFF"))
+    if mask_mode and color is None:
+        raise ValueError("mask operation requires channel R/G/B")
+    if kind == "pixel":
+        draw.point((int(op["x"]), int(op["y"])), fill=color)
+    elif kind == "rect":
+        draw.rectangle(tuple(map(int, op["box"])), fill=color)
+    elif kind == "ellipse":
+        draw.ellipse(tuple(map(int, op["box"])), fill=color)
+    elif kind == "polygon":
+        points = [tuple(map(int, p)) for p in op["points"]]
+        draw.polygon(points, fill=color)
+    elif kind == "line":
+        points = [tuple(map(int, p)) for p in op["points"]]
+        draw.line(points, fill=color, width=max(1, int(op.get("width", 1))), joint="curve")
+    else:
+        raise ValueError(f"unsupported primitive: {kind}")
+
+
+def validate_recipe(recipe: dict) -> None:
+    if recipe.get("contract") != CONTRACT:
+        raise ValueError(f"contract must be {CONTRACT}")
+    if recipe.get("frameSize", list(FRAME)) != list(FRAME):
+        raise ValueError("frameSize must be [48,64]")
+    target = recipe.get("target") or {}
+    kind = target.get("kind")
+    if kind == "artLayer":
+        if target.get("name") not in ART_LAYERS:
+            raise ValueError(f"unknown art layer: {target.get('name')}")
+    elif kind == "maskBank":
+        if target.get("name") not in MASK_BANKS:
+            raise ValueError(f"unknown mask bank: {target.get('name')}")
+    else:
+        raise ValueError("target.kind must be artLayer or maskBank")
+    if not isinstance(recipe.get("operations"), list):
+        raise ValueError("operations must be an array")
+
+
+def render(recipe: dict, seed: int) -> Image.Image:
+    validate_recipe(recipe)
+    rng = random.Random(seed)
+    image = Image.new("RGBA", FRAME, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    mask_mode = recipe["target"]["kind"] == "maskBank"
+    for raw in recipe["operations"]:
+        op = dict(raw)
+        # Optional deterministic jitter is deliberately tiny and opt-in. It is
+        # useful for painted texture tests without making normal vector recipes noisy.
+        jitter = int(op.pop("jitterPx", 0) or 0)
+        if jitter:
+            dx, dy = rng.randint(-jitter, jitter), rng.randint(-jitter, jitter)
+            if "x" in op: op["x"] = int(op["x"]) + dx
+            if "y" in op: op["y"] = int(op["y"]) + dy
+            if "box" in op:
+                x0, y0, x1, y1 = map(int, op["box"])
+                op["box"] = [x0 + dx, y0 + dy, x1 + dx, y1 + dy]
+            if "points" in op:
+                op["points"] = [[int(x) + dx, int(y) + dy] for x, y in op["points"]]
+        draw_op(draw, op, mask_mode=mask_mode)
+    return image
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--recipe", type=Path, required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--seed", type=int, default=1337)
+    args = parser.parse_args()
+    try:
+        recipe_path = args.recipe if args.recipe.is_absolute() else (REPO_ROOT / args.recipe).resolve()
+        out_path = args.out if args.out.is_absolute() else (REPO_ROOT / args.out).resolve()
+        recipe = load_json(recipe_path)
+        image = render(recipe, args.seed)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        image.save(out_path, optimize=False, compress_level=9)
+        digest = hashlib.sha256(out_path.read_bytes()).hexdigest()
+        payload = {
+            "contract": "CH_CHARACTER_DRAW_REPORT_V0",
+            "status": "ok",
+            "seed": args.seed,
+            "target": recipe["target"],
+            "frameSize": list(FRAME),
+            "output": str(out_path),
+            "sha256": digest
+        }
+        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        return 0
+    except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+        sys.stdout.write(json.dumps({"contract":"CH_CHARACTER_DRAW_REPORT_V0","status":"error","message":str(exc)}, indent=2) + "\n")
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
