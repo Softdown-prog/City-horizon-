@@ -6,7 +6,33 @@
   "seed": 157,
   "camera": {"contract": "CH_CAMERA_V1", "tile": [128, 64], "yawDeg": 45, "elevationDeg": 30, "projection": "orthographic_dimetric"},
   "lighting": {"direction": [-1, -1], "shadowOffset": [4, 6]},
-  "finish": {"edgeBreakupPx": 0.8, "surfaceVariation": 0.10, "brushStamps": 42, "brushOpacity": 0.10},
+  "finish": {"edgeBreakupPx": 0.8, "surfaceVariation": 0.10, "brushStamps": 34, "brushOpacity": 0.08},
+  "finishRegions": [
+    {
+      "style": "plank_seams",
+      "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 8, "tension": 0.42,
+        "points": [[39,111],[53,89],[86,76],[130,71],[176,70],[207,89],[218,103],[207,126],[181,147],[132,153],[83,151],[56,132]]},
+      "stamps": 8,
+      "opacity": 0.10,
+      "angleDeg": -5
+    },
+    {
+      "style": "edge_wear",
+      "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 8, "tension": 0.42,
+        "points": [[39,111],[53,89],[86,76],[130,71],[176,70],[207,89],[218,103],[207,126],[181,147],[132,153],[83,151],[56,132]]},
+      "stamps": 34,
+      "opacity": 0.10,
+      "angleDeg": 0
+    },
+    {
+      "style": "scratches",
+      "mask": {"primitive": "smooth_polygon", "samplesPerSegment": 7, "tension": 0.44,
+        "points": [[61,107],[85,92],[125,85],[165,86],[192,102],[176,126],[136,132],[96,130]]},
+      "stamps": 18,
+      "opacity": 0.06,
+      "angleDeg": -4
+    }
+  ],
   "validation": {"minimumOpaqueHeightPx": 52, "maximumOpaqueHeightPx": 174},
   "symbols": {
     "seat": [{
