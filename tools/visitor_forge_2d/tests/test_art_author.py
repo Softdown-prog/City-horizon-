@@ -40,6 +40,35 @@ def test_author_routes_other_families_without_guessing() -> None:
     assert custom["broadleafStructure"]["masses"] == 52
 
 
+def test_visual_profiles_route_known_tree_grammars() -> None:
+    tropical, report = author_recipe({
+        "contract": CONTRACT,
+        "id": "mango_profile_study",
+        "visualProfile": "drooping_lanceolate_tropical",
+        "seed": 77,
+    })
+    assert tropical["visualProfile"] == "drooping_lanceolate_tropical"
+    assert tropical["authorIntent"]["visualProfile"] == "drooping_lanceolate_tropical"
+    assert tropical["broadleafStructure"]["radius"] == [78, 64]
+    assert tropical["broadleafStructure"]["masses"] == 59
+    assert tropical["visualProfileData"]["foliage"]["microLeafBrush"] == "leaf_cluster_lanceolate"
+    assert "visualProfile=drooping_lanceolate_tropical" in report["decisions"]
+
+    maple, maple_report = author_recipe({
+        "contract": CONTRACT,
+        "id": "maple_profile_study",
+        "visualProfile": "red_mapple_open_branching",
+        "seed": 91,
+    })
+    assert maple["sceneryType"] == "red_mapple"
+    assert maple["visualProfile"] == "red_mapple_open_branching"
+    assert maple["visualProfileData"]["foliage"]["microLeafBrush"] == "leaf_cluster_maple"
+    assert maple_report["subject"] == "custom"
+
+    with pytest.raises(ValueError, match="unknown visualProfile"):
+        author_recipe({"contract": CONTRACT, "id": "bad_profile", "visualProfile": "missing_profile"})
+
+
 def test_organic_styles_choose_distinct_canopies_and_named_palettes() -> None:
     oiti, _ = author_recipe({"contract": CONTRACT, "id": "oiti_study",
                              "prompt": "oiti de copa fechada, verde fresco", "seed": 11})
