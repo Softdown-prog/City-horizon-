@@ -12,17 +12,18 @@ from pathlib import Path
 
 from PIL import Image
 
-from .core import flower_bed_scenery, flower_bed_scenery_v2, organic_scenery, red_mapple_scenery, shape_recipe
+from .core import fence_scenery, flower_bed_scenery, flower_bed_scenery_v2, organic_scenery, red_mapple_scenery, shape_recipe
 
 SHAPE_CONTRACT = "CH_2D_SHAPE_RECIPE_V1"
 ORGANIC_CONTRACT = "CH_2D_ORGANIC_SCENERY_V1"
+FENCE_CONTRACT = "CH_2D_FENCE_SCENERY_V1"
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 
 
 def validate_recipe(recipe: dict) -> str:
     """Recipe worker: reject invalid IDs, geometry and camera before writing."""
-    if not isinstance(recipe, dict) or recipe.get("contract") not in (SHAPE_CONTRACT, ORGANIC_CONTRACT):
-        raise ValueError("worker needs a supported 2D shape or organic scenery recipe")
+    if not isinstance(recipe, dict) or recipe.get("contract") not in (SHAPE_CONTRACT, ORGANIC_CONTRACT, FENCE_CONTRACT):
+        raise ValueError("worker needs a supported 2D shape, organic scenery or fence recipe")
     asset_id = recipe.get("id")
     if not isinstance(asset_id, str) or not _SAFE_ID.fullmatch(asset_id):
         raise ValueError("recipe id must use lowercase letters, digits, _ or -")
@@ -36,6 +37,9 @@ def validate_recipe(recipe: dict) -> str:
         raise ValueError("anchor must lie within the canvas")
     if recipe["contract"] == SHAPE_CONTRACT:
         return "shape"
+    if recipe["contract"] == FENCE_CONTRACT:
+        fence_scenery.validate_recipe(recipe)
+        return "fence"
     camera = recipe.get("camera", {})
     if (not isinstance(camera, dict) or camera.get("contract") != "CH_CAMERA_V1" or
         camera.get("tile") != [128, 64] or
@@ -93,6 +97,8 @@ def run_workers(recipe_path: Path, output_root: Path) -> dict:
     folder = output_root / recipe["id"]
     if kind == "shape":
         result = shape_recipe.export_shape_recipe(recipe_path, folder)
+    elif kind == "fence":
+        result = fence_scenery.export_fence_scenery(recipe_path, folder)
     elif kind == "flower_bed":
         result = flower_bed_scenery.export(recipe_path, folder)
     elif kind == "flower_bed_v2":
