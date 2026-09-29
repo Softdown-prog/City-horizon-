@@ -81,6 +81,7 @@ GameplayUiModel base_model() {
     model.administration_alerts = "SEM ALERTAS CRITICOS";
     model.master_volume_percent = 78;
     model.effects_volume_percent = 64;
+    model.save_available = true;
     model.active_tool = UiTool::none;
     return model;
 }
@@ -91,10 +92,11 @@ GameplayUiModel base_model() {
                                    const std::filesystem::path& output_path) {
     model.overlay = overlay;
     model.paused = overlay == UiOverlay::pause;
+    model.startup_main_menu = overlay == UiOverlay::main_menu;
     ui.update_layout(kWidth, kHeight, model);
     ui.handle_mouse_motion(1100.0F, 700.0F);
 
-    if (!has_enabled_action(ui, required_action)) {
+    if (required_action != UiAction::none && !has_enabled_action(ui, required_action)) {
         std::cerr << "modal capture failed: expected action missing for "
                   << output_path.string() << '\n';
         return false;
@@ -146,13 +148,28 @@ int main(int argc, char** argv) {
     const bool administration_ok = capture_overlay(
         ui, renderer, model, UiOverlay::administration, UiAction::open_reports,
         output_dir / "modal_administration.png");
+    const bool reports_ok = capture_overlay(
+        ui, renderer, model, UiOverlay::reports, UiAction::close_modal,
+        output_dir / "modal_reports.png");
+    const bool save_load_ok = capture_overlay(
+        ui, renderer, model, UiOverlay::save_load, UiAction::back_from_save_load,
+        output_dir / "modal_save_load.png");
+    const bool main_menu_ok = capture_overlay(
+        ui, renderer, model, UiOverlay::main_menu, UiAction::start_new_city,
+        output_dir / "modal_main_menu.png");
+    const bool quit_confirm_ok = capture_overlay(
+        ui, renderer, model, UiOverlay::quit_confirm, UiAction::cancel_quit,
+        output_dir / "modal_quit_confirm.png");
 
     ui.release_renderer_resources();
     SDL_DestroyRenderer(renderer);
     SDL_DestroySurface(canvas);
     SDL_Quit();
 
-    if (!pause_ok || !settings_ok || !administration_ok) return 1;
+    if (!pause_ok || !settings_ok || !administration_ok || !reports_ok ||
+        !save_load_ok || !main_menu_ok || !quit_confirm_ok) {
+        return 1;
+    }
     std::cout << "modal nine-slice visual capture passed: " << output_dir.string() << '\n';
     return 0;
 }
