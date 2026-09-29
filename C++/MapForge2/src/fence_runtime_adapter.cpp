@@ -15,7 +15,10 @@ namespace {
 
 [[nodiscard]] ParkFencePiece to_renderer_piece(const FenceVisualType type) {
     switch (type) {
-        case FenceVisualType::isolated: return ParkFencePiece::Post;
+        // A single isolated vertex is rendered with the existing End primitive
+        // until the renderer gets a dedicated post-only piece. Runtime topology
+        // remains authoritative; this is only a visual fallback.
+        case FenceVisualType::isolated: return ParkFencePiece::End;
         case FenceVisualType::end: return ParkFencePiece::End;
         case FenceVisualType::straight: return ParkFencePiece::Straight;
         case FenceVisualType::corner: return ParkFencePiece::Corner;
@@ -23,7 +26,7 @@ namespace {
         case FenceVisualType::cross: return ParkFencePiece::Cross;
         case FenceVisualType::gate: return ParkFencePiece::Gate;
     }
-    return ParkFencePiece::Post;
+    return ParkFencePiece::End;
 }
 
 } // namespace
