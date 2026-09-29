@@ -93,7 +93,13 @@ jobs:
           if (-not (Test-Path $baseRequest)) { throw "Base capture request does not exist: $baseRequest" }
 
           $cli = (Resolve-Path "build/ch-mapforge-video/Release/MapForge2CLI.exe").Path
-          $candidate = (Resolve-Path $candidate).Path
+          $candidateRaw = (Resolve-Path $candidate).Path
+          $normalizedCandidate = Join-Path (Resolve-Path "out/ch-mapforge-video").Path "candidate_normalized.png"
+          $env:CH_VIDEO_RAW_CANDIDATE = $candidateRaw
+          $env:CH_VIDEO_NORMALIZED_CANDIDATE = $normalizedCandidate
+          python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; dst=os.environ['CH_VIDEO_NORMALIZED_CANDIDATE']; im=Image.open(src).convert('RGBA'); im.save(dst, format='PNG', optimize=False)"
+          if (-not (Test-Path $normalizedCandidate)) { throw "Normalized candidate PNG missing" }
+          $candidate = (Resolve-Path $normalizedCandidate).Path
           $baseRequest = (Resolve-Path $baseRequest).Path
           $repoRoot = (Resolve-Path ".").Path
           $output = (Resolve-Path "out/ch-mapforge-video").Path
