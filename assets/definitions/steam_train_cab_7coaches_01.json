@@ -1,0 +1,49 @@
+{
+  "id": "steam_train_cab_7coaches_01",
+  "name": "Trem a Vapor - 7 Vagoes",
+  "category": "transport",
+  "texture": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_south.png",
+  "sprites": {
+    "0": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_south.png",
+    "1": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_west.png",
+    "2": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_north.png",
+    "3": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_east.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.84375,
+      "y": 0.768554688
+    },
+    "1": {
+      "x": 0.15625,
+      "y": 0.768554688
+    },
+    "2": {
+      "x": 0.84375,
+      "y": 0.768554688
+    },
+    "3": {
+      "x": 0.15625,
+      "y": 0.768554688
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "grassOnly": false,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 13,
+    "height": 2
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_vehicle_train_visual_approved",
+  "runtimeRole": "vehicle_train_visual_validation",
+  "runtimeManifest": "assets/vehicles/steam_train_cab_7coaches_01/steam_train_runtime.json",
+  "sourceApprovedProxySha256": "16befd244af17bad3fbfabf8533dcc4afde6db81562021e8881882df179ab7a6"
+}

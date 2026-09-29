@@ -1,0 +1,92 @@
+{
+  "contract": "CH_RUNTIME_VEHICLE_TRAIN_V1",
+  "assetId": "vehicle.steam_train.cab_7coaches.01",
+  "assetType": "vehicle_train",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    1024,
+    1024
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "footprint": {
+    "widthTiles": 13,
+    "depthTiles": 2
+  },
+  "views": {
+    "south": {
+      "file": "steam_train_south.png",
+      "pivot": {
+        "x": 512,
+        "y": 547
+      },
+      "sha256": "eb781b6c10c6c0ade4923f740de4715309773d2cabd3a94b5def2cb12427a586"
+    },
+    "east": {
+      "file": "steam_train_east.png",
+      "pivot": {
+        "x": 512,
+        "y": 547
+      },
+      "sha256": "208f7cd6e91125a89d71d0c856f885cfc48991a97259f991448b4926c8ae57c1"
+    },
+    "west": {
+      "file": "steam_train_west.png",
+      "pivot": {
+        "x": 512,
+        "y": 547
+      },
+      "sha256": "76eb5fdb34d6d1a15d7ed61bfc4183ae71c5ec9f6a12eeb0014b6e70bee920a5"
+    },
+    "north": {
+      "file": "steam_train_north.png",
+      "pivot": {
+        "x": 512,
+        "y": 547
+      },
+      "sha256": "15bf3f4beffef26dc6ef4b12da938038007a96f4d00348acd9fc64ac1b5249f3"
+    }
+  },
+  "runtimeAnchors": {
+    "south": {
+      "x": 0.84375,
+      "y": 0.768554688
+    },
+    "east": {
+      "x": 0.15625,
+      "y": 0.768554688
+    },
+    "west": {
+      "x": 0.15625,
+      "y": 0.768554688
+    },
+    "north": {
+      "x": 0.84375,
+      "y": 0.768554688
+    }
+  },
+  "futureLayers": {
+    "steamOverlay": {
+      "planned": true,
+      "enabled": false
+    },
+    "coachColorMask": {
+      "planned": true,
+      "enabled": false,
+      "contract": "CH_COLOR_MASK_V1"
+    }
+  },
+  "sourceCommit": "c0fe7bba9aaae6f18b398a873664fa1cd386d473",
+  "sourceWorkflowRun": 36623049615,
+  "sourceArtifactId": 11059113865,
+  "approvedProxySha256": "16befd244af17bad3fbfabf8533dcc4afde6db81562021e8881882df179ab7a6",
+  "approvedForRuntime": true
+}
