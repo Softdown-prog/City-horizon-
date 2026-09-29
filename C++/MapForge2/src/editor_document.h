@@ -1,8 +1,12 @@
 #pragma once
 
+#include "src/fence_system.h"
+
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace ch::editor {
 
@@ -19,9 +23,8 @@ public:
 
     bool loadScenario(const std::string& path, std::string* error = nullptr);
     void newEmpty(int width = 64, int height = 64);
-    // Resizes the editable map bounds while preserving all tiles that remain
-    // inside the new rectangle. The current minimum grid coordinate is kept
-    // stable so growing a map never shifts authored content.
+    // Resizes the editable map bounds while preserving all tiles and fence
+    // vertices that remain inside the new rectangle.
     bool resize(int width, int height);
 
     [[nodiscard]] int width() const { return width_; }
@@ -37,6 +40,14 @@ public:
     void setTerrain(int x, int y, std::string terrainId);
     void setRoad(int x, int y, bool road);
 
+    // Scratch-map fence authoring uses the same FenceManager as runtime. The
+    // editor contributes input only; N/E/S/W topology and visual resolution stay
+    // canonical in src/fence_system.*.
+    [[nodiscard]] const FenceManager& fences() const { return *fences_; }
+    [[nodiscard]] bool placeFenceDrag(FenceVertex start, FenceVertex end);
+    [[nodiscard]] bool removeFenceNode(int vertexX, int vertexY);
+    void clearFences();
+
     [[nodiscard]] const std::string& sourcePath() const { return source_path_; }
     [[nodiscard]] std::uint64_t revision() const { return revision_; }
 
@@ -44,6 +55,7 @@ private:
     static std::uint64_t key(int x, int y);
     static int keyX(std::uint64_t packed);
     static int keyY(std::uint64_t packed);
+    void resetFenceManager(bool preserve);
 
     int width_ = 64;
     int height_ = 64;
@@ -53,6 +65,7 @@ private:
     int max_y_ = 63;
     std::string source_path_;
     std::unordered_map<std::uint64_t, TileState> tiles_;
+    std::unique_ptr<FenceManager> fences_;
     std::uint64_t revision_ = 0;
 };
 
