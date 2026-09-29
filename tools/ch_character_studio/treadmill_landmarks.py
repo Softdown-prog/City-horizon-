@@ -3,6 +3,9 @@
 
 The sprite walk is intentionally treadmill/in-place: the canonical ground anchor
 never moves. Runtime/world translation is a separate engine concern.
+
+V2 polish is deliberately conservative: preserve the approved stride timing and
+horizontal opening, while softening foot lift/contact, body bob and arm extremes.
 """
 from __future__ import annotations
 
@@ -19,6 +22,30 @@ SCALE = 52
 DIRECTIONS = (("S", 0.0), ("E", math.pi / 2), ("W", -math.pi / 2), ("N", math.pi))
 FRAMES = ("idle",) + tuple(f"walk_{i:02d}" for i in range(8))
 
+# Conservative walk-polish values. These do not change frame count, anchor,
+# treadmill behavior or horizontal stride range.
+LEG_VERTICAL_GAIN = 0.86
+KNEE_LIFT_GAIN = 0.88
+BODY_BOB_GAIN = 0.75
+ARM_EXTREME_GAIN = 0.92
+ARM_ELBOW_GAIN = 0.94
+
+
+def smooth_positive(value: float) -> float:
+    """C1-smoothed positive half-wave in [0,1].
+
+    Replaces max(0, wave), whose slope changes abruptly at foot contact and can
+    read as a marching pop when sampled in only eight frames.
+    """
+    u = max(0.0, min(1.0, value))
+    return u * u * (3.0 - 2.0 * u)
+
+
+def soften_extreme(wave: float, companion: float) -> float:
+    """Keep transition speed but ease the very end of arm swing slightly."""
+    gain = ARM_EXTREME_GAIN + (1.0 - ARM_EXTREME_GAIN) * abs(companion)
+    return wave * gain
+
 
 def project(direction: float, point: tuple[float, float, float]) -> list[float]:
     x, y, z = point
@@ -32,9 +59,10 @@ def project(direction: float, point: tuple[float, float, float]) -> list[float]:
 
 
 def pose_points(direction: float, phase: float, *, idle: bool = False) -> dict[str, list[float]]:
-    sine = 0.0 if idle else math.sin(2 * math.pi * phase)
-    cosine = 0.0 if idle else math.cos(2 * math.pi * phase)
-    bob = 0.0 if idle else .004 * abs(math.sin(4 * math.pi * phase))
+    theta = 2 * math.pi * phase
+    sine = 0.0 if idle else math.sin(theta)
+    cosine = 0.0 if idle else math.cos(theta)
+    bob = 0.0 if idle else (.004 * BODY_BOB_GAIN) * abs(math.sin(2 * theta))
 
     world: dict[str, tuple[float, float, float]] = {
         "head": (0, .875 + bob, 0),
@@ -45,20 +73,31 @@ def pose_points(direction: float, phase: float, *, idle: bool = False) -> dict[s
     }
 
     for sign, suffix in ((-1, "L"), (1, "R")):
-        opposite = -sign * sine
+        arm_wave = soften_extreme(-sign * sine, cosine)
         shoulder = (sign * .175, .685 + bob, -.005)
-        elbow = (sign * .205, .565 + bob, .055 * opposite)
-        hand = (sign * .19, .445 + bob, .115 * opposite + .01)
+        elbow = (sign * .205, .565 + bob, .055 * ARM_ELBOW_GAIN * arm_wave)
+        hand = (sign * .19, .445 + bob, .115 * arm_wave + .01)
         world[f"shoulder_{suffix}"] = shoulder
         world[f"elbow_{suffix}"] = elbow
         world[f"hand_{suffix}"] = hand
 
         swing = sign * sine
         hip = (sign * .078, .405, 0)
+
+        # Keep the approved horizontal stride/depth path. Only vertical lift is
+        # softened so the clown no longer reads as high-stepping/marching.
         z = .145 * swing + .025 * sign * cosine
-        lifted = max(0.0, swing) * .032 + max(0.0, sign * cosine) * .012
+        swing_lift = smooth_positive(swing)
+        transfer_lift = smooth_positive(sign * cosine)
+        lifted = LEG_VERTICAL_GAIN * (
+            swing_lift * .032 + transfer_lift * .012
+        )
         foot_base = (sign * (.082 + .008 * abs(sine)), .035 + lifted, z)
-        knee = (sign * .08, .225 + lifted * .33, z * .42 - .028 * max(0.0, swing))
+        knee = (
+            sign * .08,
+            .225 + lifted * .33 * KNEE_LIFT_GAIN,
+            z * .42 - .028 * KNEE_LIFT_GAIN * swing_lift,
+        )
         ankle = (foot_base[0], foot_base[1] + .055, foot_base[2] - .016)
         toe = (foot_base[0], foot_base[1], foot_base[2] + .085)
         world[f"hip_{suffix}"] = hip
@@ -103,6 +142,16 @@ def build() -> dict:
         "contract": "CH_CHARACTER_LANDMARKS_V0",
         "source": "tools/ch_actor_lab/software_render.py approved 8-frame locomotion",
         "motionMode": "treadmill_in_place",
+        "walkPolish": {
+            "version": "V2_conservative",
+            "legVerticalGain": LEG_VERTICAL_GAIN,
+            "kneeLiftGain": KNEE_LIFT_GAIN,
+            "bodyBobGain": BODY_BOB_GAIN,
+            "armExtremeGain": ARM_EXTREME_GAIN,
+            "armElbowGain": ARM_ELBOW_GAIN,
+            "horizontalStridePreserved": True,
+            "footLiftEasing": "smoothstep_positive_half_wave",
+        },
         "worldTranslation": "runtime_only_separate_from_sprite_cycle",
         "frameSize": list(FRAME),
         "groundAnchor": list(ANCHOR),
@@ -121,6 +170,7 @@ def main() -> int:
     print(json.dumps({
         "contract": payload["contract"],
         "motionMode": payload["motionMode"],
+        "walkPolish": payload["walkPolish"],
         "frames": len(payload["frames"]),
         "groundAnchor": payload["groundAnchor"],
         "rootTranslationLockedPx": payload["rootTranslationLockedPx"],
