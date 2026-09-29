@@ -1,25 +1,25 @@
-"""Deterministic reference-inspired modular park fence for City Horizon.
+"""Deterministic modular fence scenery for City Horizon.
 
-The generator draws original 2D geometry from recipe parameters. It does not
-sample or trace source-image pixels. Runtime promotion remains a separate gate.
+One recipe produces east/south segments, matching gates, a reusable vertex post,
+a gameplay review enclosure and an isometric camera review.  Runtime promotion
+remains an explicit later gate.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from .exporter import alpha_safe_resize
 
 CONTRACT = "CH_2D_FENCE_SCENERY_V1"
 SCALE = 4
-DIRECTIONS = {
-    "east": (64.0, 32.0),
-    "south": (-64.0, 32.0),
-}
+DIRECTIONS = {"east": (64.0, 32.0), "south": (-64.0, 32.0)}
+VARIANTS = {"iron", "chainlink", "wood"}
 
 
 def _color(value: object, label: str) -> tuple[int, int, int, int]:
@@ -43,158 +43,176 @@ def _number(value: object, label: str, low: float, high: float) -> float:
 def validate_recipe(recipe: dict) -> dict:
     if not isinstance(recipe, dict) or recipe.get("contract") != CONTRACT:
         raise ValueError(f"Fence recipe must declare {CONTRACT}")
-    if recipe.get("camera") != {
-        "contract": "CH_CAMERA_V1",
-        "tile": [128, 64],
-        "yawDeg": 45,
-        "elevationDeg": 30,
-    }:
-        raise ValueError("Fence scenery requires exact CH_CAMERA_V1")
+    camera = recipe.get("camera")
+    if not isinstance(camera, dict) or camera.get("contract") != "CH_CAMERA_V1" or camera.get("tile") != [128, 64] or camera.get("yawDeg") != 45 or camera.get("elevationDeg") != 30:
+        raise ValueError("Fence scenery requires CH_CAMERA_V1, tile 128x64, yaw 45 and elevation 30")
     if recipe.get("canvas") != [192, 128] or recipe.get("anchor") != [96, 64]:
         raise ValueError("V1 fence modules require canvas [192,128] and anchor [96,64]")
-    geom = recipe.get("geometry")
-    palette = recipe.get("palette")
+    variant = recipe.get("variant", "iron")
+    if variant not in VARIANTS:
+        raise ValueError(f"Fence variant must be one of {sorted(VARIANTS)}")
+    geom, palette = recipe.get("geometry"), recipe.get("palette")
     if not isinstance(geom, dict) or not isinstance(palette, dict):
         raise ValueError("Fence recipe requires geometry and palette objects")
-    checked = {
-        "height": _number(geom.get("heightPx"), "heightPx", 16, 48),
-        "base_width": _number(geom.get("stoneBaseWidthPx"), "stoneBaseWidthPx", 3, 14),
-        "bar_spacing": _number(geom.get("barSpacingPx"), "barSpacingPx", 5, 20),
-        "post_width": _number(geom.get("postWidthPx"), "postWidthPx", 2, 10),
-        "rail_width": _number(geom.get("railWidthPx"), "railWidthPx", 1, 8),
+    cfg = {
+        "variant": variant,
+        "height": _number(geom.get("heightPx"), "heightPx", 14, 52),
+        "post_width": _number(geom.get("postWidthPx"), "postWidthPx", 2, 12),
+        "rail_width": _number(geom.get("railWidthPx"), "railWidthPx", 1, 9),
     }
-    for key in ("metal", "metalHighlight", "metalShadow", "stone", "stoneHighlight",
-                "stoneShadow", "groundShadow"):
-        checked[key] = _color(palette.get(key), f"palette.{key}")
-    return checked
+    if variant == "iron":
+        cfg["base_width"] = _number(geom.get("stoneBaseWidthPx"), "stoneBaseWidthPx", 3, 14)
+        cfg["bar_spacing"] = _number(geom.get("barSpacingPx"), "barSpacingPx", 5, 20)
+        keys = ("metal", "metalHighlight", "metalShadow", "stone", "stoneHighlight", "stoneShadow", "groundShadow")
+    elif variant == "chainlink":
+        cfg["mesh_spacing"] = _number(geom.get("meshSpacingPx"), "meshSpacingPx", 4, 14)
+        keys = ("metal", "metalHighlight", "metalShadow", "mesh", "meshShadow", "groundShadow")
+    else:
+        cfg["picket_spacing"] = _number(geom.get("picketSpacingPx"), "picketSpacingPx", 5, 18)
+        cfg["picket_width"] = _number(geom.get("picketWidthPx"), "picketWidthPx", 2, 9)
+        keys = ("wood", "woodHighlight", "woodShadow", "groundShadow")
+    for key in keys:
+        cfg[key] = _color(palette.get(key), f"palette.{key}")
+    return cfg
 
 
 def _pt(point: tuple[float, float]) -> tuple[int, int]:
     return round(point[0] * SCALE), round(point[1] * SCALE)
 
 
-def _line(draw: ImageDraw.ImageDraw, points: list[tuple[float, float]],
-          fill: tuple[int, int, int, int], width: float) -> None:
-    draw.line([_pt(point) for point in points], fill=fill,
-              width=max(1, round(width * SCALE)), joint="curve")
+def _line(draw: ImageDraw.ImageDraw, points, fill, width: float) -> None:
+    draw.line([_pt(point) for point in points], fill=fill, width=max(1, round(width * SCALE)), joint="curve")
 
 
-def _ellipse(draw: ImageDraw.ImageDraw, box: tuple[float, float, float, float],
-             fill: tuple[int, int, int, int]) -> None:
-    draw.ellipse(tuple(round(value * SCALE) for value in box), fill=fill)
+def _shadow(draw: ImageDraw.ImageDraw, p0, p1, cfg) -> None:
+    colour = (*cfg["groundShadow"][:3], 72)
+    _line(draw, [(p0[0] + 3, p0[1] + 4), (p1[0] + 3, p1[1] + 4)], colour, 5.5)
 
 
-def _draw_post(draw: ImageDraw.ImageDraw, point: tuple[float, float], cfg: dict) -> None:
+def _draw_post(draw, point, cfg) -> None:
     x, y = point
-    height = cfg["height"]
-    width = cfg["post_width"]
-    _line(draw, [(x, y - 2), (x, y - height - 5)], cfg["metalShadow"], width + 2)
-    _line(draw, [(x, y - 2), (x, y - height - 5)], cfg["metal"], width)
-    _line(draw, [(x - 0.7, y - 3), (x - 0.7, y - height - 4)], cfg["metalHighlight"], 0.8)
-    radius = max(2.0, width * 0.7)
-    _ellipse(draw, (x - radius, y - height - 9, x + radius, y - height - 3), cfg["metalShadow"])
-    _ellipse(draw, (x - radius + 1, y - height - 8, x + radius - 1, y - height - 4), cfg["metalHighlight"])
+    h, w = cfg["height"], cfg["post_width"]
+    if cfg["variant"] == "wood":
+        dark, mid, light = cfg["woodShadow"], cfg["wood"], cfg["woodHighlight"]
+    else:
+        dark, mid, light = cfg["metalShadow"], cfg["metal"], cfg["metalHighlight"]
+    _line(draw, [(x, y - 1), (x, y - h - 4)], dark, w + 1.6)
+    _line(draw, [(x - .5, y - 1), (x - .5, y - h - 4)], mid, w)
+    _line(draw, [(x - w * .25, y - 3), (x - w * .25, y - h - 3)], light, .8)
+    cap = [(_pt((x - w * .7, y - h - 4))), (_pt((x, y - h - 8))), (_pt((x + w * .7, y - h - 4))), (_pt((x, y - h - 1.5)))]
+    draw.polygon(cap, fill=light)
 
 
-def _draw_regular_segment(draw: ImageDraw.ImageDraw, p0: tuple[float, float],
-                          p1: tuple[float, float], cfg: dict) -> None:
-    height = cfg["height"]
-    base = cfg["base_width"]
-    _line(draw, [(p0[0] + 3, p0[1] + 4), (p1[0] + 3, p1[1] + 4)],
-          (*cfg["groundShadow"][:3], 70), base + 3)
-    _line(draw, [p0, p1], cfg["stoneShadow"], base + 3)
-    _line(draw, [p0, p1], cfg["stone"], base)
-    _line(draw, [(p0[0], p0[1] - 2), (p1[0], p1[1] - 2)], cfg["stoneHighlight"], 2)
-    top0, top1 = (p0[0], p0[1] - height), (p1[0], p1[1] - height)
-    low0, low1 = (p0[0], p0[1] - height * 0.35), (p1[0], p1[1] - height * 0.35)
-    for start, end in ((top0, top1), (low0, low1)):
-        _line(draw, [start, end], cfg["metalShadow"], cfg["rail_width"] + 1.5)
-        _line(draw, [start, end], cfg["metal"], cfg["rail_width"])
+def _draw_iron(draw, p0, p1, cfg, gate=False) -> None:
+    h = cfg["height"]
+    _shadow(draw, p0, p1, cfg)
+    if not gate:
+        _line(draw, [p0, p1], cfg["stoneShadow"], cfg["base_width"] + 2)
+        _line(draw, [p0, p1], cfg["stone"], cfg["base_width"])
+        _line(draw, [(p0[0], p0[1] - 2), (p1[0], p1[1] - 2)], cfg["stoneHighlight"], 1.5)
+    for rise in (h, h * .36):
+        _line(draw, [(p0[0], p0[1] - rise), (p1[0], p1[1] - rise)], cfg["metalShadow"], cfg["rail_width"] + 1.2)
+        _line(draw, [(p0[0], p0[1] - rise - .4), (p1[0], p1[1] - rise - .4)], cfg["metal"], cfg["rail_width"])
     count = max(3, int(math.dist(p0, p1) / cfg["bar_spacing"]))
-    for index in range(1, count):
-        t = index / count
-        x = p0[0] + (p1[0] - p0[0]) * t
-        y = p0[1] + (p1[1] - p0[1]) * t
-        _line(draw, [(x, y - 3), (x, y - height + 2)], cfg["metalShadow"], 2.6)
-        _line(draw, [(x - 0.4, y - 3), (x - 0.4, y - height + 2)], cfg["metalHighlight"], 0.8)
+    for i in range(1, count):
+        t = i / count
+        x, y = p0[0] + (p1[0]-p0[0])*t, p0[1] + (p1[1]-p0[1])*t
+        _line(draw, [(x, y - 4), (x, y - h + 1)], cfg["metalShadow"], 2.5)
+        _line(draw, [(x - .4, y - 4), (x - .4, y - h + 1)], cfg["metalHighlight"], .75)
 
 
-def _draw_gate_segment(draw: ImageDraw.ImageDraw, p0: tuple[float, float],
-                       p1: tuple[float, float], cfg: dict) -> None:
-    """Draw a two-leaf gate and deliberately keep the ground opening clear."""
-    height = cfg["height"]
-    _line(draw, [(p0[0] + 2, p0[1] + 4), (p1[0] + 2, p1[1] + 4)],
-          (*cfg["groundShadow"][:3], 70), 5)
-    for start, end in ((0.0, 0.5), (0.5, 1.0)):
-        q0 = (p0[0] + (p1[0] - p0[0]) * start, p0[1] + (p1[1] - p0[1]) * start)
-        q1 = (p0[0] + (p1[0] - p0[0]) * end, p0[1] + (p1[1] - p0[1]) * end)
-        for rise, width in ((height, 3.5), (5, 3.2)):
-            a, b = (q0[0], q0[1] - rise), (q1[0], q1[1] - rise)
-            _line(draw, [a, b], cfg["metalShadow"], width + 1.5)
-            _line(draw, [a, b], cfg["metal"], width)
-        for t in (start, end):
-            x = p0[0] + (p1[0] - p0[0]) * t
-            y = p0[1] + (p1[1] - p0[1]) * t
-            _line(draw, [(x, y - 4), (x, y - height - 1)], cfg["metalShadow"], 4.2)
-            _line(draw, [(x, y - 4), (x, y - height - 1)], cfg["metal"], 2.4)
-        count = max(2, int(math.dist(q0, q1) / max(5.0, cfg["bar_spacing"] - 1)))
-        for index in range(1, count):
-            t = start + (end - start) * index / count
-            x = p0[0] + (p1[0] - p0[0]) * t
-            y = p0[1] + (p1[1] - p0[1]) * t
-            _line(draw, [(x, y - 6), (x, y - height + 2)], cfg["metalShadow"], 2.5)
-            _line(draw, [(x - 0.35, y - 6), (x - 0.35, y - height + 2)], cfg["metalHighlight"], 0.75)
+def _draw_chainlink(draw, p0, p1, cfg, gate=False) -> None:
+    h = cfg["height"]
+    _shadow(draw, p0, p1, cfg)
+    for rise in (h, 4):
+        _line(draw, [(p0[0], p0[1]-rise), (p1[0], p1[1]-rise)], cfg["metalShadow"], cfg["rail_width"] + 1)
+        _line(draw, [(p0[0], p0[1]-rise-.4), (p1[0], p1[1]-rise-.4)], cfg["metal"], cfg["rail_width"])
+    length = math.dist(p0, p1)
+    count = max(4, int(length / cfg["mesh_spacing"]))
+    for i in range(count + 1):
+        t = i / count
+        x, y = p0[0] + (p1[0]-p0[0])*t, p0[1] + (p1[1]-p0[1])*t
+        lean = 5.0
+        _line(draw, [(x-lean, y-4), (x+lean, y-h)], cfg["meshShadow"], .9)
+        _line(draw, [(x+lean, y-4), (x-lean, y-h)], cfg["mesh"], .65)
+    if gate:
+        mid = ((p0[0]+p1[0])/2, (p0[1]+p1[1])/2)
+        _line(draw, [(mid[0], mid[1]-3), (mid[0], mid[1]-h)], cfg["metal"], 2.2)
+
+
+def _draw_wood(draw, p0, p1, cfg, gate=False) -> None:
+    h = cfg["height"]
+    _shadow(draw, p0, p1, cfg)
+    for rise in (h*.72, h*.30):
+        _line(draw, [(p0[0], p0[1]-rise), (p1[0], p1[1]-rise)], cfg["woodShadow"], cfg["rail_width"] + 1.4)
+        _line(draw, [(p0[0], p0[1]-rise-.5), (p1[0], p1[1]-rise-.5)], cfg["wood"], cfg["rail_width"])
+    count = max(3, int(math.dist(p0, p1) / cfg["picket_spacing"]))
+    for i in range(1, count):
+        t = i / count
+        x, y = p0[0] + (p1[0]-p0[0])*t, p0[1] + (p1[1]-p0[1])*t
+        _line(draw, [(x, y-2), (x, y-h)], cfg["woodShadow"], cfg["picket_width"] + 1)
+        _line(draw, [(x-.5, y-2), (x-.5, y-h)], cfg["wood"], cfg["picket_width"])
+        _line(draw, [(x-1, y-h+2), (x-1, y-4)], cfg["woodHighlight"], .7)
+
+
+def _draw_segment(draw, p0, p1, cfg, gate=False) -> None:
+    if cfg["variant"] == "iron":
+        _draw_iron(draw, p0, p1, cfg, gate)
+    elif cfg["variant"] == "chainlink":
+        _draw_chainlink(draw, p0, p1, cfg, gate)
+    else:
+        _draw_wood(draw, p0, p1, cfg, gate)
 
 
 def _module(recipe: dict, cfg: dict, direction: str, kind: str) -> Image.Image:
     canvas = tuple(recipe["canvas"])
-    work = Image.new("RGBA", (canvas[0] * SCALE, canvas[1] * SCALE))
-    draw = ImageDraw.Draw(work)
+    work = Image.new("RGBA", (canvas[0]*SCALE, canvas[1]*SCALE))
+    draw = ImageDraw.Draw(work, "RGBA")
     p0 = tuple(recipe["anchor"])
     vector = DIRECTIONS[direction]
     p1 = (p0[0] + vector[0], p0[1] + vector[1])
-    if kind == "segment":
-        _draw_regular_segment(draw, p0, p1, cfg)
-    elif kind == "gate":
-        _draw_gate_segment(draw, p0, p1, cfg)
-    elif kind == "post":
+    if kind == "post":
         _draw_post(draw, p0, cfg)
     else:
-        raise ValueError(f"Unknown fence module kind {kind!r}")
+        _draw_segment(draw, p0, p1, cfg, gate=kind == "gate")
+        _draw_post(draw, p0, cfg)
+        _draw_post(draw, p1, cfg)
     return alpha_safe_resize(work, canvas)
 
 
-def _review(recipe: dict, cfg: dict) -> Image.Image:
-    width, height = 900, 620
-    work = Image.new("RGBA", (width * SCALE, height * SCALE), (218, 214, 194, 255))
-    draw = ImageDraw.Draw(work)
-    origin = (450.0, 110.0)
+def _isometric_review(recipe: dict, cfg: dict) -> Image.Image:
+    board = Image.new("RGBA", (768*SCALE, 480*SCALE), (46,77,55,255))
+    draw = ImageDraw.Draw(board, "RGBA")
+    gx, gy = 384.0, 292.0
+    def project(x, y): return gx + (x-y)*64, gy + (x+y)*32
+    for y in range(-2, 3):
+        for x in range(-3, 4):
+            c = project(x,y)
+            diamond = [(c[0],c[1]-32),(c[0]+64,c[1]),(c[0],c[1]+32),(c[0]-64,c[1])]
+            fill = (76,119,66,255) if (x+y)%2==0 else (71,113,64,255)
+            draw.polygon([_pt(p) for p in diamond], fill=fill, outline=(105,148,93,190))
+    segments = [((0,0),(1,0),False),((1,0),(2,0),False),((2,0),(2,1),False),((2,1),(2,2),True),((2,2),(1,2),False),((1,2),(0,2),False),((0,2),(0,1),False),((0,1),(0,0),False)]
+    segments.sort(key=lambda s:(project(*s[0])[1]+project(*s[1])[1])/2)
+    vertices=set()
+    for a,b,gate in segments:
+        pa,pb=project(*a),project(*b)
+        _draw_segment(draw,pa,pb,cfg,gate)
+        vertices.update((a,b))
+    for v in sorted(vertices,key=lambda p:project(*p)[1]):
+        _draw_post(draw,project(*v),cfg)
+    draw.text(_pt((18,14)), f"CH_CAMERA_V1 / fence {cfg['variant']} / modular edge scenery", fill=(247,244,220,255))
+    return alpha_safe_resize(board,(768,480))
 
-    def project(x: int, y: int) -> tuple[float, float]:
-        return origin[0] + (x - y) * 64, origin[1] + (x + y) * 32
 
-    for y in range(5):
-        for x in range(7):
-            points = [project(x, y), project(x + 1, y), project(x + 1, y + 1), project(x, y + 1)]
-            fill = (107 + ((x + y) % 2) * 3, 139, 74, 255)
-            draw.polygon([_pt(point) for point in points], fill=fill)
-            draw.line([_pt(point) for point in points + [points[0]]], fill=(164, 174, 133, 150), width=SCALE)
-
-    segments: list[tuple[tuple[int, int], tuple[int, int], bool]] = []
-    for x in range(7):
-        segments += [((x, 0), (x + 1, 0), False), ((x, 5), (x + 1, 5), x == 2)]
-    for y in range(5):
-        segments += [((0, y), (0, y + 1), False), ((7, y), (7, y + 1), False)]
-    segments.sort(key=lambda item: (project(*item[0])[1] + project(*item[1])[1]) / 2)
-    for start, end, gate in segments:
-        if gate:
-            _draw_gate_segment(draw, project(*start), project(*end), cfg)
-        else:
-            _draw_regular_segment(draw, project(*start), project(*end), cfg)
-    vertices = {vertex for start, end, _ in segments for vertex in (start, end)}
-    for vertex in sorted(vertices, key=lambda item: project(*item)[1]):
-        _draw_post(draw, project(*vertex), cfg)
-    return alpha_safe_resize(work, (width, height))
+def _review(recipe: dict, cfg: dict, modules: dict[str,Image.Image]) -> Image.Image:
+    board = Image.new("RGBA", (640, 520), (69,104,66,255))
+    draw = ImageDraw.Draw(board)
+    draw.text((14,10), f"{recipe['id']} / {cfg['variant']} / gameplay modules", fill=(246,241,218,255))
+    placements=[("segment_east",20,48),("segment_south",330,48),("gate_east",20,220),("gate_south",330,220),("post",224,380)]
+    for key,x,y in placements:
+        board.alpha_composite(modules[key],(x,y))
+        draw.text((x,y+132),key,fill=(236,228,196,255))
+    return board
 
 
 def export_fence_scenery(recipe_path: Path, output_dir: Path) -> dict:
@@ -202,36 +220,51 @@ def export_fence_scenery(recipe_path: Path, output_dir: Path) -> dict:
     recipe = json.loads(raw)
     cfg = validate_recipe(recipe)
     output_dir.mkdir(parents=True, exist_ok=True)
+    modules: dict[str,Image.Image] = {}
     outputs = {}
     for direction in DIRECTIONS:
-        for kind in ("segment", "gate"):
-            image = _module(recipe, cfg, direction, kind)
-            path = output_dir / f"{recipe['id']}_{kind}_{direction}.png"
-            image.save(path, format="PNG", optimize=False)
-            outputs[f"{kind}_{direction}"] = str(path)
-    post_image = _module(recipe, cfg, "east", "post")
-    post_path = output_dir / f"{recipe['id']}_post.png"
-    post_image.save(post_path, format="PNG", optimize=False)
-    outputs["post"] = str(post_path)
-    review = _review(recipe, cfg)
-    review_path = output_dir / f"{recipe['id']}_enclosure_review.png"
-    review.save(review_path, format="PNG", optimize=False)
+        for kind in ("segment","gate"):
+            key=f"{kind}_{direction}"
+            image=_module(recipe,cfg,direction,kind)
+            path=output_dir/f"{recipe['id']}_{key}.png"
+            image.save(path)
+            modules[key]=image
+            outputs[key]=str(path)
+    modules["post"]=_module(recipe,cfg,"east","post")
+    post_path=output_dir/f"{recipe['id']}_post.png"
+    modules["post"].save(post_path)
+    outputs["post"]=str(post_path)
 
-    metadata = {
-        "contract": CONTRACT,
-        "id": recipe["id"],
-        "camera": recipe["camera"],
-        "canvas": recipe["canvas"],
-        "anchor": recipe["anchor"],
-        "segmentVectors": {name: list(vector) for name, vector in DIRECTIONS.items()},
-        "composition": "segment sprites plus one post per occupied fence vertex",
-        "gate": "two-leaf segment; no stone base across walkable opening",
-        "recipeSha256": hashlib.sha256(raw).hexdigest(),
-        "outputs": outputs,
-        "review": str(review_path),
-        "artApproved": False,
-        "runtimePromotion": False,
+    primary=modules["segment_east"]
+    png=output_dir/f"{recipe['id']}.png"
+    review_path=output_dir/f"{recipe['id']}_review.png"
+    iso_path=output_dir/f"{recipe['id']}_isometric_review.png"
+    metadata_path=output_dir/f"{recipe['id']}.json"
+    primary.save(png)
+    _review(recipe,cfg,modules).save(review_path)
+    _isometric_review(recipe,cfg).save(iso_path)
+    bounds=primary.getchannel("A").getbbox()
+    metadata={
+        "contract":CONTRACT,"id":recipe["id"],"variant":cfg["variant"],
+        "camera":recipe["camera"],"canvas":recipe["canvas"],"anchor":recipe["anchor"],
+        "bounds":list(bounds) if bounds else None,"segmentVectors":{k:list(v) for k,v in DIRECTIONS.items()},
+        "composition":"edge segment plus one post per occupied fence vertex",
+        "recipeSha256":hashlib.sha256(raw).hexdigest(),"outputs":outputs,
+        "png":str(png),"review":str(review_path),"isometricReview":str(iso_path),
+        "artApproved":False,"runtimePromotion":False,
     }
-    metadata_path = output_dir / f"{recipe['id']}_metadata.json"
-    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    return {**metadata, "metadata": str(metadata_path)}
+    metadata_path.write_text(json.dumps(metadata,indent=2)+"\n",encoding="utf-8")
+    return {"png":str(png),"review":str(review_path),"isometricReview":str(iso_path),"metadata":str(metadata_path)}
+
+
+def main() -> int:
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--recipe",type=Path,required=True)
+    parser.add_argument("--output",type=Path,required=True)
+    args=parser.parse_args()
+    print(json.dumps(export_fence_scenery(args.recipe,args.output),indent=2))
+    return 0
+
+
+if __name__=="__main__":
+    raise SystemExit(main())
