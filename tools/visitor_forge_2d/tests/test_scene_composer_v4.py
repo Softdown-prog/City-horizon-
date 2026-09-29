@@ -102,3 +102,28 @@ def test_scene_v4_rejects_unbounded_finish_and_wrong_camera() -> None:
         assert False, "wrong camera passed"
     except ValueError as exc:
         assert "CH_CAMERA_V1" in str(exc)
+
+
+def test_scene_v4_resolves_gallery_components_deterministically() -> None:
+    recipe = json.loads((EXAMPLES / "prop_component_gallery_demo_v1.json").read_text(encoding="utf-8"))
+    first, meta1 = render_scene(recipe)
+    second, meta2 = render_scene(recipe)
+    assert first.mode == "RGBA" and first.size == (192, 192)
+    assert first.tobytes() == second.tobytes()
+    assert meta1["componentInstanceCount"] == 7 == meta2["componentInstanceCount"]
+    assert set(meta1["componentIds"]) >= {
+        "wood_plank_clean_lg_000",
+        "metal_pipe_round_lg_090",
+        "sign_panel_rounded_md_000",
+        "fastener_rivet_sm_000",
+    }
+
+
+def test_scene_v4_rejects_unknown_gallery_component() -> None:
+    recipe = json.loads((EXAMPLES / "prop_component_gallery_demo_v1.json").read_text(encoding="utf-8"))
+    recipe["layers"][1]["componentId"] = "does_not_exist"
+    try:
+        render_scene(recipe)
+        assert False, "unknown component passed"
+    except KeyError as exc:
+        assert "does_not_exist" in str(exc)
