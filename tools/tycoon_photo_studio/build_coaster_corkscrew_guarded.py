@@ -29,13 +29,17 @@ import build_coaster_banked_guarded as banked  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
-CORKSCREW_LENGTH = base.TILE * 5.6
+CORKSCREW_LENGTH = base.TILE * 5.8
 HORIZONTAL_RADIUS = base.TILE * 0.58
 VERTICAL_RADIUS = base.TILE * 0.32
-APPROACH_LENGTH = base.TILE * 1.10
+APPROACH_LENGTH = base.TILE * 1.05
 ROLL_DEGREES = 360.0
-PHASE_RAMP = 0.24
-LONGITUDINAL_MID_BOOST = 0.45
+ENTRY_END = 0.30
+EXIT_START = 0.70
+ENTRY_PHASE_SHARE = 0.22
+CORE_PHASE_SHARE = 0.56
+ENTRY_Y_SHARE = 0.20
+CORE_Y_SHARE = 0.60
 FOOTPRINT = {"widthTiles": 3, "depthTiles": 8}
 
 
@@ -60,29 +64,31 @@ def handedness(piece: str) -> float:
     return 1.0 if piece == "corkscrew_left" else -1.0
 
 
-def phase_progress(t: float) -> float:
-    """Nearly constant-speed phase with longer eased connector ramps."""
+def staged_progress(t: float, entry_share: float, core_share: float) -> float:
+    """Three-stage monotonic mapping with an expanded middle section.
+
+    The first and last shoulders get shorter shares while the central inversion
+    gets most of the available progress. Linear local motion avoids the old
+    phase pinch while the stage boundaries remain deterministic and symmetric.
+    """
     t = max(0.0, min(1.0, t))
-    r = PHASE_RAMP
-    total = 1.0 - r
-    if t < r:
-        u = t / r
-        return (r * (u ** 3 - 0.5 * u ** 4)) / total
-    if t > 1.0 - r:
-        return 1.0 - phase_progress(1.0 - t)
-    return (0.5 * r + (t - r)) / total
+    exit_share = 1.0 - entry_share - core_share
+    if t <= ENTRY_END:
+        u = t / ENTRY_END
+        return entry_share * u
+    if t < EXIT_START:
+        u = (t - ENTRY_END) / (EXIT_START - ENTRY_END)
+        return entry_share + core_share * u
+    u = (t - EXIT_START) / (1.0 - EXIT_START)
+    return entry_share + core_share + exit_share * u
+
+
+def phase_progress(t: float) -> float:
+    return staged_progress(t, ENTRY_PHASE_SHARE, CORE_PHASE_SHARE)
 
 
 def longitudinal_progress(t: float) -> float:
-    """Advance farther along the track during the middle of the inversion.
-
-    Endpoints remain exact while longitudinal speed is reduced near the two
-    connector shoulders and increased around t=0.5. This prevents an isometric
-    camera from compressing the middle of the helix into a narrow vertical wall.
-    """
-    t = max(0.0, min(1.0, t))
-    k = LONGITUDINAL_MID_BOOST
-    return t - (k / math.tau) * math.sin(math.tau * t)
+    return staged_progress(t, ENTRY_Y_SHARE, CORE_Y_SHARE)
 
 
 def inversion_phase(piece: str, t: float) -> float:
@@ -90,12 +96,12 @@ def inversion_phase(piece: str, t: float) -> float:
 
 
 def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int = 241):
-    """Build a low, stretched corkscrew with a longitudinally opened center.
+    """Build a three-stage corkscrew: entry shoulder, open core, exit shoulder.
 
-    V7 keeps V6 height, lateral radius and total footprint, but warps body
-    progress along Y so the middle of the 360-degree inversion advances farther
-    longitudinally. The shoulders advance more gently while the center gets more
-    front/back separation, reducing the vertical-wall read in isometric views.
+    Unlike V1-V7, the body no longer relies on one globally warped helix. The
+    central 40% of parameter time receives 60% of longitudinal travel and 56%
+    of the inversion phase, so the middle moves decisively forward/back instead
+    of collapsing into a near-vertical wall in isometric projection.
     """
     points = []
     body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
@@ -113,7 +119,11 @@ def sample_centerline(piece: str, approach_samples: int = 37, body_samples: int 
         phase = abs(inversion_phase(piece, t))
         y_t = longitudinal_progress(t)
         y = body_start_y + body_length * y_t
-        x = sign * HORIZONTAL_RADIUS * math.sin(phase)
+
+        # Keep the shoulders restrained and let the center read wider. This is
+        # intentionally not one constant-radius helix anymore.
+        core_envelope = 0.88 + 0.12 * math.sin(math.pi * t) ** 2
+        x = sign * HORIZONTAL_RADIUS * core_envelope * math.sin(phase)
         z = base.RAIL_Z + VERTICAL_RADIUS * (1.0 - math.cos(phase))
         points.append(Vector((x, y, z)))
 
@@ -139,12 +149,7 @@ def phase_for_centerline_index(piece: str, index: int) -> float:
 
 
 def elliptical_track_frame(points, index: int, point: Vector):
-    """Orient the deck from the elliptical helix geometry itself.
-
-    The inward ellipse normal becomes track up. This keeps the rails parallel,
-    naturally turns the deck upside-down once, and avoids reintroducing an
-    independent 360-degree roll on top of the centerline geometry.
-    """
+    """Orient the deck from the local inversion geometry itself."""
     tangent = base.tangent(points, index)
     axis_z = base.RAIL_Z + VERTICAL_RADIUS
     x = point.x
@@ -193,33 +198,18 @@ def build_piece(piece: str):
         tangent, right, up, _ = frames[idx]
         p = centerline[idx] - up * 0.11
         authored.append(banked.add_oriented_box(
-            f"Tie_{n:03d}",
-            p,
+            f"Tie_{n:03d}", p,
             (base.TIE_HALF_WIDTH, base.TIE_HALF_DEPTH, base.TIE_HALF_HEIGHT),
-            ties_mat,
-            "coaster.tie",
-            right,
-            tangent,
-            up,
+            ties_mat, "coaster.tie", right, tangent, up,
         ))
 
     last = len(centerline) - 1
-    support_indices = sorted(set((
-        0,
-        len(centerline) // 8,
-        len(centerline) // 4,
-        (len(centerline) * 3) // 4,
-        (len(centerline) * 7) // 8,
-        last,
-    )))
+    support_indices = sorted(set((0, len(centerline) // 8, len(centerline) // 4,
+                                  (len(centerline) * 3) // 4,
+                                  (len(centerline) * 7) // 8, last)))
     for n, idx in enumerate(support_indices):
-        base.build_support_frame(
-            authored,
-            f"Support_{n:03d}",
-            centerline[idx],
-            base.tangent(centerline, idx),
-            support_mat,
-        )
+        base.build_support_frame(authored, f"Support_{n:03d}", centerline[idx],
+                                 base.tangent(centerline, idx), support_mat)
 
     return authored, centerline, frames
 
@@ -230,7 +220,7 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v6_longitudinal_mid_boost",
+        "profile": "single_inversion_v7_three_stage_open_core",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
         "length": CORKSCREW_LENGTH,
@@ -238,8 +228,12 @@ def write_metadata(output: Path, piece: str, centerline, frames):
         "verticalRadius": VERTICAL_RADIUS,
         "approachLength": APPROACH_LENGTH,
         "rollDegrees": ROLL_DEGREES,
-        "phaseRamp": PHASE_RAMP,
-        "longitudinalMidBoost": LONGITUDINAL_MID_BOOST,
+        "entryEnd": ENTRY_END,
+        "exitStart": EXIT_START,
+        "entryPhaseShare": ENTRY_PHASE_SHARE,
+        "corePhaseShare": CORE_PHASE_SHARE,
+        "entryYShare": ENTRY_Y_SHARE,
+        "coreYShare": CORE_Y_SHARE,
         "rollSamplesDegrees": [round(math.degrees(frame[3]), 6) for frame in frames],
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
@@ -288,23 +282,15 @@ def main():
 
     write_metadata(output, args.piece, centerline, frames)
     report = scene_gate.run_preflight(
-        scene=scene,
-        authored=authored,
-        footprint=FOOTPRINT,
-        profile=profile,
-        asset_id=f"{ASSET_ID}.{args.piece}",
-        report_path=output / "preflight_report.json",
+        scene=scene, authored=authored, footprint=FOOTPRINT, profile=profile,
+        asset_id=f"{ASSET_ID}.{args.piece}", report_path=output / "preflight_report.json",
     )
     scene_gate.require_pass(report)
 
     if args.stage == "proxy":
         proxy = scene_gate.render_proxy(
-            scene=scene,
-            authored=authored,
-            output_path=output / "proxy_south.png",
-            profile=profile,
-            asset_id=f"{ASSET_ID}.{args.piece}",
-            direction="south",
+            scene=scene, authored=authored, output_path=output / "proxy_south.png",
+            profile=profile, asset_id=f"{ASSET_ID}.{args.piece}", direction="south",
         )
         (output / "proxy_report.json").write_text(json.dumps(proxy, indent=2), encoding="utf-8")
     elif args.stage == "final":
@@ -320,11 +306,9 @@ def main():
         for direction in bs.DIRECTIONS:
             bs.set_direction(root, direction)
             scene_gate.render_proxy(
-                scene=scene,
-                authored=authored,
+                scene=scene, authored=authored,
                 output_path=output / f"track_{direction['id']}.png",
-                profile=profile,
-                asset_id=f"{ASSET_ID}.{args.piece}",
+                profile=profile, asset_id=f"{ASSET_ID}.{args.piece}",
                 direction=direction["id"],
             )
 
