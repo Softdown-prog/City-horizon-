@@ -1,0 +1,63 @@
+{
+  "contract": "CH_MATH_WORKER_V1",
+  "jobContract": "CH_MATH_JOB_V1",
+  "reportContract": "CH_MATH_REPORT_V1",
+  "purpose": "Deterministic project-centered math service for City Horizon agents and tools.",
+  "authority": {
+    "canonicalSources": [
+      "src/ch_core/contracts.h",
+      "src/ch_core/projection.h",
+      "src/road_system.h"
+    ],
+    "policy": "Read canonical project constants at execution time; never replace runtime authority."
+  },
+  "runtime": {
+    "language": "python3",
+    "standardLibraryOnly": true,
+    "networkAccess": false,
+    "runtimeGameDependency": false,
+    "writesGameState": false
+  },
+  "operations": {
+    "canonical": {
+      "description": "Return current canonical grid/camera/road constants."
+    },
+    "project_world": {
+      "description": "Project x/y/z world points with CH_CAMERA_V1-compatible math."
+    },
+    "screen_to_tile": {
+      "description": "Convert screen points to logical ground tiles using the canonical grid."
+    },
+    "bezier_cubic": {
+      "description": "Sample cubic Bezier centerlines, tangents and approximate arc length."
+    },
+    "road_ribbon": {
+      "description": "Build deterministic procedural-road ribbon vertices, UVs and triangle indices."
+    },
+    "terrain_bilinear": {
+      "description": "Sample a four-corner terrain height bilinearly."
+    }
+  },
+  "limits": {
+    "cameraRotations": [0, 1, 2, 3],
+    "bezierSamples": {"min": 2, "max": 4097},
+    "roadSubdivisions": {"min": 2, "max": 256},
+    "finiteNumbersOnly": true
+  },
+  "agentPolicy": {
+    "preferWorkerFor": [
+      "projection batches",
+      "Bezier sampling",
+      "road mesh calculations",
+      "terrain interpolation",
+      "contract constant lookup"
+    ],
+    "doNotUseFor": [
+      "gameplay decisions",
+      "visual approval",
+      "asset generation",
+      "simulation state mutation"
+    ],
+    "failClosedOnContractMismatch": true
+  }
+}
