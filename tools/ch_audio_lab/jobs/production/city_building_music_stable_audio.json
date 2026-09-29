@@ -1,0 +1,36 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "city_building_music_stable_audio",
+  "attempt": 1,
+  "kind": "music",
+  "prompt": "Instrumental background music for a calm classic city-building and tycoon game. Warm optimistic mood, gentle acoustic piano, light marimba, soft strings, restrained percussion, subtle bass, steady relaxed tempo, unobtrusive arrangement, no vocals, no dramatic cinematic rises, suitable for long construction sessions and seamless game ambience.",
+  "negativePrompt": "vocals, lyrics, aggressive drums, trailer music, huge brass, EDM drops, distorted guitar, abrupt ending",
+  "durationSeconds": 90.0,
+  "tags": ["music", "city-builder", "tycoon", "calm", "stable-audio", "production-review"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stability_audio.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "stable-audio-2.5",
+      "--seed", "20260930",
+      "--report", "out/ch-audio-lab/city_building_music_stable_audio/provider_report.json"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -16.0,
+    "truePeakDb": -1.0,
+    "fadeInSeconds": 0.75,
+    "fadeOutSeconds": 2.0,
+    "channels": 2,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "replace"
+  }
+}
