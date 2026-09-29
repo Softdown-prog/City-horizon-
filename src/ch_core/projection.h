@@ -176,6 +176,13 @@ static_assert(building_depth_span(10, 20, 5, 4, CameraRotation::r270).front == -
     return world_to_screen_point(world.x, world.y, world.z, camera, viewport_w, viewport_h);
 }
 
+// Continuous inverse of the canonical ground projection. Editor gizmos use
+// this when handles must move freely between tile centres. Tile picking remains
+// a thin floor() wrapper around the same function, so tools cannot drift into a
+// second inverse-projection convention.
+[[nodiscard]] WorldPoint screen_to_world_point(float screen_x, float screen_y, const CameraState& camera,
+                                               float viewport_w, float viewport_h);
+
 [[nodiscard]] GridCoord screen_to_tile_coord(float screen_x, float screen_y, const CameraState& camera, float viewport_w, float viewport_h);
 
 } // namespace ch

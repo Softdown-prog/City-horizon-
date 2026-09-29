@@ -19,13 +19,20 @@ ScreenPoint world_to_screen_point(const float world_x, const float world_y, cons
     return projected;
 }
 
-GridCoord screen_to_tile_coord(const float screen_x, const float screen_y, const CameraState& camera, const float viewport_w, const float viewport_h) {
+WorldPoint screen_to_world_point(const float screen_x, const float screen_y, const CameraState& camera,
+                                 const float viewport_w, const float viewport_h) {
     runtime_view::capture(camera, viewport_w, viewport_h);
-    const float axis_x = (screen_x - viewport_w * 0.5F - camera.pan_x) / (contracts::kTileWidth * 0.5F * camera.zoom);
-    const float axis_y = (screen_y - viewport_h * 0.5F - camera.pan_y) / (contracts::kTileHeight * 0.5F * camera.zoom);
-    const WorldPoint logical = logical_world_point((axis_y + axis_x) * 0.5F,
-                                                   (axis_y - axis_x) * 0.5F,
-                                                   camera.rotation);
+    const float axis_x = (screen_x - viewport_w * 0.5F - camera.pan_x) /
+                         (contracts::kTileWidth * 0.5F * camera.zoom);
+    const float axis_y = (screen_y - viewport_h * 0.5F - camera.pan_y) /
+                         (contracts::kTileHeight * 0.5F * camera.zoom);
+    return logical_world_point((axis_y + axis_x) * 0.5F,
+                               (axis_y - axis_x) * 0.5F,
+                               camera.rotation);
+}
+
+GridCoord screen_to_tile_coord(const float screen_x, const float screen_y, const CameraState& camera, const float viewport_w, const float viewport_h) {
+    const WorldPoint logical = screen_to_world_point(screen_x, screen_y, camera, viewport_w, viewport_h);
     return {
         static_cast<int>(std::floor(logical.x)),
         static_cast<int>(std::floor(logical.y))
