@@ -45,11 +45,56 @@ Produced by `tools/ch_audio_lab/ch_audio_lab.py`. It links the original prompt, 
 
 ## Providers
 
-### Stable Audio production provider
+### Local Stable Audio 3 CPU provider — preferred generative path
 
-`tools/ch_audio_lab/providers/stability_audio.py` is the first production text-to-audio adapter. It calls Stability AI's official Stable Audio text-to-audio API and requests a WAV master, which is then passed through the normal City Horizon mastering and validation path.
+`tools/ch_audio_lab/providers/stable_audio_local.py` runs Stability AI's official **Stable Audio 3 LiteRT/TFLite CPU backend locally inside the worker**. It does not call a paid generation API.
 
-The adapter defaults to `stable-audio-2.5` and intentionally reads credentials only from the environment:
+City Horizon uses the two small CPU-capable families:
+
+- `sm-sfx` — sound effects;
+- `sm-music` — music.
+
+The provider is pinned to a specific upstream `Stability-AI/stable-audio-3` commit for reproducibility. It clones the official runtime into the development cache, installs only the TFLite runtime dependencies, then lets the official downloader fetch the required optimized weights from `stabilityai/stable-audio-3-optimized` on Hugging Face.
+
+The GitHub-hosted `ubuntu-latest` path uses:
+
+- CPU-only inference;
+- 4 worker threads by default;
+- `w8a8-dyn` DiT precision by default to reduce the downloaded model footprint;
+- `w8a8` SAME-S decoder;
+- GitHub Actions cache for Hugging Face weights and the pinned upstream checkout.
+
+The optimized Hugging Face weights support anonymous downloads. `HF_TOKEN` is optional and only improves Hugging Face download limits/bandwidth; it is not a paid audio-generation credential.
+
+Example command-provider job fragment:
+
+```json
+{
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "20260929"
+    ]
+  }
+}
+```
+
+The model exists only in the authoring/CI environment. Generated WAV/OGG assets may be promoted to the game, but model weights are never committed under `assets/` and are never shipped with the City Horizon runtime.
+
+### Stability hosted API provider — optional fallback
+
+`tools/ch_audio_lab/providers/stability_audio.py` calls Stability AI's hosted Stable Audio text-to-audio API and requests a WAV master, which is then passed through the normal City Horizon mastering and validation path.
+
+The adapter reads credentials only from the environment:
 
 ```text
 STABILITY_API_KEY
@@ -57,7 +102,7 @@ STABILITY_API_KEY
 
 Never put an API key in a job JSON, commit, command argument, report, or catalog.
 
-Production review jobs are kept under:
+Hosted-API production review jobs are kept under:
 
 ```text
 tools/ch_audio_lab/jobs/production/
@@ -68,15 +113,7 @@ Current reference jobs:
 - `steam_whistle_stable_audio.json` — clean steam locomotive whistle SFX;
 - `city_building_music_stable_audio.json` — calm city-builder/tycoon background music.
 
-These production jobs are **manual review jobs**. They live in a nested directory so normal pushes do not automatically spend provider credits.
-
-To run one in GitHub Actions, configure the repository Actions secret `STABILITY_API_KEY`, open the `CH Audio Lab` workflow, choose **Run workflow**, and provide a production job path such as:
-
-```text
-tools/ch_audio_lab/jobs/production/steam_whistle_stable_audio.json
-```
-
-The generated provider master is never registered in the game automatically. The job keeps `target.register` set to `false`, producing a review artifact first.
+These are manual review jobs and do not auto-run on normal pushes.
 
 ### `synthetic_smoke`
 
@@ -106,7 +143,7 @@ Copies an existing source file into the lab workspace and sends it through the s
 
 ### `command`
 
-Stable integration seam for a real AI audio generator. The command is executed without a shell. Secrets must come from the environment, never from the JSON job.
+Stable integration seam for local or hosted generators. The command is executed without a shell. Secrets must come from the environment, never from the JSON job.
 
 Supported placeholders:
 
@@ -115,25 +152,6 @@ Supported placeholders:
 - `{output}`
 - `{duration}`
 - `{repo}`
-
-Example:
-
-```json
-{
-  "provider": {
-    "type": "command",
-    "command": [
-      "python",
-      "tools/my_audio_provider.py",
-      "--prompt-file", "{prompt_file}",
-      "--duration", "{duration}",
-      "--output", "{output}"
-    ]
-  }
-}
-```
-
-A provider wrapper may call a hosted model/API or a local model. The CH Audio Lab contract does not depend on one vendor.
 
 Do not make AudioCraft/MusicGen/AudioGen the default production provider without separately resolving their model-weight licensing for the intended game use. Provider licensing must be recorded and reviewed before generated assets are promoted.
 
@@ -178,14 +196,25 @@ Synthetic/offline validation:
 python tools/ch_audio_lab/ch_audio_lab.py tools/ch_audio_lab/jobs/steam_hiss_smoke.json
 ```
 
-Production provider example:
+Local Stable Audio 3 direct provider example:
+
+```bash
+python tools/ch_audio_lab/providers/stable_audio_local.py \
+  --prompt "single classic steam locomotive whistle, clean game sound effect" \
+  --duration 7 \
+  --output out/train_whistle.wav \
+  --model sm-sfx \
+  --threads 4
+```
+
+Hosted API example:
 
 ```bash
 export STABILITY_API_KEY="..."
 python tools/ch_audio_lab/ch_audio_lab.py tools/ch_audio_lab/jobs/production/steam_whistle_stable_audio.json
 ```
 
-The default output goes to `out/ch-audio-lab/<job-id>/` and contains:
+The default CH Audio Lab output goes to `out/ch-audio-lab/<job-id>/` and contains:
 
 ```text
 generation_request.json
@@ -196,6 +225,6 @@ review.ogg
 audio_lab_report.json
 ```
 
-Production adapters may also emit provider-specific provenance such as `provider_report.json`.
+Production adapters may also emit provider-specific provenance such as `provider_report.json` or `local_provider_report.json`.
 
 The GitHub Actions workflow `CH Audio Lab` runs explicit jobs and uploads the complete review package as an artifact.
