@@ -1,6 +1,8 @@
 #include "road_system.h"
 
+#include <algorithm>
 #include <bit>
+#include <cmath>
 #include <iterator>
 
 namespace {
@@ -15,7 +17,108 @@ namespace {
     return {0, 0};
 }
 
+[[nodiscard]] float road_distance_3d(const RoadWorldPoint3& a, const RoadWorldPoint3& b) {
+    const float dx = b.x - a.x;
+    const float dy = b.y - a.y;
+    const float dz = b.z - a.z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
 }  // namespace
+
+RoadWorldPoint3 RoadMeshBuilder::sample_cubic(const RoadSplineSegment& segment, const float t) {
+    const float clamped_t = std::clamp(t, 0.0F, 1.0F);
+    const float one_minus_t = 1.0F - clamped_t;
+    const float b0 = one_minus_t * one_minus_t * one_minus_t;
+    const float b1 = 3.0F * one_minus_t * one_minus_t * clamped_t;
+    const float b2 = 3.0F * one_minus_t * clamped_t * clamped_t;
+    const float b3 = clamped_t * clamped_t * clamped_t;
+    return {
+        segment.start.x * b0 + segment.control_a.x * b1 + segment.control_b.x * b2 + segment.end.x * b3,
+        segment.start.y * b0 + segment.control_a.y * b1 + segment.control_b.y * b2 + segment.end.y * b3,
+        segment.start.z * b0 + segment.control_a.z * b1 + segment.control_b.z * b2 + segment.end.z * b3,
+    };
+}
+
+RoadWorldPoint3 RoadMeshBuilder::tangent_cubic(const RoadSplineSegment& segment, const float t) {
+    const float clamped_t = std::clamp(t, 0.0F, 1.0F);
+    const float one_minus_t = 1.0F - clamped_t;
+    const float a = 3.0F * one_minus_t * one_minus_t;
+    const float b = 6.0F * one_minus_t * clamped_t;
+    const float c = 3.0F * clamped_t * clamped_t;
+    return {
+        a * (segment.control_a.x - segment.start.x) +
+            b * (segment.control_b.x - segment.control_a.x) +
+            c * (segment.end.x - segment.control_b.x),
+        a * (segment.control_a.y - segment.start.y) +
+            b * (segment.control_b.y - segment.control_a.y) +
+            c * (segment.end.y - segment.control_b.y),
+        a * (segment.control_a.z - segment.start.z) +
+            b * (segment.control_b.z - segment.control_a.z) +
+            c * (segment.end.z - segment.control_b.z),
+    };
+}
+
+RoadMesh RoadMeshBuilder::build_cubic(const RoadSplineSegment& segment) {
+    RoadMesh mesh;
+    if (!(segment.width > 0.0F)) return mesh;
+
+    const int subdivisions = std::clamp(segment.subdivisions, 2, 256);
+    const float repeat_world_units = std::max(0.01F, segment.texture_repeat_world_units);
+    mesh.vertices.reserve(static_cast<std::size_t>(subdivisions + 1) * 2U);
+    mesh.indices.reserve(static_cast<std::size_t>(subdivisions) * 6U);
+
+    RoadWorldPoint3 previous_center = sample_cubic(segment, 0.0F);
+    float accumulated_length = 0.0F;
+
+    for (int step = 0; step <= subdivisions; ++step) {
+        const float t = static_cast<float>(step) / static_cast<float>(subdivisions);
+        const RoadWorldPoint3 center = sample_cubic(segment, t);
+        if (step > 0) accumulated_length += road_distance_3d(previous_center, center);
+        previous_center = center;
+
+        RoadWorldPoint3 tangent = tangent_cubic(segment, t);
+        float planar_length = std::sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+        if (planar_length < 0.00001F) {
+            tangent.x = segment.end.x - segment.start.x;
+            tangent.y = segment.end.y - segment.start.y;
+            planar_length = std::sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+        }
+        if (planar_length < 0.00001F) {
+            tangent.x = 1.0F;
+            tangent.y = 0.0F;
+            planar_length = 1.0F;
+        }
+
+        const float normal_x = -tangent.y / planar_length;
+        const float normal_y = tangent.x / planar_length;
+        const float half_width = segment.width * 0.5F;
+        const float v = accumulated_length / repeat_world_units;
+
+        mesh.vertices.push_back({
+            {center.x + normal_x * half_width, center.y + normal_y * half_width, center.z},
+            0.0F,
+            v,
+        });
+        mesh.vertices.push_back({
+            {center.x - normal_x * half_width, center.y - normal_y * half_width, center.z},
+            1.0F,
+            v,
+        });
+
+        if (step == 0) continue;
+        const std::uint32_t current_left = static_cast<std::uint32_t>(step * 2);
+        const std::uint32_t current_right = current_left + 1U;
+        const std::uint32_t previous_left = current_left - 2U;
+        const std::uint32_t previous_right = current_right - 2U;
+        mesh.indices.insert(mesh.indices.end(), {
+            previous_left, previous_right, current_left,
+            previous_right, current_right, current_left,
+        });
+    }
+
+    return mesh;
+}
 
 RoadManager::RoadManager(const int map_min, const int map_max)
     : map_min_(map_min), map_max_(map_max) {}

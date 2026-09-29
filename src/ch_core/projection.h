@@ -22,10 +22,26 @@ struct WorldPoint {
     float y = 0.0F;
 };
 
+// Optional elevation coordinate for geometry that genuinely needs height in the
+// otherwise-2D runtime. Ground tiles, sprites and existing systems remain on the
+// original WorldPoint contract. Procedural roads/bridges can opt into Z without
+// changing the canonical camera or turning the whole game into a 3D runtime.
+struct WorldPoint3 {
+    float x = 0.0F;
+    float y = 0.0F;
+    float z = 0.0F;
+};
+
 struct ScreenPoint {
     float x = 0.0F;
     float y = 0.0F;
 };
+
+// CH_CAMERA_V1 is a 45-degree yaw / 30-degree elevation orthographic view. The
+// existing 128x64 ground projection implies this screen-space scale for one
+// world unit of pure vertical elevation. Keeping it here makes roads, bridges
+// and future elevated geometry share one canonical Z projection.
+inline constexpr float kWorldElevationPixelsPerUnit = contracts::kTileWidth * 0.6123724357F;
 
 // CH_ISOMETRIC_OCCLUSION_V1
 //
@@ -148,6 +164,17 @@ static_assert(building_depth_span(10, 20, 5, 4, CameraRotation::r270).back == -1
 static_assert(building_depth_span(10, 20, 5, 4, CameraRotation::r270).front == -5.0F);
 
 [[nodiscard]] ScreenPoint world_to_screen_point(float world_x, float world_y, const CameraState& camera, float viewport_w, float viewport_h);
+
+// Elevated overload used only by geometry that carries real Z. Z never changes
+// logical tile selection or ground-plane depth; it only lifts the projected
+// screen position. That preserves the existing 2D simulation contract.
+[[nodiscard]] ScreenPoint world_to_screen_point(float world_x, float world_y, float world_z,
+                                                const CameraState& camera, float viewport_w, float viewport_h);
+
+[[nodiscard]] inline ScreenPoint world_to_screen_point(const WorldPoint3& world, const CameraState& camera,
+                                                       const float viewport_w, const float viewport_h) {
+    return world_to_screen_point(world.x, world.y, world.z, camera, viewport_w, viewport_h);
+}
 
 [[nodiscard]] GridCoord screen_to_tile_coord(float screen_x, float screen_y, const CameraState& camera, float viewport_w, float viewport_h);
 

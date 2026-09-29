@@ -12,6 +12,13 @@ ScreenPoint world_to_screen_point(const float world_x, const float world_y, cons
     };
 }
 
+ScreenPoint world_to_screen_point(const float world_x, const float world_y, const float world_z,
+                                  const CameraState& camera, const float viewport_w, const float viewport_h) {
+    ScreenPoint projected = world_to_screen_point(world_x, world_y, camera, viewport_w, viewport_h);
+    projected.y -= world_z * kWorldElevationPixelsPerUnit * camera.zoom;
+    return projected;
+}
+
 GridCoord screen_to_tile_coord(const float screen_x, const float screen_y, const CameraState& camera, const float viewport_w, const float viewport_h) {
     runtime_view::capture(camera, viewport_w, viewport_h);
     const float axis_x = (screen_x - viewport_w * 0.5F - camera.pan_x) / (contracts::kTileWidth * 0.5F * camera.zoom);

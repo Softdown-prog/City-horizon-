@@ -58,6 +58,48 @@ struct RoadTile {
     std::uint8_t connections = 0;
 };
 
+// CH_PROCEDURAL_ROAD_MESH_V1
+//
+// The current gameplay road network remains tile-based. These structures are a
+// parallel visual-geometry contract for elastic roads. They deliberately do not
+// change occupancy, pathfinding, costs or save data yet. A later migration can
+// move gameplay onto a road graph once the visual proof has passed.
+struct RoadWorldPoint3 {
+    float x = 0.0F;
+    float y = 0.0F;
+    float z = 0.0F;
+};
+
+struct RoadSplineSegment {
+    RoadWorldPoint3 start{};
+    RoadWorldPoint3 control_a{};
+    RoadWorldPoint3 control_b{};
+    RoadWorldPoint3 end{};
+    float width = 0.72F;
+    float texture_repeat_world_units = 1.0F;
+    int subdivisions = 24;
+};
+
+struct RoadMeshVertex {
+    RoadWorldPoint3 position{};
+    float u = 0.0F;
+    float v = 0.0F;
+};
+
+struct RoadMesh {
+    std::vector<RoadMeshVertex> vertices;
+    std::vector<std::uint32_t> indices;
+
+    [[nodiscard]] bool empty() const { return vertices.empty() || indices.empty(); }
+};
+
+class RoadMeshBuilder {
+public:
+    [[nodiscard]] static RoadWorldPoint3 sample_cubic(const RoadSplineSegment& segment, float t);
+    [[nodiscard]] static RoadWorldPoint3 tangent_cubic(const RoadSplineSegment& segment, float t);
+    [[nodiscard]] static RoadMesh build_cubic(const RoadSplineSegment& segment);
+};
+
 class RoadManager {
 public:
     RoadManager(int map_min, int map_max);
