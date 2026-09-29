@@ -2,13 +2,12 @@
 
 A structured brief or controlled-language prompt is converted into a bounded
 parametric prop grammar and then into a CH_2D_SCENE_RECIPE_V4 scene.  The goal
-is to let agents ask for variants such as a long weathered pier or a small
-rowboat without hand-authoring every coordinate, while keeping every decision
-explicit, deterministic and review-gated.
+is to let agents ask for variants such as a long weathered pier, a small
+rowboat or a two-post metal sign without hand-authoring every coordinate, while
+keeping every decision explicit, deterministic and review-gated.
 """
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import re
@@ -16,15 +15,13 @@ import unicodedata
 from pathlib import Path
 
 from .prop_grammar import GRAMMAR_CONTRACT, build_pier_recipe, configure_rowboat_recipe
+from .prop_sign_grammar import build_sign_recipe
 from .workers import run_workers, validate_recipe
 
 CONTRACT = "CH_2D_PROP_BRIEF_V1"
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 ARCHETYPES = ("rowboat", "pier", "sign")
-TEMPLATES = {
-    "rowboat": "prop_rowboat_scene_v4.json",
-    "sign": "park_wayfinding_sign.json",
-}
+TEMPLATES = {"rowboat": "prop_rowboat_scene_v4.json"}
 ALIASES = {
     "rowboat": ("barco", "barquinho", "boat", "rowboat", "bote"),
     "pier": ("pier", "píer", "cais", "doca", "dock"),
@@ -39,7 +36,7 @@ COMMON_FIELDS = {"contract", "id", "prompt", "archetype", "condition", "seed"}
 PARAM_FIELDS = {
     "pier": {"lengthTiles", "widthTiles", "ladder", "cleats", "railing"},
     "rowboat": {"size", "oar", "seats"},
-    "sign": set(),
+    "sign": {"material", "boardShape", "posts", "arrow", "cap"},
 }
 
 
@@ -101,6 +98,29 @@ def interpret_prop_prompt(prompt: str) -> dict:
             result["seats"] = 1
         elif any(term in text for term in ("dois bancos", "2 bancos", "two seats")):
             result["seats"] = 2
+    else:
+        if any(term in text for term in ("metal", "metalica", "metalico", "metálica", "metálico")):
+            result["material"] = "metal"
+        elif any(term in text for term in ("madeira", "wood", "wooden")):
+            result["material"] = "wood"
+        if any(term in text for term in ("duas hastes", "dois postes", "2 postes", "two posts")):
+            result["posts"] = 2
+        elif any(term in text for term in ("uma haste", "um poste", "1 poste", "one post")):
+            result["posts"] = 1
+        if any(term in text for term in ("seta esquerda", "arrow left", "left arrow")):
+            result["arrow"] = "left"
+        elif any(term in text for term in ("sem seta", "no arrow", "without arrow")):
+            result["arrow"] = "none"
+        elif any(term in text for term in ("seta direita", "arrow right", "right arrow")):
+            result["arrow"] = "right"
+        if any(term in text for term in ("formato seta", "placa seta", "arrow board", "arrow-shaped")):
+            result["boardShape"] = "arrow"
+        elif any(term in text for term in ("retangular", "rectangular", "rectangle")):
+            result["boardShape"] = "rect"
+        elif any(term in text for term in ("arredondada", "arredondado", "rounded")):
+            result["boardShape"] = "rounded"
+        if any(term in text for term in ("sem tampa", "sem topo", "no cap")):
+            result["cap"] = False
     return result
 
 
@@ -125,14 +145,13 @@ def _condition_scene(recipe: dict, condition: str) -> None:
         for region in regions:
             region["opacity"] = round(min(0.30, float(region.get("opacity", 0.1)) * 1.45), 3)
             region["stamps"] = min(120, max(1, round(int(region.get("stamps", 12)) * 1.35)))
-    # 'used' deliberately preserves the authored baseline.
 
 
 def _merge_parameters(archetype: str, brief: dict, parsed: dict) -> dict:
     defaults = {
         "pier": {"lengthTiles": 3, "widthTiles": 1, "ladder": True, "cleats": True, "railing": False},
         "rowboat": {"size": "medium", "oar": True, "seats": 2},
-        "sign": {},
+        "sign": {"material": "wood", "boardShape": "rounded", "posts": 1, "arrow": "right", "cap": True},
     }[archetype]
     params = dict(defaults)
     for key in PARAM_FIELDS[archetype]:
@@ -183,11 +202,9 @@ def author_prop_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, di
         recipe["seed"] = seed
         source = f"parametric:rowboat_v1<{filename}>"
     else:
-        filename = TEMPLATES[archetype]
-        recipe = copy.deepcopy(json.loads((examples / filename).read_text(encoding="utf-8")))
-        recipe["id"] = asset_id
-        recipe["seed"] = seed
-        source = filename
+        recipe = build_sign_recipe(asset_id, seed, material=params["material"], board_shape=params["boardShape"],
+                                   posts=params["posts"], arrow=params["arrow"], cap=params["cap"])
+        source = "parametric:sign_v1"
 
     _condition_scene(recipe, condition)
     recipe["authorIntent"] = {"archetype": archetype, "condition": condition, **params}
