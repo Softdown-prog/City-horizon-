@@ -7,6 +7,7 @@
 namespace ch::studio {
 
 enum class ParkFencePiece {
+    Post,
     Straight,
     Corner,
     End,
