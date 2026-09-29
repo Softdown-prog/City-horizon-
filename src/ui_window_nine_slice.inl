@@ -1,10 +1,14 @@
-// Reusable nine-slice window frame for the first modal migration stage.
+// Reusable nine-slice window frame for the modal migration.
 // The existing procedural panel stays underneath as the fallback/background;
 // this pass only replaces the authored chrome around supported windows.
 if (renderer != nullptr && overlay_bounds_ &&
     (model_.overlay == UiOverlay::pause ||
      model_.overlay == UiOverlay::settings ||
-     model_.overlay == UiOverlay::administration)) {
+     model_.overlay == UiOverlay::administration ||
+     model_.overlay == UiOverlay::reports ||
+     model_.overlay == UiOverlay::main_menu ||
+     model_.overlay == UiOverlay::save_load ||
+     model_.overlay == UiOverlay::quit_confirm)) {
     const UiRect& panel = *overlay_bounds_;
     const auto* skin = thumbnail_for(
         renderer, ui_chrome_path("panel_window_9slice_v2"));
