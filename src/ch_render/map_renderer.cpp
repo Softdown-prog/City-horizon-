@@ -36,6 +36,8 @@ constexpr float kTileWidth = static_cast<float>(contracts::kTileWidth);
 constexpr float kGrassOpaqueLeft = 53.0F;
 constexpr float kGrassOpaqueTop = 23.0F;
 constexpr float kGrassOpaqueWidth = 1175.0F;
+constexpr float kGrassOpaqueHeight = 587.0F;
+constexpr float kTerrainHeightPixelsPerUnit = 16.0F;
 
 
 constexpr TileCoordinate road_access_offset(const GridDirection direction) {
@@ -217,6 +219,51 @@ void MapRenderer::render_custom_terrain_tile(SDL_Renderer* renderer, const Textu
     SDL_RenderTexture(renderer, texture.texture, nullptr, &destination);
 }
 
+void MapRenderer::render_heightfield_terrain_tile(
+    SDL_Renderer* renderer, const TextureAsset& texture, const int x, const int y,
+    const MapDocument& document, const CameraState& camera,
+    const float viewport_width, const float viewport_height, const bool grass_source) {
+    if (renderer == nullptr || texture.texture == nullptr ||
+        texture.source_width <= 0.0F || texture.source_height <= 0.0F) {
+        return;
+    }
+
+    const auto screen_corner = [&](const int grid_x, const int grid_y) {
+        ScreenPoint point = world_to_screen_point(static_cast<float>(grid_x), static_cast<float>(grid_y),
+                                                  camera, viewport_width, viewport_height);
+        point.y -= document.terrain_height_at(grid_x, grid_y) *
+                   kTerrainHeightPixelsPerUnit * camera.zoom;
+        return point;
+    };
+    const ScreenPoint top = screen_corner(x, y);
+    const ScreenPoint right = screen_corner(x + 1, y);
+    const ScreenPoint bottom = screen_corner(x + 1, y + 1);
+    const ScreenPoint left = screen_corner(x, y + 1);
+
+    const float source_width = std::max(1.0F, texture.source_width);
+    const float source_height = std::max(1.0F, texture.source_height);
+    const float left_u = grass_source ? kGrassOpaqueLeft / source_width : 0.0F;
+    const float top_v = grass_source ? kGrassOpaqueTop / source_height : 0.0F;
+    const float right_u = grass_source ? (kGrassOpaqueLeft + kGrassOpaqueWidth) / source_width : 1.0F;
+    const float bottom_v = grass_source ? (kGrassOpaqueTop + kGrassOpaqueHeight) / source_height : 1.0F;
+
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = {top.x, top.y};
+    vertices[1].position = {right.x, right.y};
+    vertices[2].position = {bottom.x, bottom.y};
+    vertices[3].position = {left.x, left.y};
+    vertices[0].tex_coord = {(left_u + right_u) * 0.5F, top_v};
+    vertices[1].tex_coord = {right_u, (top_v + bottom_v) * 0.5F};
+    vertices[2].tex_coord = {(left_u + right_u) * 0.5F, bottom_v};
+    vertices[3].tex_coord = {left_u, (top_v + bottom_v) * 0.5F};
+    for (SDL_Vertex& vertex : vertices) {
+        vertex.color = {1.0F, 1.0F, 1.0F, 1.0F};
+    }
+
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, texture.texture, vertices, 4, indices, 6);
+}
+
 void MapRenderer::render_water_caustics_overlay_tile(SDL_Renderer* renderer, const TextureAsset& overlay,
                                                      const int x, const int y, const CameraState& camera,
                                                      const float viewport_width, const float viewport_height,
@@ -290,8 +337,9 @@ void MapRenderer::render_water_surface_tile(SDL_Renderer* renderer, const Textur
 }
 
 void MapRenderer::render_map(SDL_Renderer* renderer, const TextureAsset* grass,
-                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
-                            const CameraState& camera, const float viewport_width, const float viewport_height) {
+                             const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
+                             const CameraState& camera, const float viewport_width, const float viewport_height,
+                             const MapDocument* document) {
     SDL_SetRenderDrawColor(renderer, 74, 104, 83, SDL_ALPHA_OPAQUE);
     const SDL_FRect background = {0.0F, 0.0F, viewport_width, viewport_height};
     SDL_RenderFillRect(renderer, &background);
@@ -314,8 +362,17 @@ void MapRenderer::render_map(SDL_Renderer* renderer, const TextureAsset* grass,
             const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) |
                                       static_cast<std::uint32_t>(y);
             const auto it = scenario_terrain_textures.find(key);
+            const bool deform = document != nullptr && !document->terrain_heightfield().empty();
             if (it != scenario_terrain_textures.end() && it->second != nullptr) {
-                render_custom_terrain_tile(renderer, *it->second, x, y, camera, viewport_width, viewport_height);
+                if (deform) {
+                    render_heightfield_terrain_tile(renderer, *it->second, x, y, *document,
+                                                    camera, viewport_width, viewport_height, it->second == grass);
+                } else {
+                    render_custom_terrain_tile(renderer, *it->second, x, y, camera, viewport_width, viewport_height);
+                }
+            } else if (deform) {
+                render_heightfield_terrain_tile(renderer, *grass, x, y, *document,
+                                                camera, viewport_width, viewport_height, true);
             } else {
                 render_grass_tile(renderer, *grass, x, y, camera, viewport_width, viewport_height);
             }
@@ -423,7 +480,7 @@ void MapRenderer::render_world_terrain_and_water(
 
     // Canonical Layer Execution:
     // 1. Terrain Base
-    render_map(renderer, grass_base, scenario_terrain_textures, camera, viewport_width, viewport_height);
+    render_map(renderer, grass_base, scenario_terrain_textures, camera, viewport_width, viewport_height, &document);
 
     // 1.5 Ground paths. Their connection mask comes from neighbouring
     // ground terrain, never RoadManager. First paint an opaque soil underlay:

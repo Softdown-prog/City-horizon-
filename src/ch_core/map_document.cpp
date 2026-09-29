@@ -2,6 +2,8 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cmath>
+#include <cstdlib>
 
 namespace ch {
 
@@ -22,6 +24,27 @@ std::optional<std::string> json_string(const std::string_view json, const std::s
     if (quote_end == std::string_view::npos) return std::nullopt;
 
     return std::string(json.substr(quote_start + 1, quote_end - quote_start - 1));
+}
+
+std::optional<float> json_float(const std::string_view json, const std::string_view key) {
+    const std::string key_pattern = "\"" + std::string(key) + "\"";
+    const auto key_pos = json.find(key_pattern);
+    if (key_pos == std::string_view::npos) return std::nullopt;
+
+    const auto colon_pos = json.find(':', key_pos);
+    if (colon_pos == std::string_view::npos) return std::nullopt;
+
+    std::size_t pos = colon_pos + 1;
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n' || json[pos] == '\r')) {
+        ++pos;
+    }
+    if (pos >= json.size()) return std::nullopt;
+
+    const std::string token(json.substr(pos));
+    char* end = nullptr;
+    const float value = std::strtof(token.c_str(), &end);
+    if (end == token.c_str() || !std::isfinite(value)) return std::nullopt;
+    return value;
 }
 
 std::optional<int> json_int(const std::string_view json, const std::string_view key) {
@@ -117,6 +140,30 @@ void MapDocument::parse_all() {
                     std::size_t idx = cached_terrain_.size();
                     cached_terrain_.push_back({*tx, *ty, tex_path, def_id});
                     terrain_index_[pack_key(*tx, *ty)] = idx;
+                }
+                pos = end_obj + 1;
+            }
+        }
+    }
+
+    // 1.5. Sparse terrain height vertices. Missing vertices are level zero.
+    const std::size_t heights_pos = raw_content_.find("\"terrainHeights\"");
+    if (heights_pos != std::string::npos) {
+        const std::size_t array_start = raw_content_.find('[', heights_pos);
+        const std::size_t array_end = raw_content_.find(']', array_start);
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            std::string_view array_str(raw_content_.data() + array_start, array_end - array_start + 1);
+            std::size_t pos = 0;
+            while ((pos = array_str.find('{', pos)) != std::string_view::npos) {
+                const std::size_t end_obj = array_str.find('}', pos);
+                if (end_obj == std::string_view::npos) break;
+
+                const std::string_view obj = array_str.substr(pos, end_obj - pos + 1);
+                const auto x = json_int(obj, "x");
+                const auto y = json_int(obj, "y");
+                const auto height = json_float(obj, "height");
+                if (x && y && height) {
+                    terrain_heightfield_.set_height(*x, *y, *height);
                 }
                 pos = end_obj + 1;
             }
@@ -229,6 +276,15 @@ void MapDocument::set_terrain_definition_at(int tile_x, int tile_y, const std::s
         cached_terrain_.push_back({tile_x, tile_y, texture_path, terrain_def_id});
         terrain_index_[key] = idx;
     }
+}
+
+void MapDocument::set_terrain_height_at(const int grid_x, const int grid_y, const float height) {
+    terrain_heightfield_.set_height(grid_x, grid_y, height);
+}
+
+void MapDocument::apply_terrain_brush(const float center_x, const float center_y, const float radius,
+                                       const float strength, const TerrainBrushMode mode) {
+    terrain_heightfield_.apply_brush(center_x, center_y, radius, strength, mode);
 }
 
 void MapDocument::paint_terrain_at(int tile_x, int tile_y, const std::string& terrain_def_id, const std::string& texture_path) {

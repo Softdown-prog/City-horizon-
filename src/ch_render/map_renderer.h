@@ -104,6 +104,13 @@ public:
     static void render_custom_terrain_tile(SDL_Renderer* renderer, const TextureAsset& texture, int x, int y,
                                            const CameraState& camera, float viewport_width, float viewport_height);
 
+    // Draws a tile as a shared-vertex quad whose corners follow the document's
+    // sparse heightfield. The optional grass crop keeps the legacy grass atlas aligned.
+    static void render_heightfield_terrain_tile(SDL_Renderer* renderer, const TextureAsset& texture,
+                                                int x, int y, const MapDocument& document,
+                                                const CameraState& camera, float viewport_width,
+                                                float viewport_height, bool grass_source = false);
+
     // Water is physically covered by the opaque base.  This method applies a
     // detail texture with UVs derived from world coordinates, so a shared
     // logical edge samples the same detail coordinates on both adjacent cells.
@@ -119,7 +126,8 @@ public:
 
     static void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
-                           const CameraState& camera, float viewport_width, float viewport_height);
+                           const CameraState& camera, float viewport_width, float viewport_height,
+                           const MapDocument* document = nullptr);
 
     // Canonical shared world terrain, water V2, caustics, and shoreline autotile renderer.
     static void render_world_terrain_and_water(SDL_Renderer* renderer, const MapDocument& document,

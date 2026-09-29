@@ -64,6 +64,7 @@ FetchContent_MakeAvailable(pybind11)
 
 add_library(ch_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/projection.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/terrain_heightfield.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/map_document.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/validation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/semantic_grid.cpp
@@ -149,6 +150,15 @@ if(BUILD_TESTING)
     add_test(
         NAME ch_core_test
         COMMAND ch_core_test "${CMAKE_SOURCE_DIR}/assets/scenarios/initial_city.json"
+    )
+
+    add_executable(terrain_heightfield_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ch_core/terrain_heightfield_test.cpp
+    )
+    target_link_libraries(terrain_heightfield_test PRIVATE ch_core)
+    add_test(
+        NAME terrain_heightfield_test
+        COMMAND terrain_heightfield_test
     )
     add_executable(building_system_test
         src/building_system_test.cpp
