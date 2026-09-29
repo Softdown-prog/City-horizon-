@@ -1,5 +1,6 @@
 #include "procedural_road_lane_connector.h"
 #include "procedural_road_route_sampler.h"
+#include "procedural_road_vehicle_follower.h"
 
 #include <cassert>
 #include <cmath>
@@ -63,40 +64,86 @@ void test_explicit_junction_connectors() {
     }
 }
 
-void test_continuous_route_across_two_junctions() {
+std::vector<ProceduralRoadRoutePoint> build_sampled_vehicle_route() {
     ProceduralRoadGraph graph;
     const auto a = graph.add_node({-6.0F, 0.0F, 0.0F});
     const auto b = graph.add_node({0.0F, 0.0F, 0.75F});
     const auto c = graph.add_node({4.0F, 4.0F, 1.25F});
     const auto d = graph.add_node({10.0F, 4.0F, 1.25F});
 
-    const auto ab = graph.add_segment(a, b, {2.0F, 0.0F, 0.25F}, {-2.0F, 0.0F, -0.10F}, 0.82F, 2);
-    const auto bc = graph.add_segment(b, c, {1.5F, 0.8F, 0.15F}, {-1.0F, -1.4F, -0.15F}, 0.82F, 2);
-    const auto cd = graph.add_segment(c, d, {2.0F, 0.0F, 0.0F}, {-2.0F, 0.0F, 0.0F}, 0.82F, 2);
-    assert(ab && bc && cd);
+    assert(graph.add_segment(a, b, {2.0F, 0.0F, 0.25F}, {-2.0F, 0.0F, -0.10F}, 0.82F, 2));
+    assert(graph.add_segment(b, c, {1.5F, 0.8F, 0.15F}, {-1.0F, -1.4F, -0.15F}, 0.82F, 2));
+    assert(graph.add_segment(c, d, {2.0F, 0.0F, 0.0F}, {-2.0F, 0.0F, 0.0F}, 0.82F, 2));
 
     const auto route = ProceduralRoadNavigator::find_route(graph, a, d);
     assert(route && route->segments.size() == 3U);
     const auto sampled = ProceduralRoadRouteSampler::sample_right_hand_route(graph, *route, 0.18F, 24, 12);
     assert(sampled && !sampled->empty());
+    return *sampled;
+}
 
-    bool saw_b = false;
-    bool saw_c = false;
+void test_continuous_route_across_two_junctions() {
+    const auto sampled = build_sampled_vehicle_route();
+
+    bool saw_first_junction = false;
+    bool saw_second_junction = false;
     bool saw_elevated_point = false;
     float max_step = 0.0F;
-    for (std::size_t index = 0; index < sampled->size(); ++index) {
-        const auto& point = (*sampled)[index];
+    ProceduralRoadNodeId first_junction = kInvalidProceduralRoadNodeId;
+
+    for (std::size_t index = 0; index < sampled.size(); ++index) {
+        const auto& point = sampled[index];
         if (point.kind == ProceduralRoadRoutePointKind::junction_connector) {
-            if (point.junction_node == b) saw_b = true;
-            if (point.junction_node == c) saw_c = true;
+            if (first_junction == kInvalidProceduralRoadNodeId) first_junction = point.junction_node;
+            if (point.junction_node == first_junction) saw_first_junction = true;
+            else saw_second_junction = true;
         }
         if (point.position.z > 1.0F) saw_elevated_point = true;
-        if (index > 0U) {
-            max_step = std::max(max_step, distance3((*sampled)[index - 1U].position, point.position));
+        if (index > 0U) max_step = std::max(max_step, distance3(sampled[index - 1U].position, point.position));
+    }
+    assert(saw_first_junction && saw_second_junction && saw_elevated_point);
+    assert(max_step < 0.75F);
+}
+
+void test_vehicle_follower_moves_continuously_and_slows_for_turns() {
+    ProceduralRoadVehicleFollower follower;
+    assert(follower.set_route(build_sampled_vehicle_route()));
+    assert(follower.valid());
+    assert(!follower.pose().finished);
+
+    ProceduralRoadVehicleFollowerConfig config;
+    config.cruise_speed = 1.40F;
+    config.junction_speed = 0.82F;
+    config.turn_speed = 0.62F;
+    config.acceleration = 2.0F;
+    config.braking = 4.0F;
+
+    float previous_distance = follower.pose().route_distance;
+    bool saw_junction = false;
+    bool saw_turn_cap = false;
+    bool saw_elevation = false;
+    int guard = 0;
+    while (!follower.pose().finished && guard++ < 4000) {
+        follower.update(0.05F, config);
+        const auto& pose = follower.pose();
+        assert(pose.route_distance + 0.0001F >= previous_distance);
+        previous_distance = pose.route_distance;
+        const float forward_length = std::sqrt(pose.forward.x * pose.forward.x + pose.forward.y * pose.forward.y + pose.forward.z * pose.forward.z);
+        assert(std::fabs(forward_length - 1.0F) < 0.01F);
+        if (pose.position.z > 1.0F) saw_elevation = true;
+        if (pose.kind == ProceduralRoadRoutePointKind::junction_connector) {
+            saw_junction = true;
+            if (pose.turn != ProceduralRoadTurnKind::straight && pose.speed <= config.turn_speed + 0.001F) {
+                saw_turn_cap = true;
+            }
         }
     }
-    assert(saw_b && saw_c && saw_elevated_point);
-    assert(max_step < 0.75F);
+
+    assert(guard < 4000);
+    assert(follower.pose().finished);
+    assert(near_value(follower.pose().speed, 0.0F));
+    assert(saw_junction && saw_turn_cap && saw_elevation);
+    assert(near_value(follower.pose().route_distance, follower.pose().route_length, 0.001F));
 }
 
 void test_reverse_route_is_continuous() {
@@ -140,6 +187,7 @@ int main() {
     test_turn_classification();
     test_explicit_junction_connectors();
     test_continuous_route_across_two_junctions();
+    test_vehicle_follower_moves_continuously_and_slows_for_turns();
     test_reverse_route_is_continuous();
     test_geometric_crossing_does_not_connect();
 }
