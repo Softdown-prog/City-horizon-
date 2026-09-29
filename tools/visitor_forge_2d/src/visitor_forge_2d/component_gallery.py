@@ -11,7 +11,12 @@ import json
 from pathlib import Path
 
 CONTRACT = "CH_2D_REUSABLE_COMPONENT_GALLERY_V1"
-DEFAULT_GALLERY = Path(__file__).resolve().parents[2] / "examples" / "component_gallery" / "reusable_components_v1.json"
+GALLERY_DIR = Path(__file__).resolve().parents[2] / "examples" / "component_gallery"
+DEFAULT_GALLERY = GALLERY_DIR / "reusable_components_v1.json"
+DEFAULT_GALLERY_SHARDS = (
+    GALLERY_DIR / "reusable_components_v1.json",
+    GALLERY_DIR / "reusable_components_v2.json",
+)
 
 
 def _expand_family(name: str, spec: dict) -> list[dict]:
@@ -37,7 +42,7 @@ def _expand_family(name: str, spec: dict) -> list[dict]:
     return items
 
 
-def load_component_gallery(path: Path = DEFAULT_GALLERY) -> dict:
+def _load_shard(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("contract") != CONTRACT:
         raise ValueError(f"component gallery requires {CONTRACT}")
@@ -49,12 +54,48 @@ def load_component_gallery(path: Path = DEFAULT_GALLERY) -> dict:
         items.extend(_expand_family(name, spec))
     ids = [item["id"] for item in items]
     if len(ids) != len(set(ids)):
-        raise ValueError("component gallery item ids must be unique")
+        raise ValueError("component gallery item ids must be unique within a shard")
     if data.get("currentCount") != len(items):
         raise ValueError("component gallery currentCount does not match expanded items")
     result = copy.deepcopy(data)
     result["items"] = items
     return result
+
+
+def load_component_gallery(path: Path = DEFAULT_GALLERY) -> dict:
+    # The default gallery is now a versioned aggregate. Explicit non-default
+    # paths still load one shard so tests/tools can inspect a batch in isolation.
+    paths = DEFAULT_GALLERY_SHARDS if Path(path) == DEFAULT_GALLERY else (Path(path),)
+    shards = [_load_shard(p) for p in paths]
+    families: dict[str, dict] = {}
+    items: list[dict] = []
+    for shard in shards:
+        overlap = set(families).intersection(shard["familyDefinitions"])
+        if overlap:
+            raise ValueError(f"component gallery family ids must be unique across shards: {sorted(overlap)}")
+        families.update(copy.deepcopy(shard["familyDefinitions"]))
+        items.extend(copy.deepcopy(shard["items"]))
+    ids = [item["id"] for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValueError("component gallery item ids must be unique across shards")
+    target = max(int(shard.get("targetCount", 0)) for shard in shards)
+    return {
+        "contract": CONTRACT,
+        "version": max(int(shard.get("version", 1)) for shard in shards),
+        "targetCount": target,
+        "currentCount": len(items),
+        "status": "target_reached" if len(items) >= target else "seed_library",
+        "familyDefinitions": families,
+        "generation": {
+            "sizesPerFamily": 4,
+            "stylesPerFamily": 2,
+            "orientationsPerFamily": 2,
+            "itemsPerFamily": 16,
+            "familyCount": len(families),
+            "shardCount": len(shards),
+        },
+        "items": items,
+    }
 
 
 def get_component(component_id: str, path: Path = DEFAULT_GALLERY) -> dict:
