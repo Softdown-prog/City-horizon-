@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,7 +37,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $jobPath = "${{ inputs.job_path }}"
           } else {
-            $jobPath = git diff-tree --no-commit-id --name-only -r HEAD |
+            $jobPath = git diff --name-only HEAD^ HEAD |
               Where-Object { $_ -like "tools/animation_preview/mapforge_jobs/*.json" } |
               Select-Object -First 1
           }
