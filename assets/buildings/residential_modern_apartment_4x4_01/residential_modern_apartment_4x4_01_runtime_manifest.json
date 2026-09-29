@@ -1,0 +1,23 @@
+{
+  "contract": "CH_RUNTIME_BUILDING_V1",
+  "assetId": "building.residential_modern_apartment.01",
+  "source": "ch_blender",
+  "sourceWorkflowRun": 36533006623,
+  "sourceArtifactId": 11017046910,
+  "sourceCommit": "baadb81b207df0266e087d00b2ca815f841b7b7d",
+  "approvedProxySha256": "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18",
+  "renderer": "EEVEE_NEXT",
+  "frameSize": [1024, 1024],
+  "footprint": { "width": 4, "height": 4 },
+  "tileProjection": { "width": 128, "height": 64 },
+  "studioGroundOrigin": { "x": 512.0001, "y": 556.0492 },
+  "runtimeAnchorPixel": { "x": 512.0, "y": 684.0492 },
+  "runtimeAnchor": { "x": 0.5, "y": 0.668016796875 },
+  "rotationOrder": ["south", "west", "north", "east"],
+  "sprites": {
+    "south": { "path": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_south.png", "sha256": "b754dac33de84dbd96b83b5565b4dd0fe4e60b9ecc87f3d648f3068a0f067c91" },
+    "west": { "path": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_west.png", "sha256": "6f1f9bb8a0195fd50376a728920ca92ce5fe413deb22834700f3586d84c0d93b" },
+    "north": { "path": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_north.png", "sha256": "9f9f258b913a07b76343c5d9f426bde7a4e81cd304416f403dd517290ec8ccfd" },
+    "east": { "path": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_east.png", "sha256": "7844fa6a2ce3a186581ea95493025ad8cdd02fdd0ac8edaf4dfad147cd560d9f" }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "residential_modern_apartment_01",
+  "name": "Prédio residencial moderno",
+  "category": "residential",
+  "texture": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_south.png",
+  "sprites": {
+    "0": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_south.png",
+    "1": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_west.png",
+    "2": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_north.png",
+    "3": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_east.png"
+  },
+  "spriteAnchors": {
+    "0": { "x": 0.5, "y": 0.668016796875 },
+    "1": { "x": 0.5, "y": 0.668016796875 },
+    "2": { "x": 0.5, "y": 0.668016796875 },
+    "3": { "x": 0.5, "y": 0.668016796875 }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "front_edge",
+  "frontEdge": "south",
+  "accessPoints": [
+    { "x": 1, "y": 3, "facing": "south" },
+    { "x": 2, "y": 3, "facing": "south" }
+  ],
+  "footprint": {
+    "width": 4,
+    "height": 4
+  },
+  "buildCost": 0,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "propertyTaxPerYear": 0,
+  "requiredPopulationForFullRevenue": 0,
+  "residentialCapacity": 20,
+  "powerConsumption": 0,
+  "artScale": 1.0,
+  "playerBuildable": true,
+  "productionStatus": "runtime_buildable",
+  "renderClass": "large_asset_1024",
+  "sourceAssetId": "building.residential_modern_apartment.01",
+  "runtimeManifest": "assets/buildings/residential_modern_apartment_4x4_01/residential_modern_apartment_4x4_01_runtime_manifest.json",
+  "sourceApprovedProxySha256": "3b6f97c5a295bce08fcccdcb74a1457c8bcd01a949deaf7661c4c5b945de5a18"
+}
