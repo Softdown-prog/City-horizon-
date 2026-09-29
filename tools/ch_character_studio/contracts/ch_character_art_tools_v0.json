@@ -1,0 +1,54 @@
+{
+  "contract": "CH_CHARACTER_ART_TOOLS_V0",
+  "product": "CH Character Studio Art",
+  "reference": "Photoshop-style painting and tonal tools adapted to City Horizon character production",
+  "scope": "appearance_authoring_only",
+  "frame": [48, 64],
+  "brushEngine": {
+    "presets": ["pixel_1", "pixel_2", "hard_round", "marker", "dither", "airbrush"],
+    "spacingPercent": {"min": 5, "max": 200, "default": 25},
+    "opacityPercent": {"min": 1, "max": 100, "default": 100},
+    "flowPercent": {"min": 1, "max": 100, "default": 100},
+    "imageSmoothing": false,
+    "deterministicDither": true,
+    "symmetryModes": ["off", "vertical", "horizontal", "quad"],
+    "symmetryAxis": "frame_center"
+  },
+  "gradient": {
+    "types": ["linear", "radial"],
+    "colors": 2,
+    "angleDegrees": true,
+    "opacityPercent": true,
+    "preserveExistingAlpha": true
+  },
+  "adjustments": {
+    "levels": {
+      "inputBlack": [0, 254],
+      "gamma": [0.1, 9.99],
+      "inputWhite": [1, 255],
+      "outputBlack": [0, 254],
+      "outputWhite": [1, 255]
+    },
+    "curves": {
+      "controlInputs": [0, 64, 128, 192, 255],
+      "interpolation": "piecewise_linear",
+      "outputRange": [0, 255]
+    },
+    "hueSaturation": {
+      "hueDegrees": [-180, 180],
+      "saturationPercent": [-100, 100],
+      "lightnessPercent": [-100, 100]
+    },
+    "preserveAlpha": true,
+    "historyCheckpointRequired": true
+  },
+  "canonicalProtection": {
+    "approvedMotionLocked": true,
+    "groundAnchorLocked": [24, 60],
+    "canonicalCameraLocked": "CH_ACTOR_CAMERA_V1",
+    "landmarksReadOnly": true,
+    "colorMaskBanksUnaffected": true,
+    "heldObjectSocketsUnaffected": true,
+    "toolsMayEditOnlyArtPixels": true
+  }
+}
