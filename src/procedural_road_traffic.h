@@ -34,6 +34,25 @@ struct ProceduralRoadJunctionReservationConfig {
     float stop_buffer = 0.30F;
 };
 
+enum class ProceduralRoadSignalPhase {
+    east_west_green,
+    all_red_to_north_south,
+    north_south_green,
+    all_red_to_east_west,
+};
+
+struct ProceduralRoadSignalTiming {
+    float green_duration = 6.0F;
+    float clearance_duration = 1.0F;
+};
+
+struct ProceduralRoadSignalState {
+    ProceduralRoadNodeId node_id = kInvalidProceduralRoadNodeId;
+    ProceduralRoadSignalPhase phase = ProceduralRoadSignalPhase::east_west_green;
+    float elapsed = 0.0F;
+    ProceduralRoadSignalTiming timing{};
+};
+
 struct ProceduralRoadTrafficInstance {
     std::string vehicle_id;
     ProceduralRoadVehicleFollower follower;
@@ -43,6 +62,7 @@ struct ProceduralRoadTrafficInstance {
     float leader_gap = std::numeric_limits<float>::infinity();
     ProceduralRoadNodeId reserved_junction = kInvalidProceduralRoadNodeId;
     ProceduralRoadNodeId blocked_junction = kInvalidProceduralRoadNodeId;
+    ProceduralRoadNodeId signal_blocked_junction = kInvalidProceduralRoadNodeId;
 };
 
 struct ProceduralRoadJunctionReservation {
@@ -82,6 +102,8 @@ public:
 
     void update_tick(const float tick_seconds) {
         if (!(tick_seconds > 0.0F)) return;
+
+        update_signals(tick_seconds);
 
         std::vector<ProceduralRoadVehiclePose> snapshot;
         snapshot.reserve(instances_.size());
@@ -133,6 +155,7 @@ public:
     void clear() {
         instances_.clear();
         junction_reservations_.clear();
+        signal_states_.clear();
     }
 
     void set_following_config(const ProceduralRoadTrafficFollowingConfig& config) {
@@ -150,6 +173,54 @@ public:
 
     [[nodiscard]] const ProceduralRoadJunctionReservationConfig& junction_reservation_config() const {
         return junctions_;
+    }
+
+    [[nodiscard]] bool add_signalized_junction(
+        const ProceduralRoadNodeId node_id,
+        const ProceduralRoadSignalTiming timing = {},
+        const ProceduralRoadSignalPhase initial_phase = ProceduralRoadSignalPhase::east_west_green) {
+        if (node_id == kInvalidProceduralRoadNodeId || signal_state(node_id) != nullptr) return false;
+        signal_states_.push_back({node_id, initial_phase, 0.0F, timing});
+        return true;
+    }
+
+    [[nodiscard]] bool remove_signalized_junction(const ProceduralRoadNodeId node_id) {
+        const auto found = std::find_if(signal_states_.begin(), signal_states_.end(), [&](const auto& signal) {
+            return signal.node_id == node_id;
+        });
+        if (found == signal_states_.end()) return false;
+        signal_states_.erase(found);
+        return true;
+    }
+
+    [[nodiscard]] bool is_signalized_junction(const ProceduralRoadNodeId node_id) const {
+        return signal_state(node_id) != nullptr;
+    }
+
+    [[nodiscard]] std::optional<ProceduralRoadSignalPhase> junction_signal_phase(
+        const ProceduralRoadNodeId node_id) const {
+        const ProceduralRoadSignalState* signal = signal_state(node_id);
+        if (signal == nullptr) return std::nullopt;
+        return signal->phase;
+    }
+
+    [[nodiscard]] bool junction_signal_allows(
+        const ProceduralRoadNodeId node_id,
+        const RoadWorldPoint3 forward) const {
+        const ProceduralRoadSignalState* signal = signal_state(node_id);
+        if (signal == nullptr) return true;
+
+        const bool east_west_approach = std::fabs(forward.x) >= std::fabs(forward.y);
+        switch (signal->phase) {
+            case ProceduralRoadSignalPhase::east_west_green:
+                return east_west_approach;
+            case ProceduralRoadSignalPhase::north_south_green:
+                return !east_west_approach;
+            case ProceduralRoadSignalPhase::all_red_to_north_south:
+            case ProceduralRoadSignalPhase::all_red_to_east_west:
+                return false;
+        }
+        return false;
     }
 
     [[nodiscard]] std::string_view junction_owner(const ProceduralRoadNodeId node_id) const {
@@ -180,6 +251,7 @@ public:
     [[nodiscard]] std::size_t size() const { return instances_.size(); }
     [[nodiscard]] bool empty() const { return instances_.empty(); }
     [[nodiscard]] const std::vector<ProceduralRoadTrafficInstance>& instances() const { return instances_; }
+    [[nodiscard]] const std::vector<ProceduralRoadSignalState>& signal_states() const { return signal_states_; }
 
 private:
     struct LeaderObservation {
@@ -263,6 +335,7 @@ private:
         for (ProceduralRoadTrafficInstance& instance : instances_) {
             instance.reserved_junction = kInvalidProceduralRoadNodeId;
             instance.blocked_junction = kInvalidProceduralRoadNodeId;
+            instance.signal_blocked_junction = kInvalidProceduralRoadNodeId;
         }
         if (!junctions_.enabled) {
             junction_reservations_.clear();
@@ -283,6 +356,18 @@ private:
                 instance.reserved_junction = upcoming->node_id;
                 continue;
             }
+
+            const bool signal_permits = upcoming->inside ||
+                junction_signal_allows(upcoming->node_id, instance.follower.pose().forward);
+            if (!signal_permits) {
+                instance.blocked_junction = upcoming->node_id;
+                instance.signal_blocked_junction = upcoming->node_id;
+                external_speed_caps[index] = std::min(
+                    external_speed_caps[index],
+                    junction_stop_speed_cap(upcoming->distance, instance.movement));
+                continue;
+            }
+
             if (owner.empty()) continue;
 
             instance.blocked_junction = upcoming->node_id;
@@ -297,7 +382,9 @@ private:
             const ProceduralRoadTrafficInstance* owner = find(reservation.vehicle_id);
             if (owner == nullptr) return true;
             const auto upcoming = owner->follower.upcoming_junction();
-            return !upcoming || upcoming->node_id != reservation.node_id;
+            if (!upcoming || upcoming->node_id != reservation.node_id) return true;
+            if (upcoming->inside) return false;
+            return !junction_signal_allows(reservation.node_id, owner->follower.pose().forward);
         });
     }
 
@@ -309,6 +396,10 @@ private:
             const auto upcoming = instances_[index].follower.upcoming_junction(lookahead);
             if (!upcoming || upcoming->node_id == kInvalidProceduralRoadNodeId) continue;
             if (!junction_owner(upcoming->node_id).empty()) continue;
+            if (!upcoming->inside &&
+                !junction_signal_allows(upcoming->node_id, instances_[index].follower.pose().forward)) {
+                continue;
+            }
             requests.push_back({index, upcoming->node_id, upcoming->distance, upcoming->inside});
         }
 
@@ -322,6 +413,54 @@ private:
             if (!junction_owner(request.node_id).empty()) continue;
             junction_reservations_.push_back({request.node_id, instances_[request.instance_index].vehicle_id});
         }
+    }
+
+    void update_signals(const float tick_seconds) {
+        for (ProceduralRoadSignalState& signal : signal_states_) {
+            signal.elapsed += tick_seconds;
+            int guard = 0;
+            while (guard++ < 128) {
+                const float duration = signal_phase_duration(signal);
+                if (signal.elapsed + 0.000001F < duration) break;
+                signal.elapsed -= duration;
+                signal.phase = next_signal_phase(signal.phase);
+            }
+        }
+    }
+
+    [[nodiscard]] static ProceduralRoadSignalPhase next_signal_phase(
+        const ProceduralRoadSignalPhase phase) {
+        switch (phase) {
+            case ProceduralRoadSignalPhase::east_west_green:
+                return ProceduralRoadSignalPhase::all_red_to_north_south;
+            case ProceduralRoadSignalPhase::all_red_to_north_south:
+                return ProceduralRoadSignalPhase::north_south_green;
+            case ProceduralRoadSignalPhase::north_south_green:
+                return ProceduralRoadSignalPhase::all_red_to_east_west;
+            case ProceduralRoadSignalPhase::all_red_to_east_west:
+                return ProceduralRoadSignalPhase::east_west_green;
+        }
+        return ProceduralRoadSignalPhase::east_west_green;
+    }
+
+    [[nodiscard]] static float signal_phase_duration(const ProceduralRoadSignalState& signal) {
+        const bool green = signal.phase == ProceduralRoadSignalPhase::east_west_green ||
+                           signal.phase == ProceduralRoadSignalPhase::north_south_green;
+        return std::max(0.01F, green ? signal.timing.green_duration : signal.timing.clearance_duration);
+    }
+
+    [[nodiscard]] ProceduralRoadSignalState* signal_state(const ProceduralRoadNodeId node_id) {
+        const auto found = std::find_if(signal_states_.begin(), signal_states_.end(), [&](const auto& signal) {
+            return signal.node_id == node_id;
+        });
+        return found == signal_states_.end() ? nullptr : &*found;
+    }
+
+    [[nodiscard]] const ProceduralRoadSignalState* signal_state(const ProceduralRoadNodeId node_id) const {
+        const auto found = std::find_if(signal_states_.begin(), signal_states_.end(), [&](const auto& signal) {
+            return signal.node_id == node_id;
+        });
+        return found == signal_states_.end() ? nullptr : &*found;
     }
 
     [[nodiscard]] float junction_stop_speed_cap(
@@ -339,4 +478,5 @@ private:
     ProceduralRoadTrafficFollowingConfig following_{};
     ProceduralRoadJunctionReservationConfig junctions_{};
     std::vector<ProceduralRoadJunctionReservation> junction_reservations_;
+    std::vector<ProceduralRoadSignalState> signal_states_;
 };
