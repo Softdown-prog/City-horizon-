@@ -5,10 +5,13 @@
 #include <algorithm>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 namespace ch::editor {
 
-EditorDocument::EditorDocument() = default;
+EditorDocument::EditorDocument() {
+    resetFenceManager(false);
+}
 
 std::uint64_t EditorDocument::key(const int x, const int y) {
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32U)
@@ -64,6 +67,61 @@ void EditorDocument::setRoad(const int x, const int y, const bool road) {
     setTile(x, y, state);
 }
 
+void EditorDocument::resetFenceManager(const bool preserve) {
+    std::vector<FenceNode> old_nodes;
+    std::vector<FenceSegment> old_segments;
+    if (preserve && fences_) {
+        old_nodes = fences_->nodes();
+        old_segments = fences_->segments();
+    }
+
+    // FenceManager currently accepts one inclusive coordinate interval for both
+    // axes. EditorDocument keeps the stricter rectangular bounds at its API.
+    const int fence_min = std::min(min_x_, min_y_);
+    const int fence_max = std::max(max_x_, max_y_);
+    fences_ = std::make_unique<FenceManager>(fence_min, fence_max);
+
+    if (!preserve) return;
+    for (const FenceNode& node : old_nodes) {
+        if (!inBounds(node.vertex_x, node.vertex_y)) continue;
+        if (fences_->place_node(node.vertex_x, node.vertex_y, node.orientation_hint)
+            && node.kind == FenceNodeKind::gate) {
+            (void)fences_->set_gate(node.vertex_x, node.vertex_y, true);
+        }
+    }
+    for (const FenceSegment& segment : old_segments) {
+        if (!segment.open_gate) continue;
+        if (!inBounds(segment.from.x, segment.from.y) || !inBounds(segment.to.x, segment.to.y)) continue;
+        (void)fences_->set_open_gate(segment.from, segment.to, true);
+    }
+}
+
+bool EditorDocument::placeFenceDrag(const FenceVertex start, const FenceVertex end) {
+    if (!inBounds(start.x, start.y) || !inBounds(end.x, end.y)) return false;
+    const std::vector<FenceVertex> path = fences_->line_between(start, end);
+    if (path.empty() || std::any_of(path.begin(), path.end(), [this](const FenceVertex vertex) {
+            return !inBounds(vertex.x, vertex.y);
+        })) {
+        return false;
+    }
+    const int placed = fences_->place_run(path);
+    if (placed <= 0) return false;
+    ++revision_;
+    return true;
+}
+
+bool EditorDocument::removeFenceNode(const int vertexX, const int vertexY) {
+    if (!inBounds(vertexX, vertexY) || !fences_->remove_node(vertexX, vertexY)) return false;
+    ++revision_;
+    return true;
+}
+
+void EditorDocument::clearFences() {
+    if (fences_->nodes().empty()) return;
+    fences_->clear();
+    ++revision_;
+}
+
 void EditorDocument::newEmpty(const int width, const int height) {
     width_ = std::max(1, width);
     height_ = std::max(1, height);
@@ -73,6 +131,7 @@ void EditorDocument::newEmpty(const int width, const int height) {
     max_y_ = height_ - 1;
     source_path_.clear();
     tiles_.clear();
+    resetFenceManager(false);
     ++revision_;
 }
 
@@ -100,6 +159,7 @@ bool EditorDocument::resize(const int width, const int height) {
     height_ = new_height;
     max_x_ = new_max_x;
     max_y_ = new_max_y;
+    resetFenceManager(true);
     ++revision_;
     return true;
 }
@@ -165,6 +225,7 @@ bool EditorDocument::loadScenario(const std::string& path, std::string* error) {
     width_ = std::max(1, max_x_ - min_x_ + 1);
     height_ = std::max(1, max_y_ - min_y_ + 1);
     source_path_ = path;
+    resetFenceManager(false);
     ++revision_;
     return true;
 }
