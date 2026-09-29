@@ -42,6 +42,110 @@ def _add_cross_gable(root, mats, r, front):
         edge.rotation_euler[1] = (-0.64 if dx < 0 else 0.64)
 
 
+def _add_fine_architectural_details(root, mats, r, front, garage_front, garage_w, gx, z0):
+    """Third-pass game-readable detail without changing the approved house massing."""
+    win = r["windows"]
+
+    # Main front window: stronger cream surround, sill, lintel and simple mullions.
+    if win["frontCentersX"]:
+        wx = float(win["frontCentersX"][0])
+        ww = float(win["frontWidth"])
+        wh = float(win["frontHeight"])
+        wz = float(win["frontCenterZ"])
+        y = front - 0.385
+        base.box("FrontWindowLintelV3", (wx, y, wz + wh / 2.0 + 0.09),
+                 (ww + 0.28, 0.075, 0.13), mats["trim"], root, 0.01)
+        base.box("FrontWindowSillV3", (wx, y - 0.01, wz - wh / 2.0 - 0.075),
+                 (ww + 0.34, 0.11, 0.12), mats["trim"], root, 0.012)
+        for mx in (-ww * 0.18, ww * 0.18):
+            base.box(f"FrontWindowMullionV3_{mx:+.2f}", (wx + mx, y - 0.03, wz),
+                     (0.045, 0.028, wh - 0.08), mats["trim"], root, 0.003)
+        base.box("FrontWindowMullionHV3", (wx, y - 0.032, wz + 0.10),
+                 (ww - 0.10, 0.028, 0.045), mats["trim"], root, 0.003)
+
+    # East wall window gains a proper frame/sill read at the isometric camera.
+    sy = float(win["sideCenterY"])
+    sw = float(win["sideWidth"])
+    sh = float(win["sideHeight"])
+    sz = float(win["sideCenterZ"])
+    side_x = float(r["mass"]["bodyWidth"]) / 2.0 + 0.09
+    base.box("EastWindowSillV3", (side_x + 0.035, sy, sz - sh / 2.0 - 0.07),
+             (0.10, sw + 0.26, 0.11), mats["trim"], root, 0.01)
+    base.box("EastWindowMullionV3", (side_x + 0.045, sy, sz),
+             (0.04, 0.045, sh - 0.08), mats["trim"], root, 0.003)
+    base.box("EastWindowMullionHV3", (side_x + 0.047, sy, sz + 0.08),
+             (0.04, sw - 0.10, 0.045), mats["trim"], root, 0.003)
+
+    # Porch columns get base/cap blocks so they stop reading as simple extruded sticks.
+    entry = r["entry"]
+    ex = float(entry["centerX"])
+    spacing = float(entry["columnSpacing"])
+    for side, cx in (("L", ex - spacing / 2.0), ("R", ex + spacing / 2.0)):
+        base.box(f"PorchColumnBaseV3{side}", (cx, front - 0.76, 0.49),
+                 (0.38, 0.38, 0.34), mats["foundation"], root, 0.018)
+        base.box(f"PorchColumnCapV3{side}", (cx, front - 0.76, 2.06),
+                 (0.34, 0.34, 0.15), mats["trim"], root, 0.01)
+
+    # Front door gains recessed panels and a warm glazed top section.
+    dy = front - 0.43
+    dz = z0 + float(entry["doorHeight"]) / 2.0
+    for idx, pz in enumerate((dz - 0.44, dz + 0.05)):
+        base.box(f"DoorPanelV3_{idx}", (ex, dy - 0.035, pz),
+                 (0.58, 0.032, 0.34), mats["frame"], root, 0.006)
+    base.box("DoorTopGlassV3", (ex, dy - 0.04, dz + 0.50),
+             (0.58, 0.03, 0.30), mats["glass"], root, 0.006)
+    for mx in (-0.19, 0.0, 0.19):
+        base.box(f"DoorTopMullionV3_{mx:+.2f}", (ex + mx, dy - 0.06, dz + 0.50),
+                 (0.025, 0.018, 0.27), mats["trim"], root, 0.002)
+    base.sphere("DoorHandleV3", (ex + 0.30, dy - 0.075, dz - 0.03), 0.045,
+                mats["trim"], root, (1.0, 0.65, 0.75), 10, 6)
+
+    # Garage: finer recessed panel grid, bottom rail and a small handle.
+    door_w = float(r["garage"]["doorWidth"])
+    door_h = float(r["garage"]["doorHeight"])
+    door_y = garage_front - 0.225
+    for row in range(3):
+        pz = z0 + 0.34 + row * 0.43
+        for col in (-0.52, 0.0, 0.52):
+            base.box(f"GarageInsetV3_{row}_{col:+.2f}", (gx + col, door_y, pz),
+                     (0.46, 0.022, 0.26), mats["frame"], root, 0.004)
+    base.box("GarageBottomRailV3", (gx, door_y - 0.01, z0 + 0.11),
+             (door_w - 0.10, 0.026, 0.08), mats["frame"], root, 0.004)
+    base.sphere("GarageHandleV3", (gx, door_y - 0.035, z0 + 0.58), 0.04,
+                mats["trim"], root, (1.0, 0.55, 0.75), 10, 6)
+
+    # Stonework gains horizontal course joints and a few vertical breaks.
+    stone_y = front - 0.176
+    for row_z in (0.31, 0.47, 0.63):
+        base.box(f"FrontStoneCourseV3_{row_z:.2f}", (-2.16, stone_y, row_z),
+                 (2.35, 0.022, 0.022), mats["frame"], root, 0.002)
+    for sx in (-2.82, -2.28, -1.74, -1.20):
+        base.box(f"FrontStoneJointV3_{sx:+.2f}", (sx, stone_y - 0.006, 0.46),
+                 (0.022, 0.018, 0.40), mats["frame"], root, 0.002)
+    for px in (gx - 1.02, gx + 1.02):
+        for row_z in (0.29, 0.45, 0.61):
+            base.box(f"GaragePierCourseV3_{px:+.2f}_{row_z:.2f}",
+                     (px, garage_front - 0.225, row_z),
+                     (0.30, 0.022, 0.022), mats["frame"], root, 0.002)
+
+    # Roof/chimney finishing that survives at 256px: chimney banding and cap shadow.
+    ch = r["chimney"]
+    cx = float(ch["x"])
+    cy = float(ch["y"])
+    for z in (3.30, 3.55, 3.80, 4.05):
+        base.box(f"ChimneyCourseV3_{z:.2f}", (cx, cy - 0.285, z),
+                 (float(ch["width"]) + 0.04, 0.035, 0.035), mats["foundation"], root, 0.004)
+    base.box("ChimneyTopBandV3", (cx, cy, 4.36),
+             (0.67, 0.67, 0.12), mats["trim"], root, 0.01)
+
+    # Small private planting accents near the porch/garage. No public vegetation.
+    for idx, (px, py, scale) in enumerate(((-1.15, front - 0.72, 0.16),
+                                            (0.45, front - 0.66, 0.15),
+                                            (gx + garage_w / 2.0 + 0.18, garage_front + 0.45, 0.14))):
+        base.sphere(f"DetailShrubV3_{idx}", (px, py, 0.24), scale,
+                    mats["greenLight"], root, (1.25, 0.88, 0.95), 12, 7)
+
+
 def _add_garage_and_reference_details(root, mats, r):
     """Add a readable protruding garage and starter-home facade details."""
     g = r["garage"]
@@ -136,6 +240,8 @@ def _add_garage_and_reference_details(root, mats, r):
                  (0.14, 0.05, 0.28), mats["frame"], root, 0.012)
         base.sphere(f"SconceGlow{idx}", (lx, ly - 0.045, 1.55), 0.085,
                     mats["glass"], root, (0.8, 0.45, 1.15), 12, 6)
+
+    _add_fine_architectural_details(root, mats, r, front, garage_front, garage_w, gx, z0)
 
 
 def build_house(root, mats, r):
