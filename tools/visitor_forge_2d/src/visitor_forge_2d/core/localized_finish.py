@@ -1,8 +1,10 @@
 """Localized deterministic finish passes for Visitor Forge 2D.
 
 These passes sit between structural rendering and the final gameplay critic.
-They let recipes paint wear, scratches and grain accents inside authored masks
-instead of applying the same global texture to the entire asset.
+They let recipes paint material-specific wear and construction detail inside
+authored masks instead of applying one global texture to the entire asset.
+The vocabulary is intentionally generic enough for boats, piers, signs, street
+props and decorations while staying deterministic and bounded.
 """
 from __future__ import annotations
 
@@ -14,7 +16,16 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from . import scene_composer_v3, smooth_geometry
 
-_ALLOWED_STYLES = {"wood_wear", "edge_wear", "scratches"}
+_ALLOWED_STYLES = {
+    "wood_wear",
+    "edge_wear",
+    "scratches",
+    "plank_seams",
+    "paint_chips",
+    "rust_bloom",
+    "grime",
+    "rope_fibers",
+}
 _MAX_REGIONS = 32
 _MAX_STAMPS = 120
 
@@ -116,6 +127,85 @@ def _edge_wear(size, mask, rng, stamps: int, opacity: float) -> Image.Image:
     return layer
 
 
+def _plank_seams(size, mask, rng, stamps: int, opacity: float, angle_deg: float) -> Image.Image:
+    """Long paired construction seams for planked wood and pier decking."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    angle = math.radians(angle_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    nx, ny = -s, c
+    diag = math.hypot(*size)
+    spread = max(size)
+    count = max(1, stamps)
+    offsets = [(-0.5 + (i + 0.5) / count) * spread for i in range(count)]
+    for off in offsets:
+        jitter = rng.uniform(-2.0, 2.0)
+        cx = size[0] / 2 + nx * (off + jitter)
+        cy = size[1] / 2 + ny * (off + jitter)
+        alpha_dark = round(255 * opacity * rng.uniform(0.45, 0.9))
+        alpha_light = round(255 * opacity * rng.uniform(0.18, 0.5))
+        _oriented_line(d, cx, cy, angle, diag, 1, (46, 26, 18, alpha_dark))
+        _oriented_line(d, cx + nx, cy + ny, angle, diag, 1, (239, 190, 133, alpha_light))
+    layer = layer.filter(ImageFilter.GaussianBlur(0.2))
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    return layer
+
+
+def _paint_chips(size, mask, rng, stamps: int, opacity: float) -> Image.Image:
+    """Small irregular chips revealing dark undercoat and a pale rim."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    for _ in range(stamps):
+        x = rng.randrange(size[0]); y = rng.randrange(size[1])
+        rx = rng.randint(1, 4); ry = rng.randint(1, 3)
+        a = round(255 * opacity * rng.uniform(0.45, 1.0))
+        d.ellipse((x-rx, y-ry, x+rx, y+ry), fill=(47, 42, 37, a))
+        if rng.random() > 0.35:
+            d.arc((x-rx-1, y-ry-1, x+rx+1, y+ry+1), 190, 330,
+                  fill=(239, 221, 188, max(1, a // 2)), width=1)
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    return layer
+
+
+def _rust_bloom(size, mask, rng, stamps: int, opacity: float) -> Image.Image:
+    """Soft orange/brown oxidation blooms for metal props and hardware."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    for _ in range(stamps):
+        x = rng.randrange(size[0]); y = rng.randrange(size[1])
+        r = rng.randint(2, 8)
+        a = round(255 * opacity * rng.uniform(0.25, 0.75))
+        color = rng.choice(((150, 65, 25, a), (180, 86, 32, a), (92, 49, 30, a)))
+        d.ellipse((x-r, y-r, x+r, y+r), fill=color)
+    layer = layer.filter(ImageFilter.GaussianBlur(1.6))
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    return layer
+
+
+def _grime(size, mask, rng, stamps: int, opacity: float) -> Image.Image:
+    """Low-frequency dirt/moss-like staining for piers and outdoor props."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    for _ in range(stamps):
+        x = rng.randrange(size[0]); y = rng.randrange(size[1])
+        rx = rng.randint(3, 10); ry = rng.randint(2, 6)
+        a = round(255 * opacity * rng.uniform(0.18, 0.65))
+        color = rng.choice(((48, 54, 34, a), (72, 61, 39, a), (40, 37, 31, a)))
+        d.ellipse((x-rx, y-ry, x+rx, y+ry), fill=color)
+    layer = layer.filter(ImageFilter.GaussianBlur(2.0))
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    return layer
+
+
+def _rope_fibers(size, mask, rng, stamps: int, opacity: float, angle_deg: float) -> Image.Image:
+    """Short alternating fiber marks that read as twisted rope at game scale."""
+    layer = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    base = math.radians(angle_deg)
+    for _ in range(stamps):
+        x = rng.randrange(size[0]); y = rng.randrange(size[1])
+        angle = base + rng.choice((-0.55, 0.55))
+        a = round(255 * opacity * rng.uniform(0.35, 0.9))
+        _oriented_line(d, x, y, angle, rng.uniform(1.5, 4.0), 1, (244, 220, 166, a))
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    return layer
+
+
 def apply_regions(frame: Image.Image, regions: object, seed: int) -> Image.Image:
     validate_regions(regions)
     if not regions:
@@ -132,7 +222,17 @@ def apply_regions(frame: Image.Image, regions: object, seed: int) -> Image.Image
             layer = _wood_wear(image.size, mask, rng, stamps, opacity, angle)
         elif style == "scratches":
             layer = _scratches(image.size, mask, rng, stamps, opacity, angle)
-        else:
+        elif style == "edge_wear":
             layer = _edge_wear(image.size, mask, rng, stamps, opacity)
+        elif style == "plank_seams":
+            layer = _plank_seams(image.size, mask, rng, stamps, opacity, angle)
+        elif style == "paint_chips":
+            layer = _paint_chips(image.size, mask, rng, stamps, opacity)
+        elif style == "rust_bloom":
+            layer = _rust_bloom(image.size, mask, rng, stamps, opacity)
+        elif style == "grime":
+            layer = _grime(image.size, mask, rng, stamps, opacity)
+        else:
+            layer = _rope_fibers(image.size, mask, rng, stamps, opacity, angle)
         image = Image.alpha_composite(image, layer)
     return image
