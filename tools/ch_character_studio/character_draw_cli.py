@@ -9,7 +9,7 @@ import random
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRAME = (48, 64)
@@ -65,6 +65,35 @@ def draw_op(draw: ImageDraw.ImageDraw, op: dict, mask_mode: bool = False, scale:
         raise ValueError(f"unsupported primitive: {kind}")
 
 
+def downsample_premultiplied(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Resize RGBA without straight-alpha color fringes around transparent edges."""
+    rgba = image.convert("RGBA")
+    r, g, b, a = rgba.split()
+    premultiplied = Image.merge("RGBA", (
+        ImageChops.multiply(r, a),
+        ImageChops.multiply(g, a),
+        ImageChops.multiply(b, a),
+        a,
+    )).resize(size, Image.Resampling.LANCZOS)
+
+    pr, pg, pb, pa = premultiplied.split()
+    pr_data = list(pr.getdata())
+    pg_data = list(pg.getdata())
+    pb_data = list(pb.getdata())
+    a_data = list(pa.getdata())
+    out = bytearray(len(a_data) * 4)
+    for i, alpha in enumerate(a_data):
+        p = i * 4
+        if alpha <= 0:
+            out[p:p+4] = bytes((0, 0, 0, 0))
+            continue
+        out[p] = min(255, round(pr_data[i] * 255 / alpha))
+        out[p+1] = min(255, round(pg_data[i] * 255 / alpha))
+        out[p+2] = min(255, round(pb_data[i] * 255 / alpha))
+        out[p+3] = alpha
+    return Image.frombytes("RGBA", size, bytes(out))
+
+
 def validate_recipe(recipe: dict) -> None:
     if recipe.get("contract") != CONTRACT:
         raise ValueError(f"contract must be {CONTRACT}")
@@ -99,8 +128,6 @@ def render(recipe: dict, seed: int) -> Image.Image:
     draw = ImageDraw.Draw(image)
     for raw in recipe["operations"]:
         op = dict(raw)
-        # Optional deterministic jitter is deliberately tiny and opt-in. It is
-        # useful for painted texture tests without making normal recipes noisy.
         jitter = int(op.pop("jitterPx", 0) or 0)
         if jitter:
             dx, dy = rng.randint(-jitter, jitter), rng.randint(-jitter, jitter)
@@ -113,7 +140,7 @@ def render(recipe: dict, seed: int) -> Image.Image:
                 op["points"] = [[int(x) + dx, int(y) + dy] for x, y in op["points"]]
         draw_op(draw, op, mask_mode=mask_mode, scale=supersample)
     if supersample > 1:
-        image = image.resize(FRAME, Image.Resampling.LANCZOS)
+        image = downsample_premultiplied(image, FRAME)
     return image
 
 
@@ -138,6 +165,7 @@ def main() -> int:
             "target": recipe["target"],
             "frameSize": list(FRAME),
             "supersample": int(recipe.get("supersample", 1)),
+            "alphaDownsample": "premultiplied_lanczos" if int(recipe.get("supersample", 1)) > 1 else "none",
             "output": str(out_path),
             "sha256": digest
         }
