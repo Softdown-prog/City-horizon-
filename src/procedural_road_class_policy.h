@@ -24,17 +24,17 @@ public:
         int north_south_rank = -1;
         for (const ProceduralRoadSegmentId segment_id : graph.connected_segments(node_id)) {
             const ProceduralRoadGraphSegment* segment = graph.segment(segment_id);
-            const auto spline = graph.spline_for(segment_id);
-            if (segment == nullptr || !spline) continue;
+            if (segment == nullptr) continue;
 
+            // Handles are stored relative to each endpoint. At the start node the
+            // start handle points outward along the road. At the end node the end
+            // handle points from the node back into the road, which is also the
+            // desired outward-from-junction direction for axis classification.
             RoadWorldPoint3 outward{};
             if (segment->start_node == node_id) {
-                outward = RoadMeshBuilder::tangent_cubic(*spline, 0.0F);
+                outward = segment->start_handle;
             } else if (segment->end_node == node_id) {
-                outward = RoadMeshBuilder::tangent_cubic(*spline, 1.0F);
-                outward.x = -outward.x;
-                outward.y = -outward.y;
-                outward.z = -outward.z;
+                outward = segment->end_handle;
             } else {
                 continue;
             }
