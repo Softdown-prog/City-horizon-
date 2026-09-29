@@ -60,6 +60,13 @@
       "path": "assets/ui/icons/service",
       "role": "procedural_service_and_shop_icons",
       "manifest": "assets/ui/icons/service/service_icons_v1.json"
+    },
+    "panel_build_catalog_nine_slice": {
+      "path": "assets/ui/chrome/panel_build_catalog_9slice_v1.png",
+      "role": "construction_catalog_nine_slice_pilot",
+      "insets": [10, 10, 10, 10],
+      "source_size": [64, 64],
+      "status": "pilot"
     }
   }
 }
