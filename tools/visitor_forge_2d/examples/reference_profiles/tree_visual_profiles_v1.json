@@ -1,0 +1,87 @@
+{
+  "contract": "CH_2D_TREE_VISUAL_REFERENCE_V1",
+  "profiles": {
+    "dense_round_broadleaf": {
+      "useFor": ["oiti", "dense_urban_broadleaf"],
+      "silhouette": {
+        "shape": "broad_rounded_umbrella",
+        "widthToHeight": 1.15,
+        "negativeSpace": "low_to_medium",
+        "edgeRhythm": "many_small_overlapping_clusters"
+      },
+      "branching": {
+        "visibleWood": 0.28,
+        "primaryForks": 3,
+        "secondaryForks": 7,
+        "branchArc": "outward_upward"
+      },
+      "foliage": {
+        "macroMasses": 9,
+        "midClustersPerMass": [4, 8],
+        "microLeafBrush": "leaf_cluster_broadleaf",
+        "highlightPattern": "top_front_clustered"
+      },
+      "paletteIntent": {
+        "interior": "deep_cool_green",
+        "mid": "natural_leaf_green",
+        "highlight": "yellow_green_warm",
+        "wood": "warm_golden_brown"
+      }
+    },
+    "drooping_lanceolate_tropical": {
+      "useFor": ["mango_like", "tropical_long_leaf"],
+      "silhouette": {
+        "shape": "rounded_layered_droop",
+        "widthToHeight": 1.08,
+        "negativeSpace": "low",
+        "edgeRhythm": "rosette_droop"
+      },
+      "branching": {
+        "visibleWood": 0.22,
+        "primaryForks": 3,
+        "secondaryForks": 6,
+        "branchArc": "outward_supporting_rosettes"
+      },
+      "foliage": {
+        "macroMasses": 11,
+        "midClustersPerMass": [3, 6],
+        "microLeafBrush": "leaf_cluster_lanceolate",
+        "secondaryBrush": "leaf_rosette_droop",
+        "highlightPattern": "upper_left_leaf_ridges"
+      },
+      "paletteIntent": {
+        "interior": "blue_green_deep",
+        "mid": "saturated_green",
+        "highlight": "lime_yellow_green",
+        "wood": "medium_warm_brown"
+      }
+    },
+    "red_mapple_open_branching": {
+      "useFor": ["red_mapple", "scarlet_autumn_ornamental"],
+      "silhouette": {
+        "shape": "upright_rounded_open",
+        "widthToHeight": 0.88,
+        "negativeSpace": "medium",
+        "edgeRhythm": "small_defined_maple_clusters"
+      },
+      "branching": {
+        "visibleWood": 0.36,
+        "primaryForks": 3,
+        "secondaryForks": 9,
+        "branchArc": "upright_fan"
+      },
+      "foliage": {
+        "macroMasses": 10,
+        "midClustersPerMass": [4, 7],
+        "microLeafBrush": "leaf_cluster_maple",
+        "highlightPattern": "scarlet_orange_front_top"
+      },
+      "paletteIntent": {
+        "interior": "wine_crimson",
+        "mid": "scarlet_red",
+        "highlight": "orange_red",
+        "wood": "gray_warm_brown"
+      }
+    }
+  }
+}
