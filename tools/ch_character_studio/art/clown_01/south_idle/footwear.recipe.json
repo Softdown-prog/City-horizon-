@@ -1,0 +1,15 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"footwear"},
+  "operations":[
+    {"type":"ellipse","box":[15,52,24,58],"color":"#26313a"},
+    {"type":"ellipse","box":[24,52,33,58],"color":"#26313a"},
+    {"type":"rect","box":[17,53,22,55],"color":"#394650"},
+    {"type":"rect","box":[26,53,31,55],"color":"#394650"},
+    {"type":"pixel","x":17,"y":53,"color":"#5a6974"},
+    {"type":"pixel","x":30,"y":53,"color":"#5a6974"},
+    {"type":"line","points":[[16,57],[23,57]],"color":"#141a1f","width":1},
+    {"type":"line","points":[[25,57],[32,57]],"color":"#141a1f","width":1}
+  ]
+}
