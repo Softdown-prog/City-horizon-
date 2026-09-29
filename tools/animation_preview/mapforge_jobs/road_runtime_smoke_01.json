@@ -1,0 +1,70 @@
+{
+  "contract": "CH_VIDEO_SCENARIO_V1",
+  "id": "mapforge.road.runtime_smoke_01",
+  "reviewOnly": true,
+  "fps": 15,
+  "durationSeconds": 5,
+  "mapforgeCandidateFile": "assets/roads/premium_01/road_10.png",
+  "mapforgeBaseRequestFile": "C++/MapForge2/examples/map_capture/capture_request.json",
+  "baseRequestFile": "C++/MapForge2/examples/map_capture/capture_request.json",
+  "renderer": {
+    "cwd": ".",
+    "command": ["placeholder"]
+  },
+  "events": [
+    {
+      "time": 0,
+      "set": {
+        "capture.candidate.showFootprint": false,
+        "capture.candidate.showAnchor": true,
+        "capture.stage.drawGrid": true
+      }
+    },
+    {
+      "time": 4.0,
+      "set": {
+        "capture.candidate.showAnchor": false
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "path": "capture.candidate.tile",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": [-2.0, 0.0]},
+        {"time": 2.5, "value": [0.0, 0.0]},
+        {"time": 5.0, "value": [2.0, 0.0]}
+      ]
+    },
+    {
+      "path": "capture.camera.focusTile",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": [-1.0, 0.0]},
+        {"time": 2.5, "value": [0.0, 0.0]},
+        {"time": 5.0, "value": [1.0, 0.0]}
+      ]
+    },
+    {
+      "path": "capture.camera.zoom",
+      "interpolation": "smoothstep",
+      "keyframes": [
+        {"time": 0.0, "value": 0.82},
+        {"time": 2.5, "value": 1.08},
+        {"time": 5.0, "value": 0.90}
+      ]
+    }
+  ],
+  "gif": {
+    "enabled": true,
+    "durationMs": 67,
+    "output": "road_runtime_smoke_01.gif",
+    "contactSheet": "road_runtime_smoke_01_contact_sheet.png"
+  },
+  "video": {
+    "enabled": true,
+    "fps": 15,
+    "output": "road_runtime_smoke_01.mp4"
+  }
+}
