@@ -4,17 +4,19 @@
 
 The reusable runtime infrastructure is available in `src/ui_nine_slice.h`.
 
-The first visual pilot is now wired to the construction catalog:
+The construction-catalog pilot now uses the V2 reference-derived skin:
 
-- skin: `assets/ui/chrome/panel_build_catalog_9slice_v1.png`;
-- source size: 64x64;
-- insets: 10 / 10 / 10 / 10 pixels;
+- skin: `assets/ui/chrome/panel_build_catalog_9slice_v2.png`;
+- source size: 192x192;
+- insets: 32 / 32 / 32 / 32 pixels;
+- center patch: transparent, so runtime content and the procedural fallback remain visible;
+- filtering: nearest-neighbor for this skin to avoid an extra blur pass;
 - runtime hook: `src/ui_build_panel_nine_slice.inl`;
 - registry entry: `panel_build_catalog_nine_slice` in `assets/ui/ui_asset_catalog.json`.
 
-The pilot deliberately keeps the existing procedural SDL panel underneath it. The authored PNG has a transparent center, so if the skin fails to load the old panel remains usable, and while the pilot is under review only the frame/chrome is replaced.
+V1 remains in the repository as the original minimal pilot and rollback point. V2 preserves the heavier frame, bevels and four decorated corners from the supplied visual reference while keeping the center free for catalog content.
 
-This is still an incremental migration. The construction-catalog skin is integrated but is not yet promoted as the universal UI frame until an in-game/runtime capture is reviewed at gameplay scale.
+This remains an incremental migration. The construction-catalog skin is integrated but is not yet promoted as the universal UI frame until an in-game/runtime capture is reviewed at gameplay scale.
 
 ## Why nine-slice
 
@@ -54,4 +56,4 @@ Use nine-slice for resizable panels and dialogs. Fixed-height controls that only
 
 `src/ui_manager_test.cpp` verifies normal nine-slice geometry and compact destinations where borders must compress and the center collapses.
 
-Geometry tests do not approve artwork. The first construction-catalog skin still requires an actual runtime/gameplay-scale capture before its visual status changes from `pilot` to `approved`.
+Geometry tests do not approve artwork. The V2 construction-catalog skin still requires an actual runtime/gameplay-scale capture before its visual status changes from `pilot_v2` to `approved`.

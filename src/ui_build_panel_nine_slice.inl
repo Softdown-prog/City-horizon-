@@ -1,24 +1,26 @@
-// First visual nine-slice pilot: only the construction catalog frame.
-// This file is included inside GameplayUi::render after the legacy UI has
-// rendered, so the existing procedural panel remains the fallback whenever the
-// authored PNG is unavailable or invalid.
+// Construction-catalog nine-slice pilot V2, derived from the approved visual
+// reference. The procedural SDL panel remains underneath as a safe fallback.
 if (renderer != nullptr && model_.overlay == UiOverlay::none &&
     model_.build_panel_open && build_panel_bounds_) {
     const UiRect& panel = *build_panel_bounds_;
     const auto* skin = thumbnail_for(
-        renderer, ui_chrome_path("panel_build_catalog_9slice_v1"));
+        renderer, ui_chrome_path("panel_build_catalog_9slice_v2"));
 
     constexpr ch::ui::NineSliceInsets kInsets = {
-        10.0F,
-        10.0F,
-        10.0F,
-        10.0F,
+        32.0F,
+        32.0F,
+        32.0F,
+        32.0F,
     };
     constexpr float kMinimumSkinWidth = kInsets.left + kInsets.right;
     constexpr float kMinimumSkinHeight = kInsets.top + kInsets.bottom;
 
     if (skin != nullptr && skin->texture != nullptr &&
         skin->width >= kMinimumSkinWidth && skin->height >= kMinimumSkinHeight) {
+        // Preserve the supplied pixel-art character of the frame instead of
+        // adding another linear-filtering pass while the 9 slices are scaled.
+        SDL_SetTextureScaleMode(skin->texture, SDL_SCALEMODE_NEAREST);
+
         const SDL_FRect destination = {
             panel.x,
             panel.y,
