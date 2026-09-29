@@ -1,8 +1,8 @@
 """Guarded CH Blender prototype for a vertical roller-coaster loop.
 
 CH_COASTER_LOOP_V0 reuses the existing CH coaster rail/tie/support vocabulary,
-while defining a deterministic vertical-plane centerline with flat approach and
-exit connectors. Runtime remains pre-rendered 2D.
+while defining a deterministic teardrop vertical-plane centerline with smooth
+flat approach/exit connectors. Runtime remains pre-rendered 2D.
 """
 
 from __future__ import annotations
@@ -27,8 +27,9 @@ import build_coaster_track_guarded as base  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 PIECE = "vertical_loop"
-LOOP_RADIUS = base.TILE * 1.35
-APPROACH_LENGTH = base.TILE * 0.85
+LOOP_HALF_WIDTH = base.TILE * 1.25
+LOOP_HEIGHT = base.TILE * 3.0
+APPROACH_LENGTH = base.TILE * 1.15
 FOOTPRINT = {"widthTiles": 3, "depthTiles": 4}
 
 
@@ -44,24 +45,36 @@ def parse_args():
     return parser.parse_args(argv)
 
 
-def sample_centerline(approach_samples: int = 25, loop_samples: int = 129):
+def smoothstep(t: float) -> float:
+    return t * t * (3.0 - 2.0 * t)
+
+
+def sample_centerline(approach_samples: int = 33, loop_samples: int = 161):
     points = []
 
-    # Flat approach into the bottom of the loop.
+    # Flat approach aimed at the loop centreline.
     for i in range(approach_samples):
         t = i / (approach_samples - 1)
         y = -APPROACH_LENGTH + APPROACH_LENGTH * t
         points.append(Vector((0.0, y, base.RAIL_Z)))
 
-    # Vertical loop in the Y/Z plane. theta=0 starts at the bottom heading +Y.
+    # Teardrop loop in Y/Z. Wider near the base and tighter near the crown.
+    # theta=0 starts at the bottom heading +Y and returns with the same tangent.
     for i in range(1, loop_samples):
         t = i / (loop_samples - 1)
         theta = math.tau * t
-        y = LOOP_RADIUS * math.sin(theta)
-        z = base.RAIL_Z + LOOP_RADIUS * (1.0 - math.cos(theta))
+
+        # Narrow the horizontal radius toward the top to avoid a perfect circle.
+        crown = (1.0 - math.cos(theta)) * 0.5
+        width_scale = 1.0 - 0.34 * smoothstep(crown)
+        y = LOOP_HALF_WIDTH * width_scale * math.sin(theta)
+
+        # Smooth vertical profile; slightly taller than wide for a classic loop silhouette.
+        z_norm = (1.0 - math.cos(theta)) * 0.5
+        z = base.RAIL_Z + LOOP_HEIGHT * z_norm
         points.append(Vector((0.0, y, z)))
 
-    # Flat exit continues forward from the same bottom tangent.
+    # Flat exit continues forward from the bottom tangent.
     for i in range(1, approach_samples):
         t = i / (approach_samples - 1)
         y = APPROACH_LENGTH * t
@@ -72,8 +85,6 @@ def sample_centerline(approach_samples: int = 25, loop_samples: int = 129):
 
 def frame(points, index: int):
     tangent = base.tangent(points, index)
-    # The loop lives in Y/Z, so a fixed X lateral axis prevents frame flipping
-    # while tangent becomes vertical at the loop sides.
     right = Vector((1.0, 0.0, 0.0))
     up = right.cross(tangent).normalized()
     return tangent, right, up
@@ -90,6 +101,17 @@ def add_oriented_box(name, location, scale, material, role, right, forward, up):
     obj.data.materials.append(material)
     scene_gate.tag(obj, role)
     return obj
+
+
+def add_vertical_post(authored, name, x, y, top_z, material):
+    height = max(0.18, top_z)
+    authored.append(base.add_box(
+        name,
+        (x, y, height * 0.5),
+        (base.SUPPORT_HALF_WIDTH * 1.2, base.SUPPORT_HALF_WIDTH * 1.2, height * 0.5),
+        material,
+        "coaster.support.post",
+    ))
 
 
 def build_piece():
@@ -123,9 +145,8 @@ def build_piece():
             ties_mat, "coaster.tie", right, tangent, up,
         ))
 
-    # V0 support proof: approach/exit frames plus two tall side supports.
-    support_indices = sorted(set((0, len(centerline) - 1)))
-    for n, idx in enumerate(support_indices):
+    # Approach/exit support frames keep connectors grounded.
+    for n, idx in enumerate((0, len(centerline) - 1)):
         base.build_support_frame(
             authored,
             f"Support_Base_{n:03d}",
@@ -134,19 +155,13 @@ def build_piece():
             support_mat,
         )
 
-    side_points = [
-        Vector((-base.GAUGE * 0.72, 0.0, LOOP_RADIUS)),
-        Vector((base.GAUGE * 0.72, 0.0, LOOP_RADIUS)),
-    ]
-    for n, p in enumerate(side_points):
-        height = max(0.2, p.z)
-        authored.append(base.add_box(
-            f"LoopSideSupport_{n:02d}",
-            (p.x, p.y, height * 0.5),
-            (base.SUPPORT_HALF_WIDTH * 1.25, base.SUPPORT_HALF_WIDTH * 1.25, height * 0.5),
-            support_mat,
-            "coaster.support.post",
-        ))
+    # Side supports sit outside the train envelope and brace the lower loop quarters.
+    lower_z = base.RAIL_Z + LOOP_HEIGHT * 0.30
+    brace_y = LOOP_HALF_WIDTH * 0.72
+    post_x = base.GAUGE * 0.78
+    for side_sign, side_name in ((-1.0, "L"), (1.0, "R")):
+        add_vertical_post(authored, f"LoopBraceFront_{side_name}", side_sign * post_x, -brace_y, lower_z, support_mat)
+        add_vertical_post(authored, f"LoopBraceRear_{side_name}", side_sign * post_x, brace_y, lower_z, support_mat)
 
     return authored, centerline
 
@@ -157,11 +172,12 @@ def write_metadata(output: Path, centerline):
         "assetId": ASSET_ID,
         "piece": PIECE,
         "loopContract": "CH_COASTER_LOOP_V0",
+        "profile": "teardrop_v2",
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
-        "radius": LOOP_RADIUS,
+        "halfWidth": LOOP_HALF_WIDTH,
+        "height": LOOP_HEIGHT,
         "approachLength": APPROACH_LENGTH,
-        "height": LOOP_RADIUS * 2.0,
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
         "exit": base.payload_endpoint(centerline, -1),
