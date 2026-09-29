@@ -119,21 +119,46 @@
     "contractPath": "tools/ch_character_studio/contracts/ch_character_photoshop_tools_v0.json",
     "implementation": "tools/ch_character_studio/photoshop_tools.js",
     "studioApi": "CH_CHARACTER_STUDIO_API_V0",
-    "stage1": [
-      "rectangular_selection",
-      "lasso_selection",
-      "move_selection",
-      "free_transform_selection",
-      "eyedropper",
-      "paint_bucket",
-      "fill_selection",
-      "delete_selection",
-      "undo_redo",
-      "layer_opacity",
-      "layer_blend_mode"
-    ],
-    "stage2": ["layer_groups", "layer_masks", "clipping_masks", "non_destructive_transform_state", "duplicate_merge_flatten_layers"],
-    "stage3": ["brush_presets", "brush_spacing", "brush_opacity_flow", "symmetry", "gradient", "curves_levels_hue_saturation"],
+    "stage1": {
+      "status": "implemented",
+      "features": [
+        "rectangular_selection",
+        "lasso_selection",
+        "move_selection",
+        "free_transform_selection",
+        "eyedropper",
+        "paint_bucket",
+        "fill_selection",
+        "delete_selection",
+        "undo_redo",
+        "layer_opacity",
+        "layer_blend_mode"
+      ]
+    },
+    "stage2": {
+      "status": "implemented",
+      "contract": "CH_CHARACTER_LAYER_STACK_V0",
+      "contractPath": "tools/ch_character_studio/contracts/ch_character_layer_stack_v0.json",
+      "implementation": "tools/ch_character_studio/photoshop_layers_v2.js",
+      "compatibilityBridge": "tools/ch_character_studio/photoshop_layers_v2_bridge.js",
+      "features": [
+        "layer_groups_with_visibility_and_opacity",
+        "layer_masks_with_alpha_visibility",
+        "clipping_masks",
+        "non_destructive_transform_state",
+        "duplicate_layers",
+        "safe_merge_preserving_sources",
+        "safe_flatten_preserving_sources",
+        "per_frame_stack_state",
+        "stack_undo_redo",
+        "advanced_composite_export",
+        "layer_mask_png_export"
+      ]
+    },
+    "stage3": {
+      "status": "planned",
+      "features": ["brush_presets", "brush_spacing", "brush_opacity_flow", "symmetry", "gradient", "curves_levels_hue_saturation"]
+    },
     "historyLimitPerFrame": 50,
     "selectionTransformScope": "active_art_layer_pixels_only",
     "imageSmoothing": false,
