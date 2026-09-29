@@ -25,7 +25,7 @@ O `CH_2D_ART_BRIEF_V1` aceita `id` seguro e `subject`. Campos específicos:
 
 | Família | Receita de referência | Controles do autor |
 | --- | --- | --- |
-| `broadleaf` | outonal, oiti e angico sob `examples/` | `style`: `rounded`/`umbrella`/`open_branching`; `palette`: `spring_lime`/`summer_deep`/`dry_olive`/`autumn_amber`; `season`: `early_autumn`/`summer`; `silhouette`: `rounded`/`wide`/`tall`; `density`: `sparse`/`balanced`/`dense`; `seed` |
+| `broadleaf` | outonal, oiti e angico sob `examples/` | `species`: `oiti`/`angico`; `style`: `rounded`/`umbrella`/`open_branching`; `palette`: quatro paletas gerais mais `oiti_evergreen`/`angico_feather`; `season`: `early_autumn`/`summer`; `silhouette`: `rounded`/`wide`/`tall`; `density`: `sparse`/`balanced`/`dense`; `seed` |
 | `conifer` | `pine_small_v1.json` e variantes | `silhouette`: `rounded`/`wide`/`tall`; `density`; `seed` |
 | `flower_bed` | `flower_bed_01.json` | `seed` |
 | `sign` | `park_wayfinding_sign.json` | `seed` |
@@ -71,7 +71,33 @@ Isso evita que as quatro faixas da receita `organic_02` sejam fundidas em
 prateleiras planas. As receitas antigas continuam usando seu desenho anterior.
 A candidata deve ser comparada em 1x e na grade antes de qualquer promoção.
 
-## Copas de oiti e angico
+## Oiti e angico como espécies de árvores
+
+O brief com `species: "oiti"` escolhe a receita de oiti; `species: "angico"`
+escolhe a de angico. Um `style` incompatível é rejeitado. O nome da espécie
+também é reconhecido no prompt curto. Cada receita mantém câmera, anchor,
+tronco, copa e seed para árvores individuais em parques ou florestas.
+
+`examples/park_tree_oiti_species_v4.json` preserva uma copa globosa, densa e
+sempre verde com folhas simples, elípticas, verdes escuras e brotos mais claros.
+`examples/park_tree_angico_species_v4.json` usa galhos grossos e irregulares,
+copa mais ampla e pequenos folíolos em pares para sugerir folhas bipinadas no
+tamanho do jogo. São escolhas estilizadas apoiadas nas descrições da
+[Embrapa para o oiti](https://www.alice.cnptia.embrapa.br/alice/bitstream/doc/1140567/1/Especies-Arboreas-Brasileiras-vol-5-Oiti-da-Praia.pdf)
+e [angico-branco](https://www.alice.cnptia.embrapa.br/alice/bitstream/doc/1140196/1/Especies-Arboreas-Brasileiras-vol-1-Angico-Branco.pdf).
+Paletas em `examples/palettes/organic_canopy_v3.json`; `seed` muda as folhas e
+parte da silhueta para evitar cópias idênticas na floresta.
+
+```bash
+PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
+  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_study_v4.json \
+  --output out/visitor_forge_2d/author
+```
+
+Use `park_tree_angico_study_v4.json` para a outra espécie. São estudos para
+inspeção em 1x, sem promoção automática a `assets/`.
+
+## Histórico dos perfis anteriores
 
 `examples/park_tree_oiti_groups_v3.json` usa `painted_canopy` com perfil
 `domed`: uma silhueta irregular contínua recebe folhas pequenas e sobrepostas.
@@ -79,14 +105,7 @@ A candidata deve ser comparada em 1x e na grade antes de qualquer promoção.
 acompanham os galhos em alturas diferentes, com espaços entre os ramos. A cor vem de
 `examples/palettes/organic_canopy_v2.json`; o brief pode escolher outra das
 quatro paletas sem alterar a geometria nem a câmera. O layout anterior
-`crown_groups` permanece disponível para reproduzir as receitas v2. Reproduza
-os estudos novos por:
-
-```bash
-PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d author-art \
-  --brief tools/visitor_forge_2d/examples/briefs/park_tree_oiti_study_v3.json \
-  --output out/visitor_forge_2d/author
-```
-
-Use o brief correspondente `park_tree_angico_study_v3.json` para o angico.
-São candidatos para inspeção visual, sem promoção automática a `assets/`.
+`crown_groups` permanece disponível para reproduzir as receitas v2. As receitas
+v3 também permanecem disponíveis com `painted_canopy`. Para reprodução exata
+do v3, use o JSON de receita v3 diretamente no renderer.
+O brief `species` usa sempre a versão mais recente da receita correspondente.

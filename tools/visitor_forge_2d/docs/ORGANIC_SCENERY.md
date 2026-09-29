@@ -17,6 +17,14 @@ can be selected through an art brief. The oiti and angico v3 examples exercise
 these profiles. The v2 `crown_groups` layout, continuous recipes and approved
 sprites retain their original painter.
 
+`layout: "species_canopy"` uses `species: "oiti"` or `species: "angico"`.
+The former adds simple elongated leaves to an evergreen globose crown; the
+latter keeps the irregular branching umbrella readable and adds paired fine
+leaflets. The v4 examples carry their own palettes and deterministic seeds.
+Changing a seed varies the foliage; the angico's primary branch skeleton is
+still authored in `trunkBranches` rather than randomly regenerated. These
+are individual tree assets for groves and forestry as well as park placement.
+
 The renderer is `core/organic_scenery.py`. It is deterministic: the JSON recipe,
 palette and integer `seed` reproduce the same PNG without an image model or a
 hidden raster source.

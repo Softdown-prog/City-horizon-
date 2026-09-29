@@ -28,10 +28,11 @@ TEMPLATES = {
 }
 BROADLEAF_STYLES = {
     "rounded": "park_tree_broadleaf_early_autumn_v1.json",
-    "umbrella": "park_tree_oiti_groups_v3.json",
-    "open_branching": "park_tree_angico_branches_v3.json",
+    "umbrella": "park_tree_oiti_species_v4.json",
+    "open_branching": "park_tree_angico_species_v4.json",
 }
-PALETTE_LIBRARY = "palettes/organic_canopy_v2.json"
+BROADLEAF_SPECIES = {"oiti": "umbrella", "angico": "open_branching"}
+PALETTE_LIBRARY = "palettes/organic_canopy_v3.json"
 TERMS = {
     "conifer": ("pinheiro", "pine", "conifer", "abeto"),
     "broadleaf": ("broadleaf", "folhosa", "arvore", "tree", "decidua", "oiti", "angico"),
@@ -39,7 +40,7 @@ TERMS = {
     "sign": ("placa", "sinalizacao", "wayfinding sign", "sign"),
 }
 ALLOWED = {
-    "broadleaf": {"season", "style", "silhouette", "density", "palette", "seed"},
+    "broadleaf": {"species", "season", "style", "silhouette", "density", "palette", "seed"},
     "conifer": {"silhouette", "density", "palette", "seed"},
     "flower_bed": {"palette", "seed"},
     "sign": {"palette", "seed"},
@@ -70,6 +71,10 @@ def interpret_prompt(prompt: str) -> dict:
         result["style"] = "open_branching"
     elif any(term in words for term in ("oiti", "copa guarda-chuva", "umbrella canopy", "copa fechada")):
         result["style"] = "umbrella"
+    if "angico" in words:
+        result["species"] = "angico"
+    elif "oiti" in words:
+        result["species"] = "oiti"
     if any(term in words for term in ("verde claro", "verde fresco", "spring green")):
         result["palette"] = "spring_lime"
     elif any(term in words for term in ("verde escuro", "verde profundo", "deep green")):
@@ -124,10 +129,22 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         raise ValueError(f"unsupported subject {subject!r}; available: {', '.join(TEMPLATES)}, custom")
     if parsed and parsed["subject"] != subject:
         raise ValueError("prompt subject and structured subject disagree")
-    intent = {**parsed, **{key: brief[key] for key in ("season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
+    intent = {**parsed, **{key: brief[key] for key in ("species", "season", "style", "silhouette", "density", "palette", "seed") if key in brief}}
     unknown = set(intent) - ALLOWED.get(subject, {"seed"}) - {"subject"}
     if unknown:
         raise ValueError(f"{subject} does not support {', '.join(sorted(unknown))}; use a custom recipe")
+    if subject == "broadleaf" and "species" in intent:
+        species = intent["species"]
+        if species not in BROADLEAF_SPECIES:
+            raise ValueError(f"unknown broadleaf species {species!r}; choose {', '.join(BROADLEAF_SPECIES)}")
+        expected_style = BROADLEAF_SPECIES[species]
+        if "style" in intent and intent["style"] != expected_style:
+            raise ValueError(f"species {species} requires style {expected_style}")
+        intent["style"] = expected_style
+    elif subject == "broadleaf":
+        species_for_style = {style: species for species, style in BROADLEAF_SPECIES.items()}
+        if intent.get("style") in species_for_style:
+            intent["species"] = species_for_style[intent["style"]]
 
     if subject == "custom":
         filename = brief.get("template")
@@ -153,6 +170,8 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
         season = intent.get("season", "early_autumn" if style == "rounded" else "summer")
         if season not in ("early_autumn", "summer"):
             raise ValueError("broadleaf supports early_autumn or summer; other seasons need a new palette recipe")
+        if "species" in intent and season == "early_autumn":
+            raise ValueError("species-specific autumn foliage needs its own recipe; keep oiti/angico morphology and palette")
         palette_id = intent.get("palette")
         if palette_id is not None:
             palettes = json.loads((examples / PALETTE_LIBRARY).read_text(encoding="utf-8"))["palettes"]
@@ -173,6 +192,8 @@ def author_recipe(brief: dict, examples: Path = EXAMPLES) -> tuple[dict, dict]:
             recipe["palette"].update(palettes["autumn_amber"])
             decisions.append("palette=autumn_amber")
         decisions.extend((f"style={style}", f"season={season}"))
+        if "species" in intent:
+            decisions.append(f"species={intent['species']}")
         density = intent.get("density", "balanced")
         if density not in ("sparse", "balanced", "dense"):
             raise ValueError("density must be sparse, balanced or dense")

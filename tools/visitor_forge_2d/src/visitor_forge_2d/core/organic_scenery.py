@@ -580,6 +580,112 @@ def _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view):
         _foliage_paint(work, mask, rng, palette, (x, y), (sx, sy), open_crown=True)
 
 
+def _draw_leaflet(draw, x, y, length, width, angle, color, opacity):
+    """A small tapered leaf at supersampled resolution."""
+    dx, dy = math.cos(angle), math.sin(angle)
+    nx, ny = -dy, dx
+    points = [((x - dx * length * .5) * WORK_SCALE, (y - dy * length * .5) * WORK_SCALE),
+              ((x - dx * length * .08 + nx * width) * WORK_SCALE,
+               (y - dy * length * .08 + ny * width) * WORK_SCALE),
+              ((x + dx * length * .43 + nx * width * .38) * WORK_SCALE,
+               (y + dy * length * .43 + ny * width * .38) * WORK_SCALE),
+              ((x + dx * length * .62) * WORK_SCALE, (y + dy * length * .62) * WORK_SCALE),
+              ((x + dx * length * .27 - nx * width * .76) * WORK_SCALE,
+               (y + dy * length * .27 - ny * width * .76) * WORK_SCALE)]
+    draw.polygon(points, fill=(*_hex(color), opacity))
+
+
+def _paint_species_foliage(work, mask, rng, palette, center, radius, species):
+    """Species leaf detail on top of a readable shaded canopy volume."""
+    cx, cy = center
+    rx, ry = radius
+    W, H = mask.size
+    layer = Image.new("RGBA", (W, H))
+    draw = ImageDraw.Draw(layer, "RGBA")
+    pixels = mask.load()
+    if species == "oiti":
+        # Wider, simple leaves overlap. Young yellow-green growth stays near
+        # the upper lit edge; mature foliage holds the cool dark interior.
+        for _ in range(340):
+            x = cx + rng.uniform(-.99, .99) * rx
+            y = cy + rng.uniform(-.98, .98) * ry
+            ix, iy = round(x * WORK_SCALE), round(y * WORK_SCALE)
+            if not 0 <= ix < W or not 0 <= iy < H or pixels[ix, iy] < 220:
+                continue
+            lit = x < cx + rx * .25 and y < cy + ry * .22
+            roll = rng.random()
+            color = (palette["highlight"] if lit and roll < .15 else
+                     palette["front_top"] if lit and roll < .58 else
+                     palette["mid_top"] if y < cy or roll < .45 else palette["front_bottom"])
+            _draw_leaflet(draw, x, y, rng.uniform(4.7, 8.7), rng.uniform(1.7, 3.3),
+                          rng.uniform(-.75, .55), color, rng.randint(100, 175))
+    else:
+        # Paired leaflets along fine curved sprays suggest the bipinnate leaf
+        # without drawing subpixel botanical detail that disappears at 1x.
+        for _ in range(13):
+            x = cx + rng.uniform(-.65, .65) * rx
+            y = cy + rng.uniform(-.62, .62) * ry
+            theta = rng.uniform(-2.8, .2)
+            length = rng.uniform(8.0, 14.0)
+            dx, dy = math.cos(theta), math.sin(theta)
+            endpoint = (x + dx * length, y + dy * length)
+            twig = _hex(palette["mid_bottom"])
+            draw.line(((x * WORK_SCALE, y * WORK_SCALE),
+                       (endpoint[0] * WORK_SCALE, endpoint[1] * WORK_SCALE)),
+                      fill=(*twig, 80), width=max(1, round(.55 * WORK_SCALE)))
+            for pair in range(1, 6):
+                t = pair / 6
+                for side in (-1, 1):
+                    leaf_x = x + dx * length * t + (-dy) * side * 1.9
+                    leaf_y = y + dy * length * t + dx * side * 1.9
+                    lit = leaf_x < cx + rx * .12 and leaf_y < cy + ry * .10
+                    color = (palette["highlight"] if lit and rng.random() < .18 else
+                             palette["front_top"] if lit else palette["mid_top"])
+                    _draw_leaflet(draw, leaf_x, leaf_y, rng.uniform(2.8, 4.2),
+                                  rng.uniform(.72, 1.15), theta + side * 1.15,
+                                  color, rng.randint(90, 160))
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), mask))
+    work.alpha_composite(layer)
+
+
+def _paint_species_canopy(work, recipe, rng, palette, W, H, view):
+    """Species-aware crowns; older painted_canopy recipes keep their raster."""
+    cfg = recipe["broadleafStructure"]
+    cx, cy = map(float, cfg["center"])
+    rx, ry = map(float, cfg["radius"])
+    species = cfg.get("species")
+    if species not in ("oiti", "angico"):
+        raise ValueError("species_canopy requires species oiti or angico")
+    density = max(.55, min(1.45, float(cfg.get("density", 1.0))))
+    phase = VIEW_PHASE[view]
+    if species == "oiti":
+        # Seed-dependent irregularity lets a forest contain related trees
+        # without repeated cutout silhouettes. A small world-facing offset
+        # lets the four camera turns reveal different sides of a dense crown.
+        cx += rng.uniform(-3.5, 3.5) + math.cos(phase + .35) * 3.4
+        cy += rng.uniform(-2.5, 2.5) + math.sin(phase + .35) * 2.0
+        rx *= rng.uniform(.94, 1.04) * (1 + .027 * math.cos(phase + .8)) * math.sqrt(density)
+        ry *= rng.uniform(.96, 1.05) * (1 + .023 * math.sin(phase + .4)) * math.sqrt(density)
+        silhouette = _cloud_mask((W, H), rng, cx, cy, rx, ry, scallops=19)
+        _foliage_paint(work, silhouette, rng, palette, (cx, cy), (rx, ry))
+        _paint_species_foliage(work, silhouette, rng, palette, (cx, cy), (rx, ry), species)
+        return
+
+    if not recipe.get("trunkBranches", [])[1:]:
+        raise ValueError("angico species_canopy needs authored trunkBranches")
+    # Preserve the broad, irregular forked structure. Fine paired leaflets
+    # are applied after it is readable in 1x, rather than replacing the crown
+    # with a row of translucent, disconnected foliage balls.
+    _paint_broadleaf_groups(work, recipe, rng, palette, W, H, view)
+    detail_rng = random.Random(int(recipe["seed"]) ^ (0xA691C0 + round(phase * 100)))
+    occupied = work.getchannel("A")
+    for x, y, sx, sy in ((cx - rx * .43, cy - ry * .10, rx * .45, ry * .51),
+                         (cx + rx * .03, cy - ry * .29, rx * .43, ry * .48),
+                         (cx + rx * .43, cy - ry * .06, rx * .45, ry * .50)):
+        _paint_species_foliage(work, occupied, detail_rng, palette,
+                               (x, y), (sx, sy), species)
+
+
 def _scatter_texture(layer, rng, mask, color, count, alpha_range=(12, 36), size_range=(.45, 1.7), elongate=2.0):
     bbox = mask.getbbox()
     if not bbox:
@@ -702,10 +808,11 @@ def render(recipe, view="south"):
 
     crown_style = recipe.get("crownStyle", "conifer")
     layout = recipe.get("broadleafStructure", {}).get("layout")
-    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups", "painted_canopy"):
+    if crown_style == "broadleaf" and layout in ("continuous", "crown_groups", "painted_canopy", "species_canopy"):
         painter = {"continuous": _paint_broadleaf_volume,
                    "crown_groups": _paint_broadleaf_groups_legacy,
-                   "painted_canopy": _paint_broadleaf_groups}[layout]
+                   "painted_canopy": _paint_broadleaf_groups,
+                   "species_canopy": _paint_species_canopy}[layout]
         painter(work, recipe, rng, palette, W, H, view)
         frame = _alpha_safe_resize(work, tuple(canvas))
         frame = _final_raster_pass(frame, rng, palette, recipe)

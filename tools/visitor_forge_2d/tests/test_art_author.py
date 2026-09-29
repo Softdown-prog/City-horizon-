@@ -47,13 +47,24 @@ def test_organic_styles_choose_distinct_canopies_and_named_palettes() -> None:
                                "prompt": "angico de copa aberta, verde profundo", "seed": 11})
     assert oiti["broadleafStructure"]["profile"] == "domed"
     assert angico["broadleafStructure"]["profile"] == "branching"
-    assert oiti["broadleafStructure"]["layout"] == "painted_canopy"
-    assert angico["broadleafStructure"]["layout"] == "painted_canopy"
+    assert oiti["broadleafStructure"]["layout"] == "species_canopy"
+    assert angico["broadleafStructure"]["layout"] == "species_canopy"
+    assert oiti["broadleafStructure"]["species"] == "oiti"
+    assert angico["broadleafStructure"]["species"] == "angico"
+    named, _ = author_recipe({"contract": CONTRACT, "id": "named_oiti",
+                              "subject": "broadleaf", "species": "oiti", "seed": 11})
+    assert named["broadleafStructure"]["profile"] == "domed"
     assert oiti["palette"]["highlight"] != angico["palette"]["highlight"]
     assert oiti["camera"] == angico["camera"]
     with pytest.raises(ValueError, match="unknown organic palette"):
         author_recipe({"contract": CONTRACT, "id": "bad_palette", "subject": "broadleaf",
                        "palette": "neon"})
+    with pytest.raises(ValueError, match="requires style"):
+        author_recipe({"contract": CONTRACT, "id": "mismatch", "subject": "broadleaf",
+                       "species": "oiti", "style": "open_branching"})
+    with pytest.raises(ValueError, match="autumn foliage"):
+        author_recipe({"contract": CONTRACT, "id": "evergreen_autumn", "subject": "broadleaf",
+                       "species": "oiti", "season": "early_autumn"})
 
 
 def test_unknown_subject_and_protected_contract_are_rejected() -> None:
