@@ -2,6 +2,21 @@
 
 #include <cassert>
 
+// This gate validates only the ground/elevated admission policy. The production
+// RoadMeshBuilder is compiled separately through mapforge2_editor and the real
+// MapForge2ProceduralRoadPreview in the same workflow. Keeping a tiny local mesh
+// double here prevents unrelated building/economy linkage from contaminating a
+// topology/Z-filter test.
+RoadMesh RoadMeshBuilder::build_cubic(const RoadSplineSegment& segment) {
+    RoadMesh mesh;
+    if (!(segment.width > 0.0F)) return mesh;
+    mesh.vertices.push_back({segment.start, 0.0F, 0.0F});
+    mesh.vertices.push_back({segment.end, 1.0F, 1.0F});
+    mesh.vertices.push_back({segment.end, 0.0F, 1.0F});
+    mesh.indices = {0U, 1U, 2U};
+    return mesh;
+}
+
 namespace {
 
 void test_ground_network_is_admitted() {
