@@ -1,0 +1,39 @@
+{
+  "contract": "CH_RUNTIME_CHARACTER_V1",
+  "id": "clown_01",
+  "displayName": "Palhaço",
+  "enabled": false,
+  "autoSpawn": false,
+  "runtimeStatus": "installed_disabled",
+  "source": {
+    "actorContract": "CH_ACTOR_VALIDATED_V1",
+    "skinContract": "CH_ACTOR_SKIN_V1",
+    "skinId": "clown_01",
+    "directionProfile": "CH_ACTOR_RUNTIME_DIRECTIONS_V1"
+  },
+  "frame": {
+    "width": 48,
+    "height": 64,
+    "groundAnchor": [24, 60]
+  },
+  "animation": {
+    "walkFrames": 8,
+    "directions": ["S", "E", "W", "N"],
+    "screenMapping": {
+      "S": "SW",
+      "E": "SE",
+      "W": "NW",
+      "N": "NE"
+    }
+  },
+  "assets": {
+    "generatorPage": "tools/ch_actor_lab/validated/clown_01.html",
+    "skinScript": "tools/ch_actor_lab/skins/clown_01_v1.js",
+    "directionProfile": "tools/ch_actor_lab/validated/ch_actor_runtime_directions_v1.js"
+  },
+  "notes": [
+    "Character is installed in the runtime asset catalog but intentionally disabled.",
+    "Do not alter appearance or approved walk motion when enabling runtime spawn.",
+    "Enable only after an explicit gameplay/runtime activation pass."
+  ]
+}
