@@ -1,0 +1,30 @@
+name: CH Actor Validated Gate
+
+on:
+  push:
+    branches:
+      - main
+      - feature/ch-character-studio-art-v0
+    paths:
+      - 'tools/ch_actor_lab/validated/**'
+      - 'tools/ch_actor_lab/skins/**'
+      - 'tools/ch_actor_lab/motion/ch_actor_walk_v1.json'
+      - 'tools/ch_character_studio/specs/clown_01.character.json'
+      - '.github/workflows/ch-actor-validated-gate.yml'
+  pull_request:
+    paths:
+      - 'tools/ch_actor_lab/validated/**'
+      - 'tools/ch_actor_lab/skins/**'
+      - 'tools/ch_actor_lab/motion/ch_actor_walk_v1.json'
+      - 'tools/ch_character_studio/specs/clown_01.character.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate locked CH Actor and clown skin
+        run: python tools/ch_actor_lab/validated/validate_ch_actor_skin.py
