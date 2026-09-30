@@ -23,6 +23,8 @@
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
+// 19. Terrain raise/lower/smooth are player-facing construction catalog tools while
+//     H/J/N remain keyboard shortcuts for the same canonical heightfield operations.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -263,6 +265,27 @@ public:
                                                          const float mouse_y,
                                                          const bool primary_button) {
         UiInputResult result = ChRuntimeGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
+
+        // Terrain sculpting is construction gameplay.  The legacy runtime loop
+        // already owns the canonical H/J/N tool activation, so the construction
+        // catalog routes its three cards through that same path instead of
+        // creating a second heightfield implementation.
+        if (result.action && result.action->action == UiAction::select_building) {
+            SDL_Scancode terrain_shortcut = SDL_SCANCODE_UNKNOWN;
+            if (result.action->payload == "terrain_raise_tool") terrain_shortcut = SDL_SCANCODE_H;
+            else if (result.action->payload == "terrain_lower_tool") terrain_shortcut = SDL_SCANCODE_J;
+            else if (result.action->payload == "terrain_smooth_tool") terrain_shortcut = SDL_SCANCODE_N;
+
+            if (terrain_shortcut != SDL_SCANCODE_UNKNOWN) {
+                SDL_Event terrain_event{};
+                terrain_event.type = SDL_EVENT_KEY_DOWN;
+                terrain_event.key.scancode = terrain_shortcut;
+                (void)SDL_PushEvent(&terrain_event);
+                result.action.reset();
+                return result;
+            }
+        }
+
         if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||
             camera_ == nullptr || selected_pedestrian_id_ == nullptr) {
             return result;
@@ -355,10 +378,40 @@ private:
     ([&]() { \
         auto ch_ui_model = (model); \
         ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \
+        const auto ch_has_build_item = [&](const char* definition_id) { \
+            return std::any_of(ch_ui_model.build_items.begin(), ch_ui_model.build_items.end(), \
+                               [&](const UiBuildItem& item) { return item.definition_id == definition_id; }); \
+        }; \
+        if (!ch_has_build_item("terrain_raise_tool")) { \
+            const std::string ch_terrain_thumbnail = \
+                (asset_root / "assets/terrain/grass_isometric_01.png").string(); \
+            ch_ui_model.build_items.insert(ch_ui_model.build_items.begin(), { \
+                {"terrain_raise_tool", "Elevar Terreno", "TERRENO", "SEM CUSTO", true, \
+                 ch_terrain_thumbnail, "PINCEL R2.5", \
+                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1}, \
+                {"terrain_lower_tool", "Rebaixar Terreno", "TERRENO", "SEM CUSTO", true, \
+                 ch_terrain_thumbnail, "PINCEL R2.5", \
+                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1}, \
+                {"terrain_smooth_tool", "Suavizar Terreno", "TERRENO", "SEM CUSTO", true, \
+                 ch_terrain_thumbnail, "PINCEL R2.5", \
+                 "SUAVIZA TRANSICOES | SOLO VAZIO | CLIQUE E ARRASTE", 1}, \
+            }); \
+        } \
+        if (terrain_relief_mode) { \
+            ch_ui_model.active_tool = UiTool::buildings; \
+            ch_ui_model.selected_building_id = \
+                *terrain_relief_mode == ch::TerrainBrushMode::raise ? "terrain_raise_tool" : \
+                (*terrain_relief_mode == ch::TerrainBrushMode::lower ? "terrain_lower_tool" : "terrain_smooth_tool"); \
+            ch_ui_model.placement_preview_path = \
+                (asset_root / "assets/terrain/grass_isometric_01.png").string(); \
+            ch_ui_model.placement_preview_frame_count = 1; \
+            ch_ui_model.placement_rotatable = false; \
+            ch_ui_model.placement_rotation_label = "PINCEL R2.5"; \
+        } \
         gameplay_ui.bind_selection_context( \
             &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \
             placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
-            !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
+            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
