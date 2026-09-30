@@ -7,6 +7,8 @@ on:
       - "src/rail_system.h"
       - "src/rail_system.cpp"
       - "src/rail_system_test.cpp"
+      - "src/rail_path_builder.h"
+      - "src/rail_path_builder_test.cpp"
       - ".github/workflows/ch-procedural-rail-core-check.yml"
   workflow_dispatch:
 
@@ -33,7 +35,14 @@ jobs:
             -Isrc \
             src/rail_system.cpp src/rail_system_test.cpp \
             -o /tmp/ch_procedural_rail_core_test
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc \
+            src/rail_system.cpp src/rail_path_builder_test.cpp \
+            -o /tmp/ch_procedural_rail_path_test
 
       - name: Run fail-closed rail safety tests
         shell: bash
-        run: /tmp/ch_procedural_rail_core_test
+        run: |
+          set -euo pipefail
+          /tmp/ch_procedural_rail_core_test
+          /tmp/ch_procedural_rail_path_test
