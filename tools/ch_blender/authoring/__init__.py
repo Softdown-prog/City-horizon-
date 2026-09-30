@@ -16,12 +16,16 @@ from .shapes import (
     torus_form,
 )
 from .character import CharacterAuthoring
+from .recipe import CONTRACT as AUTHORING_RECIPE_CONTRACT, execute_recipe, load_recipe
 
 __all__ = [
+    "AUTHORING_RECIPE_CONTRACT",
     "AuthoringObject",
     "CharacterAuthoring",
     "create_root",
     "curve_tube",
+    "execute_recipe",
+    "load_recipe",
     "rounded_box",
     "soft_form",
     "stylized_material",
