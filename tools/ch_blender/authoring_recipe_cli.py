@@ -10,6 +10,7 @@ CONTRACT = "CH_AUTHORING_RECIPE_V1"
 KINDS = {
     "soft_form": ("location", "scale"),
     "tapered_segment": ("start", "end", "radiusStart", "radiusEnd"),
+    "loft_form": ("location", "profiles"),
     "rounded_box": ("location", "size"),
     "curve_tube": ("points", "radius"),
     "torus": ("location", "majorRadius", "minorRadius"),
@@ -62,6 +63,28 @@ def validate(data: dict) -> list[str]:
         for field in KINDS[kind]:
             if field not in part:
                 errors.append(f"{prefix} ({part_id}): missing {field}")
+
+        if kind == "loft_form":
+            profiles = part.get("profiles")
+            if not isinstance(profiles, list) or len(profiles) < 2:
+                errors.append(f"{prefix} ({part_id}): profiles must contain at least two entries")
+            else:
+                previous_z = None
+                for profile_index, profile in enumerate(profiles):
+                    pp = f"{prefix} ({part_id}) profiles[{profile_index}]"
+                    if not isinstance(profile, dict):
+                        errors.append(f"{pp}: must be an object")
+                        continue
+                    for field in ("z", "width", "depth"):
+                        if field not in profile or not isinstance(profile[field], (int, float)):
+                            errors.append(f"{pp}: {field} must be numeric")
+                    if all(isinstance(profile.get(field), (int, float)) for field in ("z", "width", "depth")):
+                        if float(profile["width"]) <= 0 or float(profile["depth"]) <= 0:
+                            errors.append(f"{pp}: width/depth must be > 0")
+                        z = float(profile["z"])
+                        if previous_z is not None and z <= previous_z:
+                            errors.append(f"{pp}: z values must be strictly increasing")
+                        previous_z = z
 
         material = part.get("material")
         if material is not None and material not in materials:
