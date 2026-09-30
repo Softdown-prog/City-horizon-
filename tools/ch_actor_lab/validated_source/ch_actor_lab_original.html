@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CH Actor Lab — candidato de caminhada</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root { color-scheme: dark; font: 14px system-ui,sans-serif; background:#090f1d; color:#e2e8f0 }
+    body { max-width:1100px; margin:auto; padding:22px }
+    h1 { font-size:22px; margin:0 } h2 { font-size:16px; margin:0 0 10px }
+    p { color:#a9b8ca; line-height:1.5 } .layout { display:grid; grid-template-columns:minmax(240px,320px) 1fr; gap:18px }
+    section { padding:18px; background:#131e2d; border:1px solid #304153; border-radius:12px; margin-bottom:18px }
+    label { display:block; margin:14px 0 4px } input[type=range] { width:100% }
+    select,button { background:#223348; color:#e2e8f0; border:1px solid #486077; border-radius:6px; padding:8px }
+    button { cursor:pointer } button:hover { background:#17617a } .buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px }
+    .views { display:grid; grid-template-columns:repeat(4,minmax(80px,1fr)); gap:8px }
+    .view { text-align:center; background:#101a25; padding:6px; border-radius:8px }
+    canvas { image-rendering:pixelated; image-rendering:crisp-edges }
+    .view canvas { width:96px; height:auto; max-width:100% }
+    .sheet { overflow:auto; background-color:#182538; background-image:linear-gradient(45deg,#28364a 25%,transparent 25%),linear-gradient(-45deg,#28364a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#28364a 75%),linear-gradient(-45deg,transparent 75%,#28364a 75%); background-position:0 0,0 8px,8px -8px,-8px 0; background-size:16px 16px; padding:12px }
+    .sheet canvas { width:auto; max-width:none; border:1px solid #577085 }
+    .palette { display:grid; grid-template-columns:repeat(2,1fr); gap:0 12px }
+    .palette label { display:flex; justify-content:space-between; align-items:center }
+    small { color:#a9b8ca } #status { color:#6ee7b7 }
+    @media(max-width:720px) { .layout { grid-template-columns:1fr } .views { grid-template-columns:repeat(2,1fr) } }
+  </style>
+</head>
+<body>
+  <header><h1>CH Actor Lab · candidato</h1><p>Quatro direções, câmera CH_CAMERA_V1 e exportação RGBA. A aprovação visual no mapa ainda é necessária.</p></header>
+  <main class="layout">
+    <section>
+      <h2>Passada</h2>
+      <label for="resolution">Quadro</label><select id="resolution"><option value="32x48">32 × 48</option><option value="48x64" selected>48 × 64</option><option value="24x36">24 × 36</option></select>
+      <label for="frames">Quadros por direção</label><select id="frames"><option value="2">2 · extremos A/B</option><option value="4">4 · ciclo completo</option><option value="8" selected>8 · ciclo completo</option></select>
+      <label for="leg">Pernas <output id="legValue"></output></label><input id="leg" type="range" min="0.16" max="0.52" step="0.02" value="0.32">
+      <label for="arm">Braços <output id="armValue"></output></label><input id="arm" type="range" min="0.06" max="0.34" step="0.02" value="0.18">
+      <label for="bounce">Oscilação do tronco <output id="bounceValue"></output></label><input id="bounce" type="range" min="0" max="0.016" step="0.002" value="0.004">
+      <label><input id="outline" type="checkbox" checked> Contorno de 1 pixel</label>
+      <label><input id="anchor" type="checkbox" checked> Mostrar pivô no preview</label>
+      <div class="palette">
+        <label>Jaqueta <input id="jacket" type="color" value="#15803d"></label>
+        <label>Camisa <input id="shirt" type="color" value="#f8fafc"></label>
+        <label>Calça <input id="pants" type="color" value="#1d4ed8"></label>
+        <label>Cabelo <input id="hair" type="color" value="#5a3825"></label>
+        <label>Pele <input id="skin" type="color" value="#f6c29e"></label>
+        <label>Sapatos <input id="shoes" type="color" value="#1f2937"></label>
+      </div>
+      <div class="buttons"><button id="exportPng">Exportar PNG RGBA</button><button id="exportJson">Exportar manifesto JSON</button></div>
+      <p><small>O PNG exportado tem o tamanho real indicado no manifesto. Os fundos dos previews e o marcador do pivô não entram na spritesheet.</small></p>
+    </section>
+    <div>
+      <section><h2>Prévia sobre o piso · ampliada para inspeção</h2><div class="views">
+        <div class="view">S · ↙ SW<br><canvas id="viewS"></canvas></div>
+        <div class="view">E · ↘ SE<br><canvas id="viewE"></canvas></div>
+        <div class="view">W · ↖ NW<br><canvas id="viewW"></canvas></div>
+        <div class="view">N · ↗ NE<br><canvas id="viewN"></canvas></div>
+      </div></section>
+      <section><h2>Spritesheet <small id="dimensions"></small></h2><div class="sheet"><canvas id="sheet"></canvas></div><p id="status"></p></section>
+    </div>
+  </main>
+  <script>
+  'use strict';
+  // CH_CAMERA_V1: câmera fixa 45°/30°; cada direção gira apenas o ator.
+  // Com +Z como frente do boneco, estas rotações preservam o mapeamento
+  // relativo da prova V0 (S/E/W/N) após a mudança de yaw da câmera.
+  const CONTRACT = Object.freeze({version:'CH_ACTOR_CONTRACT_V1', camera:'CH_CAMERA_V1', yawDeg:45, pitchDeg:30,
+    anchorOffsetPx:4, directions:[
+      {logical:'S',screen:'SW',row:0,angleRad:Math.PI/2},
+      {logical:'E',screen:'SE',row:1,angleRad:0},
+      {logical:'W',screen:'NW',row:2,angleRad:Math.PI},
+      {logical:'N',screen:'NE',row:3,angleRad:-Math.PI/2}
+    ]});
+  const $=id=>document.getElementById(id);
+  if(!window.THREE) { $('status').textContent='Three.js não carregou. Verifique a conexão e recarregue a página.'; throw Error('Three.js unavailable'); }
+  const state={w:48,h:64,count:8,leg:.32,arm:.18,bounce:.004,outline:true};
+  const scene=new THREE.Scene();
+  const source=document.createElement('canvas');
+  const renderer=new THREE.WebGLRenderer({canvas:source,alpha:true,antialias:false,preserveDrawingBuffer:true});
+  renderer.setPixelRatio(1); renderer.setClearColor(0x000000,0); renderer.autoClear=true;
+  const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,100);
+  const root=new THREE.Group(); scene.add(root);
+  scene.add(new THREE.AmbientLight(0xffffff,.75));
+  const sun=new THREE.DirectionalLight(0xffffff,.85); sun.position.set(-6,14,9); scene.add(sun);
+  const bounceLight=new THREE.DirectionalLight(0x94a3b8,.3); bounceLight.position.set(6,-2,-6); scene.add(bounceLight);
+  const palette={}; for(const k of ['jacket','shirt','pants','hair','skin','shoes']) palette[k]=new THREE.MeshLambertMaterial({color:$(k).value});
+  const add=(parent,geo,mat,x,y,z)=>{const mesh=new THREE.Mesh(geo,mat); mesh.position.set(x,y,z); parent.add(mesh); return mesh};
+  const torso=new THREE.Group(); torso.position.y=.42; root.add(torso);
+  add(torso,new THREE.CylinderGeometry(.14,.12,.32,12),palette.jacket,0,.16,0);
+  add(torso,new THREE.BoxGeometry(.09,.28,.05),palette.shirt,0,.16,.12);
+  for(const x of [-.07,.07]) add(torso,new THREE.BoxGeometry(.045,.29,.05),palette.jacket,x,.16,.135);
+  const head=new THREE.Group(); head.position.y=.32; torso.add(head);
+  const face=add(head,new THREE.SphereGeometry(.15,12,10),palette.skin,0,.14,0); face.scale.set(.9,1.05,.9);
+  // Meia esfera superior: o cabelo não cobre o rosto frontal.
+  const cap=add(head,new THREE.SphereGeometry(.17,12,10,0,Math.PI*2,0,Math.PI*.58),palette.hair,0,.17,-.02); cap.scale.set(.96,.92,1);
+  add(head,new THREE.SphereGeometry(.045,8,6),palette.hair,0,.24,.125);
+  for(const x of [-.055,.055]) add(head,new THREE.SphereGeometry(.01,6,4),palette.hair,x,.155,.133);
+  const arms=[];
+  for(const sign of [-1,1]) {const arm=new THREE.Group(); arm.position.set(sign*.17,.29,0); torso.add(arm); arms.push(arm);
+    add(arm,new THREE.CylinderGeometry(.052,.047,.22,8),palette.jacket,0,-.11,0);
+    add(arm,new THREE.SphereGeometry(.046,8,6),palette.skin,0,-.23,0);
+  }
+  const legs=[];
+  for(const sign of [-1,1]) {const hip=new THREE.Group(); hip.position.set(sign*.08,.40,0); root.add(hip);
+    add(hip,new THREE.CylinderGeometry(.064,.056,.20,8),palette.pants,0,-.10,0);
+    const knee=new THREE.Group(); knee.position.y=-.20; hip.add(knee);
+    add(knee,new THREE.CylinderGeometry(.057,.05,.17,8),palette.pants,0,-.085,0);
+    add(knee,new THREE.BoxGeometry(.095,.065,.16),palette.shoes,0,-.17,.035);
+    legs.push({hip,knee});
+  }
+  const shadow=add(root,new THREE.CircleGeometry(.23,20),new THREE.MeshBasicMaterial({color:0x101827,transparent:true,opacity:.35}),0,.004,0);
+  shadow.rotation.x=-Math.PI/2; shadow.scale.set(.9,.55,1);
+  const capture=document.createElement('canvas'); const captureCtx=capture.getContext('2d',{willReadFrequently:true});
+  const sheet=$('sheet'),sheetCtx=sheet.getContext('2d');
+  const frame=document.createElement('canvas'),frameCtx=frame.getContext('2d',{willReadFrequently:true});
+  function updateCamera(){
+    renderer.setSize(state.w,state.h,false); capture.width=frame.width=state.w; capture.height=frame.height=state.h;
+    const elev=Math.PI*CONTRACT.pitchDeg/180, yaw=Math.PI*CONTRACT.yawDeg/180, dist=12, targetY=.475;
+    camera.position.set(Math.sin(yaw)*Math.cos(elev)*dist,targetY+Math.sin(elev)*dist,Math.cos(yaw)*Math.cos(elev)*dist);
+    camera.lookAt(0,targetY,0);
+    const height=1.35, aspect=state.w/state.h;
+    camera.left=-height*aspect/2; camera.right=height*aspect/2;
+    // Posicionar a origem do solo exatamente no pixel do ground anchor.
+    const projectedGround=-targetY*Math.cos(elev);
+    camera.top=projectedGround+((state.h-CONTRACT.anchorOffsetPx)/state.h)*height;
+    camera.bottom=camera.top-height; camera.updateProjectionMatrix();
+    for(const dir of CONTRACT.directions){const c=$('view'+dir.logical); c.width=state.w; c.height=state.h}
+  }
+  function pose(phase){
+    const s=Math.sin(2*Math.PI*phase), c=Math.cos(2*Math.PI*phase), a=state.leg*s;
+    legs[0].hip.rotation.x=a; legs[1].hip.rotation.x=-a;
+    // Dobra o joelho da perna que avança e deixa a perna de apoio quase reta.
+    // Cosseno distingue as duas transferências de peso em t=0 e t=0.5.
+    legs[0].knee.rotation.x=-.30*Math.max(0,-s)-.08*Math.max(0,c);
+    legs[1].knee.rotation.x=-.30*Math.max(0,s)-.08*Math.max(0,-c);
+    arms[0].rotation.x=-state.arm*s; arms[1].rotation.x=state.arm*s;
+    torso.position.y=.42+state.bounce*Math.abs(Math.sin(4*Math.PI*phase));
+  }
+  function render(angle,phase){
+    root.rotation.y=angle; pose(phase); renderer.clear(); renderer.render(scene,camera);
+    captureCtx.clearRect(0,0,state.w,state.h); captureCtx.drawImage(source,0,0);
+    frameCtx.clearRect(0,0,state.w,state.h);
+    if(state.outline){
+      const src=captureCtx.getImageData(0,0,state.w,state.h).data;
+      const dst=frameCtx.createImageData(state.w,state.h),out=dst.data;
+      for(let y=0;y<state.h;y++)for(let x=0;x<state.w;x++){
+        const i=(y*state.w+x)*4;
+        if(src[i+3]>40)continue;
+        const solid=(xx,yy)=>xx>=0&&xx<state.w&&yy>=0&&yy<state.h&&src[(yy*state.w+xx)*4+3]>40;
+        if(solid(x-1,y)||solid(x+1,y)||solid(x,y-1)||solid(x,y+1)){
+          out[i]=15;out[i+1]=23;out[i+2]=42;out[i+3]=240;
+        }
+      }
+      frameCtx.putImageData(dst,0,0);
+    }
+    frameCtx.drawImage(capture,0,0); return frame;
+  }
+  function phases(){return state.count===2?[.25,.75]:Array.from({length:state.count},(_,i)=>i/state.count)}
+  function rebuild(){
+    const list=phases(); sheet.width=state.w*state.count; sheet.height=state.h*4;
+    for(const dir of CONTRACT.directions)for(let i=0;i<list.length;i++)
+      sheetCtx.drawImage(render(dir.angleRad,list[i]),i*state.w,dir.row*state.h);
+    $('dimensions').textContent=`${sheet.width} × ${sheet.height} px · RGBA`;
+    $('status').textContent=`${state.count} quadros × 4 direções · câmera 45°/30° · pivô (${Math.round(state.w/2)}, ${state.h-4})`;
+  }
+  function preview(t){
+    const phase=(t/1100)%1;
+    for(const dir of CONTRACT.directions){
+      const c=$('view'+dir.logical), ctx=c.getContext('2d');
+      ctx.fillStyle='#597d42';ctx.fillRect(0,0,c.width,c.height);
+      ctx.fillStyle='#46515c';ctx.beginPath();ctx.moveTo(-10,c.height*.52);ctx.lineTo(c.width+10,c.height*.75);
+      ctx.lineTo(c.width+10,c.height);ctx.lineTo(-10,c.height*.77);ctx.fill();
+      ctx.drawImage(render(dir.angleRad,phase),0,0);
+      if($('anchor').checked){ctx.fillStyle='#f87171';ctx.fillRect(Math.round(state.w/2)-1,state.h-5,3,3)}
+    }
+    requestAnimationFrame(preview);
+  }
+  function download(filename,href){const a=document.createElement('a');a.download=filename;a.href=href;a.click()}
+  function manifest(){return {metadata:{generator:'CH Actor Lab',contractVersion:CONTRACT.version,status:'CANDIDATE',cameraContract:CONTRACT.camera},
+    camera:{projection:'orthographic',yawDeg:CONTRACT.yawDeg,pitchDeg:CONTRACT.pitchDeg,locked:true},
+    dimensions:{frameWidth:state.w,frameHeight:state.h,totalWidth:sheet.width,totalHeight:sheet.height,groundAnchor:{x:Math.round(state.w/2),y:state.h-4}},
+    animation:{frameCount:state.count,framePhases:phases(),kinematics:{legSwingRad:state.leg,armSwingRad:state.arm,verticalBounce:state.bounce}},
+    directionsOrder:CONTRACT.directions.map(d=>({...d})), paletteSlots:Object.fromEntries(Object.keys(palette).map(k=>[k,$(k).value])),
+    render:{transparent:true,outlinePx:state.outline?1:0,anchorIncluded:false}}}
+  $('resolution').onchange=()=>{[state.w,state.h]=$('resolution').value.split('x').map(Number);updateCamera();rebuild()};
+  $('frames').onchange=()=>{state.count=Number($('frames').value);rebuild()};
+  for(const k of ['leg','arm','bounce']){$(k).oninput=()=>{state[k]=Number($(k).value);$(k+'Value').textContent=state[k].toFixed(3);rebuild()};$(k+'Value').textContent=state[k].toFixed(3)}
+  $('outline').onchange=()=>{state.outline=$('outline').checked;rebuild()};
+  for(const k of Object.keys(palette))$(k).oninput=()=>{palette[k].color.set($(k).value);rebuild()};
+  $('exportPng').onclick=()=>{rebuild();download(`ch_actor_${state.w}x${state.h}_${state.count}f.png`,sheet.toDataURL('image/png'))};
+  $('exportJson').onclick=()=>{rebuild();const url=URL.createObjectURL(new Blob([JSON.stringify(manifest(),null,2)],{type:'application/json'}));
+    download(`ch_actor_${state.w}x${state.h}_${state.count}f_manifest.json`,url);setTimeout(()=>URL.revokeObjectURL(url),10000)};
+  updateCamera();rebuild();requestAnimationFrame(preview);
+  </script>
+</body>
+</html>
