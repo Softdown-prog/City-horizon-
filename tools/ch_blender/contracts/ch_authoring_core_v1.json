@@ -14,7 +14,8 @@
     "loft_form",
     "rounded_box",
     "curve_tube",
-    "torus"
+    "torus",
+    "blob_cluster"
   ],
   "materials": {
     "defaultRoughness": 0.82,
@@ -27,6 +28,7 @@
     "Changing direction must rotate the physical root, not rebuild independent silhouette geometry.",
     "Asset recipes should describe semantic forms instead of raw Blender operators.",
     "Loft forms should be preferred over boxes or ellipsoids when silhouette needs independent shoulder, waist and hem control.",
+    "Blob clusters should be used for continuous organic masses such as stylized hair or foliage when separate soft forms create visible bead-like seams.",
     "Visual review at enlarged resolution is required before final sprite bake.",
     "The Blender source tree may be modified only when the Python/API layer cannot implement a required capability cleanly."
   ],
