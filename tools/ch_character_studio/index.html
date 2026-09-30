@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CH Character Studio Art V0</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#15231f; color:#eef5f1; }
+    header { height:52px; display:flex; align-items:center; gap:12px; padding:0 16px; background:#0f1916; border-bottom:1px solid #2e433b; }
+    header strong { color:#f4d35e; }
+    .app { display:grid; grid-template-columns:292px minmax(520px,1fr) 340px; height:calc(100vh - 52px); }
+    aside { padding:14px; overflow:auto; background:#13201c; }
+    aside.left { border-right:1px solid #2e433b; }
+    aside.right { border-left:1px solid #2e433b; }
+    main { display:flex; align-items:center; justify-content:center; overflow:auto; padding:24px; background:#20332d; }
+    .panel { margin-bottom:18px; }
+    .panel h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:#a9c5ba; }
+    button, select, input[type=file]::file-selector-button, input[type=text], input[type=number] { background:#29443a; color:#fff; border:1px solid #45665a; border-radius:6px; padding:8px 10px; }
+    button, input[type=file]::file-selector-button { cursor:pointer; }
+    button.active { background:#d6ae39; color:#172019; border-color:#f2d35d; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    select { width:100%; }
+    input[type=text], input[type=number] { width:100%; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .row > label.grow { flex:1 1 110px; }
+    .stack { display:grid; gap:8px; }
+    .tool-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+    .tool-grid button { width:100%; }
+    .canvas-wrap { position:relative; width:480px; height:640px; box-shadow:0 12px 40px #07110db0; background-image:linear-gradient(45deg,#30453d 25%,transparent 25%),linear-gradient(-45deg,#30453d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#30453d 75%),linear-gradient(-45deg,transparent 75%,#30453d 75%); background-size:24px 24px; background-position:0 0,0 12px,12px -12px,-12px 0; }
+    .canvas-wrap canvas { position:absolute; inset:0; width:480px; height:640px; image-rendering:pixelated; display:block; }
+    #objectBackView { z-index:0; pointer-events:none; }
+    #view { z-index:1; cursor:crosshair; }
+    #objectFrontView { z-index:2; pointer-events:none; }
+    #maskView { z-index:3; pointer-events:none; cursor:crosshair; }
+    #spatialView { z-index:4; pointer-events:none; }
+    #photoshopView { z-index:5; pointer-events:none; cursor:crosshair; }
+    .layer { display:grid; grid-template-columns:24px 1fr 58px; align-items:center; gap:8px; padding:7px; border:1px solid #2f4a40; border-radius:6px; margin-bottom:6px; cursor:pointer; }
+    .layer.selected { border-color:#e1c04a; background:#263d35; }
+    .layer small { opacity:.65; }
+    .swatches { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+    .swatch { height:30px; border:2px solid #ffffff33; border-radius:5px; cursor:pointer; }
+    .swatch.active { outline:2px solid #fff; }
+    label { font-size:12px; color:#bdd0c8; }
+    input[type=range] { width:100%; }
+    input[type=color] { width:42px; height:32px; padding:0; border:0; background:none; }
+    .hint { font-size:11px; color:#91aaa0; line-height:1.4; margin-top:8px; }
+    .status { font-size:12px; line-height:1.5; color:#aac0b7; background:#0f1916; border:1px solid #2b4239; padding:8px; border-radius:6px; }
+    .reference { border-color:#6b6330; color:#d9ce8b; }
+    .mask-note { border-color:#385d70; color:#a9cedd; }
+    .photoshop-note { border-color:#615a91; color:#c8c1ef; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>CH Character Studio Art</strong>
+    <span>V0 · CH Blender underlay + Studio paint</span>
+    <span style="margin-left:auto">48×64 · anchor 24,60 · S/E/N/W</span>
+  </header>
+  <div class="app">
+    <aside class="left">
+      <div class="panel">
+        <h3>Frame</h3>
+        <div class="stack">
+          <select id="direction"><option>S</option><option>E</option><option>N</option><option>W</option></select>
+          <select id="frame"><option>idle</option><option>walk_00</option><option>walk_01</option><option>walk_02</option><option>walk_03</option><option>walk_04</option><option>walk_05</option><option>walk_06</option><option>walk_07</option></select>
+          <label>Base CH Blender <input id="baseFile" type="file" accept="image/png" /></label>
+          <label>Landmarks CH Blender <input id="landmarksFile" type="file" accept="application/json,.json" /></label>
+        </div>
+        <div class="hint">Um landmarks.json contém os 36 estados, anchors dos pés, sockets e footprint.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Ferramentas</h3>
+        <div class="row"><button id="brushBtn" class="active">Pincel</button><button id="eraserBtn">Borracha</button><button id="shapeBtn">Forma inteligente</button><button id="clearBtn">Limpar</button></div>
+        <div style="margin-top:10px"><label>Tamanho <span id="sizeLabel">1</span> px</label><input id="brushSize" type="range" min="1" max="8" value="1" /></div>
+        <div class="row" style="margin-top:10px"><label>Cor</label><input id="color" type="color" value="#f2d744" /></div>
+      </div>
+
+      <div class="panel">
+        <h3>Formas de personagem</h3>
+        <div class="stack"><select id="shapeSelect"></select><label>Escala <span id="shapeScaleLabel">1.00</span>×</label><input id="shapeScale" type="range" min="0.50" max="2.00" step="0.25" value="1.00" /></div>
+        <div class="hint">A peça vai automaticamente para sua camada semântica.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Molde de personagem</h3>
+        <div class="stack"><select id="templateSelect"></select><button id="applyTemplate">Aplicar molde</button></div>
+        <div class="hint">Moldes não alteram pose, caminhada, câmera ou ground anchor.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Objeto na mão</h3>
+        <div class="stack">
+          <label><input id="heldObjectEnabled" type="checkbox" /> Ativar objeto</label>
+          <label>ID do objeto <input id="heldObjectId" type="text" value="held_object_new" /></label>
+          <label>Socket <select id="heldObjectSocket"><option value="right_hand">Mão direita</option><option value="left_hand">Mão esquerda</option></select></label>
+          <label>Profundidade <select id="heldObjectDepth"><option value="auto">Automática</option><option value="front">Frente</option><option value="back">Atrás</option></select></label>
+          <label>PNG visual <input id="heldObjectFile" type="file" accept="image/png" /></label>
+          <label>PNG máscara RGB <input id="heldObjectMaskFile" type="file" accept="image/png" /></label>
+          <div class="row"><label class="grow">Grip X <input id="heldGripX" type="number" step="1" value="0" /></label><label class="grow">Grip Y <input id="heldGripY" type="number" step="1" value="0" /></label></div>
+          <div class="row"><label class="grow">Offset X <input id="heldOffsetX" type="number" step="1" value="0" /></label><label class="grow">Offset Y <input id="heldOffsetY" type="number" step="1" value="0" /></label></div>
+          <label><input id="showHandSocket" type="checkbox" /> Mostrar socket invisível</label>
+        </div>
+        <div id="heldObjectStatus" class="status" style="margin-top:8px">Socket preparado, mas invisível.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Paleta ampla</h3>
+        <div class="stack"><select id="paletteFamily"></select><div id="swatches" class="swatches"></div></div>
+        <div class="hint">Biblioteca versionada CH_CHARACTER_PALETTE_V1: pele, cabelo, neutros, vivas, pastéis, terra, profundas, metais e fantasia.</div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="canvas-wrap">
+        <canvas id="objectBackView" width="48" height="64"></canvas>
+        <canvas id="view" width="48" height="64"></canvas>
+        <canvas id="objectFrontView" width="48" height="64"></canvas>
+        <canvas id="maskView" width="48" height="64"></canvas>
+        <canvas id="spatialView" width="48" height="64"></canvas>
+        <canvas id="photoshopView" width="48" height="64"></canvas>
+      </div>
+    </main>
+
+    <aside class="right">
+      <div class="panel">
+        <h3>Photoshop · Etapa 1</h3>
+        <div class="tool-grid">
+          <button id="psRectSelect">Seleção (M)</button>
+          <button id="psLasso">Laço (L)</button>
+          <button id="psMove">Mover (V)</button>
+          <button id="psEyedropper">Conta-gotas (I)</button>
+          <button id="psBucket">Balde (G)</button>
+          <button id="psDeselect">Desmarcar</button>
+          <button id="psUndo">Desfazer</button>
+          <button id="psRedo">Refazer</button>
+        </div>
+        <div class="stack" style="margin-top:10px">
+          <label>Tolerância do balde <input id="psTolerance" type="range" min="0" max="96" value="0" /></label>
+          <div class="row"><button id="psFillSelection">Preencher seleção</button><button id="psDeleteSelection">Apagar seleção</button></div>
+        </div>
+        <div class="hint">Atalhos: Ctrl+Z, Ctrl+Shift+Z, Ctrl+D e Delete. Seleções afetam somente pixels da camada artística ativa.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Transformar seleção</h3>
+        <div class="row">
+          <label class="grow">X <input id="psTransformX" type="number" step="1" value="0" /></label>
+          <label class="grow">Y <input id="psTransformY" type="number" step="1" value="0" /></label>
+        </div>
+        <div class="row">
+          <label class="grow">Escala % <input id="psTransformScale" type="number" step="5" value="100" /></label>
+          <label class="grow">Rotação ° <input id="psTransformRotate" type="number" step="15" value="0" /></label>
+        </div>
+        <div class="row"><label><input id="psFlipH" type="checkbox" /> Espelhar H</label><label><input id="psFlipV" type="checkbox" /> Espelhar V</label></div>
+        <button id="psApplyTransform" style="margin-top:8px;width:100%">Aplicar transformação</button>
+        <div class="hint">Nearest-neighbor obrigatório: a transformação não suaviza pixels nem altera pose/anchor.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Camada ativa</h3>
+        <div class="stack">
+          <label>Opacidade <span id="psLayerOpacityLabel">100</span>% <input id="psLayerOpacity" type="range" min="0" max="100" value="100" /></label>
+          <label>Blend mode
+            <select id="psLayerBlend">
+              <option value="source-over">Normal</option>
+              <option value="multiply">Multiply</option>
+              <option value="screen">Screen</option>
+              <option value="overlay">Overlay</option>
+              <option value="darken">Darken</option>
+              <option value="lighten">Lighten</option>
+              <option value="soft-light">Soft Light</option>
+              <option value="hard-light">Hard Light</option>
+              <option value="difference">Difference</option>
+            </select>
+          </label>
+        </div>
+        <div id="psStatus" class="status photoshop-note" style="margin-top:8px">Ferramentas de referência prontas.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Validação espacial</h3>
+        <div class="stack">
+          <label><input id="showGroundAnchor" type="checkbox" checked /> Ground anchor</label>
+          <label><input id="showFootAnchors" type="checkbox" checked /> Foot anchors / pé de apoio</label>
+          <label><input id="showFootprint" type="checkbox" checked /> Footprint</label>
+          <label><input id="showSockets" type="checkbox" /> Sockets das mãos</label>
+        </div>
+        <div id="spatialStatus" class="status" style="margin-top:8px">Carregue landmarks para validar o contato com o chão.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Propagação de aparência</h3>
+        <div class="stack"><button id="markReference">Marcar frame atual como referência</button><button id="applyReference" disabled>Aplicar referência ao frame atual</button><button id="propagateDirection" disabled>Propagar nos 9 frames desta direção</button></div>
+        <div id="referenceStatus" class="status reference" style="margin-top:8px">Nenhuma referência marcada.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Máscaras de cor</h3>
+        <div class="stack">
+          <select id="maskBank"><option value="appearance">Aparência</option><option value="clothing">Roupas</option><option value="held_object">Objeto na mão</option></select>
+          <select id="maskChannel"></select>
+          <label><input id="maskPreview" type="checkbox" /> Visualizar máscara sobre o personagem</label>
+          <div class="row"><button id="maskPaintBtn">Pintar máscara</button><button id="maskEraseBtn">Apagar máscara</button></div>
+          <button id="maskFillVisible">Preencher cobertura visível no canal</button><button id="maskClear">Limpar banco atual</button><button id="exportMask">Exportar máscara atual</button><button id="exportAllMasks">Exportar 3 máscaras</button>
+        </div>
+        <div id="maskStatus" class="status mask-note" style="margin-top:8px">Máscaras RGB prontas.</div>
+      </div>
+
+      <div class="panel"><h3>Camadas</h3><div id="layers"></div></div>
+
+      <div class="panel">
+        <h3>Acabamento</h3>
+        <div class="row"><label>Outline</label><input id="outlineColor" type="color" value="#342e2b" /></div>
+        <div class="stack" style="margin-top:8px"><button id="generateOutline">Gerar outline 1 px</button><button id="clearOutline">Limpar outline</button></div>
+      </div>
+
+      <div class="panel">
+        <h3>Exportar</h3>
+        <div class="stack"><button id="exportLayer">PNG da camada</button><button id="exportComposite">PNG composto</button><button id="exportCompositeObject">PNG composto + objeto</button><button id="exportSpec">JSON do personagem</button><button id="exportObjectConfig">JSON máscaras + objeto</button></div>
+      </div>
+
+      <div class="panel"><h3>Status</h3><div id="status" class="status">Studio pronto. Importe o passe do CH Blender ou comece a desenhar.</div></div>
+    </aside>
+  </div>
+
+  <script src="color_palettes.js"></script>
+  <script src="smart_shapes.js"></script>
+  <script src="character_templates.js"></script>
+  <script src="pose_transfer.js"></script>
+  <script src="color_masks.js"></script>
+  <script src="held_objects.js"></script>
+  <script src="studio.js"></script>
+  <script src="photoshop_tools.js"></script>
+  <script src="palette_ui.js"></script>
+  <script src="color_object_ui.js"></script>
+  <script src="spatial_ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "contract": "CH_CLOWN_TURNTABLE_V1",
+  "characterId": "clown_01",
+  "purpose": "Make S/E/N/W share one physical character volume. CH Blender owns silhouette, proportion, occlusion and spatial landmarks; Character Studio owns final paint/style.",
+  "camera": "CH_ACTOR_CAMERA_V1",
+  "frameSize": [48, 64],
+  "groundAnchor": [24, 60],
+  "directions": ["S", "E", "N", "W"],
+  "authoritativeGeometry": {
+    "source": "tools/ch_character_studio/blender_clown_turntable.py",
+    "singleProxyRotatedForAllDirections": true,
+    "headVolumeLocked": true,
+    "hairVolumeLocked": true,
+    "shoulderWidthLocked": true,
+    "torsoVolumeLocked": true,
+    "hipWidthLocked": true,
+    "shoeVolumeLocked": true,
+    "crossDirectionRasterWarp": false,
+    "independentDirectionalSilhouetteAuthoring": false
+  },
+  "costumeProxy": {
+    "hair": "shared_center_mass_plus_left_right_puffs",
+    "collar": "shared_ruff_volume",
+    "upper": "red_torso_with_blue_left_yellow_right_sleeves",
+    "lower": "blue_left_yellow_right_trousers",
+    "shoes": "shared_oversized_rigid_shoe_volume",
+    "face": "shared_head_volume_directional_visibility_only"
+  },
+  "paintOwnership": {
+    "south": "reviewed_master_style_reference",
+    "eastWestNorth": "paint_over_blender_underlay_without_silhouette_invention",
+    "allowed": ["makeup", "hair shading", "cloth shading", "fixed details", "outline", "color masks"],
+    "forbidden": ["change head width by direction", "change torso width by direction", "change leg length by direction", "change shoe scale by direction", "invent different facial proportions per direction"]
+  },
+  "validation": {
+    "requiredIdleTurntable": true,
+    "requiredFourDirectionScreenshot": true,
+    "requiredLandmarks": true,
+    "silhouetteTolerancePx": 1.5,
+    "anchorInvariant": [24, 60],
+    "runtimeExportAllowedFromInspectionCamera": false
+  },
+  "status": "authoring_contract"
+}

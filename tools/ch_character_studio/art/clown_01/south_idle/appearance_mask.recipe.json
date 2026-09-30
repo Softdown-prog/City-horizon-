@@ -1,0 +1,18 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"maskBank","name":"appearance"},
+  "operations":[
+    {"type":"ellipse","box":[18,10,30,23],"channel":"R"},
+    {"type":"ellipse","box":[15,36,18,40],"channel":"R"},
+    {"type":"ellipse","box":[30,36,33,40],"channel":"R"},
+    {"type":"ellipse","box":[14,9,20,16],"channel":"G"},
+    {"type":"ellipse","box":[12,12,19,19],"channel":"G"},
+    {"type":"ellipse","box":[28,9,34,16],"channel":"G"},
+    {"type":"ellipse","box":[29,12,36,19],"channel":"G"},
+    {"type":"ellipse","box":[22,17,26,21],"channel":"B"},
+    {"type":"line","points":[[20,22],[22,23],[24,24],[26,23],[28,22]],"channel":"B","width":1},
+    {"type":"pixel","x":19,"y":20,"channel":"B"},
+    {"type":"pixel","x":29,"y":20,"channel":"B"}
+  ]
+}

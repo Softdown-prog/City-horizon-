@@ -1,0 +1,183 @@
+{
+  "contract": "CH_CHARACTER_STUDIO_V0",
+  "productName": "CH Character Studio Art",
+  "purpose": "Author, paint, inspect and export City Horizon character appearance while reusing CH Blender for pose, camera, depth and render passes.",
+  "underlay": {
+    "engine": "CH Blender 4.2.3",
+    "manifest": "tools/ch_blender/ch_blender_manifest.json",
+    "cameraContract": "CH_ACTOR_CAMERA_V1",
+    "frameContract": "CH_ACTOR_V1",
+    "motionSource": "approved_actor_motion_only",
+    "landmarksContract": "CH_CHARACTER_LANDMARKS_V0"
+  },
+  "pipeline": [
+    "character_spec",
+    "ch_blender_base_passes",
+    "ch_blender_pose_landmarks",
+    "spatial_anchor_and_footprint_validation",
+    "paint_layers",
+    "photoshop_reference_editing",
+    "photoshop_art_stage3",
+    "landmark_pose_transfer",
+    "character_color_masks",
+    "optional_held_object_socket",
+    "outline_and_readability",
+    "rotational_inspection",
+    "preview",
+    "spritesheet_export"
+  ],
+  "spatial": {
+    "contract": "CH_CHARACTER_SPATIAL_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_spatial_v0.json",
+    "groundAnchorPx": [24, 60],
+    "footAnchors": ["foot_L", "foot_R"],
+    "supportFootPerFrame": true,
+    "footprint": {"shape": "ellipse", "radiusMeters": [0.16, 0.10]},
+    "debugOverlay": true
+  },
+  "paletteLibrary": {
+    "contract": "CH_CHARACTER_PALETTE_V1",
+    "path": "tools/ch_character_studio/palettes/ch_character_palette_v1.json",
+    "families": ["skin", "hair", "neutral", "vivid", "pastel", "earth", "deep", "metal", "fantasy"],
+    "stableColorIds": true,
+    "seedRequiredForRandomSelection": true
+  },
+  "artLayers": [
+    "silhouette", "skin", "hair", "face", "upper_clothing", "lower_clothing",
+    "footwear", "accessories_back", "accessories_front", "paint_over", "outline"
+  ],
+  "blenderPasses": ["base_color", "normal", "depth", "object_id", "shadow", "ambient_occlusion"],
+  "poseTransfer": {
+    "contract": "CH_CHARACTER_POSE_TRANSFER_V0",
+    "source": "one approved art frame per direction",
+    "targets": "idle_plus_8_walk_frames_same_direction",
+    "method": "semantic_layer_landmark_weighted_deformation",
+    "derivedOutline": "rebuild_dilated_1px_after_transfer",
+    "copyBlenderUnderlay": false,
+    "crossDirectionAutomaticTransfer": false,
+    "mayModifyApprovedMotion": false
+  },
+  "colorMasks": {
+    "contract": "CH_CHARACTER_COLOR_MASK_V0",
+    "extends": "CH_COLOR_MASK_V1",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_color_mask_v0.json",
+    "packedFormat": "PNG_RGBA",
+    "alphaMeaning": "coverage_only",
+    "banks": {
+      "appearance": {"R": "skin", "G": "hair", "B": "appearance_accent"},
+      "clothing": {"R": "primary_clothing", "G": "secondary_clothing", "B": "clothing_accent"},
+      "held_object": {"R": "object_primary", "G": "object_secondary", "B": "object_accent"}
+    },
+    "rules": {
+      "separateBankPngs": true,
+      "lightingInMask": false,
+      "ambientOcclusionInMask": false,
+      "outlineInMask": false,
+      "ditherInMask": false,
+      "alphaAsFourthTintChannel": false
+    }
+  },
+  "heldObjects": {
+    "contract": "CH_CHARACTER_HAND_SOCKET_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_hand_socket_v0.json",
+    "defaultEnabled": false,
+    "sockets": {"left_hand": "hand_L", "right_hand": "hand_R"},
+    "socketVisibility": "editor_debug_only",
+    "depthModes": ["auto", "back", "front"],
+    "followsApprovedHandLandmark": true,
+    "visualAndMaskShareTransform": true,
+    "fallbackObjectMask": "opaque_pixels_to_R_object_primary"
+  },
+  "inspectionCamera": {
+    "mode": "non_canonical_review_only",
+    "renderer": "tools/ch_character_studio/blender_character_base.py",
+    "cliCommand": "make-inspection-job",
+    "controls": ["yaw", "pitch", "ortho_scale", "resolution_scale"],
+    "canonicalCameraRemainsLocked": true,
+    "runtimeExportAllowed": false,
+    "defaultResolutionScale": 4
+  },
+  "drawingCli": {
+    "contract": "CH_CHARACTER_DRAW_RECIPE_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_draw_recipe_v0.json",
+    "executable": "tools/ch_character_studio/character_draw_cli.py",
+    "nativeFrame": [48, 64],
+    "deterministicSeed": 1337,
+    "targets": ["artLayer", "maskBank"]
+  },
+  "workers": {
+    "contract": "CH_CHARACTER_WORKERS_V0",
+    "profilePath": "tools/ch_character_studio/workers/ch_character_workers_v0.json",
+    "planner": "tools/ch_character_studio/character_workers.py",
+    "handoffContract": "CH_CHARACTER_WORKER_HANDOFF_V0",
+    "deterministic": true,
+    "defaultSeed": 1337,
+    "externalAgentsConsumeWorkPackets": true,
+    "claimsToSpawnRemoteAgents": false
+  },
+  "photoshopReferenceTools": {
+    "contract": "CH_CHARACTER_PHOTOSHOP_TOOLS_V0",
+    "contractPath": "tools/ch_character_studio/contracts/ch_character_photoshop_tools_v0.json",
+    "implementation": "tools/ch_character_studio/photoshop_tools.js",
+    "studioApi": "CH_CHARACTER_STUDIO_API_V0",
+    "stage1": {
+      "status": "implemented",
+      "features": [
+        "rectangular_selection", "lasso_selection", "move_selection", "free_transform_selection",
+        "eyedropper", "paint_bucket", "fill_selection", "delete_selection", "undo_redo",
+        "layer_opacity", "layer_blend_mode"
+      ]
+    },
+    "stage2": {
+      "status": "implemented",
+      "contract": "CH_CHARACTER_LAYER_STACK_V0",
+      "contractPath": "tools/ch_character_studio/contracts/ch_character_layer_stack_v0.json",
+      "implementation": "tools/ch_character_studio/photoshop_layers_v2.js",
+      "compatibilityBridge": "tools/ch_character_studio/photoshop_layers_v2_bridge.js",
+      "features": [
+        "layer_groups_with_visibility_and_opacity", "layer_masks_with_alpha_visibility",
+        "clipping_masks", "non_destructive_transform_state", "duplicate_layers",
+        "safe_merge_preserving_sources", "safe_flatten_preserving_sources",
+        "per_frame_stack_state", "stack_undo_redo", "advanced_composite_export",
+        "layer_mask_png_export"
+      ]
+    },
+    "stage3": {
+      "status": "implemented",
+      "contract": "CH_CHARACTER_ART_TOOLS_V0",
+      "contractPath": "tools/ch_character_studio/contracts/ch_character_art_tools_v0.json",
+      "implementation": "tools/ch_character_studio/photoshop_art_v3.js",
+      "features": [
+        "brush_presets", "brush_spacing", "brush_opacity", "brush_flow",
+        "vertical_horizontal_quad_symmetry", "linear_radial_gradient",
+        "levels", "piecewise_linear_curves", "hue_saturation_lightness"
+      ],
+      "brushPresets": ["pixel_1", "pixel_2", "hard_round", "marker", "dither", "airbrush"],
+      "pixelFilter": "nearest_neighbor",
+      "adjustmentAlphaPolicy": "preserve_existing_alpha",
+      "editScope": "selected_canonical_semantic_art_layer",
+      "advancedRasterSelectionPolicy": "refuse_silent_edit_and_require_semantic_layer_selection"
+    },
+    "historyLimitPerFrame": 50,
+    "selectionTransformScope": "active_art_layer_pixels_only",
+    "imageSmoothing": false,
+    "mayChangeApprovedMotion": false,
+    "mayMoveGroundAnchor": false
+  },
+  "lockedRules": {
+    "frameSize": [48, 64],
+    "groundAnchor": [24, 60],
+    "directions": ["S", "E", "N", "W"],
+    "walkFrames": 8,
+    "cameraPitchDegrees": 30,
+    "cameraYawDegrees": 45,
+    "artMayChangeMotion": false,
+    "artMayChangeGroundAnchor": false,
+    "heldObjectMayChangeMotion": false,
+    "inspectionCameraMayBecomeRuntimeCamera": false,
+    "photoshopReferenceToolsMayChangeMotion": false,
+    "photoshopReferenceToolsMayMoveGroundAnchor": false,
+    "stage3AdjustmentsMayAlterLandmarks": false
+  },
+  "designPrinciple": "Blender solves spatial consistency. Studio Art owns final visible style; inspection and Photoshop-reference tools may edit appearance freely but never rewrite canonical motion, anchor or export-camera contracts."
+}

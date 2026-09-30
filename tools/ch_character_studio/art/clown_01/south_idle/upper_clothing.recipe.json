@@ -1,0 +1,21 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"upper_clothing"},
+  "operations":[
+    {"type":"polygon","points":[[18,26],[21,24],[27,24],[30,26],[31,38],[17,38]],"color":"#d43b2f"},
+    {"type":"polygon","points":[[18,26],[21,25],[20,37],[17,38]],"color":"#b52f28"},
+    {"type":"polygon","points":[[27,25],[30,26],[31,38],[28,37]],"color":"#ed5a4c"},
+    {"type":"polygon","points":[[16,27],[19,28],[18,37],[14,37],[13,31]],"color":"#2b71c9"},
+    {"type":"polygon","points":[[29,28],[32,27],[35,31],[34,37],[30,37]],"color":"#f0c83b"},
+    {"type":"line","points":[[21,25],[21,37]],"color":"#f2d744","width":1},
+    {"type":"line","points":[[27,25],[27,37]],"color":"#2b71c9","width":1},
+    {"type":"ellipse","box":[20,24,28,28],"color":"#f4f2e3"},
+    {"type":"ellipse","box":[17,24,22,28],"color":"#ebe7d7"},
+    {"type":"ellipse","box":[26,24,31,28],"color":"#fffdf3"},
+    {"type":"ellipse","box":[14,35,18,40],"color":"#f7f5e9"},
+    {"type":"ellipse","box":[30,35,34,40],"color":"#f7f5e9"},
+    {"type":"pixel","x":23,"y":30,"color":"#f8e879"},
+    {"type":"pixel","x":25,"y":34,"color":"#6ea0e9"}
+  ]
+}

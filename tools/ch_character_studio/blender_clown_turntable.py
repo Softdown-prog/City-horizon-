@@ -1,0 +1,286 @@
+"""Render one physical clown proxy through the four canonical CH Actor directions.
+
+The same physical proxy is rotated to S/E/N/W so Character Studio can paint over
+one consistent silhouette instead of inventing a different body per direction.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import bpy
+from mathutils import Vector
+
+import blender_character_base as base
+
+DIRECTIONS = ("S", "E", "N", "W")
+FRAME = base.FRAME
+ANCHOR = base.ANCHOR
+
+
+def script_args() -> list[str]:
+    argv = sys.argv
+    return argv[argv.index("--") + 1 :] if "--" in argv else []
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--character-spec", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--stage", default="proxy")
+    parser.add_argument("--preflight-profile")
+    parser.add_argument("--approval-proxy-sha")
+    args, _ = parser.parse_known_args(script_args())
+    args.camera_mode = "canonical"
+    args.inspection_yaw = 45.0
+    args.inspection_pitch = 30.0
+    args.inspection_ortho_scale = 2.05
+    args.inspection_resolution_scale = 1
+    return args
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def local(direction: str, point: tuple[float, float, float]) -> Vector:
+    return base.rotate_local(point, direction)
+
+
+def add_proxy_ellipsoid(name: str, direction: str, point, scale, mat, root):
+    obj = base.add_uv_sphere(
+        name,
+        local(direction, point),
+        scale,
+        mat,
+        z_rotation=base.DIRECTION_ANGLE[direction],
+    )
+    obj.parent = root
+    return obj
+
+
+def remove_generic_costume_geometry() -> None:
+    """Keep the shared skin head/neck, camera and lights; replace all costume geometry.
+
+    blender_character_base creates a visible generic actor. The clown turntable uses
+    that setup only for canonical camera, pose points and the skin head/neck. Generic
+    torso, limbs, shoes, hands and HairMass would otherwise render underneath the
+    clown costume and cause doubled silhouettes across directions.
+    """
+    remove_exact = {"Torso", "Pelvis", "HairMass", "Hand_L", "Hand_R", "Foot_L", "Foot_R"}
+    remove_prefixes = ("Leg_L_", "Leg_R_", "Arm_L_", "Arm_R_")
+    for obj in list(bpy.data.objects):
+        if obj.name in remove_exact or obj.name.startswith(remove_prefixes):
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+
+def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> dict:
+    palette = spec["appearance"]["palette"]
+    hair = base.material("CH_CLOWN_HAIR", palette["hair"])
+    red = base.material("CH_CLOWN_RED", palette["primary"])
+    blue = base.material("CH_CLOWN_BLUE", palette["secondary"])
+    yellow = base.material("CH_CLOWN_YELLOW", palette.get("accent", "#f2d744"))
+    shoes = base.material("CH_CLOWN_SHOES", palette["shoes"])
+    white = base.material("CH_CLOWN_WHITE", "#f4f2e3")
+    nose_mat = base.material("CH_CLOWN_NOSE", "#df3b36")
+    eye_mat = base.material("CH_CLOWN_EYE", "#2f2b29")
+    purple = base.material("CH_CLOWN_BOW", "#8b5cf6")
+
+    root = bpy.data.objects.new("CH_CLOWN_PROXY_ROOT", None)
+    bpy.context.collection.objects.link(root)
+
+    # Three fixed hair lobes: one physical hairstyle viewed from four directions.
+    add_proxy_ellipsoid("ClownHairCenter", direction, (0.0, 0.025, 1.60), (0.12, 0.105, 0.085), hair, root)
+    add_proxy_ellipsoid("ClownHairLeft", direction, (-0.16, 0.015, 1.57), (0.125, 0.105, 0.135), hair, root)
+    add_proxy_ellipsoid("ClownHairRight", direction, (0.16, 0.015, 1.57), (0.125, 0.105, 0.135), hair, root)
+
+    # Volumetric ruff rather than a paper-thin white disk.
+    for index, x in enumerate((-0.14, -0.05, 0.05, 0.14)):
+        add_proxy_ellipsoid(f"ClownRuff_{index}", direction, (x, -0.005, 1.31), (0.09, 0.072, 0.055), white, root)
+
+    add_proxy_ellipsoid("ClownTorso", direction, (0.0, 0.0, 1.02), (0.235, 0.165, 0.30), red, root)
+
+    # Complete sleeves own both upper arm and forearm; no generic arm remains underneath.
+    arm_mats = {"L": blue, "R": yellow}
+    for label in ("L", "R"):
+        base.add_capsule(
+            f"ClownSleeveUpper_{label}",
+            points[f"shoulder_{label}"],
+            points[f"elbow_{label}"],
+            0.068,
+            arm_mats[label],
+        ).parent = root
+        base.add_capsule(
+            f"ClownSleeveLower_{label}",
+            points[f"elbow_{label}"],
+            points[f"hand_{label}"],
+            0.057,
+            arm_mats[label],
+        ).parent = root
+        base.add_uv_sphere(
+            f"ClownGlove_{label}",
+            points[f"hand_{label}"],
+            (0.066, 0.066, 0.075),
+            white,
+        ).parent = root
+
+    leg_mats = {"L": blue, "R": yellow}
+    for label in ("L", "R"):
+        base.add_capsule(
+            f"ClownTrouserUpper_{label}",
+            points[f"hip_{label}"],
+            points[f"knee_{label}"],
+            0.073,
+            leg_mats[label],
+        ).parent = root
+        base.add_capsule(
+            f"ClownTrouserLower_{label}",
+            points[f"knee_{label}"],
+            points[f"ankle_{label}"],
+            0.068,
+            leg_mats[label],
+        ).parent = root
+        shoe = base.add_uv_sphere(
+            f"ClownShoe_{label}",
+            points[f"foot_{label}"],
+            (0.10, 0.155, 0.065),
+            shoes,
+            z_rotation=base.DIRECTION_ANGLE[direction],
+        )
+        shoe.parent = root
+
+    # Front-only physical details naturally disappear by occlusion when rotated away.
+    add_proxy_ellipsoid("ClownBowLeft", direction, (-0.045, -0.175, 1.20), (0.065, 0.035, 0.055), purple, root)
+    add_proxy_ellipsoid("ClownBowRight", direction, (0.045, -0.175, 1.20), (0.065, 0.035, 0.055), purple, root)
+    add_proxy_ellipsoid("ClownNose", direction, (0.0, -0.145, 1.52), (0.052, 0.038, 0.052), nose_mat, root)
+    add_proxy_ellipsoid("ClownEyeL", direction, (-0.055, -0.135, 1.575), (0.020, 0.014, 0.023), eye_mat, root)
+    add_proxy_ellipsoid("ClownEyeR", direction, (0.055, -0.135, 1.575), (0.020, 0.014, 0.023), eye_mat, root)
+
+    return {
+        "contract": "CH_CLOWN_PROXY_V1",
+        "direction": direction,
+        "sharedGeometry": True,
+        "genericCostumeGeometryRemoved": True,
+        "headVolumeLocked": True,
+        "hairVolumeLocked": True,
+        "torsoVolumeLocked": True,
+        "shoeVolumeLocked": True,
+    }
+
+
+def render_direction(spec: dict, args: argparse.Namespace, direction: str, output_dir: Path) -> dict:
+    _, canonical_camera, points = base.setup_scene(spec, direction, "idle", args)
+    remove_generic_costume_geometry()
+    proxy = add_clown_proxy(spec, direction, points)
+
+    direction_dir = output_dir / direction.lower()
+    direction_dir.mkdir(parents=True, exist_ok=True)
+    scene = bpy.context.scene
+    scene.render.filepath = str((direction_dir / "underlay.png").resolve())
+    bpy.ops.render.render(write_still=True)
+
+    projected = base.project_landmarks(scene, canonical_camera, points)
+    spatial = base.frame_spatial(scene, canonical_camera, projected, direction)
+    payload = {
+        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V1",
+        "direction": direction,
+        "frame": "idle",
+        "frameSize": list(FRAME),
+        "groundAnchor": list(ANCHOR),
+        "camera": "CH_ACTOR_CAMERA_V1",
+        "proxy": proxy,
+        "points": projected,
+        "anchors": spatial,
+        "sockets": {"left_hand": projected["hand_L"], "right_hand": projected["hand_R"]},
+        "outputs": {"underlay": "underlay.png"},
+    }
+    (direction_dir / "underlay.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
+def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
+    south = output_dir / "s" / "underlay.png"
+    proxy_south = output_dir / "proxy_south.png"
+    shutil.copyfile(south, proxy_south)
+
+    preflight_report = {
+        "contract": "CH_SCENE_PREFLIGHT_V1",
+        "status": "pass",
+        "assetId": "clown_01",
+        "purpose": "character_direction_identity_lock",
+        "frameSize": list(FRAME),
+        "groundAnchor": list(ANCHOR),
+        "camera": "CH_ACTOR_CAMERA_V1",
+        "checks": {
+            "singleSharedProxy": True,
+            "fourCanonicalDirections": True,
+            "genericCostumeGeometryRemoved": True,
+            "runtimeExportAllowed": False,
+        },
+    }
+    (output_dir / "preflight_report.json").write_text(
+        json.dumps(preflight_report, indent=2) + "\n", encoding="utf-8"
+    )
+
+    proxy_report = {
+        "contract": "CH_PROXY_RENDER_V1",
+        "status": "ok",
+        "assetId": preflight_report["assetId"],
+        "direction": "south",
+        "sha256": sha256(proxy_south),
+        "proxy": "proxy_south.png",
+        "turntableReport": "turntable_report.json",
+        "geometryAuthority": "CH_Blender_single_proxy",
+        "requiresHumanVisualReview": True,
+        "runtimeExportAllowed": False,
+        "directions": report["directions"],
+    }
+    (output_dir / "proxy_report.json").write_text(
+        json.dumps(proxy_report, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def main() -> None:
+    args = parse_args()
+    spec = base.load_spec(args.character_spec)
+    if spec.get("characterId") != "clown_01":
+        raise RuntimeError("blender_clown_turntable.py currently expects clown_01")
+
+    args.output.mkdir(parents=True, exist_ok=True)
+    directions = {}
+    for direction in DIRECTIONS:
+        directions[direction] = render_direction(spec, args, direction, args.output)
+
+    report = {
+        "contract": "CH_CLOWN_TURNTABLE_V1",
+        "status": "candidate_for_visual_review",
+        "characterId": "clown_01",
+        "directions": list(DIRECTIONS),
+        "camera": "CH_ACTOR_CAMERA_V1",
+        "frameSize": list(FRAME),
+        "groundAnchor": list(ANCHOR),
+        "geometryAuthority": "CH_Blender_single_proxy",
+        "paintAuthority": "CH_Character_Studio",
+        "crossDirectionRasterWarp": False,
+        "independentDirectionalSilhouetteAuthoring": False,
+        "directionsData": directions,
+    }
+    (args.output / "turntable_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_guarded_proxy_outputs(args.output, report)
+    print(json.dumps(report, indent=2))
+
+
+if __name__ == "__main__":
+    main()

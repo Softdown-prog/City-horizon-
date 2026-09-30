@@ -1,0 +1,37 @@
+{
+  "contract": "CH_CHARACTER_MASTER_BUILD_V0",
+  "status": "candidate_for_visual_review",
+  "characterId": "clown_01",
+  "direction": "S",
+  "frame": "idle",
+  "frameSize": [48, 64],
+  "groundAnchor": [24, 60],
+  "seed": 1337,
+  "artSupersample": 4,
+  "alphaDownsample": "premultiplied_lanczos",
+  "maskSupersample": 1,
+  "motionModified": false,
+  "canonicalCameraModified": false,
+  "composite": {
+    "path": "clown_01_s_idle.png",
+    "sha256": "e4954039b31be433694b7ec73fc8f27c5d58a48955356c8fa02568ae6bacbdff"
+  },
+  "review": {
+    "path": "clown_01_s_idle_review_8x.png",
+    "sha256": "ddcc543d2e7448e9bf6de2a27d2305f30523418816494e1e86313a67f46b8426"
+  },
+  "masks": {
+    "appearance": {
+      "path": "appearance.png",
+      "sha256": "897027fc3fd6044841ff436ed3805cf79baf461b258abbb39b49ac3d05029448"
+    },
+    "clothing": {
+      "path": "clothing.png",
+      "sha256": "cdd424061d3d773dd77e75b7e48497764ee8c627ab47f2b3e240d833ec7f3125"
+    },
+    "held_object": {
+      "path": "held_object.png",
+      "sha256": "4e8efeb44d1029e35a9f81ebd968aa310b273926f50c7984b13528dd9dbec971"
+    }
+  }
+}

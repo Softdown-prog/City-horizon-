@@ -1,0 +1,23 @@
+{
+  "contract": "CH_ACTOR_WALK_MOTION_V1",
+  "sourceActor": "ch_actor_green_01",
+  "sourceGenerator": "tools/ch_actor_lab/software_render.py",
+  "frame": {"width": 48, "height": 64, "groundAnchor": [24, 60]},
+  "camera": {"contract": "CH_CAMERA_V1", "yawDeg": 45.0, "elevationDeg": 30.0, "projection": "orthographic"},
+  "walk": {
+    "fps": 7.2727272727272725,
+    "frameCount": 8,
+    "loop": true,
+    "formula": {
+      "sine": "sin(2*pi*phase)",
+      "cosine": "cos(2*pi*phase)",
+      "bob": "0.004*abs(sin(4*pi*phase))",
+      "leg": "hip=(sign*.078,.405,0); z=.145*sign*sine+.025*sign*cosine; lifted=max(0,sign*sine)*.032+max(0,sign*cosine)*.012; foot=(sign*(.082+.008*abs(sine)),.035+lifted,z); knee=(sign*.08,.225+lifted*.33,z*.42-.028*max(0,sign*sine))",
+      "arm": "shoulder=(sign*.175,.685+bob,-.005); elbow=(sign*.205,.565+bob,.055*(-sign*sine)); hand=(sign*.19,.445+bob,.115*(-sign*sine)+.01)"
+    },
+    "phases": [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
+  },
+  "idle": {"phase": 0.0, "bob": 0.0},
+  "coordinateSystem": {"x": "actor lateral", "y": "actor up", "z": "actor forward", "blenderMapping": "(x,-z,y)"},
+  "policy": "Visual models may change. These exact equations are the approved locomotion contract and costumes must not alter them."
+}

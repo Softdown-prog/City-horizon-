@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - main
+      - feature/ch-character-studio-art-v0
     paths:
       - "tools/ch_blender/jobs/*.job.json"
 

@@ -1,0 +1,76 @@
+{
+  "contract": "CH_CHARACTER_PHOTOSHOP_TOOLS_V0",
+  "version": "0.1",
+  "reference": "Photoshop-style image editing concepts adapted for City Horizon character authoring; not a UI clone.",
+  "stage1": {
+    "status": "implemented",
+    "tools": [
+      "rectangular_selection",
+      "lasso_selection",
+      "move_selection",
+      "free_transform_selection",
+      "eyedropper",
+      "paint_bucket",
+      "fill_selection",
+      "delete_selection",
+      "undo_redo",
+      "layer_opacity",
+      "layer_blend_mode"
+    ],
+    "shortcuts": {
+      "M": "rectangular_selection",
+      "L": "lasso_selection",
+      "V": "move_selection",
+      "I": "eyedropper",
+      "G": "paint_bucket",
+      "Ctrl+Z": "undo",
+      "Ctrl+Shift+Z": "redo",
+      "Ctrl+D": "deselect",
+      "Delete": "delete_selection"
+    }
+  },
+  "stage2": {
+    "status": "planned",
+    "tools": [
+      "layer_groups",
+      "layer_masks",
+      "clipping_masks",
+      "non_destructive_transform_state",
+      "duplicate_merge_flatten_layers"
+    ]
+  },
+  "stage3": {
+    "status": "planned",
+    "tools": [
+      "brush_presets",
+      "brush_spacing",
+      "brush_opacity_flow",
+      "symmetry",
+      "gradient",
+      "curves_levels_hue_saturation",
+      "selection_feather_expand_contract"
+    ]
+  },
+  "lockedRules": {
+    "nativeFrame": [48, 64],
+    "groundAnchor": [24, 60],
+    "toolsMayChangeApprovedMotion": false,
+    "toolsMayMoveGroundAnchor": false,
+    "selectionTransformScope": "active_art_layer_pixels_only",
+    "imageSmoothing": false,
+    "historyPerDirectionFrame": true,
+    "historyLimit": 50,
+    "canonicalExportCameraUnaffected": true
+  },
+  "blendModesV0": [
+    "source-over",
+    "multiply",
+    "screen",
+    "overlay",
+    "darken",
+    "lighten",
+    "soft-light",
+    "hard-light",
+    "difference"
+  ]
+}

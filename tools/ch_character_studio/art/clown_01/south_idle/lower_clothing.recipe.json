@@ -1,0 +1,14 @@
+{
+  "contract":"CH_CHARACTER_DRAW_RECIPE_V0",
+  "frameSize":[48,64],
+  "target":{"kind":"artLayer","name":"lower_clothing"},
+  "operations":[
+    {"type":"polygon","points":[[18,38],[24,38],[23,54],[18,54]],"color":"#2b71c9"},
+    {"type":"polygon","points":[[24,38],[30,38],[30,54],[25,54]],"color":"#f2d744"},
+    {"type":"polygon","points":[[18,39],[21,39],[20,53],[18,54]],"color":"#225ca5"},
+    {"type":"polygon","points":[[27,39],[30,39],[30,54],[28,53]],"color":"#d4ae2e"},
+    {"type":"line","points":[[24,39],[24,52]],"color":"#8f3d32","width":1},
+    {"type":"pixel","x":21,"y":43,"color":"#5b8fd4"},
+    {"type":"pixel","x":27,"y":43,"color":"#ffe676"}
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "contract": "CH_CHARACTER_SPATIAL_V0",
+  "version": "0.1",
+  "description": "Canonical grounding contract for CH Character Studio sprites. Runtime/export anchors stay locked while inspection views may rotate independently.",
+  "frame": {
+    "size": [48, 64],
+    "groundAnchorPx": [24, 60],
+    "groundAnchorMeaning": "actor root projected onto the gameplay ground plane",
+    "pixelOrigin": "top_left"
+  },
+  "footAnchors": {
+    "left": "foot_L",
+    "right": "foot_R",
+    "leftAnkle": "ankle_L",
+    "rightAnkle": "ankle_R",
+    "supportSelection": "lowest_projected_contact_then_motion_phase",
+    "exportPerFrame": true
+  },
+  "footprint": {
+    "space": "actor_local_ground_meters",
+    "shape": "ellipse",
+    "center": [0.0, 0.0],
+    "radius": [0.16, 0.10],
+    "rotationFollowsActorDirection": true,
+    "renderInSprite": false,
+    "debugOverlayOnly": true,
+    "purpose": ["grounding_validation", "selection", "runtime_occupancy_hint", "prop_contact_review"]
+  },
+  "validation": {
+    "groundAnchorLocked": true,
+    "footContactsMustProjectInsideFrame": true,
+    "supportFootMustStayNearGroundAnchor": true,
+    "maxSupportFootDistancePx": 10.0,
+    "footprintMustRemainCenteredOnActorRoot": true,
+    "inspectionCameraMayNotRewriteCanonicalAnchors": true
+  },
+  "inspection": {
+    "cameraIsNonCanonical": true,
+    "mayRotateYaw": true,
+    "mayRotatePitch": true,
+    "mayChangeOrthoScale": true,
+    "mustBeWatermarkedAsInspection": true,
+    "mayBeUsedForRuntimeExport": false
+  }
+}
