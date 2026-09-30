@@ -108,6 +108,17 @@ def execute_recipe(
                 float(part["radiusEnd"]),
                 mat,
                 vertices=int(part.get("vertices", 24)),
+                round_caps=bool(part.get("roundCaps", True)),
+            )
+        elif kind == "loft_form":
+            builder.loft(
+                key,
+                _vec(part["location"], points),
+                part["profiles"],
+                mat,
+                rotation=tuple(part.get("rotation", (0.0, 0.0, 0.0))),
+                segments=int(part.get("segments", 28)),
+                cap_ends=bool(part.get("capEnds", True)),
             )
         elif kind == "rounded_box":
             builder.box(
