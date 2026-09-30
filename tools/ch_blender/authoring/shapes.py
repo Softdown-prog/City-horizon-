@@ -204,6 +204,45 @@ def loft_form(
     return AuthoringObject(name, obj)
 
 
+def blob_cluster(
+    name: str,
+    elements: Sequence[dict],
+    material: bpy.types.Material | None,
+    *,
+    root: bpy.types.Object | None = None,
+    resolution: float = 0.035,
+    render_resolution: float = 0.018,
+    threshold: float = 0.60,
+) -> AuthoringObject:
+    """Create one organically fused mass from deterministic metaball elements.
+
+    Each element is ``{location: xyz, radius: r, stiffness?: s}``. Use this for
+    clown hair, foliage cores, cloud masses and other shapes that should read as
+    one soft volume rather than a necklace of independent spheres.
+    """
+    if not elements:
+        raise ValueError(f"{name}: blob_cluster requires at least one element")
+
+    metaball = bpy.data.metaballs.new(name + "_Metaball")
+    metaball.resolution = max(0.01, float(resolution))
+    metaball.render_resolution = max(0.006, float(render_resolution))
+    metaball.threshold = max(0.05, float(threshold))
+    _assign_material(metaball, material)
+
+    for item in elements:
+        element = metaball.elements.new()
+        element.type = "BALL"
+        element.co = _vec(item["location"])
+        element.radius = max(1e-4, float(item["radius"]))
+        if "stiffness" in item:
+            element.stiffness = max(0.01, min(10.0, float(item["stiffness"])))
+
+    obj = bpy.data.objects.new(name, metaball)
+    bpy.context.collection.objects.link(obj)
+    _parent(obj, root)
+    return AuthoringObject(name, obj)
+
+
 def rounded_box(
     name: str,
     location,
