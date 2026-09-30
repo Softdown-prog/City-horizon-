@@ -1,0 +1,42 @@
+{
+  "contract": "CH_ACTOR_VALIDATED_V1",
+  "source": "user_validated_ch_actor_lab_html_2026-09-30",
+  "status": "LOCKED_BASELINE",
+  "frame": {"width": 48, "height": 64, "groundAnchor": [24, 60], "anchorOffsetPx": 4},
+  "camera": {"contract": "CH_CAMERA_V1", "projection": "orthographic", "yawDeg": 45, "pitchDeg": 30, "orthoHeight": 1.35, "targetY": 0.475},
+  "animation": {
+    "frameCount": 8,
+    "phases": [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875],
+    "legSwingRad": 0.32,
+    "armSwingRad": 0.18,
+    "verticalBounce": 0.004,
+    "kneeAdvance": -0.30,
+    "kneeTransfer": -0.08,
+    "rootTranslationPx": [0, 0],
+    "policy": "treadmill_in_place"
+  },
+  "directions": [
+    {"logical": "S", "screen": "SW", "row": 0, "angleRad": 1.5707963267948966},
+    {"logical": "E", "screen": "SE", "row": 1, "angleRad": 0.0},
+    {"logical": "W", "screen": "NW", "row": 2, "angleRad": 3.141592653589793},
+    {"logical": "N", "screen": "NE", "row": 3, "angleRad": -1.5707963267948966}
+  ],
+  "lighting": {
+    "ambient": {"color": "#ffffff", "intensity": 0.75},
+    "sun": {"color": "#ffffff", "intensity": 0.85, "position": [-6, 14, 9]},
+    "bounce": {"color": "#94a3b8", "intensity": 0.30, "position": [6, -2, -6]}
+  },
+  "locks": {
+    "camera": true,
+    "directions": true,
+    "root": true,
+    "torsoParenting": true,
+    "headParentedToTorso": true,
+    "walkFormula": true,
+    "groundAnchor": true,
+    "costumeMayModifyMotion": false,
+    "costumeMayAddHeadYaw": false
+  },
+  "productionMotionContract": "tools/ch_actor_lab/motion/ch_actor_walk_v1.json",
+  "policy": "Character variants are skins/costumes of this actor. Do not replace the actor, rig, camera, direction mapping or locomotion to author appearance."
+}
