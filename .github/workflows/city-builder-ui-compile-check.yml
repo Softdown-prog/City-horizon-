@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - terrain-construction-gameplay
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
