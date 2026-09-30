@@ -30,6 +30,7 @@ MIGRATED_REQUIREMENTS = {
     "tile_surface_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "park_fence_renderer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
     "building_block_preview_renderer.cpp": ("authoring_projection.h", "projectAuthoringGround"),
+    "building_projected_shadow_renderer.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "map_capture_service.cpp": ("tilePolygonAtElevation", "world_to_screen_point"),
     "procedural_road_preview_main.cpp": ("world_to_screen_point", "screen_to_world_point"),
 }
