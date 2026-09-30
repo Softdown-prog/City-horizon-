@@ -1,8 +1,9 @@
 """Guarded CH Blender authoring for roller-coaster corkscrew elements.
 
-This builder now uses CH_COASTER_GEOMETRY_SOLVER_V1: arc-length sampling,
-clothoid-style curvature ramps, parallel-transport frames, and independent
-track roll. Runtime remains pre-rendered 2D; Blender is authoring only.
+V11 uses the validated analytic circular helix as the inversion core. The core
+itself supplies the 360-degree orientation change; no second artificial roll is
+applied. Straight connectors are joined to the helix with deterministic cubic
+Hermite tangent transitions.
 """
 
 from __future__ import annotations
@@ -29,13 +30,13 @@ import coaster_geometry_solver as geometry  # noqa: E402
 
 ASSET_ID = "ride.coaster.track_v0"
 VALID_PIECES = ("corkscrew_left", "corkscrew_right")
-CORKSCREW_LENGTH = base.TILE * 5.8
-APPROACH_LENGTH = base.TILE * 0.90
-HELIX_RADIUS = base.TILE * 0.58
-TRANSITION_FRACTION = 0.18
-ROLL_RAMP_FRACTION = 0.20
-BODY_SAMPLES = 281
-APPROACH_SAMPLES = 33
+HELIX_RADIUS = base.TILE * 0.62
+HELIX_PITCH = base.TILE * 3.6
+TRANSITION_LENGTH = base.TILE * 1.15
+STRAIGHT_LENGTH = base.TILE * 0.75
+HELIX_SAMPLES = 241
+TRANSITION_SAMPLES = 49
+STRAIGHT_SAMPLES = 25
 FOOTPRINT = {"widthTiles": 4, "depthTiles": 8}
 
 
@@ -55,81 +56,144 @@ def handedness(piece: str) -> float:
     return 1.0 if piece == "corkscrew_left" else -1.0
 
 
-def _shift_sample(sample: geometry.CurveSample, offset: Vector) -> geometry.CurveSample:
-    return geometry.CurveSample(
+def _frame_from_tangent(tangent: Vector):
+    tangent = tangent.normalized()
+    up = Vector((0.0, 0.0, 1.0))
+    up = up - tangent * up.dot(tangent)
+    if up.length < 1.0e-8:
+        up = Vector((1.0, 0.0, 0.0))
+        up = up - tangent * up.dot(tangent)
+    up.normalize()
+    right = tangent.cross(up).normalized()
+    up = right.cross(tangent).normalized()
+    return tangent, right, up
+
+
+def _hermite_point_and_tangent(p0: Vector, p1: Vector, t0: Vector, t1: Vector, u: float, scale: float):
+    u2 = u * u
+    u3 = u2 * u
+    h00 = 2.0 * u3 - 3.0 * u2 + 1.0
+    h10 = u3 - 2.0 * u2 + u
+    h01 = -2.0 * u3 + 3.0 * u2
+    h11 = u3 - u2
+    m0 = t0.normalized() * scale
+    m1 = t1.normalized() * scale
+    point = p0 * h00 + m0 * h10 + p1 * h01 + m1 * h11
+
+    dh00 = 6.0 * u2 - 6.0 * u
+    dh10 = 3.0 * u2 - 4.0 * u + 1.0
+    dh01 = -6.0 * u2 + 6.0 * u
+    dh11 = 3.0 * u2 - 2.0 * u
+    deriv = p0 * dh00 + m0 * dh10 + p1 * dh01 + m1 * dh11
+    if deriv.length < 1.0e-8:
+        deriv = t0.lerp(t1, u)
+    return point, deriv.normalized()
+
+
+def _append_flat_sample(samples, point: Vector, tangent: Vector, curvature: float = 0.0):
+    tangent, right, up = _frame_from_tangent(tangent)
+    samples.append(geometry.CurveSample(0.0, point, tangent, right, up, curvature, 0.0))
+
+
+def _reparameterize(samples):
+    if not samples:
+        return []
+    out = []
+    s = 0.0
+    prev = samples[0].position
+    for i, sample in enumerate(samples):
+        if i:
+            s += (sample.position - prev).length
+            prev = sample.position
+        out.append(geometry.CurveSample(
+            s,
+            sample.position.copy(),
+            sample.tangent.copy(),
+            sample.right.copy(),
+            sample.up.copy(),
+            sample.curvature,
+            sample.curvature_plane_angle,
+        ))
+    return out
+
+
+def sample_centerline(piece: str):
+    """Straight -> tangent transition -> exact analytic helix -> transition -> straight."""
+    sign = handedness(piece)
+    core, core_meta = geometry.sample_analytic_helix_reference(
+        radius=HELIX_RADIUS,
+        pitch_per_turn=HELIX_PITCH,
+        turns=1.0,
+        samples=HELIX_SAMPLES,
+        handedness=sign,
+        base_z=base.RAIL_Z,
+    )
+
+    # Center the one-turn helix longitudinally around Y=0.
+    core_shift = Vector((0.0, -0.5 * HELIX_PITCH, 0.0))
+    shifted_core = [geometry.CurveSample(
         sample.s,
-        sample.position + offset,
+        sample.position + core_shift,
         sample.tangent.copy(),
         sample.right.copy(),
         sample.up.copy(),
         sample.curvature,
         sample.curvature_plane_angle,
-    )
+    ) for sample in core]
 
+    first = shifted_core[0]
+    last = shifted_core[-1]
+    entry_transition_start = Vector((0.0, first.position.y - TRANSITION_LENGTH, base.RAIL_Z))
+    exit_transition_end = Vector((0.0, last.position.y + TRANSITION_LENGTH, base.RAIL_Z))
+    entry_straight_start = entry_transition_start - Vector((0.0, STRAIGHT_LENGTH, 0.0))
+    exit_straight_end = exit_transition_end + Vector((0.0, STRAIGHT_LENGTH, 0.0))
+    forward = Vector((0.0, 1.0, 0.0))
 
-def sample_centerline(piece: str):
-    """Build straight connectors plus one solver-driven corkscrew body."""
-    body_length = CORKSCREW_LENGTH - 2.0 * APPROACH_LENGTH
-    pitch_per_turn = body_length
-    sign = handedness(piece)
-
-    body, solver_meta = geometry.sample_engineering_corkscrew(
-        total_length=body_length,
-        samples=BODY_SAMPLES,
-        helix_radius=HELIX_RADIUS,
-        pitch_per_turn=pitch_per_turn,
-        handedness=sign,
-        base_z=base.RAIL_Z,
-        transition_fraction=TRANSITION_FRACTION,
-        roll_ramp_fraction=ROLL_RAMP_FRACTION,
-    )
-
-    # The solver starts its body centered around Y=0. Add deterministic straight
-    # connectors using the exact solved endpoint tangent/frame.
-    first = body[0]
-    last = body[-1]
     samples = []
+    for i in range(STRAIGHT_SAMPLES):
+        u = i / float(STRAIGHT_SAMPLES - 1)
+        p = entry_straight_start.lerp(entry_transition_start, u)
+        _append_flat_sample(samples, p, forward)
 
-    for i in range(APPROACH_SAMPLES):
-        u = i / float(APPROACH_SAMPLES - 1)
-        distance = APPROACH_LENGTH * (1.0 - u)
-        pos = first.position - first.tangent * distance
-        samples.append(geometry.CurveSample(
-            -distance,
-            pos,
-            first.tangent.copy(),
-            first.right.copy(),
-            first.up.copy(),
-            0.0,
-            first.curvature_plane_angle,
-        ))
+    hermite_scale = TRANSITION_LENGTH * 1.15
+    for i in range(1, TRANSITION_SAMPLES):
+        u = i / float(TRANSITION_SAMPLES - 1)
+        p, tangent = _hermite_point_and_tangent(
+            entry_transition_start, first.position, forward, first.tangent, u, hermite_scale
+        )
+        _append_flat_sample(samples, p, tangent)
 
-    # Avoid duplicating the first body sample.
-    samples.extend(body[1:])
+    # The validated analytic helix supplies both the centerline and the full
+    # orientation inversion. Do not layer another 360-degree roll over it.
+    samples.extend(shifted_core[1:])
 
-    base_s = samples[-1].s if samples else body_length
-    for i in range(1, APPROACH_SAMPLES):
-        u = i / float(APPROACH_SAMPLES - 1)
-        distance = APPROACH_LENGTH * u
-        pos = last.position + last.tangent * distance
-        samples.append(geometry.CurveSample(
-            body_length + distance,
-            pos,
-            last.tangent.copy(),
-            last.right.copy(),
-            last.up.copy(),
-            0.0,
-            last.curvature_plane_angle,
-        ))
+    for i in range(1, TRANSITION_SAMPLES):
+        u = i / float(TRANSITION_SAMPLES - 1)
+        p, tangent = _hermite_point_and_tangent(
+            last.position, exit_transition_end, last.tangent, forward, u, hermite_scale
+        )
+        _append_flat_sample(samples, p, tangent)
 
-    solver_meta.update({
-        "elementLength": CORKSCREW_LENGTH,
-        "bodyLength": body_length,
-        "approachLength": APPROACH_LENGTH,
-        "bodySamples": BODY_SAMPLES,
-        "approachSamples": APPROACH_SAMPLES,
+    for i in range(1, STRAIGHT_SAMPLES):
+        u = i / float(STRAIGHT_SAMPLES - 1)
+        p = exit_transition_end.lerp(exit_straight_end, u)
+        _append_flat_sample(samples, p, forward)
+
+    samples = _reparameterize(samples)
+    meta = dict(core_meta)
+    meta.update({
+        "profile": "analytic_helix_core_with_hermite_tangent_transitions_v1",
+        "helixIsSoleInversionSource": True,
+        "independentRollDegrees": 0.0,
+        "transitionType": "cubic_hermite_tangent_match",
+        "transitionLength": TRANSITION_LENGTH,
+        "straightLength": STRAIGHT_LENGTH,
+        "helixSamples": HELIX_SAMPLES,
+        "transitionSamples": TRANSITION_SAMPLES,
+        "straightSamples": STRAIGHT_SAMPLES,
+        "totalSampledArcLength": samples[-1].s,
     })
-    return samples, solver_meta
+    return samples, meta
 
 
 def build_piece(piece: str):
@@ -157,25 +221,15 @@ def build_piece(piece: str):
         tangent, right, up = frames[idx]
         p = centerline[idx] - up * 0.11
         authored.append(banked.add_oriented_box(
-            f"Tie_{n:03d}",
-            p,
+            f"Tie_{n:03d}", p,
             (base.TIE_HALF_WIDTH, base.TIE_HALF_DEPTH, base.TIE_HALF_HEIGHT),
-            ties_mat,
-            "coaster.tie",
-            right,
-            tangent,
-            up,
+            ties_mat, "coaster.tie", right, tangent, up,
         ))
 
+    # Keep support frames away from the inversion core until the new geometry is
+    # visually approved; supports sit on straight/shoulder regions only.
     last = len(centerline) - 1
-    support_indices = sorted(set((
-        0,
-        len(centerline) // 10,
-        len(centerline) // 5,
-        (len(centerline) * 4) // 5,
-        (len(centerline) * 9) // 10,
-        last,
-    )))
+    support_indices = sorted(set((0, STRAIGHT_SAMPLES - 1, last - STRAIGHT_SAMPLES + 1, last)))
     for n, idx in enumerate(support_indices):
         base.build_support_frame(
             authored,
@@ -194,15 +248,15 @@ def write_metadata(output: Path, piece: str, centerline, solved, solver_meta):
         "assetId": ASSET_ID,
         "piece": piece,
         "corkscrewContract": "CH_COASTER_CORKSCREW_V0",
-        "profile": "single_inversion_v10_geometry_solver_v1",
+        "profile": "single_inversion_v11_analytic_helix_core",
         "geometrySolver": solver_meta,
         "blenderUnitsPerTile": base.TILE,
         "footprint": FOOTPRINT,
-        "length": CORKSCREW_LENGTH,
         "helixRadius": HELIX_RADIUS,
-        "transitionFraction": TRANSITION_FRACTION,
-        "rollRampFraction": ROLL_RAMP_FRACTION,
-        "curvatureSamples": [round(sample.curvature, 8) for sample in solved],
+        "helixPitch": HELIX_PITCH,
+        "transitionLength": TRANSITION_LENGTH,
+        "straightLength": STRAIGHT_LENGTH,
+        "independentRollDegrees": 0.0,
         "centerline": [[round(p.x, 6), round(p.y, 6), round(p.z, 6)] for p in centerline],
         "entry": base.payload_endpoint(centerline, 0),
         "exit": base.payload_endpoint(centerline, -1),
