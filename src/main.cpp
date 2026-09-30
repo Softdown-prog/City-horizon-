@@ -23,8 +23,8 @@
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
-// 19. Terrain raise/lower/smooth are player-facing construction catalog tools while
-//     H/J/N remain keyboard shortcuts for the same canonical heightfield operations.
+// 19. Terrain raise/lower/smooth are exposed as construction catalog tools while
+//     preserving H/J/N as shortcuts into the same canonical runtime heightfield.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -34,7 +34,6 @@
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
 #include "simulation_clock.h"
-#include "src/ch_core/terrain_heightfield.h"
 #include "src/runtime_view_state.h"
 #include "src/runtime_map_renderer.h"
 #include "src/runtime_game_state.h"
@@ -42,7 +41,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <optional>
 
 namespace ch {
@@ -254,15 +252,13 @@ public:
                                 const int viewport_width,
                                 const int viewport_height,
                                 std::optional<std::uint64_t>* selected_pedestrian_id,
-                                const bool world_selection_enabled,
-                                std::function<void(ch::TerrainBrushMode)> terrain_tool_activation) {
+                                const bool world_selection_enabled) {
         pedestrians_ = pedestrians;
         camera_ = camera;
         viewport_width_ = viewport_width;
         viewport_height_ = viewport_height;
         selected_pedestrian_id_ = selected_pedestrian_id;
         world_selection_enabled_ = world_selection_enabled;
-        terrain_tool_activation_ = std::move(terrain_tool_activation);
     }
 
     [[nodiscard]] UiInputResult handle_mouse_button_down(const float mouse_x,
@@ -270,17 +266,20 @@ public:
                                                          const bool primary_button) {
         UiInputResult result = ChRuntimeGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
 
-        // Terrain sculpting is construction gameplay.  The cards invoke the
-        // same canonical runtime activation used by H/J/N; only the entry point
-        // moves into the player-facing construction catalog.
-        if (result.action && result.action->action == UiAction::select_building && terrain_tool_activation_) {
-            std::optional<ch::TerrainBrushMode> mode;
-            if (result.action->payload == "terrain_raise_tool") mode = ch::TerrainBrushMode::raise;
-            else if (result.action->payload == "terrain_lower_tool") mode = ch::TerrainBrushMode::lower;
-            else if (result.action->payload == "terrain_smooth_tool") mode = ch::TerrainBrushMode::smooth;
+        // The terrain tools live in the construction catalog, but activation is
+        // deliberately routed through the existing H/J/N runtime commands so
+        // there is still only one canonical heightfield implementation.
+        if (result.action && result.action->action == UiAction::select_building) {
+            SDL_Scancode shortcut = SDL_SCANCODE_UNKNOWN;
+            if (result.action->payload == "terrain_raise_tool") shortcut = SDL_SCANCODE_H;
+            else if (result.action->payload == "terrain_lower_tool") shortcut = SDL_SCANCODE_J;
+            else if (result.action->payload == "terrain_smooth_tool") shortcut = SDL_SCANCODE_N;
 
-            if (mode) {
-                terrain_tool_activation_(*mode);
+            if (shortcut != SDL_SCANCODE_UNKNOWN) {
+                SDL_Event event{};
+                event.type = SDL_EVENT_KEY_DOWN;
+                event.key.scancode = shortcut;
+                (void)SDL_PushEvent(&event);
                 result.action.reset();
                 return result;
             }
@@ -306,7 +305,6 @@ private:
     int viewport_height_ = 1;
     std::optional<std::uint64_t>* selected_pedestrian_id_ = nullptr;
     bool world_selection_enabled_ = false;
-    std::function<void(ch::TerrainBrushMode)> terrain_tool_activation_;
 };
 
 #define parcels() world_parcels()
@@ -412,8 +410,7 @@ private:
         gameplay_ui.bind_selection_context( \
             &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \
             placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
-            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none, \
-            [&](const ch::TerrainBrushMode mode) { begin_terrain_relief_mode(mode); }); \
+            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
