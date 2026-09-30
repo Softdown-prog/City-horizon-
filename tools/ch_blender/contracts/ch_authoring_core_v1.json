@@ -1,0 +1,36 @@
+{
+  "contract": "CH_AUTHORING_CORE_V1",
+  "purpose": "high_level_stylized_asset_authoring_for_2d_prerender",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered",
+  "authoring": {
+    "singlePhysicalModel": true,
+    "directionViewsFromRootRotation": true,
+    "rawBpyInAssetRecipes": "discouraged",
+    "preferredInterface": "CH_AUTHORING_RECIPE_V1"
+  },
+  "primitives": [
+    "soft_form",
+    "tapered_segment",
+    "rounded_box",
+    "curve_tube",
+    "torus"
+  ],
+  "materials": {
+    "defaultRoughness": 0.82,
+    "defaultSpecular": 0.16,
+    "defaultMetallic": 0.0,
+    "goal": "stylized_readability_after_downsampling"
+  },
+  "rules": [
+    "One physical asset must own all canonical directions unless the asset contract explicitly says otherwise.",
+    "Changing direction must rotate the physical root, not rebuild independent silhouette geometry.",
+    "Asset recipes should describe semantic forms instead of raw Blender operators.",
+    "Visual review at enlarged resolution is required before final sprite bake.",
+    "The Blender source tree may be modified only when the Python/API layer cannot implement a required capability cleanly."
+  ],
+  "qualityGate": {
+    "preflight": true,
+    "proxyReview": true,
+    "finalAfterApproval": true
+  }
+}
