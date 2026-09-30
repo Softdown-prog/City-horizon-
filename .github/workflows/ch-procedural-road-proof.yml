@@ -79,7 +79,8 @@ jobs:
           assert png.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
           data = json.loads(report.read_text(encoding='utf-8'))
           assert data['contract'] == 'CH_MATH_REPORT_V1'
-          assert data['status'] == 'ok'
+          assert data['workerContract'] == 'CH_MATH_WORKER_V1'
+          assert isinstance(data.get('result'), dict) and data['result']
           print('Procedural road editor + ground gate + PNG proof: OK')
           PY
 
