@@ -206,6 +206,15 @@ add_executable(MapForge2ProceduralRoadPreview
 target_include_directories(MapForge2ProceduralRoadPreview PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2ProceduralRoadPreview PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
 
+# CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves that the
+# MapForge rollout admits ground roads while rejecting elevated/mixed-height
+# geometry before any bridge/viaduct rendering reaches the canonical viewport.
+add_executable(MapForge2ProceduralRoadGroundRenderPlanTest
+    ${CH_ROOT}/src/procedural_road_ground_render_plan_test.cpp
+)
+target_include_directories(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE ${CH_ROOT})
+target_link_libraries(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE mapforge2_render mapforge2_canonical)
+
 add_executable(MapForge2UiPausePreview
     src/ui_pause_preview_main.cpp
 )
@@ -244,6 +253,7 @@ if(MSVC)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ParkFencePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ProceduralRoadPreview PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2UiPausePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2MapCapture PRIVATE /W4 /permissive- /utf-8)
@@ -263,6 +273,7 @@ else()
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ParkFencePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ProceduralRoadPreview PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2UiPausePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2MapCapture PRIVATE -Wall -Wextra -Wpedantic)
