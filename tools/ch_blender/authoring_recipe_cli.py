@@ -11,6 +11,7 @@ KINDS = {
     "soft_form": ("location", "scale"),
     "tapered_segment": ("start", "end", "radiusStart", "radiusEnd"),
     "loft_form": ("location", "profiles"),
+    "blob_cluster": ("elements",),
     "rounded_box": ("location", "size"),
     "curve_tube": ("points", "radius"),
     "torus": ("location", "majorRadius", "minorRadius"),
@@ -102,6 +103,26 @@ def validate(data: dict) -> list[str]:
                         if previous_z is not None and z <= previous_z:
                             errors.append(f"{pp}: z values must be strictly increasing")
                         previous_z = z
+
+        if kind == "blob_cluster":
+            elements = part.get("elements")
+            if not isinstance(elements, list) or not elements:
+                errors.append(f"{prefix} ({part_id}): elements must contain at least one entry")
+            else:
+                for element_index, element in enumerate(elements):
+                    ep = f"{prefix} ({part_id}) elements[{element_index}]"
+                    if not isinstance(element, dict):
+                        errors.append(f"{ep}: must be an object")
+                        continue
+                    if "location" not in element:
+                        errors.append(f"{ep}: missing location")
+                    radius = element.get("radius")
+                    if not isinstance(radius, (int, float)) or float(radius) <= 0:
+                        errors.append(f"{ep}: radius must be > 0")
+                    if "stiffness" in element:
+                        stiffness = element["stiffness"]
+                        if not isinstance(stiffness, (int, float)) or not 0.01 <= float(stiffness) <= 10.0:
+                            errors.append(f"{ep}: stiffness must be in [0.01, 10.0]")
 
         material = part.get("material")
         if material is not None and material not in materials:
