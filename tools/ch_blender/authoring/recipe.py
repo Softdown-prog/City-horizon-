@@ -47,6 +47,62 @@ def _vec(value, points: Mapping[str, Vector]) -> Vector:
     raise TypeError(f"Expected point name, point+offset, or xyz vector, got {value!r}")
 
 
+def _profile_value(profile: Mapping[str, object], key: str) -> float:
+    value = float(profile.get(key, 1.0))
+    if not 0.55 <= value <= 1.45:
+        raise ValueError(f"proportions.{key} must be in [0.55, 1.45], got {value}")
+    return value
+
+
+def apply_proportion_profile(
+    recipe: Mapping[str, object],
+    points: Mapping[str, Vector],
+) -> dict[str, Vector]:
+    """Apply semantic character proportions while keeping feet planted.
+
+    ``legLength`` scales hip/knee/ankle from each foot so the ground contact is
+    unchanged. The resulting average hip shift moves pelvis/torso with the legs.
+    ``torsoLength`` scales upper-body landmarks from the shifted pelvis and
+    ``armLength`` scales elbow/hand from each transformed shoulder. Defaults are
+    1.0, so existing assets are byte-for-byte equivalent until they opt in.
+    """
+    profile = recipe.get("proportions", {})
+    if not isinstance(profile, Mapping) or not profile:
+        return {name: point.copy() for name, point in points.items()}
+
+    leg_length = _profile_value(profile, "legLength")
+    torso_length = _profile_value(profile, "torsoLength")
+    arm_length = _profile_value(profile, "armLength")
+
+    out = {name: point.copy() for name, point in points.items()}
+    old_hip_mid = (points["hip_L"] + points["hip_R"]) * 0.5
+
+    for label in ("L", "R"):
+        foot = points[f"foot_{label}"]
+        for joint in ("ankle", "knee", "hip"):
+            key = f"{joint}_{label}"
+            out[key] = foot + (points[key] - foot) * leg_length
+
+    new_hip_mid = (out["hip_L"] + out["hip_R"]) * 0.5
+    hip_shift = new_hip_mid - old_hip_mid
+    out["pelvis"] = points["pelvis"] + hip_shift
+
+    for name in ("chest", "neck", "head", "head_top"):
+        out[name] = out["pelvis"] + (points[name] - points["pelvis"]) * torso_length
+
+    for label in ("L", "R"):
+        shoulder_key = f"shoulder_{label}"
+        old_shoulder = points[shoulder_key]
+        out[shoulder_key] = out["pelvis"] + (old_shoulder - points["pelvis"]) * torso_length
+        for joint in ("elbow", "hand"):
+            key = f"{joint}_{label}"
+            out[key] = out[shoulder_key] + (points[key] - old_shoulder) * arm_length
+
+    # Root/feet remain untouched by design, so ground contact and treadmill
+    # translation invariants stay under the canonical runtime contract.
+    return out
+
+
 def _material(
     builder: CharacterAuthoring,
     materials: dict,
