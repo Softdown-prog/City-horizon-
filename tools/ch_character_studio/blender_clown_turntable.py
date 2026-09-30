@@ -1,27 +1,30 @@
-"""Render one physical clown model through the four canonical CH Actor directions.
+"""Render one physical clown authored by CH Blender Authoring Core.
 
-V2 fixes the visual failure of the first proxy: the character is authored once in
-South-local space, parented to one root and the root is rotated for E/N/W. No
-independent directional silhouette authoring is allowed.
+The character is built exactly once in South-local space. Canonical S/E/N/W
+views are produced only by rotating the physical root. No directional geometry
+re-authoring or cross-direction raster warping is allowed.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import math
 import shutil
 import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+REPO_ROOT = SCRIPT_DIR.parents[1]
+CH_BLENDER_DIR = REPO_ROOT / "tools" / "ch_blender"
+for candidate in (SCRIPT_DIR, CH_BLENDER_DIR):
+    if str(candidate) not in sys.path:
+        sys.path.insert(0, str(candidate))
 
 import bpy
 from mathutils import Vector
 
 import blender_character_base as base
+from authoring import CharacterAuthoring
 
 DIRECTIONS = ("S", "E", "N", "W")
 FRAME = base.FRAME
@@ -59,6 +62,7 @@ def sha256(path: Path) -> str:
 
 
 def remove_generic_actor_geometry() -> None:
+    """Keep canonical camera/lights and delete the generic visible actor."""
     keep = {"CH_ACTOR_CAMERA", "CH_KEY_LIGHT", "CH_FILL_LIGHT"}
     for obj in list(bpy.data.objects):
         if obj.name in keep or obj.type in {"CAMERA", "LIGHT"}:
@@ -66,114 +70,110 @@ def remove_generic_actor_geometry() -> None:
         bpy.data.objects.remove(obj, do_unlink=True)
 
 
-def mat(spec: dict, key: str, fallback: str, name: str):
-    value = spec.get("appearance", {}).get("palette", {}).get(key, fallback)
-    return base.material(name, value)
+def palette_value(spec: dict, key: str, fallback: str) -> str:
+    return spec.get("appearance", {}).get("palette", {}).get(key, fallback)
 
 
-def add_ellipsoid(name: str, point, scale, material, root):
-    obj = base.add_uv_sphere(name, Vector(point), scale, material)
-    obj.parent = root
-    return obj
-
-
-def add_capsule(name: str, a: Vector, b: Vector, radius: float, material, root):
-    delta = b - a
-    length = max(delta.length, 0.001)
-    mid = (a + b) * 0.5
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=radius, depth=length, location=mid)
-    obj = bpy.context.object
-    obj.name = name
-    obj.data.materials.append(material)
-    obj.rotation_mode = "QUATERNION"
-    obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(delta.normalized())
-    obj.parent = root
-    for suffix, p in (("A", a), ("B", b)):
-        joint = base.add_uv_sphere(f"{name}_{suffix}", p, (radius, radius, radius), material)
-        joint.parent = root
-    return obj
-
-
-def add_beveled_box(name: str, point, scale, material, root, bevel=0.035):
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=Vector(point))
-    obj = bpy.context.object
-    obj.name = name
-    obj.scale = scale
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    obj.data.materials.append(material)
-    modifier = obj.modifiers.new("SoftEdges", "BEVEL")
-    modifier.width = bevel
-    modifier.segments = 3
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.shade_smooth()
-    obj.parent = root
-    return obj
-
-
-def build_clown_once(spec: dict) -> tuple[bpy.types.Object, dict[str, Vector]]:
-    """Build the physical character exactly once in South-local space."""
+def build_clown(spec: dict) -> tuple[CharacterAuthoring, dict[str, Vector]]:
+    """Build one stylized physical clown using semantic high-level forms."""
     points = base.pose_points(spec, "S", "idle")
-    root = bpy.data.objects.new("CH_CLOWN_PHYSICAL_ROOT", None)
-    bpy.context.collection.objects.link(root)
+    ch = CharacterAuthoring("CH_CLOWN")
 
-    skin = mat(spec, "skin", "#f3c7ad", "CH_CLOWN_SKIN")
-    hair = mat(spec, "hair", "#d43b2f", "CH_CLOWN_HAIR")
-    red = mat(spec, "primary", "#d43b2f", "CH_CLOWN_RED")
-    blue = mat(spec, "secondary", "#2b71c9", "CH_CLOWN_BLUE")
-    yellow = mat(spec, "accent", "#f2d744", "CH_CLOWN_YELLOW")
-    shoes = mat(spec, "shoes", "#26313a", "CH_CLOWN_SHOES")
-    white = base.material("CH_CLOWN_WHITE", "#f4f2e3")
-    nose_mat = base.material("CH_CLOWN_NOSE", "#df3b36")
-    eye_mat = base.material("CH_CLOWN_EYES", "#262220")
-    purple = base.material("CH_CLOWN_BOW", "#8b5cf6")
+    skin = ch.material("SKIN", palette_value(spec, "skin", "#f3c7ad"), roughness=0.90, specular=0.08)
+    hair = ch.material("HAIR", palette_value(spec, "hair", "#d43b2f"), roughness=0.88, specular=0.10)
+    red = ch.material("RED", palette_value(spec, "primary", "#d43b2f"))
+    blue = ch.material("BLUE", palette_value(spec, "secondary", "#2b71c9"))
+    yellow = ch.material("YELLOW", palette_value(spec, "accent", "#f2d744"))
+    shoes = ch.material("SHOES", palette_value(spec, "shoes", "#26313a"), roughness=0.76, specular=0.12)
+    white = ch.material("WHITE", "#f4f2e3", roughness=0.94, specular=0.05)
+    nose = ch.material("NOSE", "#df3b36", roughness=0.86, specular=0.08)
+    eye = ch.material("EYE", "#262220", roughness=0.92, specular=0.04)
+    purple = ch.material("BOW", "#8b5cf6", roughness=0.84, specular=0.08)
 
-    # Head is intentionally readable and smaller than the failed V1 mushroom mass.
-    add_ellipsoid("Head", (0.0, 0.0, 1.52), (0.135, 0.125, 0.165), skin, root)
-    add_ellipsoid("Neck", (0.0, 0.0, 1.335), (0.058, 0.058, 0.075), skin, root)
-    add_ellipsoid("EarL", (-0.135, 0.0, 1.53), (0.028, 0.020, 0.040), skin, root)
-    add_ellipsoid("EarR", (0.135, 0.0, 1.53), (0.028, 0.020, 0.040), skin, root)
+    # Head and neck. The head remains compact so hair owns the clown silhouette.
+    ch.soft("head", (0.0, 0.0, 1.52), (0.132, 0.122, 0.158), skin)
+    ch.soft("neck", (0.0, 0.0, 1.34), (0.057, 0.057, 0.072), skin)
+    ch.soft("ear_L", (-0.132, 0.0, 1.53), (0.027, 0.019, 0.038), skin)
+    ch.soft("ear_R", (0.132, 0.0, 1.53), (0.027, 0.019, 0.038), skin)
 
-    # Hair is a ring of small curls around the side/back, not three giant ellipsoids.
-    curls = [
-        (-0.145, 0.015, 1.60), (-0.115, 0.055, 1.655), (-0.055, 0.085, 1.68),
-        (0.055, 0.085, 1.68), (0.115, 0.055, 1.655), (0.145, 0.015, 1.60),
-        (-0.10, 0.105, 1.59), (0.0, 0.115, 1.61), (0.10, 0.105, 1.59),
-    ]
-    for index, p in enumerate(curls):
-        add_ellipsoid(f"HairCurl_{index:02d}", p, (0.060, 0.052, 0.060), hair, root)
+    # Hairstyle = one semantic cluster, not three giant spheres. Most volume is
+    # side/back so the face remains readable from the canonical South view.
+    ch.hair_lobes(
+        "hair",
+        [
+            {"location": (-0.142, 0.018, 1.605), "scale": (0.058, 0.050, 0.060)},
+            {"location": (-0.118, 0.060, 1.657), "scale": (0.057, 0.052, 0.058)},
+            {"location": (-0.063, 0.094, 1.681), "scale": (0.055, 0.052, 0.056)},
+            {"location": (0.000, 0.108, 1.690), "scale": (0.054, 0.052, 0.054)},
+            {"location": (0.063, 0.094, 1.681), "scale": (0.055, 0.052, 0.056)},
+            {"location": (0.118, 0.060, 1.657), "scale": (0.057, 0.052, 0.058)},
+            {"location": (0.142, 0.018, 1.605), "scale": (0.058, 0.050, 0.060)},
+            {"location": (-0.095, 0.115, 1.598), "scale": (0.052, 0.048, 0.052)},
+            {"location": (0.095, 0.115, 1.598), "scale": (0.052, 0.048, 0.052)},
+        ],
+        hair,
+    )
 
-    # Small facial volumes on the physical front (-depth).
-    add_ellipsoid("Nose", (0.0, -0.128, 1.515), (0.042, 0.030, 0.042), nose_mat, root)
-    add_ellipsoid("EyeL", (-0.047, -0.119, 1.565), (0.014, 0.010, 0.018), eye_mat, root)
-    add_ellipsoid("EyeR", (0.047, -0.119, 1.565), (0.014, 0.010, 0.018), eye_mat, root)
+    # Facial landmarks live only on the physical front. Rotation/occlusion decides
+    # whether they are visible in E/N/W; no direction-specific face is authored.
+    ch.soft("nose", (0.0, -0.126, 1.515), (0.040, 0.029, 0.040), nose)
+    ch.soft("eye_L", (-0.046, -0.116, 1.566), (0.013, 0.009, 0.017), eye)
+    ch.soft("eye_R", (0.046, -0.116, 1.566), (0.013, 0.009, 0.017), eye)
 
-    # Jacket: compact rounded volume instead of balloon torso.
-    add_beveled_box("Jacket", (0.0, 0.0, 1.045), (0.39, 0.27, 0.48), red, root, bevel=0.070)
-    add_ellipsoid("Waist", (0.0, 0.0, 0.785), (0.165, 0.115, 0.105), red, root)
+    # Jacket is a compact rounded shell. It deliberately avoids the former balloon
+    # ellipsoid so the waist/shoulders read as clothing rather than a red abdomen.
+    ch.box("jacket", (0.0, 0.0, 1.055), (0.345, 0.225, 0.405), red, bevel=0.060, bevel_segments=4)
+    ch.soft("waist", (0.0, 0.0, 0.825), (0.150, 0.102, 0.085), red)
 
-    # Ruff made from smaller puffs following the neck circumference.
-    for index, (x, y) in enumerate(((-0.12, 0.0), (-0.06, -0.03), (0.0, -0.04), (0.06, -0.03), (0.12, 0.0), (0.0, 0.045))):
-        add_ellipsoid(f"Ruff_{index:02d}", (x, y, 1.305), (0.055, 0.045, 0.040), white, root)
+    # Ruff is a real toroidal collar plus two front puffs for the old-tycoon read.
+    ch.ring("ruff_ring", (0.0, 0.0, 1.305), 0.092, 0.030, white)
+    ch.soft("ruff_front_L", (-0.055, -0.065, 1.300), (0.055, 0.034, 0.037), white)
+    ch.soft("ruff_front_R", (0.055, -0.065, 1.300), (0.055, 0.034, 0.037), white)
 
-    # Bow-tie front only.
-    add_ellipsoid("BowL", (-0.038, -0.145, 1.225), (0.050, 0.024, 0.040), purple, root)
-    add_ellipsoid("BowR", (0.038, -0.145, 1.225), (0.050, 0.024, 0.040), purple, root)
+    ch.soft("bow_L", (-0.038, -0.137, 1.225), (0.047, 0.022, 0.037), purple)
+    ch.soft("bow_R", (0.038, -0.137, 1.225), (0.047, 0.022, 0.037), purple)
 
+    # Tapered sleeves are wider at the shoulder/cuff and no longer read as pipes.
     arm_mats = {"L": blue, "R": yellow}
     for label in ("L", "R"):
-        add_capsule(f"SleeveUpper_{label}", points[f"shoulder_{label}"], points[f"elbow_{label}"], 0.052, arm_mats[label], root)
-        add_capsule(f"SleeveLower_{label}", points[f"elbow_{label}"], points[f"hand_{label}"], 0.046, arm_mats[label], root)
-        add_ellipsoid(f"Glove_{label}", points[f"hand_{label}"], (0.055, 0.055, 0.062), white, root)
+        ch.segment(
+            f"sleeve_upper_{label}",
+            points[f"shoulder_{label}"], points[f"elbow_{label}"],
+            0.060, 0.050, arm_mats[label], vertices=24,
+        )
+        ch.segment(
+            f"sleeve_lower_{label}",
+            points[f"elbow_{label}"], points[f"hand_{label}"],
+            0.050, 0.056, arm_mats[label], vertices=24,
+        )
+        ch.soft(f"glove_{label}", points[f"hand_{label}"], (0.056, 0.056, 0.061), white)
 
+    # Trousers taper gently toward the ankle. Each side remains an independent
+    # semantic color region for later color-mask generation.
     leg_mats = {"L": blue, "R": yellow}
     for label in ("L", "R"):
-        add_capsule(f"TrouserUpper_{label}", points[f"hip_{label}"], points[f"knee_{label}"], 0.060, leg_mats[label], root)
-        add_capsule(f"TrouserLower_{label}", points[f"knee_{label}"], points[f"ankle_{label}"], 0.052, leg_mats[label], root)
+        ch.segment(
+            f"trouser_upper_{label}",
+            points[f"hip_{label}"], points[f"knee_{label}"],
+            0.064, 0.057, leg_mats[label], vertices=24,
+        )
+        ch.segment(
+            f"trouser_lower_{label}",
+            points[f"knee_{label}"], points[f"ankle_{label}"],
+            0.057, 0.047, leg_mats[label], vertices=24,
+        )
         foot = points[f"foot_{label}"]
-        shoe = add_ellipsoid(f"Shoe_{label}", (foot.x, foot.y + 0.020, foot.z), (0.082, 0.125, 0.052), shoes, root)
-        shoe.rotation_euler[2] = 0.0
+        # Rounded boxes make shoes wide/flat without the football-shaped ellipsoid.
+        ch.box(
+            f"shoe_{label}",
+            (foot.x, foot.y + 0.035, foot.z + 0.005),
+            (0.155, 0.225, 0.085),
+            shoes,
+            bevel=0.035,
+            bevel_segments=4,
+        )
 
-    return root, points
+    return ch, points
 
 
 def render_supersampled(scene: bpy.types.Scene, direction_dir: Path) -> None:
@@ -195,30 +195,25 @@ def render_supersampled(scene: bpy.types.Scene, direction_dir: Path) -> None:
     bpy.data.images.remove(image)
 
 
-def render_direction(spec: dict, args: argparse.Namespace, direction: str, output_dir: Path) -> dict:
-    # Scene/camera is always created from the same South pose. Direction is applied
-    # only as one root rotation, guaranteeing one physical model in all four views.
+def setup_authoring_scene(spec: dict, args: argparse.Namespace):
+    """Create canonical camera/lights once, then replace the generic actor."""
     _, canonical_camera, _ = base.setup_scene(spec, "S", "idle", args)
     remove_generic_actor_geometry()
-
-    # setup_scene removal also removes lights/root geometry but keeps camera/lights by name.
     scene = bpy.context.scene
-    if scene.camera is None or scene.camera.name not in bpy.data.objects:
-        canonical_camera = base.setup_canonical_camera(scene)
-        scene.camera = canonical_camera
-    else:
-        canonical_camera = scene.camera
+    scene.camera = canonical_camera
+    return scene, canonical_camera
 
-    # Recreate lights if needed after geometry cleanup.
-    if "CH_KEY_LIGHT" not in bpy.data.objects:
-        bpy.ops.object.light_add(type="AREA", location=(-2.5, -3.0, 4.5))
-        key = bpy.context.object; key.name = "CH_KEY_LIGHT"; key.data.energy = 650; key.data.shape = "DISK"; key.data.size = 4.0
-    if "CH_FILL_LIGHT" not in bpy.data.objects:
-        bpy.ops.object.light_add(type="AREA", location=(2.0, 1.0, 2.4))
-        fill = bpy.context.object; fill.name = "CH_FILL_LIGHT"; fill.data.energy = 180; fill.data.size = 3.0
 
-    root, _ = build_clown_once(spec)
-    root.rotation_euler[2] = base.DIRECTION_ANGLE[direction]
+def render_direction(
+    spec: dict,
+    scene: bpy.types.Scene,
+    canonical_camera: bpy.types.Object,
+    character: CharacterAuthoring,
+    direction: str,
+    output_dir: Path,
+) -> dict:
+    character.set_yaw(base.DIRECTION_ANGLE[direction])
+    bpy.context.view_layer.update()
 
     direction_dir = output_dir / direction.lower()
     render_supersampled(scene, direction_dir)
@@ -227,19 +222,21 @@ def render_direction(spec: dict, args: argparse.Namespace, direction: str, outpu
     projected = base.project_landmarks(scene, canonical_camera, direction_points)
     spatial = base.frame_spatial(scene, canonical_camera, projected, direction)
     payload = {
-        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V2",
+        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V3",
         "direction": direction,
         "frame": "idle",
         "frameSize": list(FRAME),
         "reviewSize": [FRAME[0] * SUPERSAMPLE, FRAME[1] * SUPERSAMPLE],
         "groundAnchor": list(ANCHOR),
         "camera": "CH_ACTOR_CAMERA_V1",
+        "authoringCore": "CH_AUTHORING_CORE_V1",
         "proxy": {
-            "contract": "CH_CLOWN_PHYSICAL_PROXY_V2",
+            "contract": "CH_CLOWN_PHYSICAL_PROXY_V3",
             "singleAuthoredModel": True,
             "directionViaRootRotationOnly": True,
-            "primitiveBalloonTorsoRemoved": True,
-            "smallCurlHairRing": True,
+            "semanticHighLevelForms": True,
+            "taperedLimbs": True,
+            "roundedShoeForms": True,
             "supersample": SUPERSAMPLE,
         },
         "points": projected,
@@ -260,11 +257,12 @@ def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
         "contract": "CH_SCENE_PREFLIGHT_V1",
         "status": "pass",
         "assetId": "clown_01",
-        "purpose": "character_direction_identity_lock_v2",
+        "purpose": "character_authoring_core_visual_gate",
         "frameSize": list(FRAME),
         "groundAnchor": list(ANCHOR),
         "camera": "CH_ACTOR_CAMERA_V1",
         "checks": {
+            "authoringCoreV1": True,
             "singlePhysicalModel": True,
             "directionViaRootRotationOnly": True,
             "fourCanonicalDirections": True,
@@ -282,7 +280,7 @@ def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
         "sha256": sha256(proxy_south),
         "proxy": "proxy_south.png",
         "turntableReport": "turntable_report.json",
-        "geometryAuthority": "CH_Blender_single_physical_model_v2",
+        "geometryAuthority": "CH_AUTHORING_CORE_V1",
         "requiresHumanVisualReview": True,
         "runtimeExportAllowed": False,
         "directions": report["directions"],
@@ -297,20 +295,28 @@ def main() -> None:
         raise RuntimeError("blender_clown_turntable.py currently expects clown_01")
 
     args.output.mkdir(parents=True, exist_ok=True)
-    directions = {direction: render_direction(spec, args, direction, args.output) for direction in DIRECTIONS}
+    scene, canonical_camera = setup_authoring_scene(spec, args)
+    character, _ = build_clown(spec)
+
+    directions = {}
+    for direction in DIRECTIONS:
+        directions[direction] = render_direction(
+            spec, scene, canonical_camera, character, direction, args.output
+        )
+
     report = {
-        "contract": "CH_CLOWN_TURNTABLE_V2",
+        "contract": "CH_CLOWN_TURNTABLE_V3",
         "status": "candidate_for_visual_review",
         "characterId": "clown_01",
         "directions": list(DIRECTIONS),
         "camera": "CH_ACTOR_CAMERA_V1",
         "frameSize": list(FRAME),
         "groundAnchor": list(ANCHOR),
-        "geometryAuthority": "one_model_root_rotated",
+        "authoringCore": "CH_AUTHORING_CORE_V1",
+        "geometryAuthority": "CH_Blender_Authoring_Core_single_physical_model",
         "paintAuthority": "CH_Character_Studio",
         "crossDirectionRasterWarp": False,
         "independentDirectionalSilhouetteAuthoring": False,
-        "supersample": SUPERSAMPLE,
         "directionsData": directions,
     }
     (args.output / "turntable_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
