@@ -23,41 +23,71 @@ def load_recipe(path: str | Path) -> dict:
     return data
 
 
+def _offset(value) -> Vector:
+    if value is None:
+        return Vector((0.0, 0.0, 0.0))
+    if isinstance(value, Sequence) and len(value) == 3:
+        return Vector(tuple(float(v) for v in value))
+    raise TypeError(f"Expected xyz offset, got {value!r}")
+
+
 def _vec(value, points: Mapping[str, Vector]) -> Vector:
+    """Resolve absolute xyz, rig point name, or {point, offset}."""
     if isinstance(value, str):
         if value not in points:
             raise KeyError(f"Unknown recipe point {value!r}")
         return points[value].copy()
+    if isinstance(value, Mapping):
+        name = value.get("point")
+        if not isinstance(name, str) or name not in points:
+            raise KeyError(f"Unknown recipe point {name!r}")
+        return points[name].copy() + _offset(value.get("offset"))
     if isinstance(value, Sequence) and len(value) == 3:
         return Vector(tuple(float(v) for v in value))
-    raise TypeError(f"Expected point name or xyz vector, got {value!r}")
+    raise TypeError(f"Expected point name, point+offset, or xyz vector, got {value!r}")
 
 
-def _material(builder: CharacterAuthoring, materials: dict, key: str):
+def _material(
+    builder: CharacterAuthoring,
+    materials: dict,
+    key: str,
+    material_overrides: Mapping[str, str],
+):
     if key not in materials:
         raise KeyError(f"Unknown recipe material {key!r}")
     spec = materials[key]
+    color = material_overrides.get(key, spec["color"])
     return builder.material(
         key,
-        spec["color"],
+        color,
         roughness=float(spec.get("roughness", 0.82)),
         specular=float(spec.get("specular", 0.16)),
         metallic=float(spec.get("metallic", 0.0)),
     )
 
 
-def execute_recipe(recipe: dict, *, points: Mapping[str, Vector] | None = None) -> CharacterAuthoring:
+def execute_recipe(
+    recipe: dict,
+    *,
+    points: Mapping[str, Vector] | None = None,
+    material_overrides: Mapping[str, str] | None = None,
+) -> CharacterAuthoring:
     """Build one physical asset from a validated high-level recipe."""
     if recipe.get("contract") != CONTRACT:
         raise RuntimeError(f"Expected {CONTRACT}")
     points = points or {}
+    material_overrides = material_overrides or {}
     builder = CharacterAuthoring(recipe["assetId"])
     materials = recipe.get("materials", {})
 
     for part in recipe.get("parts", []):
         key = part["id"]
         kind = part["type"]
-        mat = _material(builder, materials, part["material"]) if part.get("material") else None
+        mat = (
+            _material(builder, materials, part["material"], material_overrides)
+            if part.get("material")
+            else None
+        )
 
         if kind == "soft_form":
             builder.soft(
