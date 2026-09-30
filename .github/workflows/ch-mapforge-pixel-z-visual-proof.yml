@@ -1,0 +1,92 @@
+name: CH MapForge Pixel-Z Visual Proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-mapforge-pixel-z-visual-proof.yml"
+      - "C++/MapForge2/src/authoring_projection.h"
+      - "C++/MapForge2/src/authoring_pixel_z_parity_test.cpp"
+      - "C++/MapForge2/src/building_composer.cpp"
+      - "C++/MapForge2/src/building_facade_renderer.cpp"
+      - "C++/MapForge2/src/building_roof_editor_renderer.cpp"
+      - "C++/MapForge2/src/building_projected_shadow_renderer.cpp"
+      - "C++/MapForge2/src/composer_preview_main.cpp"
+      - "C++/MapForge2/tools/check_projection_drift.py"
+      - "C++/MapForge2/examples/golden_building_composer_pilot_review.png"
+      - "src/ch_core/projection.cpp"
+      - "src/ch_core/projection.h"
+      - "src/ch_core/contracts.h"
+      - "tools/visual_reference_gate.py"
+
+jobs:
+  pixel-z-visual-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: linux
+          target: desktop
+          cache: true
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config
+
+      - name: Run projection drift guard
+        run: python3 C++/MapForge2/tools/check_projection_drift.py
+
+      - name: Compile pixel-Z parity gate
+        run: |
+          c++ -std=c++20 -O0 -g \
+            -I. -IC++/MapForge2/src \
+            $(pkg-config --cflags Qt6Core Qt6Gui) \
+            C++/MapForge2/src/authoring_pixel_z_parity_test.cpp \
+            src/ch_core/projection.cpp \
+            -o authoring_pixel_z_parity_test \
+            $(pkg-config --libs Qt6Core Qt6Gui)
+
+      - name: Run pixel-Z parity gate
+        run: ./authoring_pixel_z_parity_test
+
+      - name: Configure focused MapForge build
+        run: >-
+          cmake -S C++/MapForge2 -B build/mapforge2 -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Composer Preview
+        run: cmake --build build/mapforge2 --target MapForge2ComposerPreview --parallel 2
+
+      - name: Generate SOUTH EAST WEST NORTH proof
+        run: |
+          mkdir -p out/pixel-z-proof
+          export QT_QPA_PLATFORM=offscreen
+          build/mapforge2/MapForge2ComposerPreview out/pixel-z-proof
+          test -f out/pixel-z-proof/building_composer_pilot_review.png
+          test -f out/pixel-z-proof/building_composer_pilot_4view.png
+          test -f out/pixel-z-proof/building_composer_pilot_manifest.json
+
+      - name: Compare against golden visual
+        run: |
+          python3 tools/visual_reference_gate.py \
+            --candidate out/pixel-z-proof/building_composer_pilot_review.png \
+            --golden C++/MapForge2/examples/golden_building_composer_pilot_review.png \
+            --diff-out out/pixel-z-proof/visual_reference_diff.png \
+            --report out/pixel-z-proof/visual_reference_gate.json \
+            --threshold 2.0
+
+      - name: Upload four-view proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge2-Pixel-Z-Visual-Proof
+          path: out/pixel-z-proof
+          if-no-files-found: error
+          retention-days: 14
