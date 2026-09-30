@@ -1,0 +1,51 @@
+{
+  "contract": "CITY_HORIZON_RAIL_TRACK_V1",
+  "assetId": "transport.rail_track.classic.01",
+  "displayName": "Trilho Classico - Base Modular",
+  "assetType": "rail_track_module",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "gridContract": "CH_GRID_V1",
+  "runtimeRepresentation": "2D_RGBA_modular_track",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1
+  },
+  "module": {
+    "kind": "straight",
+    "axis": "x",
+    "tileWorldSize": 3.0,
+    "railGauge": 1.28,
+    "railWidth": 0.10,
+    "railHeight": 0.12,
+    "sleeperLength": 2.12,
+    "sleeperWidth": 0.20,
+    "sleeperHeight": 0.10,
+    "sleeperCount": 8,
+    "ballastWidth": 2.38,
+    "ballastHeight": 0.075
+  },
+  "artDirection": {
+    "style": "classic_tycoon_prerendered",
+    "rails": "dark steel with restrained highlight",
+    "sleepers": "warm aged timber, readable at gameplay zoom",
+    "ballast": "muted grey-brown compact bed",
+    "avoid": [
+      "photorealism",
+      "micro detail",
+      "oversized ballast",
+      "gaps at tile boundaries"
+    ]
+  },
+  "runtimePlan": {
+    "connectionModel": "graph_edges_reusing_procedural_road_topology",
+    "dragPlacement": true,
+    "seamlessTileBoundary": true,
+    "futureModules": [
+      "quarter_curve",
+      "switch_left",
+      "switch_right",
+      "crossing"
+    ]
+  }
+}
