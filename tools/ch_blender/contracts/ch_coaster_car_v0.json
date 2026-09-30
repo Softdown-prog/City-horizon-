@@ -1,0 +1,38 @@
+{
+  "contract": "CH_COASTER_CAR_V0",
+  "status": "prototype",
+  "authority": "City Horizon simple coaster vehicle authoring",
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "designGoal": "compact classic tycoon-style coaster car for non-inverting track",
+  "geometry": {
+    "trackGauge": 0.95,
+    "carLengthTiles": 0.72,
+    "carWidthTiles": 0.58,
+    "bodyHeightTiles": 0.30,
+    "rows": 2,
+    "seatsPerRow": 2,
+    "passengerCapacity": 4,
+    "wheelAssemblies": 4
+  },
+  "runtimeScope": {
+    "visualRepresentation": "pre-rendered 2D pose atlas",
+    "motion": "sample CH_COASTER_TRACK_V1 centerline by route distance",
+    "inversionsRequired": false,
+    "upsideDownFramesRequired": false,
+    "supportedPoseFamilies": [
+      "flat",
+      "slope_up",
+      "slope_down",
+      "curve_left",
+      "curve_right",
+      "airtime_hill"
+    ]
+  },
+  "authoring": {
+    "cameraContract": "CH_CAMERA_V1",
+    "studioContract": "CH_TYCOON_STUDIO_V1",
+    "qualityGate": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "firstPrototype": "single empty car, SOUTH flat pose",
+    "laterExpansion": "multi-pose atlas and linked train consist"
+  }
+}
