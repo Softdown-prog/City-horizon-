@@ -1,6 +1,7 @@
 #include "canonical_viewport.h"
 
 #include "src/ch_core/contracts.h"
+#include "src/ch_render/procedural_road_network_renderer.h"
 #include "src/road_system.h"
 
 #include <algorithm>
@@ -95,6 +96,7 @@ bool CanonicalViewport::initialize(void* nativeWindowHandle, const int physicalW
 void CanonicalViewport::shutdown() {
     terrain_textures_.clear();
     road_manager_.reset();
+    procedural_road_plan_ = {};
     sorted_buildings_.clear();
     document_.reset();
     clearTextures();
@@ -191,6 +193,7 @@ void CanonicalViewport::clearTextures() {
 void CanonicalViewport::rebuildSceneCache() {
     terrain_textures_.clear();
     road_manager_ = std::make_unique<RoadManager>(contracts::kMapMin, contracts::kMapMax);
+    procedural_road_plan_ = {};
     sorted_buildings_.clear();
 
     if (!document_.has_value()) return;
@@ -206,6 +209,7 @@ void CanonicalViewport::rebuildSceneCache() {
     for (const auto& road : document_->roads()) {
         (void)road_manager_->place_tile(road.tile_x, road.tile_y);
     }
+    procedural_road_plan_ = build_procedural_road_ground_render_plan(road_manager_->procedural_mirror());
 
     sorted_buildings_ = document_->buildings();
     rebuildBuildingOrder();
@@ -241,6 +245,15 @@ void CanonicalViewport::rebuildBuildingOrder() {
 void CanonicalViewport::renderRoads(const float viewportWidth, const float viewportHeight) {
     if (road_manager_ == nullptr) return;
 
+    if (procedural_road_preview_enabled_ && !procedural_road_plan_.empty()) {
+        if (render_procedural_road_ground_plan(
+                renderer_, procedural_road_plan_, camera_, viewportWidth, viewportHeight)) {
+            return;
+        }
+    }
+
+    // Immediate safety fallback. Legacy tile/PNG roads remain authoritative and
+    // unchanged while the procedural ground-only visual layer is being proven.
     MapRenderer::render_roads(
         renderer_, *road_manager_, road_visuals_,
         [this](const std::filesystem::path& path) { return findTexture(path); },
