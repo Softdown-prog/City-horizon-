@@ -7,6 +7,7 @@ on:
       - feature/ch-character-studio-art-v0
     paths:
       - 'tools/ch_actor_lab/validated/ch_actor_validated_v1.js'
+      - 'tools/ch_actor_lab/validated/ch_actor_runtime_directions_v1.js'
       - 'tools/ch_actor_lab/skins/clown_01_v1.js'
       - 'tools/ch_actor_lab/validated/clown_01.html'
       - 'tools/ch_actor_lab/validated/export_skin_runner.mjs'
