@@ -1,8 +1,8 @@
 name: CH MapForge Video Capture
 
 # Deterministic CH Video Lab proof using the first-party MapForge renderer.
-# This is intentionally path-scoped: only explicit video jobs spend the
-# Windows/Qt build minutes. Ordinary source and asset commits do not trigger it.
+# The feature-branch terrain job is a focused visual proof for the shared
+# CH_TERRAIN_HEIGHTFIELD_V1 gameplay/editor contract.
 on:
   workflow_dispatch:
     inputs:
@@ -14,11 +14,19 @@ on:
   push:
     branches:
       - main
+      - terrain-construction-gameplay
     paths:
       - "tools/animation_preview/mapforge_jobs/*.json"
+      - ".github/workflows/ch-mapforge-video-capture.yml"
+      - "C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp"
+      - "src/ch_core/terrain_heightfield.cpp"
+      - "src/ch_core/terrain_heightfield.h"
+      - "src/ch_core/projection.cpp"
+      - "src/ch_core/projection.h"
 
 jobs:
   capture-windows:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -141,5 +149,84 @@ jobs:
           path: |
             out/ch-mapforge-video/**
             out/ch-mapforge-video-job-resolved.json
+          if-no-files-found: error
+          retention-days: 14
+
+  terrain-gif-proof:
+    if: github.ref == 'refs/heads/terrain-construction-gameplay'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: linux
+          target: desktop
+          cache: true
+
+      - name: Install GIF dependency
+        run: python3 -m pip install --upgrade pillow
+
+      - name: Compile focused MapForge terrain proof
+        shell: bash
+        run: |
+          mkdir -p build/terrain-gif-proof out/terrain-gif-proof/frames
+          c++ -std=c++20 -O2 -fPIC \
+            -I. \
+            $(pkg-config --cflags Qt6Core Qt6Gui) \
+            C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp \
+            src/ch_core/terrain_heightfield.cpp \
+            src/ch_core/projection.cpp \
+            -o build/terrain-gif-proof/MapForge2TerrainSculptGifProof \
+            $(pkg-config --libs Qt6Core Qt6Gui)
+
+      - name: Render heightfield sculpt frames
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/terrain-gif-proof/MapForge2TerrainSculptGifProof out/terrain-gif-proof/frames
+
+      - name: Encode animated GIF
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('out/terrain-gif-proof')
+          paths = sorted((root / 'frames').glob('frame_*.png'))
+          if len(paths) != 36:
+              raise SystemExit(f'Expected 36 frames, got {len(paths)}')
+          frames = [Image.open(p).convert('RGBA') for p in paths]
+          frames[0].save(root / 'mapforge_terrain_sculpt_test.gif', save_all=True,
+                         append_images=frames[1:], duration=95, loop=0,
+                         disposal=2, optimize=True)
+
+          picks = [0, 11, 23, 35]
+          sheet = Image.new('RGB', (960, 640), (24, 30, 27))
+          for slot, idx in enumerate(picks):
+              thumb = frames[idx].convert('RGB').resize((480, 320), Image.Resampling.LANCZOS)
+              sheet.paste(thumb, ((slot % 2) * 480, (slot // 2) * 320))
+          sheet.save(root / 'mapforge_terrain_sculpt_contact_sheet.png')
+          frames[0].save(root / 'mapforge_terrain_sculpt_start.png')
+          frames[-1].save(root / 'mapforge_terrain_sculpt_end.png')
+          PY
+
+      - name: Validate terrain proof
+        run: |
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_test.gif
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_contact_sheet.png
+
+      - name: Upload terrain GIF proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge2-Terrain-Sculpt-GIF-Proof
+          path: |
+            out/terrain-gif-proof/mapforge_terrain_sculpt_test.gif
+            out/terrain-gif-proof/mapforge_terrain_sculpt_contact_sheet.png
+            out/terrain-gif-proof/mapforge_terrain_sculpt_start.png
+            out/terrain-gif-proof/mapforge_terrain_sculpt_end.png
           if-no-files-found: error
           retention-days: 14
