@@ -1,0 +1,39 @@
+name: CH Procedural Rail Core Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/rail_system.h"
+      - "src/rail_system.cpp"
+      - "src/rail_system_test.cpp"
+      - ".github/workflows/ch-procedural-rail-core-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-procedural-rail-core-check
+  cancel-in-progress: true
+
+jobs:
+  rail-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile focused rail core
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc \
+            src/rail_system.cpp src/rail_system_test.cpp \
+            -o /tmp/ch_procedural_rail_core_test
+
+      - name: Run fail-closed rail safety tests
+        shell: bash
+        run: /tmp/ch_procedural_rail_core_test
