@@ -15,6 +15,7 @@ KINDS = {
     "curve_tube": ("points", "radius"),
     "torus": ("location", "majorRadius", "minorRadius"),
 }
+PROPORTION_FIELDS = ("legLength", "torsoLength", "armLength")
 
 
 def validate(data: dict) -> list[str]:
@@ -23,6 +24,22 @@ def validate(data: dict) -> list[str]:
         errors.append(f"contract must be {CONTRACT}")
     if not isinstance(data.get("assetId"), str) or not data.get("assetId"):
         errors.append("assetId must be a non-empty string")
+
+    proportions = data.get("proportions", {})
+    if proportions is not None and not isinstance(proportions, dict):
+        errors.append("proportions must be an object")
+    elif isinstance(proportions, dict):
+        unknown = sorted(set(proportions) - set(PROPORTION_FIELDS))
+        if unknown:
+            errors.append(f"proportions contains unsupported fields: {unknown}")
+        for field in PROPORTION_FIELDS:
+            if field not in proportions:
+                continue
+            value = proportions[field]
+            if not isinstance(value, (int, float)):
+                errors.append(f"proportions.{field} must be numeric")
+            elif not 0.55 <= float(value) <= 1.45:
+                errors.append(f"proportions.{field} must be in [0.55, 1.45]")
 
     materials = data.get("materials")
     if not isinstance(materials, dict):
@@ -106,6 +123,7 @@ def main() -> int:
         "recipe": str(args.recipe),
         "status": "error" if errors else "ok",
         "errors": errors,
+        "proportions": data.get("proportions", {}),
         "partCount": len(data.get("parts", [])) if isinstance(data.get("parts"), list) else 0,
     }
     if args.report:
