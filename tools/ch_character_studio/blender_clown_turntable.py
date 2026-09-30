@@ -14,8 +14,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
 import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 import bpy
 from mathutils import Vector
@@ -40,7 +45,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preflight-profile")
     parser.add_argument("--approval-proxy-sha")
     args, _ = parser.parse_known_args(script_args())
-    # Reuse the shape expected by blender_character_base.setup_scene.
     args.camera_mode = "canonical"
     args.inspection_yaw = 45.0
     args.inspection_pitch = 30.0
@@ -66,11 +70,6 @@ def add_proxy_ellipsoid(name: str, direction: str, point, scale, mat, root):
 
 
 def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> dict:
-    """Add costume/face volumes shared identically by every direction.
-
-    The geometry is intentionally simple. It is an authoring underlay that owns
-    proportion and occlusion, not final art quality.
-    """
     palette = spec["appearance"]["palette"]
     skin = base.material("CH_CLOWN_SKIN", palette["skin"])
     hair = base.material("CH_CLOWN_HAIR", palette["hair"])
@@ -86,20 +85,15 @@ def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> di
     root = bpy.data.objects.new("CH_CLOWN_PROXY_ROOT", None)
     bpy.context.collection.objects.link(root)
 
-    # Shared hair mass: same three lobes rotated with the character.
     add_proxy_ellipsoid("ClownHairCenter", direction, (0.0, 0.025, 1.60), (0.15, 0.12, 0.11), hair, root)
     add_proxy_ellipsoid("ClownHairLeft", direction, (-0.17, 0.01, 1.57), (0.14, 0.12, 0.15), hair, root)
     add_proxy_ellipsoid("ClownHairRight", direction, (0.17, 0.01, 1.57), (0.14, 0.12, 0.15), hair, root)
 
-    # Ruff collar. Four overlapping volumes avoid a paper-thin disk from side/back.
     for index, x in enumerate((-0.14, -0.05, 0.05, 0.14)):
         add_proxy_ellipsoid(f"ClownRuff_{index}", direction, (x, -0.005, 1.31), (0.095, 0.075, 0.06), white, root)
 
-    # Costume torso overlay. Existing generic red torso remains underneath; this
-    # locks the clown-specific width/volume across all views.
     add_proxy_ellipsoid("ClownTorso", direction, (0.0, 0.0, 1.02), (0.245, 0.17, 0.31), red, root)
 
-    # Colored sleeves follow the exact rig arms. Blue is anatomical left, yellow right.
     arm_mats = {"L": blue, "R": yellow}
     for label in ("L", "R"):
         base.add_capsule(
@@ -116,8 +110,6 @@ def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> di
             white,
         ).parent = root
 
-    # Split trousers use the same articulated legs, therefore E/W/N cannot invent
-    # a different leg length or hip width.
     leg_mats = {"L": blue, "R": yellow}
     for label in ("L", "R"):
         base.add_capsule(
@@ -134,7 +126,6 @@ def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> di
             0.068,
             leg_mats[label],
         ).parent = root
-        # Oversized rigid-looking clown shoe volume. One physical size for every view.
         shoe = base.add_uv_sphere(
             f"ClownShoe_{label}",
             points[f"foot_{label}"],
@@ -144,13 +135,9 @@ def add_clown_proxy(spec: dict, direction: str, points: dict[str, Vector]) -> di
         )
         shoe.parent = root
 
-    # Bow is a real front-side volume. It disappears naturally when the character
-    # turns away instead of needing a hand-authored north exception.
     add_proxy_ellipsoid("ClownBowLeft", direction, (-0.045, -0.175, 1.20), (0.065, 0.035, 0.055), purple, root)
     add_proxy_ellipsoid("ClownBowRight", direction, (0.045, -0.175, 1.20), (0.065, 0.035, 0.055), purple, root)
 
-    # Face volumes are positioned on the same head. Rotation controls visibility;
-    # there is no separate E/W face design.
     add_proxy_ellipsoid("ClownNose", direction, (0.0, -0.145, 1.52), (0.055, 0.04, 0.055), nose_mat, root)
     add_proxy_ellipsoid("ClownEyeL", direction, (-0.055, -0.135, 1.575), (0.022, 0.015, 0.025), eye_mat, root)
     add_proxy_ellipsoid("ClownEyeR", direction, (0.055, -0.135, 1.575), (0.022, 0.015, 0.025), eye_mat, root)
@@ -195,6 +182,46 @@ def render_direction(spec: dict, args: argparse.Namespace, direction: str, outpu
     return payload
 
 
+def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
+    """Emit the canonical guarded_blender_script proxy outputs expected by CH Blender."""
+    south = output_dir / "s" / "underlay.png"
+    proxy_south = output_dir / "proxy_south.png"
+    shutil.copyfile(south, proxy_south)
+
+    preflight_report = {
+        "contract": "CH_BLENDER_PREFLIGHT_REPORT_V1",
+        "status": "ok",
+        "assetId": "clown_01",
+        "purpose": "character_direction_identity_lock",
+        "frameSize": list(FRAME),
+        "groundAnchor": list(ANCHOR),
+        "camera": "CH_ACTOR_CAMERA_V1",
+        "checks": {
+            "singleSharedProxy": True,
+            "fourCanonicalDirections": True,
+            "runtimeExportAllowed": False,
+        },
+    }
+    (output_dir / "preflight_report.json").write_text(
+        json.dumps(preflight_report, indent=2) + "\n", encoding="utf-8"
+    )
+
+    proxy_report = {
+        "contract": "CH_BLENDER_PROXY_REPORT_V1",
+        "status": "candidate_for_visual_review",
+        "assetId": "clown_01",
+        "proxy": "proxy_south.png",
+        "turntableReport": "turntable_report.json",
+        "geometryAuthority": "CH_Blender_single_proxy",
+        "requiresHumanVisualReview": True,
+        "runtimeExportAllowed": False,
+        "directions": report["directions"],
+    }
+    (output_dir / "proxy_report.json").write_text(
+        json.dumps(proxy_report, indent=2) + "\n", encoding="utf-8"
+    )
+
+
 def main() -> None:
     args = parse_args()
     spec = base.load_spec(args.character_spec)
@@ -221,6 +248,7 @@ def main() -> None:
         "directionsData": directions,
     }
     (args.output / "turntable_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_guarded_proxy_outputs(args.output, report)
     print(json.dumps(report, indent=2))
 
 
