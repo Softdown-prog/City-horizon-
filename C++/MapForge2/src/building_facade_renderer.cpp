@@ -1,5 +1,6 @@
 #include "building_facade_renderer.h"
 
+#include "authoring_projection.h"
 #include "building_projected_shadow_renderer.h"
 #include "building_roof_editor_renderer.h"
 #include "src/ch_core/contracts.h"
@@ -21,22 +22,25 @@ struct Point3 { float x = 0.0F; float y = 0.0F; float z = 0.0F; };
 constexpr std::array<BuildingView, 4> kViews = {BuildingView::South, BuildingView::East, BuildingView::West, BuildingView::North};
 constexpr float kPi = 3.14159265358979323846F;
 
-Point3 rotatePoint(const Point3 p, const BuildingView view) {
+int quarterTurns(const BuildingView view) {
     switch (view) {
-        case BuildingView::East: return {-p.y, p.x, p.z};
-        case BuildingView::North: return {-p.x, -p.y, p.z};
-        case BuildingView::West: return {p.y, -p.x, p.z};
-        case BuildingView::South: return p;
+        case BuildingView::South: return 0;
+        case BuildingView::East: return 1;
+        case BuildingView::North: return 2;
+        case BuildingView::West: return 3;
     }
-    return p;
+    return 0;
 }
 
 QPointF projectPoint(const Point3 p, const BuildingView view, const QSize canvas) {
-    const Point3 r = rotatePoint(p, view);
-    const float half_tile_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
-    const float half_tile_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
-    return {static_cast<float>(canvas.width()) * 0.5F + (r.x - r.y) * half_tile_w,
-            static_cast<float>(canvas.height()) - 42.0F + (r.x + r.y) * half_tile_h - r.z};
+    return projectAuthoringPixelElevation(
+        p.x,
+        p.y,
+        p.z,
+        quarterTurns(view),
+        QSizeF(canvas),
+        QPointF(static_cast<qreal>(canvas.width()) * 0.5,
+                static_cast<qreal>(canvas.height()) - 42.0));
 }
 
 Point3 lerpPoint(const Point3 a, const Point3 b, const float t, const float z) {
@@ -369,7 +373,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.setBrush(scaledColor(spec.door_color, 1.04F));
         painter.drawPolygon(faceRect(a, b, t0 - 0.018F, t1 + 0.018F,
                                      counter_z0, counter_z1, view, canvas));
-        // A shallow projecting sill gives the counter a usable top surface.
         const Point3 n = outwardNormal(edge);
         const Point3 back0 = lerpPoint(a, b, t0 - 0.018F, counter_z1);
         const Point3 back1 = lerpPoint(a, b, t1 + 0.018F, counter_z1);
@@ -470,9 +473,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
             painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
                                           projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
 
-            // The valance is a filled curved strip, not a row of detached circles.
-            // Adjacent quadratic segments share their endpoints, producing one
-            // continuous scalloped silhouette while retaining the stripe colors.
             const QPointF front0 = projectPoint(o0, view, canvas);
             const QPointF front1 = projectPoint(o1, view, canvas);
             const QPointF mid = (front0 + front1) * 0.5;
@@ -489,8 +489,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         const Point3 i0 = lerpPoint(a, b, t0, z), i1 = lerpPoint(a, b, t1, z);
         const Point3 o0{i0.x + n.x * 0.28F, i0.y + n.y * 0.28F, z - floor_h * 0.095F};
         const Point3 o1{i1.x + n.x * 0.28F, i1.y + n.y * 0.28F, z - floor_h * 0.095F};
-        // The darker front lip closes the canvas thickness without drawing
-        // noisy seams between its five stripes at gameplay scale.
         painter.setPen(Qt::NoPen);
         painter.setBrush(scaledColor(spec.accent_color, 0.48F, 150));
         painter.drawPolygon(QPolygonF{
@@ -503,9 +501,6 @@ void drawModule(QPainter& painter, const BuildingComposerSpec& spec,
         painter.drawPolygon(QPolygonF{projectPoint(i0, view, canvas), projectPoint(i1, view, canvas),
                                       projectPoint(o1, view, canvas), projectPoint(o0, view, canvas)});
     } else if (module.kind == BuildingFacadeModuleKind::CurvedPediment) {
-        // Keep the ornament seated on the facade rather than floating over the
-        // roof plane. The base trim also gives the plaque a clear architectural
-        // support that survives all four canonical rotations.
         const float z_base = base_z + floor_h * 0.72F;
         const float z_shoulder = base_z + floor_h * 0.89F;
         const float z_peak = base_z + floor_h * 1.10F;
