@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Sequence, Tuple
+from typing import Callable, List, Sequence, Tuple
 
 from mathutils import Quaternion, Vector
 
@@ -35,12 +35,6 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 
 def linear_clothoid_envelope(u: float, ramp_fraction: float = 0.18) -> float:
-    """0->1->0 curvature envelope with linear ramps in arc length.
-
-    A linear curvature ramp is the defining useful property of a clothoid for
-    our authoring purposes. The middle remains at full curvature and the two
-    shoulders are symmetric.
-    """
     u = _clamp(u, 0.0, 1.0)
     r = _clamp(ramp_fraction, 1.0e-4, 0.4999)
     if u < r:
@@ -51,7 +45,6 @@ def linear_clothoid_envelope(u: float, ramp_fraction: float = 0.18) -> float:
 
 
 def smooth_roll_progress(u: float, ramp_fraction: float = 0.18) -> float:
-    """Monotonic 0..1 roll schedule with zero-ish shoulder velocity."""
     u = _clamp(u, 0.0, 1.0)
     r = _clamp(ramp_fraction, 1.0e-4, 0.4999)
     total = 1.0 - r
@@ -78,31 +71,18 @@ def _orthonormal_frame(tangent: Vector, preferred_up: Vector) -> Tuple[Vector, V
     return tangent, right, up
 
 
-def transport_frame(
-    old_tangent: Vector,
-    new_tangent: Vector,
-    right: Vector,
-    up: Vector,
-) -> Tuple[Vector, Vector]:
-    """Parallel-transport right/up from one tangent to the next.
-
-    This avoids the Frenet-frame flip near zero curvature, which matters at
-    straight connectors and clothoid shoulders.
-    """
+def transport_frame(old_tangent: Vector, new_tangent: Vector, right: Vector, up: Vector) -> Tuple[Vector, Vector]:
     a = old_tangent.normalized()
     b = new_tangent.normalized()
     axis = a.cross(b)
     axis_len = axis.length
     if axis_len < EPS:
         return right.copy(), up.copy()
-
     axis.normalize()
     angle = math.atan2(axis_len, _clamp(a.dot(b), -1.0, 1.0))
     q = Quaternion(axis, angle)
     new_right = q @ right
     new_up = q @ up
-
-    # Remove accumulated numeric drift.
     new_right = new_right - b * new_right.dot(b)
     if new_right.length < EPS:
         new_right = b.cross(new_up)
@@ -111,22 +91,12 @@ def transport_frame(
     return new_right, new_up
 
 
-def integrate_curvature_curve(
-    *,
-    total_length: float,
-    samples: int,
-    curvature_fn: Callable[[float, float], float],
-    curvature_plane_angle_fn: Callable[[float, float], float],
-    initial_position: Vector,
-    initial_tangent: Vector = Vector((0.0, 1.0, 0.0)),
-    preferred_up: Vector = Vector((0.0, 0.0, 1.0)),
-) -> List[CurveSample]:
-    """Integrate a 3D centerline using arc length as the independent variable.
-
-    `curvature_fn(s, u)` supplies kappa(s). `curvature_plane_angle_fn(s, u)`
-    rotates the curvature vector around the transported tangent. This is a small
-    deterministic Bishop-frame integrator rather than a graphics-only spline.
-    """
+def integrate_curvature_curve(*, total_length: float, samples: int,
+                              curvature_fn: Callable[[float, float], float],
+                              curvature_plane_angle_fn: Callable[[float, float], float],
+                              initial_position: Vector,
+                              initial_tangent: Vector = Vector((0.0, 1.0, 0.0)),
+                              preferred_up: Vector = Vector((0.0, 0.0, 1.0))) -> List[CurveSample]:
     if total_length <= 0.0:
         raise ValueError("total_length must be > 0")
     if samples < 3:
@@ -145,8 +115,6 @@ def integrate_curvature_curve(
         out.append(CurveSample(s, position.copy(), tangent.copy(), right.copy(), up.copy(), kappa, beta))
         if i == samples - 1:
             break
-
-        # Midpoint estimate gives a stable tangent update without a heavy solver.
         sm = s + 0.5 * ds
         um = (i + 0.5) / float(samples - 1)
         km = max(0.0, float(curvature_fn(sm, um)))
@@ -156,7 +124,6 @@ def integrate_curvature_curve(
         if next_tangent.length < EPS:
             next_tangent = tangent.copy()
         next_tangent.normalize()
-
         next_right, next_up = transport_frame(tangent, next_tangent, right, up)
         travel_dir = tangent + next_tangent
         if travel_dir.length < EPS:
@@ -168,14 +135,7 @@ def integrate_curvature_curve(
     return out
 
 
-def apply_roll(
-    samples: Sequence[CurveSample],
-    roll_fn: Callable[[float, float], float],
-) -> List[CurveSample]:
-    """Apply track roll around the already-solved tangent.
-
-    Centerline geometry and rail/deck roll stay independent by design.
-    """
+def apply_roll(samples: Sequence[CurveSample], roll_fn: Callable[[float, float], float]) -> List[CurveSample]:
     if not samples:
         return []
     total = samples[-1].s if samples[-1].s > 0.0 else 1.0
@@ -186,20 +146,12 @@ def apply_roll(
         q = Quaternion(sample.tangent, angle)
         right = (q @ sample.right).normalized()
         up = (q @ sample.up).normalized()
-        out.append(CurveSample(
-            sample.s,
-            sample.position.copy(),
-            sample.tangent.copy(),
-            right,
-            up,
-            sample.curvature,
-            sample.curvature_plane_angle,
-        ))
+        out.append(CurveSample(sample.s, sample.position.copy(), sample.tangent.copy(), right, up,
+                               sample.curvature, sample.curvature_plane_angle))
     return out
 
 
 def helix_curvature_and_torsion(radius: float, pitch_per_turn: float) -> Tuple[float, float]:
-    """Return constant curvature/torsion of an ideal circular helix."""
     if radius <= 0.0:
         raise ValueError("radius must be > 0")
     a = pitch_per_turn / math.tau
@@ -207,24 +159,73 @@ def helix_curvature_and_torsion(radius: float, pitch_per_turn: float) -> Tuple[f
     return radius / denom, a / denom
 
 
-def sample_engineering_corkscrew(
-    *,
-    total_length: float,
-    samples: int,
-    helix_radius: float,
-    pitch_per_turn: float,
-    handedness: float,
-    base_z: float,
-    transition_fraction: float = 0.18,
-    roll_ramp_fraction: float = 0.18,
-) -> Tuple[List[CurveSample], dict]:
-    """Sample one engineering-inspired corkscrew element.
+def sample_analytic_helix_reference(*, radius: float, pitch_per_turn: float,
+                                    turns: float, samples: int, handedness: float,
+                                    base_z: float) -> Tuple[List[CurveSample], dict]:
+    """Exact circular helix used as the geometry solver's ground-truth fixture.
 
-    The target helix supplies physical curvature/torsion values. Curvature is
-    introduced/removed with clothoid-style linear ramps. A Bishop frame keeps
-    straight connectors stable, while one independent 360-degree track roll is
-    layered on top.
+    Axis is +Y. For one full turn the endpoint must have the same X/Z as the
+    start and advance exactly ``pitch_per_turn`` along Y. The local up vector is
+    the inward radial normal projected perpendicular to the tangent, so the deck
+    orientation comes from helix geometry itself; no independent 360-degree roll
+    is applied here.
     """
+    if radius <= 0.0 or samples < 3 or turns <= 0.0:
+        raise ValueError("radius/turns must be > 0 and samples >= 3")
+    sign = 1.0 if handedness >= 0.0 else -1.0
+    a = pitch_per_turn / math.tau
+    kappa, torsion = helix_curvature_and_torsion(radius, pitch_per_turn)
+    theta_max = math.tau * turns
+    arc_per_rad = math.sqrt(radius * radius + a * a)
+    total_length = arc_per_rad * theta_max
+    out: List[CurveSample] = []
+
+    for i in range(samples):
+        u = i / float(samples - 1)
+        theta = sign * theta_max * u
+        x = radius * math.sin(theta)
+        y = a * abs(theta)
+        z = base_z + radius * (1.0 - math.cos(theta))
+        d = Vector((sign * radius * math.cos(theta), a, sign * radius * math.sin(theta)))
+        tangent = d.normalized()
+        inward = Vector((-math.sin(theta), 0.0, math.cos(theta)))
+        up = inward - tangent * inward.dot(tangent)
+        up.normalize()
+        right = tangent.cross(up).normalized()
+        up = right.cross(tangent).normalized()
+        s = total_length * u
+        out.append(CurveSample(s, Vector((x, y, z)), tangent, right, up, kappa, sign * torsion * s))
+
+    start = out[0].position
+    end = out[-1].position
+    expected_y = pitch_per_turn * turns
+    closure_xz = math.hypot(end.x - start.x, end.z - start.z)
+    y_error = abs((end.y - start.y) - expected_y)
+    tolerance = 1.0e-5
+    metadata = {
+        "solverContract": "CH_COASTER_GEOMETRY_SOLVER_V1",
+        "fixture": "analytic_circular_helix",
+        "axis": "+Y",
+        "radius": radius,
+        "pitchPerTurn": pitch_per_turn,
+        "turns": turns,
+        "arcLength": total_length,
+        "idealHelixCurvature": kappa,
+        "idealHelixTorsion": torsion * sign,
+        "closureXZError": closure_xz,
+        "longitudinalAdvanceError": y_error,
+        "analyticValidationPassed": closure_xz <= tolerance and y_error <= tolerance,
+    }
+    if not metadata["analyticValidationPassed"]:
+        raise ValueError(f"analytic helix invariant failed: {metadata}")
+    return out, metadata
+
+
+def sample_engineering_corkscrew(*, total_length: float, samples: int,
+                                 helix_radius: float, pitch_per_turn: float,
+                                 handedness: float, base_z: float,
+                                 transition_fraction: float = 0.18,
+                                 roll_ramp_fraction: float = 0.18) -> Tuple[List[CurveSample], dict]:
     sign = 1.0 if handedness >= 0.0 else -1.0
     kappa, torsion = helix_curvature_and_torsion(helix_radius, pitch_per_turn)
 
@@ -235,20 +236,12 @@ def sample_engineering_corkscrew(
         return sign * torsion * s
 
     raw = integrate_curvature_curve(
-        total_length=total_length,
-        samples=samples,
-        curvature_fn=curvature_fn,
-        curvature_plane_angle_fn=plane_angle_fn,
+        total_length=total_length, samples=samples,
+        curvature_fn=curvature_fn, curvature_plane_angle_fn=plane_angle_fn,
         initial_position=Vector((0.0, -0.5 * total_length, base_z)),
-        initial_tangent=Vector((0.0, 1.0, 0.0)),
-        preferred_up=Vector((0.0, 0.0, 1.0)),
+        initial_tangent=Vector((0.0, 1.0, 0.0)), preferred_up=Vector((0.0, 0.0, 1.0)),
     )
-
-    rolled = apply_roll(
-        raw,
-        lambda _s, u: sign * math.tau * smooth_roll_progress(u, roll_ramp_fraction),
-    )
-
+    rolled = apply_roll(raw, lambda _s, u: sign * math.tau * smooth_roll_progress(u, roll_ramp_fraction))
     metadata = {
         "solverContract": "CH_COASTER_GEOMETRY_SOLVER_V1",
         "parameterization": "arc_length",
