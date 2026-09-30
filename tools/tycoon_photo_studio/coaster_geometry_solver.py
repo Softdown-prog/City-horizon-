@@ -159,6 +159,115 @@ def helix_curvature_and_torsion(radius: float, pitch_per_turn: float) -> Tuple[f
     return radius / denom, a / denom
 
 
+def sample_elliptic_helical_rmf(*, radius_x: float, radius_z: float,
+                                pitch_per_turn: float, turns: float,
+                                samples: int, handedness: float,
+                                base_z: float, roll_turns: float = 1.0,
+                                phase_rad: float = 0.0) -> Tuple[List[CurveSample], dict]:
+    """Sample an elliptic helix around +Y using a rotation-minimizing frame.
+
+    The trajectory itself is a true 3D elliptic helix.  A Bishop/parallel-
+    transport frame is propagated from sample to sample, avoiding the singular
+    world-UP projection that collapses near vertical tangents.  Explicit track
+    roll is then accumulated about each local tangent.  ``roll_turns=1`` means
+    one full 2*pi roll over the element.
+    """
+    if radius_x <= 0.0 or radius_z <= 0.0 or pitch_per_turn <= 0.0:
+        raise ValueError("elliptic helix radii and pitch must be > 0")
+    if turns <= 0.0 or samples < 3:
+        raise ValueError("turns must be > 0 and samples >= 3")
+
+    sign = 1.0 if handedness >= 0.0 else -1.0
+    theta_total = math.tau * turns
+    a = pitch_per_turn / math.tau
+    positions: List[Vector] = []
+    tangents: List[Vector] = []
+
+    for i in range(samples):
+        u = i / float(samples - 1)
+        theta = phase_rad + sign * theta_total * u
+        x = radius_x * math.sin(theta)
+        y = pitch_per_turn * turns * u
+        z = base_z + radius_z * (1.0 - math.cos(theta))
+        dtheta_du = sign * theta_total
+        deriv = Vector((
+            radius_x * math.cos(theta) * dtheta_du,
+            pitch_per_turn * turns,
+            radius_z * math.sin(theta) * dtheta_du,
+        ))
+        if deriv.length < EPS:
+            raise ValueError("elliptic helix produced zero tangent")
+        positions.append(Vector((x, y, z)))
+        tangents.append(deriv.normalized())
+
+    # Arc-length parameterization from the exact sampled polyline.
+    arc = [0.0]
+    for i in range(1, samples):
+        arc.append(arc[-1] + (positions[i] - positions[i - 1]).length)
+    total_length = arc[-1]
+    if total_length <= EPS:
+        raise ValueError("elliptic helix has zero arc length")
+
+    # RMF/Bishop frame.  No repeated world-UP projection after initialization.
+    t0, right, up = _orthonormal_frame(tangents[0], Vector((0.0, 0.0, 1.0)))
+    out: List[CurveSample] = []
+    prev_tangent = t0
+    min_right = float("inf")
+    min_up = float("inf")
+
+    for i in range(samples):
+        tangent = tangents[i]
+        if i:
+            right, up = transport_frame(prev_tangent, tangent, right, up)
+        u_arc = arc[i] / total_length
+        roll = sign * math.tau * roll_turns * u_arc
+        q = Quaternion(tangent, roll)
+        rolled_right = q @ right
+        rolled_right = rolled_right - tangent * rolled_right.dot(tangent)
+        if rolled_right.length < EPS:
+            raise ValueError(f"RMF right vector collapsed at sample {i}")
+        rolled_right.normalize()
+        rolled_up = rolled_right.cross(tangent)
+        if rolled_up.length < EPS:
+            raise ValueError(f"RMF up vector collapsed at sample {i}")
+        rolled_up.normalize()
+        min_right = min(min_right, rolled_right.length)
+        min_up = min(min_up, rolled_up.length)
+        out.append(CurveSample(
+            arc[i], positions[i].copy(), tangent.copy(), rolled_right, rolled_up,
+            0.0, roll,
+        ))
+        prev_tangent = tangent
+
+    closure_xz = math.hypot(out[-1].position.x - out[0].position.x,
+                            out[-1].position.z - out[0].position.z)
+    y_advance = out[-1].position.y - out[0].position.y
+    expected_y = pitch_per_turn * turns
+    metadata = {
+        "solverContract": "CH_COASTER_GEOMETRY_SOLVER_V1",
+        "fixture": "elliptic_helical_rmf",
+        "axis": "+Y",
+        "frame": "parallel_transport_rmf_bishop",
+        "radiusX": radius_x,
+        "radiusZ": radius_z,
+        "pitchPerTurn": pitch_per_turn,
+        "turns": turns,
+        "rollTurns": roll_turns,
+        "rollDegrees": 360.0 * roll_turns * sign,
+        "phaseRadians": phase_rad,
+        "arcLength": total_length,
+        "closureXZError": closure_xz,
+        "longitudinalAdvanceError": abs(y_advance - expected_y),
+        "frameCollapseDetected": False,
+        "minimumRightLength": min_right,
+        "minimumUpLength": min_up,
+        "validationPassed": closure_xz <= 1.0e-4 and abs(y_advance - expected_y) <= 1.0e-4,
+    }
+    if not metadata["validationPassed"]:
+        raise ValueError(f"elliptic helix invariant failed: {metadata}")
+    return out, metadata
+
+
 def sample_analytic_helix_reference(*, radius: float, pitch_per_turn: float,
                                     turns: float, samples: int, handedness: float,
                                     base_z: float) -> Tuple[List[CurveSample], dict]:
