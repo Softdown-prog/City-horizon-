@@ -3,6 +3,7 @@
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_render/map_renderer.h"
+#include "src/procedural_road_ground_render_plan.h"
 
 #include <filesystem>
 #include <memory>
@@ -32,6 +33,12 @@ public:
     void setCamera(const CameraState& camera);
     bool loadDocument(const MapDocument& document);
     void setHover(int tileX, int tileY, int brushSize, bool visible);
+    void setProceduralRoadPreviewEnabled(bool enabled) {
+        if (procedural_road_preview_enabled_ == enabled) return;
+        procedural_road_preview_enabled_ = enabled;
+        frame_dirty_ = true;
+    }
+    [[nodiscard]] bool proceduralRoadPreviewEnabled() const { return procedural_road_preview_enabled_; }
     void renderFrame();
 
     [[nodiscard]] bool isInitialized() const { return window_ != nullptr && renderer_ != nullptr; }
@@ -59,8 +66,10 @@ private:
     // repeated until the document or camera rotation actually changes.
     std::unordered_map<std::uint64_t, const TextureAsset*> terrain_textures_;
     std::unique_ptr<RoadManager> road_manager_;
+    ProceduralRoadGroundRenderPlan procedural_road_plan_;
     std::vector<BuildingInstanceEntry> sorted_buildings_;
     bool frame_dirty_ = true;
+    bool procedural_road_preview_enabled_ = true;
 
     BuildingCatalog building_catalog_;
     RoadVisualCatalog road_visuals_;
