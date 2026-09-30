@@ -95,7 +95,7 @@ def authoring_core_contract() -> dict:
         raise RuntimeError("CH_AUTHORING_CORE_V1 must derive directions from root rotation")
     if authoring.get("preferredInterface") != AUTHORING_RECIPE_CONTRACT_ID:
         raise RuntimeError("CH_AUTHORING_CORE_V1 preferred interface must be CH_AUTHORING_RECIPE_V1")
-    required = {"soft_form", "tapered_segment", "rounded_box", "curve_tube", "torus"}
+    required = {"soft_form", "tapered_segment", "loft_form", "rounded_box", "curve_tube", "torus"}
     primitives = set(data.get("primitives", []))
     if not required.issubset(primitives):
         raise RuntimeError(f"CH_AUTHORING_CORE_V1 is missing primitives: {sorted(required - primitives)}")
