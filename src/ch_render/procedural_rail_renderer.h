@@ -9,6 +9,7 @@ class ProceduralRailRenderer final {
 public:
     ProceduralRailRenderer() = delete;
     static constexpr const char* kRuntimeContract = "CH_PROCEDURAL_RAIL_RUNTIME_V1";
+    static constexpr bool kFailClosedOnInvalidGeometry = true;
 
     struct Palette {
         SDL_Color ballast{105, 98, 86, 255};
