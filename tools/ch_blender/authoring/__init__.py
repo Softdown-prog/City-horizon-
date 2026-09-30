@@ -24,11 +24,14 @@ from .recipe import (
     execute_recipe,
     load_recipe,
 )
+from .studio import CONTRACT as CHARACTER_PREVIEW_CONTRACT, apply_character_preview_style
 
 __all__ = [
     "AUTHORING_RECIPE_CONTRACT",
+    "CHARACTER_PREVIEW_CONTRACT",
     "AuthoringObject",
     "CharacterAuthoring",
+    "apply_character_preview_style",
     "apply_proportion_profile",
     "blob_cluster",
     "create_root",
