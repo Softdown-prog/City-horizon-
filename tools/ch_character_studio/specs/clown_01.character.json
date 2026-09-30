@@ -3,6 +3,18 @@
   "characterId": "clown_01",
   "baseActor": "ch_actor_green_01",
   "frame": {"size": [48, 64], "groundAnchor": [24, 60]},
+  "productionBaseFrames": {
+    "authority": "approved_CH_Actor_PNGs",
+    "path": "assets/characters/ch_actor_green_01/frames",
+    "maskPath": "assets/characters/ch_actor_green_01/masks",
+    "expectedFrameCount": 36,
+    "layout": "4_directions_x_idle_plus_8_walk",
+    "directions": ["s", "e", "w", "n"],
+    "immutable": true,
+    "bodyPixelsMayBeRepositioned": false,
+    "bodyPixelsMayBeRetimed": false,
+    "productionRule": "recolor_by_existing_masks_then_alpha_composite_costume_overlay_only"
+  },
   "spatial": {
     "contract": "CH_CHARACTER_SPATIAL_V0",
     "groundAnchorPx": [24, 60],
@@ -39,6 +51,7 @@
     "primaryPreview": "tools/ch_actor_lab/validated/clown_01.html",
     "validatedActorCore": "tools/ch_actor_lab/validated/ch_actor_validated_v1.js",
     "skinModule": "tools/ch_actor_lab/skins/clown_01_v1.js",
+    "offlineCostumeBuilder": "tools/ch_actor_lab/build_clown_costume.py",
     "characterStudio": "tools/ch_character_studio/index.html",
     "paletteLibrary": "CH_CHARACTER_PALETTE_V1",
     "deterministicSeed": 1337,
@@ -52,7 +65,7 @@
   },
   "underlayAuthority": {
     "contract": "CH_ACTOR_VALIDATED_V1",
-    "geometryOwner": "validated_CH_Actor",
+    "geometryOwner": "approved_CH_Actor_PNG_frames",
     "motionOwner": "CH_ACTOR_WALK_MOTION_V1",
     "appearanceOwner": "CH_ACTOR_SKIN_V1/clown_01",
     "paintOwner": "CH_Character_Studio_optional_finish",
@@ -67,11 +80,11 @@
   },
   "masterArt": {
     "status": "validated_actor_skin_candidate",
-    "policy": "keep_validated_actor_and_finish_only_appearance",
-    "south": "same_validated_actor_rotation_plus_clown_skin",
-    "east": "same_validated_actor_rotation_plus_clown_skin",
-    "west": "same_validated_actor_rotation_plus_clown_skin",
-    "north": "same_validated_actor_rotation_plus_clown_skin",
+    "policy": "keep_approved_actor_pixels_and_finish_only_appearance",
+    "south": "approved_south_actor_frame_plus_clown_overlay",
+    "east": "approved_east_actor_frame_plus_clown_overlay",
+    "west": "approved_west_actor_frame_plus_clown_overlay",
+    "north": "approved_north_actor_frame_plus_clown_overlay",
     "crossDirectionAutoTransfer": false,
     "crossDirectionRasterWarp": false,
     "directionalSilhouetteMayBeInventedBy2DArt": false
@@ -81,12 +94,14 @@
     "preview": "tools/ch_actor_lab/validated/clown_01.html",
     "framesPerDirection": 8,
     "totalWalkFrames": 32,
+    "idleFrames": 4,
+    "totalApprovedSourceFrames": 36,
     "sheetLayout": "8_columns_x_4_rows",
     "sheetRows": ["S", "E", "W", "N"],
     "requiredInvariants": [
-      "all_32_frames_use_CH_ACTOR_VALIDATED_V1",
-      "all_32_frames_share_ground_anchor_24_60",
-      "all_32_frames_have_root_translation_0_0",
+      "all_production_frames_start_from_approved_CH_Actor_PNGs",
+      "all_32_walk_frames_share_ground_anchor_24_60",
+      "all_32_walk_frames_have_root_translation_0_0",
       "walk_equations_are_not_modified_by_costume",
       "camera_is_CH_CAMERA_V1_45_30_orthographic",
       "directions_are_actor_root_rotations",
@@ -124,6 +139,7 @@
   "colorMasks": {
     "contract": "CH_CHARACTER_COLOR_MASK_V0",
     "enabled": true,
+    "existingActorMaskGenerator": "tools/ch_actor_lab/build_clothing_masks.py",
     "banks": {
       "appearance": {"R": "skin", "G": "hair", "B": "appearance_accent"},
       "clothing": {"R": "primary_clothing", "G": "secondary_clothing", "B": "clothing_accent"},
@@ -154,7 +170,7 @@
       "costume_never_changes_motion_or_parenting",
       "head_and_body_always_face_the_same_actor_direction",
       "asymmetric_clown_color_blocking_survives_root_rotation",
-      "feet_and_legs_use_validated_actor_motion",
+      "feet_and_legs_are_the_approved_actor_pixels",
       "one_pixel_outer_outline_only"
     ]
   }
