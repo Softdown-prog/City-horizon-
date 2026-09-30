@@ -19,10 +19,17 @@
     "studio": "CH_TYCOON_STUDIO_V1",
     "style": "CH_STYLIZED_PRERENDER_V1",
     "bake": "TYCOON_ASSET_BAKE_V1",
-    "parametricAuthoring": "CH_PARAMETRIC_AUTHORING_V1"
+    "parametricAuthoring": "CH_PARAMETRIC_AUTHORING_V1",
+    "authoringCore": "CH_AUTHORING_CORE_V1",
+    "authoringRecipe": "CH_AUTHORING_RECIPE_V1"
   },
   "authoringStandards": {
     "parametricContract": "tools/ch_blender/contracts/ch_parametric_authoring_v1.json",
+    "authoringCoreContract": "tools/ch_blender/contracts/ch_authoring_core_v1.json",
+    "authoringCorePackage": "tools/ch_blender/authoring",
+    "recipeExecutor": "tools/ch_blender/authoring/recipe.py",
+    "preferredAssetInterface": "semantic_high_level_forms",
+    "rawBpyPerAsset": "discouraged",
     "helperModule": "tools/ch_blender/parametric_authoring.py",
     "metricSceneUnits": true,
     "nonDestructiveModifierStages": true,
@@ -91,7 +98,8 @@
     "nonDestructiveParametricAuthoring": true,
     "deterministicProceduralSeeds": true,
     "externalSourceProvenanceRequiredWhenLinked": true,
-    "proprietaryRendererDependencyAllowedByDefault": false
+    "proprietaryRendererDependencyAllowedByDefault": false,
+    "preferAuthoringCoreOverRawBpy": true
   },
   "qualityGates": {
     "contract": "CH_ASSET_QUALITY_GATES_V1",
