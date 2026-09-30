@@ -1,0 +1,56 @@
+name: CH Actor Original HTML Export
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/ch-character-studio-art-v0
+    paths:
+      - tools/ch_actor_lab/validated_source/**
+      - .github/workflows/ch-actor-original-html-export.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local static server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/ch_actor_http.log 2>&1 &
+          echo $! > /tmp/ch_actor_http.pid
+          sleep 2
+          curl --fail http://127.0.0.1:8765/tools/ch_actor_lab/validated_source/ch_actor_lab_original.html > /dev/null
+
+      - name: Execute original CH Actor HTML and export
+        run: |
+          node tools/ch_actor_lab/validated_source/export_runner.mjs out/ch_actor_validated_source
+
+      - name: Show execution report
+        if: always()
+        run: |
+          test -f out/ch_actor_validated_source/execution_report.json && cat out/ch_actor_validated_source/execution_report.json || true
+          test -f /tmp/ch_actor_http.log && cat /tmp/ch_actor_http.log || true
+
+      - name: Upload validated CH Actor export
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Actor-Original-HTML-${{ github.run_id }}
+          path: out/ch_actor_validated_source/
+          if-no-files-found: error
+          retention-days: 90
