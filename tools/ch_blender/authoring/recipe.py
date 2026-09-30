@@ -64,7 +64,7 @@ def apply_proportion_profile(
     unchanged. The resulting average hip shift moves pelvis/torso with the legs.
     ``torsoLength`` scales upper-body landmarks from the shifted pelvis and
     ``armLength`` scales elbow/hand from each transformed shoulder. Defaults are
-    1.0, so existing assets are byte-for-byte equivalent until they opt in.
+    1.0, so existing assets are unchanged until they opt in.
     """
     profile = recipe.get("proportions", {})
     if not isinstance(profile, Mapping) or not profile:
@@ -98,8 +98,6 @@ def apply_proportion_profile(
             key = f"{joint}_{label}"
             out[key] = out[shoulder_key] + (points[key] - old_shoulder) * arm_length
 
-    # Root/feet remain untouched by design, so ground contact and treadmill
-    # translation invariants stay under the canonical runtime contract.
     return out
 
 
@@ -120,6 +118,19 @@ def _material(
         specular=float(spec.get("specular", 0.16)),
         metallic=float(spec.get("metallic", 0.0)),
     )
+
+
+def _blob_elements(part: dict, points: Mapping[str, Vector]) -> list[dict]:
+    result: list[dict] = []
+    for item in part["elements"]:
+        resolved = {
+            "location": _vec(item["location"], points),
+            "radius": float(item["radius"]),
+        }
+        if "stiffness" in item:
+            resolved["stiffness"] = float(item["stiffness"])
+        result.append(resolved)
+    return result
 
 
 def execute_recipe(
@@ -175,6 +186,15 @@ def execute_recipe(
                 rotation=tuple(part.get("rotation", (0.0, 0.0, 0.0))),
                 segments=int(part.get("segments", 28)),
                 cap_ends=bool(part.get("capEnds", True)),
+            )
+        elif kind == "blob_cluster":
+            builder.blob(
+                key,
+                _blob_elements(part, points),
+                mat,
+                resolution=float(part.get("resolution", 0.035)),
+                render_resolution=float(part.get("renderResolution", 0.018)),
+                threshold=float(part.get("threshold", 0.60)),
             )
         elif kind == "rounded_box":
             builder.box(
