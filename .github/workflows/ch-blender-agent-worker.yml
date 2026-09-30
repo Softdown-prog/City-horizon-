@@ -90,6 +90,29 @@ jobs:
             safe="$(basename "$job" .job.json | tr -cd 'A-Za-z0-9._-')"
             python tools/ch_blender/ch_blender_cli.py validate-job --job "$job" \
               --report "out/ch_blender_agent/reports/${safe}.validation.json" || failed=1
+
+            recipe="$(python - "$job" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          value = data.get('authoringRecipe')
+          print(value if isinstance(value, str) else '')
+          PY
+            )"
+            if [[ -n "$recipe" ]]; then
+              case "$recipe" in
+                tools/*) ;;
+                *) echo "Rejected authoring recipe path: $recipe" >&2; failed=1; continue ;;
+              esac
+              if [[ ! -f "$recipe" ]]; then
+                echo "Missing authoring recipe: $recipe" >&2
+                failed=1
+                continue
+              fi
+              python tools/ch_blender/authoring_recipe_cli.py "$recipe" \
+                --report "out/ch_blender_agent/reports/${safe}.authoring-recipe.json" || failed=1
+            fi
           done < "${{ steps.jobs.outputs.jobs-file }}"
           exit "$failed"
 
