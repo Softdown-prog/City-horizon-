@@ -1,0 +1,38 @@
+name: CH Procedural Rail Renderer Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/rail_system.h"
+      - "src/ch_render/procedural_rail_renderer.h"
+      - "src/ch_render/procedural_rail_renderer.cpp"
+      - ".github/workflows/ch-procedural-rail-renderer-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-procedural-rail-renderer-check
+  cancel-in-progress: true
+
+jobs:
+  renderer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure only to materialize pinned SDL3 headers
+        shell: bash
+        run: cmake -S . -B build-rail-renderer -DBUILD_TESTING=OFF
+
+      - name: Syntax-check rail renderer against project SDL3
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only \
+            -I. -Isrc -Ibuild-rail-renderer/_deps/sdl3-src/include \
+            src/ch_render/procedural_rail_renderer.cpp
