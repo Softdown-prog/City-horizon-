@@ -26,6 +26,7 @@ import bpy
 import blender_character_base as base
 from authoring import (
     CharacterAuthoring,
+    apply_character_preview_style,
     apply_proportion_profile,
     execute_recipe,
     load_recipe,
@@ -134,12 +135,14 @@ def setup_authoring_scene(spec: dict, args: argparse.Namespace):
     remove_generic_actor_geometry()
     scene = bpy.context.scene
     scene.camera = canonical_camera
-    return scene, canonical_camera
+    preview_style = apply_character_preview_style(scene)
+    return scene, canonical_camera, preview_style
 
 
 def render_direction(
     spec: dict,
     recipe: dict,
+    preview_style: dict,
     scene: bpy.types.Scene,
     canonical_camera: bpy.types.Object,
     character: CharacterAuthoring,
@@ -156,7 +159,7 @@ def render_direction(
     projected = base.project_landmarks(scene, canonical_camera, direction_points)
     spatial = base.frame_spatial(scene, canonical_camera, projected, direction)
     payload = {
-        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V5",
+        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V6",
         "direction": direction,
         "frame": "idle",
         "frameSize": list(FRAME),
@@ -165,16 +168,18 @@ def render_direction(
         "camera": "CH_ACTOR_CAMERA_V1",
         "authoringCore": "CH_AUTHORING_CORE_V1",
         "authoringRecipe": "CH_AUTHORING_RECIPE_V1",
+        "previewStudio": preview_style,
         "recipePath": "tools/ch_character_studio/recipes/clown_01.authoring.json",
         "proportions": recipe.get("proportions", {}),
         "proxy": {
-            "contract": "CH_CLOWN_PHYSICAL_PROXY_V5",
+            "contract": "CH_CLOWN_PHYSICAL_PROXY_V6",
             "singleAuthoredModel": True,
             "directionViaRootRotationOnly": True,
             "semanticHighLevelForms": True,
             "recipeDrivenGeometry": True,
             "semanticProportionProfile": True,
             "feetStayPlanted": True,
+            "stylizedPreviewStudio": True,
             "supersample": SUPERSAMPLE
         },
         "points": projected,
@@ -207,6 +212,7 @@ def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
             "singlePhysicalModel": True,
             "directionViaRootRotationOnly": True,
             "fourCanonicalDirections": True,
+            "stylizedPreviewStudio": True,
             "supersampled": True,
             "runtimeExportAllowed": False
         }
@@ -236,17 +242,17 @@ def main() -> None:
         raise RuntimeError("blender_clown_turntable.py currently expects clown_01")
 
     args.output.mkdir(parents=True, exist_ok=True)
-    scene, canonical_camera = setup_authoring_scene(spec, args)
+    scene, canonical_camera, preview_style = setup_authoring_scene(spec, args)
     character, _, recipe = build_clown(spec)
 
     directions = {}
     for direction in DIRECTIONS:
         directions[direction] = render_direction(
-            spec, recipe, scene, canonical_camera, character, direction, args.output
+            spec, recipe, preview_style, scene, canonical_camera, character, direction, args.output
         )
 
     report = {
-        "contract": "CH_CLOWN_TURNTABLE_V5",
+        "contract": "CH_CLOWN_TURNTABLE_V6",
         "status": "candidate_for_visual_review",
         "characterId": "clown_01",
         "directions": list(DIRECTIONS),
@@ -255,6 +261,7 @@ def main() -> None:
         "groundAnchor": list(ANCHOR),
         "authoringCore": "CH_AUTHORING_CORE_V1",
         "authoringRecipe": recipe["contract"],
+        "previewStudio": preview_style,
         "proportions": recipe.get("proportions", {}),
         "recipePath": "tools/ch_character_studio/recipes/clown_01.authoring.json",
         "recipeSha256": sha256(AUTHORING_RECIPE),
