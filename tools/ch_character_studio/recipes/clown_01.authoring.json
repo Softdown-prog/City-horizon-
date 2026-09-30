@@ -2,6 +2,11 @@
   "contract": "CH_AUTHORING_RECIPE_V1",
   "assetId": "clown_01",
   "description": "Single physical clown model for CH Blender turntable and sprite bake.",
+  "proportions": {
+    "legLength": 0.84,
+    "torsoLength": 0.96,
+    "armLength": 0.90
+  },
   "materials": {
     "skin": {"color": "#f3c7ad", "roughness": 0.90, "specular": 0.08},
     "hair": {"color": "#d43b2f", "roughness": 0.88, "specular": 0.10},
