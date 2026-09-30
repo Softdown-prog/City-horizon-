@@ -5,21 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/ch-mapforge-pixel-z-visual-proof.yml"
-      - "C[+][+]/MapForge2/src/authoring_projection.h"
-      - "C[+][+]/MapForge2/src/authoring_pixel_z_parity_test.cpp"
-      - "C[+][+]/MapForge2/src/building_composer.cpp"
-      - "C[+][+]/MapForge2/src/building_facade_renderer.cpp"
-      - "C[+][+]/MapForge2/src/building_roof_editor_renderer.cpp"
-      - "C[+][+]/MapForge2/src/building_projected_shadow_renderer.cpp"
-      - "C[+][+]/MapForge2/src/composer_preview_main.cpp"
-      - "C[+][+]/MapForge2/tools/check_projection_drift.py"
-      - "C[+][+]/MapForge2/examples/golden_building_composer_pilot_review.png"
-      - "src/ch_core/projection.cpp"
-      - "src/ch_core/projection.h"
-      - "src/ch_core/contracts.h"
-      - "tools/visual_reference_gate.py"
 
 permissions:
   contents: read
