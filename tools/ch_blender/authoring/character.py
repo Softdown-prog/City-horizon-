@@ -12,6 +12,7 @@ from .shapes import (
     AuthoringObject,
     create_root,
     curve_tube,
+    loft_form,
     rounded_box,
     soft_form,
     tapered_segment,
@@ -75,6 +76,19 @@ class CharacterAuthoring:
             ),
         )
 
+    def loft(self, key: str, location, profiles, material, **kwargs) -> bpy.types.Object:
+        return self.register(
+            key,
+            loft_form(
+                f"{self.name}_{key}",
+                location,
+                profiles,
+                material,
+                root=self.root,
+                **kwargs,
+            ),
+        )
+
     def box(self, key: str, location, size, material, **kwargs) -> bpy.types.Object:
         return self.register(
             key,
@@ -107,12 +121,7 @@ class CharacterAuthoring:
         lobes: Sequence[dict],
         material,
     ) -> list[bpy.types.Object]:
-        """Create a semantic hairstyle from compact soft volumes.
-
-        Each lobe accepts location, scale and optional rotation. Keeping the list
-        in one recipe makes it easy to reshape a hairstyle without editing four
-        directional copies.
-        """
+        """Create a semantic hairstyle from compact soft volumes."""
         result = []
         for index, lobe in enumerate(lobes):
             result.append(
