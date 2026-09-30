@@ -227,7 +227,8 @@ def blob_cluster(
     metaball.resolution = max(0.01, float(resolution))
     metaball.render_resolution = max(0.006, float(render_resolution))
     metaball.threshold = max(0.05, float(threshold))
-    _assign_material(metaball, material)
+    if material is not None:
+        metaball.materials.append(material)
 
     for item in elements:
         element = metaball.elements.new()
