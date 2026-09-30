@@ -17,12 +17,18 @@ from .shapes import (
     torus_form,
 )
 from .character import CharacterAuthoring
-from .recipe import CONTRACT as AUTHORING_RECIPE_CONTRACT, execute_recipe, load_recipe
+from .recipe import (
+    CONTRACT as AUTHORING_RECIPE_CONTRACT,
+    apply_proportion_profile,
+    execute_recipe,
+    load_recipe,
+)
 
 __all__ = [
     "AUTHORING_RECIPE_CONTRACT",
     "AuthoringObject",
     "CharacterAuthoring",
+    "apply_proportion_profile",
     "create_root",
     "curve_tube",
     "execute_recipe",
