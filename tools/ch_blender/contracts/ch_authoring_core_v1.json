@@ -11,6 +11,7 @@
   "primitives": [
     "soft_form",
     "tapered_segment",
+    "loft_form",
     "rounded_box",
     "curve_tube",
     "torus"
@@ -25,6 +26,7 @@
     "One physical asset must own all canonical directions unless the asset contract explicitly says otherwise.",
     "Changing direction must rotate the physical root, not rebuild independent silhouette geometry.",
     "Asset recipes should describe semantic forms instead of raw Blender operators.",
+    "Loft forms should be preferred over boxes or ellipsoids when silhouette needs independent shoulder, waist and hem control.",
     "Visual review at enlarged resolution is required before final sprite bake.",
     "The Blender source tree may be modified only when the Python/API layer cannot implement a required capability cleanly."
   ],
