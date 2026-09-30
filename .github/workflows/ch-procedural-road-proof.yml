@@ -58,11 +58,14 @@ jobs:
       - name: Build procedural road preview
         run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadPreview --parallel 2
 
+      - name: Build headless PNG proof wrapper
+        run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadPngProof --parallel 2
+
       - name: Render procedural road proof
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          build/ch-procedural-road/MapForge2ProceduralRoadPreview out/ch-procedural-road/procedural_road_preview.png
+          build/ch-procedural-road/MapForge2ProceduralRoadPngProof out/ch-procedural-road/procedural_road_preview.png
           test -f out/ch-procedural-road/procedural_road_preview.png
 
       - name: Validate proof outputs
@@ -77,7 +80,7 @@ jobs:
           data = json.loads(report.read_text(encoding='utf-8'))
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['status'] == 'ok'
-          print('Procedural road compile + ground gate + PNG proof: OK')
+          print('Procedural road editor + ground gate + PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
