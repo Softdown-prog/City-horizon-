@@ -206,14 +206,14 @@ add_executable(MapForge2ProceduralRoadPreview
 target_include_directories(MapForge2ProceduralRoadPreview PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2ProceduralRoadPreview PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
 
-# CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves that the
-# MapForge rollout admits ground roads while rejecting elevated/mixed-height
-# geometry before any bridge/viaduct rendering reaches the canonical viewport.
+# CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves only the
+# ground/elevated admission policy. It intentionally does not link the broad
+# gameplay renderer: production RoadMeshBuilder/SDL integration is compiled by
+# mapforge2_editor and MapForge2ProceduralRoadPreview in the same workflow.
 add_executable(MapForge2ProceduralRoadGroundRenderPlanTest
     ${CH_ROOT}/src/procedural_road_ground_render_plan_test.cpp
 )
 target_include_directories(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE ${CH_ROOT})
-target_link_libraries(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE mapforge2_render mapforge2_canonical)
 
 add_executable(MapForge2UiPausePreview
     src/ui_pause_preview_main.cpp
