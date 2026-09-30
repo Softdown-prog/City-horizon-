@@ -1,0 +1,80 @@
+{
+  "contract": "CH_COASTER_TRACK_V1",
+  "status": "production_scope_locked",
+  "authority": "City Horizon simple modular coaster authoring",
+  "goal": "classic tycoon-style coaster without mandatory inversions",
+  "units": {
+    "blenderUnitsPerTile": 3.0,
+    "heightStep": 0.75,
+    "heightStepsPerTile": 4
+  },
+  "trackProfile": {
+    "gauge": 0.95,
+    "railRadius": 0.06,
+    "tieSpacing": 0.36,
+    "railCenterHeight": 0.48
+  },
+  "productionPieces": [
+    "straight",
+    "curve_left",
+    "curve_right",
+    "slope_up",
+    "slope_down",
+    "flat_to_slope_up",
+    "slope_up_to_flat",
+    "flat_to_slope_down",
+    "slope_down_to_flat",
+    "airtime_hill_small",
+    "airtime_hill_large"
+  ],
+  "productionScope": {
+    "requiredGameplay": [
+      "flat track",
+      "left and right turns",
+      "up and down slopes",
+      "smooth flat/slope transitions",
+      "small airtime hill",
+      "large airtime hill"
+    ],
+    "explicitlyNotRequiredForV1": [
+      "vertical_loop",
+      "corkscrew",
+      "inversion",
+      "helix",
+      "cobra_roll",
+      "heartline_roll"
+    ]
+  },
+  "pieceRules": {
+    "airtime_hill_small": {
+      "footprintTiles": [1, 2],
+      "entryHeightStep": 0,
+      "exitHeightStep": 0,
+      "entryHeading": "north",
+      "exitHeading": "north",
+      "peakHeightSteps": 2,
+      "profile": "cosine_ease"
+    },
+    "airtime_hill_large": {
+      "footprintTiles": [1, 3],
+      "entryHeightStep": 0,
+      "exitHeightStep": 0,
+      "entryHeading": "north",
+      "exitHeading": "north",
+      "peakHeightSteps": 4,
+      "profile": "cosine_ease"
+    }
+  },
+  "runtimeModel": {
+    "visualRepresentation": "pre-rendered 2D sprites",
+    "logicalRepresentation": "piece graph plus sampled 3D centerline",
+    "trainMotion": "distance along centerline",
+    "inversionsRequired": false
+  },
+  "authoringPolicy": {
+    "pipeline": "CH Blender guarded_blender_script",
+    "qualityGate": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "runtime3D": false,
+    "deterministic": true
+  }
+}
