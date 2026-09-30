@@ -1,6 +1,6 @@
 {
   "contract": "CH_BLENDER_AGENT_JOB_V1",
-  "jobId": "character.clown_01.turntable.proxy.008",
+  "jobId": "character.clown_01.turntable.proxy.009",
   "operation": "guarded_blender_script",
   "script": "tools/ch_character_studio/blender_clown_turntable.py",
   "authoringRecipe": "tools/ch_character_studio/recipes/clown_01.authoring.json",
@@ -9,7 +9,7 @@
     "--character-spec",
     "tools/ch_character_studio/specs/clown_01.character.json",
     "--output",
-    "out/ch_blender_agent/character.clown_01.turntable.proxy.008"
+    "out/ch_blender_agent/character.clown_01.turntable.proxy.009"
   ],
-  "outputDir": "out/ch_blender_agent/character.clown_01.turntable.proxy.008"
+  "outputDir": "out/ch_blender_agent/character.clown_01.turntable.proxy.009"
 }
