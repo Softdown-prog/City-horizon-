@@ -51,7 +51,8 @@
     ],
     "TrainSteamWhistle": [
       "trains/steam_whistle_01.ogg"
-    ]
+    ],
+    "MoneyIncome": []
   },
   "music": {
     "Loading": "music/loading_horizonte_de_sal.ogg"
