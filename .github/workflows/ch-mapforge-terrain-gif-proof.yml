@@ -1,0 +1,107 @@
+name: CH MapForge Terrain GIF Proof
+
+on:
+  push:
+    branches:
+      - terrain-construction-gameplay
+    paths:
+      - ".github/workflows/ch-mapforge-terrain-gif-proof.yml"
+      - "C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp"
+      - "src/ch_core/terrain_heightfield.cpp"
+      - "src/ch_core/terrain_heightfield.h"
+      - "src/ch_core/projection.cpp"
+      - "src/ch_core/projection.h"
+
+jobs:
+  terrain-gif-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: linux
+          target: desktop
+          cache: true
+
+      - name: Install GIF dependency
+        run: python3 -m pip install --upgrade pillow
+
+      - name: Compile focused MapForge terrain proof
+        shell: bash
+        run: |
+          mkdir -p build/terrain-gif-proof out/terrain-gif-proof/frames
+          c++ -std=c++20 -O2 -fPIC \
+            -I. \
+            $(pkg-config --cflags Qt6Core Qt6Gui) \
+            C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp \
+            src/ch_core/terrain_heightfield.cpp \
+            src/ch_core/projection.cpp \
+            -o build/terrain-gif-proof/MapForge2TerrainSculptGifProof \
+            $(pkg-config --libs Qt6Core Qt6Gui)
+
+      - name: Render actual heightfield frames
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/terrain-gif-proof/MapForge2TerrainSculptGifProof out/terrain-gif-proof/frames
+
+      - name: Encode animated GIF and contact sheet
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+
+          root = Path('out/terrain-gif-proof')
+          frame_paths = sorted((root / 'frames').glob('frame_*.png'))
+          if len(frame_paths) != 36:
+              raise SystemExit(f'Expected 36 frames, got {len(frame_paths)}')
+
+          frames = [Image.open(p).convert('RGBA') for p in frame_paths]
+          frames[0].save(
+              root / 'mapforge_terrain_sculpt_test.gif',
+              save_all=True,
+              append_images=frames[1:],
+              duration=95,
+              loop=0,
+              disposal=2,
+              optimize=True,
+          )
+
+          picks = [0, 11, 23, 35]
+          thumb_w, thumb_h = 480, 320
+          sheet = Image.new('RGB', (thumb_w * 2, thumb_h * 2), (24, 30, 27))
+          for slot, idx in enumerate(picks):
+              frame = frames[idx].convert('RGB').resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+              x = (slot % 2) * thumb_w
+              y = (slot // 2) * thumb_h
+              sheet.paste(frame, (x, y))
+          sheet.save(root / 'mapforge_terrain_sculpt_contact_sheet.png')
+
+          # Keep two exact frames alongside the GIF for quick artifact inspection.
+          frames[0].save(root / 'mapforge_terrain_sculpt_start.png')
+          frames[-1].save(root / 'mapforge_terrain_sculpt_end.png')
+          PY
+
+      - name: Validate proof outputs
+        shell: bash
+        run: |
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_test.gif
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_contact_sheet.png
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_start.png
+          test -s out/terrain-gif-proof/mapforge_terrain_sculpt_end.png
+
+      - name: Upload MapForge terrain GIF proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge2-Terrain-Sculpt-GIF-Proof
+          path: |
+            out/terrain-gif-proof/mapforge_terrain_sculpt_test.gif
+            out/terrain-gif-proof/mapforge_terrain_sculpt_contact_sheet.png
+            out/terrain-gif-proof/mapforge_terrain_sculpt_start.png
+            out/terrain-gif-proof/mapforge_terrain_sculpt_end.png
+          if-no-files-found: error
+          retention-days: 14
