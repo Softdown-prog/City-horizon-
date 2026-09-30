@@ -10,6 +10,7 @@ from mathutils import Vector
 from .materials import stylized_material
 from .shapes import (
     AuthoringObject,
+    blob_cluster,
     create_root,
     curve_tube,
     loft_form,
@@ -83,6 +84,18 @@ class CharacterAuthoring:
                 f"{self.name}_{key}",
                 location,
                 profiles,
+                material,
+                root=self.root,
+                **kwargs,
+            ),
+        )
+
+    def blob(self, key: str, elements, material, **kwargs) -> bpy.types.Object:
+        return self.register(
+            key,
+            blob_cluster(
+                f"{self.name}_{key}",
+                elements,
                 material,
                 root=self.root,
                 **kwargs,
