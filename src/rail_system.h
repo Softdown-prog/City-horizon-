@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+inline constexpr const char* kChProceduralRailGeometryContract = "CH_PROCEDURAL_RAIL_GEOMETRY_V1";
+
 // CH_PROCEDURAL_RAIL_GEOMETRY_V1
 //
 // Runtime remains 2D. Rail geometry lives in world space (including Z thickness)
