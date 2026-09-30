@@ -183,7 +183,7 @@ def setup_scene(spec: dict, direction: str, frame: str, args: argparse.Namespace
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
-    scene.view_settings.look = "Medium High Contrast"
+    scene.view_settings.look = "AgX - Medium High Contrast"
     world = scene.world or bpy.data.worlds.new("CH_CHARACTER_WORLD")
     scene.world = world
     world.color = (0.035, 0.045, 0.04)
