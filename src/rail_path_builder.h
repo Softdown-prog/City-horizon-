@@ -175,8 +175,8 @@ public:
         // editor/runtime can expose the turnout.
         const RailBuildResult through_mesh = RailMeshBuilder::build(through.segment, profile);
         const RailBuildResult branch_mesh = RailMeshBuilder::build(branch.segment, profile);
-        if (!through_mesh) return {through_mesh.validation, {}, {}, 0.0F};
-        if (!branch_mesh) return {branch_mesh.validation, {}, {}, 0.0F};
+        if (!through_mesh.ok()) return {through_mesh.validation, {}, {}, 0.0F};
+        if (!branch_mesh.ok()) return {branch_mesh.validation, {}, {}, 0.0F};
 
         RailTurnoutBuildResult result;
         result.through = through.segment;
