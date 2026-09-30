@@ -52,7 +52,9 @@
     "TrainSteamWhistle": [
       "trains/steam_whistle_01.ogg"
     ],
-    "MoneyIncome": []
+    "MoneyIncome": [
+      "economy/money_income_01.ogg"
+    ]
   },
   "music": {
     "Loading": "music/loading_horizonte_de_sal.ogg"
