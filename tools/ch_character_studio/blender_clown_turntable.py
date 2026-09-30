@@ -24,7 +24,12 @@ for candidate in (SCRIPT_DIR, CH_BLENDER_DIR):
 import bpy
 
 import blender_character_base as base
-from authoring import CharacterAuthoring, execute_recipe, load_recipe
+from authoring import (
+    CharacterAuthoring,
+    apply_proportion_profile,
+    execute_recipe,
+    load_recipe,
+)
 
 DIRECTIONS = ("S", "E", "N", "W")
 FRAME = base.FRAME
@@ -84,12 +89,19 @@ def palette_overrides(spec: dict) -> dict[str, str]:
     }
 
 
+def proportioned_points(spec: dict, recipe: dict, direction: str) -> dict:
+    return apply_proportion_profile(
+        recipe,
+        base.pose_points(spec, direction, "idle"),
+    )
+
+
 def build_clown(spec: dict) -> tuple[CharacterAuthoring, dict, dict]:
     """Build one physical clown entirely from CH_AUTHORING_RECIPE_V1 data."""
-    points = base.pose_points(spec, "S", "idle")
     recipe = load_recipe(AUTHORING_RECIPE)
     if recipe.get("assetId") != "clown_01":
         raise RuntimeError("Clown turntable requires clown_01 authoring recipe")
+    points = proportioned_points(spec, recipe, "S")
     character = execute_recipe(
         recipe,
         points=points,
@@ -127,6 +139,7 @@ def setup_authoring_scene(spec: dict, args: argparse.Namespace):
 
 def render_direction(
     spec: dict,
+    recipe: dict,
     scene: bpy.types.Scene,
     canonical_camera: bpy.types.Object,
     character: CharacterAuthoring,
@@ -139,11 +152,11 @@ def render_direction(
     direction_dir = output_dir / direction.lower()
     render_supersampled(scene, direction_dir)
 
-    direction_points = base.pose_points(spec, direction, "idle")
+    direction_points = proportioned_points(spec, recipe, direction)
     projected = base.project_landmarks(scene, canonical_camera, direction_points)
     spatial = base.frame_spatial(scene, canonical_camera, projected, direction)
     payload = {
-        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V4",
+        "contract": "CH_CLOWN_TURNTABLE_DIRECTION_V5",
         "direction": direction,
         "frame": "idle",
         "frameSize": list(FRAME),
@@ -153,12 +166,15 @@ def render_direction(
         "authoringCore": "CH_AUTHORING_CORE_V1",
         "authoringRecipe": "CH_AUTHORING_RECIPE_V1",
         "recipePath": "tools/ch_character_studio/recipes/clown_01.authoring.json",
+        "proportions": recipe.get("proportions", {}),
         "proxy": {
-            "contract": "CH_CLOWN_PHYSICAL_PROXY_V4",
+            "contract": "CH_CLOWN_PHYSICAL_PROXY_V5",
             "singleAuthoredModel": True,
             "directionViaRootRotationOnly": True,
             "semanticHighLevelForms": True,
             "recipeDrivenGeometry": True,
+            "semanticProportionProfile": True,
+            "feetStayPlanted": True,
             "supersample": SUPERSAMPLE
         },
         "points": projected,
@@ -186,6 +202,8 @@ def write_guarded_proxy_outputs(output_dir: Path, report: dict) -> None:
         "checks": {
             "authoringCoreV1": True,
             "authoringRecipeV1": True,
+            "semanticProportionProfile": True,
+            "feetStayPlanted": True,
             "singlePhysicalModel": True,
             "directionViaRootRotationOnly": True,
             "fourCanonicalDirections": True,
@@ -224,11 +242,11 @@ def main() -> None:
     directions = {}
     for direction in DIRECTIONS:
         directions[direction] = render_direction(
-            spec, scene, canonical_camera, character, direction, args.output
+            spec, recipe, scene, canonical_camera, character, direction, args.output
         )
 
     report = {
-        "contract": "CH_CLOWN_TURNTABLE_V4",
+        "contract": "CH_CLOWN_TURNTABLE_V5",
         "status": "candidate_for_visual_review",
         "characterId": "clown_01",
         "directions": list(DIRECTIONS),
@@ -237,6 +255,7 @@ def main() -> None:
         "groundAnchor": list(ANCHOR),
         "authoringCore": "CH_AUTHORING_CORE_V1",
         "authoringRecipe": recipe["contract"],
+        "proportions": recipe.get("proportions", {}),
         "recipePath": "tools/ch_character_studio/recipes/clown_01.authoring.json",
         "recipeSha256": sha256(AUTHORING_RECIPE),
         "geometryAuthority": "CH_Blender_Authoring_Recipe_single_physical_model",
