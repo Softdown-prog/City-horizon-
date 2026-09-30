@@ -5,9 +5,24 @@ The Authoring Core is the preferred geometry interface for new City Horizon asse
 ## Required mindset
 
 Describe **semantic forms**, not low-level Blender operations. Prefer `soft_form`,
-`tapered_segment`, `rounded_box`, `curve_tube`, `torus`, `CharacterAuthoring`, or a
-`CH_AUTHORING_RECIPE_V1` recipe. Raw `bpy.ops` inside individual asset scripts is a
-last resort, not the default.
+`tapered_segment`, `loft_form`, `rounded_box`, `curve_tube`, `torus`,
+`CharacterAuthoring`, or a `CH_AUTHORING_RECIPE_V1` recipe. Raw `bpy.ops` inside
+individual asset scripts is a last resort, not the default.
+
+## Primitive selection
+
+Use primitives according to the visual job instead of convenience:
+
+- `soft_form`: head, cheeks, hair puffs, gloves and genuinely soft compact masses.
+- `tapered_segment`: sleeves, arms, trousers, legs and other articulated elongated forms. Keep rounded caps enabled for organic/cloth joints unless a hard cut is intentional.
+- `loft_form`: jackets, shirts, dresses, torsos, skirts, canopies and any silhouette that needs independent shoulder/chest/waist/hem control. Prefer this over a box or giant ellipsoid for clothing.
+- `rounded_box`: shoes, bags, props, machinery or intentionally block-like forms.
+- `curve_tube`: locks, straps, piping, hoses and flowing linear details.
+- `torus`: collars, cuffs, rings and circular trims.
+
+A technically valid primitive choice can still be visually wrong. If a jacket reads
+as a box, a limb reads as a pipe, or hair reads as a few balloons, reject the proxy
+and change the semantic construction before final bake.
 
 ## Character rule
 
