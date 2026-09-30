@@ -26,24 +26,34 @@
     {"id": "ear_R", "type": "soft_form", "location": {"point": "head", "offset": [0.154, 0.0, 0.010]}, "scale": [0.030, 0.021, 0.041], "material": "skin"},
 
     {
-      "id": "hair_mass",
+      "id": "hair_left",
       "type": "blob_cluster",
       "elements": [
-        {"location": {"point": "head", "offset": [-0.176, 0.030, 0.070]}, "radius": 0.096, "stiffness": 2.2},
-        {"location": {"point": "head", "offset": [-0.137, 0.048, 0.143]}, "radius": 0.088, "stiffness": 2.1},
-        {"location": {"point": "head", "offset": [-0.120, 0.112, 0.072]}, "radius": 0.086, "stiffness": 2.0},
-        {"location": {"point": "head", "offset": [-0.168, 0.060, 0.012]}, "radius": 0.078, "stiffness": 2.0},
-        {"location": {"point": "head", "offset": [0.176, 0.030, 0.070]}, "radius": 0.096, "stiffness": 2.2},
-        {"location": {"point": "head", "offset": [0.137, 0.048, 0.143]}, "radius": 0.088, "stiffness": 2.1},
-        {"location": {"point": "head", "offset": [0.120, 0.112, 0.072]}, "radius": 0.086, "stiffness": 2.0},
-        {"location": {"point": "head", "offset": [0.168, 0.060, 0.012]}, "radius": 0.078, "stiffness": 2.0},
-        {"location": {"point": "head", "offset": [0.000, 0.145, 0.092]}, "radius": 0.092, "stiffness": 1.9}
+        {"location": {"point": "head", "offset": [-0.181, 0.018, 0.066]}, "radius": 0.104, "stiffness": 2.25},
+        {"location": {"point": "head", "offset": [-0.151, 0.036, 0.137]}, "radius": 0.091, "stiffness": 2.10},
+        {"location": {"point": "head", "offset": [-0.171, 0.041, 0.005]}, "radius": 0.083, "stiffness": 2.00},
+        {"location": {"point": "head", "offset": [-0.139, 0.094, 0.073]}, "radius": 0.087, "stiffness": 2.00}
       ],
       "resolution": 0.028,
       "renderResolution": 0.012,
-      "threshold": 0.64,
+      "threshold": 0.53,
       "material": "hair"
     },
+    {
+      "id": "hair_right",
+      "type": "blob_cluster",
+      "elements": [
+        {"location": {"point": "head", "offset": [0.181, 0.018, 0.066]}, "radius": 0.104, "stiffness": 2.25},
+        {"location": {"point": "head", "offset": [0.151, 0.036, 0.137]}, "radius": 0.091, "stiffness": 2.10},
+        {"location": {"point": "head", "offset": [0.171, 0.041, 0.005]}, "radius": 0.083, "stiffness": 2.00},
+        {"location": {"point": "head", "offset": [0.139, 0.094, 0.073]}, "radius": 0.087, "stiffness": 2.00}
+      ],
+      "resolution": 0.028,
+      "renderResolution": 0.012,
+      "threshold": 0.53,
+      "material": "hair"
+    },
+    {"id": "hair_back_bridge", "type": "soft_form", "location": {"point": "head", "offset": [0.0, 0.142, 0.078]}, "scale": [0.112, 0.052, 0.069], "material": "hair"},
 
     {"id": "nose", "type": "soft_form", "location": {"point": "head", "offset": [0.0, -0.145, -0.005]}, "scale": [0.048, 0.034, 0.048], "material": "nose"},
     {"id": "eye_L", "type": "soft_form", "location": {"point": "head", "offset": [-0.052, -0.134, 0.052]}, "scale": [0.015, 0.010, 0.019], "material": "eye"},
