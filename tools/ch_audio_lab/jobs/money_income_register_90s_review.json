@@ -1,0 +1,38 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "money_income_register_90s_review",
+  "kind": "effect",
+  "prompt": "Short dry mechanical cash register sound from an older 1980s-1990s style supermarket register: lever release, drawer latch clack, small metal cash drawer opening, a brief handful of coins clinking and striking the tray, compact and tactile, classic tycoon game economy feedback, realistic mechanical register, no electronic beep, no modern POS scanner, no slot machine, no casino, no music, no voice, isolated sound effect, very short tail suitable for many overlapping purchase events",
+  "negativePrompt": "electronic checkout beep, barcode scanner, slot machine, casino win, magical sparkle, long reverb, music, voice, crowd, ambience",
+  "durationSeconds": 1.5,
+  "tags": ["economy", "cash-register", "coins", "purchase", "tycoon", "review", "local-ai"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "202609301",
+      "--cfg", "1.0"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -18.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.0,
+    "fadeOutSeconds": 0.05,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
