@@ -5,6 +5,7 @@ They are designed for small stylized assets that will be pre-rendered to 2D.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
@@ -85,11 +86,12 @@ def tapered_segment(
     root: bpy.types.Object | None = None,
     vertices: int = 24,
     cap_ends: bool = True,
+    round_caps: bool = True,
 ) -> AuthoringObject:
     """Create a tapered limb/garment segment aligned between two points.
 
-    Unlike a constant-radius capsule, this can describe sleeves, trousers,
-    forearms and shins without making every limb read as a tube.
+    Independent endpoint radii describe sleeves and trousers more naturally than
+    a constant-radius capsule. Optional soft end caps hide mechanical flat joints.
     """
     a = _vec(start)
     b = _vec(end)
@@ -98,10 +100,12 @@ def tapered_segment(
     if length <= 1e-6:
         raise ValueError(f"{name}: tapered segment requires distinct endpoints")
 
+    r0 = max(1e-4, float(radius_start))
+    r1 = max(1e-4, float(radius_end))
     bpy.ops.mesh.primitive_cone_add(
         vertices=max(8, int(vertices)),
-        radius1=max(1e-4, float(radius_start)),
-        radius2=max(1e-4, float(radius_end)),
+        radius1=r0,
+        radius2=r1,
         depth=length,
         end_fill_type="NGON" if cap_ends else "NOTHING",
         location=(a + b) * 0.5,
@@ -110,6 +114,90 @@ def tapered_segment(
     obj.name = name
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = Vector((0.0, 0.0, 1.0)).rotation_difference(delta.normalized())
+    _assign_material(obj, material)
+    _smooth(obj)
+    _parent(obj, root)
+
+    if round_caps:
+        for suffix, point, radius in (("A", a, r0), ("B", b, r1)):
+            bpy.ops.mesh.primitive_uv_sphere_add(
+                segments=max(12, int(vertices)),
+                ring_count=max(8, int(vertices // 2)),
+                location=point,
+            )
+            cap = bpy.context.object
+            cap.name = f"{name}_{suffix}_RoundCap"
+            cap.scale = (radius, radius, radius * 0.82)
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            _assign_material(cap, material)
+            _smooth(cap)
+            _parent(cap, root)
+
+    return AuthoringObject(name, obj)
+
+
+def loft_form(
+    name: str,
+    location,
+    profiles: Sequence[dict],
+    material: bpy.types.Material | None,
+    *,
+    root: bpy.types.Object | None = None,
+    rotation=(0.0, 0.0, 0.0),
+    segments: int = 28,
+    cap_ends: bool = True,
+) -> AuthoringObject:
+    """Create a smooth volume by lofting stacked elliptical profiles.
+
+    Each profile is ``{z, width, depth}`` where width/depth are radii relative to
+    ``location``. This is the preferred primitive for jackets, dresses, torsos,
+    canopies and other silhouettes that need shoulder/waist/hem control.
+    """
+    if len(profiles) < 2:
+        raise ValueError(f"{name}: loft_form requires at least two profiles")
+    count = max(8, int(segments))
+    ordered = sorted(profiles, key=lambda item: float(item["z"]))
+    verts: list[tuple[float, float, float]] = []
+    faces: list[tuple[int, ...]] = []
+
+    for profile in ordered:
+        z = float(profile["z"])
+        width = max(1e-4, float(profile["width"]))
+        depth = max(1e-4, float(profile["depth"]))
+        for index in range(count):
+            angle = 2.0 * math.pi * index / count
+            verts.append((width * math.cos(angle), depth * math.sin(angle), z))
+
+    for ring in range(len(ordered) - 1):
+        current = ring * count
+        nxt = (ring + 1) * count
+        for index in range(count):
+            following = (index + 1) % count
+            faces.append((
+                current + index,
+                current + following,
+                nxt + following,
+                nxt + index,
+            ))
+
+    if cap_ends:
+        bottom_center = len(verts)
+        verts.append((0.0, 0.0, float(ordered[0]["z"])))
+        top_center = len(verts)
+        verts.append((0.0, 0.0, float(ordered[-1]["z"])))
+        top_start = (len(ordered) - 1) * count
+        for index in range(count):
+            following = (index + 1) % count
+            faces.append((bottom_center, following, index))
+            faces.append((top_center, top_start + index, top_start + following))
+
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.location = _vec(location)
+    obj.rotation_euler = rotation
     _assign_material(obj, material)
     _smooth(obj)
     _parent(obj, root)
@@ -171,7 +259,6 @@ def curve_tube(
     curve.resolution_u = max(1, int(resolution))
     curve.bevel_depth = max(1e-4, float(radius))
     curve.bevel_resolution = max(0, int(bevel_resolution))
-    curve.resolution_u = max(1, int(resolution))
     spline = curve.splines.new("BEZIER")
     spline.bezier_points.add(len(pts) - 1)
     for bp, point in zip(spline.bezier_points, pts):
