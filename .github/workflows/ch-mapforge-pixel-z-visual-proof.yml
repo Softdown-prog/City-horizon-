@@ -21,6 +21,9 @@ on:
       - "src/ch_core/contracts.h"
       - "tools/visual_reference_gate.py"
 
+permissions:
+  contents: read
+
 jobs:
   pixel-z-visual-proof:
     runs-on: ubuntu-latest
