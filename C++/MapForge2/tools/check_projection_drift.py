@@ -15,22 +15,15 @@ from pathlib import Path
 MAPFORGE_ROOT = Path(__file__).resolve().parents[1]
 SRC = MAPFORGE_ROOT / "src"
 
-# These renderers still keep the historical authoring formula because their vertical
-# coordinate is authored directly in output pixels. Their XY/view math is parity-guarded
-# by CH_MAPFORGE_AUTHORING_PROJECTION_V1. Migrate them only through a focused renderer
-# change with visual proof; do not grow this allowlist.
-PIXEL_Z_COMPAT_ALLOWLIST = {
-    "building_composer.cpp",
-    "building_facade_renderer.cpp",
-    "building_roof_editor_renderer.cpp",
-}
-
 MIGRATED_REQUIREMENTS = {
     "asset_grid_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "tile_surface_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "park_fence_renderer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
     "building_block_preview_renderer.cpp": ("authoring_projection.h", "projectAuthoringGround"),
     "building_projected_shadow_renderer.cpp": ("authoring_projection.h", "projectAuthoringGround"),
+    "building_composer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
+    "building_facade_renderer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
+    "building_roof_editor_renderer.cpp": ("authoring_projection.h", "projectAuthoringPixelElevation"),
     "map_capture_service.cpp": ("tilePolygonAtElevation", "world_to_screen_point"),
     "procedural_road_preview_main.cpp": ("world_to_screen_point", "screen_to_world_point"),
 }
@@ -75,8 +68,6 @@ def main() -> int:
     for path in sorted(SRC.glob("*")):
         if path.suffix not in {".cpp", ".h", ".hpp"}:
             continue
-        if path.name in PIXEL_Z_COMPAT_ALLOWLIST:
-            continue
         text = path.read_text(encoding="utf-8")
         for pattern in DRIFT_PATTERNS:
             if pattern.search(text):
@@ -86,7 +77,7 @@ def main() -> int:
         fail("new local projection math detected: " + "; ".join(violations))
 
     print("PASS CH_MAPFORGE_PROJECTION_DRIFT_GUARD_V1")
-    print("pixel-Z compatibility allowlist: " + ", ".join(sorted(PIXEL_Z_COMPAT_ALLOWLIST)))
+    print("all tracked MapForge projection users are canonical")
     return 0
 
 
