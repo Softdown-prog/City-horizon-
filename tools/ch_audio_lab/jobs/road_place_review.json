@@ -1,0 +1,37 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "road_place_review",
+  "kind": "effect",
+  "prompt": "One pleasant isolated road placement sound effect for a classic city-builder game. A single soft compact paving placement thunk with a subtle short gravel and asphalt texture, like one road tile settling neatly into place. Clean, satisfying, restrained, dry, close. No hammering, no construction machinery, no engines, no voices, no music, no ambience, no repeated impacts, no long reverb.",
+  "durationSeconds": 0.9,
+  "tags": ["road", "placement", "construction", "city-builder", "sfx", "review"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "20261002",
+      "--cfg", "0.9"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -19.0,
+    "truePeakDb": -2.0,
+    "fadeInSeconds": 0.0,
+    "fadeOutSeconds": 0.05,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
