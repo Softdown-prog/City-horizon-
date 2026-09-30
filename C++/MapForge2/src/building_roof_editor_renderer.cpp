@@ -1,5 +1,6 @@
 #include "building_roof_editor_renderer.h"
 
+#include "authoring_projection.h"
 #include "src/ch_core/contracts.h"
 
 #include <QFont>
@@ -57,25 +58,15 @@ int quarterTurns(const BuildingView view) {
     return 0;
 }
 
-Point3 rotatePoint(const Point3 point, const BuildingView view) {
-    switch (quarterTurns(view)) {
-        case 1: return {-point.y, point.x, point.z};
-        case 2: return {-point.x, -point.y, point.z};
-        case 3: return {point.y, -point.x, point.z};
-        default: return point;
-    }
-}
-
 QPointF projectPoint(const Point3 point, const BuildingView view, const QSize canvas) {
-    const Point3 rotated = rotatePoint(point, view);
-    const float half_tile_w = static_cast<float>(ch::contracts::kTileWidth) * 0.5F;
-    const float half_tile_h = static_cast<float>(ch::contracts::kTileHeight) * 0.5F;
-    const float center_x = static_cast<float>(canvas.width()) * 0.5F;
-    const float ground_y = static_cast<float>(canvas.height()) - 42.0F;
-    return {
-        center_x + (rotated.x - rotated.y) * half_tile_w,
-        ground_y + (rotated.x + rotated.y) * half_tile_h - rotated.z,
-    };
+    return projectAuthoringPixelElevation(
+        point.x,
+        point.y,
+        point.z,
+        quarterTurns(view),
+        QSizeF(canvas),
+        QPointF(static_cast<qreal>(canvas.width()) * 0.5,
+                static_cast<qreal>(canvas.height()) - 42.0));
 }
 
 QPointF lerpScreen(const QPointF& a, const QPointF& b, const float t) {
