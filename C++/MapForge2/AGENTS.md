@@ -11,15 +11,20 @@ These rules extend the repository-root `AGENTS.md` for work under `C++/MapForge2
 - Asset-view quarter turns rotate the asset; runtime `CameraRotation` rotates the camera. Use `authoringCameraRotation(...)` rather than assuming the enum directions are identical.
 - New ground/elevated captures must project all four tile corners at the requested world Z; do not move only an anchor while leaving the tile at Z=0.
 
-## Temporary pixel-Z compatibility allowlist
+## Pixel-Z authoring renderers
 
-The following renderers still contain the historical authoring projection formula because their building Z values are authored in pixels:
+The former Building Composer compatibility allowlist has been retired. `building_composer.cpp`, `building_facade_renderer.cpp` and `building_roof_editor_renderer.cpp` now delegate XY/view projection to `authoring_projection.h` while preserving authored vertical dimensions in output pixels.
 
-- `src/building_composer.cpp`
-- `src/building_facade_renderer.cpp`
-- `src/building_roof_editor_renderer.cpp`
+Do not convert authored pixel-Z values such as wall/roof/fascia heights into gameplay world elevation unless a newer explicit contract replaces this authoring model.
 
-Do not add files to this list. Their XY/view behavior is guarded by `CH_MAPFORGE_AUTHORING_PROJECTION_V1`. Migrate these files only in a focused change with before/after visual proof because a blind conversion of their pixel Z to world elevation changes asset proportions.
+## Procedural road rollout
+
+- `RoadManager` remains the authoritative gameplay/save/occupancy road system until a later migration gate explicitly changes that.
+- The synchronized procedural graph is a visual/traffic migration surface, not a second gameplay authority.
+- The first MapForge canonical-viewport rollout is `CH_PROCEDURAL_ROAD_GROUND_RENDER_V1`: only splines entirely on the ground plane may render procedurally.
+- Elevated spans, ramps and mixed-height junctions must be rejected by the ground render plan instead of being approximated silently.
+- The legacy tile/PNG renderer remains the immediate fallback if the procedural SDL geometry submission fails or the ground plan is unavailable.
+- Do not make viaducts/bridges a dependency for proving ordinary streets. If elevated-road complexity threatens the stable city-builder slice, keep elevated rendering disabled and continue with ground roads.
 
 ## Validation
 
@@ -27,6 +32,7 @@ For camera/projection changes, prefer the focused checks before broader builds:
 
 - `src/mapforge_camera_parity_test.cpp` — runtime/editor XYZ, inverse projection, four rotations, preserved focus.
 - `src/mapforge_authoring_projection_test.cpp` — authoring XY/view + pixel-Z compatibility.
-- `tools/check_projection_drift.py` — blocks new local projection formulas outside the explicit compatibility allowlist.
+- `tools/check_projection_drift.py` — blocks new local projection formulas.
+- `${CH_ROOT}/src/procedural_road_ground_render_plan_test.cpp` / `MapForge2ProceduralRoadGroundRenderPlanTest` — ground roads admitted; elevated and mixed-height geometry rejected.
 
 A workflow run that ends with `jobs: []` did not compile or execute these gates. Do not report it as a code-test failure or success.
