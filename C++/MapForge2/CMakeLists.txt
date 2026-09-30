@@ -206,6 +206,15 @@ add_executable(MapForge2ProceduralRoadPreview
 target_include_directories(MapForge2ProceduralRoadPreview PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2ProceduralRoadPreview PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
 
+# Headless proof wrapper. It reuses the exact preview implementation but creates
+# QGuiApplication before QPainter reaches the font database, which is required
+# when CI writes the PNG without opening the interactive window.
+add_executable(MapForge2ProceduralRoadPngProof
+    src/procedural_road_preview_headless_main.cpp
+)
+target_include_directories(MapForge2ProceduralRoadPngProof PRIVATE ${CH_ROOT})
+target_link_libraries(MapForge2ProceduralRoadPngProof PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
+
 # CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves only the
 # ground/elevated admission policy. It intentionally does not link the broad
 # gameplay renderer: production RoadMeshBuilder/SDL integration is compiled by
@@ -253,6 +262,7 @@ if(MSVC)
     target_compile_options(MapForge2AnimationPreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ParkFencePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ProceduralRoadPreview PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MapForge2ProceduralRoadPngProof PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2UiPausePreview PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE /W4 /permissive- /utf-8)
@@ -273,6 +283,7 @@ else()
     target_compile_options(MapForge2AnimationPreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ParkFencePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ProceduralRoadPreview PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(MapForge2ProceduralRoadPngProof PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2ProceduralRoadGroundRenderPlanTest PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2UiPausePreview PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(MapForge2AssetDocumentGate PRIVATE -Wall -Wextra -Wpedantic)
