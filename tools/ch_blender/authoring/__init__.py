@@ -8,6 +8,7 @@ instead of rebuilding low-level Blender geometry for every asset.
 from .materials import stylized_material
 from .shapes import (
     AuthoringObject,
+    blob_cluster,
     create_root,
     soft_form,
     tapered_segment,
@@ -29,6 +30,7 @@ __all__ = [
     "AuthoringObject",
     "CharacterAuthoring",
     "apply_proportion_profile",
+    "blob_cluster",
     "create_root",
     "curve_tube",
     "execute_recipe",
