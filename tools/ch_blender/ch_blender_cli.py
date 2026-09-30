@@ -33,6 +33,9 @@ from agent_worker import (
 
 PARAMETRIC_CONTRACT_ID = "CH_PARAMETRIC_AUTHORING_V1"
 PARAMETRIC_CONTRACT_PATH = REPO_ROOT / "tools/ch_blender/contracts/ch_parametric_authoring_v1.json"
+AUTHORING_CORE_CONTRACT_ID = "CH_AUTHORING_CORE_V1"
+AUTHORING_CORE_CONTRACT_PATH = REPO_ROOT / "tools/ch_blender/contracts/ch_authoring_core_v1.json"
+AUTHORING_RECIPE_CONTRACT_ID = "CH_AUTHORING_RECIPE_V1"
 
 
 def emit(payload: dict, path: Path | None = None) -> None:
@@ -81,15 +84,60 @@ def parametric_contract_summary() -> dict:
     }
 
 
+def authoring_core_contract() -> dict:
+    data = json.loads(AUTHORING_CORE_CONTRACT_PATH.read_text(encoding="utf-8"))
+    if data.get("contract") != AUTHORING_CORE_CONTRACT_ID:
+        raise RuntimeError(f"Expected {AUTHORING_CORE_CONTRACT_ID} at {AUTHORING_CORE_CONTRACT_PATH}")
+    authoring = data.get("authoring", {})
+    if authoring.get("singlePhysicalModel") is not True:
+        raise RuntimeError("CH_AUTHORING_CORE_V1 must require one physical model")
+    if authoring.get("directionViewsFromRootRotation") is not True:
+        raise RuntimeError("CH_AUTHORING_CORE_V1 must derive directions from root rotation")
+    if authoring.get("preferredInterface") != AUTHORING_RECIPE_CONTRACT_ID:
+        raise RuntimeError("CH_AUTHORING_CORE_V1 preferred interface must be CH_AUTHORING_RECIPE_V1")
+    required = {"soft_form", "tapered_segment", "rounded_box", "curve_tube", "torus"}
+    primitives = set(data.get("primitives", []))
+    if not required.issubset(primitives):
+        raise RuntimeError(f"CH_AUTHORING_CORE_V1 is missing primitives: {sorted(required - primitives)}")
+    gate = data.get("qualityGate", {})
+    if gate.get("preflight") is not True or gate.get("proxyReview") is not True or gate.get("finalAfterApproval") is not True:
+        raise RuntimeError("CH_AUTHORING_CORE_V1 quality gate must require preflight, proxy review and approval")
+    return data
+
+
+def authoring_core_summary() -> dict:
+    data = authoring_core_contract()
+    return {
+        "contract": data["contract"],
+        "path": AUTHORING_CORE_CONTRACT_PATH.relative_to(REPO_ROOT).as_posix(),
+        "preferredInterface": data["authoring"]["preferredInterface"],
+        "singlePhysicalModel": data["authoring"]["singlePhysicalModel"],
+        "directionViewsFromRootRotation": data["authoring"]["directionViewsFromRootRotation"],
+        "primitives": data["primitives"],
+        "runtimeRepresentation": data["runtimeRepresentation"],
+    }
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     blender = resolve_blender(args.blender)
     identity = blender_identity(blender)
     m = manifest()
     parametric = parametric_contract_summary()
+    authoring_core = authoring_core_summary()
     declared = m.get("cityHorizonContracts", {}).get("parametricAuthoring")
     if declared != PARAMETRIC_CONTRACT_ID:
         raise RuntimeError(
             f"Manifest parametricAuthoring contract {declared!r} does not match {PARAMETRIC_CONTRACT_ID}"
+        )
+    declared_core = m.get("cityHorizonContracts", {}).get("authoringCore")
+    if declared_core != AUTHORING_CORE_CONTRACT_ID:
+        raise RuntimeError(
+            f"Manifest authoringCore contract {declared_core!r} does not match {AUTHORING_CORE_CONTRACT_ID}"
+        )
+    declared_recipe = m.get("cityHorizonContracts", {}).get("authoringRecipe")
+    if declared_recipe != AUTHORING_RECIPE_CONTRACT_ID:
+        raise RuntimeError(
+            f"Manifest authoringRecipe contract {declared_recipe!r} does not match {AUTHORING_RECIPE_CONTRACT_ID}"
         )
     payload = {
         "contract": "CH_BLENDER_DOCTOR_V1",
@@ -99,6 +147,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "blender": identity,
         "contracts": m["cityHorizonContracts"],
         "parametricAuthoring": parametric,
+        "authoringCore": authoring_core,
         "agentJobContract": JOB_CONTRACT,
         "agentReportContract": REPORT_CONTRACT,
     }
@@ -140,6 +189,7 @@ def cmd_validate_job(args: argparse.Namespace) -> int:
             "jobId": job["jobId"],
             "operation": job["operation"],
             "qualityStage": job.get("qualityStage"),
+            "authoringRecipe": job.get("authoringRecipe"),
             "job": job_path.relative_to(REPO_ROOT).as_posix(),
         }, report_path)
         return EXIT["OK"]
@@ -159,6 +209,8 @@ def cmd_contract(_: argparse.Namespace) -> int:
             "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
         },
         "parametricAuthoring": parametric_contract_summary(),
+        "authoringCore": authoring_core_summary(),
+        "authoringRecipeContract": AUTHORING_RECIPE_CONTRACT_ID,
         "operations": {
             "guarded_blender_script": {
                 "preferredForNewAssets": True,
@@ -174,6 +226,7 @@ def cmd_contract(_: argparse.Namespace) -> int:
                     "outputDir",
                     "qualityProfile",
                     "approval",
+                    "authoringRecipe",
                 ],
             },
             "canonical_bake": {
@@ -189,7 +242,7 @@ def cmd_contract(_: argparse.Namespace) -> int:
             "blender_script": {
                 "legacyUnguarded": True,
                 "required": ["contract", "jobId", "operation", "script"],
-                "optional": ["args", "expectedOutputs", "outputDir"],
+                "optional": ["args", "expectedOutputs", "outputDir", "authoringRecipe"],
                 "defaults": {
                     "args": [],
                     "expectedOutputs": [],
