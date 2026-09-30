@@ -41,7 +41,10 @@ jobs:
           python tools/ch_math_worker/worker.py tools/ch_math_worker/jobs/procedural_road_probe.job.json --output out/ch-procedural-road/math_report.json
 
       - name: Configure focused MapForge build
-        run: cmake -S "C++/MapForge2" -B build/ch-procedural-road -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >-
+          cmake -S "C++/MapForge2" -B build/ch-procedural-road -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DSDL_UNIX_CONSOLE_BUILD=ON
 
       - name: Build MapForge editor integration
         run: cmake --build build/ch-procedural-road --target mapforge2_editor --parallel 2
