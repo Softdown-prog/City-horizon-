@@ -1,0 +1,20 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "coaster.track_v1.airtime_hill_small.preflight.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_coaster_track_v1_guarded.py",
+  "qualityStage": "preflight",
+  "args": [
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/coaster.track_v1.airtime_hill_small.preflight.001",
+    "--piece",
+    "airtime_hill_small"
+  ],
+  "outputDir": "out/ch_blender_agent/coaster.track_v1.airtime_hill_small.preflight.001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/coaster.track_v1.airtime_hill_small.preflight.001/preflight_report.json",
+    "out/ch_blender_agent/coaster.track_v1.airtime_hill_small.preflight.001/track_metadata.json"
+  ]
+}
