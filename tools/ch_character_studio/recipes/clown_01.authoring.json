@@ -17,6 +17,8 @@
     "white": {"color": "#f4f2e3", "roughness": 0.94, "specular": 0.05},
     "nose": {"color": "#df3b36", "roughness": 0.86, "specular": 0.08},
     "eye": {"color": "#262220", "roughness": 0.92, "specular": 0.04},
+    "mouth": {"color": "#9f3540", "roughness": 0.90, "specular": 0.05},
+    "cheek": {"color": "#e88780", "roughness": 0.92, "specular": 0.04},
     "bow": {"color": "#8b5cf6", "roughness": 0.84, "specular": 0.08}
   },
   "parts": [
@@ -56,8 +58,51 @@
     {"id": "hair_back_bridge", "type": "soft_form", "location": {"point": "head", "offset": [0.0, 0.142, 0.078]}, "scale": [0.112, 0.052, 0.069], "material": "hair"},
 
     {"id": "nose", "type": "soft_form", "location": {"point": "head", "offset": [0.0, -0.145, -0.005]}, "scale": [0.048, 0.034, 0.048], "material": "nose"},
-    {"id": "eye_L", "type": "soft_form", "location": {"point": "head", "offset": [-0.052, -0.134, 0.052]}, "scale": [0.015, 0.010, 0.019], "material": "eye"},
-    {"id": "eye_R", "type": "soft_form", "location": {"point": "head", "offset": [0.052, -0.134, 0.052]}, "scale": [0.015, 0.010, 0.019], "material": "eye"},
+    {"id": "eye_L", "type": "soft_form", "location": {"point": "head", "offset": [-0.052, -0.143, 0.052]}, "scale": [0.017, 0.010, 0.021], "material": "eye"},
+    {"id": "eye_R", "type": "soft_form", "location": {"point": "head", "offset": [0.052, -0.143, 0.052]}, "scale": [0.017, 0.010, 0.021], "material": "eye"},
+    {"id": "cheek_L", "type": "soft_form", "location": {"point": "head", "offset": [-0.078, -0.139, -0.018]}, "scale": [0.025, 0.009, 0.019], "material": "cheek"},
+    {"id": "cheek_R", "type": "soft_form", "location": {"point": "head", "offset": [0.078, -0.139, -0.018]}, "scale": [0.025, 0.009, 0.019], "material": "cheek"},
+    {
+      "id": "brow_L",
+      "type": "curve_tube",
+      "points": [
+        {"point": "head", "offset": [-0.079, -0.137, 0.088]},
+        {"point": "head", "offset": [-0.053, -0.149, 0.099]},
+        {"point": "head", "offset": [-0.029, -0.138, 0.091]}
+      ],
+      "radius": 0.006,
+      "resolution": 2,
+      "bevelResolution": 2,
+      "material": "eye"
+    },
+    {
+      "id": "brow_R",
+      "type": "curve_tube",
+      "points": [
+        {"point": "head", "offset": [0.029, -0.138, 0.091]},
+        {"point": "head", "offset": [0.053, -0.149, 0.099]},
+        {"point": "head", "offset": [0.079, -0.137, 0.088]}
+      ],
+      "radius": 0.006,
+      "resolution": 2,
+      "bevelResolution": 2,
+      "material": "eye"
+    },
+    {
+      "id": "smile",
+      "type": "curve_tube",
+      "points": [
+        {"point": "head", "offset": [-0.055, -0.139, -0.052]},
+        {"point": "head", "offset": [-0.030, -0.148, -0.070]},
+        {"point": "head", "offset": [0.000, -0.152, -0.079]},
+        {"point": "head", "offset": [0.030, -0.148, -0.070]},
+        {"point": "head", "offset": [0.055, -0.139, -0.052]}
+      ],
+      "radius": 0.007,
+      "resolution": 2,
+      "bevelResolution": 3,
+      "material": "mouth"
+    },
 
     {
       "id": "jacket",
