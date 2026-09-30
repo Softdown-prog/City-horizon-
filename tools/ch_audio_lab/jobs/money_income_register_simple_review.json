@@ -1,0 +1,37 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "money_income_register_simple_review",
+  "kind": "effect",
+  "prompt": "One isolated vintage mechanical cash register sound effect. A single short cash drawer clack followed immediately by a brief natural rattle of coins inside the drawer. No bell, no beep, no music, no ambience, no extra impacts, no multiple registers, no layered sounds. Dry, close, realistic, compact, classic supermarket cash register feel.",
+  "durationSeconds": 1.0,
+  "tags": ["economy", "cash-register", "coins", "mechanical", "money-income", "simple"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "20261001",
+      "--cfg", "0.85"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -19.0,
+    "truePeakDb": -2.0,
+    "fadeInSeconds": 0.0,
+    "fadeOutSeconds": 0.05,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
