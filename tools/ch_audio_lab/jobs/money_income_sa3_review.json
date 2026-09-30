@@ -1,0 +1,37 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "money_income_sa3_review",
+  "kind": "effect",
+  "prompt": "Short pleasant city-builder money income sound effect, subtle coins and a soft cash register confirmation chime, clean polished tycoon game UI feedback, rewarding but restrained, no casino jackpot, no slot machine, no speech, no music",
+  "durationSeconds": 2.0,
+  "tags": ["economy", "money", "income", "ui", "tycoon", "local-ai", "review"],
+  "provider": {
+    "type": "command",
+    "command": [
+      "python",
+      "tools/ch_audio_lab/providers/stable_audio_local.py",
+      "--prompt-file", "{prompt_file}",
+      "--duration", "{duration}",
+      "--output", "{output}",
+      "--model", "sm-sfx",
+      "--dit-precision", "w8a8-dyn",
+      "--decoder-precision", "w8a8",
+      "--threads", "4",
+      "--seed", "20260930",
+      "--cfg", "1.0"
+    ]
+  },
+  "mastering": {
+    "normalize": true,
+    "targetLufs": -18.0,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.01,
+    "fadeOutSeconds": 0.12,
+    "channels": 1,
+    "quality": 5
+  },
+  "target": {
+    "register": false,
+    "mode": "append"
+  }
+}
