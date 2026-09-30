@@ -1,0 +1,52 @@
+name: CH MapForge Composer PNG Proof Once
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  composer-png-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: linux
+          target: desktop
+          cache: true
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config
+
+      - name: Configure MapForge2
+        run: cmake -S C++/MapForge2 -B build/mapforge2 -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Composer Preview
+        run: cmake --build build/mapforge2 --target MapForge2ComposerPreview --parallel 2
+
+      - name: Generate Composer PNG proof
+        run: |
+          mkdir -p out/composer-png-proof
+          export QT_QPA_PLATFORM=offscreen
+          build/mapforge2/MapForge2ComposerPreview out/composer-png-proof
+          test -f out/composer-png-proof/building_composer_pilot_review.png
+          test -f out/composer-png-proof/building_composer_pilot_4view.png
+          test -f out/composer-png-proof/building_composer_pilot_manifest.json
+
+      - name: Upload Composer PNG proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapForge2-Composer-PNG-Proof
+          path: out/composer-png-proof
+          if-no-files-found: error
+          retention-days: 7
