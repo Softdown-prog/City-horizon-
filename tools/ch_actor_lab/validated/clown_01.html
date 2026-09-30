@@ -5,6 +5,7 @@
 <title>CH Actor Validated · clown_01</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="ch_actor_validated_v1.js"></script>
+<script src="ch_actor_runtime_directions_v1.js"></script>
 <script src="../skins/clown_01_v1.js"></script>
 <style>
 :root{color-scheme:dark;font:14px system-ui,sans-serif;background:#090f1d;color:#e2e8f0}body{max-width:1100px;margin:auto;padding:22px}section{padding:18px;background:#131e2d;border:1px solid #304153;border-radius:12px;margin-bottom:18px}.layout{display:grid;grid-template-columns:300px 1fr;gap:18px}.views{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.view{text-align:center;background:#101a25;padding:6px;border-radius:8px}.view canvas{width:120px;max-width:100%;image-rendering:pixelated}.sheet{overflow:auto;background:#182538;padding:12px}.sheet canvas{image-rendering:pixelated;border:1px solid #577085}.lock{color:#6ee7b7;font-weight:700}.bad{color:#fb7185}.buttons{display:flex;gap:8px;flex-wrap:wrap}button{background:#223348;color:#e2e8f0;border:1px solid #486077;border-radius:6px;padding:8px;cursor:pointer}small,p{color:#a9b8ca;line-height:1.5}@media(max-width:720px){.layout{grid-template-columns:1fr}.views{grid-template-columns:repeat(2,1fr)}}
@@ -12,13 +13,14 @@
 </head>
 <body>
 <h1>CH Actor Validated · clown_01</h1>
-<p>Palhaço = skin do ator validado. Câmera, root, cabeça, passada, anchor e 4 direções estão bloqueados.</p>
+<p>Palhaço = skin do ator validado. Câmera, root, cabeça, passada e anchor estão bloqueados. Direções usam o perfil de runtime validado no mapa pelo CH Actor/Faxineiro.</p>
 <main class="layout">
 <section>
 <h2>Contrato congelado</h2>
 <p id="contract"></p>
 <p>Quadro: <b>48×64</b><br>Anchor: <b>[24,60]</b><br>Frames: <b>8</b><br>Pernas: <b>0.32 rad</b><br>Braços: <b>0.18 rad</b><br>Bounce: <b>0.004</b></p>
 <p class="lock">MOVIMENTO LOCKED · aparência não pode alterar pose.</p>
+<p class="lock">DIREÇÕES MAPA: S→SW · E→SE · W→NW · N→NE</p>
 <label><input id="outline" type="checkbox" checked> Outline 1 px</label><br>
 <label><input id="anchor" type="checkbox" checked> Mostrar anchor no preview</label>
 <div class="buttons" style="margin-top:16px"><button id="exportPng">Exportar spritesheet RGBA</button><button id="exportJson">Exportar manifesto</button></div>
@@ -32,24 +34,24 @@
 </div></main>
 <script>
 'use strict';
-const CORE=window.CH_ACTOR_VALIDATED_V1, SKIN=window.CH_ACTOR_SKINS?.clown_01;
-const $=id=>document.getElementById(id); if(!window.THREE||!CORE||!SKIN)throw Error('CH Actor validated dependencies unavailable');
+const CORE=window.CH_ACTOR_VALIDATED_V1, DIRS=window.CH_ACTOR_RUNTIME_DIRECTIONS_V1, SKIN=window.CH_ACTOR_SKINS?.clown_01;
+const $=id=>document.getElementById(id); if(!window.THREE||!CORE||!DIRS||!SKIN)throw Error('CH Actor validated dependencies unavailable');
 const state={...CORE.DEFAULT_STATE,count:8,leg:.32,arm:.18,bounce:.004};
 const scene=new THREE.Scene(), source=document.createElement('canvas');
 const renderer=new THREE.WebGLRenderer({canvas:source,alpha:true,antialias:false,preserveDrawingBuffer:true});renderer.setPixelRatio(1);renderer.setClearColor(0x000000,0);
 const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,100);CORE.configureCamera(THREE,renderer,camera,48,64);
 const actor=CORE.createActor(THREE,scene,{colors:{skin:'#f3ead7',hair:'#d43b2f'}});SKIN.apply(THREE,actor);
 if(actor.head.parent!==actor.torso||actor.head.rotation.x!==0||actor.head.rotation.y!==0||actor.head.rotation.z!==0)throw Error('HEAD/TORSO LOCK VIOLATION');
-$('contract').innerHTML=`<span class="lock">${CORE.CONTRACT.version}</span> + ${actor.skin.contract}`;
+$('contract').innerHTML=`<span class="lock">${CORE.CONTRACT.version}</span> + ${actor.skin.contract}<br><span class="lock">${DIRS.version}</span>`;
 const capture=document.createElement('canvas');capture.width=48;capture.height=64;const captureCtx=capture.getContext('2d',{willReadFrequently:true});
 const frame=document.createElement('canvas');frame.width=48;frame.height=64;const frameCtx=frame.getContext('2d',{willReadFrequently:true});
 const sheet=$('sheet'),sheetCtx=sheet.getContext('2d');
-function render(logical,phase){CORE.setDirection(actor,logical);CORE.pose(actor,phase,state);renderer.clear();renderer.render(scene,camera);captureCtx.clearRect(0,0,48,64);captureCtx.drawImage(source,0,0);frameCtx.clearRect(0,0,48,64);if($('outline').checked){const src=captureCtx.getImageData(0,0,48,64).data,dst=frameCtx.createImageData(48,64),out=dst.data;for(let y=0;y<64;y++)for(let x=0;x<48;x++){const i=(y*48+x)*4;if(src[i+3]>40)continue;const solid=(xx,yy)=>xx>=0&&xx<48&&yy>=0&&yy<64&&src[(yy*48+xx)*4+3]>40;if(solid(x-1,y)||solid(x+1,y)||solid(x,y-1)||solid(x,y+1)){out[i]=15;out[i+1]=23;out[i+2]=42;out[i+3]=240}}frameCtx.putImageData(dst,0,0)}frameCtx.drawImage(capture,0,0);return frame}
-function rebuild(){const phases=CORE.phases(8),dirs=CORE.CONTRACT.directions;sheet.width=48*8;sheet.height=64*4;for(const d of dirs)for(let i=0;i<8;i++)sheetCtx.drawImage(render(d.logical,phases[i]),i*48,d.row*64);$('status').textContent='32 frames · mesmo ator · movimento validado preservado';}
-function preview(t){const phase=(t/1100)%1;for(const d of CORE.CONTRACT.directions){const c=$('view'+d.logical);c.width=48;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle='#597d42';ctx.fillRect(0,0,48,64);ctx.drawImage(render(d.logical,phase),0,0);if($('anchor').checked){ctx.fillStyle='#f87171';ctx.fillRect(23,59,3,3)}}requestAnimationFrame(preview)}
+function render(logical,phase){DIRS.setDirection(actor,logical);CORE.pose(actor,phase,state);renderer.clear();renderer.render(scene,camera);captureCtx.clearRect(0,0,48,64);captureCtx.drawImage(source,0,0);frameCtx.clearRect(0,0,48,64);if($('outline').checked){const src=captureCtx.getImageData(0,0,48,64).data,dst=frameCtx.createImageData(48,64),out=dst.data;for(let y=0;y<64;y++)for(let x=0;x<48;x++){const i=(y*48+x)*4;if(src[i+3]>40)continue;const solid=(xx,yy)=>xx>=0&&xx<48&&yy>=0&&yy<64&&src[(yy*48+xx)*4+3]>40;if(solid(x-1,y)||solid(x+1,y)||solid(x,y-1)||solid(x,y+1)){out[i]=15;out[i+1]=23;out[i+2]=42;out[i+3]=240}}frameCtx.putImageData(dst,0,0)}frameCtx.drawImage(capture,0,0);return frame}
+function rebuild(){const phases=CORE.phases(8),dirs=DIRS.directions;sheet.width=48*8;sheet.height=64*4;for(const d of dirs)for(let i=0;i<8;i++)sheetCtx.drawImage(render(d.logical,phases[i]),i*48,d.row*64);$('status').textContent='32 frames · mesma aparência · caminhada preservada · direções alinhadas ao perfil do Faxineiro';}
+function preview(t){const phase=(t/1100)%1;for(const d of DIRS.directions){const c=$('view'+d.logical);c.width=48;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle='#597d42';ctx.fillRect(0,0,48,64);ctx.drawImage(render(d.logical,phase),0,0);if($('anchor').checked){ctx.fillStyle='#f87171';ctx.fillRect(23,59,3,3)}}requestAnimationFrame(preview)}
 function download(name,href){const a=document.createElement('a');a.download=name;a.href=href;a.click()}
 $('outline').onchange=rebuild;
 $('exportPng').onclick=()=>{rebuild();download('clown_01_ch_actor_validated_4dir_8f.png',sheet.toDataURL('image/png'))};
-$('exportJson').onclick=()=>{const payload={contract:'CH_ACTOR_SKIN_EXPORT_V1',actorContract:CORE.CONTRACT.version,skin:'clown_01',frame:{size:[48,64],groundAnchor:[24,60]},motion:{locked:true,legSwingRad:.32,armSwingRad:.18,verticalBounce:.004,frames:8},directions:CORE.CONTRACT.directions.map(x=>({...x})),head:{parent:'torso',independentYaw:false}};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)+'\n'],{type:'application/json'}));download('clown_01_ch_actor_validated.json',url);setTimeout(()=>URL.revokeObjectURL(url),10000)};
+$('exportJson').onclick=()=>{const payload={contract:'CH_ACTOR_SKIN_EXPORT_V1',actorContract:CORE.CONTRACT.version,directionContract:DIRS.version,skin:'clown_01',frame:{size:[48,64],groundAnchor:[24,60]},motion:{locked:true,legSwingRad:.32,armSwingRad:.18,verticalBounce:.004,frames:8},directions:DIRS.directions.map(x=>({...x})),head:{parent:'torso',independentYaw:false}};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)+'\n'],{type:'application/json'}));download('clown_01_ch_actor_validated.json',url);setTimeout(()=>URL.revokeObjectURL(url),10000)};
 rebuild();requestAnimationFrame(preview);
 </script></body></html>
