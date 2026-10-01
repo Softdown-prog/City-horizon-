@@ -45,7 +45,10 @@ jobs:
           grep -q "CH_PROCEDURAL_ROAD_2D_RENDER_V1" src/procedural_road_ground_render_plan.h
           grep -q "ProceduralRoad2DMesh" src/ch_render/procedural_road_network_renderer.h
           grep -q "CH_PROCEDURAL_ROAD_2D_RUNTIME_V1" src/runtime_procedural_road_renderer.h
+          grep -q "CH_PROCEDURAL_ROAD_2D_CULLING_V1" src/runtime_procedural_road_culling.h
           grep -q "try_render_procedural_roads_runtime" src/runtime_map_renderer.h
+          grep -q "#define MapRenderer RuntimeMapRenderer" main.cpp
+          grep -q "LEGACY 3D DIAGNOSTIC ONLY" "C++/MapForge2/CMakeLists.txt"
           if grep -q "RoadMeshBuilder::build_cubic" src/procedural_road_ground_render_plan.h; then
             echo "3D RoadMeshBuilder leaked back into the canonical procedural road plan"
             exit 1
@@ -88,6 +91,12 @@ jobs:
       - name: Run procedural 2D road gate
         run: build/ch-procedural-road/MapForge2ProceduralRoadGroundRenderPlanTest
 
+      - name: Build runtime road review gate
+        run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadRuntimeReviewTest --parallel 2
+
+      - name: Run runtime road review gate
+        run: build/ch-procedural-road/MapForge2ProceduralRoadRuntimeReviewTest
+
       - name: Build procedural 2D PNG proof
         run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadPngProof --parallel 2
 
@@ -111,7 +120,7 @@ jobs:
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['workerContract'] == 'CH_MATH_WORKER_V1'
           assert isinstance(data.get('result'), dict) and data['result']
-          print('Procedural road 2D renderer + runtime integration + MapForge PNG proof: OK')
+          print('Procedural road 2D renderer + culling + mirror sync + MapForge PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
