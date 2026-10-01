@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - terrain-construction-gameplay-v2
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
@@ -38,9 +39,11 @@ on:
       - "src/ui_nine_slice.h"
       - "src/ui_visual_capture.cpp"
       - "src/ui_modal_visual_capture.cpp"
+      - "src/terrain_relief_visual_proof.cpp"
       - "assets/ui/ui_asset_catalog.json"
       - "assets/ui/chrome/panel_window_9slice_v2.png"
       - "tools/ui_capture/**"
+      - "tools/terrain_relief_capture/**"
       - "CMakeLists.txt"
       - ".github/workflows/city-builder-ui-compile-check.yml"
 
@@ -125,5 +128,41 @@ jobs:
         with:
           name: City-Builder-UI-Visual-Proof
           path: out/ui-capture/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+  terrain-relief-proof:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure terrain relief proof
+        shell: pwsh
+        run: cmake -S tools/terrain_relief_capture -B build/terrain-relief-proof -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=OFF
+
+      - name: Build terrain relief proof
+        shell: pwsh
+        run: cmake --build build/terrain-relief-proof --config Release --target terrain_relief_visual_proof --parallel
+
+      - name: Render hill and basin proof
+        shell: pwsh
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: |
+          New-Item -ItemType Directory -Force -Path out/terrain-relief | Out-Null
+          & "build/terrain-relief-proof/Release/terrain_relief_visual_proof.exe" "out/terrain-relief"
+          if ($LASTEXITCODE -ne 0) { throw "terrain_relief_visual_proof failed" }
+          foreach ($file in @("terrain_relief_flat.png", "terrain_relief_sculpted.png")) {
+            $path = Join-Path "out/terrain-relief" $file
+            if (-not (Test-Path $path)) { throw "Missing terrain proof: $file" }
+            if ((Get-Item $path).Length -le 4096) { throw "Terrain proof is unexpectedly small: $file" }
+          }
+
+      - name: Upload terrain relief proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Terrain-Relief-Proof
+          path: out/terrain-relief/*.png
           if-no-files-found: error
           retention-days: 14
