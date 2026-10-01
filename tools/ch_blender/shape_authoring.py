@@ -53,6 +53,7 @@ def add_rounded_box(
         mod.width = float(bevel)
         mod.segments = 2
     _tag(obj, role)
+    obj["chShapePrimitive"] = "rounded_box"
     return obj
 
 
@@ -105,11 +106,7 @@ def add_symmetric_section_loft(
     bevel: float = 0.0,
     cap_ends: bool = True,
 ) -> bpy.types.Object:
-    """Create one integrated symmetric body from ordered longitudinal sections.
-
-    This is intentionally simple. It is more predictable for agent-authored tycoon
-    assets than stacking unrelated boxes and hoping their silhouettes fuse in render.
-    """
+    """Create one integrated symmetric body from ordered longitudinal sections."""
     _validate_sections(sections)
     rings = [_section_ring(section) for section in sections]
     verts = [vertex for ring in rings for vertex in ring]
@@ -140,6 +137,111 @@ def add_symmetric_section_loft(
         mod.segments = 2
     _tag(obj, role)
     obj["chShapePrimitive"] = "symmetric_section_loft"
+    obj["chShapeSections"] = json.dumps(sections, sort_keys=True, separators=(",", ":"))
+    return obj
+
+
+def _validate_open_tub_sections(sections: Sequence[dict]) -> None:
+    if len(sections) < 2:
+        raise ValueError("open tub loft requires at least two sections")
+    previous_y = None
+    required = ("y", "outerHalfWidth", "innerHalfWidth", "outerBottomZ", "innerFloorZ", "rimZ")
+    for index, section in enumerate(sections):
+        for key in required:
+            if key not in section:
+                raise ValueError(f"open tub section {index} missing {key}")
+        y = float(section["y"])
+        outer = float(section["outerHalfWidth"])
+        inner = float(section["innerHalfWidth"])
+        outer_bottom = float(section["outerBottomZ"])
+        inner_floor = float(section["innerFloorZ"])
+        rim = float(section["rimZ"])
+        if previous_y is not None and y <= previous_y:
+            raise ValueError("open tub sections must be strictly increasing in Y")
+        if outer <= 0.0 or inner <= 0.0:
+            raise ValueError("open tub widths must be > 0")
+        if inner >= outer:
+            raise ValueError("open tub innerHalfWidth must be smaller than outerHalfWidth")
+        if inner_floor <= outer_bottom:
+            raise ValueError("open tub innerFloorZ must be above outerBottomZ")
+        if rim <= inner_floor:
+            raise ValueError("open tub rimZ must be above innerFloorZ")
+        previous_y = y
+
+
+def _open_tub_section_ring(section: dict) -> list[tuple[float, float, float]]:
+    """Closed U-shaped material section whose upper middle remains an open cavity."""
+    y = float(section["y"])
+    outer = float(section["outerHalfWidth"])
+    inner = float(section["innerHalfWidth"])
+    bottom = float(section["outerBottomZ"])
+    floor = float(section["innerFloorZ"])
+    rim = float(section["rimZ"])
+    outer_h = rim - bottom
+    inner_rim_z = float(section.get("innerRimZ", rim))
+    if inner_rim_z <= floor or inner_rim_z > rim:
+        raise ValueError("open tub innerRimZ must be above innerFloorZ and <= rimZ")
+    return [
+        (-outer * 0.72, y, bottom),
+        (-outer, y, bottom + outer_h * 0.20),
+        (-outer, y, rim - outer_h * 0.12),
+        (-outer * 0.94, y, rim),
+        (-inner, y, inner_rim_z),
+        (-inner * 0.90, y, floor),
+        (inner * 0.90, y, floor),
+        (inner, y, inner_rim_z),
+        (outer * 0.94, y, rim),
+        (outer, y, rim - outer_h * 0.12),
+        (outer, y, bottom + outer_h * 0.20),
+        (outer * 0.72, y, bottom),
+    ]
+
+
+def add_open_tub_loft(
+    name: str,
+    *,
+    sections: Sequence[dict],
+    material,
+    role: str,
+    bevel: float = 0.0,
+    cap_ends: bool = True,
+) -> bpy.types.Object:
+    """Create one deterministic hollow, open-top body from longitudinal U sections.
+
+    The cavity, floor and side walls are a single mesh. This avoids the detached-panel
+    look produced when open vehicles are assembled from unrelated boxes or wall slabs.
+    """
+    _validate_open_tub_sections(sections)
+    rings = [_open_tub_section_ring(section) for section in sections]
+    verts = [vertex for ring in rings for vertex in ring]
+    ring_size = len(rings[0])
+    faces: list[tuple[int, ...]] = []
+
+    for section_index in range(len(rings) - 1):
+        a = section_index * ring_size
+        b = (section_index + 1) * ring_size
+        for i in range(ring_size):
+            j = (i + 1) % ring_size
+            faces.append((a + i, a + j, b + j, b + i))
+
+    if cap_ends:
+        faces.append(tuple(range(ring_size - 1, -1, -1)))
+        last = (len(rings) - 1) * ring_size
+        faces.append(tuple(last + i for i in range(ring_size)))
+
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    if bevel > 0.0:
+        mod = obj.modifiers.new("CHShapeBevel", "BEVEL")
+        mod.width = float(bevel)
+        mod.segments = 2
+    _tag(obj, role)
+    obj["chShapePrimitive"] = "open_tub_loft"
+    obj["chShapeOpenTop"] = True
     obj["chShapeSections"] = json.dumps(sections, sort_keys=True, separators=(",", ":"))
     return obj
 
@@ -246,6 +348,16 @@ def _semantic_bounds(objects: Iterable[bpy.types.Object]) -> dict:
     return {role: _bounds(group) for role, group in sorted(groups.items())}
 
 
+def _primitive_counts(objects: Iterable[bpy.types.Object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for obj in _mesh_objects(objects):
+        primitive = obj.get("chShapePrimitive")
+        if primitive:
+            key = str(primitive)
+            counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def build_shape_report(
     *,
     scene,
@@ -276,6 +388,7 @@ def build_shape_report(
         projected_bounds = {"minX": min_x, "maxX": max_x, "minY": min_y, "maxY": max_y}
         occupancy = max(0.0, max_x - min_x) * max(0.0, max_y - min_y)
 
+    primitive_counts = _primitive_counts(objects)
     constraints = constraints or {}
     if symmetry_error is not None:
         maximum = float(constraints.get("maxXSymmetryError", 1.0))
@@ -313,6 +426,21 @@ def build_shape_report(
                 "maximum": maximum,
             })
 
+    required_minimums = constraints.get("requiredPrimitiveMinimums", {})
+    if not isinstance(required_minimums, dict):
+        raise ValueError("requiredPrimitiveMinimums must be an object mapping primitive name to minimum count")
+    for primitive, minimum_value in sorted(required_minimums.items()):
+        minimum = int(minimum_value)
+        actual = int(primitive_counts.get(str(primitive), 0))
+        if actual < minimum:
+            violations.append({
+                "code": "CH_SHAPE_REQUIRED_PRIMITIVE",
+                "message": "Authored asset is missing a required deterministic shape primitive.",
+                "primitive": str(primitive),
+                "actual": actual,
+                "minimum": minimum,
+            })
+
     return {
         "contract": REPORT_CONTRACT,
         "status": "pass" if not violations else "fail",
@@ -325,6 +453,7 @@ def build_shape_report(
         "projectedSouthBounds": projected_bounds,
         "projectedSouthOccupancy": occupancy,
         "semanticRoleBounds": _semantic_bounds(objects),
+        "shapePrimitiveCounts": primitive_counts,
         "constraints": constraints,
         "violations": violations,
     }
