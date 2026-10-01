@@ -1,0 +1,52 @@
+name: CH Road Review Fixes Once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - tools/patch_procedural_road_review_fixes.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply reviewed road fixes
+        run: python tools/patch_procedural_road_review_fixes.py
+
+      - name: Validate patch shape
+        run: |
+          git diff --check
+          grep -q 'ProceduralRoad2DWorldBounds' src/procedural_road_ground_render_plan.h
+          grep -q 'culled_segments' src/procedural_road_ground_render_plan.h
+          grep -q 'procedural_visible' src/runtime_map_renderer.h
+          grep -q 'LEGACY 3D ROAD PILOT' 'C++/MapForge2/src/procedural_road_preview_main.cpp'
+
+      - name: Commit fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/procedural_road_ground_render_plan.h \
+            src/ch_render/procedural_road_network_renderer.h \
+            src/runtime_procedural_road_renderer.h \
+            src/runtime_map_renderer.h \
+            src/procedural_road_ground_render_plan_test.cpp \
+            'C++/MapForge2/CMakeLists.txt' \
+            'C++/MapForge2/src/procedural_road_preview_main.cpp'
+          if git diff --cached --quiet; then
+            echo 'Review fixes already applied.'
+            exit 0
+          fi
+          git commit -m 'Roads: harden procedural 2D runtime after review'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
