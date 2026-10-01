@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/ch_render/map_renderer.h"
+#include "src/runtime_procedural_road_renderer.h"
 #include "src/ch_core/ground_surface.h"
 #include "src/ch_core/shoreline_autotile.h"
 #include "src/ch_render/shoreline_catalog.h"
@@ -417,6 +418,11 @@ public:
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
         if (!visible.valid || roads.tiles().empty()) return;
+
+        if (try_render_procedural_roads_runtime(
+                renderer, roads, camera, viewport_width, viewport_height)) {
+            return;
+        }
 
         std::vector<const RoadTile*> visible_tiles;
         visible_tiles.reserve(std::min(roads.tiles().size(), visible.cell_count()));
