@@ -35,7 +35,7 @@
 #include "park_fence_save_manager.h"
 #include "simulation_clock.h"
 #include "src/runtime_view_state.h"
-#include "src/runtime_map_renderer.h"
+#include "src/runtime_terrain_renderer.h"
 #include "src/runtime_game_state.h"
 #include "src/runtime_game_ui.h"
 
@@ -371,7 +371,7 @@ private:
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
-#define MapRenderer RuntimeMapRenderer
+#define MapRenderer TerrainAwareRuntimeMapRenderer
 #define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
     ([&]() { \
