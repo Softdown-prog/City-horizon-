@@ -206,19 +206,19 @@ add_executable(MapForge2ProceduralRoadPreview
 target_include_directories(MapForge2ProceduralRoadPreview PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2ProceduralRoadPreview PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
 
-# Headless proof wrapper. It reuses the exact preview implementation but creates
-# QGuiApplication before QPainter reaches the font database, which is required
-# when CI writes the PNG without opening the interactive window.
+# Headless canonical proof for CH_PROCEDURAL_ROAD_2D_RENDER_V1. It creates
+# QGuiApplication before QPainter reaches the font database, allowing CI to
+# render the approved flat XY road geometry without opening an interactive view.
 add_executable(MapForge2ProceduralRoadPngProof
     src/procedural_road_preview_headless_main.cpp
 )
 target_include_directories(MapForge2ProceduralRoadPngProof PRIVATE ${CH_ROOT})
 target_link_libraries(MapForge2ProceduralRoadPngProof PRIVATE mapforge2_render mapforge2_canonical Qt6::Gui)
 
-# CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves only the
-# ground/elevated admission policy. It intentionally does not link the broad
-# gameplay renderer: production RoadMeshBuilder/SDL integration is compiled by
-# mapforge2_editor and MapForge2ProceduralRoadPreview in the same workflow.
+# CH_PROCEDURAL_ROAD_GROUND_RENDER_V1. This focused executable proves the flat
+# ground/elevated admission policy. Runtime 2D integration, culling and mirror
+# synchronization are validated separately by MapForge2ProceduralRoadRuntimeReviewTest
+# and the compile gate in ch-procedural-road-proof.yml.
 add_executable(MapForge2ProceduralRoadGroundRenderPlanTest
     ${CH_ROOT}/src/procedural_road_ground_render_plan_test.cpp
 )
