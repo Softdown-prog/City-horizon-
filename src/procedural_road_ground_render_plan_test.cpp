@@ -1,25 +1,11 @@
 #include "procedural_road_ground_render_plan.h"
 
 #include <cassert>
-
-// This gate validates only the ground/elevated admission policy. The production
-// RoadMeshBuilder is compiled separately through mapforge2_editor and the real
-// MapForge2ProceduralRoadPreview in the same workflow. Keeping a tiny local mesh
-// double here prevents unrelated building/economy linkage from contaminating a
-// topology/Z-filter test.
-RoadMesh RoadMeshBuilder::build_cubic(const RoadSplineSegment& segment) {
-    RoadMesh mesh;
-    if (!(segment.width > 0.0F)) return mesh;
-    mesh.vertices.push_back({segment.start, 0.0F, 0.0F});
-    mesh.vertices.push_back({segment.end, 1.0F, 1.0F});
-    mesh.vertices.push_back({segment.end, 0.0F, 1.0F});
-    mesh.indices = {0U, 1U, 2U};
-    return mesh;
-}
+#include <cmath>
 
 namespace {
 
-void test_ground_network_is_admitted() {
+void test_ground_network_is_admitted_as_flat_2d() {
     ProceduralRoadPlacementBridge bridge;
     const auto result = bridge.mirror_tile_segment(
         {{0, 0}, {1, 0}, {2, 0}}, ProceduralRoadClass::local, 0.0F);
@@ -30,6 +16,33 @@ void test_ground_network_is_admitted() {
     assert(plan.junction_meshes.size() == 1U);
     assert(plan.skipped_elevated_segments == 0U);
     assert(plan.skipped_mixed_junctions == 0U);
+
+    for (const ProceduralRoad2DMesh& mesh : plan.segment_meshes) {
+        assert(!mesh.empty());
+        for (const ProceduralRoad2DVertex& vertex : mesh.vertices) {
+            assert(std::isfinite(vertex.position.x));
+            assert(std::isfinite(vertex.position.y));
+        }
+    }
+    assert(!plan.junction_meshes.front().empty());
+}
+
+void test_straight_ribbon_preserves_authored_width() {
+    RoadSplineSegment segment;
+    segment.start = {0.0F, 0.0F, 0.0F};
+    segment.control_a = {1.0F / 3.0F, 0.0F, 0.0F};
+    segment.control_b = {2.0F / 3.0F, 0.0F, 0.0F};
+    segment.end = {1.0F, 0.0F, 0.0F};
+    segment.width = 0.72F;
+    segment.subdivisions = 4;
+
+    const ProceduralRoad2DMesh mesh = build_procedural_road_2d_ribbon(segment);
+    assert(mesh.vertices.size() == 10U);
+    assert(mesh.indices.size() == 24U);
+
+    const float first_pair_width = std::abs(
+        mesh.vertices[0].position.y - mesh.vertices[1].position.y);
+    assert(std::abs(first_pair_width - segment.width) < 0.0001F);
 }
 
 void test_elevated_segment_is_rejected() {
@@ -44,7 +57,7 @@ void test_elevated_segment_is_rejected() {
     assert(plan.skipped_elevated_segments == 1U);
 }
 
-void test_mixed_height_junction_is_not_patched() {
+void test_mixed_height_junction_is_not_rendered() {
     ProceduralRoadPlacementBridge bridge;
     ProceduralRoadGraph& graph = bridge.graph();
     ProceduralRoadClassCatalog& classes = bridge.classes();
@@ -72,8 +85,9 @@ void test_mixed_height_junction_is_not_patched() {
 } // namespace
 
 int main() {
-    test_ground_network_is_admitted();
+    test_ground_network_is_admitted_as_flat_2d();
+    test_straight_ribbon_preserves_authored_width();
     test_elevated_segment_is_rejected();
-    test_mixed_height_junction_is_not_patched();
+    test_mixed_height_junction_is_not_rendered();
     return 0;
 }
