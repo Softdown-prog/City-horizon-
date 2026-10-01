@@ -9,6 +9,11 @@ on:
       - 'src/coaster_car_pose_test.cpp'
       - 'src/coaster_train_runtime.h'
       - 'src/coaster_train_runtime_test.cpp'
+      - 'src/coaster_centerline_route.h'
+      - 'src/coaster_runtime.h'
+      - 'src/coaster_runtime_test.cpp'
+      - 'src/coaster_render_adapter.h'
+      - 'src/coaster_render_adapter_test.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
   pull_request:
@@ -19,6 +24,11 @@ on:
       - 'src/coaster_car_pose_test.cpp'
       - 'src/coaster_train_runtime.h'
       - 'src/coaster_train_runtime_test.cpp'
+      - 'src/coaster_centerline_route.h'
+      - 'src/coaster_runtime.h'
+      - 'src/coaster_runtime_test.cpp'
+      - 'src/coaster_render_adapter.h'
+      - 'src/coaster_render_adapter_test.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
 
@@ -54,6 +64,25 @@ jobs:
 
       - name: Run articulated coaster train regression
         run: /tmp/coaster_train_runtime_test
+
+      - name: Compile centerline runtime regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -Isrc src/coaster_runtime_test.cpp -o /tmp/coaster_runtime_test
+
+      - name: Run centerline runtime regression
+        run: /tmp/coaster_runtime_test
+
+      - name: Compile coaster render adapter regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -I. -Isrc src/coaster_render_adapter_test.cpp src/ch_core/projection.cpp \
+            -o /tmp/coaster_render_adapter_test
+
+      - name: Run coaster render adapter regression
+        run: /tmp/coaster_render_adapter_test
 
       - name: Validate promoted Flame atlas
         run: |
