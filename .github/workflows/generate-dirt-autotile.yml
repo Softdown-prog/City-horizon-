@@ -3,10 +3,12 @@ name: Generate Dirt Autotile
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, terrain-construction-gameplay]
     paths:
       - "assets/terrain/dirt_isometric_01.png"
+      - "assets/terrain/paths/dirt_01/**"
       - "tools/generate_dirt_paths.py"
+      - "tools/generate_dirt_slope_sprites.py"
       - "tools/ground_tile_worker.py"
       - "tools/normalize_atomic_path_tile.py"
       - "tools/tile_geometry.py"
@@ -101,6 +103,34 @@ jobs:
             --prefix dirt_path \
             --report out/dirt_path_family_report.json
 
+      - name: Generate pre-rendered slope and stair pilot
+        run: |
+          python tools/generate_dirt_slope_sprites.py \
+            --output-dir out/dirt_slope_sprite_pilot \
+            --contact-sheet out/dirt_slope_sprite_pilot_sheet.png \
+            --manifest out/dirt_slope_sprite_pilot_manifest.json
+
+      - name: Validate slope sprite pilot
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          files = sorted(Path('out/dirt_slope_sprite_pilot').glob('*.png'))
+          if len(files) != 20:
+              raise SystemExit(f'expected 20 slope/stair PNGs, found {len(files)}')
+          for path in files:
+              with Image.open(path) as im:
+                  im.load()
+                  if im.mode != 'RGBA' or im.size != (128, 112):
+                      raise SystemExit(f'{path}: expected 128x112 RGBA, got {im.size} {im.mode}')
+          manifest = json.loads(Path('out/dirt_slope_sprite_pilot_manifest.json').read_text(encoding='utf-8'))
+          if manifest.get('runtime_visual_policy') != 'sprite_select_only':
+              raise SystemExit('pilot policy must be sprite_select_only')
+          print('PASS slope/stair pilot=20 PNGs')
+          PY
+
       - name: Upload autotile preview
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,5 +144,17 @@ jobs:
             out/dirt_isometric_candidate.png
             assets/terrain/dirt_isometric_01.png
             out/dirt_path_candidate/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload pre-rendered slope sprite pilot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Dirt-Slope-Sprite-Pilot
+          path: |
+            out/dirt_slope_sprite_pilot/*.png
+            out/dirt_slope_sprite_pilot_sheet.png
+            out/dirt_slope_sprite_pilot_manifest.json
           if-no-files-found: warn
           retention-days: 14
