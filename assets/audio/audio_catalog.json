@@ -43,7 +43,9 @@
     "FerrisWheelRunning": [
       "attractions/ferris_wheel_running.ogg"
     ],
-    "VikingShipRunning": [],
+    "VikingShipRunning": [
+      "attractions/viking_ship_rope_creak.ogg"
+    ],
     "WeatherRain": [
       "weather/rain_calm.ogg"
     ],
