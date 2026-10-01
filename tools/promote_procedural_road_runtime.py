@@ -5,7 +5,9 @@ This script intentionally edits only the two promotion seams:
 - RuntimeMapRenderer::render_roads gets a procedural-first call with legacy fallback.
 - The existing road proof workflow also compiles the real city_builder executable.
 
-It is idempotent so a rerun is harmless.
+It is idempotent so a rerun is harmless. The temporary promotion workflow rebases
+its generated commit onto the current main before pushing, avoiding force pushes
+when unrelated City Horizon work lands concurrently.
 """
 
 from pathlib import Path
