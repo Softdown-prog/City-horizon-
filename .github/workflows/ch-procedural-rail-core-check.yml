@@ -13,6 +13,10 @@ on:
       - "src/rail_placement_controller.h"
       - "src/rail_drag_adapter.h"
       - "src/rail_drag_adapter_test.cpp"
+      - "src/rail_mapforge_input_adapter.h"
+      - "src/rail_mapforge_input_adapter_test.cpp"
+      - "src/ch_core/projection.h"
+      - "src/ch_core/projection.cpp"
       - ".github/workflows/ch-procedural-rail-core-check.yml"
   workflow_dispatch:
 
@@ -36,17 +40,21 @@ jobs:
         run: |
           set -euo pipefail
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
-            -Isrc \
+            -I. -Isrc \
             src/rail_system.cpp src/rail_system_test.cpp \
             -o /tmp/ch_procedural_rail_core_test
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
-            -Isrc \
+            -I. -Isrc \
             src/rail_system.cpp src/rail_path_builder_test.cpp \
             -o /tmp/ch_procedural_rail_path_test
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
-            -Isrc \
+            -I. -Isrc \
             src/rail_system.cpp src/rail_drag_adapter_test.cpp \
             -o /tmp/ch_procedural_rail_drag_test
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -I. -Isrc \
+            src/rail_system.cpp src/ch_core/projection.cpp src/rail_mapforge_input_adapter_test.cpp \
+            -o /tmp/ch_procedural_rail_mapforge_input_test
 
       - name: Run fail-closed rail safety tests
         shell: bash
@@ -55,3 +63,4 @@ jobs:
           /tmp/ch_procedural_rail_core_test
           /tmp/ch_procedural_rail_path_test
           /tmp/ch_procedural_rail_drag_test
+          /tmp/ch_procedural_rail_mapforge_input_test
