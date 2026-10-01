@@ -43,26 +43,28 @@ int main(int argc, char** argv) {
 
     ch::MapDocument document = ch::MapDocument::create_empty("Runtime Terrain Proof", 32, 32);
 
-    // Rounded hill: two raise passes plus a smoothing pass reproduce a player
-    // dragging the terrain brush instead of constructing a hard tile plateau.
-    document.apply_terrain_brush(12.5F, 12.5F, 5.5F, 0.78F, ch::TerrainBrushMode::raise);
-    document.apply_terrain_brush(12.5F, 12.5F, 4.2F, 0.58F, ch::TerrainBrushMode::raise);
-    document.apply_terrain_brush(12.5F, 12.5F, 6.0F, 0.55F, ch::TerrainBrushMode::smooth);
+    // Deliberately strong, still-canonical relief. Repeated brush passes are
+    // exactly what a player can do and make the shape readable in a screenshot
+    // without introducing any debug/fake terrain geometry.
+    document.apply_terrain_brush(11.5F, 12.0F, 5.0F, 1.35F, ch::TerrainBrushMode::raise);
+    document.apply_terrain_brush(11.5F, 12.0F, 4.2F, 1.35F, ch::TerrainBrushMode::raise);
+    document.apply_terrain_brush(11.5F, 12.0F, 3.4F, 0.90F, ch::TerrainBrushMode::raise);
+    document.apply_terrain_brush(11.5F, 12.0F, 5.5F, 0.22F, ch::TerrainBrushMode::smooth);
 
-    // Rounded basin/depression using the exact same canonical heightfield.
-    document.apply_terrain_brush(20.0F, 18.0F, 4.8F, 0.82F, ch::TerrainBrushMode::lower);
-    document.apply_terrain_brush(20.0F, 18.0F, 3.5F, 0.48F, ch::TerrainBrushMode::lower);
-    document.apply_terrain_brush(20.0F, 18.0F, 5.2F, 0.60F, ch::TerrainBrushMode::smooth);
+    document.apply_terrain_brush(20.5F, 18.5F, 4.7F, 1.35F, ch::TerrainBrushMode::lower);
+    document.apply_terrain_brush(20.5F, 18.5F, 3.9F, 1.35F, ch::TerrainBrushMode::lower);
+    document.apply_terrain_brush(20.5F, 18.5F, 3.1F, 0.90F, ch::TerrainBrushMode::lower);
+    document.apply_terrain_brush(20.5F, 18.5F, 5.2F, 0.22F, ch::TerrainBrushMode::smooth);
 
-    // Refuse to create a visual artifact if the canonical heightfield did not
-    // actually produce both signs of relief. This prevents a flat screenshot
-    // from being mistaken for a successful runtime proof.
-    const float hill_height = document.terrain_heightfield().sample(12.5F, 12.5F);
-    const float basin_height = document.terrain_heightfield().sample(20.0F, 18.0F);
+    // Refuse to create a visual artifact unless the canonical heightfield has
+    // a clearly elevated hill and clearly lowered basin. This guards against
+    // a visually flat screenshot being accepted merely because rendering ran.
+    const float hill_height = document.terrain_heightfield().sample(11.5F, 12.0F);
+    const float basin_height = document.terrain_heightfield().sample(20.5F, 18.5F);
     std::cout << "terrain proof samples: hill=" << hill_height
               << " basin=" << basin_height << '\n';
-    if (hill_height <= 0.15F || basin_height >= -0.15F) {
-        std::cerr << "canonical terrain relief did not produce the expected hill/basin signs\n";
+    if (hill_height <= 2.0F || basin_height >= -2.0F) {
+        std::cerr << "canonical terrain relief did not produce strong hill/basin samples\n";
         return 7;
     }
 
@@ -120,24 +122,15 @@ int main(int argc, char** argv) {
     }
 
     ch::CameraState camera{};
-    camera.zoom = 0.92F;
-    const float center_x = 14.5F;
-    const float center_y = 15.0F;
+    camera.zoom = 1.02F;
+    const float center_x = 15.0F;
+    const float center_y = 15.2F;
     camera.pan_x = -(center_x - center_y) * 64.0F * camera.zoom;
     camera.pan_y = -(center_x + center_y) * 32.0F * camera.zoom;
 
     ch::TerrainAwareRuntimeMapRenderer::render_world_terrain_and_water(
         renderer, document, find_texture, repo_root, camera,
         static_cast<float>(kWidth), static_cast<float>(kHeight), 0.0F);
-
-    // A subtle outline around the two brush centers makes the proof easier to
-    // inspect without replacing or faking the production terrain rendering.
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 60);
-    ch::MapRenderer::render_tile_outline(renderer, 12, 12, camera,
-                                         static_cast<float>(kWidth), static_cast<float>(kHeight));
-    ch::MapRenderer::render_tile_outline(renderer, 20, 18, camera,
-                                         static_cast<float>(kWidth), static_cast<float>(kHeight));
 
     SDL_RenderPresent(renderer);
     const bool saved = SDL_SaveBMP(canvas, output_path.string().c_str());
