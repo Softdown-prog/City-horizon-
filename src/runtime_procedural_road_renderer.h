@@ -63,9 +63,9 @@ namespace ch {
         build_visible_procedural_road_ground_render_plan(mirror, visible_bounds);
     const ProceduralRoadGroundRenderPlan& plan = visible.plan;
 
-    // Promotion is all-or-fallback for the camera-visible working set. Roads
-    // outside visible_bounds are culled before tessellation and therefore avoid
-    // the expensive mesh generation/draw work for the rest of the city.
+    // Promotion is all-or-fallback for the camera-visible working set. The
+    // mirror's CH_PROCEDURAL_ROAD_SPATIAL_INDEX_V1 selects nearby chunks first;
+    // exact culling and tessellation then run only on those candidates.
     const bool complete_ground_plan =
         plan.skipped_elevated_segments == 0U &&
         plan.skipped_mixed_junctions == 0U &&
@@ -78,11 +78,11 @@ namespace ch {
         return false;
     }
 
-    // Markings use the same camera-visible working set as the asphalt surface.
-    // Once asphalt has been submitted, a cosmetic line failure must not redraw
-    // the legacy tiles on top of the procedural road.
+    // Markings use the same spatially indexed camera-visible working set as the
+    // asphalt surface. Once asphalt has been submitted, a cosmetic line failure
+    // must not redraw legacy tiles on top of the procedural road.
     (void)render_visible_procedural_road_center_markings(
-        renderer, graph, camera, viewport_width, viewport_height, visible_bounds);
+        renderer, mirror, camera, viewport_width, viewport_height, visible_bounds);
     return true;
 }
 
