@@ -97,3 +97,5 @@ jobs:
             out/runtime-terrain/runtime_terrain_proof.bmp
           if-no-files-found: error
           retention-days: 14
+
+# Re-run marker: CH_PATH_SLOPE_SPRITE_V1 baked sprite runtime proof.
