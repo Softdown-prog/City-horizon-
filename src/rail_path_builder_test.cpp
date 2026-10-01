@@ -36,8 +36,6 @@ float normalized_planar_dot(const RailWorldPoint3& a, const RailWorldPoint3& b) 
 int main() {
     const RailProfile profile{};
 
-    // A straight enters a broad left 90-degree curve and exits into a second
-    // straight. Both seams must be position- and tangent-continuous.
     const RailPathBuildResult approach = RailPathBuilder::straight(
         {-6.0F, 0.0F, 0.0F}, 0.0F, 6.0F, 32, profile);
     assert(approach.ok());
@@ -62,11 +60,9 @@ int main() {
     assert_geometry_safe(curve_mesh.geometry, profile);
     assert_geometry_safe(exit_mesh.geometry, profile);
 
-    // Canonical quarter-curve endpoint for an eastbound left turn of radius 4.
     assert(std::abs(left_curve.segment.end.x - 4.0F) < 0.0001F);
     assert(std::abs(left_curve.segment.end.y - 4.0F) < 0.0001F);
 
-    // Right turns use the same structural contract and mirror safely.
     const RailPathBuildResult right_curve = RailPathBuilder::quarter_curve(
         {0.0F, 0.0F, 0.0F}, 0.0F, 4.0F, RailTurnDirection::right, 48, profile);
     assert(right_curve.ok());
@@ -76,8 +72,6 @@ int main() {
     assert(right_mesh.ok());
     assert_geometry_safe(right_mesh.geometry, profile);
 
-    // Shallow arc curves are the primitive used by turnouts. They preserve an
-    // analytical entry tangent and a predictable rotated exit tangent.
     const RailPathBuildResult shallow = RailPathBuilder::arc_curve(
         {0.0F, 0.0F, 0.0F}, 0.0F, 8.0F, kPiOverTwelve,
         RailTurnDirection::left, 48, profile);
@@ -88,8 +82,6 @@ int main() {
     assert(normalized_planar_dot(shallow_exit_tangent,
                                  {std::cos(kPiOverTwelve), std::sin(kPiOverTwelve), 0.0F}) > 0.9999F);
 
-    // Canonical turnout: both routes start at the same graph node and exact
-    // heading. The branch then diverges progressively without a direction snap.
     const RailTurnoutBuildResult turnout_left = RailPathBuilder::turnout(
         {0.0F, 0.0F, 0.0F}, 0.0F, 8.0F, kPiOverTwelve,
         RailTurnDirection::left, 48, profile);
@@ -99,9 +91,6 @@ int main() {
     const RailWorldPoint3 through_entry_tangent = RailMeshBuilder::tangent_cubic(turnout_left.through, 0.0F);
     const RailWorldPoint3 branch_entry_tangent = RailMeshBuilder::tangent_cubic(turnout_left.diverging, 0.0F);
     assert(normalized_planar_dot(through_entry_tangent, branch_entry_tangent) > 0.9999F);
-
-    // The exits must be meaningfully separated; otherwise a turnout would be a
-    // visually duplicated straight and could not form two graph branches.
     assert(planar_distance(turnout_left.through.end, turnout_left.diverging.end) > profile.gauge * 0.5F);
     assert(turnout_left.diverging.end.y > turnout_left.through.end.y);
     assert(std::abs(turnout_left.diverging_exit_heading_radians - kPiOverTwelve) < 0.0001F);
@@ -113,7 +102,6 @@ int main() {
     assert_geometry_safe(turnout_through_mesh.geometry, profile);
     assert_geometry_safe(turnout_branch_mesh.geometry, profile);
 
-    // Mirrored right turnout must remain symmetric around the source heading.
     const RailTurnoutBuildResult turnout_right = RailPathBuilder::turnout(
         {0.0F, 0.0F, 0.0F}, 0.0F, 8.0F, kPiOverTwelve,
         RailTurnDirection::right, 48, profile);
@@ -123,8 +111,6 @@ int main() {
     assert(std::abs(turnout_right.diverging.end.y + turnout_left.diverging.end.y) < 0.0001F);
     assert(std::abs(turnout_right.diverging_exit_heading_radians + kPiOverTwelve) < 0.0001F);
 
-    // Requests below the railway's minimum radius fail closed and carry no
-    // usable segment into the mesh builder.
     const RailPathBuildResult too_tight = RailPathBuilder::quarter_curve(
         {0.0F, 0.0F, 0.0F}, 0.0F, profile.min_turn_radius * 0.5F,
         RailTurnDirection::left, 48, profile);
@@ -137,8 +123,6 @@ int main() {
     assert(!turnout_too_tight.ok());
     assert(turnout_too_tight.validation.error == RailValidationError::turn_radius_too_small);
 
-    // Turnout angles are deliberately shallow. Extreme branch angles are not
-    // silently accepted because they belong to ordinary curve primitives.
     const RailTurnoutBuildResult turnout_too_wide = RailPathBuilder::turnout(
         {0.0F, 0.0F, 0.0F}, 0.0F, 8.0F, kHalfPi,
         RailTurnDirection::left, 48, profile);
@@ -149,9 +133,7 @@ int main() {
         RailTurnDirection::left, 48, profile);
     assert(!turnout_too_narrow.ok());
 
-    // Editor staging graph: accepted authoring operations become deterministic
-    // nodes/edges, every edge remains mesh-safe, and cancellation rolls back
-    // only geometry produced after the checkpoint.
+    // Transactional editor staging graph.
     RailPlacementGraph placement(profile);
     const auto placement_root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
     assert(placement_root.has_value());
@@ -186,9 +168,6 @@ int main() {
     assert(placement.edges().size() == cancel_point.edge_count);
     assert(placement.node(temporary_extension->node) == nullptr);
 
-    // A turnout commits both branches atomically from one source node. Both
-    // edge meshes must be buildable and a failed turnout must leave counts
-    // unchanged.
     const RailPlacementCheckpoint before_turnout = placement.checkpoint();
     const auto placed_turnout = placement.append_turnout(
         placed_straight->node, 8.0F, kPiOverTwelve, RailTurnDirection::right, 48);
@@ -215,10 +194,8 @@ int main() {
     assert(placement.edges().size() == before_rejected_turnout.edge_count);
 
     assert(!placement.add_root({std::nanf(""), 0.0F, 0.0F}, 0.0F).has_value());
-    assert(!placement.rollback({placement.nodes().size() + 1U, placement.edges().size()}).operator bool());
+    assert(!placement.rollback({placement.nodes().size() + 1U, placement.edges().size()}));
 
-    // Non-finite authoring input is rejected before trigonometry can poison the
-    // generated control points.
     const RailPathBuildResult bad_heading = RailPathBuilder::straight(
         {0.0F, 0.0F, 0.0F}, std::nanf(""), 4.0F, 32, profile);
     assert(!bad_heading.ok());
