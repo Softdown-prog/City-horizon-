@@ -1,0 +1,40 @@
+{
+  "id": "park_tree_broadleaf_organic_lush_01",
+  "name": "Árvore Frondosa de Parque",
+  "description": "Árvore folhosa de copa larga e densa, refeita no Visitor Forge 2D procedural a partir da referência aprovada.",
+  "category": "trees",
+  "assetDir": "assets/tree",
+  "views": {
+    "south": "park_tree_broadleaf_organic_lush_01_south.png",
+    "west": "park_tree_broadleaf_organic_lush_01_west.png",
+    "north": "park_tree_broadleaf_organic_lush_01_north.png",
+    "east": "park_tree_broadleaf_organic_lush_01_east.png"
+  },
+  "anchor": [
+    128,
+    310
+  ],
+  "footprint": {
+    "width": 1,
+    "height": 1,
+    "mask": [
+      "1"
+    ]
+  },
+  "tags": [
+    "park",
+    "tree",
+    "broadleaf",
+    "lush",
+    "shade"
+  ],
+  "variations": 1,
+  "rotationMode": "sprite_4dir",
+  "generatedBy": "visitor_forge_2d",
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "pipelineRevision": 13,
+  "runtime": {
+    "selectable": true,
+    "placeable": true
+  }
+}
