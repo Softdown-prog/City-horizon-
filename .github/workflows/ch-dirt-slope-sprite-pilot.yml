@@ -7,13 +7,15 @@ on:
       - terrain-construction-gameplay
     paths:
       - "tools/generate_dirt_slope_sprites.py"
-      - "assets/terrain/paths/dirt_01/**"
-      - "assets/terrain/paths/sand_01/**"
+      - "assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png"
+      - "assets/terrain/paths/dirt_01/dirt_path_10_straight_ew.png"
+      - "assets/terrain/paths/sand_01/sand_path_05_straight_ns.png"
+      - "assets/terrain/paths/sand_01/sand_path_10_straight_ew.png"
       - "docs/CH_PATH_SLOPE_SPRITE_V1.md"
       - ".github/workflows/ch-dirt-slope-sprite-pilot.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 # CH_PATH_SLOPE_SPRITE_V1 is an offline bake. Runtime only selects baked sprites.
 concurrency:
@@ -27,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -92,6 +96,26 @@ jobs:
 
           print('PASS dirt_01 + sand_01 = 40 baked CH_PATH_SLOPE_SPRITE_V1 PNGs')
           PY
+
+      - name: Promote approved bakes into game assets
+        run: |
+          mkdir -p assets/terrain/paths/dirt_01/slopes
+          mkdir -p assets/terrain/paths/sand_01/slopes
+          cp out/path_slope_sprites/dirt_01/*.png assets/terrain/paths/dirt_01/slopes/
+          cp out/path_slope_sprites/sand_01/*.png assets/terrain/paths/sand_01/slopes/
+          cp out/path_slope_sprites/dirt_01_manifest.json assets/terrain/paths/dirt_01/slopes/manifest.json
+          cp out/path_slope_sprites/sand_01_manifest.json assets/terrain/paths/sand_01/slopes/manifest.json
+
+          git add assets/terrain/paths/dirt_01/slopes assets/terrain/paths/sand_01/slopes
+          if git diff --cached --quiet; then
+            echo "Baked asset library is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bake approved ground path slope sprites"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload ground path slope sprite library
         uses: actions/upload-artifact@v4
