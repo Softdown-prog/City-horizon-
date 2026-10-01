@@ -1,0 +1,64 @@
+{
+  "contract": "CH_COASTER_CAR_V1",
+  "status": "production_pose_scope_locked",
+  "authority": "City Horizon simple coaster vehicle runtime atlas",
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeRepresentation": "composed_individual_car_2D_sprites",
+  "designGoal": "smooth classic tycoon-style train articulation on flat curves, slopes and airtime hills without inversions",
+  "baseForwardAxis": "+Y",
+  "poseConvention": {
+    "headingDegrees": "positive rotation around +Z from +Y toward -X",
+    "pitchDegrees": "positive nose-up rotation around the car local +X axis",
+    "rollDegrees": 0,
+    "anchor": "track rail center under the car"
+  },
+  "flatCurveAtlas": {
+    "headingFrameCount": 16,
+    "headingStepDegrees": 22.5,
+    "headingsDegrees": [0.0, 22.5, 45.0, 67.5, 90.0, 112.5, 135.0, 157.5, 180.0, 202.5, 225.0, 247.5, 270.0, 292.5, 315.0, 337.5],
+    "reason": "one 90-degree quarter curve receives five atlas headings including both endpoints; rotating the track through four cardinals exercises all sixteen headings"
+  },
+  "verticalPoseSupplement": {
+    "cardinalHeadingsDegrees": [0.0, 90.0, 180.0, 270.0],
+    "nonZeroPitchBinsDegrees": [-46.0, -30.0, -14.0, 14.0, 30.0, 46.0],
+    "flatPitchDegrees": 0.0,
+    "reason": "CH_COASTER_TRACK_V1 slope and hill pieces are longitudinal/cardinal; only flat curves need intermediate yaw headings",
+    "standardSlopePitchDegreesApprox": 14.04,
+    "largeAirtimeHillMaxPitchDegreesApprox": 46.32
+  },
+  "frameBudget": {
+    "flatCurveFrames": 16,
+    "verticalSupplementFrames": 24,
+    "totalFramesPerCarStyle": 40
+  },
+  "trainComposition": {
+    "carCountDefault": 4,
+    "placement": "sample route centerline independently for each car by distance offset",
+    "headingSelection": "nearest flatCurveAtlas heading from local tangent for flat/curve pieces",
+    "pitchSelection": "nearest verticalPoseSupplement pitch bin for slope/hill pieces",
+    "spriteSelection": "flat 16-way atlas for pitch near zero; otherwise cardinal heading plus pitch bin",
+    "depthOrdering": "sort individual car sprites by projected ground anchor/depth",
+    "rigidWholeTrainSpriteForMotion": false
+  },
+  "supportedTrackPieces": [
+    "straight",
+    "curve_left",
+    "curve_right",
+    "slope_up",
+    "slope_down",
+    "flat_to_slope_up",
+    "slope_up_to_flat",
+    "flat_to_slope_down",
+    "slope_down_to_flat",
+    "airtime_hill_small",
+    "airtime_hill_large"
+  ],
+  "excluded": ["vertical_loop", "corkscrew", "helix", "banked_inversion", "upside_down_pose"],
+  "authoring": {
+    "pipeline": "CH Blender guarded_blender_script",
+    "qualityGate": "preflight_then_proxy_then_explicit_human_approval_then_final",
+    "proxyPose": {"headingDegrees": 45.0, "pitchDegrees": 0.0},
+    "deterministic": true
+  }
+}
