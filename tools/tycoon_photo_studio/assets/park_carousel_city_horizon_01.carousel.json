@@ -40,6 +40,8 @@
     "canopyInnerZ": 2.86,
     "canopyThickness": 0.055,
     "canopySegments": 24,
+    "canopyRecolorStripeCount": 12,
+    "canopyFixedStripeCount": 12,
     "canopyRibCount": 12,
     "canopyRibRadius": 0.022,
     "supportCount": 10,
@@ -130,11 +132,46 @@
     }
   },
   "animation": {
+    "contract": "CH_CAROUSEL_ROTATION_V1",
     "frameStart": 1,
-    "frameEnd": 16,
+    "frameEnd": 48,
+    "frameCount": 48,
     "fps": 8,
     "looping": true,
+    "fullRotationDegrees": 360.0,
+    "angularStepDegrees": 7.5,
+    "loopClosureFrame": 49,
+    "exportLoopClosureFrame": false,
+    "rotationPeriodSeconds": 6.0,
+    "samplingPolicy": "48_unique_samples_no_duplicate_360_frame",
     "motion": "one_full_carousel_rotation_with_gentle_horse_bob"
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "animated": true,
+    "scope": "canopy_recolor_stripes_only",
+    "frameSync": "same_direction_same_frame_as_beauty",
+    "alpha": "asset_coverage",
+    "channels": {
+      "R": "canopy_recolor_stripes",
+      "G": "unused",
+      "B": "unused"
+    },
+    "selector": {
+      "objectNamePattern": "CanopySector_*",
+      "sectorParity": "even",
+      "sourceMaterial": "Carousel_yellow"
+    },
+    "fixedCanopyStripeMaterial": "Carousel_cream",
+    "maskEverythingElse": false,
+    "sheetPolicy": {
+      "columns": 48,
+      "rowsPerDirection": 1,
+      "frameOrder": "1_to_48",
+      "mustMatchBeautyPivot": true,
+      "mustMatchBeautyCanvas": true
+    }
   },
   "runtimeLayers": {
     "contract": "CH_ATTRACTION_MOTION_OVERLAY_V1",
