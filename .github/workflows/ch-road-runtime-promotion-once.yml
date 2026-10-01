@@ -27,13 +27,12 @@ jobs:
           git diff --check
           grep -q 'runtime_procedural_road_renderer.h' src/runtime_map_renderer.h
           grep -q 'try_render_procedural_roads_runtime' src/runtime_map_renderer.h
-          grep -q 'Build City Horizon runtime with procedural 2D roads' .github/workflows/ch-procedural-road-proof.yml
 
       - name: Commit promotion
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/runtime_map_renderer.h .github/workflows/ch-procedural-road-proof.yml
+          git add src/runtime_map_renderer.h
           if git diff --cached --quiet; then
             echo 'Runtime promotion already applied.'
             exit 0
