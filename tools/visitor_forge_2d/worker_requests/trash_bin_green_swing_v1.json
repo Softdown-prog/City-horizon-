@@ -1,0 +1,22 @@
+{
+  "contract": "CH_2D_WORKER_REQUEST_V1",
+  "id": "trash_bin_green_swing_v1",
+  "recipes": [
+    {
+      "path": "tools/visitor_forge_2d/examples/prop_trash_bin_green_swing_scene_v1_south.json",
+      "sha256": "b94ecdd2c2581442aaff9a8ebdeea57178185019e0e96b7d0a33d73955f8fad8"
+    },
+    {
+      "path": "tools/visitor_forge_2d/examples/prop_trash_bin_green_swing_scene_v1_east.json",
+      "sha256": "2822c9618046114b82fdcfc1cd6c5bad7dba443b85d019392d1cda5f4ee6e6a4"
+    },
+    {
+      "path": "tools/visitor_forge_2d/examples/prop_trash_bin_green_swing_scene_v1_north.json",
+      "sha256": "ee46cdc80985f23f737563e5a8a98b4cb3ef02d718b6925fe6a24483ce912973"
+    },
+    {
+      "path": "tools/visitor_forge_2d/examples/prop_trash_bin_green_swing_scene_v1_west.json",
+      "sha256": "9f54f254223b264d48a6e890ac1e9d5ac3cbd076f83bf21e8f45aa9cc2d59974"
+    }
+  ]
+}
