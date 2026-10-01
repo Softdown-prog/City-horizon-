@@ -1,0 +1,190 @@
+name: CH MapForge Viking Video
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/animation_preview/viking_jobs/*.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  viking-video-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install media and Qt dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip pillow aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:/Qt
+          "C:/Qt/6.8.3/msvc2022_64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg -y --no-progress
+          }
+          ffmpeg -version | Select-Object -First 1
+          ffprobe -version | Select-Object -First 1
+
+      - name: Download approved Viking V15 passenger swing proof
+        uses: actions/download-artifact@v4
+        with:
+          name: CH-Blender-Agent-36350851439-1
+          path: out/viking-source
+          repository: Softdown-prog/City-horizon-
+          run-id: 36350851439
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure MapForge capture renderer
+        shell: pwsh
+        run: cmake -S "C++/MapForge2" -B build/ch-mapforge-viking-video -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+
+      - name: Build MapForge2CLI
+        shell: pwsh
+        run: cmake --build build/ch-mapforge-viking-video --config Release --target MapForge2CLI --parallel
+
+      - name: Render approved Viking swing through MapForge2
+        shell: pwsh
+        env:
+          QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
+        run: |
+          @'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          repo = Path.cwd()
+          source_root = repo / "out" / "viking-source" / "attraction.park_viking_ship.rebuild.v15_passenger_overlay_proxy_1k"
+          cli = repo / "build" / "ch-mapforge-viking-video" / "Release" / "MapForge2CLI.exe"
+          base_request = repo / "C++" / "MapForge2" / "examples" / "map_capture" / "capture_request.json"
+          out = repo / "out" / "ch-mapforge-viking-video"
+          frames = out / "frames"
+          requests = out / "requests"
+          frames.mkdir(parents=True, exist_ok=True)
+          requests.mkdir(parents=True, exist_ok=True)
+
+          source_frames = [source_root / f"occupied_south_{i:02d}.png" for i in range(12)]
+          missing = [str(p) for p in source_frames if not p.is_file()]
+          if missing:
+              raise SystemExit(f"approved Viking V15 frames missing: {missing}")
+          if not cli.is_file():
+              raise SystemExit(f"MapForge2CLI missing: {cli}")
+
+          base = json.loads(base_request.read_text(encoding="utf-8"))
+          capture = base.setdefault("capture", {})
+          capture["canvas"] = {
+              "width": 1280,
+              "height": 800,
+              "background": "#26372f"
+          }
+          capture["camera"] = {
+              "contract": "CH_CAMERA_V1",
+              "rotationQuarterTurns": 0,
+              "zoom": 0.92,
+              "focusTile": [0.0, 0.0],
+              "focusScreen": [0.5, 0.74]
+          }
+          capture["stage"] = {
+              "minTile": -7,
+              "maxTile": 7,
+              "groundColor": "#668458",
+              "alternateGroundColor": "#6d8c5f",
+              "gridColor": "#40563c",
+              "drawGrid": True,
+              "drawGrassTexture": True,
+              "grassSpeckleColor": "#557449"
+          }
+          capture["candidate"] = {
+              "tile": [0, 0],
+              "elevationWorld": 0.0,
+              "footprint": [5, 4],
+              "scale": 0.54,
+              "offsetPixels": [0, -4],
+              "showFootprint": False,
+              "showAnchor": False,
+              "renderAsGroundTile": False,
+              "footprintColor": "#f6c448"
+          }
+          capture["portal"] = {"enabled": False}
+
+          fps = 8
+          duration_seconds = 6
+          frame_count = fps * duration_seconds
+          for index in range(frame_count):
+              source = source_frames[index % len(source_frames)]
+              request_path = requests / f"frame_{index:06d}.json"
+              output_path = frames / f"frame_{index:06d}.png"
+              request_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
+              subprocess.run([
+                  str(cli), "capture", str(output_path), str(source), str(request_path)
+              ], cwd=repo, check=True)
+              if not output_path.is_file() or output_path.stat().st_size < 1024:
+                  raise SystemExit(f"MapForge frame missing/too small: {output_path}")
+
+          report = {
+              "contract": "CH_MAPFORGE_VIKING_VIDEO_V1",
+              "status": "ok",
+              "renderer": "MapForge2CLI/MAPFORGE_CAPTURE_REQUEST_V1",
+              "sourceWorkflowRun": 36350851439,
+              "sourceRevision": "V15 human-reviewed passenger swing proxy",
+              "sourceFrames": 12,
+              "frameCount": frame_count,
+              "fps": fps,
+              "durationSeconds": duration_seconds,
+              "passengerOverlay": True,
+              "rideSwing": True,
+              "audio": "assets/audio/attractions/viking_ship_rope_creak.ogg"
+          }
+          (out / "mapforge_viking_render_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+          '@ | python -
+
+      - name: Encode MP4 with Viking runtime sound
+        shell: pwsh
+        run: |
+          $audio = "assets/audio/attractions/viking_ship_rope_creak.ogg"
+          if (-not (Test-Path $audio)) { throw "Viking runtime audio missing: $audio" }
+          ffmpeg -hide_banner -loglevel error -y `
+            -framerate 8 -i "out/ch-mapforge-viking-video/frames/frame_%06d.png" `
+            -stream_loop -1 -i $audio `
+            -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart `
+            -c:a aac -b:a 160k -shortest `
+            "out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4"
+
+      - name: Validate MP4 streams
+        shell: pwsh
+        run: |
+          $video = "out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4"
+          if (-not (Test-Path $video)) { throw "Viking MP4 missing" }
+          $probe = ffprobe -v error -show_entries stream=codec_type,codec_name,width,height -show_entries format=duration,size -of json $video
+          $probe | Set-Content "out/ch-mapforge-viking-video/ffprobe.json" -Encoding utf8
+          $json = $probe | ConvertFrom-Json
+          $videoStream = $json.streams | Where-Object { $_.codec_type -eq "video" }
+          $audioStream = $json.streams | Where-Object { $_.codec_type -eq "audio" }
+          if ($null -eq $videoStream) { throw "MP4 has no video stream" }
+          if ($null -eq $audioStream) { throw "MP4 has no audio stream" }
+          if ([double]$json.format.duration -lt 5.5) { throw "MP4 is shorter than expected" }
+          Write-Host "Viking MapForge MP4 validated with video + audio"
+
+      - name: Upload Viking MapForge video
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Viking-Video
+          path: |
+            out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4
+            out/ch-mapforge-viking-video/mapforge_viking_render_report.json
+            out/ch-mapforge-viking-video/ffprobe.json
+            out/ch-mapforge-viking-video/frames/frame_000000.png
+            out/ch-mapforge-viking-video/frames/frame_000006.png
+            out/ch-mapforge-viking-video/frames/frame_000011.png
+          if-no-files-found: error
+          retention-days: 14
