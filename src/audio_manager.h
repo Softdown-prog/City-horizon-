@@ -24,6 +24,7 @@ enum class SoundEvent : std::size_t {
     ui_scroll,
     notification,
     ferris_wheel_running,
+    viking_ship_running,
     weather_rain,
     weather_thunder,
     count,
