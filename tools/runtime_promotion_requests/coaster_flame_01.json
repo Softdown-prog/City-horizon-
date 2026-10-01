@@ -1,0 +1,17 @@
+{
+  "contract": "CH_RUNTIME_PROMOTION_REQUEST_V1",
+  "assetId": "vehicle.coaster.flame_01",
+  "sourceAssetId": "ride.coaster.train_flame_v7",
+  "sourceWorkflowRun": 36903309772,
+  "sourceArtifactId": 11181909810,
+  "sourceCommit": "ac8699478d7ddc62f56d0d26555eee328a9c30e0",
+  "approvedProxySha256": "eca7cc62de7986911c1f795bb6535e3cb713ad8934d1bc3c5894c085c075b867",
+  "target": "assets/vehicles/coaster_flame_01",
+  "requestedOutputs": [
+    "train_south.png",
+    "train_east.png",
+    "train_west.png",
+    "train_north.png",
+    "coaster_flame_01_runtime.json"
+  ]
+}
