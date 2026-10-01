@@ -39,6 +39,7 @@ jobs:
           set -euo pipefail
           out='out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01'
           mkdir -p "$out"
+          # Render the current production recipe (V12+) into all canonical views.
           python -m visitor_forge_2d.core.organic_scenery \
             --recipe tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_lush_01.json \
             --output "$out"
