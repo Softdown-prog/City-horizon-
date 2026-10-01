@@ -6,7 +6,9 @@ This document describes the production path for visual assets. It is intentional
 
 City Horizon ships **2D PNG sprites**. Blender is an offline authoring/render tool used to keep scale, perspective, lighting and rotation consistent across the game.
 
-The current style contract is `CH_STYLIZED_PRERENDER_V1`. The target is a readable stylized pre-rendered city-builder look. Classic Tycoon games guide readability, miniature composition and nostalgia; they are not a requirement to literally reproduce early-2000s rendering limitations.
+The current style contract is `CH_STYLIZED_PRERENDER_V1`. The target is a readable stylized pre-rendered city-builder look. Classic Tycoon games guide readability, path logic, information density, silhouette clarity and gameplay composition; they are not a requirement to reproduce early-2000s rendering limitations or a miniature/diorama aesthetic.
+
+Assets must preserve believable category-appropriate proportions and coherent relative scale against the 128×64 gameplay grid. Simplifying unreadable detail is allowed; making buildings squat, toy-like, dollhouse-like or otherwise miniaturized by default is not.
 
 ## Shared frozen contracts
 
@@ -83,7 +85,7 @@ The studio remains frozen:
 - transparent RGBA output;
 - SOUTH/EAST/WEST/NORTH produced by rotating the asset root.
 
-Do not move the camera or lights independently for each direction.
+Do not move the camera or lights independently for each direction. Do not change massing or relative scale merely to force a miniature read.
 
 ## Optional building/prop color masks
 
@@ -124,7 +126,7 @@ The source bake may be supersampled and more detailed than the final game sprite
 
 This is intentional. The project currently favors a restrained, slightly pixel-like pre-rendered result because it integrates better with a 2D isometric world and suppresses an overly glossy/plastic 3D-render appearance.
 
-Do not increase source/detail scale just to make an isolated Blender image look more impressive if the current downsampled result reads better in gameplay.
+Do not increase source/detail scale just to make an isolated Blender image look more impressive if the current downsampled result reads better in gameplay. Likewise, downsampling is not permission to distort proportions into a toy or miniature style.
 
 ## Post-processing
 
@@ -175,7 +177,8 @@ Review at minimum:
 - footprint and pivot consistency;
 - alpha/edge quality on representative backgrounds;
 - color-mask review when the asset opts into `CH_COLOR_MASK_V1`;
-- MapForge/runtime placement when integration matters.
+- MapForge/runtime placement when integration matters;
+- coherent relative scale and believable category proportions, without unrequested miniature/toy distortion.
 
 Once an asset is approved, freeze it. Do not reopen it for speculative polishing unless a concrete in-game problem appears.
 
