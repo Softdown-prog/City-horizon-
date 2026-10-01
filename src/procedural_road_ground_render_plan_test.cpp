@@ -13,7 +13,8 @@ void test_ground_network_is_admitted_as_flat_2d() {
 
     const ProceduralRoadGroundRenderPlan plan = build_procedural_road_ground_render_plan(bridge);
     assert(plan.segment_meshes.size() == 2U);
-    assert(plan.junction_meshes.size() == 1U);
+    // A perfectly straight degree-2 continuation does not need a blob/patch.
+    assert(plan.junction_meshes.empty());
     assert(plan.skipped_elevated_segments == 0U);
     assert(plan.skipped_mixed_junctions == 0U);
 
@@ -24,7 +25,6 @@ void test_ground_network_is_admitted_as_flat_2d() {
             assert(std::isfinite(vertex.position.y));
         }
     }
-    assert(!plan.junction_meshes.front().empty());
 }
 
 void test_straight_ribbon_preserves_authored_width() {
@@ -43,6 +43,54 @@ void test_straight_ribbon_preserves_authored_width() {
     const float first_pair_width = std::abs(
         mesh.vertices[0].position.y - mesh.vertices[1].position.y);
     assert(std::abs(first_pair_width - segment.width) < 0.0001F);
+}
+
+void test_degree_two_corner_gets_continuous_visual_tangent() {
+    ProceduralRoadPlacementBridge bridge;
+    const auto result = bridge.mirror_tile_segment(
+        {{0, 0}, {1, 0}, {1, 1}}, ProceduralRoadClass::local, 0.0F);
+    assert(result.has_value());
+    assert(result->segments.size() == 2U);
+
+    const auto first = procedural_road_visual_spline_2d(bridge.graph(), result->segments[0]);
+    const auto second = procedural_road_visual_spline_2d(bridge.graph(), result->segments[1]);
+    assert(first.has_value());
+    assert(second.has_value());
+
+    const ProceduralRoad2DPoint arriving{
+        first->end.x - first->control_b.x,
+        first->end.y - first->control_b.y,
+    };
+    const ProceduralRoad2DPoint leaving{
+        second->control_a.x - second->start.x,
+        second->control_a.y - second->start.y,
+    };
+    const float arriving_len = procedural_road_length_2d(arriving);
+    const float leaving_len = procedural_road_length_2d(leaving);
+    assert(arriving_len > 0.0F);
+    assert(leaving_len > 0.0F);
+
+    const float dot = (arriving.x * leaving.x + arriving.y * leaving.y) /
+                      (arriving_len * leaving_len);
+    assert(dot > 0.999F);
+
+    const ProceduralRoadGroundRenderPlan plan = build_procedural_road_ground_render_plan(bridge);
+    assert(plan.segment_meshes.size() == 2U);
+    assert(plan.junction_meshes.size() == 1U);
+}
+
+void test_cross_uses_one_directional_junction_patch() {
+    ProceduralRoadPlacementBridge bridge;
+    assert(bridge.mirror_tile_segment(
+        {{-1, 0}, {0, 0}, {1, 0}}, ProceduralRoadClass::local, 0.0F).has_value());
+    assert(bridge.mirror_tile_segment(
+        {{0, -1}, {0, 0}, {0, 1}}, ProceduralRoadClass::local, 0.0F).has_value());
+
+    const ProceduralRoadGroundRenderPlan plan = build_procedural_road_ground_render_plan(bridge);
+    assert(plan.segment_meshes.size() == 4U);
+    assert(plan.junction_meshes.size() == 1U);
+    assert(plan.junction_meshes.front().vertices.size() == 9U);
+    assert(plan.junction_meshes.front().indices.size() == 24U);
 }
 
 void test_elevated_segment_is_rejected() {
@@ -87,6 +135,8 @@ void test_mixed_height_junction_is_not_rendered() {
 int main() {
     test_ground_network_is_admitted_as_flat_2d();
     test_straight_ribbon_preserves_authored_width();
+    test_degree_two_corner_gets_continuous_visual_tangent();
+    test_cross_uses_one_directional_junction_patch();
     test_elevated_segment_is_rejected();
     test_mixed_height_junction_is_not_rendered();
     return 0;
