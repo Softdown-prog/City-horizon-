@@ -1,0 +1,37 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "tree_test_broadleaf_01",
+  "canvas": [192, 256],
+  "anchor": [96, 239],
+  "seed": 41,
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "tile": [128, 64]
+  },
+  "crownStyle": "broadleaf",
+  "palette": {
+    "ground_shadow": "#17271F",
+    "trunk_top": "#A66E3E",
+    "trunk_bottom": "#5C3824",
+    "trunk_light": "#D29458",
+    "back_top": "#24553A",
+    "back_bottom": "#103125",
+    "mid_top": "#4F8652",
+    "mid_bottom": "#245139",
+    "front_top": "#72A85F",
+    "front_bottom": "#376C45",
+    "highlight": "#B5D77D",
+    "occlusion": "#163829"
+  },
+  "tiers": [
+    {"y": 45, "span": 38, "thickness": 27, "skew": -3},
+    {"y": 78, "span": 61, "thickness": 36, "skew": 5},
+    {"y": 113, "span": 76, "thickness": 43, "skew": -4},
+    {"y": 148, "span": 82, "thickness": 42, "skew": 3},
+    {"y": 178, "span": 70, "thickness": 34, "skew": -2}
+  ],
+  "validation": {
+    "minimumOpaqueHeightPx": 150,
+    "maximumOpaqueHeightPx": 230
+  }
+}
