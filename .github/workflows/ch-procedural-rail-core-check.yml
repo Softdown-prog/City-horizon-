@@ -15,6 +15,9 @@ on:
       - "src/rail_drag_adapter_test.cpp"
       - "src/rail_mapforge_input_adapter.h"
       - "src/rail_mapforge_input_adapter_test.cpp"
+      - "src/rail_2d_visual_catalog.h"
+      - "src/rail_2d_visual_catalog.cpp"
+      - "src/rail_2d_visual_catalog_test.cpp"
       - "src/ch_core/projection.h"
       - "src/ch_core/projection.cpp"
       - ".github/workflows/ch-procedural-rail-core-check.yml"
@@ -55,6 +58,10 @@ jobs:
             -I. -Isrc \
             src/rail_system.cpp src/ch_core/projection.cpp src/rail_mapforge_input_adapter_test.cpp \
             -o /tmp/ch_procedural_rail_mapforge_input_test
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -I. -Isrc \
+            src/rail_2d_visual_catalog.cpp src/rail_2d_visual_catalog_test.cpp \
+            -o /tmp/ch_rail_2d_visual_catalog_test
 
       - name: Run fail-closed rail safety tests
         shell: bash
@@ -64,3 +71,4 @@ jobs:
           /tmp/ch_procedural_rail_path_test
           /tmp/ch_procedural_rail_drag_test
           /tmp/ch_procedural_rail_mapforge_input_test
+          /tmp/ch_rail_2d_visual_catalog_test
