@@ -16,6 +16,7 @@ on:
 jobs:
   capture-runtime-terrain:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +29,15 @@ jobs:
         shell: pwsh
         run: cmake --build build/runtime-terrain-capture --config Release --target ch_runtime_terrain_visual_capture --parallel
 
+      - name: Stage SDL runtime dependency
+        shell: pwsh
+        run: |
+          $exeDir = Resolve-Path "build/runtime-terrain-capture/Release"
+          $sdl = Get-ChildItem -Path "build/runtime-terrain-capture" -Filter "SDL3.dll" -File -Recurse | Select-Object -First 1
+          if ($null -eq $sdl) { throw "SDL3.dll was not produced by the capture build" }
+          Copy-Item -Force $sdl.FullName (Join-Path $exeDir "SDL3.dll")
+          Write-Host "Staged SDL3.dll from $($sdl.FullName)"
+
       - name: Render production runtime terrain path
         shell: pwsh
         env:
@@ -35,7 +45,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path out/runtime-terrain | Out-Null
           & "build/runtime-terrain-capture/Release/ch_runtime_terrain_visual_capture.exe" "$PWD" "out/runtime-terrain/runtime_terrain_proof.bmp"
-          if ($LASTEXITCODE -ne 0) { throw "runtime terrain capture failed" }
+          $captureExit = $LASTEXITCODE
+          Write-Host "terrain capture exit code: $captureExit"
+          if ($captureExit -ne 0) { throw "runtime terrain capture failed with exit code $captureExit" }
+          if (-not (Test-Path "out/runtime-terrain/runtime_terrain_proof.bmp")) { throw "runtime terrain proof BMP was not created" }
           if ((Get-Item "out/runtime-terrain/runtime_terrain_proof.bmp").Length -le 10000) { throw "runtime terrain proof is unexpectedly small" }
 
       - name: Convert proof to PNG
