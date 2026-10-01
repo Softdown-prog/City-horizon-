@@ -1,0 +1,73 @@
+#include "src/runtime_procedural_road_culling.h"
+#include "src/road_system.h"
+
+#include <cassert>
+
+namespace {
+
+void test_camera_bounds_are_finite() {
+    ch::CameraState camera{};
+    camera.zoom = 1.0F;
+    const ProceduralRoad2DWorldBounds bounds =
+        procedural_road_visible_world_bounds(camera, 1280.0F, 720.0F);
+    assert(bounds.valid());
+    assert(bounds.min_x < bounds.max_x);
+    assert(bounds.min_y < bounds.max_y);
+}
+
+void test_far_segments_are_culled_before_tessellation() {
+    ProceduralRoadPlacementBridge bridge;
+    assert(bridge.mirror_tile_segment(
+        {{0, 0}, {1, 0}}, ProceduralRoadClass::local, 0.0F).has_value());
+    assert(bridge.mirror_tile_segment(
+        {{50, 50}, {51, 50}}, ProceduralRoadClass::local, 0.0F).has_value());
+
+    const ProceduralRoad2DWorldBounds bounds{-2.0F, -2.0F, 3.0F, 3.0F};
+    const ProceduralRoadVisibleGroundRenderPlan visible =
+        build_visible_procedural_road_ground_render_plan(bridge, bounds);
+
+    assert(visible.considered_segments == 1U);
+    assert(visible.culled_segments == 1U);
+    assert(visible.plan.segment_meshes.size() == 1U);
+    assert(visible.plan.skipped_elevated_segments == 0U);
+    assert(visible.plan.skipped_mixed_junctions == 0U);
+}
+
+void test_road_manager_mirror_stays_synchronized() {
+    RoadManager roads(-8, 8);
+
+    assert(roads.place_tile(0, 0));
+    assert(roads.procedural_mirror().graph().nodes().size() == 1U);
+    assert(roads.procedural_mirror().graph().segments().empty());
+
+    assert(roads.place_tile(1, 0));
+    assert(roads.procedural_mirror().graph().nodes().size() == 2U);
+    assert(roads.procedural_mirror().graph().segments().size() == 1U);
+
+    assert(roads.place_tile(1, 1));
+    assert(roads.procedural_mirror().graph().nodes().size() == 3U);
+    assert(roads.procedural_mirror().graph().segments().size() == 2U);
+
+    RoadManager copied = roads;
+    assert(copied.procedural_mirror().graph().nodes().size() == 3U);
+    assert(copied.procedural_mirror().graph().segments().size() == 2U);
+
+    assert(roads.remove_tile(1, 0));
+    assert(roads.tiles().size() == 2U);
+    assert(roads.procedural_mirror().graph().nodes().size() == 2U);
+    assert(roads.procedural_mirror().graph().segments().empty());
+
+    roads.clear();
+    assert(roads.tiles().empty());
+    assert(roads.procedural_mirror().graph().nodes().empty());
+    assert(roads.procedural_mirror().graph().segments().empty());
+}
+
+} // namespace
+
+int main() {
+    test_camera_bounds_are_finite();
+    test_far_segments_are_culled_before_tessellation();
+    test_road_manager_mirror_stays_synchronized();
+    return 0;
+}
