@@ -356,6 +356,83 @@ inline void render_visible_terrain_base(
     }
 }
 
+[[nodiscard]] inline float relief_shadow_alpha(
+    const MapDocument& document,
+    const int grid_x,
+    const int grid_y
+) {
+    const float west = document.terrain_height_at(grid_x - 1, grid_y);
+    const float east = document.terrain_height_at(grid_x + 1, grid_y);
+    const float north = document.terrain_height_at(grid_x, grid_y - 1);
+    const float south = document.terrain_height_at(grid_x, grid_y + 1);
+    const float dx = (east - west) * 0.5F;
+    const float dy = (south - north) * 0.5F;
+    const float slope = std::hypot(dx, dy);
+    if (slope <= kHeightEpsilon) return 0.0F;
+
+    // Stable world-space light from the north-west. Shared grid vertices use
+    // the same finite-difference sample in every neighbour, so the shade is
+    // smooth across tile boundaries instead of drawing a checkerboard seam.
+    const float away_from_light = std::max(0.0F, -(dx * 0.60F + dy * 0.80F));
+    return std::clamp(slope * 0.045F + away_from_light * 0.12F, 0.0F, 0.28F);
+}
+
+inline void render_relief_shading_tile(
+    SDL_Renderer* renderer,
+    const MapDocument& document,
+    const int tile_x,
+    const int tile_y,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height
+) {
+    if (!tile_uses_heightfield(document, tile_x, tile_y)) return;
+
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = projected_point(document, static_cast<float>(tile_x),
+                                           static_cast<float>(tile_y), camera,
+                                           viewport_width, viewport_height);
+    vertices[1].position = projected_point(document, static_cast<float>(tile_x + 1),
+                                           static_cast<float>(tile_y), camera,
+                                           viewport_width, viewport_height);
+    vertices[2].position = projected_point(document, static_cast<float>(tile_x + 1),
+                                           static_cast<float>(tile_y + 1), camera,
+                                           viewport_width, viewport_height);
+    vertices[3].position = projected_point(document, static_cast<float>(tile_x),
+                                           static_cast<float>(tile_y + 1), camera,
+                                           viewport_width, viewport_height);
+
+    vertices[0].color = {0.0F, 0.0F, 0.0F, relief_shadow_alpha(document, tile_x, tile_y)};
+    vertices[1].color = {0.0F, 0.0F, 0.0F, relief_shadow_alpha(document, tile_x + 1, tile_y)};
+    vertices[2].color = {0.0F, 0.0F, 0.0F, relief_shadow_alpha(document, tile_x + 1, tile_y + 1)};
+    vertices[3].color = {0.0F, 0.0F, 0.0F, relief_shadow_alpha(document, tile_x, tile_y + 1)};
+
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+}
+
+inline void render_visible_relief_shading(
+    SDL_Renderer* renderer,
+    const MapDocument& document,
+    const runtime_render_detail::TileCullBounds& visible,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height
+) {
+    if (renderer == nullptr || !visible.valid) return;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    for (int depth = visible.min_x + visible.min_y;
+         depth <= visible.max_x + visible.max_y; ++depth) {
+        const int first_x = std::max(visible.min_x, depth - visible.max_y);
+        const int last_x = std::min(visible.max_x, depth - visible.min_y);
+        for (int x = first_x; x <= last_x; ++x) {
+            render_relief_shading_tile(renderer, document, x, depth - x, camera,
+                                       viewport_width, viewport_height);
+        }
+    }
+}
+
 } // namespace runtime_terrain_detail
 
 // Runtime bridge for CH_TERRAIN_HEIGHTFIELD_V1 + CH_PROCEDURAL_TILE_2D_V1.
@@ -461,6 +538,12 @@ public:
             renderer, document, grass_base, scenario_terrain_textures, visible,
             camera, viewport_width, viewport_height);
         if (!visible.valid) return;
+
+        // Geometry alone is difficult to read over repeated grass sprites.
+        // Apply a subtle, production slope shadow before paths/props so hills
+        // and basins remain obvious without debug contours or fake geometry.
+        runtime_terrain_detail::render_visible_relief_shading(
+            renderer, document, visible, camera, viewport_width, viewport_height);
 
         constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
         for (const auto& tile : dirt_path_tiles) {
