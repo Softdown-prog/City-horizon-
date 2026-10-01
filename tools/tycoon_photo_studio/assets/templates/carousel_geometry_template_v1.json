@@ -3,49 +3,39 @@
   "templateId": "carousel_geometry_template_v1",
   "family": "amusement_carousel",
   "status": "geometry_only_neutral_starting_point",
-  "purpose": "Preserve only useful geometric/mechanical relationships from the experimental carousel while restarting the visual design from scratch. This template is explicitly full-scale and must not be treated as a miniature, diorama, toy-like or chibi attraction.",
+  "purpose": "Preserve only useful geometric/mechanical relationships from the experimental carousel while restarting the visual design from scratch. This template must not be treated as a miniature, diorama, toy-like or chibi attraction.",
   "cameraContract": "CH_CAMERA_V1",
   "scalePolicy": {
-    "footprintClass": "full_scale_park_attraction",
+    "footprintClass": "park_attraction_flexible_scale",
     "miniatureAesthetic": false,
     "dioramaAesthetic": false,
     "toyScale": false,
-    "previousRejectedFootprint": "3x3",
-    "authoritativeFootprint": "7x7",
-    "geometryRescaledWithFootprint": true,
-    "linearScaleFromRejected3x3": 2.3333333333,
-    "note": "The 7x7 correction applies to the geometry itself, not only to occupancy metadata. Radius, height and spacing values below were rescaled from the rejected 3x3 proxy solely to preserve useful proportions as a neutral starting point."
-  },
-  "stylePolicy": {
-    "inheritPreviousVisualDesign": false,
-    "inheritReferenceAppearance": false,
-    "materialsDefined": false,
-    "colorsDefined": false,
-    "decorativePatternDefined": false,
-    "ornamentsDefined": false,
-    "topperDefined": false,
-    "colorMaskDefined": false,
-    "requireOriginalVisualDesignBeforeProduction": true
+    "previousRejectedFootprint": "3x3_when_it_forces_miniature_reading",
+    "footprintMode": "flexible_up_to_maximum",
+    "maximumFootprintTiles": {"width": 7, "depth": 7},
+    "preferredFootprint": null,
+    "allowedSmallerFootprints": true,
+    "geometryMustScaleWithChosenFootprint": true,
+    "selectionRule": "Choose the smallest footprint that preserves believable attraction scale, readable proportions, boarding space and gameplay clarity. Do not force 7x7 when a smaller footprint works, and do not compress the asset merely to fit a smaller footprint.",
+    "note": "7x7 is a ceiling for this neutral carousel template, not a mandatory footprint. A future original design may use 4x4, 5x5, 6x6 or 7x7 if that size produces the best result."
   },
   "footprint": {
-    "widthTiles": 7,
-    "depthTiles": 7
+    "mode": "design_time_resolved",
+    "maximumWidthTiles": 7,
+    "maximumDepthTiles": 7,
+    "widthTiles": null,
+    "depthTiles": null
   },
   "hierarchy": {
     "root": "AssetRoot",
-    "staticBase": [
-      "foundation",
-      "boarding_access_optional"
-    ],
-    "rotatingAssembly": [
-      "platform",
-      "central_column",
-      "canopy",
-      "supports",
-      "ride_mounts"
-    ]
+    "staticBase": ["foundation", "boarding_access_optional"],
+    "rotatingAssembly": ["platform", "central_column", "canopy", "supports", "ride_mounts"]
   },
   "geometry": {
+    "referenceScale": {
+      "basisFootprint": "7x7_upper_bound",
+      "purpose": "Upper-bound dimensional reference only. Final geometry must be uniformly scaled/re-authored after the design-time footprint is chosen."
+    },
     "foundation": {
       "primitive": "cylinder",
       "radius": 7.1867,
@@ -65,18 +55,18 @@
       "innerZ": 6.6733,
       "thickness": 0.1283,
       "radialSegments": 24,
-      "note": "Segment count is retained only as useful construction topology. It does not prescribe stripes, colors, patterning or ornamentation."
+      "note": "These are upper-bound reference dimensions, not a forced 7x7 design. Segment count is construction topology only and does not prescribe stripes, colors, patterning or ornamentation."
     },
     "centralColumn": {
       "primitive": "cylinder",
       "centeredAt": [0.0, 0.0],
-      "note": "Exact visual treatment and crown/top geometry must be redesigned from scratch at the new full attraction scale."
+      "note": "Exact visual treatment, height and crown/top geometry must be redesigned from scratch for the selected footprint."
     },
     "outerSupports": {
       "count": 10,
       "radiusFromCenter": 6.02,
       "primitive": "vertical_post",
-      "note": "Count and radius are mechanical starting values only; support style is intentionally undefined."
+      "note": "Count and radius are neutral mechanical reference values only and may be adjusted with the new design."
     },
     "rideMounts": {
       "count": 14,
@@ -84,7 +74,7 @@
       "innerRadius": 3.1733,
       "outerRadius": 5.04,
       "nominalBodyZ": 2.52,
-      "note": "Mount count and spacing are preserved as a mechanical starting point. Vehicle/animal shape is intentionally undefined."
+      "note": "Mount count and spacing are a neutral mechanical reference only. Vehicle/animal shape is intentionally undefined and dimensions must follow the selected footprint."
     },
     "boardingAccess": {
       "enabledByDefault": false,
@@ -97,7 +87,8 @@
     "rotorOrigin": [0.0, 0.0, 0.0],
     "platformAndCanopyShareRotor": true,
     "staticFoundationDoesNotRotate": true,
-    "keepWithinFootprint": true
+    "keepWithinResolvedFootprint": true,
+    "doNotShrinkForFootprintAtExpenseOfBelievableScale": true
   },
   "excludedFromTemplate": [
     "yellow_and_cream_roof_stripes",
@@ -115,7 +106,8 @@
     "previous_boarding_step_design",
     "previous_color_mask_layout",
     "any_reference_specific_silhouette_details",
-    "rejected_3x3_scale"
+    "forced_3x3_scale",
+    "forced_7x7_scale"
   ],
-  "nextDesignRule": "Create a new original City Horizon carousel from this 7x7 full-scale geometry only. Do not reuse the rejected V1-V5 palette, roof pattern, trim, ornaments, topper, animal styling, 3x3 proportions or reference-derived decorative composition."
+  "nextDesignRule": "Create a new original City Horizon carousel from this neutral geometry. Resolve footprint during design based on believable scale and gameplay readability, with 7x7 as the maximum for this template rather than a mandatory size. Do not reuse the rejected V1-V5 visual identity or reference-derived decorative composition."
 }
