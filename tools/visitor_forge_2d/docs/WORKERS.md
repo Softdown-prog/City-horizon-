@@ -23,9 +23,36 @@ arte nem promovem um PNG para `assets/`.
 O nome da pasta é o `id` declarado no JSON, que pode diferir do nome do arquivo
 da receita; o artifact do CI captura a raiz `workers/` para cobrir ambos.
 
-O workflow `Visitor Forge 2D Workers` usa uma matriz de seis receitas: quatro
-pinheiros, canteiro e placa. Cada item roda em um worker paralelo do GitHub
-Actions com artefato independente. Para ampliar a lista, inclua uma receita
+## Pedidos travados pelo hash da receita
+
+`run-workers` continua aceitando diretamente um caminho de receita e registra o
+SHA-256 usado como proveniência. Quando um pedido precisa garantir **antes do
+render** que o worker está consumindo exatamente os bytes revisados, use o
+contrato `CH_2D_WORKER_REQUEST_V1` e o runner `worker_request`.
+
+Cada item do pedido contém somente `path` e `sha256`. O runner calcula o SHA-256
+do arquivo antes de chamar `run-workers` e aborta se houver divergência. Depois
+do render ele também compara o `recipeSha256` produzido pelo próprio worker com
+o hash esperado, fechando a ligação pedido -> receita -> worker -> proveniência.
+
+Exemplo:
+
+```bash
+PYTHONPATH=tools/visitor_forge_2d/src python -m visitor_forge_2d.worker_request \
+  --request tools/visitor_forge_2d/worker_requests/trash_bin_green_swing_v1.json \
+  --repo-root . \
+  --output out/visitor_forge_2d/worker_requests
+```
+
+O relatório agregado fica em
+`out/visitor_forge_2d/worker_requests/<request-id>/worker_request_report.json` e
+lista os hashes confirmados, PNGs, reviews e relatórios individuais. Pedidos
+versionados ficam em `tools/visitor_forge_2d/worker_requests/`. O job
+`hash-locked-requests` do workflow canônico `Visitor Forge 2D Workers` executa
+esses pedidos no GitHub Actions.
+
+O workflow `Visitor Forge 2D Workers` mantém também a matriz das receitas de
+regressão e os autores de arte/props. Para ampliar a matriz, inclua uma receita
 versionada em `examples/` e seu nome na matriz; mantenha o gate visual em 1x
 e na grade antes de qualquer integração no jogo.
 O workflow antigo de pinheiros permanece disponível manualmente, sem duplicar
