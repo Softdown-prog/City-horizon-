@@ -3,8 +3,19 @@
   "templateId": "carousel_geometry_template_v1",
   "family": "amusement_carousel",
   "status": "geometry_only_neutral_starting_point",
-  "purpose": "Preserve only useful geometric proportions and mechanical layout from the experimental carousel. This template intentionally contains no visual identity from any external reference and must be restyled from scratch before production use.",
+  "purpose": "Preserve only useful geometric/mechanical relationships from the experimental carousel while restarting the visual design from scratch. This template is explicitly full-scale and must not be treated as a miniature, diorama, toy-like or chibi attraction.",
   "cameraContract": "CH_CAMERA_V1",
+  "scalePolicy": {
+    "footprintClass": "full_scale_park_attraction",
+    "miniatureAesthetic": false,
+    "dioramaAesthetic": false,
+    "toyScale": false,
+    "previousRejectedFootprint": "3x3",
+    "authoritativeFootprint": "7x7",
+    "geometryRescaledWithFootprint": true,
+    "linearScaleFromRejected3x3": 2.3333333333,
+    "note": "The 7x7 correction applies to the geometry itself, not only to occupancy metadata. Radius, height and spacing values below were rescaled from the rejected 3x3 proxy solely to preserve useful proportions as a neutral starting point."
+  },
   "stylePolicy": {
     "inheritPreviousVisualDesign": false,
     "inheritReferenceAppearance": false,
@@ -17,8 +28,8 @@
     "requireOriginalVisualDesignBeforeProduction": true
   },
   "footprint": {
-    "widthTiles": 3,
-    "depthTiles": 3
+    "widthTiles": 7,
+    "depthTiles": 7
   },
   "hierarchy": {
     "root": "AssetRoot",
@@ -37,43 +48,43 @@
   "geometry": {
     "foundation": {
       "primitive": "cylinder",
-      "radius": 3.08,
-      "height": 0.20,
-      "centerZ": 0.10
+      "radius": 7.1867,
+      "height": 0.4667,
+      "centerZ": 0.2333
     },
     "platform": {
       "primitive": "cylinder_or_disc",
-      "radius": 3.08,
-      "topZ": 0.53
+      "radius": 7.1867,
+      "topZ": 1.2367
     },
     "canopy": {
       "primitive": "shallow_radial_disc_or_custom_profile",
-      "outerRadius": 3.12,
-      "innerRadius": 0.46,
-      "outerZ": 2.38,
-      "innerZ": 2.86,
-      "thickness": 0.055,
+      "outerRadius": 7.28,
+      "innerRadius": 1.0733,
+      "outerZ": 5.5533,
+      "innerZ": 6.6733,
+      "thickness": 0.1283,
       "radialSegments": 24,
       "note": "Segment count is retained only as useful construction topology. It does not prescribe stripes, colors, patterning or ornamentation."
     },
     "centralColumn": {
       "primitive": "cylinder",
       "centeredAt": [0.0, 0.0],
-      "note": "Exact visual treatment and crown/top geometry must be redesigned from scratch."
+      "note": "Exact visual treatment and crown/top geometry must be redesigned from scratch at the new full attraction scale."
     },
     "outerSupports": {
       "count": 10,
-      "radiusFromCenter": 2.58,
+      "radiusFromCenter": 6.02,
       "primitive": "vertical_post",
       "note": "Count and radius are mechanical starting values only; support style is intentionally undefined."
     },
     "rideMounts": {
       "count": 14,
       "layout": "two_staggered_concentric_rings",
-      "innerRadius": 1.36,
-      "outerRadius": 2.16,
-      "nominalBodyZ": 1.08,
-      "note": "Mount count and spacing are preserved. Vehicle/animal shape is not defined by this template."
+      "innerRadius": 3.1733,
+      "outerRadius": 5.04,
+      "nominalBodyZ": 2.52,
+      "note": "Mount count and spacing are preserved as a mechanical starting point. Vehicle/animal shape is intentionally undefined."
     },
     "boardingAccess": {
       "enabledByDefault": false,
@@ -103,7 +114,8 @@
     "decorative_base_panels",
     "previous_boarding_step_design",
     "previous_color_mask_layout",
-    "any_reference_specific_silhouette_details"
+    "any_reference_specific_silhouette_details",
+    "rejected_3x3_scale"
   ],
-  "nextDesignRule": "Create a new original carousel visual language from this geometry only. Do not reuse the rejected V1-V5 palette, roof pattern, trim, ornaments, topper, animal styling or reference-derived decorative composition."
+  "nextDesignRule": "Create a new original City Horizon carousel from this 7x7 full-scale geometry only. Do not reuse the rejected V1-V5 palette, roof pattern, trim, ornaments, topper, animal styling, 3x3 proportions or reference-derived decorative composition."
 }
