@@ -20,7 +20,7 @@ constexpr std::size_t event_index(const SoundEvent event) {
 constexpr std::array<std::string_view, static_cast<std::size_t>(SoundEvent::count)> kEventNames = {
     "UiClick", "UiSelect", "UiBack", "UiOpenPanel", "UiClosePanel", "UiConfirm",
     "UiError", "BuildingPlace", "UiToggle", "UiScroll", "Notification", "FerrisWheelRunning",
-    "WeatherRain", "WeatherThunder",
+    "VikingShipRunning", "WeatherRain", "WeatherThunder",
 };
 
 [[nodiscard]] std::string read_text_file(const std::filesystem::path& path) {
