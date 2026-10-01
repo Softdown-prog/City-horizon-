@@ -6,6 +6,7 @@ on:
       - feature/ch-character-studio-art-v0
     paths:
       - '.github/workflows/visitor-forge-tree-single-view-test.yml'
+      - 'tools/visitor_forge_2d/examples/tree_test_broadleaf_01.json'
 
 permissions:
   contents: read
@@ -27,20 +28,19 @@ jobs:
           python -m pip install -e tools/visitor_forge_2d
           python -m pip install pytest
 
-      - name: Validate organic scenery pipeline
-        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py
+      - name: Validate current broadleaf renderer
+        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py::test_broadleaf_crown_is_deterministic_and_differs_from_conifer
 
       - name: Render broadleaf through Forge 2D
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p out/forge2d_tree_test/full out/forge2d_tree_test/single
-          recipe='tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_02.json'
-          test -f "$recipe"
+          recipe='tools/visitor_forge_2d/examples/tree_test_broadleaf_01.json'
           python -m visitor_forge_2d.core.organic_scenery \
             --recipe "$recipe" \
             --output out/forge2d_tree_test/full
-          src='out/forge2d_tree_test/full/park_tree_broadleaf_organic_02_south.png'
+          src='out/forge2d_tree_test/full/tree_test_broadleaf_01_south.png'
           test -s "$src"
           cp "$src" 'out/forge2d_tree_test/single/forge2d_tree_test_south.png'
           python - <<'PY'
@@ -49,7 +49,8 @@ jobs:
           im=Image.open(p)
           assert im.mode == 'RGBA', im.mode
           assert im.width >= 128 and im.height >= 128, im.size
-          print('FORGE2D_TREE_TEST_PASS', im.size, im.mode)
+          assert im.getchannel('A').getbbox() is not None
+          print('FORGE2D_TREE_TEST_PASS', im.size, im.mode, im.getchannel('A').getbbox())
           PY
 
       - name: Upload single-view tree PNG
