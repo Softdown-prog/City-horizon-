@@ -1,0 +1,139 @@
+{
+  "contract": "CITY_HORIZON_CAROUSEL_V1",
+  "assetId": "park_carousel_city_horizon_01",
+  "family": "amusement_carousel",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "designIntent": {
+    "referenceUse": "Classic tycoon carousel proportions remain a broad structural reference only. This V2 establishes a distinct City Horizon identity through palette, trim, crown, horse variation and perimeter lighting.",
+    "silhouette": "low_wide_open_circular_carousel",
+    "proportionPolicy": "believable_category_scale_not_miniature_or_chibi",
+    "identity": "city_horizon_heritage_park_carousel",
+    "keyReads": [
+      "shallow circular canopy",
+      "alternating warm ochre and cream radial roof panels",
+      "short segmented hanging valance",
+      "low three-tier center crown with finial",
+      "open sides",
+      "two staggered rings of varied carousel horses",
+      "burgundy and deep teal saddle accents",
+      "burgundy perimeter skirt with brass accent panels",
+      "restrained warm perimeter bulbs"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 3
+  },
+  "geometry": {
+    "baseRadius": 3.08,
+    "platformTopZ": 0.53,
+    "skirtSegments": 20,
+    "canopyRadius": 3.12,
+    "canopyInnerRadius": 0.46,
+    "canopyOuterZ": 2.38,
+    "canopyInnerZ": 2.86,
+    "canopyThickness": 0.055,
+    "canopySegments": 24,
+    "supportCount": 10,
+    "supportRadius": 2.58,
+    "horseCount": 14,
+    "horseInnerRadius": 1.36,
+    "horseOuterRadius": 2.16,
+    "horseBodyZ": 1.08,
+    "valanceHeight": 0.20,
+    "valanceDepth": 0.16,
+    "valanceSegments": 20,
+    "bulbCount": 20,
+    "bulbRadius": 0.045,
+    "crownEnabled": true
+  },
+  "materials": {
+    "yellow": {
+      "rgba": [0.92, 0.58, 0.055, 1.0],
+      "roughness": 0.6
+    },
+    "cream": {
+      "rgba": [0.94, 0.9, 0.76, 1.0],
+      "roughness": 0.74
+    },
+    "red": {
+      "rgba": [0.43, 0.035, 0.055, 1.0],
+      "roughness": 0.64
+    },
+    "dark_red": {
+      "rgba": [0.20, 0.018, 0.028, 1.0],
+      "roughness": 0.72
+    },
+    "burgundy": {
+      "rgba": [0.34, 0.028, 0.055, 1.0],
+      "roughness": 0.66
+    },
+    "teal": {
+      "rgba": [0.035, 0.24, 0.23, 1.0],
+      "roughness": 0.67
+    },
+    "wood": {
+      "rgba": [0.39, 0.2, 0.075, 1.0],
+      "roughness": 0.74,
+      "recipe": "timber",
+      "seed": 41,
+      "strength": 0.42
+    },
+    "gold": {
+      "rgba": [0.72, 0.43, 0.075, 1.0],
+      "roughness": 0.42,
+      "metallic": 0.24
+    },
+    "horse": {
+      "rgba": [0.92, 0.9, 0.82, 1.0],
+      "roughness": 0.68
+    },
+    "horse_gray": {
+      "rgba": [0.62, 0.64, 0.62, 1.0],
+      "roughness": 0.7
+    },
+    "horse_chestnut": {
+      "rgba": [0.38, 0.16, 0.075, 1.0],
+      "roughness": 0.72
+    },
+    "bulb": {
+      "rgba": [1.0, 0.82, 0.36, 1.0],
+      "roughness": 0.34
+    },
+    "dark": {
+      "rgba": [0.105, 0.085, 0.07, 1.0],
+      "roughness": 0.72
+    }
+  },
+  "animation": {
+    "frameStart": 1,
+    "frameEnd": 16,
+    "fps": 8,
+    "looping": true,
+    "motion": "one_full_carousel_rotation_with_gentle_horse_bob"
+  },
+  "runtimeLayers": {
+    "contract": "CH_ATTRACTION_MOTION_OVERLAY_V1",
+    "staticBase": {
+      "objects": ["CarouselFoundation", "Skirt_*"]
+    },
+    "motionOverlay": {
+      "root": "CarouselRotor",
+      "activation": {
+        "trigger": "passenger_boarded",
+        "minimumPassengers": 1
+      }
+    }
+  },
+  "ride": {
+    "contract": "CH_AMUSEMENT_RIDE_V1",
+    "type": "carousel",
+    "capacity": 14,
+    "cycleDurationSeconds": 45,
+    "boardingDurationSeconds": 12,
+    "unloadingDurationSeconds": 8,
+    "activityAnimId": "carousel_spin"
+  }
+}
