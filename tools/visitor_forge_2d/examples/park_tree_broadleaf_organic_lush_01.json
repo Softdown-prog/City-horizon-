@@ -1,0 +1,100 @@
+{
+  "contract": "CH_2D_ORGANIC_SCENERY_V1",
+  "id": "park_tree_broadleaf_organic_lush_01",
+  "pipelineRevision": 11,
+  "canvas": [256, 320],
+  "anchor": [128, 310],
+  "seed": 91573,
+  "crownStyle": "broadleaf",
+  "crownCx": 128,
+  "shadowWidth": 126,
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric",
+    "tile": [128, 64],
+    "yawDeg": 45,
+    "elevationDeg": 30,
+    "worldHeightScreenVertical": true
+  },
+  "rotation": {
+    "mode": "procedural_quarter_turns",
+    "lightingSpace": "screen_camera_relative",
+    "views": ["south", "west", "north", "east"],
+    "yawDeg": {
+      "south": 45,
+      "west": 135,
+      "north": 225,
+      "east": 315
+    }
+  },
+  "lightingIntent": {
+    "reference": "approved lush broadleaf with dense rounded canopy, bright yellow-green crown highlights, deep cool-green interior and short continuous forked trunk",
+    "top": "fresh yellow-green sunlit leaf masses",
+    "front": "dense overlapping broadleaf clusters with minimal empty gaps",
+    "base": "short stout warm-brown trunk with readable root flare",
+    "rotationSpace": "procedural quarter turns under CH_CAMERA_V1"
+  },
+  "broadleafStructure": {
+    "layout": "continuous",
+    "profile": "wide_umbrella",
+    "center": [128, 145],
+    "radius": [101, 108],
+    "masses": 62,
+    "density": 1.18
+  },
+  "palette": {
+    "ground_shadow": "#243128",
+    "trunk_top": "#8D6946",
+    "trunk_bottom": "#4A3425",
+    "trunk_light": "#C59A68",
+    "back_top": "#28543C",
+    "back_bottom": "#123225",
+    "mid_top": "#668A45",
+    "mid_bottom": "#315B37",
+    "front_top": "#8FB34B",
+    "front_bottom": "#4E793D",
+    "highlight": "#BDD966",
+    "occlusion": "#17382A"
+  },
+  "raster": {
+    "shadowDabs": 0,
+    "highlightDabs": 0,
+    "needleStrokes": 0,
+    "finalGrain": 120,
+    "finalNeedles": 0
+  },
+  "trunkBranches": [
+    {
+      "p0": [128, 310],
+      "p1": [127, 262],
+      "p2": [128, 190],
+      "w0": 25,
+      "w1": 13
+    },
+    {
+      "p0": [127, 235],
+      "p1": [108, 198],
+      "p2": [83, 164],
+      "w0": 12,
+      "w1": 5
+    },
+    {
+      "p0": [129, 230],
+      "p1": [149, 192],
+      "p2": [176, 160],
+      "w0": 12,
+      "w1": 5
+    },
+    {
+      "p0": [128, 212],
+      "p1": [130, 183],
+      "p2": [136, 147],
+      "w0": 9,
+      "w1": 4
+    }
+  ],
+  "validation": {
+    "minimumOpaqueHeightPx": 245,
+    "maximumOpaqueHeightPx": 318
+  }
+}
