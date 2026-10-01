@@ -1,0 +1,261 @@
+{
+  "contract": "CH_PATH_SLOPE_SPRITE_V1",
+  "material_id": "sand_01",
+  "sprite_prefix": "sand_path",
+  "runtime_visual_policy": "sprite_select_only",
+  "source_art_policy": "preserve_rgba_pixels_reposition_y_only",
+  "riser_alignment": "opposite_isometric_grid_axis",
+  "tile_size": [
+    128,
+    64
+  ],
+  "sprite_canvas": [
+    128,
+    112
+  ],
+  "legacy_surface_y": 32,
+  "height_px_per_unit": 16.0,
+  "sources": {
+    "ns": "assets/terrain/paths/sand_01/sand_path_05_straight_ns.png",
+    "ew": "assets/terrain/paths/sand_01/sand_path_10_straight_ew.png"
+  },
+  "profiles": [
+    {
+      "name": "ramp_025",
+      "mode": "ramp",
+      "rise_px": 4,
+      "rise_units": 0.25,
+      "steps": 0
+    },
+    {
+      "name": "ramp_050",
+      "mode": "ramp",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 0
+    },
+    {
+      "name": "stairs_050_4",
+      "mode": "stairs",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 4
+    },
+    {
+      "name": "stairs_075_6",
+      "mode": "stairs",
+      "rise_px": 12,
+      "rise_units": 0.75,
+      "steps": 6
+    },
+    {
+      "name": "stairs_100_8",
+      "mode": "stairs",
+      "rise_px": 16,
+      "rise_units": 1.0,
+      "steps": 8
+    }
+  ],
+  "variants": [
+    {
+      "file": "sand_path_straight_ns_ramp_025_high_n.png",
+      "axis": "ns",
+      "high_end": "n",
+      "profile": "ramp_025",
+      "mode": "ramp",
+      "rise_px": 4,
+      "rise_units": 0.25,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ns_ramp_050_high_n.png",
+      "axis": "ns",
+      "high_end": "n",
+      "profile": "ramp_050",
+      "mode": "ramp",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_050_4_high_n.png",
+      "axis": "ns",
+      "high_end": "n",
+      "profile": "stairs_050_4",
+      "mode": "stairs",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 4
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_075_6_high_n.png",
+      "axis": "ns",
+      "high_end": "n",
+      "profile": "stairs_075_6",
+      "mode": "stairs",
+      "rise_px": 12,
+      "rise_units": 0.75,
+      "steps": 6
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_100_8_high_n.png",
+      "axis": "ns",
+      "high_end": "n",
+      "profile": "stairs_100_8",
+      "mode": "stairs",
+      "rise_px": 16,
+      "rise_units": 1.0,
+      "steps": 8
+    },
+    {
+      "file": "sand_path_straight_ns_ramp_025_high_s.png",
+      "axis": "ns",
+      "high_end": "s",
+      "profile": "ramp_025",
+      "mode": "ramp",
+      "rise_px": 4,
+      "rise_units": 0.25,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ns_ramp_050_high_s.png",
+      "axis": "ns",
+      "high_end": "s",
+      "profile": "ramp_050",
+      "mode": "ramp",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_050_4_high_s.png",
+      "axis": "ns",
+      "high_end": "s",
+      "profile": "stairs_050_4",
+      "mode": "stairs",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 4
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_075_6_high_s.png",
+      "axis": "ns",
+      "high_end": "s",
+      "profile": "stairs_075_6",
+      "mode": "stairs",
+      "rise_px": 12,
+      "rise_units": 0.75,
+      "steps": 6
+    },
+    {
+      "file": "sand_path_straight_ns_stairs_100_8_high_s.png",
+      "axis": "ns",
+      "high_end": "s",
+      "profile": "stairs_100_8",
+      "mode": "stairs",
+      "rise_px": 16,
+      "rise_units": 1.0,
+      "steps": 8
+    },
+    {
+      "file": "sand_path_straight_ew_ramp_025_high_w.png",
+      "axis": "ew",
+      "high_end": "w",
+      "profile": "ramp_025",
+      "mode": "ramp",
+      "rise_px": 4,
+      "rise_units": 0.25,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ew_ramp_050_high_w.png",
+      "axis": "ew",
+      "high_end": "w",
+      "profile": "ramp_050",
+      "mode": "ramp",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_050_4_high_w.png",
+      "axis": "ew",
+      "high_end": "w",
+      "profile": "stairs_050_4",
+      "mode": "stairs",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 4
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_075_6_high_w.png",
+      "axis": "ew",
+      "high_end": "w",
+      "profile": "stairs_075_6",
+      "mode": "stairs",
+      "rise_px": 12,
+      "rise_units": 0.75,
+      "steps": 6
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_100_8_high_w.png",
+      "axis": "ew",
+      "high_end": "w",
+      "profile": "stairs_100_8",
+      "mode": "stairs",
+      "rise_px": 16,
+      "rise_units": 1.0,
+      "steps": 8
+    },
+    {
+      "file": "sand_path_straight_ew_ramp_025_high_e.png",
+      "axis": "ew",
+      "high_end": "e",
+      "profile": "ramp_025",
+      "mode": "ramp",
+      "rise_px": 4,
+      "rise_units": 0.25,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ew_ramp_050_high_e.png",
+      "axis": "ew",
+      "high_end": "e",
+      "profile": "ramp_050",
+      "mode": "ramp",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 0
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_050_4_high_e.png",
+      "axis": "ew",
+      "high_end": "e",
+      "profile": "stairs_050_4",
+      "mode": "stairs",
+      "rise_px": 8,
+      "rise_units": 0.5,
+      "steps": 4
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_075_6_high_e.png",
+      "axis": "ew",
+      "high_end": "e",
+      "profile": "stairs_075_6",
+      "mode": "stairs",
+      "rise_px": 12,
+      "rise_units": 0.75,
+      "steps": 6
+    },
+    {
+      "file": "sand_path_straight_ew_stairs_100_8_high_e.png",
+      "axis": "ew",
+      "high_end": "e",
+      "profile": "stairs_100_8",
+      "mode": "stairs",
+      "rise_px": 16,
+      "rise_units": 1.0,
+      "steps": 8
+    }
+  ]
+}
