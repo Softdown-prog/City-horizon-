@@ -1,0 +1,82 @@
+name: CH Dirt Slope Sprite Pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - terrain-construction-gameplay
+    paths:
+      - "tools/generate_dirt_slope_sprites.py"
+      - "assets/terrain/paths/dirt_01/**"
+      - ".github/workflows/ch-dirt-slope-sprite-pilot.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-dirt-slope-sprite-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Generate pre-rendered slope and stair PNG pilot
+        run: |
+          python tools/generate_dirt_slope_sprites.py \
+            --output-dir out/dirt_slope_sprite_pilot \
+            --contact-sheet out/dirt_slope_sprite_pilot_sheet.png \
+            --manifest out/dirt_slope_sprite_pilot_manifest.json
+
+      - name: Validate pilot PNG contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('out/dirt_slope_sprite_pilot')
+          files = sorted(root.glob('*.png'))
+          if len(files) != 20:
+              raise SystemExit(f'expected 20 pilot PNGs, found {len(files)}')
+
+          for path in files:
+              with Image.open(path) as im:
+                  im.load()
+                  if im.mode != 'RGBA':
+                      raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
+                  if im.size != (128, 112):
+                      raise SystemExit(f'{path}: expected 128x112, got {im.size}')
+
+          manifest = json.loads(Path('out/dirt_slope_sprite_pilot_manifest.json').read_text(encoding='utf-8'))
+          if manifest.get('contract') != 'CH_PATH_SPRITE_PILOT_V1':
+              raise SystemExit('unexpected sprite pilot contract')
+          if manifest.get('runtime_visual_policy') != 'sprite_select_only':
+              raise SystemExit('pilot must remain sprite-select-only at runtime')
+          if len(manifest.get('variants', [])) != 20:
+              raise SystemExit('manifest must contain exactly 20 pilot variants')
+          print('PASS 20 pre-rendered PNGs + manifest')
+          PY
+
+      - name: Upload PNG pilot
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Dirt-Slope-Sprite-Pilot
+          path: |
+            out/dirt_slope_sprite_pilot/*.png
+            out/dirt_slope_sprite_pilot_sheet.png
+            out/dirt_slope_sprite_pilot_manifest.json
+          if-no-files-found: error
+          retention-days: 14
