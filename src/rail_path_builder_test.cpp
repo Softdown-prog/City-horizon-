@@ -1,4 +1,5 @@
 #include "rail_path_builder.h"
+#include "rail_placement_controller.h"
 #include "rail_placement_graph.h"
 
 #include <cassert>
@@ -194,6 +195,64 @@ int main() {
 
     assert(!placement.add_root({std::nanf(""), 0.0F, 0.0F}, 0.0F).has_value());
     assert(!placement.rollback({placement.nodes().size() + 1U, placement.edges().size()}));
+
+    // Drag controller: mouse-move previews replace, never accumulate. A bad
+    // preview returns the graph to the begin checkpoint, cancel restores it,
+    // and commit preserves exactly the final valid preview.
+    RailPlacementGraph drag_graph(profile);
+    const auto drag_root = drag_graph.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
+    assert(drag_root.has_value());
+    RailPlacementController drag_controller(drag_graph);
+
+    assert(drag_controller.begin(*drag_root, RailPlacementMode::straight));
+    const auto straight_preview_a = drag_controller.preview(3.0F);
+    assert(straight_preview_a.has_value() && straight_preview_a->ok());
+    assert(drag_graph.nodes().size() == 2U && drag_graph.edges().size() == 1U);
+    const auto straight_preview_b = drag_controller.preview(7.0F);
+    assert(straight_preview_b.has_value() && straight_preview_b->ok());
+    assert(drag_graph.nodes().size() == 2U && drag_graph.edges().size() == 1U);
+    const RailPlacementNode* resized_straight_end = drag_graph.node(straight_preview_b->primary_node);
+    assert(resized_straight_end != nullptr);
+    assert(std::abs(resized_straight_end->position.x - 7.0F) < 0.0001F);
+    assert(drag_controller.commit());
+    assert(!drag_controller.active());
+    assert(drag_graph.nodes().size() == 2U && drag_graph.edges().size() == 1U);
+
+    const RailPlacementNodeId committed_end = straight_preview_b->primary_node;
+    const RailPlacementCheckpoint before_cancelled_curve = drag_graph.checkpoint();
+    assert(drag_controller.begin(committed_end, RailPlacementMode::curve_left));
+    const auto curve_preview = drag_controller.preview(4.0F);
+    assert(curve_preview.has_value() && curve_preview->ok());
+    assert(drag_graph.edges().size() == before_cancelled_curve.edge_count + 1U);
+    assert(drag_controller.cancel());
+    assert(drag_graph.nodes().size() == before_cancelled_curve.node_count);
+    assert(drag_graph.edges().size() == before_cancelled_curve.edge_count);
+
+    const RailPlacementCheckpoint before_invalid_preview = drag_graph.checkpoint();
+    assert(drag_controller.begin(committed_end, RailPlacementMode::curve_right));
+    assert(!drag_controller.preview(profile.min_turn_radius * 0.25F).has_value());
+    assert(drag_graph.nodes().size() == before_invalid_preview.node_count);
+    assert(drag_graph.edges().size() == before_invalid_preview.edge_count);
+    assert(!drag_controller.commit());
+    assert(drag_controller.cancel());
+
+    const RailPlacementCheckpoint before_turnout_preview = drag_graph.checkpoint();
+    assert(drag_controller.begin(committed_end, RailPlacementMode::turnout_right));
+    const auto turnout_preview = drag_controller.preview(8.0F);
+    assert(turnout_preview.has_value() && turnout_preview->ok());
+    assert(turnout_preview->has_secondary_branch());
+    assert(drag_graph.nodes().size() == before_turnout_preview.node_count + 2U);
+    assert(drag_graph.edges().size() == before_turnout_preview.edge_count + 2U);
+    const auto turnout_preview_resized = drag_controller.preview(9.0F);
+    assert(turnout_preview_resized.has_value() && turnout_preview_resized->has_secondary_branch());
+    assert(drag_graph.nodes().size() == before_turnout_preview.node_count + 2U);
+    assert(drag_graph.edges().size() == before_turnout_preview.edge_count + 2U);
+    assert(drag_controller.commit());
+    assert(drag_graph.nodes().size() == before_turnout_preview.node_count + 2U);
+    assert(drag_graph.edges().size() == before_turnout_preview.edge_count + 2U);
+
+    assert(!drag_controller.begin(kInvalidRailPlacementNodeId, RailPlacementMode::straight));
+    assert(!drag_controller.preview(std::nanf("")).has_value());
 
     const RailPathBuildResult bad_heading = RailPathBuilder::straight(
         {0.0F, 0.0F, 0.0F}, std::nanf(""), 4.0F, 32, profile);
