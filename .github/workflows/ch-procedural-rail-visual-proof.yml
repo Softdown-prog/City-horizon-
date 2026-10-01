@@ -9,6 +9,8 @@ on:
       - "src/rail_path_builder.h"
       - "src/rail_visual_proof_export.cpp"
       - "tools/rail_visual_proof/render_rail_proof.py"
+      - "C++/MapForge2/src/procedural_rail_preview_main.cpp"
+      - "tools/rail_mapforge_proof/CMakeLists.txt"
       - ".github/workflows/ch-procedural-rail-visual-proof.yml"
   workflow_dispatch:
 
@@ -63,5 +65,60 @@ jobs:
         with:
           name: CH-Procedural-Rail-Visual-Proof
           path: out/ch-rail-visual-proof/**
+          if-no-files-found: error
+          retention-days: 14
+
+  rail-mapforge-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: linux
+          target: desktop
+          cache: true
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config
+
+      - name: Configure isolated MapForge rail proof
+        run: >-
+          cmake -S tools/rail_mapforge_proof -B build/ch-mapforge-rail-proof -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DSDL_UNIX_CONSOLE_BUILD=ON
+
+      - name: Build canonical rail proof
+        run: cmake --build build/ch-mapforge-rail-proof --target CHRailMapForgeProof --parallel 2
+
+      - name: Render MapForge rail PNG
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          mkdir -p out/ch-mapforge-rail
+          build/ch-mapforge-rail-proof/CHRailMapForgeProof out/ch-mapforge-rail/mapforge_procedural_rail.png
+
+      - name: Validate PNG proof
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          png = Path('out/ch-mapforge-rail/mapforge_procedural_rail.png')
+          assert png.is_file(), png
+          assert png.stat().st_size > 4096, png.stat().st_size
+          assert png.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
+          print(f'MapForge procedural rail proof: OK ({png.stat().st_size} bytes)')
+          PY
+
+      - name: Upload MapForge rail proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Procedural-Rail-Proof
+          path: out/ch-mapforge-rail/**
           if-no-files-found: error
           retention-days: 14
