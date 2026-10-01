@@ -48,3 +48,5 @@ jobs:
       - name: Run focused terrain CTest
         shell: pwsh
         run: ctest --test-dir build/runtime-terrain-proof -C Release -R "terrain|heightfield" --output-on-failure
+
+# Re-run marker: CH_PATH_SLOPE_SPRITE_V1 runtime selector validation.
