@@ -47,7 +47,7 @@ jobs:
           grep -q "CH_PROCEDURAL_ROAD_2D_RUNTIME_V1" src/runtime_procedural_road_renderer.h
           grep -q "CH_PROCEDURAL_ROAD_2D_CULLING_V1" src/runtime_procedural_road_culling.h
           grep -q "try_render_procedural_roads_runtime" src/runtime_map_renderer.h
-          grep -q "#define MapRenderer RuntimeMapRenderer" main.cpp
+          grep -q "#define MapRenderer RuntimeMapRenderer" src/main.cpp
           grep -q "LEGACY 3D DIAGNOSTIC ONLY" "C++/MapForge2/CMakeLists.txt"
           if grep -q "RoadMeshBuilder::build_cubic" src/procedural_road_ground_render_plan.h; then
             echo "3D RoadMeshBuilder leaked back into the canonical procedural road plan"
