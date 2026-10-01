@@ -4,16 +4,7 @@ on:
   push:
     branches:
       - terrain-construction-gameplay
-    paths:
-      - ".github/workflows/ch-mapforge-terrain-gif-proof.yml"
-      - "C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp"
-      - "src/ch_core/map_document.cpp"
-      - "src/ch_core/map_document.h"
-      - "src/ch_core/procedural_tile_2d.h"
-      - "src/ch_core/terrain_heightfield.cpp"
-      - "src/ch_core/terrain_heightfield.h"
-      - "src/ch_core/projection.cpp"
-      - "src/ch_core/projection.h"
+  workflow_dispatch:
 
 jobs:
   terrain-gif-proof:
