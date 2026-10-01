@@ -29,7 +29,6 @@ def parse_export(path: Path) -> List[Geometry]:
     items: List[Geometry] = []
     current: Geometry | None = None
     mesh: Mesh | None = None
-    mesh_name = ""
 
     for raw in lines[1:]:
         parts = raw.split()
@@ -42,9 +41,8 @@ def parse_export(path: Path) -> List[Geometry]:
         elif tag == "MESH":
             if current is None:
                 raise RuntimeError("mesh outside geometry")
-            mesh_name = parts[1]
             mesh = Mesh()
-            current.meshes[mesh_name] = mesh
+            current.meshes[parts[1]] = mesh
         elif tag == "V":
             if mesh is None:
                 raise RuntimeError("vertex outside mesh")
@@ -56,7 +54,6 @@ def parse_export(path: Path) -> List[Geometry]:
         elif tag == "END_GEOMETRY":
             current = None
             mesh = None
-            mesh_name = ""
     return items
 
 
@@ -79,9 +76,68 @@ def bounds(items: List[Geometry]) -> Tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def triangle_normal(verts: List[Tuple[float, float, float]]) -> Tuple[float, float, float]:
+    ax, ay, az = verts[0]
+    bx, by, bz = verts[1]
+    cx, cy, cz = verts[2]
+    ux, uy, uz = bx - ax, by - ay, bz - az
+    vx, vy, vz = cx - ax, cy - ay, cz - az
+    nx = uy * vz - uz * vy
+    ny = uz * vx - ux * vz
+    nz = ux * vy - uy * vx
+    length = math.sqrt(nx * nx + ny * ny + nz * nz)
+    if length <= 1.0e-9:
+        return 0.0, 0.0, 1.0
+    return nx / length, ny / length, nz / length
+
+
+def clamp_channel(value: float) -> int:
+    return max(0, min(255, int(round(value))))
+
+
+def shade_color(
+    base: Tuple[int, int, int, int],
+    mesh_name: str,
+    verts: List[Tuple[float, float, float]],
+) -> Tuple[int, int, int, int]:
+    nx, ny, nz = triangle_normal(verts)
+    up = abs(nz)
+
+    # Soft north-west studio light. Absolute lateral components keep opposite
+    # rail faces readable without introducing direction-dependent flashing.
+    lateral = 0.55 * abs(nx) + 0.45 * abs(ny)
+    shade = 0.66 + 0.30 * up + 0.08 * lateral
+
+    cx = sum(v[0] for v in verts) / 3.0
+    cy = sum(v[1] for v in verts) / 3.0
+    variation = math.sin(cx * 19.17 + cy * 37.31)
+
+    if mesh_name == "ballast":
+        shade += variation * 0.035
+    elif mesh_name == "sleepers":
+        shade += variation * 0.045
+        if up > 0.72:
+            shade += 0.035
+    elif mesh_name in ("left_rail", "right_rail"):
+        # The rail head catches a narrow cool highlight; vertical sides stay
+        # darker, which makes the rectangular procedural section read as steel.
+        if up > 0.72:
+            shade += 0.20
+        else:
+            shade -= 0.055
+
+    r, g, b, a = base
+    return (
+        clamp_channel(r * shade),
+        clamp_channel(g * shade),
+        clamp_channel(b * shade),
+        a,
+    )
+
+
 def draw_scene(items: List[Geometry], highlight: str | None = None) -> Image.Image:
     width, height = 960, 640
-    img = Image.new("RGBA", (width, height), (239, 242, 233, 255))
+    img = Image.new("RGBA", (width, height), (234, 239, 228, 255))
     draw = ImageDraw.Draw(img, "RGBA")
 
     minx, miny, maxx, maxy = bounds(items)
@@ -91,51 +147,57 @@ def draw_scene(items: List[Geometry], highlight: str | None = None) -> Image.Ima
     ox = 75 - minx * scale
     oy = 60 - miny * scale
 
-    # Simple ground guide.
+    # Quiet MapForge-like ground guide so the track remains the focus.
     for gx in range(-12, 14):
         a = project((gx, -10, -0.02), scale, ox, oy)
         b = project((gx, 14, -0.02), scale, ox, oy)
-        draw.line([a, b], fill=(170, 180, 160, 38), width=1)
+        draw.line([a, b], fill=(128, 145, 124, 32), width=1)
     for gy in range(-10, 15):
         a = project((-12, gy, -0.02), scale, ox, oy)
         b = project((13, gy, -0.02), scale, ox, oy)
-        draw.line([a, b], fill=(170, 180, 160, 38), width=1)
+        draw.line([a, b], fill=(128, 145, 124, 32), width=1)
 
     palette = {
-        "ballast": (118, 111, 102, 255),
-        "sleepers": (95, 61, 38, 255),
-        "left_rail": (73, 78, 84, 255),
-        "right_rail": (73, 78, 84, 255),
+        "ballast": (132, 130, 122, 255),
+        "sleepers": (104, 68, 43, 255),
+        "left_rail": (92, 101, 108, 255),
+        "right_rail": (92, 101, 108, 255),
     }
     active_palette = {
-        "ballast": (133, 120, 84, 255),
-        "sleepers": (118, 72, 38, 255),
-        "left_rail": (210, 160, 56, 255),
-        "right_rail": (210, 160, 56, 255),
+        "ballast": (151, 137, 97, 255),
+        "sleepers": (132, 83, 43, 255),
+        "left_rail": (214, 168, 66, 255),
+        "right_rail": (214, 168, 66, 255),
     }
 
     triangles = []
     for item in items:
         for mesh_name, mesh in item.meshes.items():
-            color = (active_palette if item.name == highlight else palette)[mesh_name]
+            base = (active_palette if item.name == highlight else palette)[mesh_name]
             for tri in mesh.triangles:
                 verts = [mesh.vertices[i] for i in tri]
                 depth = sum(v[0] + v[1] + v[2] * 3.0 for v in verts) / 3.0
                 pts = [project(v, scale, ox, oy) for v in verts]
-                triangles.append((depth, pts, color))
+                color = shade_color(base, mesh_name, verts)
+                triangles.append((depth, pts, color, mesh_name))
 
-    for _, pts, color in sorted(triangles, key=lambda t: t[0]):
+    for _, pts, color, mesh_name in sorted(triangles, key=lambda t: t[0]):
+        # Tiny contact shadow for raised wood/steel makes the Z thickness legible
+        # while staying compatible with the classic pre-rendered tycoon look.
+        if mesh_name != "ballast":
+            shadow = [(x + 1.0, y + 1.8) for x, y in pts]
+            draw.polygon(shadow, fill=(24, 29, 25, 38))
         draw.polygon(pts, fill=color)
 
     # Labels and legend.
-    draw.rounded_rectangle((24, 20, 420, 104), radius=14, fill=(20, 24, 28, 214))
-    draw.text((42, 36), "CITY HORIZON — PROVA VISUAL DO TRILHO PROCEDURAL", fill=(255, 255, 255, 255))
+    draw.rounded_rectangle((24, 20, 440, 104), radius=14, fill=(20, 24, 28, 220))
+    draw.text((42, 36), "CITY HORIZON — TRILHO PROCEDURAL REFINADO", fill=(255, 255, 255, 255))
     draw.text((42, 62), "Geometria real: RailMeshBuilder / RailPathBuilder", fill=(210, 215, 220, 255))
-    draw.text((42, 82), "reta → curva → agulha/bifurcação", fill=(210, 215, 220, 255))
+    draw.text((42, 82), "lastro pedra + dormentes madeira + aço sombreado", fill=(210, 215, 220, 255))
 
-    draw.rounded_rectangle((width - 276, 20, width - 24, 86), radius=12, fill=(255, 255, 255, 220), outline=(50, 55, 60, 120))
-    draw.text((width - 258, 36), "Câmera de prova: projeção 2:1", fill=(32, 36, 40, 255))
-    draw.text((width - 258, 58), "Volume: lastro + dormentes + aço", fill=(32, 36, 40, 255))
+    draw.rounded_rectangle((width - 292, 20, width - 24, 90), radius=12, fill=(255, 255, 255, 225), outline=(50, 55, 60, 110))
+    draw.text((width - 274, 36), "Câmera: projeção CH 2:1", fill=(32, 36, 40, 255))
+    draw.text((width - 274, 58), "Volume: lastro + dormentes + aço", fill=(32, 36, 40, 255))
 
     return img
 
