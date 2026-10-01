@@ -63,15 +63,28 @@
     "heroFourDirectionViewsPromoted": true,
     "movingTrainUsesIndividualCars": true,
     "poseAtlasContract": "CH_COASTER_CAR_V1",
-    "poseAtlasStatus": "pending_promotion",
+    "poseAtlasStatus": "ready",
     "flatHeadingCount": 16,
     "flatHeadingStepDegrees": 22.5,
-    "wholeTrainSpriteUsedForCurves": false
+    "wholeTrainSpriteUsedForCurves": false,
+    "poseAtlasRuntimeContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
+    "poseAtlasSpriteSheet": "car_pose_atlas.png",
+    "poseAtlasManifest": "car_pose_atlas_runtime.json",
+    "poseAtlasFrameCount": 40,
+    "verticalSupplementFrames": 24
   },
   "sourceCommit": "ac8699478d7ddc62f56d0d26555eee328a9c30e0",
   "sourceWorkflowRun": 36903309772,
   "sourceArtifactId": 11181909810,
   "sourceArtifactDigest": "sha256:e2db24e66b636ddb8c396a03be19fb70c70b7fe553bd25802693490861497287",
   "approvedProxySha256": "eca7cc62de7986911c1f795bb6535e3cb713ad8934d1bc3c5894c085c075b867",
-  "approvedForRuntime": true
+  "approvedForRuntime": true,
+  "poseAtlasSource": {
+    "sourceCommit": "157194e2de0ec9ffbe419620ce4b06e07dbc8e37",
+    "sourceWorkflowRun": 36913578419,
+    "sourceArtifactId": 11189062756,
+    "sourceArtifactDigest": "sha256:8a361fc321bbc1d42836ed5620f8ef89d1627c9eb82626f4d8c1e0b08d2189db",
+    "approvedProxySha256": "7ec94238a47c771db417ad3419b101feaa211a2260d7eeb9236c39141290382a",
+    "spriteSheetSha256": "d1a051bdef2fcb12d4b056706bb28d7270797d970dc90db9648edd011173cd8e"
+  }
 }

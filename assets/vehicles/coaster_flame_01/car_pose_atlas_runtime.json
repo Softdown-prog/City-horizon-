@@ -1,0 +1,1034 @@
+{
+  "contract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
+  "assetId": "vehicle.coaster.flame_01.pose_atlas",
+  "sourceAssetId": "ride.coaster.car_flame_pose_atlas_v1",
+  "styleId": "flame_01",
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "poseContract": "CH_COASTER_CAR_V1",
+  "runtimeRepresentation": "2D_RGBA_sprite_sheet",
+  "spriteSheet": "car_pose_atlas.png",
+  "spriteSheetSha256": "d1a051bdef2fcb12d4b056706bb28d7270797d970dc90db9648edd011173cd8e",
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "columns": 8,
+  "rows": 5,
+  "frameCount": 40,
+  "headingCount": 16,
+  "headingStepDegrees": 22.5,
+  "baseForwardAxis": "+Y",
+  "anchorWorld": [
+    0.0,
+    0.0,
+    0.48
+  ],
+  "frameOrder": "source_pose_manifest",
+  "frames": [
+    {
+      "file": "car_h00_p000.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 0,
+      "row": 0,
+      "column": 0,
+      "sourceRect": [
+        0,
+        0,
+        256,
+        256
+      ],
+      "sha256": "6cbe30379b24ff46d5c74adabed422fa8634c5f98e5fb016ff576d0d84b37607"
+    },
+    {
+      "file": "car_h01_p000.png",
+      "headingIndex": 1,
+      "headingDegrees": 22.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 1,
+      "row": 0,
+      "column": 1,
+      "sourceRect": [
+        256,
+        0,
+        256,
+        256
+      ],
+      "sha256": "21268a0a8d9352bb3b2d64b23aa5ccc4b1a25bf114de1a8e135709cf55faf704"
+    },
+    {
+      "file": "car_h02_p000.png",
+      "headingIndex": 2,
+      "headingDegrees": 45.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 2,
+      "row": 0,
+      "column": 2,
+      "sourceRect": [
+        512,
+        0,
+        256,
+        256
+      ],
+      "sha256": "073c9a828303c5f008ff20405cd45c806e35ec7ee13a2d2d655580c537aa29d2"
+    },
+    {
+      "file": "car_h03_p000.png",
+      "headingIndex": 3,
+      "headingDegrees": 67.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 3,
+      "row": 0,
+      "column": 3,
+      "sourceRect": [
+        768,
+        0,
+        256,
+        256
+      ],
+      "sha256": "b13c59871eee266df8cf337c126fb6d97501919d388138d4e269580b3f309017"
+    },
+    {
+      "file": "car_h04_p000.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 4,
+      "row": 0,
+      "column": 4,
+      "sourceRect": [
+        1024,
+        0,
+        256,
+        256
+      ],
+      "sha256": "daf74f38581c09647ba83f2f607149e3b9cc276bedee19952155c914e272c2af"
+    },
+    {
+      "file": "car_h05_p000.png",
+      "headingIndex": 5,
+      "headingDegrees": 112.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 5,
+      "row": 0,
+      "column": 5,
+      "sourceRect": [
+        1280,
+        0,
+        256,
+        256
+      ],
+      "sha256": "6f6ee908a62c70d0bda3d4464b10c55189a09eb4cedf98447d7f104d3c7adf9e"
+    },
+    {
+      "file": "car_h06_p000.png",
+      "headingIndex": 6,
+      "headingDegrees": 135.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 6,
+      "row": 0,
+      "column": 6,
+      "sourceRect": [
+        1536,
+        0,
+        256,
+        256
+      ],
+      "sha256": "7541eff37bdff242ec41b078f23d84e0ecbc3c9808636ce64f7cb3433bc7ab29"
+    },
+    {
+      "file": "car_h07_p000.png",
+      "headingIndex": 7,
+      "headingDegrees": 157.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 7,
+      "row": 0,
+      "column": 7,
+      "sourceRect": [
+        1792,
+        0,
+        256,
+        256
+      ],
+      "sha256": "5ee496a16ce1e09b506c8c4ab91c9b72d4d5082a910dcc13d2e804df0e6e965a"
+    },
+    {
+      "file": "car_h08_p000.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 8,
+      "row": 1,
+      "column": 0,
+      "sourceRect": [
+        0,
+        256,
+        256,
+        256
+      ],
+      "sha256": "d43d0e9e4eca79a66ed9e3eec9885934b05a99fbb5f3f299eb997efe3ea0c007"
+    },
+    {
+      "file": "car_h09_p000.png",
+      "headingIndex": 9,
+      "headingDegrees": 202.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 9,
+      "row": 1,
+      "column": 1,
+      "sourceRect": [
+        256,
+        256,
+        256,
+        256
+      ],
+      "sha256": "40cd965a6abea687f2d0ce6268e9f16aadd9496160a2881b7ae3732a03bc4f57"
+    },
+    {
+      "file": "car_h10_p000.png",
+      "headingIndex": 10,
+      "headingDegrees": 225.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 10,
+      "row": 1,
+      "column": 2,
+      "sourceRect": [
+        512,
+        256,
+        256,
+        256
+      ],
+      "sha256": "68cbff19696a9b19c7a13c7159eba2d9e7477c867bcfd17887f66233aa11e0c3"
+    },
+    {
+      "file": "car_h11_p000.png",
+      "headingIndex": 11,
+      "headingDegrees": 247.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 11,
+      "row": 1,
+      "column": 3,
+      "sourceRect": [
+        768,
+        256,
+        256,
+        256
+      ],
+      "sha256": "8f7a444781536062c637247ac82b6f692f488397dab5669e03e3e10c6e2071dd"
+    },
+    {
+      "file": "car_h12_p000.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 12,
+      "row": 1,
+      "column": 4,
+      "sourceRect": [
+        1024,
+        256,
+        256,
+        256
+      ],
+      "sha256": "6331f2fee9e8d0a948d022e595b273318a2c25f02fc774993a4cc6630108ecb4"
+    },
+    {
+      "file": "car_h13_p000.png",
+      "headingIndex": 13,
+      "headingDegrees": 292.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 13,
+      "row": 1,
+      "column": 5,
+      "sourceRect": [
+        1280,
+        256,
+        256,
+        256
+      ],
+      "sha256": "a18d48447ff8863d42646ac51c0dc505d2d533b9f8ade62b3406291249f4834c"
+    },
+    {
+      "file": "car_h14_p000.png",
+      "headingIndex": 14,
+      "headingDegrees": 315.0,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 14,
+      "row": 1,
+      "column": 6,
+      "sourceRect": [
+        1536,
+        256,
+        256,
+        256
+      ],
+      "sha256": "64aeb57f0813f71853d89812fc3d4955554e3408e10ab236db4cefeccf69c745"
+    },
+    {
+      "file": "car_h15_p000.png",
+      "headingIndex": 15,
+      "headingDegrees": 337.5,
+      "pitchDegrees": 0.0,
+      "family": "flat_curve_16way",
+      "trackUses": [
+        "straight",
+        "curve_left",
+        "curve_right"
+      ],
+      "atlasIndex": 15,
+      "row": 1,
+      "column": 7,
+      "sourceRect": [
+        1792,
+        256,
+        256,
+        256
+      ],
+      "sha256": "0041c74c22c2f6d8a67081093a0f6ef4d0cc0ccf4c7a8afd7711e1fbdaddc33e"
+    },
+    {
+      "file": "car_h00_m046.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": -46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 16,
+      "row": 2,
+      "column": 0,
+      "sourceRect": [
+        0,
+        512,
+        256,
+        256
+      ],
+      "sha256": "125a25c834c9173ff82c571f176494a200f9fe9618028bace2cf56659584bb2e"
+    },
+    {
+      "file": "car_h04_m046.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": -46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 17,
+      "row": 2,
+      "column": 1,
+      "sourceRect": [
+        256,
+        512,
+        256,
+        256
+      ],
+      "sha256": "6a0a3be9432284eb793eb2aa7d1e378a1db10d9db7801f36d89aaa580e7e7d1f"
+    },
+    {
+      "file": "car_h08_m046.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": -46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 18,
+      "row": 2,
+      "column": 2,
+      "sourceRect": [
+        512,
+        512,
+        256,
+        256
+      ],
+      "sha256": "0674a99cce703764359fd14973e48d018916707a075bdf0d8e195ce5cfe27c20"
+    },
+    {
+      "file": "car_h12_m046.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": -46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 19,
+      "row": 2,
+      "column": 3,
+      "sourceRect": [
+        768,
+        512,
+        256,
+        256
+      ],
+      "sha256": "f773bf8be036ead5aa5337db4dcd847b6dcaeaf23b15138d55597b5b36f73d8b"
+    },
+    {
+      "file": "car_h00_m030.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": -30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 20,
+      "row": 2,
+      "column": 4,
+      "sourceRect": [
+        1024,
+        512,
+        256,
+        256
+      ],
+      "sha256": "835b868d9221715b2e8645b9c22af2fbb7c1a27bc621cc895f248d84432bdfa0"
+    },
+    {
+      "file": "car_h04_m030.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": -30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 21,
+      "row": 2,
+      "column": 5,
+      "sourceRect": [
+        1280,
+        512,
+        256,
+        256
+      ],
+      "sha256": "fa0b23b0ea593758c6fd3cb9ca91cd5bf93b8ce0c380bf68351daa2711ad6df9"
+    },
+    {
+      "file": "car_h08_m030.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": -30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 22,
+      "row": 2,
+      "column": 6,
+      "sourceRect": [
+        1536,
+        512,
+        256,
+        256
+      ],
+      "sha256": "7778517afa8f607d33958918faa5e666ed9dd100bad556571d3b74e9313d978e"
+    },
+    {
+      "file": "car_h12_m030.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": -30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 23,
+      "row": 2,
+      "column": 7,
+      "sourceRect": [
+        1792,
+        512,
+        256,
+        256
+      ],
+      "sha256": "d09578a1a9affa5181942cfe3fd74c083e771fd629fe69a39da789f198fde2b4"
+    },
+    {
+      "file": "car_h00_m014.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": -14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 24,
+      "row": 3,
+      "column": 0,
+      "sourceRect": [
+        0,
+        768,
+        256,
+        256
+      ],
+      "sha256": "e275e583d698679420aff43b5326e97723294000b7257a9f178102364f5ae312"
+    },
+    {
+      "file": "car_h04_m014.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": -14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 25,
+      "row": 3,
+      "column": 1,
+      "sourceRect": [
+        256,
+        768,
+        256,
+        256
+      ],
+      "sha256": "c6eff216e11e1b9c0afcdb098b9beb179823fd7a27da74e2c26016018e9db823"
+    },
+    {
+      "file": "car_h08_m014.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": -14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 26,
+      "row": 3,
+      "column": 2,
+      "sourceRect": [
+        512,
+        768,
+        256,
+        256
+      ],
+      "sha256": "078ac4b6c3a88a11ab5e32f1b570ab15e11a361f768e7144f8f2b177f7c7f08a"
+    },
+    {
+      "file": "car_h12_m014.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": -14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 27,
+      "row": 3,
+      "column": 3,
+      "sourceRect": [
+        768,
+        768,
+        256,
+        256
+      ],
+      "sha256": "dde3917957e78ff7497473669c94cb9a32e8363489eff4d46d0bf93203713d09"
+    },
+    {
+      "file": "car_h00_p014.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": 14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 28,
+      "row": 3,
+      "column": 4,
+      "sourceRect": [
+        1024,
+        768,
+        256,
+        256
+      ],
+      "sha256": "f90771bde29e05c17ffada737181ac5fd8c37c2218620639487336b237cc5760"
+    },
+    {
+      "file": "car_h04_p014.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": 14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 29,
+      "row": 3,
+      "column": 5,
+      "sourceRect": [
+        1280,
+        768,
+        256,
+        256
+      ],
+      "sha256": "94d5981c5f93506afcc5477e03d564c2b2008cd88d8824c2ea4212decdd50873"
+    },
+    {
+      "file": "car_h08_p014.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": 14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 30,
+      "row": 3,
+      "column": 6,
+      "sourceRect": [
+        1536,
+        768,
+        256,
+        256
+      ],
+      "sha256": "1768a6fc29489232a06a92e997703bf30cc49fc6ef3e73a3ba282f88575b5ff6"
+    },
+    {
+      "file": "car_h12_p014.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": 14.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 31,
+      "row": 3,
+      "column": 7,
+      "sourceRect": [
+        1792,
+        768,
+        256,
+        256
+      ],
+      "sha256": "70d7a1c97af3e39ac25fd2012e92c45db57a9e47a118bf94f0500051d4018928"
+    },
+    {
+      "file": "car_h00_p030.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": 30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 32,
+      "row": 4,
+      "column": 0,
+      "sourceRect": [
+        0,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "11df9c8078787cc717fa8ce33babb904037196eef80e5e87ccd36fb691f71799"
+    },
+    {
+      "file": "car_h04_p030.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": 30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 33,
+      "row": 4,
+      "column": 1,
+      "sourceRect": [
+        256,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "f9da8dea621ce10835ad8878d7236e203f148d3db0be07f192d9bbf29d753c3c"
+    },
+    {
+      "file": "car_h08_p030.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": 30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 34,
+      "row": 4,
+      "column": 2,
+      "sourceRect": [
+        512,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "f5222eb53006560288d8c0598e58f8b782f0cb3fa45e4100da1b91cdf89d1680"
+    },
+    {
+      "file": "car_h12_p030.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": 30.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 35,
+      "row": 4,
+      "column": 3,
+      "sourceRect": [
+        768,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "41eb3519f7dacc6042d14e529289478df8af4bfc0c2b12fcdb86556f06f0b4c1"
+    },
+    {
+      "file": "car_h00_p046.png",
+      "headingIndex": 0,
+      "headingDegrees": 0.0,
+      "pitchDegrees": 46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 36,
+      "row": 4,
+      "column": 4,
+      "sourceRect": [
+        1024,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "b5cffc313e6d52cddae403e167e5508a758c12728a28d4a579f722795f67cbc3"
+    },
+    {
+      "file": "car_h04_p046.png",
+      "headingIndex": 4,
+      "headingDegrees": 90.0,
+      "pitchDegrees": 46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 37,
+      "row": 4,
+      "column": 5,
+      "sourceRect": [
+        1280,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "5b52c68a74188bca7f7dcf76b71230c8f5132168e304be057f346aa9365b4f00"
+    },
+    {
+      "file": "car_h08_p046.png",
+      "headingIndex": 8,
+      "headingDegrees": 180.0,
+      "pitchDegrees": 46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 38,
+      "row": 4,
+      "column": 6,
+      "sourceRect": [
+        1536,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "0ffe1af1dbca8ea3994aeef1960a63dd64ef79e5804fd2ea80c0272b4241aa0c"
+    },
+    {
+      "file": "car_h12_p046.png",
+      "headingIndex": 12,
+      "headingDegrees": 270.0,
+      "pitchDegrees": 46.0,
+      "family": "cardinal_vertical_supplement",
+      "trackUses": [
+        "slope_up",
+        "slope_down",
+        "flat_to_slope_up",
+        "slope_up_to_flat",
+        "flat_to_slope_down",
+        "slope_down_to_flat",
+        "airtime_hill_small",
+        "airtime_hill_large"
+      ],
+      "atlasIndex": 39,
+      "row": 4,
+      "column": 7,
+      "sourceRect": [
+        1792,
+        1024,
+        256,
+        256
+      ],
+      "sha256": "d19003ca2758746b87cefa1417d9be1e7b0de9c83953e842db1a7508d50c2ff8"
+    }
+  ],
+  "sourceCommit": "157194e2de0ec9ffbe419620ce4b06e07dbc8e37",
+  "sourceWorkflowRun": 36913578419,
+  "sourceArtifactId": 11189062756,
+  "sourceArtifactDigest": "sha256:8a361fc321bbc1d42836ed5620f8ef89d1627c9eb82626f4d8c1e0b08d2189db",
+  "approvedProxySha256": "7ec94238a47c771db417ad3419b101feaa211a2260d7eeb9236c39141290382a",
+  "approvedForRuntime": true
+}
