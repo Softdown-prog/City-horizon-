@@ -1,5 +1,6 @@
 name: CH Runtime Compile Fix 2
 
+# One-shot repair workflow; this edit intentionally triggers the repair job.
 on:
   push:
     branches:
