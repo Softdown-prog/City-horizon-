@@ -5,6 +5,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -20,10 +21,6 @@ struct ProceduralRoad2DRenderStyle {
     SDL_FColor tint{52.0F / 255.0F, 57.0F / 255.0F, 60.0F / 255.0F, 1.0F};
     SDL_Texture* texture = nullptr;
 };
-
-// Compatibility alias for callers that only customized tint/texture while the
-// old ground-only pilot was active. The payload is now explicitly 2D.
-using ProceduralRoadRenderStyle = ProceduralRoad2DRenderStyle;
 
 [[nodiscard]] inline bool render_procedural_road_2d_mesh(
     SDL_Renderer* renderer,
