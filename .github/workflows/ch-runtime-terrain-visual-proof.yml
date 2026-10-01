@@ -9,6 +9,7 @@ on:
       - ".github/workflows/ch-runtime-terrain-visual-proof.yml"
       - "tools/runtime_terrain_capture/**"
       - "tools/generate_dirt_slope_sprites.py"
+      - "tools/render_dirt_slope_continuity_proof.py"
       - "src/runtime_terrain_renderer.h"
       - "src/ch_core/terrain_heightfield.*"
       - "src/ch_core/map_document.*"
@@ -27,6 +28,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check pillow
           python tools/generate_dirt_slope_sprites.py --output-dir out/dirt-slope-pilot --contact-sheet out/dirt-slope-pilot-sheet.png --manifest out/dirt-slope-pilot-manifest.json
+          python tools/render_dirt_slope_continuity_proof.py --generated-dir out/dirt-slope-pilot --output out/dirt-slope-continuity-proof.png
 
       - name: Upload pre-rendered dirt slope sprite pilot
         uses: actions/upload-artifact@v4
@@ -36,6 +38,7 @@ jobs:
             out/dirt-slope-pilot/*.png
             out/dirt-slope-pilot-sheet.png
             out/dirt-slope-pilot-manifest.json
+            out/dirt-slope-continuity-proof.png
           if-no-files-found: error
           retention-days: 14
 
