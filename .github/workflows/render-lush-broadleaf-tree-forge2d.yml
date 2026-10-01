@@ -11,7 +11,7 @@ on:
       - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   render:
@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: feature/ch-character-studio-art-v0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -39,7 +41,6 @@ jobs:
           set -euo pipefail
           out='out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01'
           mkdir -p "$out"
-          # Render the current production recipe (V12+) into all canonical views.
           python -m visitor_forge_2d.core.organic_scenery \
             --recipe tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_lush_01.json \
             --output "$out"
@@ -73,6 +74,51 @@ jobs:
           assert list(rotation['views']) == expected
           print('LUSH_BROADLEAF_FORGE2D_PASS', hashes)
           PY
+
+      - name: Promote exact rendered views into runtime
+        if: github.ref == 'refs/heads/feature/ch-character-studio-art-v0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01'
+          stem='park_tree_broadleaf_organic_lush_01'
+          mkdir -p assets/tree assets/definitions
+          for view in south west north east; do
+            cp "${root}/${stem}_${view}.png" "assets/tree/${stem}_${view}.png"
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          stem = 'park_tree_broadleaf_organic_lush_01'
+          recipe = json.loads(Path(f'tools/visitor_forge_2d/examples/{stem}.json').read_text())
+          definition = {
+              'id': stem,
+              'name': 'Árvore Frondosa de Parque',
+              'description': 'Árvore folhosa de copa larga e densa, refeita no Visitor Forge 2D procedural a partir da referência aprovada.',
+              'category': 'trees',
+              'assetDir': 'assets/tree',
+              'views': {view: f'{stem}_{view}.png' for view in ('south','west','north','east')},
+              'anchor': recipe['anchor'],
+              'footprint': {'width': 1, 'height': 1, 'mask': ['1']},
+              'tags': ['park', 'tree', 'broadleaf', 'lush', 'shade'],
+              'variations': 1,
+              'rotationMode': 'sprite_4dir',
+              'generatedBy': 'visitor_forge_2d',
+              'contract': recipe['contract'],
+              'pipelineRevision': recipe['pipelineRevision'],
+              'runtime': {'selectable': True, 'placeable': True}
+          }
+          Path(f'assets/definitions/{stem}.json').write_text(json.dumps(definition, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "assets/tree/${stem}_south.png" "assets/tree/${stem}_west.png" "assets/tree/${stem}_north.png" "assets/tree/${stem}_east.png" "assets/definitions/${stem}.json"
+          if git diff --cached --quiet; then
+            echo 'Runtime tree bundle already matches generated output.'
+          else
+            git commit -m 'feat(runtime): add lush broadleaf Forge2D tree'
+            git push origin HEAD:feature/ch-character-studio-art-v0
+          fi
 
       - name: Upload tree bundle
         uses: actions/upload-artifact@v4
