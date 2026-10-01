@@ -39,3 +39,5 @@ jobs:
           path: out/visitor_forge_2d/worker_requests/
           retention-days: 14
           if-no-files-found: error
+
+# A follow-up touch intentionally triggers this newly registered workflow.
