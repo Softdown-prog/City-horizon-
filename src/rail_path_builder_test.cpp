@@ -1,4 +1,5 @@
 #include "rail_path_builder.h"
+#include "rail_placement_graph.h"
 
 #include <cassert>
 #include <cmath>
@@ -147,6 +148,74 @@ int main() {
         {0.0F, 0.0F, 0.0F}, 0.0F, 8.0F, 0.01F,
         RailTurnDirection::left, 48, profile);
     assert(!turnout_too_narrow.ok());
+
+    // Editor staging graph: accepted authoring operations become deterministic
+    // nodes/edges, every edge remains mesh-safe, and cancellation rolls back
+    // only geometry produced after the checkpoint.
+    RailPlacementGraph placement(profile);
+    const auto placement_root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
+    assert(placement_root.has_value());
+
+    const auto placed_straight = placement.append_straight(*placement_root, 6.0F, 32);
+    assert(placed_straight.has_value() && placed_straight->ok());
+    assert(placement.nodes().size() == 2U);
+    assert(placement.edges().size() == 1U);
+    const RailPlacementNode* straight_end = placement.node(placed_straight->node);
+    assert(straight_end != nullptr);
+    assert(std::abs(straight_end->position.x - 6.0F) < 0.0001F);
+    assert(std::abs(straight_end->position.y) < 0.0001F);
+
+    const auto placed_curve = placement.append_quarter_curve(
+        placed_straight->node, 4.0F, RailTurnDirection::left, 48);
+    assert(placed_curve.has_value() && placed_curve->ok());
+    const RailPlacementNode* curve_end = placement.node(placed_curve->node);
+    assert(curve_end != nullptr);
+    assert(std::abs(curve_end->heading_radians - kHalfPi) < 0.0001F);
+    assert(RailMeshBuilder::validate_connection(
+        placement.edge(placed_straight->edge)->segment,
+        placement.edge(placed_curve->edge)->segment,
+        profile).ok());
+
+    const RailPlacementCheckpoint cancel_point = placement.checkpoint();
+    const auto temporary_extension = placement.append_straight(placed_curve->node, 5.0F, 32);
+    assert(temporary_extension.has_value());
+    assert(placement.nodes().size() == cancel_point.node_count + 1U);
+    assert(placement.edges().size() == cancel_point.edge_count + 1U);
+    assert(placement.rollback(cancel_point));
+    assert(placement.nodes().size() == cancel_point.node_count);
+    assert(placement.edges().size() == cancel_point.edge_count);
+    assert(placement.node(temporary_extension->node) == nullptr);
+
+    // A turnout commits both branches atomically from one source node. Both
+    // edge meshes must be buildable and a failed turnout must leave counts
+    // unchanged.
+    const RailPlacementCheckpoint before_turnout = placement.checkpoint();
+    const auto placed_turnout = placement.append_turnout(
+        placed_straight->node, 8.0F, kPiOverTwelve, RailTurnDirection::right, 48);
+    assert(placed_turnout.has_value() && placed_turnout->ok());
+    assert(placement.nodes().size() == before_turnout.node_count + 2U);
+    assert(placement.edges().size() == before_turnout.edge_count + 2U);
+    assert(RailMeshBuilder::build(placement.edge(placed_turnout->through_edge)->segment, profile).ok());
+    assert(RailMeshBuilder::build(placement.edge(placed_turnout->diverging_edge)->segment, profile).ok());
+
+    const RailPlacementCheckpoint before_rejected_curve = placement.checkpoint();
+    const auto rejected_curve = placement.append_quarter_curve(
+        placed_turnout->through_node, profile.min_turn_radius * 0.25F,
+        RailTurnDirection::left, 48);
+    assert(!rejected_curve.has_value());
+    assert(placement.nodes().size() == before_rejected_curve.node_count);
+    assert(placement.edges().size() == before_rejected_curve.edge_count);
+
+    const RailPlacementCheckpoint before_rejected_turnout = placement.checkpoint();
+    const auto rejected_turnout = placement.append_turnout(
+        placed_turnout->through_node, profile.min_turn_radius * 0.25F,
+        kPiOverTwelve, RailTurnDirection::left, 48);
+    assert(!rejected_turnout.has_value());
+    assert(placement.nodes().size() == before_rejected_turnout.node_count);
+    assert(placement.edges().size() == before_rejected_turnout.edge_count);
+
+    assert(!placement.add_root({std::nanf(""), 0.0F, 0.0F}, 0.0F).has_value());
+    assert(!placement.rollback({placement.nodes().size() + 1U, placement.edges().size()}).operator bool());
 
     // Non-finite authoring input is rejected before trigonometry can poison the
     // generated control points.
