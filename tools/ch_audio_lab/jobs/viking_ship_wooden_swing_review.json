@@ -4,7 +4,7 @@
   "kind": "effect",
   "prompt": "Theme park Viking ship ride sound effect focused on thick tensioned rope creaks and rope fibers straining under load while the large wooden swinging ship changes direction. Rhythmic dry rope squeaks, twisting hemp rope friction, stretched cordage groans, subtle pulley and wooden frame creaks, occasional low wooden stress sound. No engine, no chain rattling, no metallic machinery, no crowd, no screams, no voices, no music, no horn, no water, no wind whoosh. The dominant sound must be heavy rope creaking under tension, suitable for a classic wooden amusement park Viking ship ride.",
   "durationSeconds": 6.0,
-  "tags": ["park", "ride", "viking-ship", "rope", "creak", "wood", "tension", "swing", "tycoon", "local-ai", "approved"],
+  "tags": ["park", "ride", "viking-ship", "rope", "creak", "wood", "tension", "swing", "tycoon", "local-ai", "approved", "runtime"],
   "provider": {
     "type": "command",
     "command": [
