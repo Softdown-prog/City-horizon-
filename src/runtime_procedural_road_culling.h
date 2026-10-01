@@ -12,8 +12,8 @@
 // CH_PROCEDURAL_ROAD_2D_CULLING_V1
 //
 // Runtime-only visibility layer. It trims the camera-visible working set before
-// ribbons/junctions are tessellated, while RoadManager and its procedural mirror
-// remain the authoritative full-city topology.
+// expensive spline smoothing, topology queries and ribbon tessellation, while
+// RoadManager and its procedural mirror remain authoritative for the full city.
 struct ProceduralRoad2DWorldBounds {
     float min_x = 0.0F;
     float min_y = 0.0F;
@@ -74,6 +74,28 @@ struct ProceduralRoadVisibleGroundRenderPlan {
     return {min_x - padding, min_y - padding, max_x + padding, max_y + padding};
 }
 
+[[nodiscard]] inline bool procedural_road_graph_segment_intersects_world_bounds(
+    const ProceduralRoadGraph& graph,
+    const ProceduralRoadGraphSegment& segment,
+    const ProceduralRoad2DWorldBounds& bounds,
+    const float padding = 1.0F) noexcept {
+    if (!bounds.valid()) return true;
+    const ProceduralRoadNode* start = graph.node(segment.start_node);
+    const ProceduralRoadNode* end = graph.node(segment.end_node);
+    if (start == nullptr || end == nullptr) return true;
+
+    // The visual corner handle can bend roughly half a tile away from the raw
+    // edge. A conservative one-tile guard rejects far segments cheaply without
+    // clipping a smoothed corner near the viewport boundary.
+    const float extent = std::max(0.0F, segment.width * 0.5F) + std::max(0.0F, padding);
+    const float min_x = std::min(start->position.x, end->position.x) - extent;
+    const float max_x = std::max(start->position.x, end->position.x) + extent;
+    const float min_y = std::min(start->position.y, end->position.y) - extent;
+    const float max_y = std::max(start->position.y, end->position.y) + extent;
+    return max_x >= bounds.min_x && min_x <= bounds.max_x &&
+           max_y >= bounds.min_y && min_y <= bounds.max_y;
+}
+
 [[nodiscard]] inline bool procedural_road_spline_intersects_world_bounds(
     const RoadSplineSegment& spline,
     const ProceduralRoad2DWorldBounds& bounds,
@@ -99,8 +121,16 @@ build_visible_procedural_road_ground_render_plan(
     ProceduralRoadVisibleGroundRenderPlan visible;
     const ProceduralRoadGraph& graph = bridge.graph();
 
-    visible.plan.segment_meshes.reserve(graph.segments().size());
+    visible.plan.segment_meshes.reserve(std::min<std::size_t>(graph.segments().size(), 256U));
     for (const ProceduralRoadGraphSegment& segment : graph.segments()) {
+        // Cheap endpoint AABB first. This is deliberately before
+        // procedural_road_visual_spline_2d(), whose corner smoothing asks for
+        // degree/adjacency information and is much more expensive on large graphs.
+        if (!procedural_road_graph_segment_intersects_world_bounds(graph, segment, bounds)) {
+            ++visible.culled_segments;
+            continue;
+        }
+
         const auto spline = procedural_road_visual_spline_2d(graph, segment.id);
         if (!spline) {
             ++visible.plan.skipped_elevated_segments;
@@ -120,12 +150,16 @@ build_visible_procedural_road_ground_render_plan(
     }
 
     for (const ProceduralRoadNode& node : graph.nodes()) {
-        const std::size_t degree = graph.degree(node.id);
-        if (degree < 2U) continue;
+        // Position rejection must happen before degree(). The graph currently
+        // computes degree by scanning segments, so doing it for offscreen nodes
+        // would defeat the runtime culling gate.
         if (!bounds.contains({node.position.x, node.position.y}, 1.25F)) {
             ++visible.culled_junctions;
             continue;
         }
+
+        const std::size_t degree = graph.degree(node.id);
+        if (degree < 2U) continue;
         ++visible.considered_junctions;
         if (!std::isfinite(node.position.z) || std::abs(node.position.z) > 0.0001F) {
             ++visible.plan.skipped_mixed_junctions;
@@ -178,6 +212,10 @@ namespace ch {
 
     bool ok = true;
     for (const ProceduralRoadGraphSegment& graph_segment : graph.segments()) {
+        if (!procedural_road_graph_segment_intersects_world_bounds(graph, graph_segment, bounds)) {
+            continue;
+        }
+
         const auto spline = procedural_road_visual_spline_2d(graph, graph_segment.id);
         if (!spline || !procedural_road_spline_is_ground_only(*spline) ||
             !procedural_road_spline_intersects_world_bounds(*spline, bounds)) {
