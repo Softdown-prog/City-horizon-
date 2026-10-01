@@ -2,24 +2,28 @@
   "contract": "CITY_HORIZON_CAROUSEL_V1",
   "assetId": "park_carousel_city_horizon_01",
   "family": "amusement_carousel",
+  "designRevision": 3,
   "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "cameraContract": "CH_CAMERA_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "designIntent": {
-    "referenceUse": "Classic tycoon carousel proportions remain a broad structural reference only. This V2 establishes a distinct City Horizon identity through palette, trim, crown, horse variation and perimeter lighting.",
+    "referenceUse": "Classic tycoon carousel proportions remain a broad structural reference only. Revision 3 strengthens a distinct City Horizon identity with authored trim, medallions, center drum, horse tack and layered lighting.",
     "silhouette": "low_wide_open_circular_carousel",
     "proportionPolicy": "believable_category_scale_not_miniature_or_chibi",
     "identity": "city_horizon_heritage_park_carousel",
     "keyReads": [
       "shallow circular canopy",
       "alternating warm ochre and cream radial roof panels",
-      "short segmented hanging valance",
+      "double colored canopy trim and restrained radial ribs",
+      "short segmented hanging valance with decorative medallions",
       "low three-tier center crown with finial",
+      "decorated mirrored central drum",
       "open sides",
       "two staggered rings of varied carousel horses",
-      "burgundy and deep teal saddle accents",
-      "burgundy perimeter skirt with brass accent panels",
-      "restrained warm perimeter bulbs"
+      "burgundy and deep teal saddle blankets",
+      "burgundy perimeter skirt with brass inset panels",
+      "layered platform trim",
+      "restrained warm canopy and skirt bulbs"
     ]
   },
   "footprint": {
@@ -36,6 +40,8 @@
     "canopyInnerZ": 2.86,
     "canopyThickness": 0.055,
     "canopySegments": 24,
+    "canopyRibCount": 12,
+    "canopyRibRadius": 0.022,
     "supportCount": 10,
     "supportRadius": 2.58,
     "horseCount": 14,
@@ -45,8 +51,15 @@
     "valanceHeight": 0.20,
     "valanceDepth": 0.16,
     "valanceSegments": 20,
-    "bulbCount": 20,
-    "bulbRadius": 0.045,
+    "bulbCount": 32,
+    "bulbRadius": 0.040,
+    "skirtBulbCount": 20,
+    "friezeMedallionCount": 8,
+    "friezeMedallionRadius": 0.135,
+    "centerDrumRadius": 0.42,
+    "centerDrumHeight": 0.62,
+    "centerPanelCount": 8,
+    "saddleBlankets": true,
     "crownEnabled": true
   },
   "materials": {
@@ -86,6 +99,11 @@
       "roughness": 0.42,
       "metallic": 0.24
     },
+    "mirror": {
+      "rgba": [0.46, 0.64, 0.66, 1.0],
+      "roughness": 0.28,
+      "metallic": 0.12
+    },
     "horse": {
       "rgba": [0.92, 0.9, 0.82, 1.0],
       "roughness": 0.68
@@ -117,7 +135,7 @@
   "runtimeLayers": {
     "contract": "CH_ATTRACTION_MOTION_OVERLAY_V1",
     "staticBase": {
-      "objects": ["CarouselFoundation", "Skirt_*"]
+      "objects": ["CarouselFoundation", "Skirt_*", "SkirtAccent_*", "SkirtBulb_*"]
     },
     "motionOverlay": {
       "root": "CarouselRotor",
