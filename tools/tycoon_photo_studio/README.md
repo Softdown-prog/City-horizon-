@@ -6,7 +6,9 @@ This folder is the visual production pipeline for City Horizon. It is no longer 
 
 Generate deterministic, stylized pre-rendered 2D assets that share one camera, scale, lighting setup and material language.
 
-The current art-direction contract is `CH_STYLIZED_PRERENDER_V1`. Classic Tycoon games remain useful visual references for readability and miniature composition, but the pipeline is not required to emulate early-2000s hardware limitations.
+The current art-direction contract is `CH_STYLIZED_PRERENDER_V1`. Classic Tycoon games remain useful visual references for readability, path logic, information density, silhouette clarity and gameplay composition, but the pipeline is not required to emulate early-2000s hardware limitations or a miniature/diorama aesthetic.
+
+City Horizon does not use miniature, toy-like, dollhouse, squat or chibi proportions as a default. Keep believable category-appropriate proportions and coherent relative scale against the canonical 128×64 world grid. Simplify detail for gameplay readability when needed, but do not distort scale or massing merely to make an asset feel like a small tycoon piece.
 
 ## Frozen studio
 
@@ -63,7 +65,7 @@ Category stylizers then apply controlled presentation rules:
 - `stylize_building_2d.py`
 - `stylize_foliage_2d.py`
 
-Stylization supports material/readability goals. It is not a mandate to make assets artificially old.
+Stylization supports material/readability goals. It is not a mandate to make assets artificially old or miniature.
 
 ### Color depth and retro comparison
 
@@ -131,6 +133,7 @@ This prepares authoring output only. SDL/runtime tint application is a separate 
 - `stylize_building_2d.py` — building presentation layer.
 - `stylize_foliage_2d.py` — foliage presentation layer.
 - `contracts/ch_stylized_prerender_v1.json` — current visual contract.
+- `contracts/ch_tycoon_miniature_v1.json` — deprecated compatibility tombstone; do not use for generation.
 - `contracts/ch_color_mask_v1.json` — optional color-customization mask contract.
 - `studio_presets/ch_tycoon_studio_v1.json` — frozen studio.
 
@@ -159,9 +162,10 @@ At final sprite size prioritize:
 - silhouette;
 - controlled structural detail;
 - readable windows/doors/roof;
-- soft contact information.
+- soft contact information;
+- believable category proportions and coherent relative scale.
 
-Avoid high-frequency noise, plastic CG response and detail that only works in close-up.
+Avoid high-frequency noise, plastic CG response, toy-like proportion distortion and detail that only works in close-up.
 
 ## Production stop rule
 
