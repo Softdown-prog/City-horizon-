@@ -1,0 +1,75 @@
+{
+  "contract": "CITY_HORIZON_RAIL_TRACK_V1",
+  "assetId": "rail.prerendered.curve_left_90.v1",
+  "displayName": "Rail 2D Prerender - Curve Left 90 V1",
+  "assetType": "rail_track_module",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "gridContract": "CH_GRID_V1",
+  "runtimeRepresentation": "2D_RGBA_prerendered",
+  "footprint": {
+    "widthTiles": 1,
+    "depthTiles": 1
+  },
+  "catalog": {
+    "contract": "CH_RAIL_2D_PRERENDER_CATALOG_V1",
+    "piece": "curve_left_90",
+    "anchorPolicy": "CH_RAIL_WORLD_ORIGIN_V1",
+    "outputRoot": "assets/rail/prerendered_v1",
+    "runtimeFiles": {
+      "south": "curve_left_90_south.png",
+      "west": "curve_left_90_west.png",
+      "north": "curve_left_90_north.png",
+      "east": "curve_left_90_east.png"
+    }
+  },
+  "module": {
+    "kind": "curve_left_90",
+    "turnDirection": "left",
+    "tileWorldSize": 3.0,
+    "curveRadius": 1.5,
+    "curveDegrees": 90.0,
+    "curveSegments": 32,
+    "railGauge": 1.28,
+    "railWidth": 0.10,
+    "railHeight": 0.12,
+    "sleeperLength": 2.12,
+    "sleeperWidth": 0.20,
+    "sleeperHeight": 0.10,
+    "sleeperCount": 8,
+    "ballastWidth": 2.38,
+    "ballastHeight": 0.075,
+    "canonicalEndpoints": {
+      "start": [-1.5, 0.0, 0.0],
+      "startHeadingDegrees": 0.0,
+      "end": [0.0, 1.5, 0.0],
+      "endHeadingDegrees": 90.0
+    }
+  },
+  "artDirection": {
+    "style": "classic_tycoon_prerendered",
+    "rails": "dark steel with restrained cool highlight and readable raised head",
+    "sleepers": "warm aged timber with restrained deterministic painted grain",
+    "ballast": "muted grey-brown compact stone bed",
+    "matchReference": "rail.prerendered.straight.v1",
+    "avoid": [
+      "photorealism",
+      "micro detail",
+      "glossy rails",
+      "oversized ballast",
+      "gaps at module boundaries",
+      "runtime 3D dependency",
+      "runtime mirrored curve sprites"
+    ]
+  },
+  "runtimePlan": {
+    "visualSource": "approved_2D_RGBA_prerendered_sprite",
+    "logicSource": "procedural_rail_graph_and_path_builder",
+    "logicalPrimitive": "RailPathBuilder::quarter_curve",
+    "requiresRailMeshAtRuntime": false,
+    "dragPlacement": true,
+    "seamlessTileBoundary": true,
+    "directionalSpritesRequired": true,
+    "runtimeMirroringAllowed": false
+  }
+}
