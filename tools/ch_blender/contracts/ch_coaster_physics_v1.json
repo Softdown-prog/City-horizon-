@@ -1,0 +1,74 @@
+{
+  "contract": "CH_COASTER_PHYSICS_V1",
+  "status": "production_core",
+  "authority": "City Horizon simple coaster runtime dynamics",
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "carContract": "CH_COASTER_CAR_V1",
+  "scope": "non-inverting classic tycoon-style coaster motion",
+  "units": {
+    "distance": "meter-equivalent Blender world unit",
+    "speed": "m/s",
+    "acceleration": "m/s^2",
+    "curvature": "1/m",
+    "gravity": 9.80665
+  },
+  "longitudinalModel": {
+    "state": ["distanceAlongCenterline", "speed", "height"],
+    "gravityProjection": "a_g = -g * tangent.z",
+    "potentialEnergy": "g * height",
+    "kineticEnergy": "0.5 * speed^2",
+    "freeTrack": "gravity plus rolling, aerodynamic and mechanical losses",
+    "uphillBehavior": "speed decreases as kinetic energy becomes potential energy",
+    "downhillBehavior": "speed increases as potential energy becomes kinetic energy",
+    "flatCurveBehavior": "heading changes and lateral G rises, but the curve itself adds no propulsion"
+  },
+  "losses": {
+    "rollingResistanceCoefficient": 0.0045,
+    "airDensityKgM3": 1.225,
+    "effectiveDragAreaM2": 1.45,
+    "defaultTrainMassKg": 1800.0,
+    "mechanicalLinearLossPerSecond": 0.004
+  },
+  "driveModes": {
+    "free": "gravity-driven motion",
+    "lift": {
+      "defaultTargetSpeedMps": 2.4,
+      "maximumDriveAccelerationMps2": 5.0,
+      "usage": "a normal slope_up route segment may be flagged as lift; no separate visual track piece is required"
+    },
+    "brake": {
+      "defaultTargetSpeedMps": 4.0,
+      "maximumDecelerationMps2": 6.0
+    },
+    "station": {
+      "targetSpeedMps": 0.0,
+      "maximumDecelerationMps2": 8.0
+    }
+  },
+  "gForces": {
+    "vertical": "cos(pitch) + speed^2 * verticalCurvature / g",
+    "lateral": "speed^2 * horizontalCurvature / g",
+    "airtimeThresholdVerticalG": 0.2,
+    "futureUse": ["ride intensity", "ride nausea", "airtime", "safety/debug telemetry"]
+  },
+  "runtimeRules": {
+    "routeAuthority": "sampled 3D centerline from CH_COASTER_TRACK_V1",
+    "motionCoordinate": "distance along centerline",
+    "forwardRollback": "V1 reports a forward stall instead of reversing the train",
+    "maximumSpeedMps": 55.0,
+    "visualRuntimeRemains2D": true,
+    "deterministic": true
+  },
+  "explicitlyDeferred": [
+    "derailment simulation",
+    "crash/explosion simulation",
+    "full rigid-body dynamics",
+    "inversion physics",
+    "banking compensation",
+    "rollback animation"
+  ],
+  "implementation": {
+    "runtimeHeader": "src/coaster_physics.h",
+    "regression": "src/coaster_physics_test.cpp"
+  }
+}
