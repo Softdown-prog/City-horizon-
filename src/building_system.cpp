@@ -594,6 +594,12 @@ const BuildingInstance* BuildingManager::instance_at(const int tile_x, const int
 bool BuildingManager::is_occupied(const int tile_x, const int tile_y) const { return instance_at(tile_x, tile_y) != nullptr; }
 const std::vector<BuildingInstance>& BuildingManager::instances() const { return instances_; }
 
+void BuildingManager::set_operational_by_definition(const std::string_view definition_id, const bool operational) {
+    for (BuildingInstance& instance : instances_) {
+        if (instance.definition_id == definition_id) instance.operational = operational;
+    }
+}
+
 bool BuildingManager::remove_instance(const BuildingDefinition& definition, const std::uint64_t instance_id) {
     const auto found = std::find_if(instances_.begin(), instances_.end(), [instance_id](const BuildingInstance& instance) { return instance.instance_id == instance_id; });
     if (found == instances_.end()) return false;

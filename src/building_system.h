@@ -383,6 +383,7 @@ public:
     [[nodiscard]] const BuildingInstance* instance_at(int tile_x, int tile_y) const;
     [[nodiscard]] bool is_occupied(int tile_x, int tile_y) const;
     [[nodiscard]] const std::vector<BuildingInstance>& instances() const;
+    void set_operational_by_definition(std::string_view definition_id, bool operational);
     [[nodiscard]] bool remove_instance(const BuildingDefinition& definition, std::uint64_t instance_id);
     [[nodiscard]] bool begin_activity(std::uint64_t instance_id);
     [[nodiscard]] bool end_activity(std::uint64_t instance_id);

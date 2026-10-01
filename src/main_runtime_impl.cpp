@@ -1816,6 +1816,7 @@ int main() {
     std::uint32_t seagull_pass_index = 0;
     bool seagull_pass_active = false;
     std::optional<std::uint64_t> selected_instance_id;
+    std::optional<std::uint64_t> selected_pedestrian_id;
     std::string placement_definition_id;
     BuildingRotation placement_rotation = BuildingRotation::r0;
     bool road_mode = false;

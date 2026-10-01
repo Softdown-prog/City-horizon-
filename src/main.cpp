@@ -221,19 +221,21 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
 
 [[nodiscard]] inline std::optional<std::uint64_t> ch_pick_pedestrian_at_screen(
     const PedestrianSystem& pedestrians, const float mouse_x, const float mouse_y,
-    const Camera& camera, const float viewport_width, const float viewport_height) {
+    const float viewport_width, const float viewport_height) {
+    const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
+    if (!view.valid) return std::nullopt;
     constexpr float kPickRadiusPx = 28.0F;
     constexpr float kPickRadiusSquared = kPickRadiusPx * kPickRadiusPx;
     std::optional<std::uint64_t> best;
     float best_distance_squared = kPickRadiusSquared;
     for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
         if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
-        const SDL_FPoint screen = world_to_screen(
+        const ch::ScreenPoint screen = ch::world_to_screen_point(
             pedestrian.spatial.visual_world_x + pedestrian.spatial.ground_anchor_x,
             pedestrian.spatial.visual_world_y + pedestrian.spatial.ground_anchor_y,
-            camera, viewport_width, viewport_height);
+            view.camera, viewport_width, viewport_height);
         const float dx = mouse_x - screen.x;
-        const float dy = mouse_y - (screen.y - 16.0F * camera.zoom);
+        const float dy = mouse_y - (screen.y - 16.0F * view.camera.zoom);
         const float distance_squared = dx * dx + dy * dy;
         if (distance_squared <= best_distance_squared) {
             best_distance_squared = distance_squared;
@@ -248,13 +250,11 @@ public:
     using ChRuntimeGameplayUi::ChRuntimeGameplayUi;
 
     void bind_selection_context(const PedestrianSystem* pedestrians,
-                                const Camera* camera,
                                 const int viewport_width,
                                 const int viewport_height,
                                 std::optional<std::uint64_t>* selected_pedestrian_id,
                                 const bool world_selection_enabled) {
         pedestrians_ = pedestrians;
-        camera_ = camera;
         viewport_width_ = viewport_width;
         viewport_height_ = viewport_height;
         selected_pedestrian_id_ = selected_pedestrian_id;
@@ -286,11 +286,11 @@ public:
         }
 
         if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||
-            camera_ == nullptr || selected_pedestrian_id_ == nullptr) {
+            selected_pedestrian_id_ == nullptr) {
             return result;
         }
         const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(
-            *pedestrians_, mouse_x, mouse_y, *camera_,
+            *pedestrians_, mouse_x, mouse_y,
             static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));
         if (!picked) return result;
         *selected_pedestrian_id_ = *picked;
@@ -300,7 +300,6 @@ public:
 
 private:
     const PedestrianSystem* pedestrians_ = nullptr;
-    const Camera* camera_ = nullptr;
     int viewport_width_ = 1;
     int viewport_height_ = 1;
     std::optional<std::uint64_t>* selected_pedestrian_id_ = nullptr;
@@ -408,17 +407,14 @@ private:
             ch_ui_model.placement_rotation_label = "PINCEL R2.5"; \
         } \
         gameplay_ui.bind_selection_context( \
-            &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \
+            &pedestrians, (viewport_width), (viewport_height), &selected_pedestrian_id, \
             placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
             !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
-#define selected_instance_id selected_instance_id; std::optional<std::uint64_t> selected_pedestrian_id
-
 #include "main_runtime_impl.cpp"
 
-#undef selected_instance_id
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
