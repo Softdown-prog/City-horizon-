@@ -1,10 +1,8 @@
 name: CH MapForge Procedural Rail Proof
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "src/rail_system.h"
       - "src/rail_system.cpp"
@@ -14,6 +12,7 @@ on:
       - "src/ch_core/projection.cpp"
       - "tools/rail_mapforge_proof/CMakeLists.txt"
       - ".github/workflows/ch-mapforge-procedural-rail-proof.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
