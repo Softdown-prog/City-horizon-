@@ -130,10 +130,10 @@ int main() {
     if (!(downhill.physics.gravity_acceleration_mps2 > 0.0))
         return fail("downhill aggregate gravity acceleration must be positive");
 
-    // A mixed profile verifies the important train-level behavior: the lead car
-    // can already be descending while rear cars are still climbing. The solver
-    // averages the gravity component over the complete train, avoiding a fake
-    // acceleration jump when only the first car crosses a crest.
+    // A mixed profile verifies the important train-level behavior: the first
+    // two cars can already be descending while the rear two are still climbing.
+    // The solver averages gravity over the complete train, avoiding a fake
+    // acceleration jump when only the leading part crosses a crest.
     const auto mixed_sampler = [](const double distance) {
         CenterlineSample s;
         s.distance_m = distance;
@@ -148,14 +148,12 @@ int main() {
         s.tangent_y = std::sqrt(1.0 - s.tangent_z * s.tangent_z);
         return s;
     };
-    TrainRuntimeState mixed_state;
-    mixed_state.lead.distance_m = 11.0;
-    mixed_state.lead.speed_mps = 8.0;
-    const auto mixed_samples = sample_train_centerline(11.0, config, mixed_sampler);
+    constexpr double kMixedLeadDistance = 13.0;
+    const auto mixed_samples = sample_train_centerline(kMixedLeadDistance, config, mixed_sampler);
     const TrackSample mixed_track = aggregate_train_track_sample(mixed_samples);
     if (!(mixed_samples[0].tangent_z < 0.0 && mixed_samples[1].tangent_z < 0.0 &&
           mixed_samples[2].tangent_z > 0.0 && mixed_samples[3].tangent_z > 0.0))
-        return fail("mixed crest test did not place cars on both sides of crest");
+        return fail("mixed crest test did not place two cars on each side of crest");
     if (!near(mixed_track.tangent_z, 0.0, 0.001))
         return fail("opposing car gravity components must average across train");
 
