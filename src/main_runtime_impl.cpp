@@ -2459,8 +2459,8 @@ int main() {
                     const int b = std::clamp(std::stoi(action.payload.substr(second + 1)), 0, 255);
                     const BuildingColorTint tint{static_cast<std::uint8_t>(r), static_cast<std::uint8_t>(g), static_cast<std::uint8_t>(b)};
                     const bool changed = action.action == UiAction::set_wall_color
-                        ? buildings.set_wall_color_customization(instance->instance_id, tint)
-                        : buildings.set_roof_color_customization(instance->instance_id, tint);
+                        ? buildings.set_wall_color(instance->instance_id, tint)
+                        : buildings.set_roof_color(instance->instance_id, tint);
                     status = changed ? definition->name + (action.action == UiAction::set_wall_color ? ": WALL COLOR" : ": ROOF COLOR")
                                      : "COLOR CHANGE FAILED";
                     (void)play_sound(changed ? SoundEvent::ui_click : SoundEvent::ui_error);
@@ -2471,7 +2471,7 @@ int main() {
                 break;
             }
             case UiAction::reset_building_colors:
-                if (selected_instance_id && buildings.clear_color_customization(*selected_instance_id)) {
+                if (selected_instance_id && (buildings.clear_wall_color(*selected_instance_id) && buildings.clear_roof_color(*selected_instance_id))) {
                     status = "ORIGINAL BUILDING COLORS RESTORED";
                     (void)play_sound(SoundEvent::ui_click);
                 } else {

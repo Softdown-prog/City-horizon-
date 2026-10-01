@@ -373,7 +373,7 @@ private:
 #define MapRenderer TerrainAwareRuntimeMapRenderer
 #define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
-    ([&]() { \
+    update_layout((viewport_width), (viewport_height), ([&]() { \
         auto ch_ui_model = (model); \
         ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \
         const auto ch_has_build_item = [&](const char* definition_id) { \
@@ -410,9 +410,8 @@ private:
             &pedestrians, (viewport_width), (viewport_height), &selected_pedestrian_id, \
             placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
             !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
-        update_layout((viewport_width), (viewport_height), ch_ui_model); \
-    }())
-
+        return ch_ui_model; \
+    }()))
 #include "main_runtime_impl.cpp"
 
 #undef update_layout
