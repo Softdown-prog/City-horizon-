@@ -22,16 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Qt 6.8.3
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.3'
-          host: linux
-          target: desktop
-          cache: true
-
-      - name: Install GIF dependency
-        run: python3 -m pip install --upgrade pillow
+      - name: Install Qt and GIF dependencies from runner packages
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev pkg-config python3-pil
 
       - name: Compile focused MapForge procedural 2D terrain proof
         shell: bash
@@ -85,7 +80,6 @@ jobs:
               sheet.paste(frame, (x, y))
           sheet.save(root / 'mapforge_terrain_sculpt_contact_sheet.png')
 
-          # Keep two exact frames alongside the GIF for quick artifact inspection.
           frames[0].save(root / 'mapforge_terrain_sculpt_start.png')
           frames[-1].save(root / 'mapforge_terrain_sculpt_end.png')
           PY
