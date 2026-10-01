@@ -1,18 +1,15 @@
-"""Generate pre-rendered 2D dirt-path slope/stair sprites from approved path PNGs.
+"""Bake approved 2D ground-path slope/stair sprites from existing path PNGs.
 
-CH_PATH_SPRITE_PILOT_V1
+CH_PATH_SLOPE_SPRITE_V1
 
-This is deliberately an OFFLINE asset generator. Runtime code must not draw
-free-form stair geometry from these recipes. The runtime will eventually select
-one pre-rendered PNG by topology + discrete vertical profile.
+This is deliberately an OFFLINE asset generator. Runtime code must never draw
+free-form artistic stairs from this recipe. The runtime selects one baked PNG by
+material + straight axis + discrete vertical profile + high endpoint.
 
-The generator preserves the existing dirt-path artwork by deforming the
-canonical straight path sprites themselves:
-  - NS source: assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png
-  - EW source: assets/terrain/paths/dirt_01/dirt_path_10_straight_ew.png
-
-The flat path remains the existing 128x64 PNG. Slope sprites use a taller
-transparent canvas so the raised endpoint can move upward without clipping.
+The approved flat artwork is preserved: source pixels are only repositioned in
+screen Y. Stair risers are the only generated faces, and their edges follow the
+opposite 2:1 isometric grid axis. This is the visual recipe approved for City
+Horizon after the slope/stair pilot.
 """
 from __future__ import annotations
 
@@ -24,13 +21,14 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+CONTRACT = "CH_PATH_SLOPE_SPRITE_V1"
 TILE_W = 128
 TILE_H = 64
 CANVAS_H = 112
 TOP_PAD = 32
 HEIGHT_PX_PER_UNIT = 16.0
 
-# Same screen-space connection ports used by generate_dirt_paths.py.
+# Canonical 2:1 isometric connection ports used by the approved ground paths.
 PORTS = {
     "n": (96.0, 16.0),
     "e": (96.0, 48.0),
@@ -43,11 +41,9 @@ AXES = {
     "ew": ("w", "e"),
 }
 
-# The *other* isometric grid axis is the correct screen-space direction for a
-# stair riser. A world-space 90 degree turn does NOT become a Euclidean 90
-# degree turn after 2:1 isometric projection. Using the other iso axis keeps
-# each step edge parallel to the tile grid instead of producing the overly
-# vertical/diagonal stripes from the first pilot.
+# Critical approved rule: a stair riser follows the OTHER isometric grid axis.
+# A world-space 90 degree turn is not a Euclidean 90 degree turn after 2:1
+# projection; using a screen-space perpendicular produced the rejected stripes.
 TRANSVERSE_AXES = {
     "ns": ("w", "e"),
     "ew": ("s", "n"),
@@ -66,9 +62,9 @@ class Profile:
         return self.rise_px / HEIGHT_PX_PER_UNIT
 
 
+# Approved discrete library. Do not silently change these values: runtime sprite
+# selection depends on the same thresholds/labels.
 PROFILES = (
-    # Two shallow ramps are useful for gentle terrain. The stair profiles are
-    # discrete on purpose so adjacent sprite endpoints can match exactly.
     Profile("ramp_025", 4, "ramp", 0),
     Profile("ramp_050", 8, "ramp", 0),
     Profile("stairs_050_4", 8, "stairs", 4),
@@ -80,7 +76,9 @@ PROFILES = (
 def load_source(path: Path) -> Image.Image:
     image = Image.open(path).convert("RGBA")
     if image.size != (TILE_W, TILE_H):
-        raise ValueError(f"{path}: expected {TILE_W}x{TILE_H}, got {image.size[0]}x{image.size[1]}")
+        raise ValueError(
+            f"{path}: expected {TILE_W}x{TILE_H}, got {image.size[0]}x{image.size[1]}"
+        )
     return image
 
 
@@ -89,17 +87,7 @@ def determinant(ax: float, ay: float, bx: float, by: float) -> float:
 
 
 def axis_t(x: float, y: float, axis: str, high_end: str) -> float:
-    """Return 0..1 from low endpoint to high endpoint in isometric grid space.
-
-    The original pilot projected the pixel onto the path vector with a normal
-    Euclidean dot product. That makes constant-t lines Euclidean-perpendicular
-    to the path, which is visually wrong after a 2:1 isometric projection.
-
-    Here we solve the point in the basis formed by the longitudinal path axis
-    and the *other isometric grid axis*. Constant-t bands therefore run exactly
-    along the opposite diamond axis, which is the direction a stair edge must
-    have in the final sprite.
-    """
+    """Return 0..1 from the low endpoint to the high endpoint in iso-grid space."""
     a_name, b_name = AXES[axis]
     if high_end not in (a_name, b_name):
         raise ValueError(f"high_end={high_end} is not on axis={axis}")
@@ -141,18 +129,12 @@ def darken(pixel: tuple[int, int, int, int], factor: float = 0.68) -> tuple[int,
 
 
 def render_variant(source: Image.Image, axis: str, high_end: str, profile: Profile) -> Image.Image:
-    """Bake one slope/stair variant to a transparent PNG canvas.
-
-    Treads are copied directly from the approved source texture. Stair risers
-    are generated only at quantized step boundaries and are clipped by the
-    source alpha. Their direction follows the opposite isometric grid axis,
-    preserving the visual orientation of the 2:1 tile diamond.
-    """
+    """Bake one slope/stair variant to a transparent 128x112 sprite."""
     src = source.load()
     out = Image.new("RGBA", (TILE_W, CANVAS_H), (0, 0, 0, 0))
     dst = out.load()
 
-    # Riser layer first, so tread pixels remain crisp on top.
+    # Riser faces are drawn first. Treads remain exact source pixels on top.
     if profile.mode == "stairs":
         boundary_half_width = 0.012
         per_step_rise = max(1, int(math.ceil(profile.rise_px / max(1, profile.steps - 1))))
@@ -173,12 +155,9 @@ def render_variant(source: Image.Image, axis: str, high_end: str, profile: Profi
                 riser = darken(px)
                 for dy in range(1, per_step_rise + 1):
                     py = oy + dy
-                    if 0 <= py < CANVAS_H:
-                        # Preserve the strongest alpha already present.
-                        if riser[3] >= dst[x, py][3]:
-                            dst[x, py] = riser
+                    if 0 <= py < CANVAS_H and riser[3] >= dst[x, py][3]:
+                        dst[x, py] = riser
 
-    # Tread/ramp surface: exact source pixels, only repositioned vertically.
     for y in range(TILE_H):
         for x in range(TILE_W):
             px = src[x, y]
@@ -192,11 +171,17 @@ def render_variant(source: Image.Image, axis: str, high_end: str, profile: Profi
     return out
 
 
-def profile_filename(axis: str, high_end: str, profile: Profile) -> str:
-    return f"dirt_path_straight_{axis}_{profile.name}_high_{high_end}.png"
+def profile_filename(prefix: str, axis: str, high_end: str, profile: Profile) -> str:
+    return f"{prefix}_straight_{axis}_{profile.name}_high_{high_end}.png"
 
 
-def make_contact_sheet(flat_ns: Image.Image, flat_ew: Image.Image, variants: list[tuple[str, Image.Image]], path: Path) -> None:
+def make_contact_sheet(
+    material_id: str,
+    flat_ns: Image.Image,
+    flat_ew: Image.Image,
+    variants: list[tuple[str, Image.Image]],
+    path: Path,
+) -> None:
     cell_w = 176
     cell_h = 148
     columns = 4
@@ -209,8 +194,8 @@ def make_contact_sheet(flat_ns: Image.Image, flat_ew: Image.Image, variants: lis
         font = ImageFont.load_default()
 
     entries: list[tuple[str, Image.Image]] = [
-        ("LEGACY FLAT NS", flat_ns),
-        ("LEGACY FLAT EW", flat_ew),
+        (f"{material_id} LEGACY FLAT NS", flat_ns),
+        (f"{material_id} LEGACY FLAT EW", flat_ew),
         *variants,
     ]
 
@@ -221,9 +206,7 @@ def make_contact_sheet(flat_ns: Image.Image, flat_ew: Image.Image, variants: lis
         y0 = row * cell_h
         draw.rectangle((x0 + 4, y0 + 4, x0 + cell_w - 5, y0 + cell_h - 5), fill=(49, 75, 39, 255))
         px = x0 + (cell_w - image.width) // 2
-        py = y0 + 22
-        if image.height == TILE_H:
-            py += TOP_PAD
+        py = y0 + 22 + (TOP_PAD if image.height == TILE_H else 0)
         sheet.alpha_composite(image, (px, py))
         draw.text((x0 + 8, y0 + 7), label, fill=(240, 243, 236, 255), font=font)
 
@@ -245,34 +228,58 @@ def validate_isometric_step_direction() -> None:
             t0 = axis_t(mid[0], mid[1], axis, high_end)
             t1 = axis_t(mid[0] + cx * 0.20, mid[1] + cy * 0.20, axis, high_end)
             if abs(t0 - t1) > 1.0e-5:
-                raise AssertionError(f"{axis}/{high_end}: riser band is not parallel to transverse iso axis")
+                raise AssertionError(
+                    f"{axis}/{high_end}: riser band is not parallel to transverse iso axis"
+                )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ns-source", type=Path, default=Path("assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png"))
-    parser.add_argument("--ew-source", type=Path, default=Path("assets/terrain/paths/dirt_01/dirt_path_10_straight_ew.png"))
-    parser.add_argument("--output-dir", type=Path, default=Path("out/dirt_slope_sprite_pilot"))
-    parser.add_argument("--contact-sheet", type=Path, default=Path("out/dirt_slope_sprite_pilot_sheet.png"))
-    parser.add_argument("--manifest", type=Path, default=Path("out/dirt_slope_sprite_pilot_manifest.json"))
+    parser.add_argument("--material-id", default="dirt_01")
+    parser.add_argument("--prefix", default="dirt_path")
+    parser.add_argument(
+        "--ns-source",
+        type=Path,
+        default=Path("assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png"),
+    )
+    parser.add_argument(
+        "--ew-source",
+        type=Path,
+        default=Path("assets/terrain/paths/dirt_01/dirt_path_10_straight_ew.png"),
+    )
+    parser.add_argument("--output-dir", type=Path, default=Path("out/path_slope_sprites/dirt_01"))
+    parser.add_argument("--contact-sheet", type=Path, default=Path("out/path_slope_sprites/dirt_01_sheet.png"))
+    parser.add_argument("--manifest", type=Path, default=Path("out/path_slope_sprites/dirt_01_manifest.json"))
     args = parser.parse_args()
 
     validate_isometric_step_direction()
-
     ns = load_source(args.ns_source)
     ew = load_source(args.ew_source)
     sources = {"ns": ns, "ew": ew}
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     manifest: dict[str, object] = {
-        "contract": "CH_PATH_SPRITE_PILOT_V1",
+        "contract": CONTRACT,
+        "material_id": args.material_id,
+        "sprite_prefix": args.prefix,
         "runtime_visual_policy": "sprite_select_only",
+        "source_art_policy": "preserve_rgba_pixels_reposition_y_only",
         "riser_alignment": "opposite_isometric_grid_axis",
         "tile_size": [TILE_W, TILE_H],
         "sprite_canvas": [TILE_W, CANVAS_H],
         "legacy_surface_y": TOP_PAD,
         "height_px_per_unit": HEIGHT_PX_PER_UNIT,
         "sources": {"ns": str(args.ns_source), "ew": str(args.ew_source)},
+        "profiles": [
+            {
+                "name": profile.name,
+                "mode": profile.mode,
+                "rise_px": profile.rise_px,
+                "rise_units": profile.rise_units,
+                "steps": profile.steps,
+            }
+            for profile in PROFILES
+        ],
         "variants": [],
     }
     sheet_variants: list[tuple[str, Image.Image]] = []
@@ -281,24 +288,27 @@ def main() -> None:
         for high_end in (a, b):
             for profile in PROFILES:
                 image = render_variant(sources[axis], axis, high_end, profile)
-                filename = profile_filename(axis, high_end, profile)
+                filename = profile_filename(args.prefix, axis, high_end, profile)
                 image.save(args.output_dir / filename)
-                variant = {
-                    "file": filename,
-                    "axis": axis,
-                    "high_end": high_end,
-                    "profile": profile.name,
-                    "mode": profile.mode,
-                    "rise_px": profile.rise_px,
-                    "rise_units": profile.rise_units,
-                    "steps": profile.steps,
-                }
-                manifest["variants"].append(variant)  # type: ignore[index]
-                sheet_variants.append((f"{axis.upper()} {profile.name} high {high_end.upper()}", image))
+                manifest["variants"].append(  # type: ignore[index]
+                    {
+                        "file": filename,
+                        "axis": axis,
+                        "high_end": high_end,
+                        "profile": profile.name,
+                        "mode": profile.mode,
+                        "rise_px": profile.rise_px,
+                        "rise_units": profile.rise_units,
+                        "steps": profile.steps,
+                    }
+                )
+                sheet_variants.append(
+                    (f"{axis.upper()} {profile.name} high {high_end.upper()}", image)
+                )
 
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    make_contact_sheet(ns, ew, sheet_variants, args.contact_sheet)
+    make_contact_sheet(args.material_id, ns, ew, sheet_variants, args.contact_sheet)
 
     expected = len(AXES) * 2 * len(PROFILES)
     generated = len(list(args.output_dir.glob("*.png")))
@@ -306,7 +316,7 @@ def main() -> None:
         raise SystemExit(f"expected {expected} PNG variants, generated {generated}")
 
     print(
-        f"PASS contract=CH_PATH_SPRITE_PILOT_V1 generated={generated} "
+        f"PASS contract={CONTRACT} material={args.material_id} generated={generated} "
         f"source_texture_preserved=true riser_alignment=iso_cross_axis output={args.output_dir}"
     )
 

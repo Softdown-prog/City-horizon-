@@ -1,4 +1,4 @@
-name: CH Dirt Slope Sprite Pilot
+name: CH Ground Path Slope Sprite Bake
 
 on:
   workflow_dispatch:
@@ -8,14 +8,16 @@ on:
     paths:
       - "tools/generate_dirt_slope_sprites.py"
       - "assets/terrain/paths/dirt_01/**"
+      - "assets/terrain/paths/sand_01/**"
+      - "docs/CH_PATH_SLOPE_SPRITE_V1.md"
       - ".github/workflows/ch-dirt-slope-sprite-pilot.yml"
 
 permissions:
   contents: read
 
-# Offline-only art proof: runtime integration happens only after PNG approval.
+# CH_PATH_SLOPE_SPRITE_V1 is an offline bake. Runtime only selects baked sprites.
 concurrency:
-  group: ch-dirt-slope-sprite-pilot-${{ github.ref }}
+  group: ch-ground-path-slope-sprite-bake-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,50 +36,73 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --upgrade pillow
 
-      - name: Generate pre-rendered slope and stair PNG pilot
+      - name: Bake approved dirt path slope sprites
         run: |
           python tools/generate_dirt_slope_sprites.py \
-            --output-dir out/dirt_slope_sprite_pilot \
-            --contact-sheet out/dirt_slope_sprite_pilot_sheet.png \
-            --manifest out/dirt_slope_sprite_pilot_manifest.json
+            --material-id dirt_01 \
+            --prefix dirt_path \
+            --ns-source assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png \
+            --ew-source assets/terrain/paths/dirt_01/dirt_path_10_straight_ew.png \
+            --output-dir out/path_slope_sprites/dirt_01 \
+            --contact-sheet out/path_slope_sprites/dirt_01_sheet.png \
+            --manifest out/path_slope_sprites/dirt_01_manifest.json
 
-      - name: Validate pilot PNG contract
+      - name: Bake approved sand path slope sprites
+        run: |
+          python tools/generate_dirt_slope_sprites.py \
+            --material-id sand_01 \
+            --prefix sand_path \
+            --ns-source assets/terrain/paths/sand_01/sand_path_05_straight_ns.png \
+            --ew-source assets/terrain/paths/sand_01/sand_path_10_straight_ew.png \
+            --output-dir out/path_slope_sprites/sand_01 \
+            --contact-sheet out/path_slope_sprites/sand_01_sheet.png \
+            --manifest out/path_slope_sprites/sand_01_manifest.json
+
+      - name: Validate CH_PATH_SLOPE_SPRITE_V1
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           from PIL import Image
 
-          root = Path('out/dirt_slope_sprite_pilot')
-          files = sorted(root.glob('*.png'))
-          if len(files) != 20:
-              raise SystemExit(f'expected 20 pilot PNGs, found {len(files)}')
+          for material in ('dirt_01', 'sand_01'):
+              root = Path('out/path_slope_sprites') / material
+              files = sorted(root.glob('*.png'))
+              if len(files) != 20:
+                  raise SystemExit(f'{material}: expected 20 baked PNGs, found {len(files)}')
 
-          for path in files:
-              with Image.open(path) as im:
-                  im.load()
-                  if im.mode != 'RGBA':
-                      raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
-                  if im.size != (128, 112):
-                      raise SystemExit(f'{path}: expected 128x112, got {im.size}')
+              for path in files:
+                  with Image.open(path) as im:
+                      im.load()
+                      if im.mode != 'RGBA':
+                          raise SystemExit(f'{path}: expected RGBA, got {im.mode}')
+                      if im.size != (128, 112):
+                          raise SystemExit(f'{path}: expected 128x112, got {im.size}')
 
-          manifest = json.loads(Path('out/dirt_slope_sprite_pilot_manifest.json').read_text(encoding='utf-8'))
-          if manifest.get('contract') != 'CH_PATH_SPRITE_PILOT_V1':
-              raise SystemExit('unexpected sprite pilot contract')
-          if manifest.get('runtime_visual_policy') != 'sprite_select_only':
-              raise SystemExit('pilot must remain sprite-select-only at runtime')
-          if len(manifest.get('variants', [])) != 20:
-              raise SystemExit('manifest must contain exactly 20 pilot variants')
-          print('PASS 20 pre-rendered PNGs + manifest')
+              manifest_path = Path('out/path_slope_sprites') / f'{material}_manifest.json'
+              manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+              if manifest.get('contract') != 'CH_PATH_SLOPE_SPRITE_V1':
+                  raise SystemExit(f'{material}: unexpected path-slope contract')
+              if manifest.get('runtime_visual_policy') != 'sprite_select_only':
+                  raise SystemExit(f'{material}: runtime policy must be sprite_select_only')
+              if manifest.get('riser_alignment') != 'opposite_isometric_grid_axis':
+                  raise SystemExit(f'{material}: stair riser alignment regressed')
+              if len(manifest.get('variants', [])) != 20:
+                  raise SystemExit(f'{material}: manifest must contain exactly 20 variants')
+
+          print('PASS dirt_01 + sand_01 = 40 baked CH_PATH_SLOPE_SPRITE_V1 PNGs')
           PY
 
-      - name: Upload PNG pilot
+      - name: Upload ground path slope sprite library
         uses: actions/upload-artifact@v4
         with:
-          name: City-Horizon-Dirt-Slope-Sprite-Pilot
+          name: City-Horizon-Ground-Path-Slope-Sprites
           path: |
-            out/dirt_slope_sprite_pilot/*.png
-            out/dirt_slope_sprite_pilot_sheet.png
-            out/dirt_slope_sprite_pilot_manifest.json
+            out/path_slope_sprites/dirt_01/*.png
+            out/path_slope_sprites/sand_01/*.png
+            out/path_slope_sprites/dirt_01_sheet.png
+            out/path_slope_sprites/sand_01_sheet.png
+            out/path_slope_sprites/dirt_01_manifest.json
+            out/path_slope_sprites/sand_01_manifest.json
           if-no-files-found: error
           retention-days: 14
