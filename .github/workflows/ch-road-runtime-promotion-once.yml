@@ -39,4 +39,6 @@ jobs:
             exit 0
           fi
           git commit -m 'Roads: promote procedural 2D renderer to game runtime'
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
