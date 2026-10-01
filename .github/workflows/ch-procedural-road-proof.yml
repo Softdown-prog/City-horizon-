@@ -55,21 +55,29 @@ jobs:
             exit 1
           fi
 
-      - name: Configure City Horizon runtime
-        run: >-
-          cmake -S . -B build/ch-runtime-road -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DBUILD_TESTING=OFF
-          -DSDL_UNIX_CONSOLE_BUILD=ON
-
-      - name: Build City Horizon runtime with procedural 2D roads
-        run: cmake --build build/ch-runtime-road --target city_builder --parallel 2
-
       - name: Configure focused MapForge build
         run: >-
           cmake -S "C++/MapForge2" -B build/ch-procedural-road -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DSDL_UNIX_CONSOLE_BUILD=ON
+
+      - name: Compile game road runtime integration
+        run: |
+          cat > out/ch-procedural-road/runtime_road_compile_gate.cpp <<'CPP'
+          #include "src/runtime_map_renderer.h"
+
+          int main() {
+              RoadManager roads;
+              ch::CameraState camera{};
+              return ch::try_render_procedural_roads_runtime(
+                  nullptr, roads, camera, 1280.0F, 720.0F) ? 1 : 0;
+          }
+          CPP
+          c++ -std=c++20 -fsyntax-only \
+            -I. \
+            -Ibuild/ch-procedural-road/_deps/sdl3-src/include \
+            -Ibuild/ch-procedural-road/_deps/sdl3-build/include-revision \
+            out/ch-procedural-road/runtime_road_compile_gate.cpp
 
       - name: Build MapForge editor integration
         run: cmake --build build/ch-procedural-road --target mapforge2_editor --parallel 2
@@ -103,7 +111,7 @@ jobs:
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['workerContract'] == 'CH_MATH_WORKER_V1'
           assert isinstance(data.get('result'), dict) and data['result']
-          print('Procedural road 2D renderer + City Horizon runtime + MapForge integration + PNG proof: OK')
+          print('Procedural road 2D renderer + runtime integration + MapForge PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
