@@ -28,6 +28,35 @@ void test_invalid_viewport_bounds_are_rejected() {
     assert(!zero_zoom.valid());
 }
 
+void test_graph_adjacency_index_tracks_mutation() {
+    ProceduralRoadGraph graph;
+    const ProceduralRoadNodeId a = graph.add_node({0.0F, 0.0F, 0.0F});
+    const ProceduralRoadNodeId b = graph.add_node({1.0F, 0.0F, 0.0F});
+    const ProceduralRoadNodeId c = graph.add_node({1.0F, 1.0F, 0.0F});
+    const auto ab = graph.add_segment(a, b);
+    const auto bc = graph.add_segment(b, c);
+    assert(ab.has_value());
+    assert(bc.has_value());
+
+    assert(graph.degree(a) == 1U);
+    assert(graph.degree(b) == 2U);
+    assert(graph.degree(c) == 1U);
+    assert(graph.connected_segments(b).size() == 2U);
+
+    assert(graph.remove_segment(*ab));
+    assert(graph.degree(a) == 0U);
+    assert(graph.degree(b) == 1U);
+    assert(graph.connected_segments(b).size() == 1U);
+
+    assert(graph.remove_node(c));
+    assert(graph.degree(b) == 0U);
+    assert(graph.segments().empty());
+
+    graph.clear();
+    assert(graph.nodes().empty());
+    assert(graph.degree(a) == 0U);
+}
+
 void test_spatial_chunks_limit_candidates() {
     ProceduralRoadPlacementBridge bridge;
     assert(bridge.mirror_tile_segment(
@@ -102,6 +131,15 @@ void test_road_manager_mirror_stays_synchronized() {
     assert(roads.place_tile(1, 1));
     assert(roads.procedural_mirror().graph().nodes().size() == 3U);
     assert(roads.procedural_mirror().graph().segments().size() == 2U);
+    const ProceduralRoadGraph& graph = roads.procedural_mirror().graph();
+    bool found_corner = false;
+    for (const ProceduralRoadNode& node : graph.nodes()) {
+        if (graph.degree(node.id) == 2U) {
+            found_corner = true;
+            assert(graph.connected_segments(node.id).size() == 2U);
+        }
+    }
+    assert(found_corner);
 
     RoadManager copied = roads;
     assert(copied.procedural_mirror().graph().nodes().size() == 3U);
@@ -126,6 +164,7 @@ void test_road_manager_mirror_stays_synchronized() {
 int main() {
     test_camera_bounds_are_finite();
     test_invalid_viewport_bounds_are_rejected();
+    test_graph_adjacency_index_tracks_mutation();
     test_spatial_chunks_limit_candidates();
     test_spatial_index_rebuilds_with_legacy_tiles();
     test_far_segments_are_culled_before_tessellation();
