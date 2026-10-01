@@ -15,13 +15,44 @@ class ChRuntimeGameplayUi : public ChGameplayUi {
 public:
     void update_layout(const int viewport_width, const int viewport_height,
                        const GameplayUiModel& model) {
-        ChGameplayUi::update_layout(viewport_width, viewport_height, model);
+        GameplayUiModel runtime_model = model;
+        const auto has_build_item = [&runtime_model](const std::string& id) {
+            return std::any_of(runtime_model.build_items.begin(), runtime_model.build_items.end(),
+                               [&id](const UiBuildItem& item) { return item.definition_id == id; });
+        };
+
+        // Terrain relief is gameplay construction, not an editor-only command.
+        // Keep the canonical H/J/N runtime implementation authoritative and
+        // expose it through normal construction-catalog cards.
+        if (!has_build_item("terrain_smooth_tool")) {
+            runtime_model.build_items.insert(runtime_model.build_items.begin(), {
+                "terrain_smooth_tool", "Suavizar Terreno", "TERRENO", "SEM CUSTO", true,
+                "assets/terrain/grass_isometric_01.png", "PINCEL R2.5",
+                "SUAVIZA TRANSICOES | SOLO VAZIO | CLIQUE E ARRASTE", 1,
+            });
+        }
+        if (!has_build_item("terrain_lower_tool")) {
+            runtime_model.build_items.insert(runtime_model.build_items.begin(), {
+                "terrain_lower_tool", "Rebaixar Terreno", "TERRENO", "SEM CUSTO", true,
+                "assets/terrain/grass_isometric_01.png", "PINCEL R2.5",
+                "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1,
+            });
+        }
+        if (!has_build_item("terrain_raise_tool")) {
+            runtime_model.build_items.insert(runtime_model.build_items.begin(), {
+                "terrain_raise_tool", "Elevar Terreno", "TERRENO", "SEM CUSTO", true,
+                "assets/terrain/grass_isometric_01.png", "PINCEL R2.5",
+                "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1,
+            });
+        }
+
+        ChGameplayUi::update_layout(viewport_width, viewport_height, runtime_model);
         viewport_width_ = std::max(viewport_width, 1);
         viewport_height_ = std::max(viewport_height, 1);
-        citizen_status_ = model.citizen_status;
+        citizen_status_ = runtime_model.citizen_status;
 
-        if (model.startup_main_menu) tutorial_armed_ = true;
-        if (model.overlay == UiOverlay::none && tutorial_armed_ && !tutorial_shown_) {
+        if (runtime_model.startup_main_menu) tutorial_armed_ = true;
+        if (runtime_model.overlay == UiOverlay::none && tutorial_armed_ && !tutorial_shown_) {
             tutorial_visible_ = true;
             tutorial_shown_ = true;
         }
@@ -59,7 +90,25 @@ public:
             }
             return result;
         }
-        return ChGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
+
+        UiInputResult result = ChGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
+        if (result.consumed && result.action && result.action->action == UiAction::select_building) {
+            SDL_Scancode terrain_shortcut = SDL_SCANCODE_UNKNOWN;
+            if (result.action->payload == "terrain_raise_tool") terrain_shortcut = SDL_SCANCODE_H;
+            else if (result.action->payload == "terrain_lower_tool") terrain_shortcut = SDL_SCANCODE_J;
+            else if (result.action->payload == "terrain_smooth_tool") terrain_shortcut = SDL_SCANCODE_N;
+
+            if (terrain_shortcut != SDL_SCANCODE_UNKNOWN) {
+                SDL_Event shortcut_event{};
+                shortcut_event.type = SDL_EVENT_KEY_DOWN;
+                shortcut_event.key.scancode = terrain_shortcut;
+                shortcut_event.key.down = true;
+                shortcut_event.key.repeat = false;
+                (void)SDL_PushEvent(&shortcut_event);
+                result.action.reset();
+            }
+        }
+        return result;
     }
 
     void handle_mouse_button_up(const float mouse_x, const float mouse_y) {

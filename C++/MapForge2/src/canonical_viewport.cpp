@@ -311,7 +311,8 @@ void CanonicalViewport::renderFrame() {
     const float viewportHeight = static_cast<float>(std::max(1, height));
 
     const TextureAsset* grass = findTexture("assets/terrain/grass_isometric_01.png");
-    MapRenderer::render_map(renderer_, grass, terrain_textures_, camera_, viewportWidth, viewportHeight);
+    MapRenderer::render_map(renderer_, grass, terrain_textures_, camera_, viewportWidth, viewportHeight,
+                            document_ ? &*document_ : nullptr);
     renderRoads(viewportWidth, viewportHeight);
     renderBuildings(viewportWidth, viewportHeight);
     renderHover(viewportWidth, viewportHeight);
