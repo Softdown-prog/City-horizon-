@@ -1,0 +1,134 @@
+name: CH Runtime Compile Fix 2
+
+on:
+  push:
+    branches:
+      - terrain-construction-gameplay
+    paths:
+      - ".github/workflows/ch-runtime-compile-fix2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair current runtime compile blockers
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def require(text, needle, label):
+              if needle not in text:
+                  raise SystemExit(f"missing expected fragment: {label}")
+
+          # Keep compatibility with the runtime UI naming while preserving the
+          # existing canonical BuildingManager color API.
+          path = Path("src/building_system.h")
+          text = path.read_text(encoding="utf-8")
+          anchor = "    [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);\n"
+          require(text, anchor, "building color API anchor")
+          compatibility = '''    [[nodiscard]] bool set_wall_color_customization(std::uint64_t instance_id, BuildingColorTint tint) {
+              return set_wall_color(instance_id, tint);
+          }
+              [[nodiscard]] bool set_roof_color_customization(std::uint64_t instance_id, BuildingColorTint tint) {
+              return set_roof_color(instance_id, tint);
+          }
+              [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id) {
+              if (find_by_id(instance_id) == nullptr) return false;
+              const bool wall_cleared = clear_wall_color(instance_id);
+              const bool roof_cleared = clear_roof_color(instance_id);
+              return wall_cleared && roof_cleared;
+          }
+'''
+          if "set_wall_color_customization" not in text:
+              text = text.replace(anchor, anchor + compatibility, 1)
+          path.write_text(text, encoding="utf-8")
+
+          # The old function-like update_layout macro expands even after a '.'
+          # token (gameplay_ui.update_layout), producing invalid C++. Move that
+          # augmentation into a normal captured lambda inside the runtime loop.
+          path = Path("src/main.cpp")
+          text = path.read_text(encoding="utf-8")
+          start_marker = "#define update_layout(viewport_width, viewport_height, model) \\\n"
+          include_marker = '#include "main_runtime_impl.cpp"'
+          if start_marker in text:
+              start = text.index(start_marker)
+              end = text.index(include_marker, start)
+              text = text[:start] + text[end:]
+          text = text.replace("#undef update_layout\n", "")
+          path.write_text(text, encoding="utf-8")
+
+          path = Path("src/main_runtime_impl.cpp")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));",
+              "ch_update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));")
+          text = text.replace(
+              "gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));",
+              "ch_update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));")
+
+          insert_marker = "\n    while (running) {\n"
+          require(text, insert_marker, "runtime loop")
+          if "const auto ch_update_layout =" not in text:
+              helper = r'''
+    const auto ch_update_layout = [&](const int viewport_width, const int viewport_height, GameplayUiModel model) {
+        ch_fill_citizen_status(model, pedestrians, selected_pedestrian_id);
+        const auto ch_has_build_item = [&](const char* definition_id) {
+            return std::any_of(model.build_items.begin(), model.build_items.end(),
+                               [&](const UiBuildItem& item) { return item.definition_id == definition_id; });
+        };
+        if (!ch_has_build_item("terrain_raise_tool")) {
+            const std::string ch_terrain_thumbnail =
+                (asset_root / "assets/terrain/grass_isometric_01.png").string();
+            model.build_items.insert(model.build_items.begin(), {
+                {"terrain_raise_tool", "Elevar Terreno", "TERRENO", "SEM CUSTO", true,
+                 ch_terrain_thumbnail, "PINCEL R2.5",
+                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1},
+                {"terrain_lower_tool", "Rebaixar Terreno", "TERRENO", "SEM CUSTO", true,
+                 ch_terrain_thumbnail, "PINCEL R2.5",
+                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1},
+                {"terrain_smooth_tool", "Suavizar Terreno", "TERRENO", "SEM CUSTO", true,
+                 ch_terrain_thumbnail, "PINCEL R2.5",
+                 "SUAVIZA TRANSICOES | SOLO VAZIO | CLIQUE E ARRASTE", 1},
+            });
+        }
+        if (terrain_relief_mode) {
+            model.active_tool = UiTool::buildings;
+            model.selected_building_id =
+                *terrain_relief_mode == ch::TerrainBrushMode::raise ? "terrain_raise_tool" :
+                (*terrain_relief_mode == ch::TerrainBrushMode::lower ? "terrain_lower_tool" : "terrain_smooth_tool");
+            model.placement_preview_path =
+                (asset_root / "assets/terrain/grass_isometric_01.png").string();
+            model.placement_preview_frame_count = 1;
+            model.placement_rotatable = false;
+            model.placement_rotation_label = "PINCEL R2.5";
+        }
+        gameplay_ui.bind_selection_context(
+            &pedestrians, viewport_width, viewport_height, &selected_pedestrian_id,
+            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode &&
+            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none);
+        gameplay_ui.update_layout(viewport_width, viewport_height, model);
+    };
+'''
+              text = text.replace(insert_marker, helper + insert_marker, 1)
+          path.write_text(text, encoding="utf-8")
+
+      - name: Commit repaired sources
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/building_system.h src/main.cpp src/main_runtime_impl.cpp
+          git commit -m "Fix remaining runtime compile integration blockers"
+          git push origin HEAD:terrain-construction-gameplay
