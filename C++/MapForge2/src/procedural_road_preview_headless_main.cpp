@@ -92,13 +92,23 @@ void draw_centerlines(QPainter& painter, const ProceduralRoadGraph& graph,
     painter.setBrush(Qt::NoBrush);
 
     for (const ProceduralRoadGraphSegment& graph_segment : graph.segments()) {
-        const auto spline = graph.spline_for(graph_segment.id);
+        const auto spline = procedural_road_visual_spline_2d(graph, graph_segment.id);
         if (!spline || !procedural_road_spline_is_ground_only(*spline)) continue;
 
+        // Center markings stop before real conflict areas. Degree-2 curves keep
+        // their continuous marking; tees and crosses get a clean central box.
+        constexpr float kJunctionGapT = 0.34F;
+        float begin_t = 0.0F;
+        float end_t = 1.0F;
+        if (graph.degree(graph_segment.start_node) >= 3U) begin_t = kJunctionGapT;
+        if (graph.degree(graph_segment.end_node) >= 3U) end_t = 1.0F - kJunctionGapT;
+        if (begin_t >= end_t) continue;
+
         QPainterPath path;
-        constexpr int kSamples = 32;
+        constexpr int kSamples = 36;
         for (int sample = 0; sample <= kSamples; ++sample) {
-            const float t = static_cast<float>(sample) / static_cast<float>(kSamples);
+            const float alpha = static_cast<float>(sample) / static_cast<float>(kSamples);
+            const float t = begin_t + (end_t - begin_t) * alpha;
             const ProceduralRoad2DPoint point = procedural_road_sample_cubic_2d(*spline, t);
             const QPointF screen = to_qpoint(ch::world_to_screen_point(
                 point.x, point.y, camera,
@@ -121,8 +131,11 @@ ProceduralRoadPlacementBridge build_proof_network() {
     for (int y = -5; y <= 5; ++y) north_south.push_back({0, y});
     (void)bridge.mirror_tile_segment(north_south, ProceduralRoadClass::local, 0.0F);
 
+    // This branch deliberately proves both a T-junction at {4,0} and two
+    // degree-2 90-degree corners. The visual layer should round the corners
+    // while RoadManager-compatible tile topology remains unchanged.
     const std::vector<TileCoordinate> branch = {
-        {4, 0}, {4, 1}, {4, 2}, {5, 2}, {6, 2},
+        {4, 0}, {4, 1}, {4, 2}, {5, 2}, {6, 2}, {6, 3}, {6, 4},
     };
     (void)bridge.mirror_tile_segment(branch, ProceduralRoadClass::local, 0.0F);
 
@@ -133,20 +146,20 @@ void draw_overlay(QPainter& painter, const ProceduralRoadGroundRenderPlan& plan,
                   const ProceduralRoadGraph& graph) {
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(24, 30, 33, 220));
-    painter.drawRoundedRect(QRectF(18.0, 18.0, 650.0, 116.0), 8.0, 8.0);
+    painter.drawRoundedRect(QRectF(18.0, 18.0, 690.0, 116.0), 8.0, 8.0);
 
     painter.setPen(QColor(237, 243, 244));
     painter.drawText(QPointF(34.0, 46.0),
                      QStringLiteral("City Horizon — CH_PROCEDURAL_ROAD_2D_RENDER_V1"));
     painter.drawText(QPointF(34.0, 72.0),
-                     QStringLiteral("Flat XY ribbons + procedural junction patches; no road Z, pillars or viaduct mesh"));
+                     QStringLiteral("Smooth XY corners + arm-aware junctions; no road Z, pillars or viaduct mesh"));
     painter.drawText(QPointF(34.0, 98.0),
-                     QString("Segments: %1  |  2D ribbons: %2  |  junction patches: %3")
+                     QString("Segments: %1  |  2D ribbons: %2  |  needed junction patches: %3")
                          .arg(graph.segments().size())
                          .arg(plan.segment_meshes.size())
                          .arg(plan.junction_meshes.size()));
     painter.drawText(QPointF(34.0, 122.0),
-                     QStringLiteral("RoadManager topology remains authoritative for placement, save and navigation"));
+                     QStringLiteral("Center markings clear conflict zones; RoadManager topology remains authoritative"));
 }
 
 bool render_png(const std::filesystem::path& output) {
