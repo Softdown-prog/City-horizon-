@@ -212,6 +212,49 @@ inline void render_flat_sprite_at_height(
     return SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
 }
 
+// Reuses the approved dirt-path atlas as a material source instead of inventing
+// a flat procedural brown.  A tiny center crop of the cross tile is guaranteed
+// to sit inside the dirt material, so it can be stretched along arbitrary 2D
+// ramps/stairs without carrying the transparent silhouette of a legacy tile.
+[[nodiscard]] inline bool render_textured_segment(
+    SDL_Renderer* renderer,
+    const TextureAsset& material,
+    const SDL_FPoint start,
+    const SDL_FPoint end,
+    const float width
+) {
+    if (renderer == nullptr || material.texture == nullptr || width <= 0.0F) return false;
+
+    const float dx = end.x - start.x;
+    const float dy = end.y - start.y;
+    const float length = std::hypot(dx, dy);
+    if (length < 0.01F) return true;
+
+    const float half_width = width * 0.5F;
+    const float nx = -dy / length * half_width;
+    const float ny = dx / length * half_width;
+
+    constexpr float kU0 = 0.44F;
+    constexpr float kV0 = 0.44F;
+    constexpr float kU1 = 0.56F;
+    constexpr float kV1 = 0.56F;
+
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = {start.x + nx, start.y + ny};
+    vertices[1].position = {end.x + nx, end.y + ny};
+    vertices[2].position = {end.x - nx, end.y - ny};
+    vertices[3].position = {start.x - nx, start.y - ny};
+    vertices[0].tex_coord = {kU0, kV0};
+    vertices[1].tex_coord = {kU1, kV0};
+    vertices[2].tex_coord = {kU1, kV1};
+    vertices[3].tex_coord = {kU0, kV1};
+    for (SDL_Vertex& vertex : vertices) {
+        vertex.color = {1.0F, 1.0F, 1.0F, 1.0F};
+    }
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    return SDL_RenderGeometry(renderer, material.texture, vertices, 4, indices, 6);
+}
+
 inline void render_network_stroke(
     SDL_Renderer* renderer,
     const MapDocument& document,
@@ -238,6 +281,29 @@ inline void render_network_stroke(
                                               viewport_width, viewport_height);
         (void)render_thick_segment(renderer, center, edge, width, color);
         (void)render_disc(renderer, edge, width * 0.5F, color);
+    }
+}
+
+inline void render_network_material(
+    SDL_Renderer* renderer,
+    const TextureAsset* material,
+    const MapDocument& document,
+    const GroundSurfaceDrawEntry& tile,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const float width
+) {
+    if (material == nullptr || material->texture == nullptr) return;
+
+    const SDL_FPoint center = tile_center(document, tile.tile_x, tile.tile_y,
+                                         camera, viewport_width, viewport_height);
+    for (const CardinalDirection direction : kCardinalDirections) {
+        if (!has_connection(tile.connections, direction)) continue;
+        const SDL_FPoint edge = edge_midpoint(document, tile.tile_x, tile.tile_y,
+                                              direction, camera,
+                                              viewport_width, viewport_height);
+        (void)render_textured_segment(renderer, *material, center, edge, width);
     }
 }
 
@@ -271,15 +337,22 @@ inline void render_vertical_profile_details(
                                   low.y + axis_y * axis_length * 0.18F};
         const SDL_FPoint end = {high.x - axis_x * axis_length * 0.18F,
                                 high.y - axis_y * axis_length * 0.18F};
-        SDL_SetRenderDrawColor(renderer, 220, 176, 112, 95);
+        SDL_SetRenderDrawColor(renderer, 220, 176, 112, 72);
         SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
         return;
     }
 
-    const int visible_steps = std::clamp(tile.recipe.stair_count, 2, 9);
+    // A stair is still entirely 2D: each riser is a screen-space face whose
+    // depth is derived from the canonical height delta. Higher slopes simply
+    // receive more risers, so the visual continues automatically with relief.
+    const int visible_steps = std::clamp(tile.recipe.stair_count, 2, 18);
     const float perpendicular_x = -axis_y;
     const float perpendicular_y = axis_x;
-    const float half_step_width = inner_width * 0.43F;
+    const float half_step_width = inner_width * 0.47F;
+    const float rise_pixels = tile.recipe.height_delta * kTerrainHeightPixelsPerUnit * camera.zoom /
+                              static_cast<float>(visible_steps);
+    const float face_depth = std::clamp(rise_pixels, 1.5F * camera.zoom, 5.5F * camera.zoom);
+
     for (int step = 1; step <= visible_steps; ++step) {
         const float t = static_cast<float>(step) / static_cast<float>(visible_steps + 1);
         const SDL_FPoint center = {low.x + axis_x * axis_length * t,
@@ -288,13 +361,24 @@ inline void render_vertical_profile_details(
                               center.y - perpendicular_y * half_step_width};
         const SDL_FPoint b = {center.x + perpendicular_x * half_step_width,
                               center.y + perpendicular_y * half_step_width};
-        SDL_SetRenderDrawColor(renderer, 78, 52, 31, 185);
-        SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
 
-        SDL_SetRenderDrawColor(renderer, 226, 184, 120, 105);
-        SDL_RenderLine(renderer,
-                       a.x - axis_x * 1.3F, a.y - axis_y * 1.3F,
-                       b.x - axis_x * 1.3F, b.y - axis_y * 1.3F);
+        SDL_Vertex face[4] = {};
+        face[0].position = a;
+        face[1].position = b;
+        face[2].position = {b.x, b.y + face_depth};
+        face[3].position = {a.x, a.y + face_depth};
+        face[0].color = {72.0F / 255.0F, 46.0F / 255.0F, 28.0F / 255.0F, 0.90F};
+        face[1].color = face[0].color;
+        face[2].color = {54.0F / 255.0F, 35.0F / 255.0F, 22.0F / 255.0F, 0.94F};
+        face[3].color = face[2].color;
+        const int face_indices[] = {0, 1, 2, 0, 2, 3};
+        (void)SDL_RenderGeometry(renderer, nullptr, face, 4, face_indices, 6);
+
+        SDL_SetRenderDrawColor(renderer, 229, 185, 119, 145);
+        SDL_RenderLine(renderer, a.x, a.y - 0.8F * camera.zoom,
+                       b.x, b.y - 0.8F * camera.zoom);
+        SDL_SetRenderDrawColor(renderer, 67, 43, 26, 210);
+        SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
     }
 }
 
@@ -457,6 +541,8 @@ public:
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 2);
         const TextureAsset* grass_base = find_texture("assets/terrain/grass_isometric_01.png");
+        const TextureAsset* dirt_material =
+            find_texture("assets/terrain/paths/dirt_01/dirt_path_15_cross.png");
 
         std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
         std::vector<runtime_render_detail::WaterTile> water_tiles;
@@ -568,8 +654,8 @@ public:
             74.0F / 255.0F, 49.0F / 255.0F, 30.0F / 255.0F, 0.90F};
         constexpr SDL_FColor kPathInner = {
             171.0F / 255.0F, 121.0F / 255.0F, 67.0F / 255.0F, 1.0F};
-        const float outer_width = 25.0F * camera.zoom;
-        const float inner_width = 18.0F * camera.zoom;
+        const float outer_width = 33.0F * camera.zoom;
+        const float inner_width = 27.0F * camera.zoom;
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         for (const auto& tile : dirt_path_tiles) {
@@ -583,6 +669,12 @@ public:
             runtime_terrain_detail::render_network_stroke(
                 renderer, document, tile, camera, viewport_width, viewport_height,
                 inner_width, kPathInner);
+        }
+        for (const auto& tile : dirt_path_tiles) {
+            if (tile.recipe.legacy_sprite_compatible) continue;
+            runtime_terrain_detail::render_network_material(
+                renderer, dirt_material, document, tile, camera,
+                viewport_width, viewport_height, inner_width * 0.92F);
         }
         for (const auto& tile : dirt_path_tiles) {
             if (tile.recipe.legacy_sprite_compatible) continue;
