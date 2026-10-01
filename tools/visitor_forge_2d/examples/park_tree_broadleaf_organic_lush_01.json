@@ -2,6 +2,7 @@
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_lush_01",
   "pipelineRevision": 12,
+  "revisionNote": "dense domed canopy rerender",
   "canvas": [256, 320],
   "anchor": [128, 310],
   "seed": 91573,
