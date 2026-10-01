@@ -35,6 +35,13 @@ class ProceduralRoadPlacementBridge {
 public:
     ProceduralRoadPlacementBridge() = default;
 
+    // CH_PROCEDURAL_ROAD_SPATIAL_INDEX_V1
+    //
+    // Runtime visibility queries use a coarse 16x16-world-unit index owned by
+    // the mirror itself. Save/load and gameplay remain tile-authoritative; this
+    // is only an acceleration structure and can always be rebuilt from graph_.
+    static constexpr float kSpatialChunkWorldSize = 16.0F;
+
     [[nodiscard]] std::optional<ProceduralRoadPlacementResult> mirror_tile_segment(
         const std::vector<TileCoordinate>& tiles,
         const ProceduralRoadClass road_class,
@@ -67,6 +74,7 @@ public:
                 elevation,
             });
             node_by_key_.emplace(key, node_id);
+            index_spatial_node(node_id);
             result.nodes.push_back(node_id);
             ++result.created_nodes;
         }
@@ -98,6 +106,7 @@ public:
             if (!segment_id) return std::nullopt;
 
             segment_by_edge_.emplace(edge, *segment_id);
+            index_spatial_segment(*segment_id);
             result.segments.push_back(*segment_id);
             ++result.created_segments;
         }
@@ -157,11 +166,39 @@ public:
         return true;
     }
 
+    [[nodiscard]] std::vector<ProceduralRoadNodeId> spatial_nodes_in_bounds(
+        const float min_x,
+        const float min_y,
+        const float max_x,
+        const float max_y) const {
+        return query_spatial_index(node_spatial_chunks_, min_x, min_y, max_x, max_y);
+    }
+
+    [[nodiscard]] std::vector<ProceduralRoadSegmentId> spatial_segments_in_bounds(
+        const float min_x,
+        const float min_y,
+        const float max_x,
+        const float max_y) const {
+        return query_spatial_index(segment_spatial_chunks_, min_x, min_y, max_x, max_y);
+    }
+
+    // Explicit recovery hook for editor-only code that mutates graph() directly.
+    // RoadManager's production mirror does not require this because its changes
+    // flow through mirror_tile_segment/rebuild_from_legacy_tiles.
+    void rebuild_spatial_index() {
+        node_spatial_chunks_.clear();
+        segment_spatial_chunks_.clear();
+        for (const ProceduralRoadNode& node : graph_.nodes()) index_spatial_node(node.id);
+        for (const ProceduralRoadGraphSegment& segment : graph_.segments()) index_spatial_segment(segment.id);
+    }
+
     void clear() {
         graph_.clear();
         classes_.clear();
         node_by_key_.clear();
         segment_by_edge_.clear();
+        node_spatial_chunks_.clear();
+        segment_spatial_chunks_.clear();
     }
 
     [[nodiscard]] const ProceduralRoadGraph& graph() const { return graph_; }
@@ -202,6 +239,25 @@ private:
         }
     };
 
+    struct SpatialChunkKey {
+        int x = 0;
+        int y = 0;
+
+        [[nodiscard]] bool operator==(const SpatialChunkKey&) const = default;
+    };
+
+    struct SpatialChunkKeyHash {
+        [[nodiscard]] std::size_t operator()(const SpatialChunkKey& key) const noexcept {
+            std::size_t seed = static_cast<std::size_t>(static_cast<std::uint32_t>(key.x));
+            seed ^= static_cast<std::size_t>(static_cast<std::uint32_t>(key.y)) +
+                    0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U);
+            return seed;
+        }
+    };
+
+    template <typename Id>
+    using SpatialIndex = std::unordered_map<SpatialChunkKey, std::vector<Id>, SpatialChunkKeyHash>;
+
     [[nodiscard]] static std::int32_t elevation_key(const float elevation) {
         return static_cast<std::int32_t>(std::lround(static_cast<double>(elevation) * 1000.0));
     }
@@ -217,8 +273,85 @@ private:
                static_cast<std::uint64_t>(static_cast<std::uint32_t>(y));
     }
 
+    [[nodiscard]] static int spatial_chunk_coord(const float value) {
+        return static_cast<int>(std::floor(value / kSpatialChunkWorldSize));
+    }
+
+    template <typename Id>
+    [[nodiscard]] static std::vector<Id> query_spatial_index(
+        const SpatialIndex<Id>& index,
+        const float min_x,
+        const float min_y,
+        const float max_x,
+        const float max_y) {
+        std::vector<Id> result;
+        if (!std::isfinite(min_x) || !std::isfinite(min_y) ||
+            !std::isfinite(max_x) || !std::isfinite(max_y) ||
+            min_x > max_x || min_y > max_y) {
+            return result;
+        }
+
+        const int min_chunk_x = spatial_chunk_coord(min_x);
+        const int max_chunk_x = spatial_chunk_coord(max_x);
+        const int min_chunk_y = spatial_chunk_coord(min_y);
+        const int max_chunk_y = spatial_chunk_coord(max_y);
+        std::unordered_set<Id> seen;
+
+        for (int chunk_y = min_chunk_y; chunk_y <= max_chunk_y; ++chunk_y) {
+            for (int chunk_x = min_chunk_x; chunk_x <= max_chunk_x; ++chunk_x) {
+                const auto found = index.find({chunk_x, chunk_y});
+                if (found == index.end()) continue;
+                for (const Id id : found->second) {
+                    if (seen.insert(id).second) result.push_back(id);
+                }
+            }
+        }
+        return result;
+    }
+
+    void index_spatial_node(const ProceduralRoadNodeId node_id) {
+        const ProceduralRoadNode* node = graph_.node(node_id);
+        if (node == nullptr) return;
+        node_spatial_chunks_[{
+            spatial_chunk_coord(node->position.x),
+            spatial_chunk_coord(node->position.y),
+        }].push_back(node_id);
+    }
+
+    void index_spatial_segment(const ProceduralRoadSegmentId segment_id) {
+        const ProceduralRoadGraphSegment* segment = graph_.segment(segment_id);
+        if (segment == nullptr) return;
+        const ProceduralRoadNode* start = graph_.node(segment->start_node);
+        const ProceduralRoadNode* end = graph_.node(segment->end_node);
+        if (start == nullptr || end == nullptr) return;
+
+        const float dx = end->position.x - start->position.x;
+        const float dy = end->position.y - start->position.y;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        // Visual corner smoothing can move a control handle by ~0.46 of the
+        // incident edge length. Half an edge plus road half-width and a small
+        // guard keeps the coarse index conservative before exact spline culling.
+        const float guard = std::max(1.0F, length * 0.5F + segment->width * 0.5F + 0.25F);
+        const float min_x = std::min(start->position.x, end->position.x) - guard;
+        const float max_x = std::max(start->position.x, end->position.x) + guard;
+        const float min_y = std::min(start->position.y, end->position.y) - guard;
+        const float max_y = std::max(start->position.y, end->position.y) + guard;
+
+        const int min_chunk_x = spatial_chunk_coord(min_x);
+        const int max_chunk_x = spatial_chunk_coord(max_x);
+        const int min_chunk_y = spatial_chunk_coord(min_y);
+        const int max_chunk_y = spatial_chunk_coord(max_y);
+        for (int chunk_y = min_chunk_y; chunk_y <= max_chunk_y; ++chunk_y) {
+            for (int chunk_x = min_chunk_x; chunk_x <= max_chunk_x; ++chunk_x) {
+                segment_spatial_chunks_[{chunk_x, chunk_y}].push_back(segment_id);
+            }
+        }
+    }
+
     ProceduralRoadGraph graph_;
     ProceduralRoadClassCatalog classes_;
     std::unordered_map<NodeKey, ProceduralRoadNodeId, NodeKeyHash> node_by_key_;
     std::unordered_map<EdgeKey, ProceduralRoadSegmentId, EdgeKeyHash> segment_by_edge_;
+    SpatialIndex<ProceduralRoadNodeId> node_spatial_chunks_;
+    SpatialIndex<ProceduralRoadSegmentId> segment_spatial_chunks_;
 };
