@@ -1,0 +1,198 @@
+name: CH Runtime Terrain Autofix
+
+on:
+  push:
+    branches:
+      - terrain-construction-gameplay
+    paths:
+      - ".github/workflows/ch-runtime-terrain-autofix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair runtime integration compile blockers
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def require(text, needle, label):
+              if needle not in text:
+                  raise SystemExit(f"missing expected fragment: {label}")
+
+          # 1) main.cpp: pedestrian picking must not depend on the private Camera
+          # type that is declared later inside main_runtime_impl.cpp.
+          path = Path("src/main.cpp")
+          text = path.read_text(encoding="utf-8")
+          start_marker = "[[nodiscard]] inline std::optional<std::uint64_t> ch_pick_pedestrian_at_screen("
+          end_marker = "class ChRuntimeSelectableGameplayUi"
+          require(text, start_marker, "pedestrian picker start")
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          picker = '''[[nodiscard]] inline std::optional<std::uint64_t> ch_pick_pedestrian_at_screen(
+              const PedestrianSystem& pedestrians, const float mouse_x, const float mouse_y,
+              const float viewport_width, const float viewport_height) {
+              const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
+              if (!view.valid) return std::nullopt;
+              constexpr float kPickRadiusPx = 28.0F;
+              constexpr float kPickRadiusSquared = kPickRadiusPx * kPickRadiusPx;
+              std::optional<std::uint64_t> best;
+              float best_distance_squared = kPickRadiusSquared;
+              for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+                  if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
+                  const ch::ScreenPoint screen = ch::world_to_screen_point(
+                      pedestrian.spatial.visual_world_x + pedestrian.spatial.ground_anchor_x,
+                      pedestrian.spatial.visual_world_y + pedestrian.spatial.ground_anchor_y,
+                      view.camera, viewport_width, viewport_height);
+                  const float dx = mouse_x - screen.x;
+                  const float dy = mouse_y - (screen.y - 16.0F * view.camera.zoom);
+                  const float distance_squared = dx * dx + dy * dy;
+                  if (distance_squared <= best_distance_squared) {
+                      best_distance_squared = distance_squared;
+                      best = pedestrian.id;
+                  }
+              }
+              return best;
+          }
+
+          '''
+          text = text[:start] + picker + text[end:]
+          text = text.replace(
+              "    void bind_selection_context(const PedestrianSystem* pedestrians,\n"
+              "                                const Camera* camera,\n"
+              "                                const int viewport_width,\n",
+              "    void bind_selection_context(const PedestrianSystem* pedestrians,\n"
+              "                                const int viewport_width,\n",
+              1)
+          text = text.replace("        camera_ = camera;\n", "", 1)
+          text = text.replace(
+              "        if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||\n"
+              "            camera_ == nullptr || selected_pedestrian_id_ == nullptr) {\n",
+              "        if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||\n"
+              "            selected_pedestrian_id_ == nullptr) {\n",
+              1)
+          text = text.replace(
+              "        const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(\n"
+              "            *pedestrians_, mouse_x, mouse_y, *camera_,\n"
+              "            static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));\n",
+              "        const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(\n"
+              "            *pedestrians_, mouse_x, mouse_y,\n"
+              "            static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));\n",
+              1)
+          text = text.replace("    const Camera* camera_ = nullptr;\n", "", 1)
+          text = text.replace(
+              "        gameplay_ui.bind_selection_context( \\\n"
+              "            &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \\\n",
+              "        gameplay_ui.bind_selection_context( \\\n"
+              "            &pedestrians, (viewport_width), (viewport_height), &selected_pedestrian_id, \\\n",
+              1)
+          text = text.replace(
+              "#define selected_instance_id selected_instance_id; std::optional<std::uint64_t> selected_pedestrian_id\n\n",
+              "",
+              1)
+          text = text.replace("#undef selected_instance_id\n", "", 1)
+          path.write_text(text, encoding="utf-8")
+
+          # 2) Declare pedestrian selection where the runtime state actually lives.
+          path = Path("src/main_runtime_impl.cpp")
+          text = path.read_text(encoding="utf-8")
+          old = "    std::optional<std::uint64_t> selected_instance_id;\n    std::string placement_definition_id;"
+          require(text, old, "selected instance runtime state")
+          text = text.replace(
+              old,
+              "    std::optional<std::uint64_t> selected_instance_id;\n"
+              "    std::optional<std::uint64_t> selected_pedestrian_id;\n"
+              "    std::string placement_definition_id;",
+              1)
+          path.write_text(text, encoding="utf-8")
+
+          # 3) Keep Park fence persistence signature in lock-step with SaveManager v12.
+          path = Path("src/park_fence_save_manager.h")
+          text = path.read_text(encoding="utf-8")
+          old = "                                           const MissionManager* missions = nullptr,\n                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr) const {"
+          require(text, old, "park fence save signature")
+          text = text.replace(
+              old,
+              "                                           const MissionManager* missions = nullptr,\n"
+              "                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr,\n"
+              "                                           const std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const {",
+              1)
+          text = text.replace(
+              "                                                       vehicles, missions, terrain_paint);",
+              "                                                       vehicles, missions, terrain_paint, terrain_heights);",
+              1)
+          old = "                                           MissionManager* missions = nullptr,\n                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr) const {"
+          require(text, old, "park fence load signature")
+          text = text.replace(
+              old,
+              "                                           MissionManager* missions = nullptr,\n"
+              "                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr,\n"
+              "                                           std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const {",
+              1)
+          text = text.replace(
+              "                                                       vehicle_catalog, vehicles, missions, terrain_paint);",
+              "                                                       vehicle_catalog, vehicles, missions, terrain_paint, terrain_heights);",
+              1)
+          path.write_text(text, encoding="utf-8")
+
+          # 4) Use the current animation catalog API.
+          path = Path("src/pedestrian_system.cpp")
+          text = path.read_text(encoding="utf-8")
+          old = "        update_mobile_animation(pedestrian.animation, animation_state(pedestrian.state), pedestrian.spatial.direction,\n                                frame_seconds, animations);"
+          require(text, old, "legacy pedestrian animation call")
+          text = text.replace(
+              old,
+              "        animations.update_player(pedestrian.animation, animation_state(pedestrian.state),\n"
+              "                                 pedestrian.spatial.direction, frame_seconds);",
+              1)
+          path.write_text(text, encoding="utf-8")
+
+          # 5) Restore the manager API used by save-game mission unlock restoration.
+          path = Path("src/building_system.h")
+          text = path.read_text(encoding="utf-8")
+          old = "    [[nodiscard]] const std::vector<BuildingInstance>& instances() const;\n    [[nodiscard]] bool remove_instance"
+          require(text, old, "building manager instances declaration")
+          text = text.replace(
+              old,
+              "    [[nodiscard]] const std::vector<BuildingInstance>& instances() const;\n"
+              "    void set_operational_by_definition(std::string_view definition_id, bool operational);\n"
+              "    [[nodiscard]] bool remove_instance",
+              1)
+          path.write_text(text, encoding="utf-8")
+
+          path = Path("src/building_system.cpp")
+          text = path.read_text(encoding="utf-8")
+          old = "const std::vector<BuildingInstance>& BuildingManager::instances() const { return instances_; }\n\nbool BuildingManager::remove_instance"
+          require(text, old, "building manager instances implementation")
+          text = text.replace(
+              old,
+              "const std::vector<BuildingInstance>& BuildingManager::instances() const { return instances_; }\n\n"
+              "void BuildingManager::set_operational_by_definition(const std::string_view definition_id, const bool operational) {\n"
+              "    for (BuildingInstance& instance : instances_) {\n"
+              "        if (instance.definition_id == definition_id) instance.operational = operational;\n"
+              "    }\n"
+              "}\n\n"
+              "bool BuildingManager::remove_instance",
+              1)
+          path.write_text(text, encoding="utf-8")
+
+      - name: Commit repaired runtime integration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main.cpp src/main_runtime_impl.cpp src/park_fence_save_manager.h src/pedestrian_system.cpp src/building_system.h src/building_system.cpp
+          git commit -m "Fix runtime terrain integration compile blockers"
+          git push origin HEAD:terrain-construction-gameplay
