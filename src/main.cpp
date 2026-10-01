@@ -8,7 +8,7 @@
 // 3. Pedestrian navigation respects Park fence barriers and gates.
 // 4. SaveManager persists the Park fence network alongside the canonical city save.
 // 5. Service-price clicks respect authored price steps and linked Park booths.
-// 6. Ferris-wheel audio follows activity plus current camera visibility.
+// 6. Park attraction audio follows activity plus current camera visibility.
 // 7. Runtime rendering uses a conservative camera-visible working set.
 // 8. Z/X rotate the production camera when no building is being placed.
 // 9. Runtime UI adds camera controls and lightweight procedural overlays.
@@ -23,6 +23,8 @@
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
+// 19. Viking-ship rope creaks start only while the ride moves, with a small
+//     presentation-only speed-of-sound propagation delay.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -130,7 +132,7 @@ public:
         static_cast<std::int64_t>(edited->service_price));
 }
 
-[[nodiscard]] inline bool ch_ferris_wheel_visible_in_current_view(
+[[nodiscard]] inline bool ch_attraction_visible_in_current_view(
     const BuildingInstance& instance, const BuildingDefinition& definition) {
     const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
     if (!view.valid) return false;
@@ -164,18 +166,82 @@ public:
     for (const BuildingInstance& instance : buildings.instances()) {
         if (instance.definition_id != "ferris_wheel_01" || !instance.activity_active()) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
-        if (definition != nullptr && ch_ferris_wheel_visible_in_current_view(instance, *definition)) {
+        if (definition != nullptr && ch_attraction_visible_in_current_view(instance, *definition)) {
             return true;
         }
     }
     return false;
 }
 
-inline void ch_sync_ferris_wheel_audio_visibility(
-    AudioManager& audio, const BuildingManager& buildings, const BuildingCatalog& catalog) {
-    (void)audio.set_looping(
-        SoundEvent::ferris_wheel_running,
-        ch_ferris_wheel_should_be_audible(buildings, catalog));
+[[nodiscard]] inline std::optional<std::uint32_t> ch_viking_ship_sound_delay_ms(
+    const BuildingManager& buildings, const BuildingCatalog& catalog) {
+    const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
+    if (!view.valid) return std::nullopt;
+
+    const ch::WorldPoint listener = ch::screen_to_world_point(
+        view.viewport_width * 0.5F, view.viewport_height * 0.5F,
+        view.camera, view.viewport_width, view.viewport_height);
+    float nearest_distance_tiles = -1.0F;
+
+    for (const BuildingInstance& instance : buildings.instances()) {
+        if (instance.definition_id != "viking_ship_01" || !instance.activity_active()) continue;
+        const BuildingDefinition* definition = catalog.find(instance.definition_id);
+        if (definition == nullptr || !ch_attraction_visible_in_current_view(instance, *definition)) continue;
+
+        const BuildingFootprint footprint = rotated_footprint(*definition, instance.rotation);
+        const float source_x = static_cast<float>(instance.tile_x) + static_cast<float>(footprint.width) * 0.5F;
+        const float source_y = static_cast<float>(instance.tile_y) + static_cast<float>(footprint.height) * 0.5F;
+        const float dx = source_x - listener.x;
+        const float dy = source_y - listener.y;
+        const float distance_tiles = std::sqrt(dx * dx + dy * dy);
+        if (nearest_distance_tiles < 0.0F || distance_tiles < nearest_distance_tiles) {
+            nearest_distance_tiles = distance_tiles;
+        }
+    }
+
+    if (nearest_distance_tiles < 0.0F) return std::nullopt;
+
+    // Audio presentation scale only: one logical tile is treated as roughly 3 m.
+    // Propagation uses 343 m/s and is capped so the effect stays responsive in a tycoon view.
+    constexpr float kPresentationMetersPerTile = 3.0F;
+    constexpr float kSpeedOfSoundMetersPerSecond = 343.0F;
+    constexpr std::uint32_t kMaximumPropagationDelayMs = 140U;
+    const float delay_ms = nearest_distance_tiles * kPresentationMetersPerTile /
+                           kSpeedOfSoundMetersPerSecond * 1000.0F;
+    return std::min(kMaximumPropagationDelayMs,
+                    static_cast<std::uint32_t>(std::max(0L, std::lround(delay_ms))));
+}
+
+struct ChVikingShipAudioDelayState {
+    bool waiting_or_playing = false;
+    std::uint64_t ready_at_ms = 0;
+};
+
+inline void ch_sync_park_ride_audio_visibility(
+    AudioManager& audio, const BuildingManager& buildings, const BuildingCatalog& catalog,
+    const bool simulation_running) {
+    static ChVikingShipAudioDelayState viking_audio;
+    const std::optional<std::uint32_t> viking_delay = simulation_running
+        ? ch_viking_ship_sound_delay_ms(buildings, catalog)
+        : std::nullopt;
+    const std::uint64_t now_ms = SDL_GetTicks();
+
+    if (viking_delay) {
+        if (!viking_audio.waiting_or_playing) {
+            viking_audio.waiting_or_playing = true;
+            viking_audio.ready_at_ms = now_ms + *viking_delay;
+        }
+        if (now_ms >= viking_audio.ready_at_ms) {
+            (void)audio.set_looping(SoundEvent::viking_ship_running, true);
+            return;
+        }
+    } else {
+        viking_audio = {};
+    }
+
+    const bool ferris_audible = simulation_running &&
+        ch_ferris_wheel_should_be_audible(buildings, catalog);
+    (void)audio.set_looping(SoundEvent::ferris_wheel_running, ferris_audible);
 }
 
 [[nodiscard]] inline const char* ch_pedestrian_activity_label(const PedestrianState state) {
@@ -299,7 +365,8 @@ private:
     ([&]() { \
         const auto ch_budget_date = simulation_clock.date(); \
         pedestrians.sync_monthly_budget_cycle(ch_budget_date.month, ch_budget_date.year); \
-        ch_sync_ferris_wheel_audio_visibility(audio, buildings, catalog); \
+        ch_sync_park_ride_audio_visibility( \
+            audio, buildings, catalog, simulation_clock.speed() != SimulationSpeed::paused); \
         const PedestrianSurfaceNavigationNetwork ch_visit_surfaces{roads, sidewalks}; \
         ch::building_visit_runtime::sync( \
             pedestrians, buildings, catalog, ch_visit_surfaces, \
