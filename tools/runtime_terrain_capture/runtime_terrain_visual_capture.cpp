@@ -54,6 +54,18 @@ int main(int argc, char** argv) {
     document.apply_terrain_brush(20.0F, 18.0F, 3.5F, 0.48F, ch::TerrainBrushMode::lower);
     document.apply_terrain_brush(20.0F, 18.0F, 5.2F, 0.60F, ch::TerrainBrushMode::smooth);
 
+    // Refuse to create a visual artifact if the canonical heightfield did not
+    // actually produce both signs of relief. This prevents a flat screenshot
+    // from being mistaken for a successful runtime proof.
+    const float hill_height = document.terrain_heightfield().sample(12.5F, 12.5F);
+    const float basin_height = document.terrain_heightfield().sample(20.0F, 18.0F);
+    std::cout << "terrain proof samples: hill=" << hill_height
+              << " basin=" << basin_height << '\n';
+    if (hill_height <= 0.15F || basin_height >= -0.15F) {
+        std::cerr << "canonical terrain relief did not produce the expected hill/basin signs\n";
+        return 7;
+    }
+
     // One connected path crosses the hill and then turns through the basin.
     // Flat cells use the approved legacy PNG; sloped cells are forced through
     // CH_PROCEDURAL_TILE_2D_V1 ramp/stair geometry by the runtime renderer.
