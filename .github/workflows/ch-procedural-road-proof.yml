@@ -40,6 +40,19 @@ jobs:
           mkdir -p out/ch-procedural-road
           python tools/ch_math_worker/worker.py tools/ch_math_worker/jobs/procedural_road_probe.job.json --output out/ch-procedural-road/math_report.json
 
+      - name: Assert procedural road path is native 2D
+        run: |
+          grep -q "CH_PROCEDURAL_ROAD_2D_RENDER_V1" src/procedural_road_ground_render_plan.h
+          grep -q "ProceduralRoad2DMesh" src/ch_render/procedural_road_network_renderer.h
+          if grep -q "RoadMeshBuilder::build_cubic" src/procedural_road_ground_render_plan.h; then
+            echo "3D RoadMeshBuilder leaked back into the canonical procedural road plan"
+            exit 1
+          fi
+          if grep -q "source.position.z" src/ch_render/procedural_road_network_renderer.h; then
+            echo "Road Z projection leaked back into the canonical procedural 2D renderer"
+            exit 1
+          fi
+
       - name: Configure focused MapForge build
         run: >-
           cmake -S "C++/MapForge2" -B build/ch-procedural-road -G Ninja
@@ -49,19 +62,16 @@ jobs:
       - name: Build MapForge editor integration
         run: cmake --build build/ch-procedural-road --target mapforge2_editor --parallel 2
 
-      - name: Build ground-only road gate
+      - name: Build procedural 2D road gate
         run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadGroundRenderPlanTest --parallel 2
 
-      - name: Run ground-only road gate
+      - name: Run procedural 2D road gate
         run: build/ch-procedural-road/MapForge2ProceduralRoadGroundRenderPlanTest
 
-      - name: Build procedural road preview
-        run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadPreview --parallel 2
-
-      - name: Build headless PNG proof wrapper
+      - name: Build procedural 2D PNG proof
         run: cmake --build build/ch-procedural-road --target MapForge2ProceduralRoadPngProof --parallel 2
 
-      - name: Render procedural road proof
+      - name: Render procedural 2D road proof
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
@@ -81,13 +91,13 @@ jobs:
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['workerContract'] == 'CH_MATH_WORKER_V1'
           assert isinstance(data.get('result'), dict) and data['result']
-          print('Procedural road editor + ground gate + PNG proof: OK')
+          print('Procedural road 2D renderer + MapForge integration + PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
         uses: actions/upload-artifact@v4
         with:
-          name: CH-Procedural-Road-Proof
+          name: CH-Procedural-Road-2D-Proof
           path: out/ch-procedural-road/**
           if-no-files-found: error
           retention-days: 14
