@@ -1,8 +1,8 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_lush_01",
-  "pipelineRevision": 12,
-  "revisionNote": "dense domed canopy rerender",
+  "pipelineRevision": 13,
+  "revisionNote": "defined-leaf canopy based on approved lush broadleaf reference",
   "canvas": [256, 320],
   "anchor": [128, 310],
   "seed": 91573,
@@ -30,17 +30,19 @@
   },
   "lightingIntent": {
     "reference": "approved lush broadleaf with dense rounded canopy, bright yellow-green crown highlights, deep cool-green interior and short continuous forked trunk",
-    "top": "fresh yellow-green sunlit leaf masses",
-    "front": "dense overlapping broadleaf clusters with minimal empty gaps",
+    "top": "fresh yellow-green sunlit defined leaf clusters",
+    "front": "dense overlapping simple leaves with minimal empty gaps",
     "base": "short stout warm-brown trunk with readable root flare",
     "rotationSpace": "procedural quarter turns under CH_CAMERA_V1"
   },
   "broadleafStructure": {
-    "layout": "crown_groups",
+    "layout": "leaf_canopy",
     "profile": "domed",
     "center": [128, 145],
-    "radius": [104, 110],
-    "density": 1.28
+    "radius": [99, 97],
+    "density": 1.25,
+    "species": "oiti",
+    "leafDetail": "defined"
   },
   "palette": {
     "ground_shadow": "#243128",
@@ -51,16 +53,16 @@
     "back_bottom": "#123225",
     "mid_top": "#668A45",
     "mid_bottom": "#315B37",
-    "front_top": "#8FB34B",
+    "front_top": "#91B84D",
     "front_bottom": "#4E793D",
-    "highlight": "#BDD966",
+    "highlight": "#C0DC67",
     "occlusion": "#17382A"
   },
   "raster": {
     "shadowDabs": 0,
     "highlightDabs": 0,
     "needleStrokes": 0,
-    "finalGrain": 95,
+    "finalGrain": 105,
     "finalNeedles": 0
   },
   "trunkBranches": [
@@ -93,6 +95,7 @@
       "w1": 4
     }
   ],
+  "paletteId": "lush_broadleaf_reference_01",
   "validation": {
     "minimumOpaqueHeightPx": 245,
     "maximumOpaqueHeightPx": 318
