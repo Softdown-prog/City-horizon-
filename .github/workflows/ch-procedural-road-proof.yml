@@ -67,7 +67,7 @@ jobs:
           #include "src/runtime_map_renderer.h"
 
           int main() {
-              RoadManager roads;
+              RoadManager roads(0, 64);
               ch::CameraState camera{};
               return ch::try_render_procedural_roads_runtime(
                   nullptr, roads, camera, 1280.0F, 720.0F) ? 1 : 0;
