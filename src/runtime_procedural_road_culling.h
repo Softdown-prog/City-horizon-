@@ -121,17 +121,25 @@ build_visible_procedural_road_ground_render_plan(
     ProceduralRoadVisibleGroundRenderPlan visible;
     const ProceduralRoadGraph& graph = bridge.graph();
 
-    visible.plan.segment_meshes.reserve(std::min<std::size_t>(graph.segments().size(), 256U));
-    for (const ProceduralRoadGraphSegment& segment : graph.segments()) {
-        // Cheap endpoint AABB first. This is deliberately before
-        // procedural_road_visual_spline_2d(), whose corner smoothing asks for
-        // degree/adjacency information and is much more expensive on large graphs.
-        if (!procedural_road_graph_segment_intersects_world_bounds(graph, segment, bounds)) {
+    const std::vector<ProceduralRoadSegmentId> candidate_segments =
+        bridge.spatial_segments_in_bounds(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+    visible.culled_segments = graph.segments().size() >= candidate_segments.size()
+        ? graph.segments().size() - candidate_segments.size()
+        : 0U;
+    visible.plan.segment_meshes.reserve(candidate_segments.size());
+
+    for (const ProceduralRoadSegmentId segment_id : candidate_segments) {
+        const ProceduralRoadGraphSegment* segment = graph.segment(segment_id);
+        if (segment == nullptr) continue;
+
+        // Spatial chunks are intentionally conservative. Exact endpoint AABB
+        // remains a cheap second gate before spline smoothing/topology work.
+        if (!procedural_road_graph_segment_intersects_world_bounds(graph, *segment, bounds)) {
             ++visible.culled_segments;
             continue;
         }
 
-        const auto spline = procedural_road_visual_spline_2d(graph, segment.id);
+        const auto spline = procedural_road_visual_spline_2d(graph, segment->id);
         if (!spline) {
             ++visible.plan.skipped_elevated_segments;
             continue;
@@ -149,25 +157,34 @@ build_visible_procedural_road_ground_render_plan(
         if (!mesh.empty()) visible.plan.segment_meshes.push_back(std::move(mesh));
     }
 
-    for (const ProceduralRoadNode& node : graph.nodes()) {
-        // Position rejection must happen before degree(). The graph currently
-        // computes degree by scanning segments, so doing it for offscreen nodes
-        // would defeat the runtime culling gate.
-        if (!bounds.contains({node.position.x, node.position.y}, 1.25F)) {
+    constexpr float kJunctionQueryPadding = 1.25F;
+    const std::vector<ProceduralRoadNodeId> candidate_nodes = bridge.spatial_nodes_in_bounds(
+        bounds.min_x - kJunctionQueryPadding,
+        bounds.min_y - kJunctionQueryPadding,
+        bounds.max_x + kJunctionQueryPadding,
+        bounds.max_y + kJunctionQueryPadding);
+    visible.culled_junctions = graph.nodes().size() >= candidate_nodes.size()
+        ? graph.nodes().size() - candidate_nodes.size()
+        : 0U;
+
+    for (const ProceduralRoadNodeId node_id : candidate_nodes) {
+        const ProceduralRoadNode* node = graph.node(node_id);
+        if (node == nullptr) continue;
+        if (!bounds.contains({node->position.x, node->position.y}, kJunctionQueryPadding)) {
             ++visible.culled_junctions;
             continue;
         }
 
-        const std::size_t degree = graph.degree(node.id);
+        const std::size_t degree = graph.degree(node->id);
         if (degree < 2U) continue;
         ++visible.considered_junctions;
-        if (!std::isfinite(node.position.z) || std::abs(node.position.z) > 0.0001F) {
+        if (!std::isfinite(node->position.z) || std::abs(node->position.z) > 0.0001F) {
             ++visible.plan.skipped_mixed_junctions;
             continue;
         }
 
         bool all_incident_ground = true;
-        for (const ProceduralRoadSegmentId segment_id : graph.connected_segments(node.id)) {
+        for (const ProceduralRoadSegmentId segment_id : graph.connected_segments(node->id)) {
             const auto spline = procedural_road_visual_spline_2d(graph, segment_id);
             if (!spline || !procedural_road_spline_is_ground_only(*spline)) {
                 all_incident_ground = false;
@@ -179,7 +196,7 @@ build_visible_procedural_road_ground_render_plan(
             continue;
         }
 
-        ProceduralRoad2DMesh patch = build_procedural_road_2d_junction_patch(graph, node.id);
+        ProceduralRoad2DMesh patch = build_procedural_road_2d_junction_patch(graph, node->id);
         if (!patch.empty()) visible.plan.junction_meshes.push_back(std::move(patch));
     }
 
@@ -190,12 +207,13 @@ namespace ch {
 
 [[nodiscard]] inline bool render_visible_procedural_road_center_markings(
     SDL_Renderer* renderer,
-    const ProceduralRoadGraph& graph,
+    const ProceduralRoadPlacementBridge& bridge,
     const CameraState& camera,
     const float viewport_width,
     const float viewport_height,
     const ProceduralRoad2DWorldBounds& bounds) {
     if (renderer == nullptr) return false;
+    const ProceduralRoadGraph& graph = bridge.graph();
 
     Uint8 old_r = 0;
     Uint8 old_g = 0;
@@ -211,12 +229,16 @@ namespace ch {
     constexpr int kPatternSamples = kDashSamples + kGapSamples;
 
     bool ok = true;
-    for (const ProceduralRoadGraphSegment& graph_segment : graph.segments()) {
-        if (!procedural_road_graph_segment_intersects_world_bounds(graph, graph_segment, bounds)) {
+    const std::vector<ProceduralRoadSegmentId> candidate_segments =
+        bridge.spatial_segments_in_bounds(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+    for (const ProceduralRoadSegmentId segment_id : candidate_segments) {
+        const ProceduralRoadGraphSegment* graph_segment = graph.segment(segment_id);
+        if (graph_segment == nullptr ||
+            !procedural_road_graph_segment_intersects_world_bounds(graph, *graph_segment, bounds)) {
             continue;
         }
 
-        const auto spline = procedural_road_visual_spline_2d(graph, graph_segment.id);
+        const auto spline = procedural_road_visual_spline_2d(graph, graph_segment->id);
         if (!spline || !procedural_road_spline_is_ground_only(*spline) ||
             !procedural_road_spline_intersects_world_bounds(*spline, bounds)) {
             continue;
@@ -224,8 +246,8 @@ namespace ch {
 
         float begin_t = 0.0F;
         float end_t = 1.0F;
-        if (graph.degree(graph_segment.start_node) >= 3U) begin_t = kJunctionGapT;
-        if (graph.degree(graph_segment.end_node) >= 3U) end_t = 1.0F - kJunctionGapT;
+        if (graph.degree(graph_segment->start_node) >= 3U) begin_t = kJunctionGapT;
+        if (graph.degree(graph_segment->end_node) >= 3U) end_t = 1.0F - kJunctionGapT;
         if (begin_t >= end_t) continue;
 
         for (int sample = 0; sample < kSamples; ++sample) {
