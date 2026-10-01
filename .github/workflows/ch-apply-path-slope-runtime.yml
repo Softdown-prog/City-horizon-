@@ -57,3 +57,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Use baked sprites for terrain path slopes"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+
+# One-shot migration workflow; removed after the runtime commit is verified.
