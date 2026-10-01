@@ -1,10 +1,10 @@
 {
   "contract": "CH_AUDIO_GENERATION_V1",
-  "id": "viking_ship_wooden_swing_review",
+  "id": "viking_ship_rope_creak_review",
   "kind": "effect",
-  "prompt": "Theme park Viking ship swinging ride sound effect, large heavy wooden pirate ship pendulum moving through its arc, deep timber creaks and groans, sturdy wooden hull flexing, subtle metal axle and chain strain, brief soft mechanical clunk near the direction change, gentle air whoosh as the ship gains speed, believable amusement park ride machinery, warm heavy wood character, clean game-ready sound design, no voices, no screams, no crowd, no music, no horn, no engine",
+  "prompt": "Theme park Viking ship ride sound effect focused on thick tensioned rope creaks and rope fibers straining under load while the large wooden swinging ship changes direction. Rhythmic dry rope squeaks, twisting hemp rope friction, stretched cordage groans, subtle pulley and wooden frame creaks, occasional low wooden stress sound. No engine, no chain rattling, no metallic machinery, no crowd, no screams, no voices, no music, no horn, no water, no wind whoosh. The dominant sound must be heavy rope creaking under tension, suitable for a classic wooden amusement park Viking ship ride.",
   "durationSeconds": 6.0,
-  "tags": ["park", "ride", "viking-ship", "wood", "creak", "mechanical", "swing", "tycoon", "local-ai", "review"],
+  "tags": ["park", "ride", "viking-ship", "rope", "creak", "wood", "tension", "swing", "tycoon", "local-ai", "review"],
   "provider": {
     "type": "command",
     "command": [
@@ -17,7 +17,7 @@
       "--dit-precision", "w8a8-dyn",
       "--decoder-precision", "w8a8",
       "--threads", "4",
-      "--seed", "20261001",
+      "--seed", "20261002",
       "--cfg", "1.0"
     ]
   },
