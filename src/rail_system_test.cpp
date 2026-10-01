@@ -36,6 +36,16 @@ void assert_mesh_safe(const RailMesh& mesh, const RailProfile& profile) {
 int main() {
     const RailProfile profile{};
 
+    // Refined visual proportions remain physically coherent. These assertions
+    // intentionally protect silhouette/readability without weakening any of the
+    // structural safety limits below.
+    assert(profile.ballast_width > profile.sleeper_length);
+    assert(profile.sleeper_length > profile.gauge);
+    assert(profile.gauge > profile.rail_width * 2.0F);
+    assert(profile.rail_height > profile.sleeper_height);
+    assert(profile.ballast_height > 0.0F);
+    assert(profile.sleeper_spacing > profile.sleeper_width);
+
     // Straight rail produces four volumetric material groups.
     const RailSplineSegment straight = straight_segment();
     const RailBuildResult straight_build = RailMeshBuilder::build(straight, profile);
