@@ -1,15 +1,19 @@
+#include "src/ch_core/map_document.h"
+#include "src/ch_core/procedural_tile_2d.h"
 #include "src/ch_core/projection.h"
-#include "src/ch_core/terrain_heightfield.h"
 
 #include <QColor>
 #include <QFont>
 #include <QGuiApplication>
 #include <QImage>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPainterPathStroker>
 #include <QPen>
 #include <QPolygonF>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <iomanip>
@@ -24,28 +28,45 @@ constexpr int kMinTile = -6;
 constexpr int kMaxTile = 5;
 constexpr float kHeightPixelsPerUnit = 16.0F; // Matches MapRenderer heightfield deformation.
 
-QPointF projectedVertex(const ch::TerrainHeightField& field, const int x, const int y,
-                        const ch::CameraState& camera) {
+struct PathCell {
+    int x = 0;
+    int y = 0;
+};
+
+// One connected pilot deliberately contains ends, straights, rounded corners
+// and a T junction. It crosses both sculpt zones so the exact same logical 2D
+// path automatically becomes flat, ramp or stairs as the heightfield changes.
+constexpr std::array<PathCell, 17> kPathCells = {{
+    {-5, -2}, {-4, -2}, {-3, -2}, {-2, -2}, {-1, -2}, {0, -2},
+    {0, -1}, {0, 0}, {1, 0}, {2, 0}, {3, 0},
+    {3, 1}, {3, 2},
+    {0, 1}, {0, 2},
+    {-2, -1}, {-2, 0},
+}};
+
+QPointF projectedPoint(const ch::MapDocument& document, const float worldX, const float worldY,
+                       const ch::CameraState& camera) {
     ch::ScreenPoint point = ch::world_to_screen_point(
-        static_cast<float>(x), static_cast<float>(y), camera,
+        worldX, worldY, camera,
         static_cast<float>(kWidth), static_cast<float>(kHeight));
-    point.y -= field.height_at(x, y) * kHeightPixelsPerUnit * camera.zoom;
+    point.y -= document.terrain_heightfield().sample(worldX, worldY) *
+               kHeightPixelsPerUnit * camera.zoom;
     return QPointF(point.x, point.y);
 }
 
-QPolygonF tilePolygon(const ch::TerrainHeightField& field, const int x, const int y,
+QPolygonF tilePolygon(const ch::MapDocument& document, const int x, const int y,
                       const ch::CameraState& camera) {
     return QPolygonF{
-        projectedVertex(field, x, y, camera),
-        projectedVertex(field, x + 1, y, camera),
-        projectedVertex(field, x + 1, y + 1, camera),
-        projectedVertex(field, x, y + 1, camera),
+        projectedPoint(document, static_cast<float>(x), static_cast<float>(y), camera),
+        projectedPoint(document, static_cast<float>(x + 1), static_cast<float>(y), camera),
+        projectedPoint(document, static_cast<float>(x + 1), static_cast<float>(y + 1), camera),
+        projectedPoint(document, static_cast<float>(x), static_cast<float>(y + 1), camera),
     };
 }
 
-float tileAverageHeight(const ch::TerrainHeightField& field, const int x, const int y) {
-    return (field.height_at(x, y) + field.height_at(x + 1, y) +
-            field.height_at(x + 1, y + 1) + field.height_at(x, y + 1)) * 0.25F;
+float tileAverageHeight(const ch::MapDocument& document, const int x, const int y) {
+    return (document.terrain_height_at(x, y) + document.terrain_height_at(x + 1, y) +
+            document.terrain_height_at(x + 1, y + 1) + document.terrain_height_at(x, y + 1)) * 0.25F;
 }
 
 QColor terrainColor(const float height) {
@@ -62,7 +83,172 @@ bool insideBrush(const int tileX, const int tileY, const float centerX, const fl
     return std::sqrt(dx * dx + dy * dy) <= radius;
 }
 
-void drawFrame(const ch::TerrainHeightField& field, const ch::CameraState& camera,
+bool isPathCell(const int x, const int y) {
+    return std::any_of(kPathCells.begin(), kPathCells.end(), [x, y](const PathCell& cell) {
+        return cell.x == x && cell.y == y;
+    });
+}
+
+TileConnectionMask pathConnectionMask(const int x, const int y) {
+    TileConnectionMask mask = 0;
+    for (const CardinalDirection direction : kCardinalDirections) {
+        const TileOffset offset = direction_offset(direction);
+        if (isPathCell(x + offset.x, y + offset.y)) {
+            mask = static_cast<TileConnectionMask>(mask | connection_bit(direction));
+        }
+    }
+    return mask;
+}
+
+QPointF pathEdgePoint(const ch::MapDocument& document, const int x, const int y,
+                      const CardinalDirection direction, const ch::CameraState& camera) {
+    switch (direction) {
+        case CardinalDirection::north:
+            return projectedPoint(document, static_cast<float>(x) + 0.5F, static_cast<float>(y), camera);
+        case CardinalDirection::east:
+            return projectedPoint(document, static_cast<float>(x + 1), static_cast<float>(y) + 0.5F, camera);
+        case CardinalDirection::south:
+            return projectedPoint(document, static_cast<float>(x) + 0.5F, static_cast<float>(y + 1), camera);
+        case CardinalDirection::west:
+            return projectedPoint(document, static_cast<float>(x), static_cast<float>(y) + 0.5F, camera);
+    }
+    return projectedPoint(document, static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F, camera);
+}
+
+QPainterPath pathCenterline(const ch::MapDocument& document, const PathCell& cell,
+                            const TileConnectionMask mask, const ch::CameraState& camera) {
+    const QPointF center = projectedPoint(document,
+                                          static_cast<float>(cell.x) + 0.5F,
+                                          static_cast<float>(cell.y) + 0.5F,
+                                          camera);
+    QPainterPath line;
+    if (mask == 0) {
+        line.addEllipse(center, 1.0, 1.0);
+        return line;
+    }
+
+    for (const CardinalDirection direction : kCardinalDirections) {
+        if (!has_connection(mask, direction)) continue;
+        line.moveTo(center);
+        line.lineTo(pathEdgePoint(document, cell.x, cell.y, direction, camera));
+    }
+    return line;
+}
+
+QPainterPath strokedPathShape(const QPainterPath& centerline, const qreal width) {
+    QPainterPathStroker stroker;
+    stroker.setWidth(width);
+    stroker.setCapStyle(Qt::RoundCap);
+    stroker.setJoinStyle(Qt::RoundJoin);
+    return stroker.createStroke(centerline);
+}
+
+void drawProceduralPathDetails(QPainter& painter, const ch::MapDocument& document,
+                               const PathCell& cell, const ch::ProceduralTileRecipe& recipe,
+                               const QPainterPath& surfaceShape, const ch::CameraState& camera,
+                               const qreal innerWidth) {
+    if (recipe.vertical_profile == ch::ProceduralTileVerticalProfile::flat) return;
+
+    const QPointF low = pathEdgePoint(document, cell.x, cell.y, recipe.low_edge, camera);
+    const QPointF high = pathEdgePoint(document, cell.x, cell.y, recipe.high_edge, camera);
+    QPointF axis = high - low;
+    const qreal axisLength = std::hypot(axis.x(), axis.y());
+    if (axisLength < 0.5) return;
+    axis /= axisLength;
+
+    painter.save();
+    painter.setClipPath(surfaceShape, Qt::IntersectClip);
+
+    if (recipe.vertical_profile == ch::ProceduralTileVerticalProfile::ramp) {
+        // A quiet centre highlight makes the incline readable without changing
+        // the approved dirt material into a glossy or 3D-looking surface.
+        const QPointF start = low + axis * (axisLength * 0.18);
+        const QPointF end = high - axis * (axisLength * 0.18);
+        painter.setPen(QPen(QColor(220, 176, 112, 95), 1.4, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(start, end);
+    } else {
+        const int visibleSteps = std::clamp(recipe.stair_count, 2, 9);
+        const QPointF perpendicular(-axis.y(), axis.x());
+        const qreal halfStepWidth = innerWidth * 0.43;
+
+        for (int step = 1; step <= visibleSteps; ++step) {
+            const qreal t = static_cast<qreal>(step) / static_cast<qreal>(visibleSteps + 1);
+            const QPointF center = low + axis * (axisLength * t);
+            const QPointF a = center - perpendicular * halfStepWidth;
+            const QPointF b = center + perpendicular * halfStepWidth;
+
+            painter.setPen(QPen(QColor(78, 52, 31, 185), 1.8, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(a, b);
+            painter.setPen(QPen(QColor(226, 184, 120, 105), 0.8, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(a - axis * 1.3, b - axis * 1.3);
+        }
+    }
+
+    painter.restore();
+}
+
+void drawProceduralPath(QPainter& painter, const ch::MapDocument& document,
+                        const ch::CameraState& camera,
+                        int& flatCount, int& rampCount, int& stairCount,
+                        int& endCount, int& cornerCount, int& junctionCount) {
+    const qreal outerWidth = 25.0 * camera.zoom;
+    const qreal innerWidth = 18.0 * camera.zoom;
+
+    // First pass: one continuous-looking 2D material network. Round caps create
+    // half-moon ends and round joins create curves without extra PNG variants.
+    for (const PathCell& cell : kPathCells) {
+        const TileConnectionMask mask = pathConnectionMask(cell.x, cell.y);
+        const ch::ProceduralTileRecipe recipe =
+            ch::make_procedural_tile_2d_recipe(document, cell.x, cell.y, mask);
+        const QPainterPath centerline = pathCenterline(document, cell, mask, camera);
+
+        if (mask == 0) {
+            const QPointF center = projectedPoint(document,
+                                                  static_cast<float>(cell.x) + 0.5F,
+                                                  static_cast<float>(cell.y) + 0.5F,
+                                                  camera);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(74, 49, 30, 230));
+            painter.drawEllipse(center, outerWidth * 0.5, outerWidth * 0.5);
+            painter.setBrush(QColor(171, 121, 67, 255));
+            painter.drawEllipse(center, innerWidth * 0.5, innerWidth * 0.5);
+        } else {
+            painter.setBrush(Qt::NoBrush);
+            painter.setPen(QPen(QColor(74, 49, 30, 230), outerWidth,
+                                Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.drawPath(centerline);
+            painter.setPen(QPen(QColor(171, 121, 67, 255), innerWidth,
+                                Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.drawPath(centerline);
+        }
+
+        switch (recipe.vertical_profile) {
+            case ch::ProceduralTileVerticalProfile::flat: ++flatCount; break;
+            case ch::ProceduralTileVerticalProfile::ramp: ++rampCount; break;
+            case ch::ProceduralTileVerticalProfile::stairs: ++stairCount; break;
+        }
+        switch (recipe.topology) {
+            case ch::ProceduralTileTopology::end: ++endCount; break;
+            case ch::ProceduralTileTopology::corner: ++cornerCount; break;
+            case ch::ProceduralTileTopology::tee:
+            case ch::ProceduralTileTopology::cross: ++junctionCount; break;
+            default: break;
+        }
+    }
+
+    // Second pass: slope details sit on top of the complete network, so a
+    // neighbouring tile cannot paint over the stair/ramp cue at a shared edge.
+    for (const PathCell& cell : kPathCells) {
+        const TileConnectionMask mask = pathConnectionMask(cell.x, cell.y);
+        const ch::ProceduralTileRecipe recipe =
+            ch::make_procedural_tile_2d_recipe(document, cell.x, cell.y, mask);
+        const QPainterPath centerline = pathCenterline(document, cell, mask, camera);
+        const QPainterPath surfaceShape = strokedPathShape(centerline, innerWidth);
+        drawProceduralPathDetails(painter, document, cell, recipe, surfaceShape, camera, innerWidth);
+    }
+}
+
+void drawFrame(const ch::MapDocument& document, const ch::CameraState& camera,
                const float brushX, const float brushY, const float brushRadius,
                const QString& operation, const int frameIndex,
                const std::filesystem::path& outputDir) {
@@ -87,9 +273,9 @@ void drawFrame(const ch::TerrainHeightField& field, const ch::CameraState& camer
             const int y = depth - x;
             if (y < kMinTile || y > kMaxTile) continue;
 
-            const QPolygonF polygon = tilePolygon(field, x, y, camera);
+            const QPolygonF polygon = tilePolygon(document, x, y, camera);
             painter.setPen(gridPen);
-            painter.setBrush(terrainColor(tileAverageHeight(field, x, y)));
+            painter.setBrush(terrainColor(tileAverageHeight(document, x, y)));
             painter.drawPolygon(polygon);
 
             if (insideBrush(x, y, brushX, brushY, brushRadius)) {
@@ -105,12 +291,22 @@ void drawFrame(const ch::TerrainHeightField& field, const ch::CameraState& camer
         }
     }
 
+    int flatCount = 0;
+    int rampCount = 0;
+    int stairCount = 0;
+    int endCount = 0;
+    int cornerCount = 0;
+    int junctionCount = 0;
+    drawProceduralPath(painter, document, camera,
+                       flatCount, rampCount, stairCount,
+                       endCount, cornerCount, junctionCount);
+
     QFont titleFont = painter.font();
     titleFont.setBold(true);
     titleFont.setPointSize(17);
     painter.setFont(titleFont);
     painter.setPen(QColor(239, 245, 239));
-    painter.drawText(QPointF(42, 55), QStringLiteral("MapForge · CH_TERRAIN_HEIGHTFIELD_V1"));
+    painter.drawText(QPointF(42, 55), QStringLiteral("MapForge · CH_PROCEDURAL_TILE_2D_V1"));
 
     QFont infoFont = painter.font();
     infoFont.setBold(true);
@@ -123,9 +319,17 @@ void drawFrame(const ch::TerrainHeightField& field, const ch::CameraState& camer
     infoFont.setPointSize(10);
     painter.setFont(infoFont);
     painter.setPen(QColor(205, 219, 208));
-    painter.drawText(QPointF(42, 108), QStringLiteral("Elevação contínua por vértices compartilhados · câmera CH_CAMERA_V1"));
+    painter.drawText(QPointF(42, 108),
+                     QStringLiteral("Grid 2D preservado · meia-lua, curva, rampa e escada derivados de vizinhança + heightfield"));
+    painter.drawText(QPointF(42, 130),
+                     QStringLiteral("perfil: plano %1 · rampa %2 · escada %3")
+                         .arg(flatCount).arg(rampCount).arg(stairCount));
+    painter.drawText(QPointF(42, 150),
+                     QStringLiteral("topologia: pontas %1 · cantos %2 · junções %3")
+                         .arg(endCount).arg(cornerCount).arg(junctionCount));
     painter.drawText(QPointF(42, kHeight - 37),
-                     QStringLiteral("frame %1 · raio %2").arg(frameIndex + 1, 2, 10, QLatin1Char('0')).arg(brushRadius, 0, 'f', 1));
+                     QStringLiteral("frame %1 · raio %2 · câmera CH_CAMERA_V1")
+                         .arg(frameIndex + 1, 2, 10, QLatin1Char('0')).arg(brushRadius, 0, 'f', 1));
 
     std::ostringstream filename;
     filename << "frame_" << std::setw(3) << std::setfill('0') << frameIndex << ".png";
@@ -141,7 +345,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path outputDir(argv[1]);
     std::filesystem::create_directories(outputDir);
 
-    ch::TerrainHeightField field;
+    ch::MapDocument document = ch::MapDocument::create_empty("procedural-tile-2d-proof", 16, 16);
     ch::CameraState camera{};
     camera.zoom = 0.82F;
     camera.pan_x = 0.0F;
@@ -156,21 +360,21 @@ int main(int argc, char** argv) {
         QString operation = QStringLiteral("ELEVAR");
 
         if (frame < 12) {
-            field.apply_brush(-2.0F, -1.0F, 3.15F, 0.24F, ch::TerrainBrushMode::raise);
+            document.apply_terrain_brush(-2.0F, -1.0F, 3.15F, 0.24F, ch::TerrainBrushMode::raise);
         } else if (frame < 24) {
             brushX = 2.1F;
             brushY = 1.3F;
             operation = QStringLiteral("REBAIXAR");
-            field.apply_brush(2.1F, 1.3F, 3.15F, 0.22F, ch::TerrainBrushMode::lower);
+            document.apply_terrain_brush(2.1F, 1.3F, 3.15F, 0.22F, ch::TerrainBrushMode::lower);
         } else {
             brushX = 0.0F;
             brushY = 0.0F;
             brushRadius = 5.0F;
             operation = QStringLiteral("SUAVIZAR");
-            field.apply_brush(0.0F, 0.0F, 5.0F, 0.42F, ch::TerrainBrushMode::smooth);
+            document.apply_terrain_brush(0.0F, 0.0F, 5.0F, 0.42F, ch::TerrainBrushMode::smooth);
         }
 
-        drawFrame(field, camera, brushX, brushY, brushRadius, operation, frame, outputDir);
+        drawFrame(document, camera, brushX, brushY, brushRadius, operation, frame, outputDir);
     }
 
     return 0;
