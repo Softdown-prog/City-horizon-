@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -41,6 +41,16 @@ PORTS = {
 AXES = {
     "ns": ("n", "s"),
     "ew": ("w", "e"),
+}
+
+# The *other* isometric grid axis is the correct screen-space direction for a
+# stair riser. A world-space 90 degree turn does NOT become a Euclidean 90
+# degree turn after 2:1 isometric projection. Using the other iso axis keeps
+# each step edge parallel to the tile grid instead of producing the overly
+# vertical/diagonal stripes from the first pilot.
+TRANSVERSE_AXES = {
+    "ns": ("w", "e"),
+    "ew": ("s", "n"),
 }
 
 
@@ -74,19 +84,41 @@ def load_source(path: Path) -> Image.Image:
     return image
 
 
+def determinant(ax: float, ay: float, bx: float, by: float) -> float:
+    return ax * by - ay * bx
+
+
 def axis_t(x: float, y: float, axis: str, high_end: str) -> float:
-    """Return normalized position 0..1 from the low endpoint to high endpoint."""
+    """Return 0..1 from low endpoint to high endpoint in isometric grid space.
+
+    The original pilot projected the pixel onto the path vector with a normal
+    Euclidean dot product. That makes constant-t lines Euclidean-perpendicular
+    to the path, which is visually wrong after a 2:1 isometric projection.
+
+    Here we solve the point in the basis formed by the longitudinal path axis
+    and the *other isometric grid axis*. Constant-t bands therefore run exactly
+    along the opposite diamond axis, which is the direction a stair edge must
+    have in the final sprite.
+    """
     a_name, b_name = AXES[axis]
     if high_end not in (a_name, b_name):
         raise ValueError(f"high_end={high_end} is not on axis={axis}")
+
     low_end = b_name if high_end == a_name else a_name
     x0, y0 = PORTS[low_end]
     x1, y1 = PORTS[high_end]
-    vx, vy = x1 - x0, y1 - y0
-    denom = vx * vx + vy * vy
-    if denom <= 0.0:
+    lx, ly = x1 - x0, y1 - y0
+
+    cross_a, cross_b = TRANSVERSE_AXES[axis]
+    cx = PORTS[cross_b][0] - PORTS[cross_a][0]
+    cy = PORTS[cross_b][1] - PORTS[cross_a][1]
+
+    denom = determinant(lx, ly, cx, cy)
+    if abs(denom) <= 1.0e-6:
         return 0.0
-    t = ((x - x0) * vx + (y - y0) * vy) / denom
+
+    qx, qy = x - x0, y - y0
+    t = determinant(qx, qy, cx, cy) / denom
     return max(0.0, min(1.0, t))
 
 
@@ -113,8 +145,8 @@ def render_variant(source: Image.Image, axis: str, high_end: str, profile: Profi
 
     Treads are copied directly from the approved source texture. Stair risers
     are generated only at quantized step boundaries and are clipped by the
-    source alpha, preventing the long free-form protruding lines seen in the
-    runtime procedural proof.
+    source alpha. Their direction follows the opposite isometric grid axis,
+    preserving the visual orientation of the 2:1 tile diamond.
     """
     src = source.load()
     out = Image.new("RGBA", (TILE_W, CANVAS_H), (0, 0, 0, 0))
@@ -199,6 +231,23 @@ def make_contact_sheet(flat_ns: Image.Image, flat_ew: Image.Image, variants: lis
     sheet.save(path)
 
 
+def validate_isometric_step_direction() -> None:
+    """Guard against reintroducing Euclidean-perpendicular stair bands."""
+    for axis, (cross_a, cross_b) in TRANSVERSE_AXES.items():
+        a_name, b_name = AXES[axis]
+        for high_end in (a_name, b_name):
+            low_end = b_name if high_end == a_name else a_name
+            low = PORTS[low_end]
+            high = PORTS[high_end]
+            mid = ((low[0] + high[0]) * 0.5, (low[1] + high[1]) * 0.5)
+            cx = PORTS[cross_b][0] - PORTS[cross_a][0]
+            cy = PORTS[cross_b][1] - PORTS[cross_a][1]
+            t0 = axis_t(mid[0], mid[1], axis, high_end)
+            t1 = axis_t(mid[0] + cx * 0.20, mid[1] + cy * 0.20, axis, high_end)
+            if abs(t0 - t1) > 1.0e-5:
+                raise AssertionError(f"{axis}/{high_end}: riser band is not parallel to transverse iso axis")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ns-source", type=Path, default=Path("assets/terrain/paths/dirt_01/dirt_path_05_straight_ns.png"))
@@ -208,6 +257,8 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=Path("out/dirt_slope_sprite_pilot_manifest.json"))
     args = parser.parse_args()
 
+    validate_isometric_step_direction()
+
     ns = load_source(args.ns_source)
     ew = load_source(args.ew_source)
     sources = {"ns": ns, "ew": ew}
@@ -216,6 +267,7 @@ def main() -> None:
     manifest: dict[str, object] = {
         "contract": "CH_PATH_SPRITE_PILOT_V1",
         "runtime_visual_policy": "sprite_select_only",
+        "riser_alignment": "opposite_isometric_grid_axis",
         "tile_size": [TILE_W, TILE_H],
         "sprite_canvas": [TILE_W, CANVAS_H],
         "legacy_surface_y": TOP_PAD,
@@ -255,7 +307,7 @@ def main() -> None:
 
     print(
         f"PASS contract=CH_PATH_SPRITE_PILOT_V1 generated={generated} "
-        f"source_texture_preserved=true output={args.output_dir}"
+        f"source_texture_preserved=true riser_alignment=iso_cross_axis output={args.output_dir}"
     )
 
 
