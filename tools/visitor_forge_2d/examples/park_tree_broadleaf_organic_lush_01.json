@@ -1,7 +1,7 @@
 {
   "contract": "CH_2D_ORGANIC_SCENERY_V1",
   "id": "park_tree_broadleaf_organic_lush_01",
-  "pipelineRevision": 11,
+  "pipelineRevision": 12,
   "canvas": [256, 320],
   "anchor": [128, 310],
   "seed": 91573,
@@ -35,12 +35,11 @@
     "rotationSpace": "procedural quarter turns under CH_CAMERA_V1"
   },
   "broadleafStructure": {
-    "layout": "continuous",
-    "profile": "wide_umbrella",
+    "layout": "crown_groups",
+    "profile": "domed",
     "center": [128, 145],
-    "radius": [101, 108],
-    "masses": 62,
-    "density": 1.18
+    "radius": [104, 110],
+    "density": 1.28
   },
   "palette": {
     "ground_shadow": "#243128",
@@ -60,36 +59,36 @@
     "shadowDabs": 0,
     "highlightDabs": 0,
     "needleStrokes": 0,
-    "finalGrain": 120,
+    "finalGrain": 95,
     "finalNeedles": 0
   },
   "trunkBranches": [
     {
       "p0": [128, 310],
-      "p1": [127, 262],
-      "p2": [128, 190],
-      "w0": 25,
-      "w1": 13
+      "p1": [126, 267],
+      "p2": [128, 193],
+      "w0": 31,
+      "w1": 15
     },
     {
       "p0": [127, 235],
-      "p1": [108, 198],
-      "p2": [83, 164],
-      "w0": 12,
+      "p1": [108, 199],
+      "p2": [82, 165],
+      "w0": 14,
       "w1": 5
     },
     {
-      "p0": [129, 230],
-      "p1": [149, 192],
-      "p2": [176, 160],
-      "w0": 12,
+      "p0": [129, 232],
+      "p1": [149, 195],
+      "p2": [177, 162],
+      "w0": 14,
       "w1": 5
     },
     {
-      "p0": [128, 212],
-      "p1": [130, 183],
-      "p2": [136, 147],
-      "w0": 9,
+      "p0": [128, 215],
+      "p1": [130, 184],
+      "p2": [136, 148],
+      "w0": 10,
       "w1": 4
     }
   ],
