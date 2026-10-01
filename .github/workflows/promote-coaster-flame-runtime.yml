@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - '.github/workflows/promote-coaster-flame-runtime.yml'
+      - 'tools/runtime_promotion_requests/coaster_flame_01.json'
   workflow_dispatch:
 
 permissions:
