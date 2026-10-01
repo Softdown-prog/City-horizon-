@@ -7,6 +7,18 @@
 #include <unordered_map>
 #include <vector>
 
+// main.cpp temporarily aliases CityEconomy to the runtime bridge class before
+// including main_runtime_impl.cpp. MissionManager, however, is implemented in
+// mission_system.cpp against the canonical CityEconomy type. Keep this header's
+// ABI canonical even when it is reached from inside that compatibility wrapper;
+// otherwise the declaration is macro-rewritten to ChCityEconomy& while the
+// separately compiled definition still exports CityEconomy&, causing LNK2019.
+#if defined(CityEconomy)
+#pragma push_macro("CityEconomy")
+#undef CityEconomy
+#define CH_MISSION_RESTORE_CITY_ECONOMY_MACRO 1
+#endif
+
 // Legacy mission data types are kept only so old saves and call sites continue
 // to compile while missions are no longer part of the active game loop.
 struct MissionDefinition {
@@ -73,3 +85,8 @@ public:
     void restore_completed_missions(const std::vector<std::string>& mission_ids);
     [[nodiscard]] const std::unordered_map<std::string, MissionDefinition>& definitions() const;
 };
+
+#if defined(CH_MISSION_RESTORE_CITY_ECONOMY_MACRO)
+#pragma pop_macro("CityEconomy")
+#undef CH_MISSION_RESTORE_CITY_ECONOMY_MACRO
+#endif
