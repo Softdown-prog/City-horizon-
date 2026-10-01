@@ -1,0 +1,251 @@
+# One-shot promotion of the approved 40-frame Flame coaster-car pose atlas.
+name: Promote Coaster Flame pose atlas
+
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-coaster-flame-pose-atlas.yml'
+      - 'tools/runtime_promotion_requests/coaster_flame_pose_atlas_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ARTIFACT_ID: '11189062756'
+  SOURCE_RUN_ID: '36913578419'
+  SOURCE_COMMIT: '157194e2de0ec9ffbe419620ce4b06e07dbc8e37'
+  SOURCE_ARTIFACT_DIGEST: 'sha256:8a361fc321bbc1d42836ed5620f8ef89d1627c9eb82626f4d8c1e0b08d2189db'
+  APPROVED_PROXY_SHA: '7ec94238a47c771db417ad3419b101feaa211a2260d7eeb9236c39141290382a'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download approved pose-atlas artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/coaster-flame-pose-atlas"
+          mkdir -p "$work/artifact"
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o "$work/artifact.zip"
+          unzip -q "$work/artifact.zip" -d "$work/artifact"
+
+      - name: Install deterministic atlas packer dependency
+        run: python3 -m pip install --disable-pip-version-check pillow==11.3.0
+
+      - name: Validate, pack and promote 40 car poses
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path(os.environ['RUNNER_TEMP']) / 'coaster-flame-pose-atlas' / 'artifact'
+          source = root / 'coaster.car_flame_pose_atlas_v1.final.001'
+          required_meta = [
+              'pose_manifest.json',
+              'preflight_report.json',
+              'proxy_approval.json',
+              'studio_metadata.json',
+          ]
+          for name in required_meta:
+              if not (source / name).is_file():
+                  raise SystemExit(f'missing approved atlas output: {source / name}')
+
+          manifest = json.loads((source / 'pose_manifest.json').read_text(encoding='utf-8'))
+          preflight = json.loads((source / 'preflight_report.json').read_text(encoding='utf-8'))
+          approval = json.loads((source / 'proxy_approval.json').read_text(encoding='utf-8'))
+          studio = json.loads((source / 'studio_metadata.json').read_text(encoding='utf-8'))
+
+          if manifest.get('contract') != 'CH_COASTER_CAR_V1':
+              raise SystemExit('unexpected pose manifest contract')
+          if manifest.get('assetId') != 'ride.coaster.car_flame_pose_atlas_v1':
+              raise SystemExit('unexpected pose atlas assetId')
+          if manifest.get('styleId') != 'flame_01':
+              raise SystemExit('unexpected pose atlas styleId')
+          if manifest.get('trackContract') != 'CH_COASTER_TRACK_V1':
+              raise SystemExit('unexpected track contract')
+          if manifest.get('headingCount') != 16 or manifest.get('headingStepDegrees') != 22.5:
+              raise SystemExit('unexpected heading contract')
+          if manifest.get('totalFrames') != 40 or len(manifest.get('frames', [])) != 40:
+              raise SystemExit('pose atlas must contain exactly 40 frames')
+          if preflight.get('status') != 'pass' or preflight.get('violations'):
+              raise SystemExit('pose atlas preflight did not pass')
+          if approval.get('contract') != 'CH_PROXY_APPROVAL_V1' or approval.get('reviewed') is not True:
+              raise SystemExit('missing human pose proxy approval')
+          if approval.get('proxySha256') != os.environ['APPROVED_PROXY_SHA']:
+              raise SystemExit('approved pose proxy SHA mismatch')
+          if studio.get('cameraContract') != 'CH_CAMERA_V1' or studio.get('qualityStage') != 'final':
+              raise SystemExit('unexpected studio metadata')
+          if studio.get('frameCount') != 40:
+              raise SystemExit('studio metadata frame count mismatch')
+
+          destination = Path('assets/vehicles/coaster_flame_01')
+          runtime_path = destination / 'coaster_flame_01_runtime.json'
+          if not runtime_path.is_file():
+              raise SystemExit('Flame runtime package must already be promoted')
+          runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
+          if runtime.get('assetId') != 'vehicle.coaster.flame_01' or runtime.get('approvedForRuntime') is not True:
+              raise SystemExit('unexpected existing Flame runtime package')
+
+          # Preserve the builder manifest order. Flat headings occupy indices 0..15;
+          # vertical supplements occupy 16..39. The runtime selector uses the same order.
+          columns = 8
+          rows = 5
+          frame_w = 256
+          frame_h = 256
+          sheet = Image.new('RGBA', (columns * frame_w, rows * frame_h), (0, 0, 0, 0))
+          packed_frames = []
+          seen = set()
+          for index, frame in enumerate(manifest['frames']):
+              filename = frame.get('file', '')
+              if not filename or filename in seen:
+                  raise SystemExit(f'invalid or duplicate frame name: {filename!r}')
+              seen.add(filename)
+              frame_path = source / filename
+              if not frame_path.is_file():
+                  raise SystemExit(f'missing frame: {frame_path}')
+              image = Image.open(frame_path).convert('RGBA')
+              if image.size != (frame_w, frame_h):
+                  raise SystemExit(f'{filename} is not 256x256: {image.size}')
+              column = index % columns
+              row = index // columns
+              sheet.alpha_composite(image, (column * frame_w, row * frame_h))
+              packed = dict(frame)
+              packed.update({
+                  'atlasIndex': index,
+                  'row': row,
+                  'column': column,
+                  'sourceRect': [column * frame_w, row * frame_h, frame_w, frame_h],
+                  'sha256': hashlib.sha256(frame_path.read_bytes()).hexdigest(),
+              })
+              packed_frames.append(packed)
+
+          destination.mkdir(parents=True, exist_ok=True)
+          sheet_path = destination / 'car_pose_atlas.png'
+          sheet.save(sheet_path, format='PNG', optimize=False)
+          sheet_sha = hashlib.sha256(sheet_path.read_bytes()).hexdigest()
+
+          atlas_runtime = {
+              'contract': 'CH_COASTER_CAR_ATLAS_RUNTIME_V1',
+              'assetId': 'vehicle.coaster.flame_01.pose_atlas',
+              'sourceAssetId': manifest['assetId'],
+              'styleId': 'flame_01',
+              'trackContract': 'CH_COASTER_TRACK_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'poseContract': 'CH_COASTER_CAR_V1',
+              'runtimeRepresentation': '2D_RGBA_sprite_sheet',
+              'spriteSheet': sheet_path.name,
+              'spriteSheetSha256': sheet_sha,
+              'frameWidth': frame_w,
+              'frameHeight': frame_h,
+              'columns': columns,
+              'rows': rows,
+              'frameCount': 40,
+              'headingCount': 16,
+              'headingStepDegrees': 22.5,
+              'baseForwardAxis': '+Y',
+              'anchorWorld': manifest.get('anchor'),
+              'frameOrder': 'source_pose_manifest',
+              'frames': packed_frames,
+              'sourceCommit': os.environ['SOURCE_COMMIT'],
+              'sourceWorkflowRun': int(os.environ['SOURCE_RUN_ID']),
+              'sourceArtifactId': int(os.environ['ARTIFACT_ID']),
+              'sourceArtifactDigest': os.environ['SOURCE_ARTIFACT_DIGEST'],
+              'approvedProxySha256': os.environ['APPROVED_PROXY_SHA'],
+              'approvedForRuntime': True,
+          }
+          atlas_manifest_path = destination / 'car_pose_atlas_runtime.json'
+          atlas_manifest_path.write_text(
+              json.dumps(atlas_runtime, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          motion = runtime.setdefault('motionPlan', {})
+          motion.update({
+              'heroFourDirectionViewsPromoted': True,
+              'movingTrainUsesIndividualCars': True,
+              'poseAtlasContract': 'CH_COASTER_CAR_V1',
+              'poseAtlasRuntimeContract': 'CH_COASTER_CAR_ATLAS_RUNTIME_V1',
+              'poseAtlasStatus': 'ready',
+              'poseAtlasSpriteSheet': 'car_pose_atlas.png',
+              'poseAtlasManifest': 'car_pose_atlas_runtime.json',
+              'poseAtlasFrameCount': 40,
+              'flatHeadingCount': 16,
+              'flatHeadingStepDegrees': 22.5,
+              'verticalSupplementFrames': 24,
+              'wholeTrainSpriteUsedForCurves': False,
+          })
+          runtime['poseAtlasSource'] = {
+              'sourceCommit': os.environ['SOURCE_COMMIT'],
+              'sourceWorkflowRun': int(os.environ['SOURCE_RUN_ID']),
+              'sourceArtifactId': int(os.environ['ARTIFACT_ID']),
+              'sourceArtifactDigest': os.environ['SOURCE_ARTIFACT_DIGEST'],
+              'approvedProxySha256': os.environ['APPROVED_PROXY_SHA'],
+              'spriteSheetSha256': sheet_sha,
+          }
+          runtime_path.write_text(
+              json.dumps(runtime, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+          print('Promoted 40-frame Flame car pose atlas:', sheet_path)
+          print('spriteSheetSha256=', sheet_sha)
+          PY
+
+      - name: Verify promoted pose atlas package
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('assets/vehicles/coaster_flame_01')
+          runtime = json.loads((root / 'coaster_flame_01_runtime.json').read_text(encoding='utf-8'))
+          atlas = json.loads((root / 'car_pose_atlas_runtime.json').read_text(encoding='utf-8'))
+          assert runtime['motionPlan']['poseAtlasStatus'] == 'ready'
+          assert runtime['motionPlan']['poseAtlasFrameCount'] == 40
+          assert atlas['approvedForRuntime'] is True
+          assert atlas['frameCount'] == 40
+          assert len(atlas['frames']) == 40
+          assert [f['atlasIndex'] for f in atlas['frames']] == list(range(40))
+          sheet = Image.open(root / atlas['spriteSheet'])
+          assert sheet.mode == 'RGBA'
+          assert sheet.size == (2048, 1280)
+          for frame in atlas['frames']:
+              x, y, w, h = frame['sourceRect']
+              assert w == 256 and h == 256
+              assert 0 <= x <= 2048 - w and 0 <= y <= 1280 - h
+          print('Coaster Flame 40-frame pose atlas runtime package: OK')
+          PY
+
+      - name: Commit promoted pose atlas
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/vehicles/coaster_flame_01/car_pose_atlas.png \
+                  assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json \
+                  assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json
+          if git diff --cached --quiet; then
+            echo 'Nothing to promote.'
+            exit 0
+          fi
+          git commit -m "coaster: promote approved Flame car pose atlas"
+          git pull --rebase origin main
+          git push origin HEAD:main
