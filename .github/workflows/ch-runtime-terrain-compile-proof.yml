@@ -10,6 +10,8 @@ on:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
       - "src/runtime_terrain_renderer.h"
+      - "src/mission_system.cpp"
+      - "src/mission_system.h"
       - "src/park_fence_save_manager.h"
       - "src/pedestrian_system.cpp"
       - "src/building_system.cpp"
