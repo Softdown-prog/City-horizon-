@@ -44,6 +44,8 @@ jobs:
         run: |
           grep -q "CH_PROCEDURAL_ROAD_2D_RENDER_V1" src/procedural_road_ground_render_plan.h
           grep -q "ProceduralRoad2DMesh" src/ch_render/procedural_road_network_renderer.h
+          grep -q "CH_PROCEDURAL_ROAD_2D_RUNTIME_V1" src/runtime_procedural_road_renderer.h
+          grep -q "try_render_procedural_roads_runtime" src/runtime_map_renderer.h
           if grep -q "RoadMeshBuilder::build_cubic" src/procedural_road_ground_render_plan.h; then
             echo "3D RoadMeshBuilder leaked back into the canonical procedural road plan"
             exit 1
@@ -52,6 +54,15 @@ jobs:
             echo "Road Z projection leaked back into the canonical procedural 2D renderer"
             exit 1
           fi
+
+      - name: Configure City Horizon runtime
+        run: >-
+          cmake -S . -B build/ch-runtime-road -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+
+      - name: Build City Horizon runtime with procedural 2D roads
+        run: cmake --build build/ch-runtime-road --target city_builder --parallel 2
 
       - name: Configure focused MapForge build
         run: >-
@@ -91,7 +102,7 @@ jobs:
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['workerContract'] == 'CH_MATH_WORKER_V1'
           assert isinstance(data.get('result'), dict) and data['result']
-          print('Procedural road 2D renderer + MapForge integration + PNG proof: OK')
+          print('Procedural road 2D renderer + City Horizon runtime + MapForge integration + PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
