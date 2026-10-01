@@ -15,6 +15,19 @@ void test_camera_bounds_are_finite() {
     assert(bounds.min_y < bounds.max_y);
 }
 
+void test_invalid_viewport_bounds_are_rejected() {
+    ch::CameraState camera{};
+    camera.zoom = 1.0F;
+    const ProceduralRoad2DWorldBounds zero_width =
+        procedural_road_visible_world_bounds(camera, 0.0F, 720.0F);
+    assert(!zero_width.valid());
+
+    camera.zoom = 0.0F;
+    const ProceduralRoad2DWorldBounds zero_zoom =
+        procedural_road_visible_world_bounds(camera, 1280.0F, 720.0F);
+    assert(!zero_zoom.valid());
+}
+
 void test_far_segments_are_culled_before_tessellation() {
     ProceduralRoadPlacementBridge bridge;
     assert(bridge.mirror_tile_segment(
@@ -67,6 +80,7 @@ void test_road_manager_mirror_stays_synchronized() {
 
 int main() {
     test_camera_bounds_are_finite();
+    test_invalid_viewport_bounds_are_rejected();
     test_far_segments_are_culled_before_tessellation();
     test_road_manager_mirror_stays_synchronized();
     return 0;
