@@ -10,6 +10,7 @@
   },
   "primitiveFamilies": [
     "symmetric_section_loft",
+    "open_tub_loft",
     "profile_prism",
     "mirrored_profile_pair",
     "rounded_box"
@@ -19,6 +20,13 @@
     "randomSeedAllowed": false,
     "sectionOrder": "strictly increasing Y",
     "symmetricLoftMirrorAxis": "X=0",
+    "openTub": {
+      "topMustRemainOpen": true,
+      "innerHalfWidthMustBeLessThanOuterHalfWidth": true,
+      "innerFloorMustRemainAboveOuterBottom": true,
+      "rimMustRemainAboveInnerFloor": true,
+      "purpose": "Integrated hollow bodies such as coaster cars, boats, gondolas and other open vehicles without detached side-wall masses."
+    },
     "semanticRoleRequired": true,
     "bevelSegments": 2,
     "preferSingleIntegratedSilhouette": true,
@@ -33,9 +41,17 @@
       "xSymmetryError",
       "projectedSouthBounds",
       "projectedSouthOccupancy",
-      "semanticRoleBounds"
+      "semanticRoleBounds",
+      "shapePrimitiveCounts"
     ],
-    "purpose": "Reject gross silhouette and alignment mistakes before expensive final bake. Asset-specific expected ranges belong in the builder, not this global contract."
+    "supportedConstraints": [
+      "maxXSymmetryError",
+      "maxAbsCenterOffsetX",
+      "minProjectedSouthOccupancy",
+      "maxProjectedSouthOccupancy",
+      "requiredPrimitiveMinimums"
+    ],
+    "purpose": "Reject gross silhouette, alignment and authoring-regression mistakes before expensive final bake. Asset-specific expected ranges belong in the builder, not this global contract."
   },
   "runtime": {
     "dependency": false,
