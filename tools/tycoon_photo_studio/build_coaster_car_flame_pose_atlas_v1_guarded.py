@@ -227,7 +227,7 @@ def main():
             output_path=output / "proxy_south.png",
             profile=profile,
             asset_id=ASSET_ID,
-            direction="curve_midpoint_heading_45",
+            direction="south",
         )
         proxy["pose"] = {"headingDegrees": PROXY_HEADING_DEG, "pitchDegrees": PROXY_PITCH_DEG}
         proxy["plannedFinalFrameCount"] = pose_manifest["totalFrames"]
