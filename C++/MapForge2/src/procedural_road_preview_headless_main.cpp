@@ -63,11 +63,14 @@ void draw_ground(QPainter& painter, const ch::CameraState& camera) {
     }
 }
 
-void draw_2d_mesh(QPainter& painter, const ProceduralRoad2DMesh& mesh,
-                  const ch::CameraState& camera, const QColor& color) {
+// Append every triangle to one painter path instead of rasterizing triangles one
+// at a time. QPainter antialiasing on individually filled triangles exposes the
+// shared edges as dark hairlines, which made a perfectly continuous ribbon look
+// like a ladder. Filling the whole road network as one winding path preserves
+// the same mesh geometry while antialiasing only the actual outer silhouette.
+void append_2d_mesh_path(QPainterPath& path, const ProceduralRoad2DMesh& mesh,
+                         const ch::CameraState& camera) {
     if (mesh.empty()) return;
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(color);
 
     for (std::size_t index = 0; index + 2U < mesh.indices.size(); index += 3U) {
         QPolygonF triangle;
@@ -78,7 +81,8 @@ void draw_2d_mesh(QPainter& painter, const ProceduralRoad2DMesh& mesh,
                 vertex.position.x, vertex.position.y, camera,
                 static_cast<float>(kPreviewWidth), static_cast<float>(kPreviewHeight)));
         }
-        painter.drawPolygon(triangle);
+        path.addPolygon(triangle);
+        path.closeSubpath();
     }
 }
 
@@ -152,7 +156,7 @@ void draw_overlay(QPainter& painter, const ProceduralRoadGroundRenderPlan& plan,
     painter.drawText(QPointF(34.0, 46.0),
                      QStringLiteral("City Horizon — CH_PROCEDURAL_ROAD_2D_RENDER_V1"));
     painter.drawText(QPointF(34.0, 72.0),
-                     QStringLiteral("Smooth XY corners + arm-aware junctions; no road Z, pillars or viaduct mesh"));
+                     QStringLiteral("Smooth XY corners + seam-free surface; no road Z, pillars or viaduct mesh"));
     painter.drawText(QPointF(34.0, 98.0),
                      QString("Segments: %1  |  2D ribbons: %2  |  needed junction patches: %3")
                          .arg(graph.segments().size())
@@ -179,13 +183,21 @@ bool render_png(const std::filesystem::path& output) {
     painter.fillRect(image.rect(), QColor(72, 97, 77));
 
     draw_ground(painter, camera);
-    const QColor asphalt(52, 57, 60);
+
+    // One fill for the complete road surface prevents antialiased shared edges
+    // from becoming visible as transverse "ladder" lines in the proof image.
+    QPainterPath road_surface;
+    road_surface.setFillRule(Qt::WindingFill);
     for (const ProceduralRoad2DMesh& mesh : plan.segment_meshes) {
-        draw_2d_mesh(painter, mesh, camera, asphalt);
+        append_2d_mesh_path(road_surface, mesh, camera);
     }
     for (const ProceduralRoad2DMesh& patch : plan.junction_meshes) {
-        draw_2d_mesh(painter, patch, camera, asphalt);
+        append_2d_mesh_path(road_surface, patch, camera);
     }
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(52, 57, 60));
+    painter.drawPath(road_surface);
+
     draw_centerlines(painter, bridge.graph(), camera);
     draw_overlay(painter, plan, bridge.graph());
     painter.end();
