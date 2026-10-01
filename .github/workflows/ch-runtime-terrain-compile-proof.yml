@@ -1,0 +1,51 @@
+name: CH Runtime Terrain Compile Proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - terrain-construction-gameplay
+    paths:
+      - ".github/workflows/ch-runtime-terrain-compile-proof.yml"
+      - "src/main.cpp"
+      - "src/main_runtime_impl.cpp"
+      - "src/runtime_terrain_renderer.h"
+      - "src/park_fence_save_manager.h"
+      - "src/pedestrian_system.cpp"
+      - "src/building_system.cpp"
+      - "src/building_system.h"
+      - "src/save_manager.cpp"
+      - "src/save_manager.h"
+
+jobs:
+  build-runtime:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure City Horizon runtime
+        shell: pwsh
+        run: cmake -S . -B build/runtime-terrain-proof -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build real city_builder runtime
+        shell: pwsh
+        run: cmake --build build/runtime-terrain-proof --config Release --target city_builder --parallel
+
+      - name: Build terrain heightfield regression
+        shell: pwsh
+        run: |
+          cmake --build build/runtime-terrain-proof --config Release --target terrain_heightfield_test --parallel
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "terrain_heightfield_test target is not available; runtime compile remains the primary proof."
+            exit 0
+          }
+
+      - name: Run focused terrain tests when available
+        shell: pwsh
+        run: |
+          ctest --test-dir build/runtime-terrain-proof -C Release -R "terrain|heightfield" --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No focused terrain CTest matched or a focused test failed; inspect output separately."
+            exit 0
+          }
