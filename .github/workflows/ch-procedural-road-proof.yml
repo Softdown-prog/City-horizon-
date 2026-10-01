@@ -46,6 +46,8 @@ jobs:
           grep -q "ProceduralRoad2DMesh" src/ch_render/procedural_road_network_renderer.h
           grep -q "CH_PROCEDURAL_ROAD_2D_RUNTIME_V1" src/runtime_procedural_road_renderer.h
           grep -q "CH_PROCEDURAL_ROAD_2D_CULLING_V1" src/runtime_procedural_road_culling.h
+          grep -q "CH_PROCEDURAL_ROAD_SPATIAL_INDEX_V1" src/procedural_road_placement_bridge.h
+          grep -q "spatial_segments_in_bounds" src/runtime_procedural_road_culling.h
           grep -q "try_render_procedural_roads_runtime" src/runtime_map_renderer.h
           grep -q "#define MapRenderer RuntimeMapRenderer" src/main.cpp
           grep -q "LEGACY 3D DIAGNOSTIC ONLY" "C++/MapForge2/CMakeLists.txt"
@@ -120,7 +122,7 @@ jobs:
           assert data['contract'] == 'CH_MATH_REPORT_V1'
           assert data['workerContract'] == 'CH_MATH_WORKER_V1'
           assert isinstance(data.get('result'), dict) and data['result']
-          print('Procedural road 2D renderer + culling + mirror sync + MapForge PNG proof: OK')
+          print('Procedural road 2D renderer + spatial chunks + culling + mirror sync + MapForge PNG proof: OK')
           PY
 
       - name: Upload procedural road proof
