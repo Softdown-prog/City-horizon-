@@ -68,14 +68,20 @@ int main(int argc, char** argv) {
         return 7;
     }
 
-    // One connected path crosses the hill and then turns through the basin.
-    // Use the canonical ground-surface semantic id: this ensures the capture
-    // exercises the exact procedural ramp/stair bridge used by gameplay.
+    // Dirt path: one connected route crosses the hill and then turns through
+    // the basin. This exercises the production CH_PATH_SLOPE_SPRITE_V1 selector.
     for (int x = 5; x <= 23; ++x) {
         document.paint_terrain_at(x, 13, std::string(ch::kGroundDirtPathDefinition), "");
     }
     for (int y = 13; y <= 23; ++y) {
         document.paint_terrain_at(20, y, std::string(ch::kGroundDirtPathDefinition), "");
+    }
+
+    // Sand path: use the second ground-path material family on the same canonical
+    // hill. Keeping it on a straight row makes at least one slope cell eligible
+    // for the same baked-sprite selection recipe while preserving its own texture.
+    for (int x = 5; x <= 18; ++x) {
+        document.paint_terrain_at(x, 12, std::string(ch::kGroundSandPathDefinition), "");
     }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -131,6 +137,31 @@ int main(int argc, char** argv) {
     ch::TerrainAwareRuntimeMapRenderer::render_world_terrain_and_water(
         renderer, document, find_texture, repo_root, camera,
         static_cast<float>(kWidth), static_cast<float>(kHeight), 0.0F);
+
+    // A screenshot alone is not enough: prove the production renderer actually
+    // requested baked slope PNGs from BOTH material libraries instead of falling
+    // back to the legacy flat sprite or the old free-form path painter.
+    bool loaded_dirt_slope = false;
+    bool loaded_sand_slope = false;
+    for (const auto& [key, asset] : assets) {
+        (void)asset;
+        if (key.find("/assets/terrain/paths/dirt_01/slopes/") != std::string::npos) {
+            loaded_dirt_slope = true;
+        }
+        if (key.find("/assets/terrain/paths/sand_01/slopes/") != std::string::npos) {
+            loaded_sand_slope = true;
+        }
+    }
+    std::cout << "baked slope assets used: dirt=" << loaded_dirt_slope
+              << " sand=" << loaded_sand_slope << '\n';
+    if (!loaded_dirt_slope || !loaded_sand_slope) {
+        std::cerr << "runtime did not select baked slope sprites for both ground-path materials\n";
+        for (auto& [key, asset] : assets) destroy_asset(asset);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroySurface(canvas);
+        SDL_Quit();
+        return 8;
+    }
 
     SDL_RenderPresent(renderer);
     const bool saved = SDL_SaveBMP(canvas, output_path.string().c_str());
