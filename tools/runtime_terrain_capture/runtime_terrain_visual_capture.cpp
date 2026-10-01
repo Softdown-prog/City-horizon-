@@ -69,13 +69,13 @@ int main(int argc, char** argv) {
     }
 
     // One connected path crosses the hill and then turns through the basin.
-    // Flat cells use the approved legacy PNG; sloped cells are forced through
-    // CH_PROCEDURAL_TILE_2D_V1 ramp/stair geometry by the runtime renderer.
+    // Use the canonical ground-surface semantic id: this ensures the capture
+    // exercises the exact procedural ramp/stair bridge used by gameplay.
     for (int x = 5; x <= 23; ++x) {
-        document.paint_terrain_at(x, 13, "dirt_path", "");
+        document.paint_terrain_at(x, 13, std::string(ch::kGroundDirtPathDefinition), "");
     }
     for (int y = 13; y <= 23; ++y) {
-        document.paint_terrain_at(20, y, "dirt_path", "");
+        document.paint_terrain_at(20, y, std::string(ch::kGroundDirtPathDefinition), "");
     }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
