@@ -163,6 +163,10 @@ public:
         segment->lane_count = profile.lane_count;
         segment->subdivisions = profile.subdivisions;
         segment->texture_repeat_world_units = profile.texture_repeat_world_units;
+        // Width participates in the conservative chunk envelope. Class changes
+        // are rare editor/gameplay mutations, so rebuild here keeps runtime
+        // queries exact without adding per-frame validation cost.
+        rebuild_spatial_index();
         return true;
     }
 
