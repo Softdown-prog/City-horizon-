@@ -135,6 +135,38 @@ def shade_color(
     )
 
 
+def deterministic_unit(seed: float) -> float:
+    # Stable pseudo-random value in [0, 1), intentionally independent of Python's
+    # randomized hash so CI renders are byte-stable between runs.
+    value = math.sin(seed * 12.9898 + 78.233) * 43758.5453
+    return value - math.floor(value)
+
+
+def ballast_gravel_points(
+    pts: List[Tuple[float, float]],
+    verts: List[Tuple[float, float, float]],
+) -> List[Tuple[float, float, bool]]:
+    # A few restrained aggregate flecks per top triangle. Barycentric placement
+    # guarantees every fleck stays inside the real ballast surface rather than
+    # becoming a screen-space texture that leaks across track edges.
+    cx = sum(v[0] for v in verts) / 3.0
+    cy = sum(v[1] for v in verts) / 3.0
+    cz = sum(v[2] for v in verts) / 3.0
+    base_seed = cx * 31.17 + cy * 57.41 + cz * 91.73
+    flecks: List[Tuple[float, float, bool]] = []
+    for i in range(3):
+        u = 0.16 + deterministic_unit(base_seed + i * 2.13) * 0.58
+        v = 0.12 + deterministic_unit(base_seed + i * 4.77 + 1.0) * 0.50
+        if u + v > 0.84:
+            v = 0.84 - u
+        w = 1.0 - u - v
+        x = pts[0][0] * u + pts[1][0] * v + pts[2][0] * w
+        y = pts[0][1] * u + pts[1][1] * v + pts[2][1] * w
+        light = deterministic_unit(base_seed + i * 9.31 + 3.0) > 0.52
+        flecks.append((x, y, light))
+    return flecks
+
+
 def draw_scene(items: List[Geometry], highlight: str | None = None) -> Image.Image:
     width, height = 960, 640
     img = Image.new("RGBA", (width, height), (234, 239, 228, 255))
@@ -179,9 +211,10 @@ def draw_scene(items: List[Geometry], highlight: str | None = None) -> Image.Ima
                 depth = sum(v[0] + v[1] + v[2] * 3.0 for v in verts) / 3.0
                 pts = [project(v, scale, ox, oy) for v in verts]
                 color = shade_color(base, mesh_name, verts)
-                triangles.append((depth, pts, color, mesh_name))
+                up = abs(triangle_normal(verts)[2])
+                triangles.append((depth, pts, color, mesh_name, verts, up))
 
-    for _, pts, color, mesh_name in sorted(triangles, key=lambda t: t[0]):
+    for _, pts, color, mesh_name, verts, up in sorted(triangles, key=lambda t: t[0]):
         # Tiny contact shadow for raised wood/steel makes the Z thickness legible
         # while staying compatible with the classic pre-rendered tycoon look.
         if mesh_name != "ballast":
@@ -189,11 +222,18 @@ def draw_scene(items: List[Geometry], highlight: str | None = None) -> Image.Ima
             draw.polygon(shadow, fill=(24, 29, 25, 38))
         draw.polygon(pts, fill=color)
 
+        if mesh_name == "ballast" and up > 0.72:
+            for x, y, light in ballast_gravel_points(pts, verts):
+                if light:
+                    draw.ellipse((x - 0.8, y - 0.5, x + 0.8, y + 0.5), fill=(184, 181, 169, 88))
+                else:
+                    draw.ellipse((x - 0.7, y - 0.45, x + 0.7, y + 0.45), fill=(70, 69, 65, 70))
+
     # Labels and legend.
     draw.rounded_rectangle((24, 20, 440, 104), radius=14, fill=(20, 24, 28, 220))
     draw.text((42, 36), "CITY HORIZON — TRILHO PROCEDURAL REFINADO", fill=(255, 255, 255, 255))
     draw.text((42, 62), "Geometria real: RailMeshBuilder / RailPathBuilder", fill=(210, 215, 220, 255))
-    draw.text((42, 82), "lastro pedra + dormentes madeira + aço sombreado", fill=(210, 215, 220, 255))
+    draw.text((42, 82), "lastro granulado + dormentes madeira + aço sombreado", fill=(210, 215, 220, 255))
 
     draw.rounded_rectangle((width - 292, 20, width - 24, 90), radius=12, fill=(255, 255, 255, 225), outline=(50, 55, 60, 110))
     draw.text((width - 274, 36), "Câmera: projeção CH 2:1", fill=(32, 36, 40, 255))
