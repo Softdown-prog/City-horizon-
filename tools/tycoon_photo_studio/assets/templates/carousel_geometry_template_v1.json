@@ -1,0 +1,109 @@
+{
+  "contract": "CH_CAROUSEL_GEOMETRY_TEMPLATE_V1",
+  "templateId": "carousel_geometry_template_v1",
+  "family": "amusement_carousel",
+  "status": "geometry_only_neutral_starting_point",
+  "purpose": "Preserve only useful geometric proportions and mechanical layout from the experimental carousel. This template intentionally contains no visual identity from any external reference and must be restyled from scratch before production use.",
+  "cameraContract": "CH_CAMERA_V1",
+  "stylePolicy": {
+    "inheritPreviousVisualDesign": false,
+    "inheritReferenceAppearance": false,
+    "materialsDefined": false,
+    "colorsDefined": false,
+    "decorativePatternDefined": false,
+    "ornamentsDefined": false,
+    "topperDefined": false,
+    "colorMaskDefined": false,
+    "requireOriginalVisualDesignBeforeProduction": true
+  },
+  "footprint": {
+    "widthTiles": 3,
+    "depthTiles": 3
+  },
+  "hierarchy": {
+    "root": "AssetRoot",
+    "staticBase": [
+      "foundation",
+      "boarding_access_optional"
+    ],
+    "rotatingAssembly": [
+      "platform",
+      "central_column",
+      "canopy",
+      "supports",
+      "ride_mounts"
+    ]
+  },
+  "geometry": {
+    "foundation": {
+      "primitive": "cylinder",
+      "radius": 3.08,
+      "height": 0.20,
+      "centerZ": 0.10
+    },
+    "platform": {
+      "primitive": "cylinder_or_disc",
+      "radius": 3.08,
+      "topZ": 0.53
+    },
+    "canopy": {
+      "primitive": "shallow_radial_disc_or_custom_profile",
+      "outerRadius": 3.12,
+      "innerRadius": 0.46,
+      "outerZ": 2.38,
+      "innerZ": 2.86,
+      "thickness": 0.055,
+      "radialSegments": 24,
+      "note": "Segment count is retained only as useful construction topology. It does not prescribe stripes, colors, patterning or ornamentation."
+    },
+    "centralColumn": {
+      "primitive": "cylinder",
+      "centeredAt": [0.0, 0.0],
+      "note": "Exact visual treatment and crown/top geometry must be redesigned from scratch."
+    },
+    "outerSupports": {
+      "count": 10,
+      "radiusFromCenter": 2.58,
+      "primitive": "vertical_post",
+      "note": "Count and radius are mechanical starting values only; support style is intentionally undefined."
+    },
+    "rideMounts": {
+      "count": 14,
+      "layout": "two_staggered_concentric_rings",
+      "innerRadius": 1.36,
+      "outerRadius": 2.16,
+      "nominalBodyZ": 1.08,
+      "note": "Mount count and spacing are preserved. Vehicle/animal shape is not defined by this template."
+    },
+    "boardingAccess": {
+      "enabledByDefault": false,
+      "placement": "front_edge",
+      "note": "Optional functional access zone only; previous stair/rail appearance is not inherited."
+    }
+  },
+  "mechanicalConstraints": {
+    "rotorAxis": [0.0, 0.0, 1.0],
+    "rotorOrigin": [0.0, 0.0, 0.0],
+    "platformAndCanopyShareRotor": true,
+    "staticFoundationDoesNotRotate": true,
+    "keepWithinFootprint": true
+  },
+  "excludedFromTemplate": [
+    "yellow_and_cream_roof_stripes",
+    "burgundy_teal_gold_palette",
+    "concentric_roof_trim",
+    "valance_style",
+    "medallions",
+    "rosettes",
+    "bulb_layout",
+    "mirrored_center_drum",
+    "horse_visual_design",
+    "horse_topper",
+    "saddle_blankets",
+    "decorative_base_panels",
+    "previous_boarding_step_design",
+    "previous_color_mask_layout",
+    "any_reference_specific_silhouette_details"
+  ],
+  "nextDesignRule": "Create a new original carousel visual language from this geometry only. Do not reuse the rejected V1-V5 palette, roof pattern, trim, ornaments, topper, animal styling or reference-derived decorative composition."
+}
