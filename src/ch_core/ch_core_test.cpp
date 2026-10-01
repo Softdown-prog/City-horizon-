@@ -2,6 +2,7 @@
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/procedural_tile_2d.h"
 #include "src/ch_core/validation.h"
 
 #include <cassert>
@@ -17,6 +18,7 @@ int main(int argc, char** argv) {
     static_assert(ch::contracts::kMapMin == -24);
     static_assert(ch::contracts::kMapMax == 23);
     assert(std::string(ch::contracts::kGridContract) == "CH_GRID_V1");
+    assert(std::string(ch::kProceduralTile2DContract) == "CH_PROCEDURAL_TILE_2D_V1");
 
     // 2. Verify Grid Math
     ch::GridCoord c1{5, -10};
@@ -95,6 +97,57 @@ int main(int argc, char** argv) {
 
     auto inline_report = ch::validate_map_document(inline_doc);
     assert(inline_report.valid);
+
+    // 5. Verify CH_PROCEDURAL_TILE_2D_V1 recipe classification. The logical
+    // grid stays unchanged while the visual recipe reacts to topology + Z.
+    const TileConnectionMask straight_ns = static_cast<TileConnectionMask>(
+        tile_connection_north | tile_connection_south);
+    const TileConnectionMask corner_ne = static_cast<TileConnectionMask>(
+        tile_connection_north | tile_connection_east);
+
+    ch::MapDocument flat_tile = ch::MapDocument::create_empty("procedural-flat", 8, 8);
+    const ch::ProceduralTileRecipe flat_recipe =
+        ch::make_procedural_tile_2d_recipe(flat_tile, 0, 0, straight_ns);
+    assert(flat_recipe.topology == ch::ProceduralTileTopology::straight);
+    assert(flat_recipe.contour == ch::ProceduralTileContour::continuous_outline);
+    assert(flat_recipe.vertical_profile == ch::ProceduralTileVerticalProfile::flat);
+    assert(flat_recipe.legacy_sprite_compatible);
+    assert(flat_recipe.stair_count == 0);
+
+    ch::MapDocument ramp_tile = ch::MapDocument::create_empty("procedural-ramp", 8, 8);
+    ramp_tile.set_terrain_height_at(0, 0, 0.0F);
+    ramp_tile.set_terrain_height_at(1, 0, 0.0F);
+    ramp_tile.set_terrain_height_at(0, 1, 0.45F);
+    ramp_tile.set_terrain_height_at(1, 1, 0.45F);
+    const ch::ProceduralTileRecipe ramp_recipe =
+        ch::make_procedural_tile_2d_recipe(ramp_tile, 0, 0, straight_ns);
+    assert(ramp_recipe.vertical_profile == ch::ProceduralTileVerticalProfile::ramp);
+    assert(!ramp_recipe.legacy_sprite_compatible);
+    assert(ramp_recipe.high_edge == CardinalDirection::south);
+    assert(ramp_recipe.low_edge == CardinalDirection::north);
+
+    ch::MapDocument stair_tile = ch::MapDocument::create_empty("procedural-stairs", 8, 8);
+    stair_tile.set_terrain_height_at(0, 0, 0.0F);
+    stair_tile.set_terrain_height_at(1, 0, 0.0F);
+    stair_tile.set_terrain_height_at(0, 1, 1.60F);
+    stair_tile.set_terrain_height_at(1, 1, 1.60F);
+    const ch::ProceduralTileRecipe stair_recipe =
+        ch::make_procedural_tile_2d_recipe(stair_tile, 0, 0, straight_ns);
+    assert(stair_recipe.vertical_profile == ch::ProceduralTileVerticalProfile::stairs);
+    assert(stair_recipe.stair_count >= 7);
+    assert(stair_recipe.high_edge == CardinalDirection::south);
+    assert(stair_recipe.low_edge == CardinalDirection::north);
+
+    const ch::ProceduralTileRecipe corner_recipe =
+        ch::make_procedural_tile_2d_recipe(stair_tile, 0, 0, corner_ne);
+    assert(corner_recipe.topology == ch::ProceduralTileTopology::corner);
+    assert(corner_recipe.contour == ch::ProceduralTileContour::rounded_corner);
+    assert(corner_recipe.requires_subdivision);
+
+    const ch::ProceduralTileRecipe end_recipe =
+        ch::make_procedural_tile_2d_recipe(flat_tile, 0, 0, tile_connection_north);
+    assert(end_recipe.topology == ch::ProceduralTileTopology::end);
+    assert(end_recipe.contour == ch::ProceduralTileContour::semicircle_cap);
 
     std::cout << "ch_core_test passed successfully!\n";
     return 0;
