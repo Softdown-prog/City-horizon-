@@ -7,6 +7,8 @@ on:
       - 'src/coaster_physics_test.cpp'
       - 'src/coaster_car_pose.h'
       - 'src/coaster_car_pose_test.cpp'
+      - 'src/coaster_train_runtime.h'
+      - 'src/coaster_train_runtime_test.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
   pull_request:
@@ -15,6 +17,8 @@ on:
       - 'src/coaster_physics_test.cpp'
       - 'src/coaster_car_pose.h'
       - 'src/coaster_car_pose_test.cpp'
+      - 'src/coaster_train_runtime.h'
+      - 'src/coaster_train_runtime_test.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
 
@@ -42,7 +46,16 @@ jobs:
       - name: Run coaster car pose regression
         run: /tmp/coaster_car_pose_test
 
-      - name: Validate promoted Flame atlas when present
+      - name: Compile articulated coaster train regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -Isrc src/coaster_train_runtime_test.cpp -o /tmp/coaster_train_runtime_test
+
+      - name: Run articulated coaster train regression
+        run: /tmp/coaster_train_runtime_test
+
+      - name: Validate promoted Flame atlas
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -56,15 +69,13 @@ jobs:
               raise SystemExit('missing coaster Flame runtime manifest')
           runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
           motion = runtime.get('motionPlan', {})
-
-          # The promotion workflow can race this focused compile check on the first
-          # commit. Pending is allowed only until the atlas promotion lands on main.
-          if motion.get('poseAtlasStatus') == 'pending_promotion':
-              print('Pose atlas promotion is still pending; compile regressions passed.')
-              raise SystemExit(0)
-
           if motion.get('poseAtlasStatus') != 'ready':
-              raise SystemExit('unexpected pose atlas status')
+              raise SystemExit('Flame pose atlas is not runtime-ready')
+          if motion.get('poseAtlasFrameCount') != 40 or motion.get('flatHeadingCount') != 16:
+              raise SystemExit('unexpected Flame runtime pose counts')
+          if motion.get('wholeTrainSpriteUsedForCurves') is not False:
+              raise SystemExit('moving coaster must use articulated individual cars')
+
           atlas_path = root / motion['poseAtlasManifest']
           sheet_path = root / motion['poseAtlasSpriteSheet']
           if not atlas_path.is_file() or not sheet_path.is_file():
@@ -74,6 +85,9 @@ jobs:
               raise SystemExit('unexpected runtime atlas contract')
           if atlas.get('frameCount') != 40 or len(atlas.get('frames', [])) != 40:
               raise SystemExit('runtime atlas frame count mismatch')
+          if [frame.get('atlasIndex') for frame in atlas['frames']] != list(range(40)):
+              raise SystemExit('runtime atlas ordering is not deterministic')
+
           header = sheet_path.read_bytes()[:24]
           if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
               raise SystemExit('runtime atlas is not a PNG')
