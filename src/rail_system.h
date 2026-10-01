@@ -29,18 +29,20 @@ struct RailSplineSegment {
 
 struct RailProfile {
     // Standard-gauge-inspired proportions expressed in City Horizon world units.
+    // V2 visual tuning keeps the validated topology and safety envelope intact,
+    // while giving the track a clearer classic-tycoon railway silhouette.
     float gauge = 0.50F;
-    float ballast_width = 0.96F;
-    float ballast_height = 0.10F;
-    float ballast_shoulder = 0.10F;
+    float ballast_width = 1.06F;
+    float ballast_height = 0.095F;
+    float ballast_shoulder = 0.16F;
 
-    float sleeper_length = 0.82F;
-    float sleeper_width = 0.11F;
-    float sleeper_height = 0.055F;
-    float sleeper_spacing = 0.30F;
+    float sleeper_length = 0.90F;
+    float sleeper_width = 0.125F;
+    float sleeper_height = 0.060F;
+    float sleeper_spacing = 0.27F;
 
-    float rail_width = 0.060F;
-    float rail_height = 0.075F;
+    float rail_width = 0.052F;
+    float rail_height = 0.085F;
 
     // Safety envelope. These are structural limits, not gameplay speed rules.
     float max_grade = 0.18F;          // |dz| / planar distance
