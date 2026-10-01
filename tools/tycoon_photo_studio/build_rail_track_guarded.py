@@ -96,7 +96,12 @@ def build_track(root, recipe):
 
     steel = _material("RailSteel", (0.20, 0.22, 0.22, 1.0), 0.34, 0.72)
     steel_side = _material("RailSteelDark", (0.105, 0.12, 0.12, 1.0), 0.46, 0.56)
-    timber = _material("SleeperTimber", (0.26, 0.155, 0.085, 1.0), 0.82, 0.0)
+    timber_variants = (
+        _material("SleeperTimberWarm", (0.30, 0.18, 0.105, 1.0), 0.82, 0.0),
+        _material("SleeperTimberMid", (0.255, 0.145, 0.078, 1.0), 0.84, 0.0),
+        _material("SleeperTimberDark", (0.215, 0.115, 0.060, 1.0), 0.86, 0.0),
+    )
+    timber_grain = _material("SleeperTimberGrain", (0.145, 0.072, 0.035, 1.0), 0.90, 0.0)
     ballast = _material("Ballast", (0.285, 0.275, 0.245, 1.0), 0.94, 0.0)
 
     # Continuous authoring module: geometry reaches the tile boundary so the
@@ -111,11 +116,26 @@ def build_track(root, recipe):
     start = -tile * 0.5 + spacing * 0.5
     for index in range(sleeper_count):
         x = start + spacing * index
-        _box(
+        timber = timber_variants[index % len(timber_variants)]
+        sleeper = _box(
             f"Sleeper_{index:02d}", (x, 0.0, ballast_h + sleeper_h * 0.5),
             (sleeper_w, sleeper_len, sleeper_h), timber, root,
             "rail.sleeper", ground_contact=False,
         )
+        sleeper["paintVariant"] = index % len(timber_variants)
+
+        # Sparse deterministic painted grain/wear accents. These sit just above
+        # the sleeper top, remain broad enough to survive gameplay downsampling,
+        # and avoid noisy photorealistic wood texture.
+        if index % 3 != 1:
+            grain_y = (-0.22 if index % 2 == 0 else 0.18) * sleeper_len
+            _box(
+                f"SleeperGrain_{index:02d}",
+                (x, grain_y, ballast_h + sleeper_h + 0.004),
+                (sleeper_w * 0.70, sleeper_len * 0.28, 0.008),
+                timber_grain, root,
+                "rail.sleeper_paint", ground_contact=False,
+            )
 
     rail_z = ballast_h + sleeper_h + rail_h * 0.5
     for side, y in (("L", -gauge * 0.5), ("R", gauge * 0.5)):
