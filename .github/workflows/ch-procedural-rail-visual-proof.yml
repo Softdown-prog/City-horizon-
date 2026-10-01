@@ -1,0 +1,67 @@
+name: CH Procedural Rail Visual Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/rail_system.h"
+      - "src/rail_system.cpp"
+      - "src/rail_path_builder.h"
+      - "src/rail_visual_proof_export.cpp"
+      - "tools/rail_visual_proof/render_rail_proof.py"
+      - ".github/workflows/ch-procedural-rail-visual-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-procedural-rail-visual-proof
+  cancel-in-progress: true
+
+jobs:
+  rail-visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install pillow
+
+      - name: Compile real rail geometry exporter
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc \
+            src/rail_system.cpp src/rail_visual_proof_export.cpp \
+            -o /tmp/ch_rail_visual_proof_export
+
+      - name: Export runtime rail meshes
+        run: |
+          set -euo pipefail
+          mkdir -p out/ch-rail-visual-proof
+          /tmp/ch_rail_visual_proof_export out/ch-rail-visual-proof/rail_geometry.txt
+
+      - name: Render PNG and GIF
+        run: |
+          set -euo pipefail
+          python tools/rail_visual_proof/render_rail_proof.py \
+            --input out/ch-rail-visual-proof/rail_geometry.txt \
+            --outdir out/ch-rail-visual-proof
+          test -s out/ch-rail-visual-proof/rail_proof.png
+          test -s out/ch-rail-visual-proof/rail_proof.gif
+
+      - name: Upload rail visual proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Procedural-Rail-Visual-Proof
+          path: out/ch-rail-visual-proof/**
+          if-no-files-found: error
+          retention-days: 14
