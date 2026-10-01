@@ -7,7 +7,6 @@
 namespace {
 
 constexpr float kHalfPi = 1.57079632679489661923F;
-constexpr float kPiOverSix = 0.5235987755982988F;
 constexpr float kPiOverTwelve = 0.2617993877991494F;
 
 void assert_geometry_safe(const RailGeometry& geometry, const RailProfile& profile) {
