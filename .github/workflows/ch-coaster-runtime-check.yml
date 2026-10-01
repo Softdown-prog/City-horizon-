@@ -1,0 +1,84 @@
+name: CH Coaster Runtime Check
+
+on:
+  push:
+    paths:
+      - 'src/coaster_physics.h'
+      - 'src/coaster_physics_test.cpp'
+      - 'src/coaster_car_pose.h'
+      - 'src/coaster_car_pose_test.cpp'
+      - 'assets/vehicles/coaster_flame_01/**'
+      - '.github/workflows/ch-coaster-runtime-check.yml'
+  pull_request:
+    paths:
+      - 'src/coaster_physics.h'
+      - 'src/coaster_physics_test.cpp'
+      - 'src/coaster_car_pose.h'
+      - 'src/coaster_car_pose_test.cpp'
+      - 'assets/vehicles/coaster_flame_01/**'
+      - '.github/workflows/ch-coaster-runtime-check.yml'
+
+jobs:
+  coaster-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile coaster physics regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -Isrc src/coaster_physics_test.cpp -o /tmp/coaster_physics_test
+
+      - name: Run coaster physics regression
+        run: /tmp/coaster_physics_test
+
+      - name: Compile coaster car pose regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -Isrc src/coaster_car_pose_test.cpp -o /tmp/coaster_car_pose_test
+
+      - name: Run coaster car pose regression
+        run: /tmp/coaster_car_pose_test
+
+      - name: Validate promoted Flame atlas when present
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import struct
+          from pathlib import Path
+
+          root = Path('assets/vehicles/coaster_flame_01')
+          runtime_path = root / 'coaster_flame_01_runtime.json'
+          if not runtime_path.is_file():
+              raise SystemExit('missing coaster Flame runtime manifest')
+          runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
+          motion = runtime.get('motionPlan', {})
+
+          # The promotion workflow can race this focused compile check on the first
+          # commit. Pending is allowed only until the atlas promotion lands on main.
+          if motion.get('poseAtlasStatus') == 'pending_promotion':
+              print('Pose atlas promotion is still pending; compile regressions passed.')
+              raise SystemExit(0)
+
+          if motion.get('poseAtlasStatus') != 'ready':
+              raise SystemExit('unexpected pose atlas status')
+          atlas_path = root / motion['poseAtlasManifest']
+          sheet_path = root / motion['poseAtlasSpriteSheet']
+          if not atlas_path.is_file() or not sheet_path.is_file():
+              raise SystemExit('ready atlas references missing runtime files')
+          atlas = json.loads(atlas_path.read_text(encoding='utf-8'))
+          if atlas.get('contract') != 'CH_COASTER_CAR_ATLAS_RUNTIME_V1':
+              raise SystemExit('unexpected runtime atlas contract')
+          if atlas.get('frameCount') != 40 or len(atlas.get('frames', [])) != 40:
+              raise SystemExit('runtime atlas frame count mismatch')
+          header = sheet_path.read_bytes()[:24]
+          if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
+              raise SystemExit('runtime atlas is not a PNG')
+          width, height = struct.unpack('>II', header[16:24])
+          if (width, height) != (2048, 1280):
+              raise SystemExit(f'unexpected runtime atlas size: {(width, height)}')
+          print('Promoted Flame pose atlas runtime package: OK')
+          PY
