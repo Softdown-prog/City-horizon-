@@ -4,6 +4,9 @@
 #include "src/road_system.h"
 #include "src/runtime_procedural_road_culling.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace ch {
 
 // CH_PROCEDURAL_ROAD_2D_RUNTIME_V1
@@ -27,17 +30,28 @@ namespace ch {
         procedural_road_visible_world_bounds(camera, viewport_width, viewport_height);
     if (!visible_bounds.valid()) return false;
 
+    // Admission checks use RoadManager's O(1) tile lookup over the camera window
+    // instead of scanning every road in the city. This keeps the fallback guard
+    // proportional to what can actually be visible at the current zoom.
+    const int min_tile_x = std::max(
+        contracts::kMapMin, static_cast<int>(std::floor(visible_bounds.min_x - 0.75F)));
+    const int max_tile_x = std::min(
+        contracts::kMapMax, static_cast<int>(std::ceil(visible_bounds.max_x + 0.75F)));
+    const int min_tile_y = std::max(
+        contracts::kMapMin, static_cast<int>(std::floor(visible_bounds.min_y - 0.75F)));
+    const int max_tile_y = std::min(
+        contracts::kMapMax, static_cast<int>(std::ceil(visible_bounds.max_y + 0.75F)));
+
     bool has_visible_road = false;
-    for (const RoadTile& tile : roads.tiles()) {
-        const ProceduralRoad2DPoint center{
-            static_cast<float>(tile.tile_x) + 0.5F,
-            static_cast<float>(tile.tile_y) + 0.5F,
-        };
-        if (!visible_bounds.contains(center, 0.75F)) continue;
-        has_visible_road = true;
-        // One-tile islands do not have a procedural edge yet. Fall back for the
-        // whole visible road layer instead of silently hiding that tile.
-        if (tile.connections == 0U) return false;
+    for (int tile_y = min_tile_y; tile_y <= max_tile_y; ++tile_y) {
+        for (int tile_x = min_tile_x; tile_x <= max_tile_x; ++tile_x) {
+            const RoadTile* tile = roads.tile_at(tile_x, tile_y);
+            if (tile == nullptr) continue;
+            has_visible_road = true;
+            // One-tile islands do not have a procedural edge yet. Fall back for
+            // the visible layer instead of silently hiding that tile.
+            if (tile->connections == 0U) return false;
+        }
     }
     if (!has_visible_road) return true;
 
@@ -50,8 +64,8 @@ namespace ch {
     const ProceduralRoadGroundRenderPlan& plan = visible.plan;
 
     // Promotion is all-or-fallback for the camera-visible working set. Roads
-    // outside visible_bounds are culled before tessellation and therefore do not
-    // make per-frame cost grow with the entire city network.
+    // outside visible_bounds are culled before tessellation and therefore avoid
+    // the expensive mesh generation/draw work for the rest of the city.
     const bool complete_ground_plan =
         plan.skipped_elevated_segments == 0U &&
         plan.skipped_mixed_junctions == 0U &&
