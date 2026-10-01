@@ -1,0 +1,82 @@
+name: Render Lush Broadleaf Tree Forge 2D
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/ch-character-studio-art-v0
+    paths:
+      - '.github/workflows/render-lush-broadleaf-tree-forge2d.yml'
+      - 'tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_lush_01.json'
+      - 'tools/visitor_forge_2d/src/visitor_forge_2d/core/organic_scenery.py'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Visitor Forge 2D
+        run: |
+          python -m pip install -e tools/visitor_forge_2d
+          python -m pip install pytest
+
+      - name: Validate organic scenery renderer
+        run: python -m pytest -q tools/visitor_forge_2d/tests/test_organic_scenery.py::test_broadleaf_crown_is_deterministic_and_differs_from_conifer
+
+      - name: Render four directional views
+        shell: bash
+        run: |
+          set -euo pipefail
+          out='out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01'
+          mkdir -p "$out"
+          python -m visitor_forge_2d.core.organic_scenery \
+            --recipe tools/visitor_forge_2d/examples/park_tree_broadleaf_organic_lush_01.json \
+            --output "$out"
+
+      - name: Validate runtime bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01')
+          stem = 'park_tree_broadleaf_organic_lush_01'
+          expected = ['south', 'west', 'north', 'east']
+          hashes = []
+          for view in expected:
+              path = root / f'{stem}_{view}.png'
+              assert path.is_file() and path.stat().st_size > 0, path
+              with Image.open(path) as im:
+                  rgba = im.convert('RGBA')
+                  assert rgba.size == (256, 320), (view, rgba.size)
+                  bbox = rgba.getchannel('A').getbbox()
+                  assert bbox is not None, view
+                  assert bbox[3] <= 320
+              hashes.append(hashlib.sha256(path.read_bytes()).hexdigest())
+          assert len(set(hashes)) >= 2, 'directional views unexpectedly identical'
+          rotation = json.loads((root / f'{stem}_rotation.json').read_text())
+          assert rotation['mode'] == 'procedural_quarter_turns'
+          assert list(rotation['views']) == expected
+          print('LUSH_BROADLEAF_FORGE2D_PASS', hashes)
+          PY
+
+      - name: Upload tree bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: City-Horizon-Lush-Broadleaf-Forge2D-${{ github.run_number }}
+          path: out/visitor_forge_2d/park_tree_broadleaf_organic_lush_01
+          retention-days: 14
+          if-no-files-found: error
