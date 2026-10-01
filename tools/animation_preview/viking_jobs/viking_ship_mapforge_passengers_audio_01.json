@@ -1,0 +1,26 @@
+{
+  "contract": "CH_MAPFORGE_VIKING_VIDEO_JOB_V1",
+  "id": "mapforge.viking_ship.passengers_audio.01",
+  "reviewOnly": true,
+  "renderer": "MapForge2CLI",
+  "cameraContract": "CH_CAMERA_V1",
+  "direction": "south",
+  "fps": 8,
+  "durationSeconds": 6,
+  "source": {
+    "workflowRun": 36350851439,
+    "artifact": "CH-Blender-Agent-36350851439-1",
+    "revision": "V15",
+    "humanReviewed": true,
+    "framePattern": "occupied_south_%02d.png",
+    "frameCount": 12,
+    "containsPassengerOverlay": true,
+    "containsSwingMotion": true
+  },
+  "audio": {
+    "event": "VikingShipRunning",
+    "file": "assets/audio/attractions/viking_ship_rope_creak.ogg",
+    "loop": true
+  },
+  "output": "out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4"
+}
