@@ -1,0 +1,195 @@
+name: Promote Coaster Flame runtime
+
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-coaster-flame-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ARTIFACT_ID: '11181909810'
+  SOURCE_RUN_ID: '36903309772'
+  SOURCE_COMMIT: 'ac8699478d7ddc62f56d0d26555eee328a9c30e0'
+  SOURCE_ARTIFACT_DIGEST: 'sha256:e2db24e66b636ddb8c396a03be19fb70c70b7fe553bd25802693490861497287'
+  APPROVED_PROXY_SHA: 'eca7cc62de7986911c1f795bb6535e3cb713ad8934d1bc3c5894c085c075b867'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download approved Flame V7 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/coaster-flame-runtime"
+          mkdir -p "$work/artifact"
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o "$work/artifact.zip"
+          unzip -q "$work/artifact.zip" -d "$work/artifact"
+
+      - name: Validate and promote approved four-direction train
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import struct
+          from pathlib import Path
+          from shutil import copy2
+
+          root = Path(os.environ['RUNNER_TEMP']) / 'coaster-flame-runtime' / 'artifact'
+          source = root / 'coaster.train_flame_v7.final.001'
+          required = [
+              'train_metadata.json',
+              'shape_report.json',
+              'proxy_approval.json',
+              'studio_metadata.json',
+              'train_south.png',
+              'train_east.png',
+              'train_west.png',
+              'train_north.png',
+          ]
+          for name in required:
+              if not (source / name).is_file():
+                  raise SystemExit(f'missing approved artifact output: {source / name}')
+
+          metadata = json.loads((source / 'train_metadata.json').read_text(encoding='utf-8'))
+          shape = json.loads((source / 'shape_report.json').read_text(encoding='utf-8'))
+          approval = json.loads((source / 'proxy_approval.json').read_text(encoding='utf-8'))
+          studio = json.loads((source / 'studio_metadata.json').read_text(encoding='utf-8'))
+
+          if metadata.get('contract') != 'CH_COASTER_TRAIN_STYLE_V1':
+              raise SystemExit('unexpected train metadata contract')
+          if metadata.get('assetId') != 'ride.coaster.train_flame_v7':
+              raise SystemExit('unexpected train assetId')
+          if metadata.get('styleId') != 'flame_01':
+              raise SystemExit('unexpected train styleId')
+          if metadata.get('trackContract') != 'CH_COASTER_TRACK_V1':
+              raise SystemExit('unexpected track contract')
+          if shape.get('status') != 'pass' or shape.get('violations'):
+              raise SystemExit('shape report did not pass')
+          if approval.get('contract') != 'CH_PROXY_APPROVAL_V1' or approval.get('reviewed') is not True:
+              raise SystemExit('missing human proxy approval')
+          if approval.get('proxySha256') != os.environ['APPROVED_PROXY_SHA']:
+              raise SystemExit('approved proxy SHA mismatch')
+          if studio.get('cameraContract') != 'CH_CAMERA_V1':
+              raise SystemExit('unexpected camera contract')
+
+          expected = {
+              'south': '803948bfd83780c1c62bd9d1d9b065caf6283c65b626208542a8a97a5dbc1a7d',
+              'east':  'd4ca802d9e794d8b918b055fc38d3ccfd9f3b039bdfab87bdbaac7152268a7d2',
+              'west':  '882be47c92ba7d76a8065262ed2f0b3e9402deeeccfb41d3dd0ebdfefe4d1672',
+              'north': 'a82c5e223072668acb7efbce30060dafb81457a22181f1bcfa2a1e325f9a2d92',
+          }
+
+          def png_size(path: Path):
+              data = path.read_bytes()[:24]
+              if data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+                  raise SystemExit(f'not a PNG: {path}')
+              return struct.unpack('>II', data[16:24])
+
+          destination = Path('assets/vehicles/coaster_flame_01')
+          destination.mkdir(parents=True, exist_ok=True)
+          promoted = {}
+          for direction in ('south', 'east', 'west', 'north'):
+              src = source / f'train_{direction}.png'
+              digest = hashlib.sha256(src.read_bytes()).hexdigest()
+              if digest != expected[direction]:
+                  raise SystemExit(f'{direction} SHA mismatch: {digest}')
+              if png_size(src) != (256, 256):
+                  raise SystemExit(f'{direction} is not 256x256')
+              dst = destination / f'train_{direction}.png'
+              copy2(src, dst)
+              promoted[direction] = {
+                  'file': dst.name,
+                  'sha256': digest,
+                  'pivot': {'x': 128, 'y': 128},
+              }
+
+          runtime = {
+              'contract': 'CH_RUNTIME_VEHICLE_TRAIN_V1',
+              'assetId': 'vehicle.coaster.flame_01',
+              'sourceAssetId': 'ride.coaster.train_flame_v7',
+              'assetType': 'ride_vehicle_train',
+              'styleId': 'flame_01',
+              'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'trackContract': 'CH_COASTER_TRACK_V1',
+              'runtimeRepresentation': '2D_RGBA_pre_rendered_sprite',
+              'format': 'PNG_RGBA',
+              'frameSize': [256, 256],
+              'transparentBackground': True,
+              'directionOrder': ['south', 'east', 'west', 'north'],
+              'views': promoted,
+              'train': {
+                  'carCount': metadata['carCount'],
+                  'passengerCapacityPerCar': metadata['passengerCapacityPerCar'],
+                  'passengerCapacityTotal': metadata['passengerCapacityTotal'],
+              },
+              'motionPlan': {
+                  'heroFourDirectionViewsPromoted': True,
+                  'movingTrainUsesIndividualCars': True,
+                  'poseAtlasContract': 'CH_COASTER_CAR_V1',
+                  'poseAtlasStatus': 'pending_promotion',
+                  'flatHeadingCount': 16,
+                  'flatHeadingStepDegrees': 22.5,
+                  'wholeTrainSpriteUsedForCurves': False,
+              },
+              'sourceCommit': os.environ['SOURCE_COMMIT'],
+              'sourceWorkflowRun': int(os.environ['SOURCE_RUN_ID']),
+              'sourceArtifactId': int(os.environ['ARTIFACT_ID']),
+              'sourceArtifactDigest': os.environ['SOURCE_ARTIFACT_DIGEST'],
+              'approvedProxySha256': os.environ['APPROVED_PROXY_SHA'],
+              'approvedForRuntime': True,
+          }
+          (destination / 'coaster_flame_01_runtime.json').write_text(
+              json.dumps(runtime, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+          print('Promoted Flame V7 four-direction train to', destination)
+          PY
+
+      - name: Verify promoted runtime package
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['approvedForRuntime'] is True
+          assert data['cameraContract'] == 'CH_CAMERA_V1'
+          assert data['trackContract'] == 'CH_COASTER_TRACK_V1'
+          assert data['directionOrder'] == ['south', 'east', 'west', 'north']
+          for view in data['views'].values():
+              assert (p.parent / view['file']).is_file(), view['file']
+          print('Coaster Flame runtime package: OK')
+          PY
+
+      - name: Commit promoted runtime package
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/vehicles/coaster_flame_01
+          if git diff --cached --quiet; then
+            echo 'Nothing to promote.'
+            exit 0
+          fi
+          git commit -m "coaster: promote approved Flame train runtime views"
+          git pull --rebase origin main
+          git push origin HEAD:main
