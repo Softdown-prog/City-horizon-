@@ -142,7 +142,8 @@ public:
         const auto through_node = add_root(authored.through.end, source->heading_radians);
         const auto diverging_node = add_root(authored.diverging.end, authored.diverging_exit_heading_radians);
         if (!through_node || !diverging_node) {
-            rollback(before);
+            const bool rolled_back = rollback(before);
+            (void)rolled_back;
             return std::nullopt;
         }
 
@@ -220,7 +221,8 @@ private:
         const RailPlacementEdgeId edge_id = static_cast<RailPlacementEdgeId>(edges_.size());
         edges_.push_back({edge_id, from, *to, kind, segment});
         if (edge(edge_id) == nullptr) {
-            rollback(before);
+            const bool rolled_back = rollback(before);
+            (void)rolled_back;
             return std::nullopt;
         }
         return RailPlacementAppendResult{*to, edge_id};
