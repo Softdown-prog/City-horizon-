@@ -1,6 +1,5 @@
 name: CH Runtime Compile Fix 2
 
-# One-shot repair workflow; this edit intentionally triggers the repair job.
 on:
   push:
     branches:
@@ -25,101 +24,66 @@ jobs:
         run: |
           from pathlib import Path
 
-          def require(text, needle, label):
-              if needle not in text:
-                  raise SystemExit(f"missing expected fragment: {label}")
-
-          # Keep compatibility with the runtime UI naming while preserving the
-          # existing canonical BuildingManager color API.
-          path = Path("src/building_system.h")
-          text = path.read_text(encoding="utf-8")
-          anchor = "    [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);\n"
-          require(text, anchor, "building color API anchor")
-          compatibility = '''    [[nodiscard]] bool set_wall_color_customization(std::uint64_t instance_id, BuildingColorTint tint) {
-              return set_wall_color(instance_id, tint);
-          }
-              [[nodiscard]] bool set_roof_color_customization(std::uint64_t instance_id, BuildingColorTint tint) {
-              return set_roof_color(instance_id, tint);
-          }
-              [[nodiscard]] bool clear_color_customization(std::uint64_t instance_id) {
-              if (find_by_id(instance_id) == nullptr) return false;
-              const bool wall_cleared = clear_wall_color(instance_id);
-              const bool roof_cleared = clear_roof_color(instance_id);
-              return wall_cleared && roof_cleared;
-          }
-'''
-          if "set_wall_color_customization" not in text:
-              text = text.replace(anchor, anchor + compatibility, 1)
-          path.write_text(text, encoding="utf-8")
-
-          # The old function-like update_layout macro expands even after a '.'
-          # token (gameplay_ui.update_layout), producing invalid C++. Move that
-          # augmentation into a normal captured lambda inside the runtime loop.
-          path = Path("src/main.cpp")
-          text = path.read_text(encoding="utf-8")
-          start_marker = "#define update_layout(viewport_width, viewport_height, model) \\\n"
-          include_marker = '#include "main_runtime_impl.cpp"'
-          if start_marker in text:
-              start = text.index(start_marker)
-              end = text.index(include_marker, start)
-              text = text[:start] + text[end:]
-          text = text.replace("#undef update_layout\n", "")
-          path.write_text(text, encoding="utf-8")
-
-          path = Path("src/main_runtime_impl.cpp")
-          text = path.read_text(encoding="utf-8")
+          runtime = Path("src/main_runtime_impl.cpp")
+          text = runtime.read_text(encoding="utf-8")
+          text = text.replace("set_wall_color_customization", "set_wall_color")
+          text = text.replace("set_roof_color_customization", "set_roof_color")
           text = text.replace(
-              "gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));",
-              "ch_update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));")
-          text = text.replace(
-              "gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));",
-              "ch_update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));")
+              "buildings.clear_color_customization(*selected_instance_id)",
+              "(buildings.clear_wall_color(*selected_instance_id) && buildings.clear_roof_color(*selected_instance_id))",
+          )
+          runtime.write_text(text, encoding="utf-8")
 
-          insert_marker = "\n    while (running) {\n"
-          require(text, insert_marker, "runtime loop")
-          if "const auto ch_update_layout =" not in text:
-              helper = r'''
-    const auto ch_update_layout = [&](const int viewport_width, const int viewport_height, GameplayUiModel model) {
-        ch_fill_citizen_status(model, pedestrians, selected_pedestrian_id);
-        const auto ch_has_build_item = [&](const char* definition_id) {
-            return std::any_of(model.build_items.begin(), model.build_items.end(),
-                               [&](const UiBuildItem& item) { return item.definition_id == definition_id; });
-        };
-        if (!ch_has_build_item("terrain_raise_tool")) {
-            const std::string ch_terrain_thumbnail =
-                (asset_root / "assets/terrain/grass_isometric_01.png").string();
-            model.build_items.insert(model.build_items.begin(), {
-                {"terrain_raise_tool", "Elevar Terreno", "TERRENO", "SEM CUSTO", true,
-                 ch_terrain_thumbnail, "PINCEL R2.5",
-                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1},
-                {"terrain_lower_tool", "Rebaixar Terreno", "TERRENO", "SEM CUSTO", true,
-                 ch_terrain_thumbnail, "PINCEL R2.5",
-                 "TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE", 1},
-                {"terrain_smooth_tool", "Suavizar Terreno", "TERRENO", "SEM CUSTO", true,
-                 ch_terrain_thumbnail, "PINCEL R2.5",
-                 "SUAVIZA TRANSICOES | SOLO VAZIO | CLIQUE E ARRASTE", 1},
-            });
-        }
-        if (terrain_relief_mode) {
-            model.active_tool = UiTool::buildings;
-            model.selected_building_id =
-                *terrain_relief_mode == ch::TerrainBrushMode::raise ? "terrain_raise_tool" :
-                (*terrain_relief_mode == ch::TerrainBrushMode::lower ? "terrain_lower_tool" : "terrain_smooth_tool");
-            model.placement_preview_path =
-                (asset_root / "assets/terrain/grass_isometric_01.png").string();
-            model.placement_preview_frame_count = 1;
-            model.placement_rotatable = false;
-            model.placement_rotation_label = "PINCEL R2.5";
-        }
-        gameplay_ui.bind_selection_context(
-            &pedestrians, viewport_width, viewport_height, &selected_pedestrian_id,
-            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode &&
-            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none);
-        gameplay_ui.update_layout(viewport_width, viewport_height, model);
-    };
-'''
-              text = text.replace(insert_marker, helper + insert_marker, 1)
-          path.write_text(text, encoding="utf-8")
+          wrapper = Path("src/main.cpp")
+          text = wrapper.read_text(encoding="utf-8")
+          start = text.find("#define update_layout(viewport_width, viewport_height, model)")
+          end = text.find("\n#include \"main_runtime_impl.cpp\"", start)
+          if start < 0 or end < 0:
+              raise SystemExit("update_layout wrapper block not found")
+          macro = (
+              "#define update_layout(viewport_width, viewport_height, model) \\\n"
+              "    update_layout((viewport_width), (viewport_height), ([&]() { \\\n"
+              "        auto ch_ui_model = (model); \\\n"
+              "        ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \\\n"
+              "        const auto ch_has_build_item = [&](const char* definition_id) { \\\n"
+              "            return std::any_of(ch_ui_model.build_items.begin(), ch_ui_model.build_items.end(), \\\n"
+              "                               [&](const UiBuildItem& item) { return item.definition_id == definition_id; }); \\\n"
+              "        }; \\\n"
+              "        if (!ch_has_build_item(\"terrain_raise_tool\")) { \\\n"
+              "            const std::string ch_terrain_thumbnail = \\\n"
+              "                (asset_root / \"assets/terrain/grass_isometric_01.png\").string(); \\\n"
+              "            ch_ui_model.build_items.insert(ch_ui_model.build_items.begin(), { \\\n"
+              "                {\"terrain_raise_tool\", \"Elevar Terreno\", \"TERRENO\", \"SEM CUSTO\", true, \\\n"
+              "                 ch_terrain_thumbnail, \"PINCEL R2.5\", \\\n"
+              "                 \"TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE\", 1}, \\\n"
+              "                {\"terrain_lower_tool\", \"Rebaixar Terreno\", \"TERRENO\", \"SEM CUSTO\", true, \\\n"
+              "                 ch_terrain_thumbnail, \"PINCEL R2.5\", \\\n"
+              "                 \"TERRENO PROPRIO | SOLO VAZIO | CLIQUE E ARRASTE\", 1}, \\\n"
+              "                {\"terrain_smooth_tool\", \"Suavizar Terreno\", \"TERRENO\", \"SEM CUSTO\", true, \\\n"
+              "                 ch_terrain_thumbnail, \"PINCEL R2.5\", \\\n"
+              "                 \"SUAVIZA TRANSICOES | SOLO VAZIO | CLIQUE E ARRASTE\", 1}, \\\n"
+              "            }); \\\n"
+              "        } \\\n"
+              "        if (terrain_relief_mode) { \\\n"
+              "            ch_ui_model.active_tool = UiTool::buildings; \\\n"
+              "            ch_ui_model.selected_building_id = \\\n"
+              "                *terrain_relief_mode == ch::TerrainBrushMode::raise ? \"terrain_raise_tool\" : \\\n"
+              "                (*terrain_relief_mode == ch::TerrainBrushMode::lower ? \"terrain_lower_tool\" : \"terrain_smooth_tool\"); \\\n"
+              "            ch_ui_model.placement_preview_path = \\\n"
+              "                (asset_root / \"assets/terrain/grass_isometric_01.png\").string(); \\\n"
+              "            ch_ui_model.placement_preview_frame_count = 1; \\\n"
+              "            ch_ui_model.placement_rotatable = false; \\\n"
+              "            ch_ui_model.placement_rotation_label = \"PINCEL R2.5\"; \\\n"
+              "        } \\\n"
+              "        gameplay_ui.bind_selection_context( \\\n"
+              "            &pedestrians, (viewport_width), (viewport_height), &selected_pedestrian_id, \\\n"
+              "            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \\\n"
+              "            !terrain_relief_mode && !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \\\n"
+              "        return ch_ui_model; \\\n"
+              "    }()))"
+          )
+          text = text[:start] + macro + text[end:]
+          wrapper.write_text(text, encoding="utf-8")
 
       - name: Commit repaired sources
         shell: bash
@@ -130,6 +94,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/building_system.h src/main.cpp src/main_runtime_impl.cpp
+          git add src/main.cpp src/main_runtime_impl.cpp
           git commit -m "Fix remaining runtime compile integration blockers"
           git push origin HEAD:terrain-construction-gameplay
