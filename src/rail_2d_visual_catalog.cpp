@@ -7,10 +7,11 @@ namespace {
 constexpr std::string_view kWorldOriginAnchor = "CH_RAIL_WORLD_ORIGIN_V1";
 
 constexpr std::array<Rail2dSpriteSpec, Rail2dVisualCatalog::kRequiredSpriteCount> kSprites{{
+    // Straight track is symmetric under a 180-degree turn. SOUTH/NORTH share
+    // one approved sprite and WEST/EAST share the other; logical directions
+    // are preserved by resolve() without storing duplicate PNGs.
     {Rail2dPieceKind::straight, Rail2dDirection::south, "rail.straight.south", "assets/rail/prerendered_v1/straight_south.png", kWorldOriginAnchor},
     {Rail2dPieceKind::straight, Rail2dDirection::west, "rail.straight.west", "assets/rail/prerendered_v1/straight_west.png", kWorldOriginAnchor},
-    {Rail2dPieceKind::straight, Rail2dDirection::north, "rail.straight.north", "assets/rail/prerendered_v1/straight_north.png", kWorldOriginAnchor},
-    {Rail2dPieceKind::straight, Rail2dDirection::east, "rail.straight.east", "assets/rail/prerendered_v1/straight_east.png", kWorldOriginAnchor},
 
     {Rail2dPieceKind::curve_left_90, Rail2dDirection::south, "rail.curve_left_90.south", "assets/rail/prerendered_v1/curve_left_90_south.png", kWorldOriginAnchor},
     {Rail2dPieceKind::curve_left_90, Rail2dDirection::west, "rail.curve_left_90.west", "assets/rail/prerendered_v1/curve_left_90_west.png", kWorldOriginAnchor},
@@ -43,13 +44,34 @@ constexpr std::array<Rail2dSpriteSpec, Rail2dVisualCatalog::kRequiredSpriteCount
 
 } // namespace
 
+Rail2dDirection Rail2dVisualCatalog::canonical_direction(
+    const Rail2dPieceKind piece,
+    const Rail2dDirection direction) {
+    if (!valid_piece(piece) || !valid_direction(direction)) return direction;
+    if (piece != Rail2dPieceKind::straight) return direction;
+
+    switch (direction) {
+        case Rail2dDirection::north: return Rail2dDirection::south;
+        case Rail2dDirection::east: return Rail2dDirection::west;
+        case Rail2dDirection::south:
+        case Rail2dDirection::west:
+            return direction;
+    }
+    return direction;
+}
+
 std::optional<Rail2dSpriteSpec> Rail2dVisualCatalog::resolve(
     const Rail2dPieceKind piece,
     const Rail2dDirection direction) {
     if (!valid_piece(piece) || !valid_direction(direction)) return std::nullopt;
 
+    const Rail2dDirection canonical = canonical_direction(piece, direction);
     for (const Rail2dSpriteSpec& spec : kSprites) {
-        if (spec.piece == piece && spec.direction == direction) return spec;
+        if (spec.piece == piece && spec.direction == canonical) {
+            Rail2dSpriteSpec resolved = spec;
+            resolved.direction = direction;
+            return resolved;
+        }
     }
     return std::nullopt;
 }

@@ -16,11 +16,17 @@
     "piece": "straight",
     "anchorPolicy": "CH_RAIL_WORLD_ORIGIN_V1",
     "outputRoot": "assets/rail/prerendered_v1",
+    "canonicalDirections": [
+      "south",
+      "west"
+    ],
     "runtimeFiles": {
       "south": "straight_south.png",
-      "west": "straight_west.png",
-      "north": "straight_north.png",
-      "east": "straight_east.png"
+      "west": "straight_west.png"
+    },
+    "directionAliases": {
+      "north": "south",
+      "east": "west"
     }
   },
   "module": {
@@ -57,6 +63,8 @@
     "requiresRailMeshAtRuntime": false,
     "dragPlacement": true,
     "seamlessTileBoundary": true,
+    "straightPhysicalSpriteCount": 2,
+    "straightLogicalDirectionCount": 4,
     "futurePieces": [
       "curve_left_90",
       "curve_right_90",

@@ -47,9 +47,17 @@ class Rail2dVisualCatalog final {
 public:
     static constexpr std::size_t kPieceCount = 5U;
     static constexpr std::size_t kDirectionCount = 4U;
-    static constexpr std::size_t kRequiredSpriteCount = kPieceCount * kDirectionCount;
+    static constexpr std::size_t kStraightCanonicalSpriteCount = 2U;
+    static constexpr std::size_t kDirectionalPieceCount = kPieceCount - 1U;
+    static constexpr std::size_t kRequiredSpriteCount =
+        kStraightCanonicalSpriteCount + kDirectionalPieceCount * kDirectionCount;
+    static constexpr std::size_t kLogicalResolutionCount = kPieceCount * kDirectionCount;
 
     [[nodiscard]] static std::optional<Rail2dSpriteSpec> resolve(
+        Rail2dPieceKind piece,
+        Rail2dDirection direction);
+
+    [[nodiscard]] static Rail2dDirection canonical_direction(
         Rail2dPieceKind piece,
         Rail2dDirection direction);
 
