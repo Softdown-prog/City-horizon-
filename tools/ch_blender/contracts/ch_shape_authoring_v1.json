@@ -1,0 +1,44 @@
+{
+  "contract": "CH_SHAPE_AUTHORING_V1",
+  "status": "active",
+  "authority": "City Horizon silhouette-first deterministic Blender authoring",
+  "purpose": "Make authored 3D forms predictable before proxy review by standardizing reusable silhouette primitives and machine-readable shape diagnostics.",
+  "units": {
+    "space": "Blender world space",
+    "metricScene": true,
+    "blenderUnitsPerTile": 3.0
+  },
+  "primitiveFamilies": [
+    "symmetric_section_loft",
+    "profile_prism",
+    "mirrored_profile_pair",
+    "rounded_box"
+  ],
+  "rules": {
+    "deterministic": true,
+    "randomSeedAllowed": false,
+    "sectionOrder": "strictly increasing Y",
+    "symmetricLoftMirrorAxis": "X=0",
+    "semanticRoleRequired": true,
+    "bevelSegments": 2,
+    "preferSingleIntegratedSilhouette": true,
+    "avoidDetachedDecorativeMassesWhenOneLoftCanRepresentTheBody": true
+  },
+  "diagnostics": {
+    "contract": "CH_SHAPE_REPORT_V1",
+    "requiredMetrics": [
+      "bounds",
+      "dimensions",
+      "centerOffsetX",
+      "xSymmetryError",
+      "projectedSouthBounds",
+      "projectedSouthOccupancy",
+      "semanticRoleBounds"
+    ],
+    "purpose": "Reject gross silhouette and alignment mistakes before expensive final bake. Asset-specific expected ranges belong in the builder, not this global contract."
+  },
+  "runtime": {
+    "dependency": false,
+    "representation": "pre-rendered 2D RGBA"
+  }
+}
