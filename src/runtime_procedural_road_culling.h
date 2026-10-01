@@ -47,7 +47,10 @@ struct ProceduralRoadVisibleGroundRenderPlan {
     const float viewport_width,
     const float viewport_height,
     const float padding_world = 2.0F) {
-    if (viewport_width <= 0.0F || viewport_height <= 0.0F || camera.zoom <= 0.0F) return {};
+    if (viewport_width <= 0.0F || viewport_height <= 0.0F ||
+        !std::isfinite(camera.zoom) || camera.zoom <= 0.0F) {
+        return {1.0F, 1.0F, 0.0F, 0.0F};
+    }
 
     const ch::WorldPoint corners[4] = {
         ch::screen_to_world_point(0.0F, 0.0F, camera, viewport_width, viewport_height),
