@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/ch_core/map_document.h"
+#include "src/ch_core/procedural_tile_2d.h"
 #include "src/tile_topology.h"
 
 #include <string_view>
@@ -30,6 +31,24 @@ inline constexpr std::string_view kGroundDirtPathDefinition = "ground_dirt_path"
     }
 
     return mask;
+}
+
+// Canonical bridge between the existing auto-tile neighbourhood rules and the
+// procedural 2D visual recipe. Gameplay stays tile based; the renderer receives
+// topology + contour + terrain grade from one source of truth.
+[[nodiscard]] inline ProceduralTileRecipe ground_surface_procedural_recipe(
+    const MapDocument& document,
+    const int tile_x,
+    const int tile_y,
+    const std::string_view terrain_definition,
+    const ProceduralTilePolicy& policy = {}
+) {
+    return make_procedural_tile_2d_recipe(
+        document,
+        tile_x,
+        tile_y,
+        ground_surface_connection_mask(document, tile_x, tile_y, terrain_definition),
+        policy);
 }
 
 } // namespace ch
