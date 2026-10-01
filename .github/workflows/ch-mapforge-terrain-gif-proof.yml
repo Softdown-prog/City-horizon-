@@ -7,6 +7,9 @@ on:
     paths:
       - ".github/workflows/ch-mapforge-terrain-gif-proof.yml"
       - "C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp"
+      - "src/ch_core/map_document.cpp"
+      - "src/ch_core/map_document.h"
+      - "src/ch_core/procedural_tile_2d.h"
       - "src/ch_core/terrain_heightfield.cpp"
       - "src/ch_core/terrain_heightfield.h"
       - "src/ch_core/projection.cpp"
@@ -30,7 +33,7 @@ jobs:
       - name: Install GIF dependency
         run: python3 -m pip install --upgrade pillow
 
-      - name: Compile focused MapForge terrain proof
+      - name: Compile focused MapForge procedural 2D terrain proof
         shell: bash
         run: |
           mkdir -p build/terrain-gif-proof out/terrain-gif-proof/frames
@@ -38,12 +41,13 @@ jobs:
             -I. \
             $(pkg-config --cflags Qt6Core Qt6Gui) \
             C++/MapForge2/src/terrain_sculpt_gif_proof_main.cpp \
+            src/ch_core/map_document.cpp \
             src/ch_core/terrain_heightfield.cpp \
             src/ch_core/projection.cpp \
             -o build/terrain-gif-proof/MapForge2TerrainSculptGifProof \
             $(pkg-config --libs Qt6Core Qt6Gui)
 
-      - name: Render actual heightfield frames
+      - name: Render heightfield plus procedural 2D path frames
         env:
           QT_QPA_PLATFORM: offscreen
         run: build/terrain-gif-proof/MapForge2TerrainSculptGifProof out/terrain-gif-proof/frames
@@ -53,7 +57,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageDraw
+          from PIL import Image
 
           root = Path('out/terrain-gif-proof')
           frame_paths = sorted((root / 'frames').glob('frame_*.png'))
@@ -94,10 +98,10 @@ jobs:
           test -s out/terrain-gif-proof/mapforge_terrain_sculpt_start.png
           test -s out/terrain-gif-proof/mapforge_terrain_sculpt_end.png
 
-      - name: Upload MapForge terrain GIF proof
+      - name: Upload MapForge procedural 2D terrain proof
         uses: actions/upload-artifact@v4
         with:
-          name: MapForge2-Terrain-Sculpt-GIF-Proof
+          name: MapForge2-Terrain-Procedural-Tile-2D-GIF-Proof
           path: |
             out/terrain-gif-proof/mapforge_terrain_sculpt_test.gif
             out/terrain-gif-proof/mapforge_terrain_sculpt_contact_sheet.png
