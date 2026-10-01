@@ -36,13 +36,13 @@ jobs:
           ffmpeg -version | Select-Object -First 1
           ffprobe -version | Select-Object -First 1
 
-      - name: Download approved Viking V15 passenger swing proof
+      - name: Download approved Viking V16 slower swing proof
         uses: actions/download-artifact@v4
         with:
-          name: CH-Blender-Agent-36350851439-1
+          name: CH-Blender-Agent-36361381756-1
           path: out/viking-source
           repository: Softdown-prog/City-horizon-
-          run-id: 36350851439
+          run-id: 36361381756
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure MapForge capture renderer
@@ -53,7 +53,7 @@ jobs:
         shell: pwsh
         run: cmake --build build/ch-mapforge-viking-video --config Release --target MapForge2CLI --parallel
 
-      - name: Render approved Viking swing through MapForge2
+      - name: Render approved Viking V16 swing through MapForge2
         shell: pwsh
         env:
           QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
@@ -64,7 +64,7 @@ jobs:
           from pathlib import Path
 
           repo = Path.cwd()
-          source_root = repo / "out" / "viking-source" / "attraction.park_viking_ship.rebuild.v15_passenger_overlay_proxy_1k"
+          source_root = repo / "out" / "viking-source" / "attraction.park_viking_ship.rebuild.v16_physics_proxy_1k"
           cli = repo / "build" / "ch-mapforge-viking-video" / "Release" / "MapForge2CLI.exe"
           base_request = repo / "C++" / "MapForge2" / "examples" / "map_capture" / "capture_request.json"
           out = repo / "out" / "ch-mapforge-viking-video"
@@ -73,10 +73,16 @@ jobs:
           frames.mkdir(parents=True, exist_ok=True)
           requests.mkdir(parents=True, exist_ok=True)
 
-          source_frames = [source_root / f"occupied_south_{i:02d}.png" for i in range(12)]
+          fps = 8
+          source_frame_count = 28
+          cycles = 2
+          duration_seconds = (source_frame_count / fps) * cycles
+          frame_count = source_frame_count * cycles
+
+          source_frames = [source_root / f"occupied_south_{i:02d}.png" for i in range(source_frame_count)]
           missing = [str(p) for p in source_frames if not p.is_file()]
           if missing:
-              raise SystemExit(f"approved Viking V15 frames missing: {missing}")
+              raise SystemExit(f"approved Viking V16 frames missing: {missing}")
           if not cli.is_file():
               raise SystemExit(f"MapForge2CLI missing: {cli}")
 
@@ -117,11 +123,8 @@ jobs:
           }
           capture["portal"] = {"enabled": False}
 
-          fps = 8
-          duration_seconds = 6
-          frame_count = fps * duration_seconds
           for index in range(frame_count):
-              source = source_frames[index % len(source_frames)]
+              source = source_frames[index % source_frame_count]
               request_path = requests / f"frame_{index:06d}.json"
               output_path = frames / f"frame_{index:06d}.png"
               request_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
@@ -132,35 +135,46 @@ jobs:
                   raise SystemExit(f"MapForge frame missing/too small: {output_path}")
 
           report = {
-              "contract": "CH_MAPFORGE_VIKING_VIDEO_V1",
+              "contract": "CH_MAPFORGE_VIKING_VIDEO_V2",
               "status": "ok",
               "renderer": "MapForge2CLI/MAPFORGE_CAPTURE_REQUEST_V1",
-              "sourceWorkflowRun": 36350851439,
-              "sourceRevision": "V15 human-reviewed passenger swing proxy",
-              "sourceFrames": 12,
+              "sourceWorkflowRun": 36361381756,
+              "sourceRevision": "V16 human-approved slower pendulum timing",
+              "sourceFrames": source_frame_count,
               "frameCount": frame_count,
               "fps": fps,
               "durationSeconds": duration_seconds,
+              "cycleDurationSeconds": source_frame_count / fps,
+              "motionProfile": "slow_ascent_peak_dwell_fast_descent_v1",
               "passengerOverlay": True,
               "rideSwing": True,
-              "audio": "assets/audio/attractions/viking_ship_rope_creak.ogg"
+              "audio": "assets/audio/attractions/viking_ship_rope_creak.ogg",
+              "audioSync": {
+                  "policy": "crest_triggered_with_propagation_delay",
+                  "propagationDelayMs": 70,
+                  "crestTimesSeconds": [1.0, 2.75, 4.5, 6.25]
+              }
           }
           (out / "mapforge_viking_render_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
           '@ | python -
 
-      - name: Encode MP4 with Viking runtime sound
+      - name: Encode MP4 with crest-synced Viking rope creak
         shell: pwsh
         run: |
           $audio = "assets/audio/attractions/viking_ship_rope_creak.ogg"
           if (-not (Test-Path $audio)) { throw "Viking runtime audio missing: $audio" }
+          # V16 is 28 frames at 8 fps = 3.5 s/cycle. Rope creak is triggered at
+          # each crest (frames 8 and 22), plus a small 70 ms propagation delay.
           ffmpeg -hide_banner -loglevel error -y `
             -framerate 8 -i "out/ch-mapforge-viking-video/frames/frame_%06d.png" `
-            -stream_loop -1 -i $audio `
+            -i $audio `
+            -filter_complex "[1:a]atrim=duration=0.85,asetpts=PTS-STARTPTS,afade=t=out:st=0.70:d=0.15,volume=0.55,asplit=4[a0][a1][a2][a3];[a0]adelay=1070|1070[d0];[a1]adelay=2820|2820[d1];[a2]adelay=4570|4570[d2];[a3]adelay=6320|6320[d3];[d0][d1][d2][d3]amix=inputs=4:duration=longest:normalize=0[aout]" `
+            -map 0:v:0 -map "[aout]" `
             -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart `
-            -c:a aac -b:a 160k -shortest `
+            -c:a aac -b:a 160k -t 7.0 `
             "out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4"
 
-      - name: Validate MP4 streams
+      - name: Validate MP4 streams and approved timing
         shell: pwsh
         run: |
           $video = "out/ch-mapforge-viking-video/viking_ship_mapforge_passengers_audio.mp4"
@@ -172,8 +186,9 @@ jobs:
           $audioStream = $json.streams | Where-Object { $_.codec_type -eq "audio" }
           if ($null -eq $videoStream) { throw "MP4 has no video stream" }
           if ($null -eq $audioStream) { throw "MP4 has no audio stream" }
-          if ([double]$json.format.duration -lt 5.5) { throw "MP4 is shorter than expected" }
-          Write-Host "Viking MapForge MP4 validated with video + audio"
+          $duration = [double]$json.format.duration
+          if ($duration -lt 6.9 -or $duration -gt 7.1) { throw "MP4 duration is not the expected two V16 cycles" }
+          Write-Host "Viking MapForge MP4 validated: approved V16 timing + crest-synced audio"
 
       - name: Upload Viking MapForge video
         uses: actions/upload-artifact@v4
@@ -184,7 +199,7 @@ jobs:
             out/ch-mapforge-viking-video/mapforge_viking_render_report.json
             out/ch-mapforge-viking-video/ffprobe.json
             out/ch-mapforge-viking-video/frames/frame_000000.png
-            out/ch-mapforge-viking-video/frames/frame_000006.png
-            out/ch-mapforge-viking-video/frames/frame_000011.png
+            out/ch-mapforge-viking-video/frames/frame_000008.png
+            out/ch-mapforge-viking-video/frames/frame_000022.png
           if-no-files-found: error
           retention-days: 14
