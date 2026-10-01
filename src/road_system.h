@@ -104,13 +104,16 @@ public:
 };
 
 // CH_PROCEDURAL_ROAD_GRAPH_V1
+// CH_PROCEDURAL_ROAD_ADJACENCY_INDEX_V1
 //
 // Graph topology sits beside the legacy RoadManager until the procedural-road
 // visual and editor gates pass. Nodes are shared anchors in world space. Segment
 // handles are stored relative to their endpoint nodes, so moving a junction
 // keeps every incident road attached while preserving the authored curve shape.
 // ID 0 is reserved as invalid; generated IDs are stable for the lifetime of the
-// graph and are never derived from vector indices.
+// graph and are never derived from vector indices. An explicit node->segments
+// adjacency index keeps degree/incident-edge queries proportional to local road
+// degree rather than to the size of the whole city network.
 using ProceduralRoadNodeId = std::uint64_t;
 using ProceduralRoadSegmentId = std::uint64_t;
 inline constexpr ProceduralRoadNodeId kInvalidProceduralRoadNodeId = 0;
@@ -139,6 +142,7 @@ public:
         const ProceduralRoadNodeId id = next_node_id_++;
         nodes_.push_back({id, position});
         node_indices_.emplace(id, nodes_.size() - 1U);
+        adjacent_segments_.try_emplace(id);
         return id;
     }
 
@@ -157,6 +161,8 @@ public:
         segments_.push_back({id, start_node, end_node, start_handle, end_handle,
                              width, 1.0F, 24, lane_count});
         segment_indices_.emplace(id, segments_.size() - 1U);
+        adjacent_segments_[start_node].push_back(id);
+        adjacent_segments_[end_node].push_back(id);
         return id;
     }
 
@@ -188,20 +194,15 @@ public:
     }
 
     [[nodiscard]] std::vector<ProceduralRoadSegmentId> connected_segments(const ProceduralRoadNodeId node_id) const {
-        std::vector<ProceduralRoadSegmentId> result;
-        if (node(node_id) == nullptr) return result;
-        for (const ProceduralRoadGraphSegment& item : segments_) {
-            if (item.start_node == node_id || item.end_node == node_id) result.push_back(item.id);
-        }
-        return result;
+        const auto found = adjacent_segments_.find(node_id);
+        return found == adjacent_segments_.end()
+            ? std::vector<ProceduralRoadSegmentId>{}
+            : found->second;
     }
 
     [[nodiscard]] std::size_t degree(const ProceduralRoadNodeId node_id) const {
-        if (node(node_id) == nullptr) return 0U;
-        return static_cast<std::size_t>(std::count_if(
-            segments_.begin(), segments_.end(), [node_id](const ProceduralRoadGraphSegment& item) {
-                return item.start_node == node_id || item.end_node == node_id;
-            }));
+        const auto found = adjacent_segments_.find(node_id);
+        return found == adjacent_segments_.end() ? 0U : found->second.size();
     }
 
     [[nodiscard]] std::optional<RoadSplineSegment> spline_for(const ProceduralRoadSegmentId id) const {
@@ -233,9 +234,9 @@ public:
         const auto found = node_indices_.find(id);
         if (found == node_indices_.end()) return false;
 
-        for (std::size_t index = segments_.size(); index > 0U; --index) {
-            const ProceduralRoadGraphSegment& item = segments_[index - 1U];
-            if (item.start_node == id || item.end_node == id) erase_segment_at(index - 1U);
+        const std::vector<ProceduralRoadSegmentId> incident = connected_segments(id);
+        for (const ProceduralRoadSegmentId segment_id : incident) {
+            (void)remove_segment(segment_id);
         }
 
         const std::size_t index = found->second;
@@ -246,6 +247,7 @@ public:
         }
         nodes_.pop_back();
         node_indices_.erase(id);
+        adjacent_segments_.erase(id);
         return true;
     }
 
@@ -254,6 +256,7 @@ public:
         segments_.clear();
         node_indices_.clear();
         segment_indices_.clear();
+        adjacent_segments_.clear();
         next_node_id_ = 1;
         next_segment_id_ = 1;
     }
@@ -267,14 +270,21 @@ private:
     }
 
     void erase_segment_at(const std::size_t index) {
-        const ProceduralRoadSegmentId removed_id = segments_[index].id;
+        const ProceduralRoadGraphSegment removed = segments_[index];
+        if (auto found = adjacent_segments_.find(removed.start_node); found != adjacent_segments_.end()) {
+            std::erase(found->second, removed.id);
+        }
+        if (auto found = adjacent_segments_.find(removed.end_node); found != adjacent_segments_.end()) {
+            std::erase(found->second, removed.id);
+        }
+
         const std::size_t last = segments_.size() - 1U;
         if (index != last) {
             segments_[index] = segments_[last];
             segment_indices_[segments_[index].id] = index;
         }
         segments_.pop_back();
-        segment_indices_.erase(removed_id);
+        segment_indices_.erase(removed.id);
     }
 
     ProceduralRoadNodeId next_node_id_ = 1;
@@ -283,6 +293,7 @@ private:
     std::vector<ProceduralRoadGraphSegment> segments_;
     std::unordered_map<ProceduralRoadNodeId, std::size_t> node_indices_;
     std::unordered_map<ProceduralRoadSegmentId, std::size_t> segment_indices_;
+    std::unordered_map<ProceduralRoadNodeId, std::vector<ProceduralRoadSegmentId>> adjacent_segments_;
 };
 
 class ProceduralRoadPlacementBridge;
