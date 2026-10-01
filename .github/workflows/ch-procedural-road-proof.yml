@@ -60,6 +60,7 @@ jobs:
           cmake -S . -B build/ch-runtime-road -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_TESTING=OFF
+          -DSDL_UNIX_CONSOLE_BUILD=ON
 
       - name: Build City Horizon runtime with procedural 2D roads
         run: cmake --build build/ch-runtime-road --target city_builder --parallel 2
