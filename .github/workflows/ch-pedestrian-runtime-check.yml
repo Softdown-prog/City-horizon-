@@ -1,5 +1,8 @@
 name: CH Pedestrian Runtime Check
 
+# Focused guard for pedestrian pathing/state/animation integration. It stays
+# independent from the full City Builder build so unrelated modules cannot hide
+# regressions in the citizen runtime.
 on:
   workflow_dispatch:
   push:
