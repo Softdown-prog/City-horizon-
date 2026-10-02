@@ -1,0 +1,106 @@
+name: CH Coaster Render Link
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/ch-coaster-render-link.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch runtime render integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/main_runtime_impl.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '#include "building_system.h"\n#include "crosswalk_runtime.h"\n',
+              '#include "building_system.h"\n#include "coaster_runtime.h"\n#include "coaster_sdl_renderer.h"\n#include "crosswalk_runtime.h"\n',
+              'coaster includes')
+
+          replace_once(
+              '''void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,\n                           const BuildingCatalog& building_catalog, const LandManager& lands,\n                           const std::vector<MobileEntityRenderData>& mobile_entities,\n                           const MobileAnimationCatalog& animations, TextureCache& textures,\n                           const std::filesystem::path& root, const Camera& camera,\n                           float viewport_width, float viewport_height) {\n    struct EntityDraw {\n        enum class Kind { building, mobile_entity } kind = Kind::building;\n        float depth = 0.0F;\n        const BuildingInstance* building = nullptr;\n        const MobileEntityRenderData* mobile_entity = nullptr;\n    };\n    std::vector<EntityDraw> draws;\n    draws.reserve(buildings.instances().size() + mobile_entities.size());\n''',
+              '''void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,\n                           const BuildingCatalog& building_catalog, const LandManager& lands,\n                           const std::vector<MobileEntityRenderData>& mobile_entities,\n                           const ch::coaster::TrainStepResult* coaster_train,\n                           const MobileAnimationCatalog& animations, TextureCache& textures,\n                           const std::filesystem::path& root, const Camera& camera,\n                           float viewport_width, float viewport_height) {\n    struct EntityDraw {\n        enum class Kind { building, mobile_entity, coaster_car } kind = Kind::building;\n        float depth = 0.0F;\n        const BuildingInstance* building = nullptr;\n        const MobileEntityRenderData* mobile_entity = nullptr;\n        const ch::coaster::CarRenderCommand* coaster_car = nullptr;\n    };\n    std::vector<EntityDraw> draws;\n    draws.reserve(buildings.instances().size() + mobile_entities.size() + ch::coaster::kCoasterTrainCarCount);\n''',
+              'world entity signature')
+
+          replace_once(
+              '''        draws.push_back({EntityDraw::Kind::building, camera_depth_key(ground.x, ground.y, camera), &instance, nullptr});\n''',
+              '''        draws.push_back({EntityDraw::Kind::building, camera_depth_key(ground.x, ground.y, camera), &instance, nullptr, nullptr});\n''',
+              'building draw init')
+
+          replace_once(
+              '''        draws.push_back({EntityDraw::Kind::mobile_entity,\n                         camera_depth_key(visual.spatial.visual_world_x + visual.spatial.ground_anchor_x,\n                                          visual.spatial.visual_world_y + visual.spatial.ground_anchor_y, camera),\n                         nullptr, &visual});\n    }\n    std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {\n''',
+              '''        draws.push_back({EntityDraw::Kind::mobile_entity,\n                         camera_depth_key(visual.spatial.visual_world_x + visual.spatial.ground_anchor_x,\n                                          visual.spatial.visual_world_y + visual.spatial.ground_anchor_y, camera),\n                         nullptr, &visual, nullptr});\n    }\n\n    ch::coaster::TrainRenderPlan coaster_plan;\n    if (coaster_train != nullptr && coaster_train->valid) {\n        const ch::CameraState coaster_camera{camera.pan_x, camera.pan_y, camera.zoom,\n                                             static_cast<ch::CameraRotation>(camera.rotation)};\n        coaster_plan = ch::coaster::build_train_render_plan(*coaster_train, coaster_camera);\n        for (std::size_t i = 0; i < coaster_plan.car_count; ++i) {\n            const ch::coaster::CarRenderCommand& car = coaster_plan.cars[i];\n            draws.push_back({EntityDraw::Kind::coaster_car, car.depth_key, nullptr, nullptr, &car});\n        }\n    }\n\n    std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {\n''',
+              'coaster queue insertion')
+
+          replace_once(
+              '''    for (const EntityDraw& draw : draws) {\n        if (draw.kind == EntityDraw::Kind::building) {\n''',
+              '''    for (const EntityDraw& draw : draws) {\n        if (draw.kind == EntityDraw::Kind::coaster_car) {\n            const ch::coaster::CarRenderCommand& car = *draw.coaster_car;\n            const TextureAsset* atlas = textures.find(root / car.atlas_path);\n            if (atlas == nullptr || atlas->texture == nullptr) continue;\n            const ch::CameraState coaster_camera{camera.pan_x, camera.pan_y, camera.zoom,\n                                                 static_cast<ch::CameraRotation>(camera.rotation)};\n            const ch::coaster::CarSpriteGeometry geometry = ch::coaster::build_car_sprite_geometry(\n                car, coaster_camera, viewport_width, viewport_height);\n            if (geometry.destination.w > 0.0F && geometry.destination.h > 0.0F) {\n                SDL_RenderTexture(renderer, atlas->texture, &geometry.source, &geometry.destination);\n            }\n            continue;\n        }\n        if (draw.kind == EntityDraw::Kind::building) {\n''',
+              'coaster draw branch')
+
+          replace_once(
+              '''    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");\n    show_loading(0.30F, "CARREGANDO TERRENO, RUAS E CAMINHOS");\n''',
+              '''    (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");\n    if (textures.load(renderer, asset_root / ch::coaster::kFlameCarPoseAtlasPath) == nullptr) {\n        std::cerr << "Flame coaster pose atlas unavailable; runtime preview disabled.\\n";\n    }\n    show_loading(0.30F, "CARREGANDO TERRENO, RUAS E CAMINHOS");\n''',
+              'atlas preload')
+
+          replace_once(
+              '''    Camera camera;\n    float seagull_seconds = 0.0F;\n''',
+              '''    Camera camera;\n\n    // CH_COASTER_RENDER_LINK_V1: until the track construction system owns a\n    // production centerline, P toggles a deterministic render-validation loop.\n    // The train still uses the real articulated runtime, pose atlas and world\n    // entity depth queue; only the temporary route source is developer-only.\n    ch::coaster::CoasterRuntime coaster_runtime;\n    bool coaster_preview_enabled = false;\n    {\n        const OwnedTileBounds bounds = owned_tile_bounds(lands);\n        const double center_x = (static_cast<double>(bounds.min_x) + static_cast<double>(bounds.max_x)) * 0.5;\n        const double center_y = (static_cast<double>(bounds.min_y) + static_cast<double>(bounds.max_y)) * 0.5;\n        const double width = static_cast<double>(bounds.max_x - bounds.min_x);\n        const double height = static_cast<double>(bounds.max_y - bounds.min_y);\n        const double radius = std::max(3.0, std::min(width, height) * 0.22);\n        constexpr int kPreviewSamples = 64;\n        constexpr double kPi = 3.14159265358979323846;\n        std::vector<ch::coaster::RoutePoint> route;\n        route.reserve(kPreviewSamples);\n        for (int i = 0; i < kPreviewSamples; ++i) {\n            const double angle = 2.0 * kPi * static_cast<double>(i) / static_cast<double>(kPreviewSamples);\n            ch::coaster::RoutePoint point;\n            point.x = center_x + radius * std::sin(angle);\n            point.y = center_y + radius * std::cos(angle);\n            point.z = 0.0;\n            route.push_back(point);\n        }\n        if (coaster_runtime.set_route(std::move(route), true)) {\n            coaster_runtime.config().physics.drag_area_m2 = 0.0;\n            coaster_runtime.config().physics.rolling_resistance_coefficient = 0.0;\n            coaster_runtime.config().physics.mechanical_linear_loss_per_s = 0.0;\n            coaster_runtime.reset(0.0, 4.0);\n        }\n    }\n\n    float seagull_seconds = 0.0F;\n''',
+              'coaster runtime preview init')
+
+          replace_once(
+              '''                    case SDL_SCANCODE_F8: {\n''',
+              '''                    case SDL_SCANCODE_P:\n                        if (coaster_runtime.ready()) {\n                            coaster_preview_enabled = !coaster_preview_enabled;\n                            status = std::string("FLAME COASTER RENDER: ") +\n                                     (coaster_preview_enabled ? "ON" : "OFF");\n                        } else {\n                            status = "FLAME COASTER RENDER: ROUTE UNAVAILABLE";\n                        }\n                        break;\n                    case SDL_SCANCODE_F8: {\n''',
+              'preview toggle')
+
+          replace_once(
+              '''        const SimulationAdvance time_advance = simulation_clock.advance_seconds(elapsed_seconds);\n        const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);\n''',
+              '''        const SimulationAdvance time_advance = simulation_clock.advance_seconds(elapsed_seconds);\n        const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);\n        if (coaster_preview_enabled && coaster_runtime.ready()) {\n            (void)coaster_runtime.update(std::min(elapsed_seconds, 0.050),\n                                         static_cast<int>(camera_rotation_turns(camera.rotation)));\n        }\n''',
+              'coaster runtime update')
+
+          replace_once(
+              '''        const std::vector<MobileEntityRenderData> mobile_entities = mobile_render_entities();\n        render_world_entities(renderer, buildings, catalog, lands, mobile_entities, mobile_animations, textures,\n                              asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));\n''',
+              '''        const std::vector<MobileEntityRenderData> mobile_entities = mobile_render_entities();\n        const ch::coaster::TrainStepResult coaster_train = coaster_preview_enabled && coaster_runtime.ready()\n            ? coaster_runtime.snapshot(static_cast<int>(camera_rotation_turns(camera.rotation)))\n            : ch::coaster::TrainStepResult{};\n        render_world_entities(renderer, buildings, catalog, lands, mobile_entities,\n                              coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,\n                              asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));\n''',
+              'world render call')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- src/main_runtime_impl.cpp
+
+      - name: Commit render link
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/main_runtime_impl.cpp; then
+            echo "No runtime changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main_runtime_impl.cpp
+          git commit -m "coaster: link Flame train into world render queue"
+          git push origin HEAD:main
