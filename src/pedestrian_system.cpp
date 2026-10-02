@@ -110,6 +110,15 @@ std::optional<std::uint64_t> PedestrianSystem::spawn_pedestrian(
     return create_pedestrian(at).id;
 }
 
+bool PedestrianSystem::despawn_pedestrian(const std::uint64_t pedestrian_id) {
+    const auto found = std::find_if(instances_.begin(), instances_.end(), [pedestrian_id](const PedestrianInstance& pedestrian) {
+        return pedestrian.id == pedestrian_id;
+    });
+    if (found == instances_.end()) return false;
+    instances_.erase(found);
+    return true;
+}
+
 void PedestrianSystem::assign_route(PedestrianInstance& pedestrian, const NavigationTile start,
                                     const NavigationTile destination, const NavigationPathResult& path) {
     pedestrian.speed = visual_definition_.movement_speed_tiles_per_second;
