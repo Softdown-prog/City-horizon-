@@ -79,9 +79,11 @@ int main() {
     }
     if (!runtime.set_route(lift_points, false)) return fail("open lift route must validate");
     runtime.reset(0.0, 0.0);
-    for (int i = 0; i < 400; ++i) runtime.update(0.01, 0);
+    TrainStepResult lift_step;
+    for (int i = 0; i < 400; ++i) lift_step = runtime.update(0.01, 0);
     if (!near(runtime.state().lead.speed_mps, 2.4, 0.12))
         return fail("lift route must pull train toward target speed");
+    if (lift_step.cars.empty()) return fail("lift route must continue producing renderable cars");
 
     // Invalid duplicate points fail closed instead of poisoning runtime state.
     std::vector<RoutePoint> invalid = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
