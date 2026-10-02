@@ -7,7 +7,7 @@
   "rebuild": {
     "id": "CH_VIKING_SHIP_RCT_REFERENCE_V1",
     "fromScratch": true,
-    "supersedesForReview": "Rebuild V4 and every CH_TYCOON_MINIATURE_V1 Viking candidate",
+    "supersedesForReview": "Rebuild V4 and all earlier Viking candidates",
     "intent": "Use the user-supplied RollerCoaster Tycoon pirate-ship screenshot only as a readability and park-layout reference: slim open supports, long low ship, thin integrated ride pad, queue rails and matte game-scale materials. Explicitly reject glossy toy, LEGO and plastic-machine language."
   },
   "visualLanguage": {
