@@ -41,8 +41,11 @@ int main() {
 
     runtime.reset(0.0, 8.0);
     const TrainStepResult south = runtime.snapshot(0);
-    if (south.cars[0].sprite_pose.logical_heading_index != 0)
-        return fail("circle start tangent must select h00");
+    if (!south.valid) return fail("valid centerline snapshot must be marked renderable");
+    // The authored circle starts at (0,+R) and advances toward +X. In the
+    // Flame +Y-forward convention that tangent is heading 270 degrees = h12.
+    if (south.cars[0].sprite_pose.logical_heading_index != 12)
+        return fail("circle start tangent must select h12");
     if (south.cars[0].sprite_pose.atlas_index < 0 || south.cars[0].sprite_pose.atlas_index >= kCarPoseFrameCount)
         return fail("lead car selected an invalid atlas frame");
 
@@ -83,7 +86,7 @@ int main() {
     for (int i = 0; i < 400; ++i) lift_step = runtime.update(0.01, 0);
     if (!near(runtime.state().lead.speed_mps, 2.4, 0.12))
         return fail("lift route must pull train toward target speed");
-    if (lift_step.cars.empty()) return fail("lift route must continue producing renderable cars");
+    if (!lift_step.valid) return fail("lift route must continue producing renderable cars");
 
     // Invalid duplicate points fail closed instead of poisoning runtime state.
     std::vector<RoutePoint> invalid = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
