@@ -30,6 +30,22 @@ namespace {
     return found == pedestrians.instances().end() ? nullptr : &*found;
 }
 
+[[nodiscard]] PedestrianOutingPurpose outing_purpose_for(const PedestrianInstance& pedestrian,
+                                                          const WeatherState weather) {
+    const float weakest_need = std::min({pedestrian.needs.hunger, pedestrian.needs.thirst, pedestrian.needs.fun});
+    // A materially depleted wellbeing bar remains authoritative. When the
+    // citizen is comfortable, leaving home may instead be discretionary.
+    if (weakest_need <= 70.0F) return PedestrianOutingPurpose::need;
+
+    switch (weather) {
+        case WeatherState::sunny: return PedestrianOutingPurpose::leisure_activity;
+        case WeatherState::overcast: return PedestrianOutingPurpose::shopping;
+        case WeatherState::raining:
+        case WeatherState::thunderstorm: return PedestrianOutingPurpose::service;
+    }
+    return PedestrianOutingPurpose::shopping;
+}
+
 } // namespace
 
 void PedestrianDecisionNode::reseed_for(const std::uint64_t pedestrian_id) {
@@ -266,7 +282,9 @@ void PedestrianDecisionNode::update_for(const std::uint64_t pedestrian_id, const
         }
 
         const PedestrianNeed need = pedestrians.priority_need(pedestrian_id);
+        const PedestrianOutingPurpose purpose = outing_purpose_for(*target, weather);
         if (pedestrians.authorize_outing(pedestrian_id, preference_for_weather(weather, essential), need)) {
+            (void)pedestrians.set_outing_purpose(pedestrian_id, purpose);
             decision_ = PedestrianDecision::awaiting_activity;
             retry_seconds_ = 2.0F;
             return;
