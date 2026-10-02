@@ -9,6 +9,15 @@
 
 namespace ch::coaster {
 
+// SDL-facing rectangle shape kept independent from SDL so the adapter remains
+// testable in the lightweight coaster regression job.
+struct AtlasSourceRect {
+    int x = 0;
+    int y = 0;
+    int width = kCarPoseFrameWidth;
+    int height = kCarPoseFrameHeight;
+};
+
 // CH_COASTER_RENDER_ADAPTER_V1
 // Presentation-only bridge from the articulated train simulation to the
 // existing 2D isometric renderer. It does not own textures or simulation state.
@@ -37,7 +46,12 @@ struct TrainRenderPlan {
         const CarRuntimePose& car = train.cars[i];
         CarRenderCommand& command = plan.cars[i];
         command.car_index = i;
-        command.source_rect = car.sprite_pose.source_rect;
+        command.source_rect = {
+            car.sprite_pose.source_rect.x,
+            car.sprite_pose.source_rect.y,
+            car.sprite_pose.source_rect.w,
+            car.sprite_pose.source_rect.h,
+        };
         command.world_anchor = {
             static_cast<float>(car.world_x),
             static_cast<float>(car.world_y),
