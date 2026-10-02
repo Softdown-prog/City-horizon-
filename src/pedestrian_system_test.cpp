@@ -1,6 +1,7 @@
 #include "navigation_network.h"
 #include "pedestrian_decision.h"
 #include "pedestrian_system.h"
+#include "population_system.h"
 #include "road_system.h"
 #include "sidewalk_system.h"
 
@@ -378,6 +379,74 @@ void test_resident_at_home_decision_and_weather_immunity_in_transit() {
     std::filesystem::remove_all(fixture);
 }
 
+void test_population_materializes_visible_citizens_stably() {
+    const auto fixture = std::filesystem::temp_directory_path() / "ch_pedestrian_population_fixture";
+    std::filesystem::remove_all(fixture);
+    std::filesystem::create_directories(fixture);
+    {
+        std::ofstream out(fixture / "residence.json");
+        out << R"({"id":"dense_test_home","name":"Dense Test Home","category":"residential","texture":"house.png",
+            "footprint":{"width":3,"height":3},"residentialCapacity":1000,
+            "roadAccessMode":"front_edge","frontEdge":"south"})";
+    }
+
+    BuildingCatalog catalog;
+    assert(catalog.load_from_directory(fixture));
+    const BuildingDefinition* house = catalog.find("dense_test_home");
+    assert(house != nullptr);
+
+    BuildingManager buildings{-16, 16};
+    const auto home_id = buildings.place(*house, 0, 0);
+    assert(home_id);
+
+    RoadManager roads{-16, 16};
+    SidewalkManager sidewalks{-16, 16};
+    for (int y = 3; y <= 10; ++y) assert(sidewalks.place_tile(1, y, "cement_path"));
+    PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+
+    PopulationSystem population;
+    population.restore_current_population(5, buildings, catalog);
+    assert(population.current_population() == 5);
+
+    PedestrianSystem pedestrians{{"ch_actor_green_01", 1.0F, 0.5F, 60.0F / 64.0F}};
+    PedestrianDecisionSystem decisions;
+    decisions.sync_population(population, pedestrians, network, buildings, catalog);
+    assert(pedestrians.instances().size() == 5);
+    assert(decisions.active_decision_count() == 5);
+
+    std::vector<std::uint64_t> original_ids;
+    std::vector<MobileClothingTint> original_clothing;
+    for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
+        original_ids.push_back(pedestrian.id);
+        original_clothing.push_back(pedestrian.clothing);
+        assert(pedestrian.state == PedestrianState::resting);
+        assert(decisions.home_id(pedestrian.id) == home_id);
+    }
+    for (std::size_t a = 0; a < original_ids.size(); ++a) {
+        for (std::size_t b = a + 1; b < original_ids.size(); ++b) assert(original_ids[a] != original_ids[b]);
+    }
+
+    population.restore_current_population(2, buildings, catalog);
+    decisions.sync_population(population, pedestrians, network, buildings, catalog);
+    assert(pedestrians.instances().size() == 2);
+    assert(decisions.active_decision_count() == 2);
+    assert(pedestrians.instances()[0].id == original_ids[0]);
+    assert(pedestrians.instances()[1].id == original_ids[1]);
+    assert(pedestrians.instances()[0].clothing == original_clothing[0]);
+    assert(pedestrians.instances()[1].clothing == original_clothing[1]);
+
+    population.restore_current_population(1000, buildings, catalog);
+    assert(population.current_population() == 1000);
+    assert(PedestrianDecisionSystem::target_active_citizens(population) ==
+           PedestrianDecisionSystem::kMaxActiveCitizens);
+
+    for (std::uint64_t id = 1; id <= PedestrianSystem::kDecisionShardCount; ++id) {
+        assert(PedestrianSystem::decision_shard_for(id) < PedestrianSystem::kDecisionShardCount);
+    }
+
+    std::filesystem::remove_all(fixture);
+}
+
 } // namespace
 
 int main() {
@@ -390,4 +459,5 @@ int main() {
     test_budget_distribution();
     test_need_decay_priority_and_restore();
     test_weather_policy_and_monthly_budget();
+    test_population_materializes_visible_citizens_stably();
 }
