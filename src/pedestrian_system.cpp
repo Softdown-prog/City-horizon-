@@ -414,8 +414,8 @@ void PedestrianSystem::interpolate_visual(const float) {
 void PedestrianSystem::update_animation(const float frame_seconds, const MobileAnimationCatalog& animations) {
     for (PedestrianInstance& pedestrian : instances_) {
         pedestrian.animation.playback_rate = visual_definition_.animation_playback_rate;
-        update_mobile_animation(pedestrian.animation, animation_state(pedestrian.state), pedestrian.spatial.direction,
-                                frame_seconds, animations);
+        animations.update_player(pedestrian.animation, animation_state(pedestrian.state), pedestrian.spatial.direction,
+                                 frame_seconds);
     }
 }
 
