@@ -1,0 +1,302 @@
+name: Promote Coaster Flame passenger occlusion V2
+
+on:
+  push:
+    paths:
+      - 'tools/runtime_promotion_requests/coaster_flame_passenger_occlusion_v2.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PASSENGER_SOURCE_RUN_ID: '37073965181'
+  PASSENGER_SOURCE_COMMIT: '6133a26fa68a3b1cceec982918d75a6303ecb756'
+  PASSENGER_APPROVED_PROXY_SHA: '8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb'
+  SOURCE_DIR_NAME: 'coaster.car_flame_passenger_overlay_v2.final.002'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and download V2 passenger artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/coaster-flame-passenger-occlusion-v2"
+          mkdir -p "$work/artifact"
+          meta="$work/artifacts.json"
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${PASSENGER_SOURCE_RUN_ID}/artifacts?per_page=100" \
+            -o "$meta"
+          readarray -t resolved < <(python3 - "$meta" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding='utf-8'))
+          artifacts = [a for a in data.get('artifacts', []) if not a.get('expired')]
+          if len(artifacts) != 1:
+              raise SystemExit(f'expected exactly one V2 artifact, got {len(artifacts)}')
+          a = artifacts[0]
+          print(a['id'])
+          print(a.get('digest') or '')
+          PY
+          )
+          artifact_id="${resolved[0]}"
+          artifact_digest="${resolved[1]}"
+          echo "PASSENGER_ARTIFACT_ID=$artifact_id" >> "$GITHUB_ENV"
+          echo "PASSENGER_ARTIFACT_DIGEST=$artifact_digest" >> "$GITHUB_ENV"
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+            -o "$work/artifact.zip"
+          unzip -q "$work/artifact.zip" -d "$work/artifact"
+
+      - name: Install deterministic atlas dependency
+        run: python3 -m pip install --disable-pip-version-check pillow==11.3.0
+
+      - name: Validate and promote depth-correct occupied atlas
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from PIL import Image
+
+          temp = Path(os.environ['RUNNER_TEMP']) / 'coaster-flame-passenger-occlusion-v2'
+          source = temp / 'artifact' / os.environ['SOURCE_DIR_NAME']
+          destination = Path('assets/vehicles/coaster_flame_01')
+
+          required = [
+              'passenger_overlay_manifest.json',
+              'proxy_approval.json',
+              'preflight_report.json',
+              'studio_metadata.json',
+          ]
+          for name in required:
+              if not (source / name).is_file():
+                  raise SystemExit(f'missing V2 output: {source / name}')
+
+          manifest = json.loads((source / 'passenger_overlay_manifest.json').read_text(encoding='utf-8'))
+          approval = json.loads((source / 'proxy_approval.json').read_text(encoding='utf-8'))
+          preflight = json.loads((source / 'preflight_report.json').read_text(encoding='utf-8'))
+          studio = json.loads((source / 'studio_metadata.json').read_text(encoding='utf-8'))
+
+          if manifest.get('contract') != 'CH_COASTER_PASSENGER_OVERLAY_V1':
+              raise SystemExit('unexpected passenger overlay contract')
+          if manifest.get('renderContract') != 'CH_COASTER_PASSENGER_OCCLUSION_V2':
+              raise SystemExit('missing V2 occlusion render contract')
+          if manifest.get('runtimeCompositePolicy') != 'use_blender_occupied_composite':
+              raise SystemExit('V2 manifest does not require Blender occupied composites')
+          frames = manifest.get('frames', [])
+          if manifest.get('overlayFrameCount') != 40 or len(frames) != 40:
+              raise SystemExit('V2 passenger package must contain exactly 40 poses')
+          if approval.get('proxySha256') != os.environ['PASSENGER_APPROVED_PROXY_SHA'] or approval.get('reviewed') is not True:
+              raise SystemExit('V2 approval does not match reviewed proxy')
+          if preflight.get('status') != 'pass' or preflight.get('violations'):
+              raise SystemExit('V2 passenger preflight did not pass')
+          if studio.get('qualityStage') != 'final' or studio.get('occupiedCompositeFrameCount') != 40:
+              raise SystemExit('V2 studio metadata is incomplete')
+
+          runtime_path = destination / 'coaster_flame_01_runtime.json'
+          atlas_manifest_path = destination / 'car_pose_atlas_runtime.json'
+          if not runtime_path.is_file() or not atlas_manifest_path.is_file():
+              raise SystemExit('existing Flame runtime package is missing')
+          runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
+          atlas_runtime = json.loads(atlas_manifest_path.read_text(encoding='utf-8'))
+          current_frames = atlas_runtime.get('frames', [])
+          if len(current_frames) != 40:
+              raise SystemExit('existing Flame runtime atlas does not contain 40 frames')
+
+          columns, rows, frame_w, frame_h = 8, 5, 256, 256
+          occupied_sheet = Image.new('RGBA', (columns * frame_w, rows * frame_h), (0, 0, 0, 0))
+          overlay_sheet = Image.new('RGBA', occupied_sheet.size, (0, 0, 0, 0))
+          new_runtime_frames = []
+          overlay_runtime_frames = []
+
+          for index, (frame, existing) in enumerate(zip(frames, current_frames)):
+              if frame.get('frameIndex') != index:
+                  raise SystemExit(f'non-deterministic V2 frame index at {index}')
+              for key in ('headingIndex', 'headingDegrees', 'pitchDegrees', 'family'):
+                  if frame.get(key) != existing.get(key):
+                      raise SystemExit(f'V2 pose mismatch for {key} at frame {index}')
+
+              overlay_name = frame.get('file')
+              occupied_name = frame.get('occupiedCompositeFile')
+              if not overlay_name or not occupied_name:
+                  raise SystemExit(f'missing V2 file mapping at frame {index}')
+              overlay_file = source / overlay_name
+              occupied_file = source / occupied_name
+              if not overlay_file.is_file() or not occupied_file.is_file():
+                  raise SystemExit(f'missing V2 PNG at frame {index}')
+
+              overlay = Image.open(overlay_file).convert('RGBA')
+              occupied = Image.open(occupied_file).convert('RGBA')
+              if overlay.size != (frame_w, frame_h) or occupied.size != (frame_w, frame_h):
+                  raise SystemExit(f'V2 frame {index} is not 256x256')
+
+              column, row = index % columns, index // columns
+              xy = (column * frame_w, row * frame_h)
+              occupied_sheet.alpha_composite(occupied, xy)
+              overlay_sheet.alpha_composite(overlay, xy)
+              source_rect = [xy[0], xy[1], frame_w, frame_h]
+
+              occupied_entry = dict(existing)
+              occupied_entry.update({
+                  'atlasIndex': index,
+                  'row': row,
+                  'column': column,
+                  'sourceRect': source_rect,
+                  'occupiedCompositeFile': occupied_name,
+                  'occupiedCompositeSha256': hashlib.sha256(occupied_file.read_bytes()).hexdigest(),
+                  'passengerOverlayFile': overlay_name,
+                  'passengerOverlaySha256': hashlib.sha256(overlay_file.read_bytes()).hexdigest(),
+              })
+              occupied_entry['sha256'] = occupied_entry['occupiedCompositeSha256']
+              new_runtime_frames.append(occupied_entry)
+
+              overlay_entry = dict(frame)
+              overlay_entry.update({
+                  'atlasIndex': index,
+                  'row': row,
+                  'column': column,
+                  'sourceRect': source_rect,
+                  'sha256': hashlib.sha256(overlay_file.read_bytes()).hexdigest(),
+              })
+              overlay_runtime_frames.append(overlay_entry)
+
+          occupied_path = destination / 'car_pose_atlas.png'
+          overlay_path = destination / 'passenger_pose_atlas.png'
+          occupied_sheet.save(occupied_path, format='PNG', optimize=False)
+          overlay_sheet.save(overlay_path, format='PNG', optimize=False)
+          occupied_sha = hashlib.sha256(occupied_path.read_bytes()).hexdigest()
+          overlay_sha = hashlib.sha256(overlay_path.read_bytes()).hexdigest()
+
+          source_info = {
+              'sourceCommit': os.environ['PASSENGER_SOURCE_COMMIT'],
+              'sourceWorkflowRun': int(os.environ['PASSENGER_SOURCE_RUN_ID']),
+              'sourceArtifactId': int(os.environ['PASSENGER_ARTIFACT_ID']),
+              'sourceArtifactDigest': os.environ.get('PASSENGER_ARTIFACT_DIGEST', ''),
+              'approvedProxySha256': os.environ['PASSENGER_APPROVED_PROXY_SHA'],
+              'renderContract': 'CH_COASTER_PASSENGER_OCCLUSION_V2',
+          }
+
+          atlas_runtime['spriteSheet'] = occupied_path.name
+          atlas_runtime['spriteSheetSha256'] = occupied_sha
+          atlas_runtime['frames'] = new_runtime_frames
+          atlas_runtime['occupancy'] = {
+              'mode': 'blender_depth_correct_composite',
+              'occupiedComposite': True,
+              'capacityPerCar': 2,
+              'defaultOccupiedSeatsPerCar': 2,
+              'occlusionContract': 'CH_COASTER_PASSENGER_OCCLUSION_V2',
+              'overlayContract': 'CH_COASTER_PASSENGER_OVERLAY_V1',
+              'overlaySpriteSheet': overlay_path.name,
+              'overlayManifest': 'passenger_pose_atlas_runtime.json',
+          }
+          atlas_runtime['passengerOcclusionSource'] = {**source_info, 'occupiedSpriteSheetSha256': occupied_sha}
+          atlas_manifest_path.write_text(json.dumps(atlas_runtime, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          passenger_runtime = {
+              'contract': 'CH_COASTER_PASSENGER_ATLAS_RUNTIME_V1',
+              'assetId': 'vehicle.coaster.flame_01.passenger_pose_atlas',
+              'sourceAssetId': manifest['assetId'],
+              'carContract': 'CH_COASTER_CAR_V1',
+              'trackContract': 'CH_COASTER_TRACK_V1',
+              'cameraContract': 'CH_CAMERA_V1',
+              'styleId': 'flame_01',
+              'runtimeRepresentation': '2D_RGBA_sprite_sheet_overlay',
+              'spriteSheet': overlay_path.name,
+              'spriteSheetSha256': overlay_sha,
+              'frameWidth': frame_w,
+              'frameHeight': frame_h,
+              'columns': columns,
+              'rows': rows,
+              'frameCount': 40,
+              'capacityPerCar': 2,
+              'visualRecipeSource': manifest.get('visualRecipeSource'),
+              'compositionMode': 'alpha_overlay_on_matching_car_pose',
+              'frameAlignment': 'one_to_one_by_atlasIndex_heading_pitch',
+              'activeRuntimeMode': 'blender_depth_correct_composite',
+              'occlusionContract': 'CH_COASTER_PASSENGER_OCCLUSION_V2',
+              'frames': overlay_runtime_frames,
+              **source_info,
+              'promotedForRuntimeReuse': True,
+          }
+          (destination / 'passenger_pose_atlas_runtime.json').write_text(
+              json.dumps(passenger_runtime, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          runtime.setdefault('train', {})['defaultOccupiedSeatsPerCar'] = 2
+          motion = runtime.setdefault('motionPlan', {})
+          motion.update({
+              'passengerOverlayStatus': 'ready',
+              'passengerOverlayContract': 'CH_COASTER_PASSENGER_OVERLAY_V1',
+              'passengerOverlayRuntimeContract': 'CH_COASTER_PASSENGER_ATLAS_RUNTIME_V1',
+              'passengerOverlaySpriteSheet': overlay_path.name,
+              'passengerOverlayManifest': 'passenger_pose_atlas_runtime.json',
+              'passengerOverlayFrameCount': 40,
+              'passengerRuntimeMode': 'blender_depth_correct_composite',
+              'passengerOcclusionContract': 'CH_COASTER_PASSENGER_OCCLUSION_V2',
+              'occupiedComposite': True,
+          })
+          runtime['passengerOverlaySource'] = {
+              **source_info,
+              'spriteSheetSha256': overlay_sha,
+              'occupiedCompositeSpriteSheetSha256': occupied_sha,
+          }
+          runtime_path.write_text(json.dumps(runtime, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          print('depth-correct occupied atlas SHA256=', occupied_sha)
+          print('passenger overlay atlas SHA256=', overlay_sha)
+          PY
+
+      - name: Verify V2 runtime package
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+          root = Path('assets/vehicles/coaster_flame_01')
+          runtime = json.loads((root / 'coaster_flame_01_runtime.json').read_text(encoding='utf-8'))
+          atlas = json.loads((root / 'car_pose_atlas_runtime.json').read_text(encoding='utf-8'))
+          passengers = json.loads((root / 'passenger_pose_atlas_runtime.json').read_text(encoding='utf-8'))
+          assert runtime['motionPlan']['passengerRuntimeMode'] == 'blender_depth_correct_composite'
+          assert runtime['motionPlan']['passengerOcclusionContract'] == 'CH_COASTER_PASSENGER_OCCLUSION_V2'
+          assert atlas['occupancy']['mode'] == 'blender_depth_correct_composite'
+          assert atlas['frameCount'] == 40 and len(atlas['frames']) == 40
+          assert passengers['frameCount'] == 40 and len(passengers['frames']) == 40
+          assert Image.open(root / 'car_pose_atlas.png').size == (2048, 1280)
+          assert Image.open(root / 'passenger_pose_atlas.png').size == (2048, 1280)
+          assert all(f.get('occupiedCompositeSha256') for f in atlas['frames'])
+          print('CH_COASTER_PASSENGER_OCCLUSION_V2 runtime package: OK')
+          PY
+
+      - name: Commit promoted V2 passenger runtime atlases
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/vehicles/coaster_flame_01/car_pose_atlas.png \
+                  assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json \
+                  assets/vehicles/coaster_flame_01/passenger_pose_atlas.png \
+                  assets/vehicles/coaster_flame_01/passenger_pose_atlas_runtime.json \
+                  assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json
+          if git diff --cached --quiet; then
+            echo 'Nothing to promote.'
+            exit 0
+          fi
+          git commit -m "coaster: promote depth-correct Flame passenger occlusion v2"
+          git pull --rebase origin main
+          git push origin HEAD:main
