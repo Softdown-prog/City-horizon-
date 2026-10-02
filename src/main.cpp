@@ -25,6 +25,8 @@
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
 // 19. Viking-ship rope creaks start only while the ride moves, with a small
 //     presentation-only speed-of-sound propagation delay.
+// 20. Aggregate residential population materializes bounded, persistent citizen
+//     actors whose autonomous decisions are sharded across simulation ticks.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -33,6 +35,8 @@
 #include "land_system.h"
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
+#include "pedestrian_decision.h"
+#include "population_system.h"
 #include "simulation_clock.h"
 #include "src/runtime_view_state.h"
 #include "src/runtime_map_renderer.h"
@@ -107,6 +111,46 @@ public:
         if (ch::runtime_game_state::game_over) return {};
         return SimulationClock::advance_seconds(real_seconds);
     }
+};
+
+// Runtime-only bridge: there is one authoritative population simulation in a
+// City Horizon session. The compatibility wrapper registers that instance so
+// the legacy runtime call site can feed it to the scalable citizen controller
+// without duplicating or rewriting main_runtime_impl.cpp.
+class ChPopulationSystem : public PopulationSystem {
+public:
+    ChPopulationSystem() { active_instance_ = this; }
+    ~ChPopulationSystem() {
+        if (active_instance_ == this) active_instance_ = nullptr;
+    }
+
+    [[nodiscard]] static ChPopulationSystem* active_instance() { return active_instance_; }
+
+private:
+    inline static ChPopulationSystem* active_instance_ = nullptr;
+};
+
+class ChPedestrianDecisionNode {
+public:
+    void reset() {
+        scalable_.reset();
+        legacy_.reset();
+    }
+
+    void update(const float seconds, PedestrianSystem& pedestrians, const NavigationNetwork& network,
+                const BuildingManager& buildings, const BuildingCatalog& catalog,
+                const RoadManager& roads, const SidewalkManager& sidewalks, const bool raining = false) {
+        if (ChPopulationSystem* population = ChPopulationSystem::active_instance()) {
+            scalable_.update(seconds, *population, pedestrians, network,
+                             buildings, catalog, roads, sidewalks, raining);
+            return;
+        }
+        legacy_.update(seconds, pedestrians, network, buildings, catalog, roads, sidewalks, raining);
+    }
+
+private:
+    PedestrianDecisionSystem scalable_;
+    PedestrianDecisionNode legacy_;
 };
 
 [[nodiscard]] inline bool ch_sync_service_price_after_ui_edit(
@@ -355,6 +399,8 @@ private:
 #define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
 #define SaveManager ParkFenceSaveManager
 #define CityEconomy ChCityEconomy
+#define PopulationSystem ChPopulationSystem
+#define PedestrianDecisionNode ChPedestrianDecisionNode
 #define SimulationClock ChSimulationClock
 
 #define set_service_price(instance_id, definition, service_price) \
@@ -442,6 +488,8 @@ private:
 #undef mobile_render_entities
 #undef set_service_price
 #undef SimulationClock
+#undef PedestrianDecisionNode
+#undef PopulationSystem
 #undef CityEconomy
 #undef SaveManager
 #undef PedestrianLaneNavigationNetwork
