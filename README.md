@@ -22,9 +22,9 @@ The camera and lighting stay fixed. The **asset root rotates** to generate the f
 
 ## Visual target
 
-City Horizon intentionally uses a restrained pre-rendered look that reads as 2D game art at gameplay scale. Classic Tycoon games are references for readability, path logic, information density, silhouette clarity, spatial composition and nostalgia, but the project is not trying to reproduce old hardware limitations or a miniature/diorama aesthetic.
+City Horizon intentionally uses a restrained pre-rendered look that reads as 2D game art at gameplay scale. Classic Tycoon games are references for readability, path logic, information density, silhouette clarity, spatial composition and nostalgia, but the project is not trying to reproduce old hardware limitations.
 
-Assets should keep believable, category-appropriate proportions and coherent relative scale against the canonical 128×64 gameplay grid. Do not make buildings squat, chibi, toy-like or dollhouse-like, and do not enlarge roofs, windows, doors or props merely to create a miniature feel. Simplification for gameplay readability is encouraged when useful; forced miniaturization is not.
+Assets should keep believable, category-appropriate proportions and coherent relative scale against the canonical 128×64 gameplay grid. Do not distort massing or enlarge roofs, windows, doors or props without a clear asset-specific reason. Simplification for gameplay readability is encouraged when useful.
 
 The Blender source render may be detailed, but the final asset is deliberately reduced/downsampled and stylized. This is intentional: it suppresses the glossy/plastic standalone-3D look and helps the asset belong to a 2D isometric game world.
 
