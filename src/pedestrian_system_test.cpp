@@ -4,16 +4,50 @@
 #include "road_system.h"
 #include "sidewalk_system.h"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 #include <vector>
 
 namespace {
 
 PedestrianSystem make_pedestrian_system() {
     return PedestrianSystem{{"citizen_common", 0.45F, 0.5F, 0.88F}};
+}
+
+MobileAnimationCatalog make_render_animation_catalog() {
+    const auto fixture = std::filesystem::temp_directory_path() / "ch_pedestrian_animation_fixture";
+    std::filesystem::remove_all(fixture);
+    std::filesystem::create_directories(fixture);
+
+    const auto write_set = [&fixture](const std::string_view set_id) {
+        static constexpr std::array<std::string_view, 2> states = {"idle", "walking"};
+        static constexpr std::array<std::string_view, 4> directions = {"north", "east", "south", "west"};
+        std::ofstream out(fixture / (std::string(set_id) + ".json"));
+        out << "{\"id\":\"" << set_id << "\",\"clips\":[";
+        bool first = true;
+        for (const std::string_view state : states) {
+            for (const std::string_view direction : directions) {
+                if (!first) out << ',';
+                first = false;
+                out << "{\"id\":\"" << set_id << '_' << state << '_' << direction
+                    << "\",\"state\":\"" << state << "\",\"direction\":\"" << direction
+                    << "\",\"frames\":[\"dummy.png\"],\"fps\":4,\"loop\":true}";
+            }
+        }
+        out << "]}";
+    };
+
+    write_set("citizen_common");
+    write_set("ch_actor_green_01");
+
+    MobileAnimationCatalog animations;
+    assert(animations.load_from_directory(fixture));
+    std::filesystem::remove_all(fixture);
+    return animations;
 }
 
 class CountingNavigationNetwork final : public NavigationNetwork {
@@ -98,11 +132,17 @@ void test_surface_turn_and_idle() {
     SidewalkManager sidewalks{-8, 8};
     assert(sidewalks.place_tile(0, 0, "cement_path"));
     assert(sidewalks.place_tile(1, 0, "sand_path"));
-    assert(roads.place_tile(1, 1));
+    assert(sidewalks.place_tile(1, 1, "cement_path"));
+    assert(roads.place_tile(2, 2));
     PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    assert(!network.is_navigable({2, 2}));
+
+    MobileAnimationCatalog animations = make_render_animation_catalog();
     PedestrianSystem pedestrians = make_pedestrian_system();
     assert(pedestrians.send_pedestrian({0, 0}, {1, 1}, network));
-    assert(!pedestrians.render_entities({}, true).front().umbrella.enabled);
+    const auto rendered = pedestrians.render_entities(animations, true);
+    assert(!rendered.empty());
+    assert(!rendered.front().umbrella.enabled);
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::east);
     pedestrians.update_tick(0.46F, network);
     assert(pedestrians.instances().front().spatial.direction == MobileEntityDirection::south);
@@ -143,33 +183,45 @@ void test_clothing_is_chosen_once_per_actor_birth() {
     SidewalkManager sidewalks{-8, 8};
     for (int x = 0; x <= 2; ++x) assert(sidewalks.place_tile(x, 0, "cement_path"));
     PedestrianSurfaceNavigationNetwork network{roads, sidewalks};
+    MobileAnimationCatalog animations = make_render_animation_catalog();
     PedestrianSystem pedestrians{{"ch_actor_green_01", 1.0F, 0.5F, 60.0F / 64.0F}};
     assert(pedestrians.send_pedestrian({0, 0}, {2, 0}, network));
+    pedestrians.update_animation(0.25F, animations);
+    assert(!pedestrians.instances().front().animation.clip_id.empty());
+
     const std::uint64_t born_id = pedestrians.instances().front().id;
-    const MobileClothingTint born_outfit = pedestrians.render_entities({}).front().clothing;
-    const MobileUmbrellaTint born_umbrella = pedestrians.render_entities({}, true).front().umbrella;
+    const auto born_render = pedestrians.render_entities(animations);
+    const auto rainy_born_render = pedestrians.render_entities(animations, true);
+    assert(!born_render.empty());
+    assert(!rainy_born_render.empty());
+    const MobileClothingTint born_outfit = born_render.front().clothing;
+    const MobileUmbrellaTint born_umbrella = rainy_born_render.front().umbrella;
     assert(born_outfit.enabled);
     assert(born_umbrella.enabled);
     assert(born_umbrella.fabric != MobileClothingColor{});
-    assert(!pedestrians.render_entities({}).front().umbrella.enabled);
+    assert(!born_render.front().umbrella.enabled);
     assert(born_outfit.jacket != MobileClothingColor{});
     assert(born_outfit.pants != MobileClothingColor{});
+
     advance_until_idle(pedestrians, network);
     assert(pedestrians.send_pedestrian({2, 0}, {0, 0}, network));
     assert(pedestrians.instances().front().id == born_id);
-    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
-    assert(pedestrians.render_entities({}, true).front().umbrella.fabric == born_umbrella.fabric);
+    assert(pedestrians.render_entities(animations).front().clothing == born_outfit);
+    assert(pedestrians.render_entities(animations, true).front().umbrella.fabric == born_umbrella.fabric);
     advance_until_idle(pedestrians, network);
-    assert(pedestrians.render_entities({}, true).front().umbrella.enabled);
+    assert(pedestrians.render_entities(animations, true).front().umbrella.enabled);
     assert(pedestrians.set_visiting(born_id, true));
-    assert(!pedestrians.render_entities({}, true).front().umbrella.enabled);
+    assert(!pedestrians.render_entities(animations, true).front().umbrella.enabled);
     assert(pedestrians.set_visiting(born_id, false));
     assert(pedestrians.rest_at_home({0, 0}));
-    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
-    assert(!pedestrians.render_entities({}, true).front().umbrella.enabled);
+    assert(pedestrians.instances().front().clothing.jacket == born_outfit.jacket);
+    assert(pedestrians.instances().front().clothing.pants == born_outfit.pants);
+    assert(pedestrians.render_entities(animations).empty());
+    assert(pedestrians.render_entities(animations, true).empty());
+
     pedestrians.wake_up();
-    assert(pedestrians.render_entities({}).front().clothing == born_outfit);
-    assert(pedestrians.render_entities({}, true).front().umbrella.fabric == born_umbrella.fabric);
+    assert(pedestrians.render_entities(animations).front().clothing == born_outfit);
+    assert(pedestrians.render_entities(animations, true).front().umbrella.fabric == born_umbrella.fabric);
     pedestrians.clear();
     assert(pedestrians.send_pedestrian({0, 0}, {1, 0}, network));
     assert(pedestrians.instances().front().id != born_id);
