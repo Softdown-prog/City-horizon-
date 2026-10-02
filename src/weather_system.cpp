@@ -104,3 +104,10 @@ void WeatherSystem::update(const float seconds, const int width, const int heigh
         }
     }
 }
+
+// Narrow presentation bridge used by the gameplay HUD. Keeping this as a plain
+// integer avoids making the UI own or mutate WeatherSystem state while still
+// allowing the persistent weather card to reflect the authoritative runtime.
+int ch_weather_ui_state_code() {
+    return static_cast<int>(WeatherSystem::observed_state());
+}
