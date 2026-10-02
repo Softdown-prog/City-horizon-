@@ -4,8 +4,8 @@
   "description": "Contrato visual do City Horizon para assets 2D pre-renderizados estilizados produzidos por pipeline 3D moderno.",
   "intent": {
     "target": "visual proprio do City Horizon, legivel em escala de gameplay e claramente 2D no runtime",
-    "notTarget": "emulacao literal de limitacoes graficas de jogos dos anos 2000, estetica obrigatoria de miniatura, diorama, brinquedo ou maquete",
-    "references": "tycoons classicos podem orientar leitura, escala de gameplay, silhueta, clareza, densidade e logica espacial, mas nao funcionam como limite tecnico nem como ordem para miniaturizar os assets"
+    "notTarget": "emulacao literal de limitacoes graficas de jogos dos anos 2000",
+    "references": "tycoons classicos podem orientar leitura, escala de gameplay, silhueta, clareza, densidade e logica espacial, mas nao funcionam como limite tecnico"
   },
   "render": {
     "output": "PNG RGBA pre-renderizado 2D",
@@ -20,8 +20,6 @@
     "gameplayScaleLegibilityRequired": true,
     "photorealismRequired": false,
     "modern3DRenderLookAllowed": false,
-    "miniatureOrDioramaLookRequired": false,
-    "toyLikeLookRequired": false,
     "microtextureOnlyWhenReadable": true,
     "controlledLighting": true,
     "subtleContactShadow": true,
@@ -29,9 +27,9 @@
   },
   "scaleGuidance": {
     "worldScale": "Use believable, category-appropriate proportions relative to the canonical 128x64 gameplay grid and neighboring approved assets.",
-    "buildings": "Do not force compact, squat, chibi, toy-like or dollhouse proportions. Building massing, floor height, roof size, windows and doors should remain believable for the authored building while staying readable at gameplay scale.",
-    "propsAndVehicles": "Preserve coherent relative scale with characters, buildings, roads and terrain. Do not enlarge features merely to create a miniature aesthetic.",
-    "readability": "Stylization may simplify shapes and remove unreadable microdetail, but simplification must not be confused with miniaturization or proportion distortion."
+    "buildings": "Keep building massing, floor height, roof size, windows and doors believable for the authored building while staying readable at gameplay scale.",
+    "propsAndVehicles": "Preserve coherent relative scale with characters, buildings, roads and terrain.",
+    "readability": "Stylization may simplify shapes and remove unreadable microdetail without distorting category proportions or relative world scale."
   },
   "vegetationGuidance": {
     "canopy": "preserve irregular organic silhouette, readable foliage mass and controlled internal variation",
@@ -56,9 +54,8 @@
     "mapContextReviewRequired": true,
     "rule": "An asset is approved only when it reads coherently in gameplay context, keeps believable relative scale for its category and no longer depends on modern 3D rendering cues for visual quality.",
     "rejectIf": [
-      "miniature_or_diorama_styling_was_added_without_explicit_asset_request",
-      "building_was_made_squat_or_chibi_only_to_feel_like_a_tycoon_piece",
-      "windows_doors_roofs_or_props_were_exaggerated_only_for_toy_like_read",
+      "building_proportions_were_distorted_without_an_asset_specific_reason",
+      "windows_doors_roofs_or_props_were_exaggerated_without_gameplay_need",
       "relative_scale_conflicts_with_the_gameplay_world"
     ],
     "vegetationRule": "Do not alter an already approved canopy to solve a trunk problem. Wood and foliage must be reviewed as distinct visual regions."
