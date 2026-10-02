@@ -15,6 +15,7 @@ on:
       - 'src/coaster_render_adapter.h'
       - 'src/coaster_render_adapter_test.cpp'
       - 'src/coaster_sdl_renderer.h'
+      - 'src/main_runtime_impl.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
   pull_request:
@@ -31,6 +32,7 @@ on:
       - 'src/coaster_render_adapter.h'
       - 'src/coaster_render_adapter_test.cpp'
       - 'src/coaster_sdl_renderer.h'
+      - 'src/main_runtime_impl.cpp'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
 
@@ -85,6 +87,34 @@ jobs:
 
       - name: Run coaster render adapter regression
         run: /tmp/coaster_render_adapter_test
+
+      - name: Validate Flame world render link
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          runtime = Path('src/main_runtime_impl.cpp').read_text(encoding='utf-8')
+          required = {
+              'runtime include': '#include "coaster_runtime.h"',
+              'SDL renderer include': '#include "coaster_sdl_renderer.h"',
+              'world queue kind': 'coaster_car',
+              'render plan': 'build_train_render_plan',
+              'atlas geometry': 'build_car_sprite_geometry',
+              'atlas preload': 'kFlameCarPoseAtlasPath',
+              'runtime update': 'coaster_runtime.update',
+              'camera-aware snapshot': 'coaster_runtime.snapshot',
+              'preview toggle': 'SDL_SCANCODE_P',
+          }
+          missing = [name for name, token in required.items() if token not in runtime]
+          if missing:
+              raise SystemExit('Flame world render link is incomplete: ' + ', '.join(missing))
+          if 'EntityDraw::Kind::coaster_car' not in runtime:
+              raise SystemExit('Flame cars are not submitted through the shared world depth queue')
+          if 'SDL_RenderTexture(renderer, atlas->texture' not in runtime:
+              raise SystemExit('Flame atlas is not submitted to SDL from the world queue')
+          print('CH_COASTER_RENDER_LINK_V1 integration: OK')
+          PY
 
       - name: Validate promoted Flame atlas
         run: |
