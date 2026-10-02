@@ -59,6 +59,7 @@ struct TrainRuntimeState {
 };
 
 struct TrainStepResult {
+    bool valid = false;
     TrainRuntimeState state{};
     StepResult physics{};
     std::array<CarRuntimePose, kCoasterTrainCarCount> cars{};
@@ -234,6 +235,7 @@ template <typename CenterlineSampler>
             camera_quarter_turns,
             config.physics);
     }
+    result.valid = true;
     return result;
 }
 
