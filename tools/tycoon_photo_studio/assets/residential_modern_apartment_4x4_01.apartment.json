@@ -1,6 +1,6 @@
 {
   "contract": "CITY_HORIZON_APARTMENT_V1",
-  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "assetId": "residential_modern_apartment_4x4_01",
   "assetType": "residential_building",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
