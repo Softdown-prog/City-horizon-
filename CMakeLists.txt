@@ -285,6 +285,7 @@ if(BUILD_TESTING)
     add_executable(pedestrian_system_test
         src/pedestrian_system_test.cpp
         src/building_system.cpp
+        src/crosswalk_system.cpp
         src/economy_system.cpp
         src/farming_system.cpp
         src/mobile_animation.cpp
