@@ -155,6 +155,32 @@ struct RideQueueState {
     return false;
 }
 
+[[nodiscard]] inline bool is_shopping_destination(const BuildingDefinition& definition) {
+    return definition.category == "commercial" && !definition.service_name.empty();
+}
+
+[[nodiscard]] inline bool is_service_destination(const BuildingDefinition& definition) {
+    if (is_essential_service(definition)) return true;
+    return definition.category != "commercial" && !definition.service_name.empty();
+}
+
+[[nodiscard]] inline bool is_leisure_activity_destination(const BuildingDefinition& definition) {
+    const bool activity = definition.activity_overlay && definition.activity_overlay->enabled;
+    return definition.needs_effect.fun > 0.0F || activity;
+}
+
+[[nodiscard]] inline bool supports_outing_purpose(const BuildingDefinition& definition,
+                                                  const PedestrianOutingPurpose purpose,
+                                                  const PedestrianNeed need) {
+    switch (purpose) {
+        case PedestrianOutingPurpose::need: return satisfies_need(definition, need);
+        case PedestrianOutingPurpose::shopping: return is_shopping_destination(definition);
+        case PedestrianOutingPurpose::service: return is_service_destination(definition);
+        case PedestrianOutingPurpose::leisure_activity: return is_leisure_activity_destination(definition);
+    }
+    return false;
+}
+
 inline void apply_need_effects(const std::uint64_t pedestrian_id,
                                const BuildingDefinition& definition,
                                PedestrianSystem& pedestrians) {
@@ -220,14 +246,14 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
     const NavigationTile start, const BuildingManager& buildings,
     const BuildingCatalog& catalog, const NavigationNetwork& network,
     const std::int64_t budget_cents, const PedestrianNeed need,
-    const bool essential_only = false) {
+    const PedestrianOutingPurpose purpose, const bool essential_only = false) {
     std::optional<EntranceRoute> best;
     std::size_t best_route_tiles = std::numeric_limits<std::size_t>::max();
     for (const BuildingInstance& instance : buildings.instances()) {
         if (!instance.operational) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition == nullptr || !supports_customer_visit(*definition)) continue;
-        if (!satisfies_need(*definition, need)) continue;
+        if (!supports_outing_purpose(*definition, purpose, need)) continue;
         if (essential_only && !is_essential_service(*definition)) continue;
         if (service_price_cents(instance, *definition) > budget_cents) continue;
         const auto entrance = reachable_entrance_for_instance(start, instance, *definition, network);
@@ -241,7 +267,11 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
 [[nodiscard]] inline std::optional<TicketedAttractionRoute> best_reachable_ticketed_attraction(
     const NavigationTile start, const BuildingManager& buildings,
     const BuildingCatalog& catalog, const NavigationNetwork& network,
-    const std::int64_t budget_cents, const PedestrianNeed need) {
+    const std::int64_t budget_cents, const PedestrianNeed need,
+    const PedestrianOutingPurpose purpose) {
+    if (purpose == PedestrianOutingPurpose::shopping || purpose == PedestrianOutingPurpose::service)
+        return std::nullopt;
+
     std::optional<TicketedAttractionRoute> best;
     std::size_t best_route_tiles = std::numeric_limits<std::size_t>::max();
     for (const BuildingInstance& booth : buildings.instances()) {
@@ -254,8 +284,8 @@ inline void apply_need_effects(const std::uint64_t pedestrian_id,
         const BuildingInstance* attraction = buildings.find_by_id(*attraction_id);
         if (attraction == nullptr || !attraction->operational) continue;
         const BuildingDefinition* attraction_definition = catalog.find(attraction->definition_id);
-        if (attraction_definition == nullptr || !attraction_definition->requires_ticket_booth ||
-            !satisfies_need(*attraction_definition, need)) continue;
+        if (attraction_definition == nullptr || !attraction_definition->requires_ticket_booth) continue;
+        if (purpose == PedestrianOutingPurpose::need && !satisfies_need(*attraction_definition, need)) continue;
         if (visitor_access_points(*attraction_definition, attraction->rotation).empty()) continue;
 
         const std::vector<BuildingAccessPoint> booth_access =
@@ -633,9 +663,26 @@ inline void sync(PedestrianSystem& pedestrians, BuildingManager& buildings,
                                    pedestrian_snapshot.spatial.logical_tile_y};
         const std::int64_t budget = pedestrian_snapshot.monthly_budget_cents;
         const PedestrianNeed need = pedestrian_snapshot.outing_intent.priority_need;
-        const auto entrance = best_reachable_entrance(start, buildings, catalog, network, budget, need, false);
-        const auto essential = best_reachable_entrance(start, buildings, catalog, network, budget, need, true);
-        const auto ticketed = best_reachable_ticketed_attraction(start, buildings, catalog, network, budget, need);
+        const PedestrianOutingPurpose requested_purpose = pedestrian_snapshot.outing_intent.purpose;
+        PedestrianOutingPurpose resolved_purpose = requested_purpose;
+        auto entrance = best_reachable_entrance(
+            start, buildings, catalog, network, budget, need, resolved_purpose, false);
+        auto essential = best_reachable_entrance(
+            start, buildings, catalog, network, budget, need, resolved_purpose, true);
+        auto ticketed = best_reachable_ticketed_attraction(
+            start, buildings, catalog, network, budget, need, resolved_purpose);
+
+        // Discretionary trips gracefully fall back to the citizen's weakest
+        // wellbeing need if the city does not yet contain that class of venue.
+        if (!entrance && !ticketed && resolved_purpose != PedestrianOutingPurpose::need) {
+            resolved_purpose = PedestrianOutingPurpose::need;
+            entrance = best_reachable_entrance(
+                start, buildings, catalog, network, budget, need, resolved_purpose, false);
+            essential = best_reachable_entrance(
+                start, buildings, catalog, network, budget, need, resolved_purpose, true);
+            ticketed = best_reachable_ticketed_attraction(
+                start, buildings, catalog, network, budget, need, resolved_purpose);
+        }
 
         bool choose_ticketed = false;
         std::optional<EntranceRoute> chosen_entrance;
