@@ -57,7 +57,8 @@
   "train": {
     "carCount": 4,
     "passengerCapacityPerCar": 2,
-    "passengerCapacityTotal": 8
+    "passengerCapacityTotal": 8,
+    "defaultOccupiedSeatsPerCar": 2
   },
   "motionPlan": {
     "heroFourDirectionViewsPromoted": true,
@@ -71,7 +72,15 @@
     "poseAtlasSpriteSheet": "car_pose_atlas.png",
     "poseAtlasManifest": "car_pose_atlas_runtime.json",
     "poseAtlasFrameCount": 40,
-    "verticalSupplementFrames": 24
+    "verticalSupplementFrames": 24,
+    "passengerOverlayStatus": "ready",
+    "passengerOverlayContract": "CH_COASTER_PASSENGER_OVERLAY_V1",
+    "passengerOverlayRuntimeContract": "CH_COASTER_PASSENGER_ATLAS_RUNTIME_V1",
+    "passengerOverlaySpriteSheet": "passenger_pose_atlas.png",
+    "passengerOverlayManifest": "passenger_pose_atlas_runtime.json",
+    "passengerOverlayFrameCount": 40,
+    "passengerRuntimeMode": "baked_into_pose_atlas",
+    "occupiedComposite": true
   },
   "sourceCommit": "ac8699478d7ddc62f56d0d26555eee328a9c30e0",
   "sourceWorkflowRun": 36903309772,
@@ -85,6 +94,16 @@
     "sourceArtifactId": 11189062756,
     "sourceArtifactDigest": "sha256:8a361fc321bbc1d42836ed5620f8ef89d1627c9eb82626f4d8c1e0b08d2189db",
     "approvedProxySha256": "7ec94238a47c771db417ad3419b101feaa211a2260d7eeb9236c39141290382a",
-    "spriteSheetSha256": "d1a051bdef2fcb12d4b056706bb28d7270797d970dc90db9648edd011173cd8e"
+    "baseSpriteSheetSha256": "d1a051bdef2fcb12d4b056706bb28d7270797d970dc90db9648edd011173cd8e",
+    "occupiedCompositeSpriteSheetSha256": "b3620943806f163c0ccf1976029fa5af4cd2a38c6a63e5c6403d126ac0ecdeef"
+  },
+  "passengerOverlaySource": {
+    "sourceCommit": "ac1fa84e92919cb87680d5c355b5a9a2596da519",
+    "sourceWorkflowRun": 37070846550,
+    "sourceArtifactId": 11255655197,
+    "sourceArtifactDigest": "sha256:ed1452f1cee300d0e82dcbb70d796960043ad3c4f9033d683cfcb828779adec4",
+    "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
+    "spriteSheetSha256": "c53686643cc66db8dd9fa57438caf49ff7910c285273228b8347afbc5d931e9e",
+    "occupiedCompositeSpriteSheetSha256": "b3620943806f163c0ccf1976029fa5af4cd2a38c6a63e5c6403d126ac0ecdeef"
   }
 }
