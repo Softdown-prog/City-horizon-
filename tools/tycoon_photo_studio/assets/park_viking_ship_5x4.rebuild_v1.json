@@ -2,7 +2,7 @@
   "contract": "CITY_HORIZON_VIKING_SHIP_RIDE_V1",
   "assetId": "attraction.park_viking_ship.01",
   "assetType": "animated_attraction",
-  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "rebuild": {
     "id": "CH_VIKING_SHIP_REBUILD_V1",
