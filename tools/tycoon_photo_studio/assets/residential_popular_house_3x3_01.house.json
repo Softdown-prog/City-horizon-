@@ -1,6 +1,6 @@
 {
   "contract": "CITY_HORIZON_HOUSE_V1",
-  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "assetId": "residential_popular_house_3x3_01",
   "assetType": "residential_building",
   "displayName": "Casa popular",
