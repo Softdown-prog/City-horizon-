@@ -2,14 +2,14 @@
   "contract": "CITY_HORIZON_VIKING_SHIP_RIDE_V1",
   "assetId": "attraction.park_viking_ship.01",
   "assetType": "animated_attraction",
-  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "rebuild": {
     "id": "CH_VIKING_SHIP_REBUILD_V4",
     "fromScratch": true,
     "inheritsGeometryLanguageFrom": "CH_VIKING_SHIP_REBUILD_V3",
     "supersedesForReview": "Rebuild V3 open-site candidate; retain V3 as comparison only",
-    "intent": "Keep V3's tall non-toy open-site language, but remove the remaining miniature read by making the yellow structural members substantially larger, lowering the ship toward the deck while preserving safe swing clearance, and opening the boarding platform across more of the 5x4 site."
+    "intent": "Keep V3's tall non-toy open-site language, make the yellow structural members substantially larger, lower the ship toward the deck while preserving safe swing clearance, and open the boarding platform across more of the 5x4 site."
   },
   "visualLanguage": {
     "target": "full_scale_stylized_real_fairground_machine_open_5x4_layout",
@@ -22,7 +22,7 @@
       "real timber hull"
     ],
     "rejectIfReadsAs": [
-      "miniature support hardware",
+      "undersized support hardware",
       "thin yellow sticks",
       "ship floating too high above the deck",
       "cramped boarding appendage",
