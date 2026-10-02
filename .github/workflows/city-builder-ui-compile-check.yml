@@ -68,21 +68,24 @@ jobs:
         shell: pwsh
         run: cmake -S . -B build/city-builder-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
 
+      # These regression executables intentionally use assert() as executable
+      # contracts. Keep them in Debug so MSVC does not compile fixture setup and
+      # validation out via NDEBUG. The shipping City Builder still compiles Release.
       - name: Build pedestrian system regression
         shell: pwsh
-        run: cmake --build build/city-builder-check --config Release --target pedestrian_system_test --parallel
+        run: cmake --build build/city-builder-check --config Debug --target pedestrian_system_test --parallel
 
       - name: Run pedestrian system regression
         shell: pwsh
-        run: ctest --test-dir build/city-builder-check -C Release -R "^pedestrian_system_test$" --output-on-failure
+        run: ctest --test-dir build/city-builder-check -C Debug -R "^pedestrian_system_test$" --output-on-failure
 
       - name: Build pedestrian navigation regression
         shell: pwsh
-        run: cmake --build build/city-builder-check --config Release --target navigation_network_test --parallel
+        run: cmake --build build/city-builder-check --config Debug --target navigation_network_test --parallel
 
       - name: Run pedestrian navigation regression
         shell: pwsh
-        run: ctest --test-dir build/city-builder-check -C Release -R "^navigation_network_test$" --output-on-failure
+        run: ctest --test-dir build/city-builder-check -C Debug -R "^navigation_network_test$" --output-on-failure
 
       - name: Build real City Builder
         shell: pwsh
