@@ -21,13 +21,13 @@ A successful workflow or preflight is not visual approval.
 
 There is currently **no approved house visual reference** in this directory.
 
-The previous suburban-house and miniature-house pilots were retired because they kept converging on the same unwanted design language. They are not historical templates to revive later and must not be reconstructed from memory, old artifacts, commit history, screenshots, or parameter variations unless the user explicitly asks to recover one.
+Previous suburban-house visual pilots were retired because they kept converging on the same unwanted design language. They are not historical templates to revive later and must not be reconstructed from memory, old artifacts, commit history, screenshots, or parameter variations unless the user explicitly asks to recover one.
 
 A fresh residential pilot now exists: `residential_suburban_cottage_3x3_01.house.json`, authored by `../build_residential_suburban_cottage_guarded.py`. It was started from a new user-supplied art-direction reference and is intentionally original geometry rather than a recovery of any retired house. It remains **not promoted as an approved runtime asset**: it must pass the guarded preflight, then a SOUTH proxy must be inspected and explicitly approved before any final four-direction bake.
 
 The latest visual review approved the overall cottage direction but requested a higher level of detail. That detail target is implemented as a non-destructive decorator in `../build_residential_suburban_cottage_detail_v2.py`, which preserves the original 3×3 massing and guarded workflow while adding game-readable roof, trim, porch, window, foundation and garden detail.
 
-The generic art-direction contract `CH_TYCOON_MINIATURE_V1` remains valid as guidance for game-first readability: strong silhouette, miniature charm, clean color blocking, readable openings, low material noise and restrained detail. It is **not** an approved building design by itself.
+The active art-direction contract is `CH_STYLIZED_PRERENDER_V1`. It provides the shared guidance for gameplay readability, silhouette clarity, clean color blocking, readable openings, controlled material noise and restrained detail. It is not an approved building design by itself.
 
 ## Active residential pilot
 
@@ -73,4 +73,4 @@ For later house/building experiments, create a genuinely new silhouette/grammar 
 
 ## Reference policy
 
-Classic/casual Tycoon games and supplied images may be used as references for readability, silhouette, miniature charm, information density and broad color blocking. Do not copy a specific proprietary building design. Build original geometry that shares only the broad game-art language and design cues.
+Classic/casual Tycoon games and supplied images may be used as references for readability, silhouette, information density and broad color blocking. Do not copy a specific proprietary building design. Build original geometry that shares only broad game-art language and design cues.
