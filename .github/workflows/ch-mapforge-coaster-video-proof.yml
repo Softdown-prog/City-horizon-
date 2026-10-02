@@ -6,11 +6,14 @@ on:
       - main
     paths:
       - "tools/animation_preview/coaster_jobs/*.json"
+      - "tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json"
+      - "assets/vehicles/coaster_flame_01/car_pose_atlas.png"
   workflow_dispatch:
     inputs:
       job_path:
         description: "CH_COASTER_VIDEO_PROOF_V1 JSON path"
-        required: true
+        required: false
+        default: "tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json"
         type: string
 
 permissions:
@@ -34,14 +37,16 @@ jobs:
       - name: Resolve proof job
         shell: pwsh
         run: |
+          $defaultJob = "tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json"
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $jobPath = "${{ inputs.job_path }}"
+            if ([string]::IsNullOrWhiteSpace($jobPath)) { $jobPath = $defaultJob }
           } else {
             $jobPath = git diff --name-only HEAD^ HEAD |
               Where-Object { $_ -like "tools/animation_preview/coaster_jobs/*.json" } |
               Select-Object -First 1
+            if ([string]::IsNullOrWhiteSpace($jobPath)) { $jobPath = $defaultJob }
           }
-          if ([string]::IsNullOrWhiteSpace($jobPath)) { throw "No coaster video proof job found" }
           if (-not (Test-Path $jobPath)) { throw "Coaster video job does not exist: $jobPath" }
           $job = Get-Content $jobPath -Raw | ConvertFrom-Json
           if ($job.contract -ne "CH_COASTER_VIDEO_PROOF_V1") { throw "Unsupported coaster video proof contract" }
