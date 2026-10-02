@@ -11,7 +11,7 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_viking_open_1k_v1.json",
     "--output",
-    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v5_fresh_1k",
+    "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v5.fresh_1k",
     "--save-blend",
     "out/ch_blender_agent/attraction.park_viking_ship.rebuild.v5.fresh_1k/park_viking_ship_rebuild_v5_fresh.blend"
   ],
