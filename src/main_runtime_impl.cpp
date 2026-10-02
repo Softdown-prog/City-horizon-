@@ -11,6 +11,8 @@
 
 #include "audio_manager.h"
 #include "building_system.h"
+#include "coaster_runtime.h"
+#include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
 #include "economy_system.h"
 #include "farming_system.h"
@@ -1025,23 +1027,25 @@ void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager, co
 void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildings,
                            const BuildingCatalog& building_catalog, const LandManager& lands,
                            const std::vector<MobileEntityRenderData>& mobile_entities,
+                           const ch::coaster::TrainStepResult* coaster_train,
                            const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
                            float viewport_width, float viewport_height) {
     struct EntityDraw {
-        enum class Kind { building, mobile_entity } kind = Kind::building;
+        enum class Kind { building, mobile_entity, coaster_car } kind = Kind::building;
         float depth = 0.0F;
         const BuildingInstance* building = nullptr;
         const MobileEntityRenderData* mobile_entity = nullptr;
+        const ch::coaster::CarRenderCommand* coaster_car = nullptr;
     };
     std::vector<EntityDraw> draws;
-    draws.reserve(buildings.instances().size() + mobile_entities.size());
+    draws.reserve(buildings.instances().size() + mobile_entities.size() + ch::coaster::kCoasterTrainCarCount);
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = building_catalog.find(instance.definition_id);
         if (definition == nullptr) continue;
         const BuildingFootprint footprint = rotated_footprint(*definition, instance.rotation);
         const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
-        draws.push_back({EntityDraw::Kind::building, camera_depth_key(ground.x, ground.y, camera), &instance, nullptr});
+        draws.push_back({EntityDraw::Kind::building, camera_depth_key(ground.x, ground.y, camera), &instance, nullptr, nullptr});
     }
     std::vector<MobileEntityRenderData> camera_relative_mobiles;
     camera_relative_mobiles.reserve(mobile_entities.size());
@@ -1051,12 +1055,37 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
         draws.push_back({EntityDraw::Kind::mobile_entity,
                          camera_depth_key(visual.spatial.visual_world_x + visual.spatial.ground_anchor_x,
                                           visual.spatial.visual_world_y + visual.spatial.ground_anchor_y, camera),
-                         nullptr, &visual});
+                         nullptr, &visual, nullptr});
     }
+
+    ch::coaster::TrainRenderPlan coaster_plan;
+    if (coaster_train != nullptr && coaster_train->valid) {
+        const ch::CameraState coaster_camera{camera.pan_x, camera.pan_y, camera.zoom,
+                                             static_cast<ch::CameraRotation>(camera.rotation)};
+        coaster_plan = ch::coaster::build_train_render_plan(*coaster_train, coaster_camera);
+        for (std::size_t i = 0; i < coaster_plan.car_count; ++i) {
+            const ch::coaster::CarRenderCommand& car = coaster_plan.cars[i];
+            draws.push_back({EntityDraw::Kind::coaster_car, car.depth_key, nullptr, nullptr, &car});
+        }
+    }
+
     std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {
         return left.depth < right.depth;
     });
     for (const EntityDraw& draw : draws) {
+        if (draw.kind == EntityDraw::Kind::coaster_car) {
+            const ch::coaster::CarRenderCommand& car = *draw.coaster_car;
+            const TextureAsset* atlas = textures.find(root / car.atlas_path);
+            if (atlas == nullptr || atlas->texture == nullptr) continue;
+            const ch::CameraState coaster_camera{camera.pan_x, camera.pan_y, camera.zoom,
+                                                 static_cast<ch::CameraRotation>(camera.rotation)};
+            const ch::coaster::CarSpriteGeometry geometry = ch::coaster::build_car_sprite_geometry(
+                car, coaster_camera, viewport_width, viewport_height);
+            if (geometry.destination.w > 0.0F && geometry.destination.h > 0.0F) {
+                SDL_RenderTexture(renderer, atlas->texture, &geometry.source, &geometry.destination);
+            }
+            continue;
+        }
         if (draw.kind == EntityDraw::Kind::building) {
             const BuildingDefinition* definition = building_catalog.find(draw.building->definition_id);
             if (definition == nullptr) continue;
@@ -1587,6 +1616,9 @@ int main() {
         (void)textures.load(renderer, asset_root / "assets/terrain/paths/sand_01" / sand_sprite);
     }
     (void)textures.load(renderer, asset_root / "assets/farming/prepared_soil/prepared_soil_01.png");
+    if (textures.load(renderer, asset_root / ch::coaster::kFlameCarPoseAtlasPath) == nullptr) {
+        std::cerr << "Flame coaster pose atlas unavailable; runtime preview disabled.\n";
+    }
     show_loading(0.30F, "CARREGANDO TERRENO, RUAS E CAMINHOS");
 
     BuildingCatalog catalog;
@@ -1810,6 +1842,40 @@ int main() {
     show_loading(0.97F, "FINALIZANDO CENARIO E MAPA");
 
     Camera camera;
+
+    // CH_COASTER_RENDER_LINK_V1: until the track construction system owns a
+    // production centerline, P toggles a deterministic render-validation loop.
+    // The train still uses the real articulated runtime, pose atlas and world
+    // entity depth queue; only the temporary route source is developer-only.
+    ch::coaster::CoasterRuntime coaster_runtime;
+    bool coaster_preview_enabled = false;
+    {
+        const OwnedTileBounds bounds = owned_tile_bounds(lands);
+        const double center_x = (static_cast<double>(bounds.min_x) + static_cast<double>(bounds.max_x)) * 0.5;
+        const double center_y = (static_cast<double>(bounds.min_y) + static_cast<double>(bounds.max_y)) * 0.5;
+        const double width = static_cast<double>(bounds.max_x - bounds.min_x);
+        const double height = static_cast<double>(bounds.max_y - bounds.min_y);
+        const double radius = std::max(3.0, std::min(width, height) * 0.22);
+        constexpr int kPreviewSamples = 64;
+        constexpr double kPi = 3.14159265358979323846;
+        std::vector<ch::coaster::RoutePoint> route;
+        route.reserve(kPreviewSamples);
+        for (int i = 0; i < kPreviewSamples; ++i) {
+            const double angle = 2.0 * kPi * static_cast<double>(i) / static_cast<double>(kPreviewSamples);
+            ch::coaster::RoutePoint point;
+            point.x = center_x + radius * std::sin(angle);
+            point.y = center_y + radius * std::cos(angle);
+            point.z = 0.0;
+            route.push_back(point);
+        }
+        if (coaster_runtime.set_route(std::move(route), true)) {
+            coaster_runtime.config().physics.drag_area_m2 = 0.0;
+            coaster_runtime.config().physics.rolling_resistance_coefficient = 0.0;
+            coaster_runtime.config().physics.mechanical_linear_loss_per_s = 0.0;
+            coaster_runtime.reset(0.0, 4.0);
+        }
+    }
+
     float seagull_seconds = 0.0F;
     float seagull_pass_elapsed = 0.0F;
     float seagull_next_pass_in = 8.0F;
@@ -3532,6 +3598,15 @@ int main() {
                     case SDL_SCANCODE_F7:
                         send_mixamo_se_test();
                         break;
+                    case SDL_SCANCODE_P:
+                        if (coaster_runtime.ready()) {
+                            coaster_preview_enabled = !coaster_preview_enabled;
+                            status = std::string("FLAME COASTER RENDER: ") +
+                                     (coaster_preview_enabled ? "ON" : "OFF");
+                        } else {
+                            status = "FLAME COASTER RENDER: ROUTE UNAVAILABLE";
+                        }
+                        break;
                     case SDL_SCANCODE_F8: {
                         // An ordinary production package may contain only the
                         // approved actor; skip absent experimental catalogs.
@@ -3644,6 +3719,10 @@ int main() {
         clamp_camera_to_owned_land(camera, lands, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         const SimulationAdvance time_advance = simulation_clock.advance_seconds(elapsed_seconds);
         const SimulationScheduleAdvance scheduled = simulation_scheduler.advance_frame(frame_seconds);
+        if (coaster_preview_enabled && coaster_runtime.ready()) {
+            (void)coaster_runtime.update(std::min(elapsed_seconds, 0.050),
+                                         static_cast<int>(camera_rotation_turns(camera.rotation)));
+        }
         for (std::uint32_t tick = 0; tick < scheduled.mobile_ticks; ++tick) {
             service_vehicles.update_tick(scheduled.mobile_tick_seconds, service_vehicle_catalog, vehicle_traversable);
             const park_fence_runtime::PedestrianCollisionNavigationNetwork pedestrian_surfaces{roads, sidewalks, buildings};
@@ -3837,7 +3916,11 @@ int main() {
         }
 
         const std::vector<MobileEntityRenderData> mobile_entities = mobile_render_entities();
-        render_world_entities(renderer, buildings, catalog, lands, mobile_entities, mobile_animations, textures,
+        const ch::coaster::TrainStepResult coaster_train = coaster_preview_enabled && coaster_runtime.ready()
+            ? coaster_runtime.snapshot(static_cast<int>(camera_rotation_turns(camera.rotation)))
+            : ch::coaster::TrainStepResult{};
+        render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
+                              coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         if (seagull_pass_active) {
             const OwnedTileBounds bounds = owned_tile_bounds(lands);
