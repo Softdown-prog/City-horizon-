@@ -85,6 +85,7 @@ public:
 
     [[nodiscard]] std::optional<std::uint64_t> spawn_pedestrian(
         NavigationTile at, const NavigationNetwork& network);
+    [[nodiscard]] bool despawn_pedestrian(std::uint64_t pedestrian_id);
     [[nodiscard]] bool send_pedestrian(std::uint64_t pedestrian_id, NavigationTile start,
                                        NavigationTile destination, const NavigationNetwork& network);
     [[nodiscard]] bool send_pedestrian(NavigationTile start, NavigationTile destination,
