@@ -1,0 +1,28 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "coaster.car_flame_passenger_overlay_v1.final.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_coaster_car_flame_passenger_overlay_v1_guarded.py",
+  "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb"
+  },
+  "args": [
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001"
+  ],
+  "outputDir": "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/preflight_report.json",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/passenger_overlay_manifest.json",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/proxy_approval.json",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/studio_metadata.json",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/passengers_car_h00_p000.png",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/passengers_car_h15_p000.png",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/passengers_car_h00_p046.png",
+    "out/ch_blender_agent/coaster.car_flame_passenger_overlay_v1.final.001/passengers_car_h12_m046.png"
+  ]
+}
