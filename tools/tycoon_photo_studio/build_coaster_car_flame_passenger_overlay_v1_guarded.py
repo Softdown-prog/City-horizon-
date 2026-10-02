@@ -3,7 +3,9 @@
 Reuses the reviewed CHActor seated-passenger visual recipe from Viking V15, but fits
 it to the two actual Flame car seats and the CH_COASTER_CAR_V1 pose system. The
 proxy emits both an occupied composite and a transparent passenger-only diagnostic
-layer. Final runtime baking stays gated behind human review, like the Viking ride.
+layer. Final baking emits a transparent passenger-only frame for every one of the
+40 approved Flame car poses, using the pose atlas itself as the single source of
+truth for frame order, heading and pitch.
 """
 from __future__ import annotations
 
@@ -214,7 +216,28 @@ def _render(scene, authored, profile, output: Path, name: str, direction: str):
     )
 
 
-def _write_manifest(output: Path, slots: list[dict], *, stage: str):
+def _overlay_frame_name(base_file: str) -> str:
+    return f"passengers_{base_file}"
+
+
+def _build_overlay_frames(pose_manifest: dict) -> list[dict]:
+    frames = []
+    for index, pose in enumerate(pose_manifest["frames"]):
+        frames.append({
+            "frameIndex": index,
+            "file": _overlay_frame_name(pose["file"]),
+            "baseCarFile": pose["file"],
+            "headingIndex": pose["headingIndex"],
+            "headingDegrees": pose["headingDegrees"],
+            "pitchDegrees": pose["pitchDegrees"],
+            "family": pose["family"],
+            "trackUses": pose["trackUses"],
+        })
+    return frames
+
+
+def _write_manifest(output: Path, slots: list[dict], pose_manifest: dict, *, stage: str):
+    overlay_frames = _build_overlay_frames(pose_manifest)
     payload = {
         "contract": PASSENGER_CONTRACT,
         "assetId": ASSET_ID,
@@ -229,7 +252,14 @@ def _write_manifest(output: Path, slots: list[dict], *, stage: str):
         "fillPolicy": "left_to_right_next_free_slot",
         "motionParent": "car_pose_centerline_sample",
         "posePolicy": "passengers_share_exact_car_heading_pitch_transform",
+        "compositionMode": "alpha_overlay_on_matching_car_pose",
+        "basePoseAssetId": pose_manifest["assetId"],
+        "basePoseFrameCount": pose_manifest["totalFrames"],
+        "overlayFrameCount": len(overlay_frames),
+        "frameAlignment": "one_to_one_by_frameIndex_heading_pitch",
+        "frames": overlay_frames,
         "stage": stage,
+        "bakeComplete": stage == "final",
         "runtimePromoted": False,
     }
     (output / "passenger_overlay_manifest.json").write_text(
@@ -264,10 +294,18 @@ def main():
 
     base_matrices = atlas.capture_base_matrices(authored)
     atlas.apply_pose(authored, base_matrices, PROXY_HEADING_DEG, PROXY_PITCH_DEG)
+    # Calibrate with the occupied car visible so passenger-only frames preserve the
+    # exact framing/pivot relationship of the approved car pose family.
     bs.calibrate_ortho_scale(scene, authored, safety_margin=0.34)
     bpy.context.view_layer.update()
 
-    _write_manifest(output, slots, stage=args.stage)
+    pose_manifest = atlas.build_pose_manifest()
+    if pose_manifest["totalFrames"] != 40:
+        raise RuntimeError(
+            f"CH_COASTER_PASSENGER_POSE_COUNT_MISMATCH: expected 40, got {pose_manifest['totalFrames']}"
+        )
+
+    _write_manifest(output, slots, pose_manifest, stage=args.stage)
     (output / "studio_metadata.json").write_text(json.dumps({
         "contract": "CH_STUDIO_METADATA_V1",
         "assetId": ASSET_ID,
@@ -278,6 +316,7 @@ def main():
         "poseContract": CAR_CONTRACT,
         "passengerOverlayContract": PASSENGER_CONTRACT,
         "capacityPerCar": CAPACITY,
+        "frameCount": pose_manifest["totalFrames"],
         "reviewPose": {"headingDegrees": PROXY_HEADING_DEG, "pitchDegrees": PROXY_PITCH_DEG},
     }, indent=2), encoding="utf-8")
 
@@ -293,6 +332,7 @@ def main():
 
     if args.stage == "preflight":
         return
+
     if args.stage == "proxy":
         composite = _render(scene, authored, profile, output, "occupied_proxy_south.png", "south")
         (output / "proxy_south.png").write_bytes((output / "occupied_proxy_south.png").read_bytes())
@@ -300,6 +340,7 @@ def main():
         composite["pose"] = {"headingDegrees": PROXY_HEADING_DEG, "pitchDegrees": PROXY_PITCH_DEG}
         composite["capacityPerCar"] = CAPACITY
         composite["visualRecipeSource"] = "CH_VIKING_PASSENGER_OVERLAY_V1"
+        composite["plannedFinalFrameCount"] = pose_manifest["totalFrames"]
         (output / "proxy_report.json").write_text(json.dumps(composite, indent=2), encoding="utf-8")
 
         # Diagnostic transparent rider layer, matching the Viking V15 review flow.
@@ -311,8 +352,31 @@ def main():
             obj.hide_render = hidden
         return
 
-    raise RuntimeError(
-        "CH_COASTER_PASSENGER_OVERLAY_V1_FINAL_GATED: review proxy before baking all 40 occupied poses")
+    if not args.approval_proxy_sha or len(args.approval_proxy_sha) != 64:
+        raise ValueError("The final passenger overlay bake requires the reviewed proxy SHA-256")
+
+    (output / "proxy_approval.json").write_text(json.dumps({
+        "contract": "CH_PROXY_APPROVAL_V1",
+        "assetId": ASSET_ID,
+        "reviewed": True,
+        "proxySha256": args.approval_proxy_sha,
+    }, indent=2), encoding="utf-8")
+
+    # Final output is passenger-only RGBA. The approved car atlas stays untouched.
+    _set_visibility(car_meshes, False)
+    _set_visibility(passenger_meshes, True)
+    for pose in pose_manifest["frames"]:
+        heading = float(pose["headingDegrees"])
+        pitch = float(pose["pitchDegrees"])
+        atlas.apply_pose(authored, base_matrices, heading, pitch)
+        _render(
+            scene,
+            passenger_meshes,
+            profile,
+            output,
+            _overlay_frame_name(pose["file"]),
+            f"h{pose['headingIndex']:02d}_pitch_{pitch:+.0f}",
+        )
 
 
 if __name__ == "__main__":
