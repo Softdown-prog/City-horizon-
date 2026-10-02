@@ -11,6 +11,7 @@ on:
     branches:
       - main
       - feature/ch-character-studio-art-v0
+      - feat/pirate-ship-city-horizon-v1
     paths:
       - "tools/ch_blender/jobs/*.job.json"
 
