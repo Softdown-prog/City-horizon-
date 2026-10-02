@@ -23,6 +23,15 @@ enum class PedestrianOutingPreference : std::uint8_t {
     essential_commerce,
 };
 
+// Why a citizen decided to leave home. These are trip motives, deliberately
+// separate from the compact wellbeing bars below.
+enum class PedestrianOutingPurpose : std::uint8_t {
+    need,
+    shopping,
+    service,
+    leisure_activity,
+};
+
 enum class PedestrianNeed : std::uint8_t {
     hunger,
     thirst,
@@ -38,6 +47,7 @@ struct PedestrianNeeds {
 struct PedestrianOutingIntent {
     bool active = false;
     PedestrianOutingPreference preference = PedestrianOutingPreference::balanced;
+    PedestrianOutingPurpose purpose = PedestrianOutingPurpose::need;
     PedestrianNeed priority_need = PedestrianNeed::hunger;
 };
 
@@ -102,6 +112,12 @@ public:
     [[nodiscard]] bool authorize_outing(std::uint64_t pedestrian_id, PedestrianOutingPreference preference,
                                         PedestrianNeed priority_need);
     [[nodiscard]] bool authorize_outing(PedestrianOutingPreference preference, PedestrianNeed priority_need);
+    [[nodiscard]] bool set_outing_purpose(std::uint64_t pedestrian_id, PedestrianOutingPurpose purpose) {
+        PedestrianInstance* pedestrian = find_instance(pedestrian_id);
+        if (pedestrian == nullptr || !pedestrian->outing_intent.active) return false;
+        pedestrian->outing_intent.purpose = purpose;
+        return true;
+    }
     void clear_outing_intent(std::uint64_t pedestrian_id);
     [[nodiscard]] bool spend_monthly_budget(std::uint64_t pedestrian_id, std::int64_t cents);
     [[nodiscard]] std::int64_t monthly_budget_cents(std::uint64_t pedestrian_id) const;
