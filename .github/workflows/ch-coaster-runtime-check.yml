@@ -14,6 +14,7 @@ on:
       - 'src/coaster_runtime_test.cpp'
       - 'src/coaster_render_adapter.h'
       - 'src/coaster_render_adapter_test.cpp'
+      - 'src/coaster_sdl_renderer.h'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
   pull_request:
@@ -29,6 +30,7 @@ on:
       - 'src/coaster_runtime_test.cpp'
       - 'src/coaster_render_adapter.h'
       - 'src/coaster_render_adapter_test.cpp'
+      - 'src/coaster_sdl_renderer.h'
       - 'assets/vehicles/coaster_flame_01/**'
       - '.github/workflows/ch-coaster-runtime-check.yml'
 
