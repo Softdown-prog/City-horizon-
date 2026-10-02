@@ -38,6 +38,7 @@
 #include "pedestrian_decision.h"
 #include "population_system.h"
 #include "simulation_clock.h"
+#include "src/ch_core/projection.h"
 #include "src/runtime_view_state.h"
 #include "src/runtime_map_renderer.h"
 #include "src/runtime_game_state.h"
@@ -307,6 +308,8 @@ inline void ch_sync_park_ride_audio_visibility(
     return nullptr;
 }
 
+inline std::optional<std::uint64_t> ch_selected_pedestrian_id;
+
 inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSystem& pedestrians,
                                    const std::optional<std::uint64_t> selected_id) {
     const PedestrianInstance* pedestrian = ch_find_pedestrian(pedestrians, selected_id);
@@ -329,14 +332,14 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
 
 [[nodiscard]] inline std::optional<std::uint64_t> ch_pick_pedestrian_at_screen(
     const PedestrianSystem& pedestrians, const float mouse_x, const float mouse_y,
-    const Camera& camera, const float viewport_width, const float viewport_height) {
+    const ch::CameraState& camera, const float viewport_width, const float viewport_height) {
     constexpr float kPickRadiusPx = 28.0F;
     constexpr float kPickRadiusSquared = kPickRadiusPx * kPickRadiusPx;
     std::optional<std::uint64_t> best;
     float best_distance_squared = kPickRadiusSquared;
     for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
         if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
-        const SDL_FPoint screen = world_to_screen(
+        const ch::ScreenPoint screen = ch::world_to_screen_point(
             pedestrian.spatial.visual_world_x + pedestrian.spatial.ground_anchor_x,
             pedestrian.spatial.visual_world_y + pedestrian.spatial.ground_anchor_y,
             camera, viewport_width, viewport_height);
@@ -356,13 +359,14 @@ public:
     using ChRuntimeGameplayUi::ChRuntimeGameplayUi;
 
     void bind_selection_context(const PedestrianSystem* pedestrians,
-                                const Camera* camera,
+                                const ch::CameraState& camera,
                                 const int viewport_width,
                                 const int viewport_height,
                                 std::optional<std::uint64_t>* selected_pedestrian_id,
                                 const bool world_selection_enabled) {
         pedestrians_ = pedestrians;
         camera_ = camera;
+        camera_valid_ = true;
         viewport_width_ = viewport_width;
         viewport_height_ = viewport_height;
         selected_pedestrian_id_ = selected_pedestrian_id;
@@ -374,11 +378,11 @@ public:
                                                          const bool primary_button) {
         UiInputResult result = ChRuntimeGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
         if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||
-            camera_ == nullptr || selected_pedestrian_id_ == nullptr) {
+            !camera_valid_ || selected_pedestrian_id_ == nullptr) {
             return result;
         }
         const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(
-            *pedestrians_, mouse_x, mouse_y, *camera_,
+            *pedestrians_, mouse_x, mouse_y, camera_,
             static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));
         if (!picked) return result;
         *selected_pedestrian_id_ = *picked;
@@ -388,7 +392,8 @@ public:
 
 private:
     const PedestrianSystem* pedestrians_ = nullptr;
-    const Camera* camera_ = nullptr;
+    ch::CameraState camera_{};
+    bool camera_valid_ = false;
     int viewport_width_ = 1;
     int viewport_height_ = 1;
     std::optional<std::uint64_t>* selected_pedestrian_id_ = nullptr;
@@ -467,19 +472,18 @@ private:
 #define update_layout(viewport_width, viewport_height, model) \
     ([&]() { \
         auto ch_ui_model = (model); \
-        ch_fill_citizen_status(ch_ui_model, pedestrians, selected_pedestrian_id); \
+        ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \
+        const ch::CameraState ch_selection_camera{ \
+            camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \
         gameplay_ui.bind_selection_context( \
-            &pedestrians, &camera, (viewport_width), (viewport_height), &selected_pedestrian_id, \
+            &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \
             placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
             !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
         update_layout((viewport_width), (viewport_height), ch_ui_model); \
     }())
 
-#define selected_instance_id selected_instance_id; std::optional<std::uint64_t> selected_pedestrian_id
-
 #include "main_runtime_impl.cpp"
 
-#undef selected_instance_id
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
