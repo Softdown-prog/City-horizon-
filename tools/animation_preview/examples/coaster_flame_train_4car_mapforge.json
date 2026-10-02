@@ -1,0 +1,16 @@
+{
+  "contract": "CH_COASTER_VIDEO_PROOF_V1",
+  "id": "coaster.flame.train_4car.mapforge.v1",
+  "reviewOnly": true,
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V1",
+  "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V1",
+  "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
+  "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas.png",
+  "carCount": 4,
+  "carSpacingMeters": 2.445,
+  "fps": 30,
+  "durationSeconds": 8,
+  "frameCount": 240,
+  "purpose": "Validate the promoted occupied Flame atlas on a closed MapForge coaster route with straight, curve, lift, crest and descent sections."
+}
