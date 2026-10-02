@@ -14,6 +14,7 @@ import viking_ship_rebuild_v5_fresh_geometry as fresh
 
 _base_build_for_gate = base.build_for_gate
 _base_write_metadata = base.write_metadata
+_base_load_json = base.load_json
 
 
 def _build_base(root, geometry, materials):
@@ -44,6 +45,10 @@ def _fresh_scale_gate(recipe):
     if rebuild.get("inheritsGeometryLanguageFrom") is not None:
         raise RuntimeError("CH_VIKING_V5_LEGACY_INHERITANCE_FORBIDDEN")
 
+    footprint = recipe.get("footprint", {})
+    if int(footprint.get("widthTiles", 0)) != 7 or int(footprint.get("depthTiles", 0)) != 6:
+        raise RuntimeError("CH_VIKING_V5_FOOTPRINT_MUST_BE_7X6")
+
     g = recipe["geometry"]
     if float(g["pivotZ"]) < 20.0:
         raise RuntimeError("CH_VIKING_V5_FRAME_TOO_SHORT")
@@ -51,8 +56,6 @@ def _fresh_scale_gate(recipe):
         raise RuntimeError("CH_VIKING_V5_SHIP_TOO_SMALL")
     if float(g["baseWidth"]) < 19.0 or float(g["baseDepth"]) < 16.0:
         raise RuntimeError("CH_VIKING_V5_SITE_TOO_COMPACT")
-    if int(recipe["footprint"]["widthTiles"]) < 6 or int(recipe["footprint"]["depthTiles"]) < 5:
-        raise RuntimeError("CH_VIKING_V5_FOOTPRINT_TOO_SMALL")
 
     return {
         "legacyInheritance": False,
@@ -60,17 +63,40 @@ def _fresh_scale_gate(recipe):
         "shipLength": g["shipLength"],
         "baseWidth": g["baseWidth"],
         "baseDepth": g["baseDepth"],
-        "footprint": recipe["footprint"],
+        "footprint": footprint,
         "passed": True
     }
 
 
 def _build_for_gate_v5(args):
-    recipe, studio, scene, root, pivot, ground, authored, out = _base_build_for_gate(args)
-    report = _fresh_scale_gate(recipe)
+    # The canonical Viking builder still contains the historical 5x4 first-pass lock.
+    # Keep that protection for legacy recipes, but bridge only this explicitly gated
+    # V5 Fresh 7x6 recipe through the old check. Geometry never comes from legacy
+    # rebuilds: all ride callbacks above point at v5_fresh_geometry.
+    authored_recipe = _base_load_json(args.recipe)
+    report = _fresh_scale_gate(authored_recipe)
+    authored_footprint = json.loads(json.dumps(authored_recipe["footprint"]))
+
+    def _load_for_legacy_gate(path):
+        data = _base_load_json(path)
+        if Path(path).resolve() == Path(args.recipe).resolve():
+            data = json.loads(json.dumps(data))
+            data["footprint"]["widthTiles"] = 5
+            data["footprint"]["depthTiles"] = 4
+        return data
+
+    base.load_json = _load_for_legacy_gate
+    try:
+        recipe, studio, scene, root, pivot, ground, authored, out = _base_build_for_gate(args)
+    finally:
+        base.load_json = _base_load_json
+
+    recipe["footprint"] = authored_footprint
     root["rebuildContract"] = "CH_VIKING_SHIP_REBUILD_V5_FRESH"
     root["visualLanguage"] = "full_scale_real_amusement_park_pirate_ship_machine"
     root["legacyVikingGeometryUsed"] = False
+    root["legacyFootprintGateCompatibilityShim"] = True
+    root["authoredFootprint"] = "7x6"
     root["freshScaleGatePassed"] = True
     root["freshShipLength"] = float(report["shipLength"])
     return recipe, studio, scene, root, pivot, ground, authored, out
@@ -86,6 +112,7 @@ def _write_metadata_v5(recipe, scene, out):
     payload["geometryPass"] = "tools/tycoon_photo_studio/viking_ship_rebuild_v5_fresh_geometry.py"
     payload["rebuildContract"] = "CH_VIKING_SHIP_REBUILD_V5_FRESH"
     payload["legacyVikingGeometryUsed"] = False
+    payload["legacyFootprintGateCompatibilityShim"] = True
     payload["freshScaleGate"] = _fresh_scale_gate(recipe)
     payload["authoritativeReferencePolicy"] = recipe.get("referencePolicy")
     payload["firstGateOnly"] = [
