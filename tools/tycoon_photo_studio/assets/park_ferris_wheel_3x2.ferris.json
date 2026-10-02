@@ -2,7 +2,7 @@
   "contract": "CITY_HORIZON_FERRIS_WHEEL_V1",
   "assetId": "attraction.park_ferris_wheel.01",
   "assetType": "animated_attraction",
-  "styleContract": "CH_TYCOON_MINIATURE_V1",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
   "studioPreset": "CH_TYCOON_STUDIO_V1",
   "renderPipeline": {
     "contract": "CH_RENDER_PIPELINES_V1",
