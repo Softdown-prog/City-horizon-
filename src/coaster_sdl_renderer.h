@@ -96,7 +96,7 @@ inline void render_flame_train(
         const CarSpriteGeometry geometry = build_car_sprite_geometry(
             command, camera, viewport_width, viewport_height, sprite_scale);
         if (geometry.destination.w <= 0.0F || geometry.destination.h <= 0.0F) continue;
-        SDL_RenderTexture(texture ? renderer : nullptr, texture, &geometry.source, &geometry.destination);
+        SDL_RenderTexture(renderer, texture, &geometry.source, &geometry.destination);
     }
 
     SDL_SetTextureColorMod(texture, 255, 255, 255);
