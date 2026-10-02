@@ -1,0 +1,13 @@
+{
+  "contract": "CH_RUNTIME_PROMOTION_REQUEST_V1",
+  "assetId": "vehicle.coaster.flame_01",
+  "operation": "promote_passenger_overlay_into_pose_atlas",
+  "baseArtifactId": 11189062756,
+  "passengerArtifactId": 11255655197,
+  "passengerWorkflowRun": 37070846550,
+  "approvedPassengerProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
+  "frameCount": 40,
+  "capacityPerCar": 2,
+  "composition": "baked_into_car_pose_atlas",
+  "preserveStandaloneOverlayAtlas": true
+}
