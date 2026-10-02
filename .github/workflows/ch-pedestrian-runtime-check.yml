@@ -1,0 +1,58 @@
+name: CH Pedestrian Runtime Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/pedestrian_system.cpp'
+      - 'src/pedestrian_system.h'
+      - 'src/pedestrian_system_test.cpp'
+      - 'src/pedestrian_decision.cpp'
+      - 'src/pedestrian_decision.h'
+      - 'src/mobile_animation.cpp'
+      - 'src/mobile_animation.h'
+      - 'src/navigation_network.cpp'
+      - 'src/navigation_network.h'
+      - 'src/road_system.cpp'
+      - 'src/road_system.h'
+      - 'src/sidewalk_system.cpp'
+      - 'src/sidewalk_system.h'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ch-pedestrian-runtime-check.yml'
+  pull_request:
+    paths:
+      - 'src/pedestrian_system.cpp'
+      - 'src/pedestrian_system.h'
+      - 'src/pedestrian_system_test.cpp'
+      - 'src/pedestrian_decision.cpp'
+      - 'src/pedestrian_decision.h'
+      - 'src/mobile_animation.cpp'
+      - 'src/mobile_animation.h'
+      - 'src/navigation_network.cpp'
+      - 'src/navigation_network.h'
+      - 'src/road_system.cpp'
+      - 'src/road_system.h'
+      - 'src/sidewalk_system.cpp'
+      - 'src/sidewalk_system.h'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ch-pedestrian-runtime-check.yml'
+
+jobs:
+  pedestrian-runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure pedestrian regression
+        shell: pwsh
+        run: cmake -S . -B build/pedestrian-check -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build pedestrian regression
+        shell: pwsh
+        run: cmake --build build/pedestrian-check --config Release --target pedestrian_system_test --parallel
+
+      - name: Run pedestrian regression
+        shell: pwsh
+        run: ctest --test-dir build/pedestrian-check -C Release -R "^pedestrian_system_test$" --output-on-failure
