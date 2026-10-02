@@ -6,3 +6,4 @@
 #include "ui_build_panel_nine_slice.inl"
 #include "ui_window_nine_slice.inl"
 #include "ui_topbar_interaction_fx.inl"
+#include "ui_weather_indicator.inl"
