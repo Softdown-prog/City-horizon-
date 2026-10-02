@@ -8,7 +8,7 @@
 #include <string>
 
 // Fence persistence is layered over the existing city save contract so old
-// saveVersion 1..11 files remain readable without rewriting SaveManager's JSON
+// saveVersion 1..12 files remain readable without rewriting SaveManager's JSON
 // parser. Each city save owns one small deterministic sidecar next to it.
 class ParkFenceSaveManager : public SaveManager {
 public:
@@ -19,10 +19,11 @@ public:
                                            const LandManager& lands, const PopulationSystem& population,
                                            const ServiceVehicleManager* vehicles = nullptr,
                                            const MissionManager* missions = nullptr,
-                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr) const {
+                                           const std::vector<TerrainPaintTile>* terrain_paint = nullptr,
+                                           const std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const {
         SaveOperationResult result = SaveManager::save(path, economy, clock, buildings, roads,
                                                        sidewalks, farming, lands, population,
-                                                       vehicles, missions, terrain_paint);
+                                                       vehicles, missions, terrain_paint, terrain_heights);
         if (!result.success) return result;
 
         const std::filesystem::path fence_path = sidecar_path(path);
@@ -65,10 +66,12 @@ public:
                                            const ServiceVehicleCatalog* vehicle_catalog = nullptr,
                                            ServiceVehicleManager* vehicles = nullptr,
                                            MissionManager* missions = nullptr,
-                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr) const {
+                                           std::vector<TerrainPaintTile>* terrain_paint = nullptr,
+                                           std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const {
         SaveOperationResult result = SaveManager::load(path, catalog, economy, clock, buildings, roads,
                                                        sidewalks, farming, lands, population,
-                                                       vehicle_catalog, vehicles, missions, terrain_paint);
+                                                       vehicle_catalog, vehicles, missions, terrain_paint,
+                                                       terrain_heights);
         if (!result.success) return result;
 
         park_fence_runtime::clear();
