@@ -43,6 +43,8 @@ def run_worker(asset_root: Path, source_path: Path, recipe_id: str, scenario_id:
         raise FileNotFoundError(f"Source scenario not found: {source_path}")
 
     target = asset_root / "assets" / "scenarios" / scenario_id
+    if target.resolve() == source_path.resolve():
+        raise ValueError(f"Refusing to overwrite the source scenario: {target}")
     if target.exists() and not overwrite:
         raise FileExistsError(f"Refusing to overwrite existing scenario: {target}")
 
@@ -59,7 +61,9 @@ def run_worker(asset_root: Path, source_path: Path, recipe_id: str, scenario_id:
     active_marker = None
     if activate:
         active_marker = asset_root / "assets" / "scenarios" / "active_scenario.txt"
-        active_marker.write_text(scenario_id + "\n", encoding="utf-8")
+        pending = active_marker.with_name(active_marker.name + ".tmp")
+        pending.write_text(scenario_id + "\n", encoding="utf-8")
+        pending.replace(active_marker)
     return {
         "success": True,
         "contract": "CH_MAP_FORGE_WORKER_V1",
@@ -84,7 +88,14 @@ def main() -> None:
     args = parser.parse_args()
     root = args.asset_root.resolve()
     source = args.source.resolve() if args.source else root / "assets" / "scenarios" / "initial_city.json"
-    print(json.dumps(run_worker(root, source, args.recipe, args.scenario_id, args.activate, args.overwrite), indent=2, ensure_ascii=False))
+    try:
+        result = run_worker(root, source, args.recipe, args.scenario_id, args.activate, args.overwrite)
+    except (ValueError, FileNotFoundError, FileExistsError, RuntimeError) as error:
+        print(json.dumps({"success": False, "contract": "CH_MAP_FORGE_WORKER_V1",
+                          "error": {"type": type(error).__name__, "message": str(error)}},
+                         indent=2, ensure_ascii=False))
+        raise SystemExit(1)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

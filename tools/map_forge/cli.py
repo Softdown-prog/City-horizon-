@@ -60,6 +60,10 @@ def run_cli(args: argparse.Namespace, asset_root: str, scenario_path: str):
     elif args.action == "generate-coastal-district":
         if not args.output:
             result = {"success": False, "error": "--output is required; source scenarios are never overwritten."}
+        elif os.path.abspath(args.output) == os.path.abspath(scenario_path):
+            result = {"success": False, "error": "--output must differ from the source scenario; source scenarios are never overwritten."}
+        elif os.path.exists(args.output) and not getattr(args, "overwrite", False):
+            result = {"success": False, "error": f"Refusing to overwrite existing output '{args.output}'; pass --overwrite to replace it."}
         else:
             map_model = load_scenario(scenario_path)
             catalog = load_building_catalog(asset_root)
@@ -93,6 +97,7 @@ def main_cli():
     parser.add_argument("--asset-root", type=str, default=default_root, help="Runtime asset root path")
     parser.add_argument("--scenario", type=str, default=None, help="Scenario JSON path; defaults to active runtime scenario")
     parser.add_argument("--output", type=str, default="", help="required output path for generation actions")
+    parser.add_argument("--overwrite", action="store_true", help="allow replacing an existing --output file (never the source scenario)")
 
     args = parser.parse_args()
     scenario_path = args.scenario or _default_scenario(args.asset_root)

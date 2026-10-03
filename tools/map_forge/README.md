@@ -28,6 +28,11 @@ Recipes disponíveis:
 - `coastal_forest_hydroelectric`
 - `beach_water_v2`
 
-O worker jamais altera o cenário-fonte e recusa sobrescrever uma saída existente
-sem `--overwrite`. Ele produz o JSON do cenário, manifest, validação e, quando
-recebe `--activate`, o marcador que o City Builder consome.
+O worker jamais altera o cenário-fonte (nem com `--overwrite`) e recusa
+sobrescrever uma saída existente sem `--overwrite`. Ele produz o JSON do
+cenário, manifest, validação e, quando recebe `--activate`, o marcador que o
+City Builder consome (gravado de forma atômica). Em caso de recusa ou falha ele
+imprime um JSON `{"success": false, "error": {...}}` e sai com código 1.
+
+O CLI `generate-coastal-district` aplica as mesmas regras: `--output` deve
+diferir do cenário-fonte e só substitui um arquivo existente com `--overwrite`.
