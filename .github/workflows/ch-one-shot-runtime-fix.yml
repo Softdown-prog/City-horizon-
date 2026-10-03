@@ -1,0 +1,73 @@
+name: CH One Shot Runtime Fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-one-shot-runtime-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply guarded runtime fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime = Path("src/runtime_map_renderer.h")
+          text = runtime.read_text(encoding="utf-8")
+          old = "shoreline_overlays.push_back({edit.tile.x, edit.tile_y, texture});"
+          new = "shoreline_overlays.push_back({edit.tile.x, edit.tile.y, texture});"
+          assert text.count(old) == 1, f"expected exactly one stale shoreline field, found {text.count(old)}"
+          text = text.replace(old, new)
+          runtime.write_text(text, encoding="utf-8")
+
+          main = Path("src/main.cpp")
+          text = main.read_text(encoding="utf-8")
+
+          anchor = '''class ChPedestrianDecisionNode {\n'''
+          adapter = '''class ChBuildingManager : public BuildingManager {\npublic:\n    using BuildingManager::BuildingManager;\n\n    [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,\n                                                     const BuildingColorTint tint) {\n        return set_wall_color(instance_id, tint);\n    }\n\n    [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,\n                                                     const BuildingColorTint tint) {\n        return set_roof_color(instance_id, tint);\n    }\n\n    [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {\n        const bool wall_changed = clear_wall_color(instance_id);\n        const bool roof_changed = clear_roof_color(instance_id);\n        return wall_changed || roof_changed;\n    }\n};\n\n'''
+          assert text.count(anchor) == 1, "ChPedestrianDecisionNode anchor drifted"
+          assert "class ChBuildingManager" not in text, "building adapter already present"
+          text = text.replace(anchor, adapter + anchor, 1)
+
+          method_anchor = '''    void bind_selection_context(const PedestrianSystem* pedestrians,\n'''
+          method = '''    template <typename PrepareFn>\n    void ch_runtime_update_layout(const int viewport_width, const int viewport_height,\n                                  GameplayUiModel model, PrepareFn&& prepare) {\n        prepare(model);\n        ChRuntimeGameplayUi::update_layout(viewport_width, viewport_height, model);\n    }\n\n'''
+          assert text.count(method_anchor) == 1, "selection UI anchor drifted"
+          assert "ch_runtime_update_layout" not in text, "layout adapter already present"
+          text = text.replace(method_anchor, method + method_anchor, 1)
+
+          old_macro = '''#define MapRenderer RuntimeMapRenderer\n#define GameplayUi ChRuntimeSelectableGameplayUi\n#define update_layout(viewport_width, viewport_height, model) \\\n    ([&]() { \\\n        auto ch_ui_model = (model); \\\n        ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \\\n        const ch::CameraState ch_selection_camera{ \\\n            camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \\\n        gameplay_ui.bind_selection_context( \\\n            &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \\\n            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \\\n            !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \\\n        update_layout((viewport_width), (viewport_height), ch_ui_model); \\\n    }())\n'''
+          new_macro = '''#define BuildingManager ChBuildingManager\n#define MapRenderer RuntimeMapRenderer\n#define GameplayUi ChRuntimeSelectableGameplayUi\n#define update_layout(viewport_width, viewport_height, model) \\\n    ch_runtime_update_layout((viewport_width), (viewport_height), (model), \\\n        [&](GameplayUiModel& ch_ui_model) { \\\n            ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \\\n            const ch::CameraState ch_selection_camera{ \\\n                camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \\\n            gameplay_ui.bind_selection_context( \\\n                &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \\\n                placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \\\n                !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \\\n        })\n'''
+          assert text.count(old_macro) == 1, "runtime macro block drifted"
+          text = text.replace(old_macro, new_macro, 1)
+
+          old_undef = '''#undef GameplayUi\n#undef MapRenderer\n'''
+          new_undef = '''#undef GameplayUi\n#undef MapRenderer\n#undef BuildingManager\n'''
+          assert text.count(old_undef) == 1, "runtime undef block drifted"
+          text = text.replace(old_undef, new_undef, 1)
+
+          main.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "City Horizon CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/runtime_map_renderer.h src/main.cpp
+          git diff --cached --check
+          git diff --cached --exit-code && exit 0 || true
+          git commit -m "fix: restore runtime compile contracts"
+          git push origin HEAD:main
