@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ch-coaster-v2-video-proof.yml'
+      - 'C++/MapForge2/src/coaster_project_video_main.cpp'
+      - 'C++/MapForge2/src/coaster_video_proof_main.cpp'
+      - 'C++/MapForge2/projects/coaster_flame_01.mapforge.json'
 
 permissions:
   contents: read
