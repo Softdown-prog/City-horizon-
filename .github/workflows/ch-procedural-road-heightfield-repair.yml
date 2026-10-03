@@ -1,0 +1,59 @@
+name: CH Procedural Road Heightfield Repair
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-procedural-road-heightfield-repair.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair-test-commit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto latest main
+        shell: pwsh
+        run: git pull --rebase origin main
+
+      - name: Validate and apply guarded patch
+        shell: pwsh
+        run: |
+          python -m py_compile tools/procedural_road_heightfield_patch.py
+          python tools/procedural_road_heightfield_patch.py
+          git diff --check
+
+      - name: Configure focused validation
+        shell: pwsh
+        run: cmake -S . -B build/road-heightfield-validation -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build procedural road test
+        shell: pwsh
+        run: cmake --build build/road-heightfield-validation --config Debug --target procedural_road_lane_connector_test --parallel
+
+      - name: Run procedural road test
+        shell: pwsh
+        run: ctest --test-dir build/road-heightfield-validation -C Debug -R "^procedural_road_lane_connector_test$" --output-on-failure
+
+      - name: Build real City Builder
+        shell: pwsh
+        run: cmake --build build/road-heightfield-validation --config Release --target city_builder --parallel
+
+      - name: Commit validated road terrain repair
+        shell: pwsh
+        run: |
+          git config user.name "City Horizon CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/ch_render/procedural_road_network_renderer.h src/runtime_procedural_road_culling.h src/runtime_procedural_road_renderer.h src/runtime_map_renderer.h src/main_runtime_impl.cpp
+          git rm .github/workflows/ch-procedural-road-heightfield-repair.yml tools/procedural_road_heightfield_patch.py
+          git diff --cached --check
+          git commit -m "terrain: project procedural roads onto sculpted ground"
+          git pull --rebase origin main
+          git push origin HEAD:main
