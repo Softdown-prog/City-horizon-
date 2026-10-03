@@ -1,0 +1,49 @@
+name: CH Coaster Runtime Track Promotion
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/ch_blender/requests/coaster_runtime_track_promotion_v1.request'
+
+permissions:
+  contents: write
+
+jobs:
+  promote-runtime-track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Apply guarded runtime track promotion
+        run: |
+          set -euo pipefail
+          python3 tools/ch_blender/promote_coaster_track_runtime.py
+
+      - name: Validate promotion diff
+        run: |
+          set -euo pipefail
+          grep -F 'coaster_runtime.track_geometry()' src/main_runtime_impl.cpp
+          grep -F 'render_coaster_track(' src/main_runtime_impl.cpp
+          grep -F 'CH_COASTER_RENDER_LINK_V3' src/main_runtime_impl.cpp
+          grep -F "'owned track geometry': 'coaster_runtime.track_geometry()'" .github/workflows/ch-coaster-runtime-check.yml
+          grep -F "'native track renderer': 'render_coaster_track('" .github/workflows/ch-coaster-runtime-check.yml
+          git diff --check
+
+      - name: Commit promotion
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No runtime promotion changes were needed.'
+            exit 0
+          fi
+          git config user.name 'Softdown-prog'
+          git config user.email 'rutsdrigo@gmail.com'
+          git add src/main_runtime_impl.cpp .github/workflows/ch-coaster-runtime-check.yml
+          git commit -m 'coaster: promote native track geometry to runtime preview'
+          git push origin HEAD:main
