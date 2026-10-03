@@ -13,7 +13,7 @@
       "depthTiles": 6
     },
     "minDimensions": [19, 10, 19],
-    "maxDimensions": [30, 20, 28]
+    "maxDimensions": [30, 20, 30]
   },
   "args": [
     "--recipe",
