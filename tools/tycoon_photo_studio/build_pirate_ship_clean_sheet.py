@@ -90,22 +90,17 @@ def build_boat(root,g,M):
     bpy.ops.object.empty_add(type='PLAIN_AXES',location=(0,0,pz)); pivot=bpy.context.object; pivot.name='SwingPivot'; pivot.parent=root
     bpy.ops.object.empty_add(type='PLAIN_AXES',location=(0,0,cz-pz)); boat=bpy.context.object; boat.name='BoatRoot'; boat.parent=pivot
 
-    # Open gondola construction: two independent side shells + visible floor/keel.
-    # This replaces the old full-width solid prism that made the vessel read as a closed block.
     outer=[(-half,2.55),(-half*.95,4.25),(-half*.82,2.85),(-half*.62,1.30),(-half*.34,.10),(0,-1.15),(half*.34,.10),(half*.62,1.30),(half*.82,2.85),(half*.95,4.25),(half,2.55)]
     inner=[(half*.90,2.40),(half*.76,2.02),(half*.56,.95),(half*.30,.05),(0,-.62),(-half*.30,.05),(-half*.56,.95),(-half*.76,2.02),(-half*.90,2.40)]
     side_profile=outer+inner
     hull_parts=[]
     for sy,label in ((-1,'Front'),(1,'Back')):
         wall=prism_xz(f'HullSide_{label}',side_profile,.18,M['wood'],boat); wall.location.y=sy*(hw-.18); hull_parts.append(wall)
-        # gold gunwale follows the visible upper rim
         rim_pts=[(-half*.93,sy*hw,3.90),(-half*.78,sy*hw,2.55),(-half*.56,sy*hw,1.16),(0,sy*hw,-.42),(half*.56,sy*hw,1.16),(half*.78,sy*hw,2.55),(half*.93,sy*hw,3.90)]
         for i in range(len(rim_pts)-1): beam(f'Gunwale_{label}_{i}',rim_pts[i],rim_pts[i+1],.18,.12,M['gold'],boat)
-        # decorative fascia panels stay on the side, not across the open top
         for i,x in enumerate((-6.0,-4.0,-2.0,0,2.0,4.0,6.0)):
             box(f'Fascia_{label}_{i}',(x,sy*(hw+.07),.58),(1.15,.10,.86),M['trim'],boat,.025)
 
-    # Open passenger floor and central keel. Seats remain fully visible from the review camera.
     box('PassengerFloor',(0,0,.46),(L*.72,hw*1.55,.24),M['wood'],boat,.03)
     beam('Keel',(-half*.74,0,-1.02),(half*.74,0,-1.02),.30,.36,M['frame'],boat)
     for x in (-6.2,-4.1,-2.0,0,2.0,4.1,6.2):
@@ -119,12 +114,10 @@ def build_boat(root,g,M):
         box(f'SeatBack_{i}',(x+.23,0,1.28),(.18,hw*1.34,.66),M['seat'],boat,.03)
         beam(f'LapBar_{i}',(x-.10,-hw*.60,1.42),(x-.10,hw*.60,1.42),.07,.07,M['gold'],boat)
 
-    # High decorative bow/stern treatment, attached to the shell rather than floating above it.
     for s,label in ((-1,'L'),(1,'R')):
         beam(f'ProwSpine_{label}',(s*half*.91,0,2.65),(s*(half+.42),0,5.55),.46,.66,M['gold'],boat)
         cyl(f'ProwMedallion_{label}',(s*(half+.44),0,5.68),.68,.38,M['trim'],(math.radians(90),0,0),boat,24)
 
-    # Four heavy suspension yokes terminate at visible side bearing blocks on the hull shoulders.
     top_x=1.20; attach_x=6.35; top_y=2.42; attach_y=hw+.10
     attach_z=(cz-pz)+2.12
     for sx in (-1,1):
@@ -156,8 +149,8 @@ def main():
     recv=studio['shadowReceiver']; rmat=bs.make_material('ShadowReceiver',recv['materialColor'],float(recv.get('roughness',1.0))); ground=bs.add_box('ShadowReceiverPlane',recv['location'],[max(float(recv['dimensions'][0]),21.0),max(float(recv['dimensions'][1]),18.0),float(recv['dimensions'][2])],rmat,0.0)
     authored=[o for o in bpy.context.scene.objects if o.type=='MESH' and o!=ground]
     for o in authored:o['runtimeLayer']='motion_overlay' if desc(o,pivot) else 'static_base'
-    bs.calibrate_ortho_scale(scene,authored,safety_margin=.13); bs.set_direction(root,bs.DIRECTIONS[0]); bpy.context.view_layer.update()
-    meta={'contract':CONTRACT,'assetId':ASSET_ID,'stage':'clean_sheet_gate','cameraContract':'CH_CAMERA_V1','footprint':recipe['footprint'],'recipe':'tools/tycoon_photo_studio/assets/pirate_ship_ride_clean_7x6.json','builder':'tools/tycoon_photo_studio/build_pirate_ship_clean_sheet.py','modelingMethod':'open_side_shell_gondola_with_segmented_portals','blenderVersion':bpy.app.version_string,'renderEngine':scene.render.engine}; (out/'studio_metadata.json').write_text(json.dumps(meta,indent=2),encoding='utf-8')
+    bs.calibrate_ortho_scale(scene,authored,safety_margin=.28); bs.set_direction(root,bs.DIRECTIONS[0]); bpy.context.view_layer.update()
+    meta={'contract':CONTRACT,'assetId':ASSET_ID,'stage':'clean_sheet_gate','cameraContract':'CH_CAMERA_V1','footprint':recipe['footprint'],'recipe':'tools/tycoon_photo_studio/assets/pirate_ship_ride_clean_7x6.json','builder':'tools/tycoon_photo_studio/build_pirate_ship_clean_sheet.py','modelingMethod':'segmented_portal_plus_open_gondola','blenderVersion':bpy.app.version_string,'renderEngine':scene.render.engine}; (out/'studio_metadata.json').write_text(json.dumps(meta,indent=2),encoding='utf-8')
     profile=scene_gate.load_profile(a.preflight_profile); pre=scene_gate.run_preflight(scene=scene,authored=authored,footprint=recipe['footprint'],profile=profile,asset_id=ASSET_ID,report_path=out/'preflight_report.json'); scene_gate.require_pass(pre)
     if a.stage=='preflight': save_blend(a.save_blend); return
     if a.stage=='proxy':
