@@ -27,8 +27,8 @@ def box(n,loc,dims,m,parent,b=.04):
 def beam(n,a,b,w,d,m,parent):
     a=Vector(a);b=Vector(b);v=b-a;o=box(n,(a+b)*.5,(w,d,v.length),m,parent,.03)
     o.rotation_mode='QUATERNION';o.rotation_quaternion=v.to_track_quat('Z','Y');return o
-def cyl(n,loc,r,depth,m,parent):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=r,depth=depth,location=loc,rotation=(math.pi/2,0,0))
+def cyl_x(n,loc,r,depth,m,parent):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=r,depth=depth,location=loc,rotation=(0,math.pi/2,0))
     o=bpy.context.object;o.name=n;o.data.materials.append(m);o.parent=parent;return o
 
 def hull(root,M,L,HW,cz):
@@ -52,35 +52,42 @@ def hull(root,M,L,HW,cz):
     return o
 
 def build(root,c,M):
-    d=c["dimensions"];pz=d["pivotZ"];px=d["portalHalfX"];py=d["portalHalfY"];cz=d["shipCenterZ"]
-    # Two END portals only: each end is an A, leaving the entire longitudinal swing volume open.
-    for x,label in ((-px,"LeftEnd"),(px,"RightEnd")):
-        apex=(x,0,pz)
-        for y,s in ((-py,"Near"),(py,"Far")):
-            beam(label+"_"+s+"Leg",(x,y,0.25),apex,1.0,1.0,M["structure"],root)
-        beam(label+"_LowTie",(x,-py*.72,5.0),(x,py*.72,5.0),.38,.38,M["truss"],root)
-        beam(label+"_MidTie",(x,-py*.48,11.0),(x,py*.48,11.0),.34,.34,M["truss"],root)
-    # High cross axle between end portal apexes: visually one pivot line, not a surrounding cage.
-    beam("HighPivotCarrier",(-px,0,pz),(px,0,pz),.95,.95,M["structure"],root)
-    cyl("NearBearing",(-px,0,pz),1.35,1.0,M["truss"],root);cyl("FarBearing",(px,0,pz),1.35,1.0,M["truss"],root)
-    # Two long pendulum trusses descend from axle ends to ship attachment points.
-    attachZ=cz+.25
-    for x,label in ((-px,"Left"),(px,"Right")):
-        beam(label+"PendulumMain",(x,0,pz),(x*.58,0,attachZ),.72,.72,M["truss"],root)
-        beam(label+"PendulumRear",(x,0,pz),(x*.40,0,attachZ+.2),.38,.38,M["truss"],root)
-        for k in range(1,6):
-            t=k/6; z=pz+(attachZ-pz)*t; xa=x+(x*.58-x)*t; xb=x+(x*.40-x)*t
-            beam(label+"PendulumTie"+str(k),(xa,0,z),(xb,0,z),.22,.22,M["truss"],root)
+    d=c["dimensions"]; pz=d["pivotZ"]; sy=d["sideFrameHalfY"]; lx=d["sideLegHalfX"]; cz=d["shipCenterZ"]
+    # Correct ride topology: two side A-frames centered at the ship midpoint.
+    # Each side frame sits on port/starboard; the ship swings longitudinally between them.
+    for y,label in ((-sy,"NearSide"),(sy,"FarSide")):
+        apex=(0,y,pz)
+        beam(label+"_FrontLeg",(-lx,y,0.25),apex,1.0,1.0,M["structure"],root)
+        beam(label+"_RearLeg",(lx,y,0.25),apex,1.0,1.0,M["structure"],root)
+        beam(label+"_LowTie",(-lx*.72,y,5.0),(lx*.72,y,5.0),.40,.40,M["truss"],root)
+        beam(label+"_MidTie",(-lx*.46,y,11.2),(lx*.46,y,11.2),.34,.34,M["truss"],root)
+    # Single transverse pivot axle through the two side-frame apexes.
+    beam("TransversePivotAxle",(0,-sy,pz),(0,sy,pz),1.05,1.05,M["structure"],root)
+    for y,label in ((-sy,"Near"),(sy,"Far")):
+        cyl_x(label+"BearingHousing",(0,y,pz),1.35,1.10,M["truss"],root)
+    # Long triangulated pendulum arms descend from the central axle toward bow/stern attachment zones.
+    # This is the characteristic real pirate-ship mechanism visible in the supplied references.
+    attach_z=cz+.35; attach_x=d["shipLength"]*.40
+    for y,label in ((-1.2,"NearPendulum"),(1.2,"FarPendulum")):
+        beam(label+"_BowMain",(0,y,pz),(-attach_x,y,attach_z),.62,.62,M["truss"],root)
+        beam(label+"_SternMain",(0,y,pz),(attach_x,y,attach_z),.62,.62,M["truss"],root)
+        beam(label+"_BowInner",(0,y,pz-1.0),(-attach_x*.72,y,attach_z+.2),.28,.28,M["truss"],root)
+        beam(label+"_SternInner",(0,y,pz-1.0),(attach_x*.72,y,attach_z+.2),.28,.28,M["truss"],root)
+        for k in range(1,5):
+            t=k/5
+            bx=-attach_x*t; sx=attach_x*t; z=pz+(attach_z-pz)*t
+            beam(label+"_BowTie"+str(k),(bx,y-.22,z),(bx,y+.22,z),.16,.16,M["truss"],root)
+            beam(label+"_SternTie"+str(k),(sx,y-.22,z),(sx,y+.22,z),.16,.16,M["truss"],root)
     hull(root,M,d["shipLength"],d["shipHalfWidth"],cz)
-    # independent boarding deck below ship; deliberately not structural support.
-    deckZ=d["deckZ"];box("BoardingDeck",(0,-4.75,deckZ*.5),(22.5,3.0,deckZ),M["deck"],root,.08)
-    for x in (-11.0,11.0): beam("DeckEndRail"+str(x),(x,-6.15,deckZ+1),(x,-3.35,deckZ+1),.1,.1,M["rail"],root)
-    beam("DeckOuterRail",(-11,-6.15,deckZ+1),(11,-6.15,deckZ+1),.1,.1,M["rail"],root)
-    for x in range(-10,11,2): beam("DeckPost"+str(x),(x,-6.15,deckZ),(x,-6.15,deckZ+1),.1,.1,M["rail"],root)
+    # Independent boarding platform beside the hull, not a structural cage under the ride.
+    deckZ=d["deckZ"];box("BoardingDeck",(0,-5.15,deckZ*.5),(18.5,2.4,deckZ),M["deck"],root,.08)
+    beam("DeckOuterRail",(-9.0,-6.25,deckZ+1),(9.0,-6.25,deckZ+1),.10,.10,M["rail"],root)
+    for x in range(-8,9,2): beam("DeckPost"+str(x),(x,-6.25,deckZ),(x,-6.25,deckZ+1),.10,.10,M["rail"],root)
 
 def main():
     a=argv();c=load(a.recipe)
-    if c.get("contract")!=CONTRACT or "four_post_rectangular_cage" not in c.get("forbiddenTopology",[]): raise RuntimeError("clean reference contract required")
+    forbidden=c.get("forbiddenTopology",[])
+    if c.get("contract")!=CONTRACT or "end_portals_at_bow_and_stern" not in forbidden: raise RuntimeError("corrected clean reference contract required")
     studio=bs.load_json(a.studio_preset);out=Path(a.output).resolve();out.mkdir(parents=True,exist_ok=True)
     bs.clear_scene();scene=bs.configure_scene(studio,tuple(map(int,studio["render"]["sourceResolution"])),str(out));scene.render.film_transparent=True;scene.render.image_settings.color_mode='RGBA'
     M={k:material(v) for k,v in c["materials"].items()}
@@ -90,7 +97,7 @@ def main():
     ground=bs.add_box("ShadowReceiverPlane",recv["location"],[28,20,float(recv["dimensions"][2])],rm,0)
     authored=[o for o in bpy.context.scene.objects if o.type=="MESH" and o!=ground]
     bs.calibrate_ortho_scale(scene,authored,safety_margin=.14);bs.set_direction(root,bs.DIRECTIONS[0]);bpy.context.view_layer.update()
-    (out/"studio_metadata.json").write_text(json.dumps({"contract":CONTRACT,"assetId":ASSET,"modelingMethod":"two_end_A_portals_open_swing_volume_long_pendulum_trusses","reference":"user supplied real ride photos"},indent=2))
+    (out/"studio_metadata.json").write_text(json.dumps({"contract":CONTRACT,"assetId":ASSET,"modelingMethod":"two_side_A_frames_central_transverse_axle_triangulated_pendulum","reference":"user supplied real ride photos"},indent=2))
     profile=scene_gate.load_profile(a.preflight_profile);pre=scene_gate.run_preflight(scene=scene,authored=authored,footprint=c["footprint"],profile=profile,asset_id=ASSET,report_path=out/"preflight_report.json");scene_gate.require_pass(pre)
     if a.stage=="proxy":
         rep=scene_gate.render_proxy(scene=scene,authored=authored,output_path=out/"proxy_south.png",profile=profile,asset_id=ASSET,direction="south");(out/"proxy_report.json").write_text(json.dumps(rep,indent=2))
