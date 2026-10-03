@@ -16,6 +16,7 @@ Use:
 python tools/ch_blender/ch_blender_cli.py print-contract
 python tools/ch_blender/ch_blender_cli.py doctor
 python tools/ch_blender/ch_blender_cli.py validate-job --job tools/ch_blender/jobs/<id>.job.json
+python tools/ch_blender/ch_blender_cli.py validate-jobs [--job <path> ...] [--dir tools/ch_blender/jobs] [--report <path>]
 python tools/ch_blender/ch_blender_cli.py run-job --job tools/ch_blender/jobs/<id>.job.json --report out/ch_blender_agent/reports/<id>.report.json
 ```
 

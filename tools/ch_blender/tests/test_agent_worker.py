@@ -75,6 +75,42 @@ class JobValidationTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 10)
         self.assertEqual(json.loads(completed.stdout)["error"]["code"], "JOB_INVALID")
 
+    def _run_validate_jobs(self, *paths):
+        cli = ROOT / "tools/ch_blender/ch_blender_cli.py"
+        command = [sys.executable, str(cli), "validate-jobs"]
+        for path in paths:
+            command += ["--job", str(path)]
+        return subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+
+    def test_validate_jobs_batch_ok(self):
+        self.job_path.write_text(json.dumps(self.job), encoding="utf-8")
+        completed = self._run_validate_jobs(self.job_path)
+        self.assertEqual(completed.returncode, 0)
+        report = json.loads(completed.stdout)
+        self.assertEqual((report["total"], report["valid"], report["invalid"]), (1, 1, 0))
+
+    def test_validate_jobs_reports_every_failure(self):
+        bad_a = Path(self.tmp.name) / "a.job.json"
+        bad_b = Path(self.tmp.name) / "b.job.json"
+        for path, job_id in ((bad_a, "bad.a"), (bad_b, "bad.b")):
+            job = dict(self.job, jobId=job_id, args=["--output", "out/ch_blender_agent/other"])
+            path.write_text(json.dumps(job), encoding="utf-8")
+        self.job_path.write_text(json.dumps(self.job), encoding="utf-8")
+        completed = self._run_validate_jobs(bad_a, self.job_path, bad_b)
+        self.assertEqual(completed.returncode, 10)
+        report = json.loads(completed.stdout)
+        self.assertEqual((report["total"], report["valid"], report["invalid"]), (3, 1, 2))
+        self.assertEqual([r["status"] for r in report["results"]], ["error", "ok", "error"])
+
+    def test_validate_jobs_without_files_is_an_error(self):
+        empty = Path(self.tmp.name) / "empty"
+        empty.mkdir()
+        cli = ROOT / "tools/ch_blender/ch_blender_cli.py"
+        completed = subprocess.run([sys.executable, str(cli), "validate-jobs", "--dir", str(empty)],
+                                   cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(completed.returncode, 10)
+        self.assertEqual(json.loads(completed.stdout)["error"]["code"], "JOB_INVALID")
+
 
 if __name__ == "__main__":
     unittest.main()

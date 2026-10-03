@@ -4,6 +4,7 @@
 Stable machine-facing interface:
   doctor         validate the pinned Blender executable and repository contracts
   validate-job   validate one job without Blender or output files
+  validate-jobs  validate many jobs (default: all queued jobs) and report every failure
   run-job        execute one CH_BLENDER_AGENT_JOB_V1 JSON job
   print-contract print the machine-readable worker contract
   cache-key      print the canonical shared GitHub cache key
@@ -106,17 +107,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT["OK"]
 
 
+def _resolve_path(value: str | None) -> Path | None:
+    """Resolve a CLI path argument; relative paths are anchored at the repository root."""
+    if not value:
+        return None
+    path = Path(value)
+    return path.resolve() if path.is_absolute() else (REPO_ROOT / path).resolve()
+
+
 def cmd_run_job(args: argparse.Namespace) -> int:
-    job_path = (
-        (REPO_ROOT / args.job).resolve()
-        if not Path(args.job).is_absolute()
-        else Path(args.job).resolve()
-    )
-    report_path = (
-        (REPO_ROOT / args.report).resolve()
-        if args.report and not Path(args.report).is_absolute()
-        else (Path(args.report).resolve() if args.report else None)
-    )
+    job_path = _resolve_path(args.job)
+    report_path = _resolve_path(args.report)
     try:
         validate_job(job_path)
         blender = resolve_blender(args.blender)
@@ -129,9 +130,60 @@ def cmd_run_job(args: argparse.Namespace) -> int:
         return EXIT.get(exc.code, 1)
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def cmd_validate_jobs(args: argparse.Namespace) -> int:
+    """Validate many jobs without Blender; every job is checked even if earlier ones fail."""
+    if args.job:
+        paths = [_resolve_path(value) for value in args.job]
+    else:
+        root = _resolve_path(args.dir)
+        paths = sorted(root.glob("*.job.json")) if root and root.is_dir() else []
+    report_path = _resolve_path(args.report)
+    if not paths:
+        emit({
+            "contract": "CH_BLENDER_JOB_BATCH_VALIDATION_V1",
+            "status": "error",
+            "error": {"code": "JOB_INVALID", "message": "no job files found to validate"},
+        }, report_path)
+        return EXIT["JOB_INVALID"]
+    results, failures = [], []
+    for path in paths:
+        try:
+            job = validate_job(path)
+            results.append({
+                "job": _display_path(path),
+                "status": "ok",
+                "jobId": job["jobId"],
+                "operation": job["operation"],
+                "qualityStage": job.get("qualityStage"),
+            })
+        except WorkerError as exc:
+            failures.append(exc.code)
+            results.append({
+                "job": _display_path(path),
+                "status": "error",
+                "error": {"code": exc.code, "message": str(exc), "details": exc.details},
+            })
+    emit({
+        "contract": "CH_BLENDER_JOB_BATCH_VALIDATION_V1",
+        "status": "error" if failures else "ok",
+        "total": len(results),
+        "valid": len(results) - len(failures),
+        "invalid": len(failures),
+        "results": results,
+    }, report_path)
+    return EXIT.get(failures[0], 1) if failures else EXIT["OK"]
+
+
 def cmd_validate_job(args: argparse.Namespace) -> int:
-    job_path = (REPO_ROOT / args.job).resolve() if not Path(args.job).is_absolute() else Path(args.job).resolve()
-    report_path = (REPO_ROOT / args.report).resolve() if args.report and not Path(args.report).is_absolute() else (Path(args.report).resolve() if args.report else None)
+    job_path = _resolve_path(args.job)
+    report_path = _resolve_path(args.report)
     try:
         job = validate_job(job_path)
         emit({
@@ -251,6 +303,16 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("--job", required=True)
     validate.add_argument("--report", default=None)
     validate.set_defaults(func=cmd_validate_job)
+
+    validate_many = sub.add_parser(
+        "validate-jobs",
+        help="Check many jobs without Blender (default: every tools/ch_blender/jobs/*.job.json)",
+    )
+    validate_many.add_argument("--job", action="append", default=None,
+                               help="Job file to check; repeatable. Overrides --dir.")
+    validate_many.add_argument("--dir", default="tools/ch_blender/jobs")
+    validate_many.add_argument("--report", default=None)
+    validate_many.set_defaults(func=cmd_validate_jobs)
 
     contract = sub.add_parser("print-contract")
     contract.set_defaults(func=cmd_contract)
