@@ -563,7 +563,7 @@ public:
                     world_x, world_y, document->terrain_heightfield(),
                     camera, viewport_width, viewport_height);
             }
-            return ground_point(world_x, world_y);
+            return world_to_screen_point(world_x, world_y, camera, viewport_width, viewport_height);
         };
 
         const auto soil_color = [](const float world_x, const float world_y) -> SDL_FColor {
