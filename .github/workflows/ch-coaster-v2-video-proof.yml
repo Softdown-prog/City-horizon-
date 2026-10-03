@@ -55,14 +55,21 @@ jobs:
           print('occupied V2 atlas validated', actual)
           PY
 
-      - name: Install renderer dependencies
+      - name: Install renderer dependencies and Qt 6.8.3
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build qt6-base-dev ffmpeg
+          sudo apt-get install -y cmake ninja-build ffmpeg libgl1-mesa-dev
+          python3 -m pip install --user --upgrade aqtinstall
+          python3 -m aqt install-qt linux desktop 6.8.3 gcc_64 -O "$HOME/Qt"
+          test -f "$HOME/Qt/6.8.3/gcc_64/lib/cmake/Qt6/Qt6Config.cmake"
 
       - name: Configure renderer
-        run: cmake -S tools/animation_preview/coaster_video_proof -B build/ch-coaster-v2 -G Ninja
+        run: |
+          set -euo pipefail
+          cmake -S tools/animation_preview/coaster_video_proof \
+            -B build/ch-coaster-v2 -G Ninja \
+            -DCMAKE_PREFIX_PATH="$HOME/Qt/6.8.3/gcc_64"
 
       - name: Build renderer
         run: cmake --build build/ch-coaster-v2 --target MapForge2CoasterVideoProof --parallel
