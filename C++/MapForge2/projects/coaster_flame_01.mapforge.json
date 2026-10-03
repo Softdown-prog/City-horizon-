@@ -1,0 +1,58 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "projectId": "coaster.flame.01",
+  "assetId": "ride.coaster.flame_01",
+  "name": "Flame Coaster",
+  "mapForge": {
+    "tileMeters": 3.0,
+    "footprintTiles": {
+      "width": 28,
+      "depth": 28
+    },
+    "closedRoute": true
+  },
+  "train": {
+    "carCount": 4,
+    "carSpacingMeters": 2.445,
+    "passengersPerCar": 2
+  },
+  "track": {
+    "contract": "CH_COASTER_TRACK_V1",
+    "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"
+  },
+  "layout": {
+    "station": true,
+    "liftHill": true,
+    "firstDrop": true,
+    "camelbacks": 2,
+    "brakeRun": true,
+    "activeInversionPieces": [],
+    "authoredModulesAvailable": [
+      "vertical_loop",
+      "helix_up_left",
+      "helix_up_right",
+      "corkscrew_left",
+      "corkscrew_right"
+    ],
+    "note": "Inversion/banked modules stay out of this first runtime-valid MapForge capture until the extended occupied car atlas is promoted."
+  },
+  "pieceSpans": [
+    {"piece":"station_run","startIndex":1,"endIndex":24},
+    {"piece":"lift_hill","startIndex":25,"endIndex":108},
+    {"piece":"lift_crest","startIndex":109,"endIndex":120},
+    {"piece":"elevated_turn","startIndex":121,"endIndex":152},
+    {"piece":"first_drop","startIndex":153,"endIndex":200},
+    {"piece":"valley","startIndex":201,"endIndex":216},
+    {"piece":"camelback_up","startIndex":217,"endIndex":240},
+    {"piece":"camelback_down","startIndex":241,"endIndex":264},
+    {"piece":"back_turn","startIndex":265,"endIndex":296},
+    {"piece":"back_straight","startIndex":297,"endIndex":368},
+    {"piece":"second_hill_up","startIndex":369,"endIndex":392},
+    {"piece":"second_hill_down","startIndex":393,"endIndex":416},
+    {"piece":"return_turn_1","startIndex":417,"endIndex":448},
+    {"piece":"return_straight","startIndex":449,"endIndex":536},
+    {"piece":"brake_run","startIndex":537,"endIndex":560},
+    {"piece":"return_turn_2","startIndex":561,"endIndex":592}
+  ],
+  "routePoints": []
+}
