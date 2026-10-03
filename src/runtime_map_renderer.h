@@ -192,7 +192,8 @@ class RuntimeMapRenderer : public MapRenderer {
 public:
     static void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
-                           const CameraState& camera, const float viewport_width, const float viewport_height) {
+                           const CameraState& camera, const float viewport_width, const float viewport_height,
+                           const MapDocument* document = nullptr) {
         SDL_SetRenderDrawColor(renderer, 74, 104, 83, SDL_ALPHA_OPAQUE);
         const SDL_FRect background = {0.0F, 0.0F, viewport_width, viewport_height};
         SDL_RenderFillRect(renderer, &background);
@@ -217,9 +218,25 @@ public:
             for (int x = first_x; x <= last_x; ++x) {
                 const int y = depth - x;
                 const auto it = scenario_terrain_textures.find(tile_key(x, y));
+                const bool deform = document != nullptr && (
+                    document->terrain_height_at(x, y) != 0.0F ||
+                    document->terrain_height_at(x + 1, y) != 0.0F ||
+                    document->terrain_height_at(x + 1, y + 1) != 0.0F ||
+                    document->terrain_height_at(x, y + 1) != 0.0F);
+
                 if (it != scenario_terrain_textures.end() && it->second != nullptr) {
-                    MapRenderer::render_custom_terrain_tile(renderer, *it->second, x, y, camera,
-                                                            viewport_width, viewport_height);
+                    if (deform) {
+                        MapRenderer::render_heightfield_terrain_tile(
+                            renderer, *it->second, x, y, *document, camera,
+                            viewport_width, viewport_height, it->second == grass);
+                    } else {
+                        MapRenderer::render_custom_terrain_tile(renderer, *it->second, x, y, camera,
+                                                                viewport_width, viewport_height);
+                    }
+                } else if (deform) {
+                    MapRenderer::render_heightfield_terrain_tile(
+                        renderer, *grass, x, y, *document, camera,
+                        viewport_width, viewport_height, true);
                 } else {
                     MapRenderer::render_grass_tile(renderer, *grass, x, y, camera,
                                                   viewport_width, viewport_height);
@@ -312,7 +329,7 @@ public:
         }
 
         RuntimeMapRenderer::render_map(renderer, grass_base, scenario_terrain_textures,
-                                       camera, viewport_width, viewport_height);
+                                       camera, viewport_width, viewport_height, &document);
         if (!visible.valid) return;
 
         constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
@@ -389,348 +406,19 @@ public:
                 } else if (lands.can_purchase_parcel(parcel.id)) {
                     color = {0.25F, 0.82F, 0.42F, 0.42F};
                 } else {
-                    color = {0.88F, 0.28F, 0.24F, 0.42F};
+                    color = {0.92F, 0.25F, 0.25F, 0.38F};
                 }
             } else if (parcel.owned) {
-                continue;
+                color = {0.22F, 0.58F, 0.92F, 0.15F};
             }
 
-            const int min_y = std::max({contracts::kMapMin, parcel.origin_y, visible.min_y});
-            const int max_y = std::min({contracts::kMapMax, parcel.origin_y + parcel.height - 1, visible.max_y});
-            const int min_x = std::max({contracts::kMapMin, parcel.origin_x, visible.min_x});
-            const int max_x = std::min({contracts::kMapMax, parcel.origin_x + parcel.width - 1, visible.max_x});
-            if (min_x > max_x || min_y > max_y) continue;
-
-            for (int y = min_y; y <= max_y; ++y) {
-                for (int x = min_x; x <= max_x; ++x) {
+            for (int y = parcel.min_y; y <= parcel.max_y; ++y) {
+                for (int x = parcel.min_x; x <= parcel.max_x; ++x) {
+                    if (!visible.contains(x, y)) continue;
                     MapRenderer::render_tile_fill(renderer, x, y, camera,
                                                   viewport_width, viewport_height, color);
                 }
             }
-        }
-    }
-
-    static void render_roads(SDL_Renderer* renderer, const RoadManager& roads,
-                             const RoadVisualCatalog& visuals,
-                             const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
-                             const std::filesystem::path& asset_root, const CameraState& camera,
-                             const float viewport_width, const float viewport_height) {
-        const runtime_render_detail::TileCullBounds visible =
-            runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
-        if (!visible.valid || roads.tiles().empty()) return;
-
-        if (try_render_procedural_roads_runtime(
-                renderer, roads, camera, viewport_width, viewport_height)) {
-            return;
-        }
-
-        std::vector<const RoadTile*> visible_tiles;
-        visible_tiles.reserve(std::min(roads.tiles().size(), visible.cell_count()));
-        if (visible.cell_count() < roads.tiles().size()) {
-            for (int y = visible.min_y; y <= visible.max_y; ++y) {
-                for (int x = visible.min_x; x <= visible.max_x; ++x) {
-                    if (const RoadTile* tile = roads.tile_at(x, y)) visible_tiles.push_back(tile);
-                }
-            }
-        } else {
-            for (const RoadTile& tile : roads.tiles()) {
-                if (visible.contains(tile.tile_x, tile.tile_y)) visible_tiles.push_back(&tile);
-            }
-        }
-
-        std::sort(visible_tiles.begin(), visible_tiles.end(), [&camera](const RoadTile* left, const RoadTile* right) {
-            const float left_depth = camera_depth_key(static_cast<float>(left->tile_x + 1),
-                                                      static_cast<float>(left->tile_y + 1), camera);
-            const float right_depth = camera_depth_key(static_cast<float>(right->tile_x + 1),
-                                                       static_cast<float>(right->tile_y + 1), camera);
-            if (left_depth != right_depth) return left_depth < right_depth;
-            if (left->tile_y != right->tile_y) return left->tile_y < right->tile_y;
-            return left->tile_x < right->tile_x;
-        });
-
-        constexpr SDL_FColor kRoadAsphalt = {52.0F / 255.0F, 57.0F / 255.0F, 60.0F / 255.0F, 1.0F};
-        for (const RoadTile* tile : visible_tiles) {
-            MapRenderer::render_tile_fill(renderer, tile->tile_x, tile->tile_y, camera,
-                                          viewport_width, viewport_height, kRoadAsphalt);
-        }
-        for (const RoadTile* tile : visible_tiles) {
-            const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
-                tile->connections, camera.rotation);
-            const RoadVisual* visual = visuals.get_for_mask(connections);
-            const TextureAsset* texture = visual == nullptr
-                ? nullptr : find_texture(asset_root / visual->texture_path);
-            if (texture != nullptr) {
-                MapRenderer::render_road_sprite(renderer, *texture, tile->tile_x, tile->tile_y,
-                                                camera, viewport_width, viewport_height);
-            } else {
-                MapRenderer::render_road_tile(renderer, tile->tile_x, tile->tile_y, camera,
-                    viewport_width, viewport_height,
-                    runtime_render_detail::road_placeholder_color(roads.visual_type(tile->tile_x, tile->tile_y)));
-            }
-        }
-    }
-
-    static void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks,
-                                 const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
-                                 const std::filesystem::path& asset_root, const CameraState& camera,
-                                 const float viewport_width, const float viewport_height) {
-        const runtime_render_detail::TileCullBounds visible =
-            runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
-        if (!visible.valid || sidewalks.tiles().empty()) return;
-
-        const auto render_tile = [&](const SidewalkTile& tile) {
-            const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
-                tile.connections, camera.rotation);
-            if (const TextureAsset* texture = find_texture(
-                    asset_root / runtime_render_detail::sidewalk_sprite(tile.style_id, connections))) {
-                const WorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
-                const ScreenPoint top = world_to_screen_point(visual_top.x, visual_top.y, camera,
-                                                              viewport_width, viewport_height);
-                const float scale = (static_cast<float>(contracts::kTileWidth) / texture->source_width) * camera.zoom;
-                const SDL_FRect destination = {
-                    top.x - texture->source_width * scale * 0.5F,
-                    top.y,
-                    texture->source_width * scale,
-                    texture->source_height * scale,
-                };
-                SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
-            }
-        };
-
-        if (visible.cell_count() < sidewalks.tiles().size()) {
-            for (int y = visible.min_y; y <= visible.max_y; ++y) {
-                for (int x = visible.min_x; x <= visible.max_x; ++x) {
-                    if (const SidewalkTile* tile = sidewalks.tile_at(x, y)) render_tile(*tile);
-                }
-            }
-        } else {
-            for (const SidewalkTile& tile : sidewalks.tiles()) {
-                if (visible.contains(tile.tile_x, tile.tile_y)) render_tile(tile);
-            }
-        }
-    }
-
-    static void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming,
-                               const CropCatalog& crops,
-                               const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
-                               const std::filesystem::path& root, const CameraState& camera,
-                               const float viewport_width, const float viewport_height) {
-        (void)crops;
-        (void)find_texture;
-        (void)root;
-        if (renderer == nullptr || farming.tiles().empty()) return;
-
-        const runtime_render_detail::TileCullBounds visible =
-            runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
-        if (!visible.valid) return;
-
-        const auto soil_color = [](const float world_x, const float world_y) -> SDL_FColor {
-            const float broad = std::sin(world_x * 0.52F + world_y * 0.38F) * 0.022F;
-            const float cross = std::sin(world_x * 1.27F - world_y * 0.73F + 0.8F) * 0.012F;
-            const float warm = std::sin(world_x * 0.31F + world_y * 0.91F + 1.7F) * 0.009F;
-            const float shade = broad + cross;
-            return {
-                std::clamp(118.0F / 255.0F + shade + warm, 0.0F, 1.0F),
-                std::clamp(78.0F / 255.0F + shade * 0.76F + warm * 0.30F, 0.0F, 1.0F),
-                std::clamp(45.0F / 255.0F + shade * 0.52F, 0.0F, 1.0F),
-                1.0F,
-            };
-        };
-
-        for (int y = visible.min_y; y <= visible.max_y; ++y) {
-            for (int x = visible.min_x; x <= visible.max_x; ++x) {
-                if (farming.tile_at(x, y) == nullptr) continue;
-                const ScreenPoint top = world_to_screen_point(static_cast<float>(x), static_cast<float>(y),
-                                                              camera, viewport_width, viewport_height);
-                const ScreenPoint right = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y),
-                                                                camera, viewport_width, viewport_height);
-                const ScreenPoint bottom = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1),
-                                                                 camera, viewport_width, viewport_height);
-                const ScreenPoint left = world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1),
-                                                               camera, viewport_width, viewport_height);
-                SDL_Vertex vertices[4] = {};
-                vertices[0].position = {top.x, top.y};
-                vertices[1].position = {right.x, right.y};
-                vertices[2].position = {bottom.x, bottom.y};
-                vertices[3].position = {left.x, left.y};
-                vertices[0].color = soil_color(static_cast<float>(x), static_cast<float>(y));
-                vertices[1].color = soil_color(static_cast<float>(x + 1), static_cast<float>(y));
-                vertices[2].color = soil_color(static_cast<float>(x + 1), static_cast<float>(y + 1));
-                vertices[3].color = soil_color(static_cast<float>(x), static_cast<float>(y + 1));
-                const int indices[] = {0, 1, 2, 0, 2, 3};
-                (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
-            }
-        }
-
-        constexpr std::array<float, 5> kFurrowOffsets = {0.10F, 0.30F, 0.50F, 0.70F, 0.90F};
-        constexpr float kHighlightOffset = 0.025F;
-        for (int y = visible.min_y; y <= visible.max_y; ++y) {
-            int x = visible.min_x;
-            while (x <= visible.max_x) {
-                while (x <= visible.max_x && !farming.is_occupied(x, y)) ++x;
-                if (x > visible.max_x) break;
-                const int run_start_x = x;
-                while (x <= visible.max_x && farming.is_occupied(x, y)) ++x;
-                const int run_end_x = x - 1;
-
-                for (const float offset : kFurrowOffsets) {
-                    const ScreenPoint highlight_start = world_to_screen_point(
-                        static_cast<float>(run_start_x), static_cast<float>(y) + offset - kHighlightOffset,
-                        camera, viewport_width, viewport_height);
-                    const ScreenPoint highlight_end = world_to_screen_point(
-                        static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset - kHighlightOffset,
-                        camera, viewport_width, viewport_height);
-                    SDL_SetRenderDrawColor(renderer, 154, 108, 68, 88);
-                    SDL_RenderLine(renderer, highlight_start.x, highlight_start.y,
-                                   highlight_end.x, highlight_end.y);
-
-                    const ScreenPoint shadow_start = world_to_screen_point(
-                        static_cast<float>(run_start_x), static_cast<float>(y) + offset,
-                        camera, viewport_width, viewport_height);
-                    const ScreenPoint shadow_end = world_to_screen_point(
-                        static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset,
-                        camera, viewport_width, viewport_height);
-                    SDL_SetRenderDrawColor(renderer, 78, 47, 29, 188);
-                    SDL_RenderLine(renderer, shadow_start.x, shadow_start.y,
-                                   shadow_end.x, shadow_end.y);
-                }
-            }
-        }
-    }
-
-    static void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming,
-                               const CropCatalog& crops,
-                               const std::unordered_map<std::string, TextureAsset>& texture_lookup,
-                               const std::filesystem::path& root, const CameraState& camera,
-                               const float viewport_width, const float viewport_height) {
-        RuntimeMapRenderer::render_farming(
-            renderer, farming, crops,
-            [&texture_lookup](const std::filesystem::path& path) -> const TextureAsset* {
-                const auto found = texture_lookup.find(path.generic_string());
-                return found == texture_lookup.end() ? nullptr : &found->second;
-            },
-            root, camera, viewport_width, viewport_height);
-    }
-
-    static void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager,
-                                 const BuildingCatalog& catalog, const LandManager& lands,
-                                 const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
-                                 const std::filesystem::path& asset_root, const CameraState& camera,
-                                 const float viewport_width, const float viewport_height) {
-        struct VisibleBuilding {
-            const BuildingInstance* instance = nullptr;
-            const BuildingDefinition* definition = nullptr;
-            const TextureAsset* texture = nullptr;
-            BuildingRotation visual_rotation = BuildingRotation::r0;
-            BuildingSpriteGeometry geometry{};
-            float depth = 0.0F;
-        };
-
-        std::vector<VisibleBuilding> visible_instances;
-        visible_instances.reserve(manager.instances().size());
-        for (const BuildingInstance& instance : manager.instances()) {
-            const BuildingDefinition* definition = catalog.find(instance.definition_id);
-            if (definition == nullptr) continue;
-            const BuildingRotation visual_rotation = runtime_render_detail::camera_visual_rotation(
-                *definition, instance.rotation, camera.rotation);
-            const TextureAsset* texture = find_texture(
-                asset_root / definition->texture_path_for(visual_rotation, instance.current_level));
-            if (texture == nullptr || texture->texture == nullptr) continue;
-
-            const BuildingSpriteGeometry geometry = MapRenderer::building_sprite_geometry(
-                *definition, instance, visual_rotation, texture->source_width, texture->source_height,
-                camera, viewport_width, viewport_height);
-            if (!runtime_render_detail::rect_visible(geometry.sprite_bounds, viewport_width, viewport_height)) {
-                continue;
-            }
-            visible_instances.push_back({
-                &instance,
-                definition,
-                texture,
-                visual_rotation,
-                geometry,
-                camera_depth_key(geometry.ground_world.x, geometry.ground_world.y, camera),
-            });
-        }
-
-        std::sort(visible_instances.begin(), visible_instances.end(), [](const VisibleBuilding& left,
-                                                                        const VisibleBuilding& right) {
-            if (left.depth != right.depth) return left.depth < right.depth;
-            return left.instance->instance_id < right.instance->instance_id;
-        });
-
-        for (const VisibleBuilding& entry : visible_instances) {
-            const BuildingInstance& instance = *entry.instance;
-            const BuildingDefinition& definition = *entry.definition;
-            const bool is_owned = lands.is_tile_owned(instance.tile_x, instance.tile_y);
-            const Uint8 red = is_owned ? 255 : 140;
-            const Uint8 green = is_owned ? 255 : 145;
-            const Uint8 blue = is_owned ? 255 : 155;
-            MapRenderer::render_building(renderer, definition, instance, entry.visual_rotation,
-                entry.texture->texture, entry.texture->source_width, entry.texture->source_height,
-                camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, red, green, blue);
-
-            if (!instance.activity_active() || !definition.activity_overlay.has_value() ||
-                !definition.activity_overlay->enabled) {
-                continue;
-            }
-            const BuildingActivityOverlayDefinition& activity = *definition.activity_overlay;
-            const std::size_t rotation_index = static_cast<std::size_t>(entry.visual_rotation);
-            if (rotation_index >= activity.sprite_paths.size() || activity.sprite_paths[rotation_index].empty()) {
-                continue;
-            }
-            const TextureAsset* overlay_texture = find_texture(asset_root / activity.sprite_paths[rotation_index]);
-            if (overlay_texture == nullptr || overlay_texture->texture == nullptr) continue;
-
-            SDL_Texture* overlay = overlay_texture->texture;
-            SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
-            SDL_SetTextureColorMod(overlay, 255, 255, 255);
-
-            if (activity.animation.has_value() && activity.animation->frame_count > 1) {
-                const BuildingAnimationDefinition& animation = *activity.animation;
-                const int frame_count = std::max(1, animation.frame_count);
-                const int duration_ms = std::max(1, animation.frame_duration_ms);
-                int frame_index = 0;
-
-                if (animation.playback == "ambient_once") {
-                    const int idle_frame = std::clamp(animation.idle_frame, 0, frame_count - 1);
-                    const int action_start = std::clamp(animation.action_start_frame, 0, frame_count - 1);
-                    const int action_count = std::clamp(animation.action_frame_count, 0, frame_count - action_start);
-                    frame_index = idle_frame;
-                    if (action_count > 0) {
-                        const std::uint64_t idle_hold_ms = static_cast<std::uint64_t>(
-                            std::max(0, animation.idle_hold_ms));
-                        const std::uint64_t action_duration_ms =
-                            static_cast<std::uint64_t>(action_count) * static_cast<std::uint64_t>(duration_ms);
-                        const std::uint64_t cycle_duration_ms = idle_hold_ms + action_duration_ms;
-                        const std::uint64_t phase_ms = cycle_duration_ms > 0
-                            ? (static_cast<std::uint64_t>(SDL_GetTicks()) + instance.instance_id * 977ULL) % cycle_duration_ms
-                            : 0;
-                        if (phase_ms >= idle_hold_ms && action_duration_ms > 0) {
-                            frame_index = action_start + std::min(
-                                action_count - 1,
-                                static_cast<int>((phase_ms - idle_hold_ms) /
-                                                 static_cast<std::uint64_t>(duration_ms)));
-                        }
-                    }
-                } else {
-                    frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
-                }
-
-                const float frame_width = overlay_texture->source_width / static_cast<float>(frame_count);
-                const SDL_FRect source = {
-                    frame_width * frame_index,
-                    0.0F,
-                    frame_width,
-                    overlay_texture->source_height,
-                };
-                SDL_RenderTexture(renderer, overlay, &source, &entry.geometry.sprite_bounds);
-            } else {
-                SDL_RenderTexture(renderer, overlay, nullptr, &entry.geometry.sprite_bounds);
-            }
-
-            SDL_SetTextureColorMod(overlay, 255, 255, 255);
-            SDL_SetTextureAlphaMod(overlay, SDL_ALPHA_OPAQUE);
         }
     }
 };
