@@ -21,14 +21,30 @@ jobs:
       - name: Install exactly the placement that passed V2 proof
         run: |
           set -euo pipefail
-          python3 tools/animation_preview/patch_coaster_camera_parity_v1.py
-          git diff --check -- C++/MapForge2/src/coaster_project_video_main.cpp
-          if git diff --quiet -- C++/MapForge2/src/coaster_project_video_main.cpp; then
-            echo 'Verified placement is already promoted.'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add C++/MapForge2/src/coaster_project_video_main.cpp
-          git commit -m 'coaster: align Flame V2 rail anchor with CH_CAMERA_V1'
-          git push origin HEAD:main
+
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            python3 tools/animation_preview/patch_coaster_camera_parity_v1.py
+            git diff --check -- C++/MapForge2/src/coaster_project_video_main.cpp
+
+            if git diff --quiet -- C++/MapForge2/src/coaster_project_video_main.cpp; then
+              echo 'Verified placement is already promoted.'
+              exit 0
+            fi
+
+            git add C++/MapForge2/src/coaster_project_video_main.cpp
+            git commit -m 'coaster: align Flame V2 rail anchor with CH_CAMERA_V1'
+
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "Concurrent main update detected; retrying verified placement promotion ($attempt/4)."
+          done
+
+          echo 'Unable to promote verified V2 placement after 4 concurrent-update retries.' >&2
+          exit 1
