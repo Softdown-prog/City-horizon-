@@ -5,7 +5,8 @@
   "script": "tools/ch_blender/rail_worker_task.py",
   "args": [
     "--task", "validate",
-    "--output", "out/ch_blender_agent/rail.classic.v2.04.continuity_validation"
+    "--output", "out/ch_blender_agent/rail.classic.v2.04.continuity_validation",
+    "--revision", "2"
   ],
   "outputDir": "out/ch_blender_agent/rail.classic.v2.04.continuity_validation",
   "expectedOutputs": [

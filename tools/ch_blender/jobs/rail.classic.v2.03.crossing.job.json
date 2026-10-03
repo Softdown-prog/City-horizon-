@@ -5,7 +5,8 @@
   "script": "tools/ch_blender/rail_worker_task.py",
   "args": [
     "--task", "crossing",
-    "--output", "out/ch_blender_agent/rail.classic.v2.03.crossing"
+    "--output", "out/ch_blender_agent/rail.classic.v2.03.crossing",
+    "--revision", "2"
   ],
   "outputDir": "out/ch_blender_agent/rail.classic.v2.03.crossing",
   "expectedOutputs": [
