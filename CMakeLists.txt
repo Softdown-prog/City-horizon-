@@ -213,6 +213,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/sidewalk_system.cpp
         src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
@@ -344,6 +345,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/sidewalk_system.cpp
         src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
@@ -392,6 +394,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/sidewalk_system.cpp
         src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
@@ -414,6 +417,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/sidewalk_system.cpp
         src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
@@ -437,6 +441,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/sidewalk_system.cpp
         src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
