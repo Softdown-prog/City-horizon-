@@ -1,6 +1,6 @@
 {
   "contract": "CH_COASTER_VIDEO_PROOF_V1",
-  "id": "coaster.flame.train_4car.mapforge.v1",
+  "id": "coaster.flame.train_4car.mapforge.v2",
   "reviewOnly": true,
   "trackContract": "CH_COASTER_TRACK_V1",
   "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V1",
@@ -11,7 +11,17 @@
   "carCount": 4,
   "carSpacingMeters": 2.445,
   "fps": 30,
-  "durationSeconds": 8,
-  "frameCount": 240,
-  "purpose": "Validate the promoted depth-correct occupied Flame atlas on a closed MapForge coaster route with straight, curve, lift, crest and descent sections."
+  "durationSeconds": 12,
+  "frameCount": 360,
+  "layout": {
+    "station": true,
+    "liftHill": true,
+    "firstDrop": true,
+    "camelback": true,
+    "elevatedTurn": true,
+    "secondDrop": true,
+    "brakeRun": true,
+    "supports": true
+  },
+  "purpose": "Validate the promoted depth-correct Flame atlas on a full park-coaster silhouette with a visible lift hill, first drop, camelback, elevated turnaround, second descent, sweeping return and station."
 }
