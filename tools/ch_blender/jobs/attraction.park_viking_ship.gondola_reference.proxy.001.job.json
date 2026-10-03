@@ -1,0 +1,34 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_viking_ship.gondola_reference.proxy.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_swinging_ship_gondola_reference.py",
+  "qualityStage": "proxy",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
+  "assetRequirements": {
+    "contract": "CH_ASSET_REQUIREMENTS_V1",
+    "assetId": "attraction.park_viking_ship.gondola.study",
+    "footprint": {"widthTiles": 7, "depthTiles": 3},
+    "requiredRoles": ["attraction.gondola"],
+    "minDimensions": [19.0, 5.0, 5.0],
+    "maxDimensions": [23.0, 9.0, 11.0]
+  },
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/swinging_ship_gondola_reference.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_large_ride_1k.json",
+    "--output",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k",
+    "--save-blend",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/swinging_ship_gondola_reference.blend"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k",
+  "expectedOutputs": [
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/preflight_report.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/proxy_south.png",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/proxy_report.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/studio_metadata.json",
+    "out/ch_blender_agent/attraction.park_viking_ship.gondola_reference_001_1k/swinging_ship_gondola_reference.blend"
+  ]
+}
