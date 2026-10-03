@@ -10,13 +10,14 @@
 
 namespace ch::coaster {
 
-// CH_COASTER_TRAIN_RUNTIME_V1
+// CH_COASTER_TRAIN_RUNTIME_V2
 //
 // Runtime bridge between the logical CH_COASTER_TRACK_V1 centerline, the
-// CH_COASTER_PHYSICS_V1 longitudinal solver, and the 40-frame Flame car atlas.
-// The moving train is articulated: every car samples the route independently
-// at its own distance offset. The whole-train four-direction PNGs are not used
-// while the train is moving through curves/slopes.
+// CH_COASTER_PHYSICS_V1 longitudinal solver, and the Flame car sprite atlas.
+// V2 preserves the full local track frame (forward/right/up + roll), allowing
+// inversions to be represented without pretending that heading+pitch alone are
+// sufficient. The current 40-frame atlas remains a compatibility fallback until
+// CH_COASTER_CAR_ATLAS_RUNTIME_V2 is baked.
 inline constexpr int kCoasterTrainCarCount = 4;
 inline constexpr double kFlameCarCenterSpacingM = 2.445;
 
@@ -28,6 +29,13 @@ struct CenterlineSample {
     double tangent_x = 0.0;
     double tangent_y = 1.0;
     double tangent_z = 0.0;
+    double right_x = 1.0;
+    double right_y = 0.0;
+    double right_z = 0.0;
+    double up_x = 0.0;
+    double up_y = 0.0;
+    double up_z = 1.0;
+    double roll_degrees = 0.0;
     double horizontal_curvature_per_m = 0.0;
     double vertical_curvature_per_m = 0.0;
     DriveMode drive_mode = DriveMode::Free;
@@ -50,6 +58,13 @@ struct CarRuntimePose {
     double tangent_x = 0.0;
     double tangent_y = 1.0;
     double tangent_z = 0.0;
+    double right_x = 1.0;
+    double right_y = 0.0;
+    double right_z = 0.0;
+    double up_x = 0.0;
+    double up_y = 0.0;
+    double up_z = 1.0;
+    double roll_degrees = 0.0;
     CarPoseSelection sprite_pose{};
     ForceSample forces{};
 };
@@ -120,8 +135,6 @@ struct TrainStepResult {
             target_selected = sample.target_speed_mps >= 0.0;
         } else if (priority == selected_priority && priority > 0 &&
                    sample.drive_mode == aggregate.drive_mode && sample.target_speed_mps >= 0.0) {
-            // For brakes/station the lower target is safest. For lift sections,
-            // keep a deterministic common target if adjacent samples differ.
             if (!target_selected) {
                 aggregate.target_speed_mps = sample.target_speed_mps;
                 target_selected = true;
@@ -171,10 +184,20 @@ template <typename CenterlineSampler>
     result.tangent_x = sample.tangent_x;
     result.tangent_y = sample.tangent_y;
     result.tangent_z = sample.tangent_z;
-    result.sprite_pose = select_car_pose_from_tangent(
+    result.right_x = sample.right_x;
+    result.right_y = sample.right_y;
+    result.right_z = sample.right_z;
+    result.up_x = sample.up_x;
+    result.up_y = sample.up_y;
+    result.up_z = sample.up_z;
+    result.roll_degrees = sample.roll_degrees;
+    result.sprite_pose = select_car_pose_from_frame(
         sample.tangent_x,
         sample.tangent_y,
         sample.tangent_z,
+        sample.up_x,
+        sample.up_y,
+        sample.up_z,
         camera_quarter_turns);
 
     TrackSample track;
@@ -208,8 +231,6 @@ template <typename CenterlineSampler>
 
     MotionState physics_state = current.lead;
     physics_state.distance_m = current_distance;
-    // The centerline is authoritative for world height. Using the lead-car
-    // height here keeps energy telemetry coherent after route wrap/clamp.
     physics_state.height_m = before[0].z;
 
     result.physics = step(physics_state, aggregate_track, dt_seconds, config.physics);
