@@ -1,0 +1,75 @@
+name: CH Track Topology Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/track_piece_descriptor.h"
+      - "src/track_graph.h"
+      - "src/coaster_track_graph_adapter.h"
+      - "src/track_graph_test.cpp"
+      - "src/coaster_centerline_route.h"
+      - "src/coaster_train_runtime.h"
+      - "src/coaster_physics.h"
+      - ".github/workflows/ch-track-topology-check.yml"
+  pull_request:
+    paths:
+      - "src/track_piece_descriptor.h"
+      - "src/track_graph.h"
+      - "src/coaster_track_graph_adapter.h"
+      - "src/track_graph_test.cpp"
+      - "src/coaster_centerline_route.h"
+      - "src/coaster_train_runtime.h"
+      - "src/coaster_physics.h"
+      - ".github/workflows/ch-track-topology-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-track-topology-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  track-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile shared track topology regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -I. -Isrc \
+            src/track_graph_test.cpp \
+            -o /tmp/ch_track_graph_test
+
+      - name: Run topology, switch and route compiler tests
+        shell: bash
+        run: /tmp/ch_track_graph_test
+
+      - name: Guard clean-room boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path("src/track_piece_descriptor.h"),
+              Path("src/track_graph.h"),
+              Path("src/coaster_track_graph_adapter.h"),
+              Path("src/track_graph_test.cpp"),
+          ]
+          forbidden = ("OpenRCT2", "TrackElementDescriptor", "TrackCircuitIterator")
+          for path in files:
+              text = path.read_text(encoding="utf-8")
+              found = [token for token in forbidden if token in text]
+              if found:
+                  raise SystemExit(f"clean-room boundary failed in {path}: {found}")
+          print("CH track topology clean-room boundary: OK")
+          PY
