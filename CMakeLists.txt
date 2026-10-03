@@ -456,6 +456,7 @@ if(BUILD_TESTING)
         src/ui_manager_test.cpp
         src/ui_manager.cpp
     )
+    target_include_directories(ui_manager_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(ui_manager_test PRIVATE SDL3::SDL3)
     add_test(
         NAME ui_manager_test
