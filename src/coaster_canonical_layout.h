@@ -10,20 +10,19 @@ namespace ch::coaster {
 
 // CH_COASTER_CANONICAL_LAYOUT_V1
 //
-// A deterministic, reusable assembly of the modular coaster vocabulary authored
-// for City Horizon.  The video proof and future runtime validation must consume
-// this route instead of inventing private point lists.
+// Deterministic assembly of the modular coaster vocabulary authored for
+// City Horizon. Video/runtime validation must consume this route instead of
+// inventing private point lists.
 //
-// Geometry constants intentionally mirror the approved authoring builders:
+// Geometry constants mirror the approved authoring builders:
 //   build_coaster_track_guarded.py  -> TILE=3.0, HEIGHT_STEP=0.75
 //   build_coaster_loop_guarded.py   -> LOOP_RADIUS=TILE*1.35
 //   build_coaster_helix_guarded.py  -> HELIX_RADIUS=TILE*1.5,
 //                                       HELIX_RISE=HEIGHT_STEP*1.5
 //
 // Roll-only information (bank/corkscrew orientation) is not encoded in
-// CH_COASTER_CENTERLINE_ROUTE_V1 yet, so this V1 layout uses the approved
-// centerline-compatible straight/slope/curve/vertical-loop/helix vocabulary.
-// Corkscrew roll is deliberately not faked as heading/pitch data.
+// CH_COASTER_CENTERLINE_ROUTE_V1 yet. Corkscrew roll is deliberately not
+// faked as heading/pitch data.
 
 inline constexpr double kCoasterAuthoringTileM = 3.0;
 inline constexpr double kCoasterHeightStepM = 0.75;
@@ -209,21 +208,23 @@ inline void append_ascending_helix(std::vector<RoutePoint>& out,
     append_vertical_loop(points, cursor);
     append_straight(points, cursor, 5.0, 0.0, DriveMode::Free, -1.0);
 
-    // Back section and the approved one-turn ascending helix vocabulary.
+    // Back section and approved one-turn ascending helix vocabulary.
     append_quarter_curve(points, cursor, 8.0, true);
     append_straight(points, cursor, 20.0, 0.0, DriveMode::Free, -1.0);
     append_ascending_helix(points, cursor, true);
     append_straight(points, cursor, 8.0, -kCanonicalHelixRiseM, DriveMode::Free, -1.0);
 
-    // Return and brake run. The final point intentionally stops one metre before
-    // the first station point so CenterlineRoute's closing segment has non-zero
-    // length and keeps the same +X travel direction through the seam.
+    // Continuous return to the station. The geometry deliberately arrives on
+    // the same y coordinate and +X tangent as the station seam; the remaining
+    // one-metre closing segment is therefore a normal piece of straight track,
+    // not the diagonal shortcut that the first canonical proof accidentally made.
     append_quarter_curve(points, cursor, 8.0, true);
-    append_straight(points, cursor, 33.0, 0.0, DriveMode::Free, -1.0);
-    append_quarter_curve(points, cursor, 6.0, false);
-    append_quarter_curve(points, cursor, 4.0, true);
-    append_quarter_curve(points, cursor, 4.0, true);
-    append_straight(points, cursor, 1.0, 0.0, DriveMode::Brake, 5.0);
+    append_straight(points, cursor, 30.0, 0.0, DriveMode::Free, -1.0);
+    append_quarter_curve(points, cursor, 8.0, false);
+    append_straight(points, cursor, 8.0, 0.0, DriveMode::Brake, 7.0);
+    append_quarter_curve(points, cursor, 2.0, true, DriveMode::Brake, 6.0);
+    append_quarter_curve(points, cursor, 2.0, true, DriveMode::Brake, 5.0);
+    append_straight(points, cursor, 3.0, 0.0, DriveMode::Station, 4.5);
 
     return points;
 }
