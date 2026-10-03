@@ -1,5 +1,7 @@
 from pathlib import Path
 
+# Verification trigger only: keep the regressor-approved CH_CAMERA_V1 constants
+# frozen while the full-lap proof validates the newly wired V2 pose continuity.
 PATH = Path("C++/MapForge2/src/coaster_project_video_main.cpp")
 text = PATH.read_text(encoding="utf-8")
 
