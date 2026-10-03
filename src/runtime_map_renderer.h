@@ -497,7 +497,8 @@ public:
     static void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks,
                                  const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
                                  const std::filesystem::path& asset_root, const CameraState& camera,
-                                 const float viewport_width, const float viewport_height) {
+                                 const float viewport_width, const float viewport_height,
+                                 const MapDocument* document = nullptr) {
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
         if (!visible.valid || sidewalks.tiles().empty()) return;
@@ -507,17 +508,23 @@ public:
                 tile.connections, camera.rotation);
             if (const TextureAsset* texture = find_texture(
                     asset_root / runtime_render_detail::sidewalk_sprite(tile.style_id, connections))) {
-                const WorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
-                const ScreenPoint top = world_to_screen_point(visual_top.x, visual_top.y, camera,
-                                                              viewport_width, viewport_height);
-                const float scale = (static_cast<float>(contracts::kTileWidth) / texture->source_width) * camera.zoom;
-                const SDL_FRect destination = {
-                    top.x - texture->source_width * scale * 0.5F,
-                    top.y,
-                    texture->source_width * scale,
-                    texture->source_height * scale,
-                };
-                SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
+                if (document != nullptr) {
+                    MapRenderer::render_heightfield_terrain_tile(
+                        renderer, *texture, tile.tile_x, tile.tile_y, *document,
+                        camera, viewport_width, viewport_height, false);
+                } else {
+                    const WorldPoint visual_top = tile_visual_top_world(tile.tile_x, tile.tile_y, camera.rotation);
+                    const ScreenPoint top = world_to_screen_point(visual_top.x, visual_top.y, camera,
+                                                                  viewport_width, viewport_height);
+                    const float scale = (static_cast<float>(contracts::kTileWidth) / texture->source_width) * camera.zoom;
+                    const SDL_FRect destination = {
+                        top.x - texture->source_width * scale * 0.5F,
+                        top.y,
+                        texture->source_width * scale,
+                        texture->source_height * scale,
+                    };
+                    SDL_RenderTexture(renderer, texture->texture, nullptr, &destination);
+                }
             }
         };
 
