@@ -20,7 +20,7 @@ on:
       - "tools/ch_blender/jobs/*.job.json"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   run-agent-jobs:
@@ -173,27 +173,6 @@ jobs:
             --workers "$CH_BLENDER_POOL_SIZE" \
             --reports-dir out/ch_blender_agent/reports \
             --report out/ch_blender_agent/pool_report.json
-
-      - name: Commit guarded runtime track promotion
-        if: steps.jobs.outputs.has-jobs == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- src/main_runtime_impl.cpp .github/workflows/ch-coaster-runtime-check.yml; then
-            exit 0
-          fi
-          if ! grep -qx 'tools/ch_blender/jobs/coaster.runtime.track.promote.job.json' "${{ steps.jobs.outputs.jobs-file }}"; then
-            echo 'Runtime files changed without the guarded promotion job.' >&2
-            git diff -- src/main_runtime_impl.cpp .github/workflows/ch-coaster-runtime-check.yml
-            exit 1
-          fi
-          git diff --check
-          git restore -- .github/workflows/ch-coaster-runtime-check.yml
-          git config user.name 'Softdown-prog'
-          git config user.email 'rutsdrigo@gmail.com'
-          git add src/main_runtime_impl.cpp
-          git commit -m 'coaster: promote native track geometry to runtime preview'
-          git push origin HEAD:main
 
       - name: Build animation preview GIFs
         if: steps.jobs.outputs.has-jobs == 'true'
