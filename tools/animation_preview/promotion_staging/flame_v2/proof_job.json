@@ -1,0 +1,24 @@
+{
+  "contract": "CH_COASTER_VIDEO_PROOF_V1",
+  "id": "coaster.flame.train_4car.mapforge.project.v2",
+  "reviewOnly": true,
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
+  "mapForgeProjectContract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
+  "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+  "project": "C++/MapForge2/projects/coaster_flame_01.mapforge.json",
+  "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png",
+  "atlasManifest": "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json",
+  "carCount": 4,
+  "carSpacingMeters": 2.445,
+  "fps": 30,
+  "durationSeconds": 12,
+  "frameCount": 360,
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "extendedPoseRequiredSectionsDeferred": false,
+    "combinedPitchRollModulesDeferred": true
+  },
+  "purpose": "Render the actual MapForge coaster project with four articulated occupied Flame cars using the approved 192-frame CH_COASTER_CAR_ATLAS_RUNTIME_V2. The capture must fail instead of silently falling back when a route orientation is outside the promoted V2 pose coverage."
+}
