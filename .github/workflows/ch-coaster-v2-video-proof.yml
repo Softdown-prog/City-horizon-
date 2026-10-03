@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ch-coaster-v2-video-proof.yml'
+      - 'tools/animation_preview/patch_coaster_camera_parity_v1.py'
 
 permissions:
   contents: read
@@ -144,6 +145,7 @@ jobs:
             "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
             "cameraContract": "CH_CAMERA_V1",
             "cameraParityProofPatch": true,
+            "physicalRailAnchorProof": true,
             "frameCount": 360,
             "fps": 30,
             "durationSeconds": 12,
