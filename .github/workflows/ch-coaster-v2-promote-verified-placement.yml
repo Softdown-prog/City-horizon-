@@ -1,0 +1,34 @@
+name: CH Coaster V2 Promote Verified Placement
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-coaster-v2-promote-verified-placement.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install exactly the placement that passed V2 proof
+        run: |
+          set -euo pipefail
+          python3 tools/animation_preview/patch_coaster_camera_parity_v1.py
+          git diff --check -- C++/MapForge2/src/coaster_project_video_main.cpp
+          if git diff --quiet -- C++/MapForge2/src/coaster_project_video_main.cpp; then
+            echo 'Verified placement is already promoted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add C++/MapForge2/src/coaster_project_video_main.cpp
+          git commit -m 'coaster: align Flame V2 rail anchor with CH_CAMERA_V1'
+          git push origin HEAD:main
