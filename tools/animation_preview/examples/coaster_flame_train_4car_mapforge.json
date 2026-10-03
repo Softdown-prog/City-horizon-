@@ -15,6 +15,7 @@
   "fps": 30,
   "durationSeconds": 12,
   "frameCount": 360,
+  "captureRequest": "v2-runtime-proof-2026-10-03-01",
   "capturePolicy": {
     "runtimeValidOnly": true,
     "extendedPoseRequiredSectionsDeferred": false,
