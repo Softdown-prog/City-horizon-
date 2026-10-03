@@ -7,25 +7,41 @@
 
 namespace ch::coaster {
 
-// CH_COASTER_CAR_ATLAS_RUNTIME_V2 bridge.
+// CH_COASTER_CAR_ATLAS_RUNTIME_V2
 //
-// The shipping atlas is still the approved 40-frame V1 texture. V2 adds the
-// orientation contract required by loops/banked curves/corkscrews: heading,
-// pitch and roll derived from a full local track frame. Until a V2 atlas is
-// baked, atlas_index/source_rect remain V1-compatible and
-// requires_extended_orientation tells callers when the fallback is visually
-// insufficient.
+// The occupied Flame atlas is baked from one CH Blender source with the same
+// rail anchor for all 192 frames. Ordinary slopes exist in every one of the 16
+// headings; vertical, banked and inverted supplements use the same heading
+// grid. The selector therefore never cardinal-snaps a sloped car.
+inline constexpr char kCoasterCarAtlasContract[] = "CH_COASTER_CAR_ATLAS_RUNTIME_V2";
+inline constexpr char kCoasterCarOrientationContract[] = "CH_COASTER_CAR_ORIENTATION_V2";
 inline constexpr int kCarPoseHeadingCount = 16;
 inline constexpr double kCarPoseHeadingStepDegrees = 22.5;
-inline constexpr int kCarPoseFrameCount = 40;
-inline constexpr int kCarPoseAtlasColumns = 8;
-inline constexpr int kCarPoseAtlasRows = 5;
+inline constexpr std::array<double, 7> kCarPosePitchBinsDegrees = {
+    -46.0, -30.0, -14.0, 0.0, 14.0, 30.0, 46.0,
+};
+inline constexpr std::array<double, 2> kCarPoseVerticalPitchBinsDegrees = {-90.0, 90.0};
+inline constexpr std::array<double, 2> kCarPoseBankRollBinsDegrees = {-24.0, 24.0};
+inline constexpr double kCarPoseInvertedRollDegrees = 180.0;
+inline constexpr int kCarPoseNormalFrameCount = 7 * kCarPoseHeadingCount;
+inline constexpr int kCarPoseVerticalFrameBase = kCarPoseNormalFrameCount;
+inline constexpr int kCarPoseVerticalFrameCount = 2 * kCarPoseHeadingCount;
+inline constexpr int kCarPoseBankFrameBase = kCarPoseVerticalFrameBase + kCarPoseVerticalFrameCount;
+inline constexpr int kCarPoseBankFrameCount = 2 * kCarPoseHeadingCount;
+inline constexpr int kCarPoseInvertedFrameBase = kCarPoseBankFrameBase + kCarPoseBankFrameCount;
+inline constexpr int kCarPoseInvertedFrameCount = kCarPoseHeadingCount;
+inline constexpr int kCarPoseFrameCount = 192;
+inline constexpr int kCarPoseAtlasColumns = 16;
+inline constexpr int kCarPoseAtlasRows = 12;
 inline constexpr int kCarPoseFrameWidth = 256;
 inline constexpr int kCarPoseFrameHeight = 256;
 inline constexpr const char* kFlameCarPoseAtlasPath =
-    "assets/vehicles/coaster_flame_01/car_pose_atlas.png";
+    "assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png";
 inline constexpr const char* kFlameCarPoseAtlasManifestPath =
-    "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json";
+    "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json";
+
+static_assert(kCarPoseInvertedFrameBase + kCarPoseInvertedFrameCount == kCarPoseFrameCount);
+static_assert(kCarPoseAtlasColumns * kCarPoseAtlasRows == kCarPoseFrameCount);
 
 struct CarPoseSourceRect {
     int x = 0;
@@ -48,6 +64,7 @@ struct CarPoseSelection {
     bool snapped_to_cardinal_heading = false;
     bool requires_extended_orientation = false;
     CarPoseSourceRect source_rect{};
+    double snapped_roll_degrees = 0.0;
 };
 
 [[nodiscard]] inline double normalize_degrees(double degrees) noexcept {
@@ -61,6 +78,11 @@ struct CarPoseSelection {
     degrees = normalize_degrees(degrees);
     if (degrees > 180.0) degrees -= 360.0;
     return degrees;
+}
+
+[[nodiscard]] inline double angular_distance_degrees(const double a,
+                                                     const double b) noexcept {
+    return std::abs(signed_degrees(a - b));
 }
 
 [[nodiscard]] inline int normalize_heading_index(int index) noexcept {
@@ -118,10 +140,6 @@ struct CarPoseSelection {
     const double uy = up_y / up_len;
     const double uz = up_z / up_len;
 
-    // Build the zero-roll reference by projecting world +Z onto the plane
-    // perpendicular to forward. Near vertical tangents, world +X is the stable
-    // alternate reference. This is only a measurement frame; the transported
-    // track up vector remains authoritative.
     double rx = 0.0;
     double ry = 0.0;
     double rz = 1.0;
@@ -141,7 +159,6 @@ struct CarPoseSelection {
     if (!(rlen > 1.0e-9)) return 0.0;
     rx /= rlen; ry /= rlen; rz /= rlen;
 
-    // right_ref = forward x up_ref.
     const double qx = ty * rz - tz * ry;
     const double qy = tz * rx - tx * rz;
     const double qz = tx * ry - ty * rx;
@@ -150,28 +167,19 @@ struct CarPoseSelection {
     return signed_degrees(std::atan2(sin_roll, cos_roll) * kRadiansToDegrees);
 }
 
-[[nodiscard]] inline int nearest_vertical_pitch_bin(const double pitch_degrees) noexcept {
-    static constexpr std::array<double, 6> kPitchBins = {
-        -46.0, -30.0, -14.0, 14.0, 30.0, 46.0,
-    };
+template <std::size_t N>
+[[nodiscard]] inline int nearest_linear_bin(const double value,
+                                            const std::array<double, N>& bins) noexcept {
     int best = 0;
-    double best_distance = std::abs(pitch_degrees - kPitchBins[0]);
-    for (int i = 1; i < static_cast<int>(kPitchBins.size()); ++i) {
-        const double distance = std::abs(pitch_degrees - kPitchBins[static_cast<std::size_t>(i)]);
+    double best_distance = std::abs(value - bins[0]);
+    for (int i = 1; i < static_cast<int>(N); ++i) {
+        const double distance = std::abs(value - bins[static_cast<std::size_t>(i)]);
         if (distance < best_distance) {
             best = i;
             best_distance = distance;
         }
     }
     return best;
-}
-
-[[nodiscard]] inline double vertical_pitch_bin_degrees(const int bin) noexcept {
-    static constexpr std::array<double, 6> kPitchBins = {
-        -46.0, -30.0, -14.0, 14.0, 30.0, 46.0,
-    };
-    const int clamped = std::clamp(bin, 0, static_cast<int>(kPitchBins.size()) - 1);
-    return kPitchBins[static_cast<std::size_t>(clamped)];
 }
 
 [[nodiscard]] inline CarPoseSourceRect source_rect_for_car_pose(const int atlas_index) noexcept {
@@ -186,37 +194,72 @@ struct CarPoseSelection {
     };
 }
 
-[[nodiscard]] inline CarPoseSelection select_car_pose(const double authored_heading_degrees,
-                                                      const double pitch_degrees,
-                                                      const int camera_quarter_turns = 0) noexcept {
+struct CarPoseCandidate {
+    int atlas_index = 0;
+    double pitch_degrees = 0.0;
+    double roll_degrees = 0.0;
+    bool vertical_supplement = false;
+};
+
+[[nodiscard]] inline CarPoseSelection select_car_pose_v2(
+    const double authored_heading_degrees,
+    const double pitch_degrees,
+    const double roll_degrees,
+    const int camera_quarter_turns = 0) noexcept {
     CarPoseSelection result;
     result.authored_heading_degrees = normalize_degrees(authored_heading_degrees);
     result.sampled_pitch_degrees = std::isfinite(pitch_degrees) ? pitch_degrees : 0.0;
+    result.sampled_roll_degrees = std::isfinite(roll_degrees) ? signed_degrees(roll_degrees) : 0.0;
     result.logical_heading_index = heading_index_from_degrees(result.authored_heading_degrees);
     result.visual_heading_index = normalize_heading_index(
         result.logical_heading_index - normalize_camera_quarter_turns(camera_quarter_turns) * 4);
 
-    if (std::abs(result.sampled_pitch_degrees) < 7.0) {
-        result.atlas_index = result.visual_heading_index;
-        result.snapped_pitch_degrees = 0.0;
-    } else {
-        result.vertical_supplement = true;
-        const int cardinal_slot = ((result.visual_heading_index + 2) / 4) % 4;
-        const int cardinal_heading = cardinal_slot * 4;
-        result.snapped_to_cardinal_heading = cardinal_heading != result.visual_heading_index;
-        result.visual_heading_index = cardinal_heading;
-        const int pitch_bin = nearest_vertical_pitch_bin(result.sampled_pitch_degrees);
-        result.snapped_pitch_degrees = vertical_pitch_bin_degrees(pitch_bin);
-        result.atlas_index = 16 + pitch_bin * 4 + cardinal_slot;
-    }
+    CarPoseCandidate best{};
+    double best_score = 1.0e300;
+    auto consider = [&](const CarPoseCandidate candidate) noexcept {
+        const double pitch_error = result.sampled_pitch_degrees - candidate.pitch_degrees;
+        const double roll_error = angular_distance_degrees(result.sampled_roll_degrees, candidate.roll_degrees);
+        const double score = pitch_error * pitch_error + roll_error * roll_error;
+        if (score < best_score) {
+            best = candidate;
+            best_score = score;
+        }
+    };
 
-    // V1's strongest slope is +/-46 degrees. Beyond that the selected frame is
-    // intentionally only a fallback and must not be treated as visually valid.
-    result.requires_extended_orientation = std::abs(result.sampled_pitch_degrees) > 50.0;
+    for (int p = 0; p < static_cast<int>(kCarPosePitchBinsDegrees.size()); ++p) {
+        consider({p * kCarPoseHeadingCount + result.visual_heading_index,
+                  kCarPosePitchBinsDegrees[static_cast<std::size_t>(p)], 0.0, false});
+    }
+    for (int p = 0; p < static_cast<int>(kCarPoseVerticalPitchBinsDegrees.size()); ++p) {
+        consider({kCarPoseVerticalFrameBase + p * kCarPoseHeadingCount + result.visual_heading_index,
+                  kCarPoseVerticalPitchBinsDegrees[static_cast<std::size_t>(p)], 0.0, true});
+    }
+    for (int r = 0; r < static_cast<int>(kCarPoseBankRollBinsDegrees.size()); ++r) {
+        consider({kCarPoseBankFrameBase + r * kCarPoseHeadingCount + result.visual_heading_index,
+                  0.0, kCarPoseBankRollBinsDegrees[static_cast<std::size_t>(r)], false});
+    }
+    consider({kCarPoseInvertedFrameBase + result.visual_heading_index,
+              0.0, kCarPoseInvertedRollDegrees, false});
+
+    result.atlas_index = best.atlas_index;
+    result.snapped_pitch_degrees = best.pitch_degrees;
+    result.snapped_roll_degrees = best.roll_degrees;
+    result.vertical_supplement = best.vertical_supplement;
+    result.snapped_to_cardinal_heading = false;
     result.column = result.atlas_index % kCarPoseAtlasColumns;
     result.row = result.atlas_index / kCarPoseAtlasColumns;
     result.source_rect = source_rect_for_car_pose(result.atlas_index);
+
+    const double pitch_error = std::abs(result.sampled_pitch_degrees - result.snapped_pitch_degrees);
+    const double roll_error = angular_distance_degrees(result.sampled_roll_degrees, result.snapped_roll_degrees);
+    result.requires_extended_orientation = pitch_error > 8.01 || roll_error > 12.01;
     return result;
+}
+
+[[nodiscard]] inline CarPoseSelection select_car_pose(const double authored_heading_degrees,
+                                                      const double pitch_degrees,
+                                                      const int camera_quarter_turns = 0) noexcept {
+    return select_car_pose_v2(authored_heading_degrees, pitch_degrees, 0.0, camera_quarter_turns);
 }
 
 [[nodiscard]] inline CarPoseSelection select_car_pose_from_tangent(
@@ -238,16 +281,11 @@ struct CarPoseSelection {
     const double up_y,
     const double up_z,
     const int camera_quarter_turns = 0) noexcept {
-    CarPoseSelection result = select_car_pose_from_tangent(
-        tangent_x, tangent_y, tangent_z, camera_quarter_turns);
-    result.sampled_roll_degrees = roll_degrees_from_frame(
-        tangent_x, tangent_y, tangent_z, up_x, up_y, up_z);
-    // Even modest banking is outside V1: all 40 approved frames have zero roll.
-    // Ten degrees provides tolerance for numerical transport noise while making
-    // genuine bank/inversion requirements explicit.
-    if (std::abs(result.sampled_roll_degrees) > 10.0)
-        result.requires_extended_orientation = true;
-    return result;
+    return select_car_pose_v2(
+        heading_degrees_from_tangent(tangent_x, tangent_y),
+        pitch_degrees_from_tangent(tangent_x, tangent_y, tangent_z),
+        roll_degrees_from_frame(tangent_x, tangent_y, tangent_z, up_x, up_y, up_z),
+        camera_quarter_turns);
 }
 
 }  // namespace ch::coaster

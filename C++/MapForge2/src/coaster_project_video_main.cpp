@@ -333,8 +333,12 @@ int main(int argc, char** argv) {
     QDir().mkpath(outputDir);
 
     QImage atlas(atlasPath);
-    if (atlas.isNull() || atlas.width() != 2048 || atlas.height() != 1280) {
-        std::fprintf(stderr, "invalid Flame car pose atlas\n");
+    const QSize expectedAtlasSize(
+        ch::coaster::kCarPoseAtlasColumns * ch::coaster::kCarPoseFrameWidth,
+        ch::coaster::kCarPoseAtlasRows * ch::coaster::kCarPoseFrameHeight);
+    if (atlas.isNull() || atlas.size() != expectedAtlasSize) {
+        std::fprintf(stderr, "invalid Flame V2 car pose atlas: got %dx%d expected %dx%d\n",
+                     atlas.width(), atlas.height(), expectedAtlasSize.width(), expectedAtlasSize.height());
         return 3;
     }
 

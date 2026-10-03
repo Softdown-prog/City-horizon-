@@ -45,7 +45,8 @@
   ],
   "capturePolicy": {
     "runtimeValidOnly": true,
-    "deferModulesRequiringExtendedOccupiedPoseAtlas": true,
-    "reason": "Do not fake loop/corkscrew orientation with the legacy 40-frame atlas."
+    "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+    "deferCombinedPitchRollModules": true,
+    "reason": "Occupied V2 covers 16-way slopes, vertical, +/-24 degree bank and inverted apex. Combined pitch+roll corkscrew transitions remain explicit follow-up coverage instead of using a silent fallback."
   }
 }

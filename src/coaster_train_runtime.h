@@ -16,8 +16,9 @@ namespace ch::coaster {
 // CH_COASTER_PHYSICS_V1 longitudinal solver, and the Flame car sprite atlas.
 // V2 preserves the full local track frame (forward/right/up + roll), allowing
 // inversions to be represented without pretending that heading+pitch alone are
-// sufficient. The current 40-frame atlas remains a compatibility fallback until
-// CH_COASTER_CAR_ATLAS_RUNTIME_V2 is baked.
+// sufficient. Moving Flame cars consume the promoted occupied
+// CH_COASTER_CAR_ATLAS_RUNTIME_V2; unsupported combined pitch+roll poses are
+// reported explicitly instead of silently falling back to V1.
 inline constexpr int kCoasterTrainCarCount = 4;
 inline constexpr double kFlameCarCenterSpacingM = 2.445;
 
