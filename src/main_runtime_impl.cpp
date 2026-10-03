@@ -902,7 +902,7 @@ void render_building(SDL_Renderer* renderer, const BuildingDefinition& definitio
         cs, viewport_width, viewport_height);
     if (document != nullptr) {
         const float height = document->terrain_heightfield().sample(geometry.ground_world.x, geometry.ground_world.y);
-        geometry.anchor.y -= height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+        geometry.screen_anchor.y -= height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
         geometry.sprite_bounds.y -= height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
     }
     SDL_SetTextureAlphaMod(texture.texture, alpha);
