@@ -1,0 +1,87 @@
+name: CH MapForge Coaster Project Video
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "C++/MapForge2/projects/coaster_flame_01.mapforge.json"
+      - "C++/MapForge2/src/coaster_project_video_main.cpp"
+      - "tools/animation_preview/coaster_video_proof/CMakeLists.txt"
+      - "tools/animation_preview/coaster_project_jobs/*.json"
+      - "assets/vehicles/coaster_flame_01/car_pose_atlas.png"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build and video dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev ffmpeg
+
+      - name: Configure MapForge coaster project renderer
+        run: cmake -S tools/animation_preview/coaster_video_proof -B build/ch-coaster-video -G Ninja
+
+      - name: Build MapForge coaster project renderer
+        run: cmake --build build/ch-coaster-video --target MapForge2CoasterVideoProof --parallel
+
+      - name: Render MapForge project frames
+        run: |
+          mkdir -p out/ch-coaster-project/frames
+          ./build/ch-coaster-video/MapForge2CoasterVideoProof \
+            out/ch-coaster-project/frames \
+            assets/vehicles/coaster_flame_01/car_pose_atlas.png \
+            C++/MapForge2/projects/coaster_flame_01.mapforge.json
+          test "$(find out/ch-coaster-project/frames -name 'frame_*.png' | wc -l)" -eq 360
+          cp C++/MapForge2/projects/coaster_flame_01.mapforge.json out/ch-coaster-project/
+
+      - name: Encode MP4 and contact sheet
+        run: |
+          ffmpeg -y -framerate 30 -i out/ch-coaster-project/frames/frame_%04d.png \
+            -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+            out/ch-coaster-project/coaster_flame_mapforge_project_v1.mp4
+          ffmpeg -y -i out/ch-coaster-project/coaster_flame_mapforge_project_v1.mp4 \
+            -vf "fps=1,scale=640:-1,tile=4x3" -frames:v 1 \
+            out/ch-coaster-project/contact_sheet.png
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,r_frame_rate,nb_frames -of json \
+            out/ch-coaster-project/coaster_flame_mapforge_project_v1.mp4 \
+            > out/ch-coaster-project/ffprobe.json
+
+      - name: Write project proof report
+        run: |
+          cat > out/ch-coaster-project/proof_report.json <<'JSON'
+          {
+            "contract": "CH_MAPFORGE_COASTER_PROJECT_VIDEO_V1",
+            "status": "ok",
+            "projectContract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+            "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
+            "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
+            "carCount": 4,
+            "frameCount": 360,
+            "fps": 30,
+            "runtimeValidOnly": true,
+            "extendedPoseRequiredSectionsDeferred": true
+          }
+          JSON
+
+      - name: Upload MapForge coaster project video
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Coaster-Project-Video-V1
+          path: |
+            out/ch-coaster-project/coaster_flame_mapforge_project_v1.mp4
+            out/ch-coaster-project/contact_sheet.png
+            out/ch-coaster-project/coaster_flame_01.mapforge.json
+            out/ch-coaster-project/ffprobe.json
+            out/ch-coaster-project/proof_report.json
+          if-no-files-found: error
+          retention-days: 14
