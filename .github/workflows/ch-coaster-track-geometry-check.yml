@@ -1,0 +1,70 @@
+name: CH Coaster Track Geometry Check
+
+on:
+  push:
+    paths:
+      - 'src/coaster_track_geometry.h'
+      - 'src/coaster_track_geometry_test.cpp'
+      - 'src/coaster_render_adapter.h'
+      - 'src/coaster_centerline_route.h'
+      - 'src/coaster_train_runtime.h'
+      - 'src/coaster_physics.h'
+      - 'src/ch_core/projection.h'
+      - 'src/ch_core/projection.cpp'
+      - '.github/workflows/ch-coaster-track-geometry-check.yml'
+  pull_request:
+    paths:
+      - 'src/coaster_track_geometry.h'
+      - 'src/coaster_track_geometry_test.cpp'
+      - 'src/coaster_render_adapter.h'
+      - 'src/coaster_centerline_route.h'
+      - 'src/coaster_train_runtime.h'
+      - 'src/coaster_physics.h'
+      - 'src/ch_core/projection.h'
+      - 'src/ch_core/projection.cpp'
+      - '.github/workflows/ch-coaster-track-geometry-check.yml'
+
+jobs:
+  coaster-track-geometry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile coaster track geometry regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -I. -Isrc \
+            src/coaster_track_geometry_test.cpp src/ch_core/projection.cpp \
+            -o /tmp/coaster_track_geometry_test
+
+      - name: Run coaster track geometry regression
+        run: /tmp/coaster_track_geometry_test
+
+      - name: Guard dedicated coaster contract
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          geometry = Path('src/coaster_track_geometry.h').read_text(encoding='utf-8')
+          adapter = Path('src/coaster_render_adapter.h').read_text(encoding='utf-8')
+          required = {
+              'contract': 'CH_COASTER_TRACK_GEOMETRY_V1',
+              'local right frame': 'sample.right_x',
+              'local up frame': 'sample.up_x',
+              'left rail': 'left_rail',
+              'right rail': 'right_rail',
+              'spine': 'spine',
+              'ties': 'CoasterCrossTie',
+              'supports': 'CoasterSupport',
+          }
+          missing = [name for name, token in required.items() if token not in geometry]
+          if missing:
+              raise SystemExit('coaster geometry contract incomplete: ' + ', '.join(missing))
+          if 'build_track_render_plan' not in adapter:
+              raise SystemExit('coaster track is not bridged to the runtime render adapter')
+          if 'max_grade' in geometry:
+              raise SystemExit('coaster geometry must not inherit railway max_grade')
+          print('CH_COASTER_TRACK_GEOMETRY_V1 integration: OK')
+          PY

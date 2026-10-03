@@ -1,11 +1,13 @@
 #pragma once
 
+#include "coaster_track_geometry.h"
 #include "coaster_train_runtime.h"
 #include "src/ch_core/projection.h"
 
 #include <array>
 #include <cstddef>
 #include <string_view>
+#include <vector>
 
 namespace ch::coaster {
 
@@ -19,8 +21,9 @@ struct AtlasSourceRect {
 };
 
 // CH_COASTER_RENDER_ADAPTER_V1
-// Presentation-only bridge from the articulated train simulation to the
-// existing 2D isometric renderer. It does not own textures or simulation state.
+// Presentation-only bridge from the articulated train simulation and dedicated
+// coaster track geometry to the existing 2D isometric renderer. It does not own
+// textures or simulation state.
 struct CarRenderCommand {
     std::size_t car_index = 0U;
     std::string_view atlas_path = kFlameCarPoseAtlasPath;
@@ -33,6 +36,32 @@ struct CarRenderCommand {
 struct TrainRenderPlan {
     std::array<CarRenderCommand, kCoasterTrainCarCount> cars{};
     std::size_t car_count = 0U;
+};
+
+enum class TrackLineKind {
+    support,
+    spine,
+    tie,
+    left_rail,
+    right_rail,
+};
+
+struct TrackLineRenderCommand {
+    TrackLineKind kind = TrackLineKind::spine;
+    WorldPoint3 world_a{};
+    WorldPoint3 world_b{};
+    float depth_key = 0.0F;
+};
+
+struct TrackRenderPlan {
+    std::vector<TrackLineRenderCommand> lines;
+};
+
+struct TrackScreenLine {
+    ScreenPoint a{};
+    ScreenPoint b{};
+    TrackLineKind kind = TrackLineKind::spine;
+    float depth_key = 0.0F;
 };
 
 [[nodiscard]] inline TrainRenderPlan build_train_render_plan(
@@ -63,6 +92,77 @@ struct TrainRenderPlan {
         command.atlas_index = car.sprite_pose.atlas_index;
     }
     return plan;
+}
+
+[[nodiscard]] inline WorldPoint3 coaster_track_world_point(
+    const CoasterTrackPoint3& point) noexcept {
+    return {
+        static_cast<float>(point.x),
+        static_cast<float>(point.y),
+        static_cast<float>(point.z),
+    };
+}
+
+inline void append_track_line(
+    TrackRenderPlan& plan,
+    const TrackLineKind kind,
+    const CoasterTrackPoint3& a,
+    const CoasterTrackPoint3& b,
+    const CameraState& camera) {
+    const WorldPoint3 wa = coaster_track_world_point(a);
+    const WorldPoint3 wb = coaster_track_world_point(b);
+    const float da = camera_depth_key(wa.x, wa.y, camera);
+    const float db = camera_depth_key(wb.x, wb.y, camera);
+    plan.lines.push_back({kind, wa, wb, (da + db) * 0.5F});
+}
+
+[[nodiscard]] inline TrackRenderPlan build_track_render_plan(
+    const CoasterTrackGeometry& geometry,
+    const CameraState& camera) {
+    TrackRenderPlan plan;
+    if (!geometry.valid()) return plan;
+
+    const std::size_t frame_segments =
+        geometry.closed ? geometry.frames.size() : geometry.frames.size() - 1U;
+    plan.lines.reserve(
+        geometry.supports.size() +
+        geometry.ties.size() +
+        frame_segments * 3U);
+
+    for (const CoasterSupport& support : geometry.supports) {
+        append_track_line(
+            plan, TrackLineKind::support, support.bottom, support.top, camera);
+    }
+    for (const CoasterCrossTie& tie : geometry.ties) {
+        append_track_line(
+            plan, TrackLineKind::tie, tie.left, tie.right, camera);
+    }
+
+    for (std::size_t i = 0; i < frame_segments; ++i) {
+        const std::size_t next = (i + 1U) % geometry.frames.size();
+        const CoasterTrackFrame& a = geometry.frames[i];
+        const CoasterTrackFrame& b = geometry.frames[next];
+        append_track_line(
+            plan, TrackLineKind::spine, a.spine, b.spine, camera);
+        append_track_line(
+            plan, TrackLineKind::left_rail, a.left_rail, b.left_rail, camera);
+        append_track_line(
+            plan, TrackLineKind::right_rail, a.right_rail, b.right_rail, camera);
+    }
+    return plan;
+}
+
+[[nodiscard]] inline TrackScreenLine project_track_line(
+    const TrackLineRenderCommand& command,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height) {
+    return {
+        world_to_screen_point(command.world_a, camera, viewport_width, viewport_height),
+        world_to_screen_point(command.world_b, camera, viewport_width, viewport_height),
+        command.kind,
+        command.depth_key,
+    };
 }
 
 [[nodiscard]] inline ScreenPoint project_car_anchor(
