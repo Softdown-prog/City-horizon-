@@ -28,8 +28,8 @@ int main(int argc, char* argv[]) {
     if (!audio.initialize(std::filesystem::path(argv[1]))) fail("valid audio catalog did not initialize");
     std::cerr << "audio_manager_test: catalog initialized\n" << std::flush;
 
-    if (!audio.is_available() || audio.cached_effect_count() != 18U)
-        fail("audio cache did not contain the expected 18 unique OGG effects");
+    if (!audio.is_available() || audio.cached_effect_count() != 19U)
+        fail("audio cache did not contain the expected 19 unique runtime OGG effects");
     if (std::fabs(audio.volume_settings().master - 1.0F) > 0.001F ||
         std::fabs(audio.volume_settings().effects - 0.8F) > 0.001F)
         fail("catalog volume settings were not applied");
