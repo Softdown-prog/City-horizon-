@@ -7,23 +7,24 @@
   "referenceContract":{
     "source":"user_supplied_real_ride_photos_2026_10_03",
     "primaryRead":"full_scale_pirate_ship_amusement_ride",
-    "supportTopology":"two_end_A_portals_with_open_swing_volume",
-    "pivot":"single_high_cross_axle",
-    "suspension":"two_long_trussed_pendulum_arms",
+    "supportTopology":"two_side_A_frames_centered_on_ship_midpoint",
+    "pivot":"single_transverse_axle_across_ship_width_at_center",
+    "suspension":"triangulated_pendulum_arms_from_central_axle_to_ship_ends",
     "ship":"dominant_deep_long_passenger_hull",
     "station":"independent_raised_boarding_deck"
   },
   "forbiddenTopology":[
+    "end_portals_at_bow_and_stern",
+    "longitudinal_top_beam_between_ship_ends",
     "four_post_rectangular_cage",
     "box_frame_around_ship",
-    "parallel_side_wall_towers",
     "compact_toy_scale",
     "legacy_viking_recipe_import"
   ],
   "dimensions":{
     "pivotZ":21.5,
-    "portalHalfX":10.4,
-    "portalHalfY":5.9,
+    "sideFrameHalfY":6.0,
+    "sideLegHalfX":8.8,
     "shipLength":20.0,
     "shipHalfWidth":3.15,
     "shipCenterZ":5.3,
