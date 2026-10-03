@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -373,8 +375,8 @@ private:
             return;
         }
 
-        const TrackGraphBuildResult topology = RailPlacementTrackGraphAdapter::build(graph_);
-        if (!topology.ok()) {
+        const rail::RailPlacementTopologyBuildResult topology = rail::build_track_graph(graph_);
+        if (!topology.valid) {
             const std::string error = topology.error.empty() ? "TOPOLOGY REJECTED" : topology.error;
             cancel_gesture(false);
             status_ = "RAIL TOPOLOGY REJECTED: " + error;
