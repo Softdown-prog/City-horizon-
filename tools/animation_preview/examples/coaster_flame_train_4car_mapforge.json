@@ -1,31 +1,22 @@
 {
   "contract": "CH_COASTER_VIDEO_PROOF_V1",
-  "id": "coaster.flame.train_4car.mapforge.canonical.v1",
+  "id": "coaster.flame.train_4car.mapforge.project.v1",
   "reviewOnly": true,
   "trackContract": "CH_COASTER_TRACK_V1",
-  "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V1",
-  "canonicalLayoutContract": "CH_COASTER_CANONICAL_LAYOUT_V1",
-  "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V1",
-  "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
+  "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
+  "mapForgeProjectContract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
+  "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1_COMPAT",
+  "project": "C++/MapForge2/projects/coaster_flame_01.mapforge.json",
   "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas.png",
-  "atlasPromotionCommit": "4e7bc7abfcfc782e2c019145a7b924497fa5c207",
-  "routeFixCommit": "0a9746493214ff7af7b7be1ac03389a8e94d4574",
-  "headingFixCommit": "608d91714c296a6ead3a2c1c4d0ad0acd4f2a156",
   "carCount": 4,
   "carSpacingMeters": 2.445,
   "fps": 30,
   "durationSeconds": 12,
   "frameCount": 360,
-  "layout": {
-    "station": true,
-    "liftHill": true,
-    "firstDrop": true,
-    "verticalLoop": true,
-    "ascendingHelix": true,
-    "brakeRun": true,
-    "supports": true,
-    "closedRoute": true,
-    "corkscrew": false
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "extendedPoseRequiredSectionsDeferred": true
   },
-  "purpose": "Validate four articulated Flame cars on CH_COASTER_CANONICAL_LAYOUT_V1 using the approved vertical-loop and helix centerline dimensions, a continuous station return, and the corrected travel-aligned tangent contract. Corkscrew is deferred until car roll poses exist."
+  "purpose": "Render the actual MapForge coaster project document with four articulated occupied Flame cars. This capture intentionally excludes inversion/banked modules until the extended occupied pose atlas passes review, instead of faking those orientations with the legacy 40-frame atlas."
 }
