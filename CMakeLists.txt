@@ -182,6 +182,7 @@ if(BUILD_TESTING)
         src/road_system.cpp
         src/simulation_clock.cpp
         src/sidewalk_system.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     target_link_libraries(building_system_test PRIVATE ch_core)
@@ -212,6 +213,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     # The normal target name stays stable; this avoids a file-lock collision
@@ -243,6 +245,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/sidewalk_system.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     target_link_libraries(sidewalk_topology_test PRIVATE ch_core)
@@ -341,6 +344,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     # Keep this target separate from an interrupted legacy process that can
@@ -367,6 +371,7 @@ if(BUILD_TESTING)
         src/save_manager.cpp
         src/sidewalk_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     set_target_properties(save_manager_test PROPERTIES OUTPUT_NAME save_manager_test_run)
@@ -387,6 +392,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     set_target_properties(population_system_test PROPERTIES OUTPUT_NAME population_system_test_run)
@@ -408,6 +414,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     set_target_properties(power_system_test PROPERTIES OUTPUT_NAME power_system_test_run)
@@ -430,6 +437,7 @@ if(BUILD_TESTING)
         src/resource_system.cpp
         src/road_system.cpp
         src/simulation_clock.cpp
+        src/crosswalk_system.cpp
         src/vehicle_system.cpp
     )
     set_target_properties(mission_system_test PROPERTIES OUTPUT_NAME mission_system_test_run)
