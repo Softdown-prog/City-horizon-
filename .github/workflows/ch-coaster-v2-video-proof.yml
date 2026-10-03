@@ -12,11 +12,57 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm V2 runtime gate commit
+
+      - name: Validate occupied V2 atlas
         run: |
           set -euo pipefail
-          test -f assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png
-          test -f assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json
-          echo "V2 proof workflow entry accepted"
+          python3 - <<'PY'
+          import hashlib, json, struct
+          from collections import Counter
+          from pathlib import Path
+          root = Path('assets/vehicles/coaster_flame_01')
+          atlas = root / 'car_pose_atlas_v2.png'
+          manifest_path = root / 'car_pose_atlas_runtime_v2.json'
+          runtime_path = root / 'coaster_flame_01_runtime.json'
+          for path in (atlas, manifest_path, runtime_path):
+              if not path.is_file():
+                  raise SystemExit(f'missing V2 input: {path}')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
+          if manifest.get('contract') != 'CH_COASTER_CAR_ATLAS_RUNTIME_V2':
+              raise SystemExit('wrong V2 atlas contract')
+          if manifest.get('poseContract') != 'CH_COASTER_CAR_ORIENTATION_V2':
+              raise SystemExit('wrong V2 orientation contract')
+          if (manifest.get('frameCount'), manifest.get('columns'), manifest.get('rows')) != (192, 16, 12):
+              raise SystemExit('wrong V2 atlas layout')
+          families = Counter(f.get('family') for f in manifest.get('frames', []))
+          expected = {'heading_pitch_16way':112,'vertical_16way':32,'banked_16way':32,'inverted_16way':16}
+          if families != expected:
+              raise SystemExit(f'wrong V2 pose families: {dict(families)}')
+          header = atlas.read_bytes()[:24]
+          if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
+              raise SystemExit('V2 atlas is not PNG')
+          if struct.unpack('>II', header[16:24]) != (4096, 3072):
+              raise SystemExit('wrong V2 atlas dimensions')
+          actual = hashlib.sha256(atlas.read_bytes()).hexdigest()
+          if actual != manifest.get('spriteSheetSha256'):
+              raise SystemExit('V2 atlas SHA mismatch')
+          if runtime.get('poseAtlasSource', {}).get('occupiedCompositeSpriteSheetSha256') != actual:
+              raise SystemExit('runtime catalog V2 SHA mismatch')
+          print('occupied V2 atlas validated', actual)
+          PY
+
+      - name: Install renderer dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev ffmpeg
+
+      - name: Configure renderer
+        run: cmake -S tools/animation_preview/coaster_video_proof -B build/ch-coaster-v2 -G Ninja
+
+      - name: Build renderer
+        run: cmake --build build/ch-coaster-v2 --target MapForge2CoasterVideoProof --parallel
