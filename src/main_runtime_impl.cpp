@@ -892,19 +892,46 @@ void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text
 void render_building(SDL_Renderer* renderer, const BuildingDefinition& definition, const BuildingInstance& instance,
                      const BuildingRotation visual_rotation, const TextureAsset& texture, const Camera& camera,
                      float viewport_width, float viewport_height,
+                     const ch::MapDocument* document = nullptr,
                      Uint8 alpha = SDL_ALPHA_OPAQUE,
                      Uint8 red = 255, Uint8 green = 255, Uint8 blue = 255) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_building(renderer, definition, instance, visual_rotation, texture.texture,
-                                     texture.source_width, texture.source_height, cs, viewport_width, viewport_height,
-                                     alpha, red, green, blue);
+    ch::BuildingSpriteGeometry geometry = ch::MapRenderer::building_sprite_geometry(
+        definition, instance, visual_rotation, texture.source_width, texture.source_height,
+        cs, viewport_width, viewport_height);
+    if (document != nullptr) {
+        const float height = document->terrain_heightfield().sample(geometry.ground_world.x, geometry.ground_world.y);
+        geometry.anchor.y -= height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+        geometry.sprite_bounds.y -= height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+    }
+    SDL_SetTextureAlphaMod(texture.texture, alpha);
+    SDL_SetTextureColorMod(texture.texture, red, green, blue);
+    const int frame_count = definition.animation.has_value() ? std::max(1, definition.animation->frame_count) : 1;
+    if (frame_count > 1) {
+        const int duration_ms = std::max(1, definition.animation->frame_duration_ms);
+        int frame_index = 0;
+        if (definition.animation->playback == "activity_loop") {
+            frame_index = instance.activity_active()
+                ? static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count) : 0;
+        } else {
+            frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
+        }
+        const float frame_width = texture.source_width / static_cast<float>(frame_count);
+        const SDL_FRect source = {frame_width * frame_index, 0.0F, frame_width, texture.source_height};
+        SDL_RenderTexture(renderer, texture.texture, &source, &geometry.sprite_bounds);
+    } else {
+        SDL_RenderTexture(renderer, texture.texture, nullptr, &geometry.sprite_bounds);
+    }
+    SDL_SetTextureColorMod(texture.texture, 255, 255, 255);
+    SDL_SetTextureAlphaMod(texture.texture, SDL_ALPHA_OPAQUE);
 }
 
 
 void render_building_activity_overlay(SDL_Renderer* renderer, const BuildingDefinition& definition,
                                       const BuildingInstance& instance, const BuildingRotation visual_rotation,
                                       const TextureCache& textures, const std::filesystem::path& asset_root,
-                                      const Camera& camera, const float viewport_width, const float viewport_height) {
+                                      const Camera& camera, const float viewport_width, const float viewport_height,
+                                      const ch::MapDocument* document = nullptr) {
     if (!instance.activity_active() || !definition.activity_overlay || !definition.activity_overlay->enabled) return;
     const std::size_t rotation_index = static_cast<std::size_t>(visual_rotation);
     if (rotation_index >= definition.activity_overlay->sprite_paths.size()) return;
@@ -932,7 +959,11 @@ void render_building_activity_overlay(SDL_Renderer* renderer, const BuildingDefi
     const SDL_FRect source = {frame_width * static_cast<float>(frame_index), 0.0F, frame_width, frame_height};
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
     const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
-    const SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
+    SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
+    if (document != nullptr) {
+        anchor.y -= document->terrain_heightfield().sample(ground.x, ground.y) *
+                    ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+    }
     const float scale = definition.art_scale * camera.zoom;
     const SDL_FRect destination = {
         anchor.x - frame_width * scale * definition.anchor_x_for(visual_rotation, instance.current_level),
@@ -1038,7 +1069,7 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                            const ch::coaster::TrainStepResult* coaster_train,
                            const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
-                           float viewport_width, float viewport_height) {
+                           float viewport_width, float viewport_height, const ch::MapDocument* document) {
     struct EntityDraw {
         enum class Kind { building, mobile_entity, coaster_car } kind = Kind::building;
         float depth = 0.0F;
@@ -1104,7 +1135,7 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                 const Uint8 r = is_owned ? 255 : 140;
                 const Uint8 g = is_owned ? 255 : 145;
                 const Uint8 b = is_owned ? 255 : 155;
-                render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height, SDL_ALPHA_OPAQUE, r, g, b);
+                render_building(renderer, *definition, *draw.building, visual_rotation, *texture, camera, viewport_width, viewport_height, document, SDL_ALPHA_OPAQUE, r, g, b);
 
                 // CH_COLOR_MASK_V1 is opt-in. The approved source sprite stays
                 // untouched until this concrete instance has player colors.
@@ -1115,20 +1146,20 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                     if (draw.building->wall_color_customized) {
                         if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
                             render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
-                                            viewport_width, viewport_height, kTintOverlayAlpha,
+                                            viewport_width, viewport_height, document, kTintOverlayAlpha,
                                             draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
                         }
                     }
                     if (draw.building->roof_color_customized) {
                         if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
                             render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
-                                            viewport_width, viewport_height, kTintOverlayAlpha,
+                                            viewport_width, viewport_height, document, kTintOverlayAlpha,
                                             draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
                         }
                     }
                 }
                 render_building_activity_overlay(renderer, *definition, *draw.building, visual_rotation,
-                                                 textures, root, camera, viewport_width, viewport_height);
+                                                 textures, root, camera, viewport_width, viewport_height, document);
             }
             continue;
         }
@@ -1138,9 +1169,13 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
             ? textures.load_actor_clothing(renderer, frame_path, entity.clothing) : nullptr;
         if (texture == nullptr) texture = textures.find(frame_path);
         if (texture == nullptr) continue;
-        const SDL_FPoint anchor = world_to_screen(entity.spatial.visual_world_x + entity.spatial.ground_anchor_x,
-                                                  entity.spatial.visual_world_y + entity.spatial.ground_anchor_y,
-                                                  camera, viewport_width, viewport_height);
+        const float ground_x = entity.spatial.visual_world_x + entity.spatial.ground_anchor_x;
+        const float ground_y = entity.spatial.visual_world_y + entity.spatial.ground_anchor_y;
+        SDL_FPoint anchor = world_to_screen(ground_x, ground_y, camera, viewport_width, viewport_height);
+        if (document != nullptr) {
+            anchor.y -= document->terrain_heightfield().sample(ground_x, ground_y) *
+                        ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+        }
         const float scale = entity.art_scale * camera.zoom;
         const SDL_FRect destination = {anchor.x - texture->source_width * scale * entity.sprite_anchor_x,
                                        anchor.y - texture->source_height * scale * entity.sprite_anchor_y,
@@ -3934,7 +3969,8 @@ int main() {
             : ch::coaster::TrainStepResult{};
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
                               coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,
-                              asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                              asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                              active_map_doc ? &*active_map_doc : nullptr);
         if (seagull_pass_active) {
             const OwnedTileBounds bounds = owned_tile_bounds(lands);
             const bool southbound = (seagull_pass_index % 2U) == 0U;
@@ -3966,7 +4002,8 @@ int main() {
                 preview.tile_y = mouse_tile.second;
                 preview.rotation = placement_rotation;
                 render_building(renderer, *placement_definition, preview, visual_rotation, *preview_texture, camera,
-                                static_cast<float>(viewport_width), static_cast<float>(viewport_height), 115);
+                                static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                active_map_doc ? &*active_map_doc : nullptr, 115);
             }
         }
 
