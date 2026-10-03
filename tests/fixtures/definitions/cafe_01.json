@@ -1,0 +1,32 @@
+{
+  "id": "cafe_01",
+  "name": "Cafeteria Test Fixture",
+  "category": "commercial",
+  "texture": "assets/buildings/cafe_01_lvl1.png",
+  "rotatable": false,
+  "requiresRoadAccess": true,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 2,
+    "height": 2
+  },
+  "buildCost": 2500,
+  "maintenancePerMonth": 80,
+  "taxRevenuePerMonth": 220,
+  "requiredPopulationForFullRevenue": 20,
+  "powerConsumption": 3,
+  "resourceInputs": [
+    {
+      "resourceId": "resource_coffee",
+      "amountPerMonth": 2,
+      "localSupplyBonus": 45
+    }
+  ],
+  "artScale": 1.3617,
+  "anchor": {
+    "x": 0.4654,
+    "y": 0.9932
+  },
+  "playerBuildable": false,
+  "productionStatus": "test_fixture"
+}
