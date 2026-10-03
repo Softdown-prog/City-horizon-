@@ -149,7 +149,9 @@ def main():
     recv=studio['shadowReceiver']; rmat=bs.make_material('ShadowReceiver',recv['materialColor'],float(recv.get('roughness',1.0))); ground=bs.add_box('ShadowReceiverPlane',recv['location'],[max(float(recv['dimensions'][0]),21.0),max(float(recv['dimensions'][1]),18.0),float(recv['dimensions'][2])],rmat,0.0)
     authored=[o for o in bpy.context.scene.objects if o.type=='MESH' and o!=ground]
     for o in authored:o['runtimeLayer']='motion_overlay' if desc(o,pivot) else 'static_base'
-    bs.calibrate_ortho_scale(scene,authored,safety_margin=.28); bs.set_direction(root,bs.DIRECTIONS[0]); bpy.context.view_layer.update()
+    # Large full-size rides need substantially more breathing room than compact props.
+    # 50% safety avoids the preflight crop gate without changing geometry or camera contract.
+    bs.calibrate_ortho_scale(scene,authored,safety_margin=.50); bs.set_direction(root,bs.DIRECTIONS[0]); bpy.context.view_layer.update()
     meta={'contract':CONTRACT,'assetId':ASSET_ID,'stage':'clean_sheet_gate','cameraContract':'CH_CAMERA_V1','footprint':recipe['footprint'],'recipe':'tools/tycoon_photo_studio/assets/pirate_ship_ride_clean_7x6.json','builder':'tools/tycoon_photo_studio/build_pirate_ship_clean_sheet.py','modelingMethod':'segmented_portal_plus_open_gondola','blenderVersion':bpy.app.version_string,'renderEngine':scene.render.engine}; (out/'studio_metadata.json').write_text(json.dumps(meta,indent=2),encoding='utf-8')
     profile=scene_gate.load_profile(a.preflight_profile); pre=scene_gate.run_preflight(scene=scene,authored=authored,footprint=recipe['footprint'],profile=profile,asset_id=ASSET_ID,report_path=out/'preflight_report.json'); scene_gate.require_pass(pre)
     if a.stage=='preflight': save_blend(a.save_blend); return
