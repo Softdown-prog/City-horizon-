@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+import bpy
+
+import build_pirate_ship_swing_passengers as core
+
+
+def _extract_direction() -> str:
+    argv = sys.argv
+    if "--direction" not in argv:
+        raise RuntimeError("CH_PIRATE_SWING_DIRECTION_REQUIRED")
+    i = argv.index("--direction")
+    if i + 1 >= len(argv):
+        raise RuntimeError("CH_PIRATE_SWING_DIRECTION_VALUE_MISSING")
+    direction = argv[i + 1].lower()
+    del argv[i:i + 2]
+    valid = {d["id"] for d in core.base.bs.DIRECTIONS}
+    if direction not in valid:
+        raise RuntimeError(f"CH_PIRATE_SWING_BAD_DIRECTION:{direction}")
+    return direction
+
+
+def main() -> None:
+    direction_id = _extract_direction()
+    a = core.base.argv()
+    c = core.base.load(a.recipe)
+    studio = core.base.bs.load_json(a.studio_preset)
+    out = Path(a.output).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+
+    core.base.bs.clear_scene()
+    scene = core.base.bs.configure_scene(
+        studio,
+        tuple(map(int, studio["render"]["sourceResolution"])),
+        str(out),
+    )
+    scene.render.film_transparent = True
+    scene.render.image_settings.color_mode = "RGBA"
+
+    M = {k: core.base.material(v) for k, v in c["materials"].items()}
+    bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0, 0, 0))
+    root = bpy.context.object
+    root.name = "AssetRoot"
+    root["assetId"] = core.base.ASSET
+    root["cameraContract"] = "CH_CAMERA_V1"
+    root["styleContract"] = c["styleContract"]
+    root["footprint"] = "7x6"
+    root["proceduralContract"] = core.base.CONTRACT
+    root["animationContract"] = core.ANIMATION_CONTRACT
+    root["passengerOverlayContract"] = core.PASSENGER_CONTRACT
+    root["rideCapacity"] = core.CAPACITY
+
+    core.base.build(root, c, M)
+    pivot = core._make_swing_pivot(root, c)
+    slots = core._add_passengers(pivot, c)
+
+    recv = studio["shadowReceiver"]
+    rm = core.base.bs.make_material(
+        "ShadowReceiver", recv["materialColor"], float(recv.get("roughness", 1))
+    )
+    ground = core.base.bs.add_box(
+        "ShadowReceiverPlane",
+        recv["location"],
+        [30, 21, float(recv["dimensions"][2])],
+        rm,
+        0,
+    )
+    authored = [o for o in bpy.context.scene.objects if o.type == "MESH" and o != ground]
+    core.base.bs.calibrate_ortho_scale(scene, authored, safety_margin=.16)
+
+    selected = next(d for d in core.base.bs.DIRECTIONS if d["id"] == direction_id)
+    core.base.bs.set_direction(root, selected)
+    bpy.context.view_layer.update()
+
+    metadata = {
+        "contract": core.ANIMATION_CONTRACT,
+        "assetId": core.base.ASSET,
+        "cameraContract": "CH_CAMERA_V1",
+        "direction": direction_id,
+        "frameCount": core.FRAME_COUNT,
+        "fps": core.FPS,
+        "amplitudeDegrees": core.AMPLITUDE_DEGREES,
+        "rotationAxis": "Y",
+        "motion": "pendulum_sinusoidal",
+        "passengerOverlayContract": core.PASSENGER_CONTRACT,
+        "passengerVisualRecipeSource": "CH_COASTER_PASSENGER_OVERLAY_V1 / approved Viking V15 CHActor recipe",
+        "capacity": core.CAPACITY,
+        "seatSlots": slots,
+        "parallelBake": True,
+    }
+    (out / "studio_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    (out / "passenger_overlay_manifest.json").write_text(json.dumps({
+        "contract": core.PASSENGER_CONTRACT,
+        "assetId": core.base.ASSET,
+        "direction": direction_id,
+        "capacity": core.CAPACITY,
+        "seatSlots": slots,
+        "actorSource": "CHActor",
+        "visualRecipeSource": "CH_COASTER_PASSENGER_OVERLAY_V1",
+        "motionParent": "SwingPivot",
+        "compositionMode": "depth_correct_blender_composite_plus_transparent_overlay",
+        "frameCount": core.FRAME_COUNT,
+    }, indent=2), encoding="utf-8")
+
+    profile = core.base.scene_gate.load_profile(a.preflight_profile)
+    pivot.rotation_euler[1] = 0.0
+    pre = core.base.scene_gate.run_preflight(
+        scene=scene,
+        authored=authored,
+        footprint=c["footprint"],
+        profile=profile,
+        asset_id=core.base.ASSET,
+        report_path=out / "preflight_report.json",
+    )
+    core.base.scene_gate.require_pass(pre)
+
+    cycle = core.angles()
+    frames = []
+    canonical_report = None
+    for index, angle in enumerate(cycle):
+        pivot.rotation_euler[1] = math.radians(angle)
+        bpy.context.view_layer.update()
+        occupied_name = f"swing_{direction_id}_{index:02d}.png"
+        report = core.base.scene_gate.render_proxy(
+            scene=scene,
+            authored=authored,
+            output_path=out / occupied_name,
+            profile=profile,
+            asset_id=core.base.ASSET,
+            direction=direction_id,
+        )
+        if index == 0:
+            canonical_report = dict(report)
+            (out / f"proxy_{direction_id}.png").write_bytes((out / occupied_name).read_bytes())
+
+        states = core._set_passenger_only(True)
+        overlay_name = f"passengers_{direction_id}_{index:02d}.png"
+        core.base.scene_gate.render_proxy(
+            scene=scene,
+            authored=None,
+            output_path=out / overlay_name,
+            profile=profile,
+            asset_id=core.base.ASSET,
+            direction=direction_id,
+        )
+        core._restore_visibility(states)
+
+        frames.append({
+            "direction": direction_id,
+            "frameIndex": index,
+            "angleDegrees": round(angle, 6),
+            "occupiedFile": occupied_name,
+            "passengerOverlayFile": overlay_name,
+            "sha256": report["sha256"],
+        })
+
+    if canonical_report is None:
+        raise RuntimeError("CH_PIRATE_SWING_CANONICAL_PROXY_MISSING")
+    canonical_report["path"] = str(out / f"proxy_{direction_id}.png")
+    (out / "proxy_report.json").write_text(json.dumps(canonical_report, indent=2), encoding="utf-8")
+    (out / f"swing_frames_{direction_id}.json").write_text(json.dumps({
+        "contract": core.ANIMATION_CONTRACT,
+        "status": "ok",
+        "direction": direction_id,
+        "frameCount": core.FRAME_COUNT,
+        "fps": core.FPS,
+        "amplitudeDegrees": core.AMPLITUDE_DEGREES,
+        "anglesDegrees": [round(x, 6) for x in cycle],
+        "frames": frames,
+    }, indent=2), encoding="utf-8")
+
+    pivot.rotation_euler[1] = 0.0
+    core.base.bs.set_direction(root, selected)
+    bpy.context.view_layer.update()
+    if a.save_blend:
+        q = Path(a.save_blend).resolve()
+        q.parent.mkdir(parents=True, exist_ok=True)
+        bpy.ops.wm.save_as_mainfile(filepath=str(q))
+
+
+if __name__ == "__main__":
+    main()

@@ -10,7 +10,7 @@ on:
       pool_size:
         description: Concurrent CH Blender workers (1-8)
         required: false
-        default: "2"
+        default: "4"
         type: string
   push:
     branches:
@@ -29,7 +29,7 @@ jobs:
     env:
       PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
       LIBGL_ALWAYS_SOFTWARE: "1"
-      CH_BLENDER_POOL_SIZE: ${{ inputs.pool_size || '2' }}
+      CH_BLENDER_POOL_SIZE: ${{ inputs.pool_size || '4' }}
 
     steps:
       - name: Checkout
