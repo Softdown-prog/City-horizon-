@@ -2,7 +2,6 @@
 name: Promote Casa Popular color masks
 
 on:
-  push:
   workflow_dispatch:
 
 permissions:
