@@ -11,6 +11,7 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/runtime_map_renderer.h"
       - "src/coaster_physics.h"
       - "src/coaster_car_pose.h"
       - "src/coaster_train_runtime.h"
