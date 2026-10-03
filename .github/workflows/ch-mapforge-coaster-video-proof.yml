@@ -51,7 +51,7 @@ jobs:
           $job = Get-Content $jobPath -Raw | ConvertFrom-Json
           if ($job.contract -ne "CH_COASTER_VIDEO_PROOF_V1") { throw "Unsupported coaster video proof contract" }
           if ($job.carCount -ne 4) { throw "Runtime contract requires exactly four articulated cars" }
-          if ($job.fps -ne 30 -or $job.durationSeconds -ne 8) { throw "Proof timing contract mismatch" }
+          if ($job.fps -ne 30 -or $job.durationSeconds -ne 12 -or $job.frameCount -ne 360) { throw "Proof timing contract mismatch" }
           "CH_COASTER_VIDEO_JOB=$jobPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Qt and FFmpeg
@@ -85,13 +85,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path out/ch-coaster-video/frames | Out-Null
           build/ch-coaster-video/Release/MapForge2CoasterVideoProof.exe out/ch-coaster-video/frames $atlas
           $frames = Get-ChildItem out/ch-coaster-video/frames -Filter "frame_*.png" -File
-          if ($frames.Count -ne 240) { throw "Expected 240 proof frames, got $($frames.Count)" }
+          if ($frames.Count -ne 360) { throw "Expected 360 proof frames, got $($frames.Count)" }
 
       - name: Encode MP4 and contact sheet
         shell: pwsh
         run: |
           ffmpeg -y -framerate 30 -i "out/ch-coaster-video/frames/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4"
-          ffmpeg -y -i "out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4" -vf "fps=1,scale=640:-1,tile=4x2" -frames:v 1 "out/ch-coaster-video/contact_sheet.png"
+          ffmpeg -y -i "out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4" -vf "fps=1,scale=640:-1,tile=4x3" -frames:v 1 "out/ch-coaster-video/contact_sheet.png"
           if (-not (Test-Path "out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4")) { throw "MP4 was not produced" }
           $probe = ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of json "out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4"
           $probe | Set-Content -Path out/ch-coaster-video/ffprobe.json -Encoding utf8
@@ -101,7 +101,7 @@ jobs:
         run: |
           $job = Get-Content $env:CH_COASTER_VIDEO_JOB -Raw | ConvertFrom-Json
           $report = [ordered]@{
-            contract = "CH_COASTER_VIDEO_PROOF_V1"
+            contract = "CH_COASTER_VIDEO_PROOF_V2"
             status = "ok"
             renderer = "MapForge2CoasterVideoProof"
             routeContract = "CH_COASTER_CENTERLINE_ROUTE_V1"
@@ -109,9 +109,9 @@ jobs:
             carPoseContract = "CH_COASTER_CAR_ATLAS_RUNTIME_V1"
             trackContract = "CH_COASTER_TRACK_V1"
             carCount = 4
-            frameCount = 240
+            frameCount = 360
             fps = 30
-            durationSeconds = 8
+            durationSeconds = 12
             atlas = $job.atlas
             video = "coaster_flame_train_4car_mapforge.mp4"
           }
@@ -120,7 +120,7 @@ jobs:
       - name: Upload coaster video proof
         uses: actions/upload-artifact@v4
         with:
-          name: CH-MapForge-Coaster-Video-Proof
+          name: CH-MapForge-Coaster-Video-Proof-V2
           path: |
             out/ch-coaster-video/coaster_flame_train_4car_mapforge.mp4
             out/ch-coaster-video/contact_sheet.png
