@@ -72,6 +72,8 @@ struct CarRuntimePose {
 
 struct TrainRuntimeState {
     MotionState lead{};
+    std::array<CarPoseSelection, kCoasterTrainCarCount> previous_sprite_poses{};
+    std::array<bool, kCoasterTrainCarCount> has_previous_sprite_pose{};
 };
 
 struct TrainStepResult {
@@ -171,11 +173,13 @@ template <typename CenterlineSampler>
     return samples;
 }
 
-[[nodiscard]] inline CarRuntimePose make_car_runtime_pose(const int car_index,
-                                                          const CenterlineSample& sample,
-                                                          const double train_speed_mps,
-                                                          const int camera_quarter_turns,
-                                                          const PhysicsConfig& physics_config) noexcept {
+[[nodiscard]] inline CarRuntimePose make_car_runtime_pose(
+    const int car_index,
+    const CenterlineSample& sample,
+    const double train_speed_mps,
+    const int camera_quarter_turns,
+    const PhysicsConfig& physics_config,
+    const CarPoseSelection* previous_sprite_pose = nullptr) noexcept {
     CarRuntimePose result;
     result.car_index = car_index;
     result.route_distance_m = sample.distance_m;
@@ -192,13 +196,13 @@ template <typename CenterlineSampler>
     result.up_y = sample.up_y;
     result.up_z = sample.up_z;
     result.roll_degrees = sample.roll_degrees;
-    result.sprite_pose = select_car_pose_from_frame(
-        sample.tangent_x,
-        sample.tangent_y,
-        sample.tangent_z,
-        sample.up_x,
-        sample.up_y,
-        sample.up_z,
+    result.sprite_pose = select_car_pose_v2_continuous(
+        heading_degrees_from_tangent(sample.tangent_x, sample.tangent_y),
+        pitch_degrees_from_tangent(sample.tangent_x, sample.tangent_y, sample.tangent_z),
+        roll_degrees_from_frame(
+            sample.tangent_x, sample.tangent_y, sample.tangent_z,
+            sample.up_x, sample.up_y, sample.up_z),
+        previous_sprite_pose,
         camera_quarter_turns);
 
     TrackSample track;
@@ -250,12 +254,19 @@ template <typename CenterlineSampler>
         config.physics.gravity_mps2);
 
     for (int car = 0; car < kCoasterTrainCarCount; ++car) {
-        result.cars[static_cast<std::size_t>(car)] = make_car_runtime_pose(
+        const auto index = static_cast<std::size_t>(car);
+        const CarPoseSelection* previous = current.has_previous_sprite_pose[index]
+            ? &current.previous_sprite_poses[index]
+            : nullptr;
+        result.cars[index] = make_car_runtime_pose(
             car,
-            after[static_cast<std::size_t>(car)],
+            after[index],
             result.state.lead.speed_mps,
             camera_quarter_turns,
-            config.physics);
+            config.physics,
+            previous);
+        result.state.previous_sprite_poses[index] = result.cars[index].sprite_pose;
+        result.state.has_previous_sprite_pose[index] = true;
     }
     result.valid = true;
     return result;
