@@ -71,7 +71,6 @@ def decorate_ship(root,c,M):
     d=c['dimensions']; L=float(d['shipLength']); HW=float(d['shipHalfWidth']); cz=float(d['shipCenterZ'])
     palette,names=park_palette(M)
 
-    # Flush decorative panels replace the earlier floating side badges.
     panel_x=(-6.4,-3.2,0.0,3.2,6.4)
     for side,side_name in ((-1,'Port'),(1,'Starboard')):
         y=side*(HW+.025)
@@ -87,8 +86,6 @@ def decorate_ship(root,c,M):
             base.box(f'{label}ColorInset_{"Near" if side<0 else "Far"}',(x+(-.19 if x>0 else .19),side*.55,cz+4.28),(.10,.62,.92),mat,root,.035)
         base.box(f'{label}YellowCrown',(x,0,cz+5.62),(.46,1.34,.20),M['funYellow'],root,.055)
 
-    # Small carnival bulbs follow the visible sheer line; they read as integrated trim,
-    # not loose geometry, and stay large enough to survive the 1k isometric bake.
     bulb_x=(-7.6,-5.1,-2.6,0.0,2.6,5.1,7.6)
     for side,side_name in ((-1,'Port'),(1,'Starboard')):
         y=side*(HW+.09)
@@ -97,6 +94,58 @@ def decorate_ship(root,c,M):
             u=abs(x)/(L*.5)
             z=cz+1.02+2.10*u*u
             base.cyl_axis(f'{side_name}SheerLamp_{names[idx]}_{i}',(x,y,z),.16,.10,'Y',palette[idx],root)
+
+
+def create_hat_crown(name,center,depth,mat,parent):
+    cx,cy,cz=center
+    profile=[(-1.55,0.0),(-1.18,1.65),(-.52,2.25),(0.0,2.42),(.52,2.25),(1.18,1.65),(1.55,0.0)]
+    verts=[]
+    for yoff in (-depth*.5,depth*.5):
+        for x,z in profile:
+            verts.append((cx+x,cy+yoff,cz+z))
+    n=len(profile)
+    faces=[tuple(range(n)),tuple(range(n,2*n))]
+    for i in range(n-1):
+        faces.append((i,i+1,n+i+1,n+i))
+    faces.append((n-1,0,n,n+n-1))
+    mesh=bpy.data.meshes.new(name+'Mesh'); mesh.from_pydata(verts,[],faces); mesh.update()
+    obj=bpy.data.objects.new(name,mesh); bpy.context.scene.collection.objects.link(obj); obj.parent=parent
+    obj.data.materials.append(mat)
+    bev=obj.modifiers.new('HatCrownBevel','BEVEL'); bev.width=.09; bev.segments=3
+    return obj
+
+
+def decorate_pirate_hat_totem(root,c,M):
+    d=c['dimensions']; pz=float(d['pivotZ']); sy=float(d['sideFrameHalfY'])
+    # A real tricorn silhouette mounted above the axle, large enough to survive the isometric bake.
+    base_z=pz+1.05
+    base.box('PirateHatTotemPedestal',(0,0,pz+.58),(1.10,1.10,1.05),M['structure'],root,.12)
+    base.box('PirateHatTotemYellowPedestalBand',(0,0,pz+1.02),(1.28,1.26,.18),M['funYellow'],root,.05)
+
+    # Wide central brim and two upturned side wings form the unmistakable pirate-hat read.
+    brim=base.box('PirateHatBrim',(0,0,base_z),(4.65,1.55,.34),M['funBlue'],root,.16)
+    left=base.box('PirateHatLeftWing',(-1.72,0,base_z+.48),(2.05,1.48,.34),M['funBlue'],root,.14)
+    right=base.box('PirateHatRightWing',(1.72,0,base_z+.48),(2.05,1.48,.34),M['funBlue'],root,.14)
+    left.rotation_euler[1]=math.radians(-28)
+    right.rotation_euler[1]=math.radians(28)
+
+    create_hat_crown('PirateHatCrown',(0,0,base_z+.12),1.18,M['structure'],root)
+    base.box('PirateHatRedBand',(0,-.64,base_z+1.02),(2.75,.10,.34),M['funRed'],root,.06)
+    base.box('PirateHatYellowBandTrim',(0,-.71,base_z+1.02),(2.98,.06,.10),M['funYellow'],root,.03)
+
+    # Front medallion: a simple stylized skull mark built from game-readable primitives.
+    emblem_y=-.78; emblem_z=base_z+1.62
+    base.cyl_axis('PirateHatSkullDisc',(0,emblem_y,emblem_z),.52,.12,'Y',M['funYellow'],root)
+    base.cyl_axis('PirateHatSkullFace',(0,emblem_y-.07,emblem_z+.04),.34,.10,'Y',M['structure'],root)
+    for x in (-.12,.12):
+        base.cyl_axis('PirateHatEye_'+('L' if x<0 else 'R'),(x,emblem_y-.13,emblem_z+.12),.07,.06,'Y',M['funRed'],root)
+    base.box('PirateHatCrossboneA',(0,emblem_y-.15,emblem_z-.34),(1.05,.08,.10),M['funYellow'],root,.035).rotation_euler[1]=math.radians(26)
+    base.box('PirateHatCrossboneB',(0,emblem_y-.16,emblem_z-.34),(1.05,.08,.10),M['funYellow'],root,.035).rotation_euler[1]=math.radians(-26)
+
+    # Small bulbs connect the totem to the carnival color language already used on the ride.
+    palette,_=park_palette(M)
+    for i,x in enumerate((-1.65,-.82,0,.82,1.65)):
+        base.cyl_axis(f'PirateHatBrimLamp_{i}',(x,-.83,base_z+.02),.12,.10,'Y',palette[i%3],root)
 
 
 def decorate_frame(root,c,M):
@@ -115,7 +164,6 @@ def decorate_frame(root,c,M):
         mat=palette[side_index]
         base.cyl_axis(f'PivotColorCap_{side_index}',(0,y*1.002,pz),.46,.16,'Y',mat,root)
 
-    # Decorative top-center crest connects the color language to the axle assembly.
     base.box('TopCenterSignPlate',(0,-sy-.16,pz-1.90),(2.30,.22,1.05),M['funBlue'],root,.10)
     base.box('TopCenterSignTrim',(0,-sy-.30,pz-1.90),(2.55,.10,1.28),M['funYellow'],root,.08)
     base.box('TopCenterSignCore',(0,-sy-.36,pz-1.90),(1.30,.08,.48),M['funRed'],root,.06)
@@ -123,7 +171,6 @@ def decorate_frame(root,c,M):
 
 def refine_boarding_deck(root,c,M):
     d=c['dimensions']; deckZ=float(d['deckZ']); deckY=-5.15
-    # Give the flush deck a deliberate station edge instead of reading as a leftover slab.
     base.box('BoardingDeckFrontFascia',(0,deckY-1.43,deckZ*.72),(18.7,.16,.72),M['structure'],root,.05)
     for x in (-8.5,-4.25,0,4.25,8.5):
         base.box(f'BoardingDeckPanel_{x}',(x,deckY-1.53,deckZ*.75),(2.2,.08,.42),M['funBlue' if int(abs(x))%2==0 else 'funRed'],root,.035)
@@ -138,6 +185,7 @@ def decorated_build(root,c,M):
     decorate_suspension(root,c,M)
     decorate_ship(root,c,M)
     decorate_frame(root,c,M)
+    decorate_pirate_hat_totem(root,c,M)
     refine_boarding_deck(root,c,M)
 
 base.build=decorated_build
