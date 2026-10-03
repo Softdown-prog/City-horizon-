@@ -14,8 +14,8 @@ int main(int argc, char** argv) {
     static_assert(ch::contracts::kTileWidth == 128);
     static_assert(ch::contracts::kTileHeight == 64);
     static_assert(ch::contracts::kDiamondRatio == 2.0);
-    static_assert(ch::contracts::kMapMin == -24);
-    static_assert(ch::contracts::kMapMax == 23);
+    static_assert(ch::contracts::kMapMin == -80);
+    static_assert(ch::contracts::kMapMax == 79);
     assert(std::string(ch::contracts::kGridContract) == "CH_GRID_V1");
 
     // 2. Verify Grid Math
@@ -27,9 +27,9 @@ int main(int argc, char** argv) {
 
     ch::GridBounds bounds;
     assert(bounds.contains(0, 0));
-    assert(bounds.contains(-24, 23));
-    assert(!bounds.contains(-25, 0));
-    assert(!bounds.contains(0, 24));
+    assert(bounds.contains(-80, 79));
+    assert(!bounds.contains(-81, 0));
+    assert(!bounds.contains(0, 80));
 
     assert(ch::tile_key(5, -10) != ch::tile_key(-10, 5));
 
