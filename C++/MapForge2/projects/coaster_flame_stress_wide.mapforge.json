@@ -1,0 +1,38 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "projectId": "coaster.flame.stress.wide",
+  "assetId": "ride.coaster.flame_01",
+  "name": "Flame Coaster - Wide Stress",
+  "mapForge": {
+    "tileMeters": 3.0,
+    "footprintTiles": {"width": 48, "depth": 48},
+    "closedRoute": true,
+    "start": {"x": 18.0, "y": 0.0, "z": 0.0, "headingDegrees": 0.0}
+  },
+  "train": {"carCount": 4, "carSpacingMeters": 2.445, "passengersPerCar": 2},
+  "track": {"contract": "CH_COASTER_TRACK_V1", "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"},
+  "pieces": [
+    {"id":"station","type":"straight","length":16.0,"rise":0.0,"driveMode":"station","targetSpeedMps":4.5},
+    {"id":"lift","type":"straight","length":48.0,"rise":12.0,"driveMode":"lift","targetSpeedMps":6.0},
+    {"id":"crest","type":"straight","length":16.0,"rise":0.0},
+    {"id":"turn_1","type":"quarter_curve","radius":18.0,"left":true},
+    {"id":"drop","type":"straight","length":32.0,"rise":-12.0},
+    {"id":"valley","type":"straight","length":8.0,"rise":0.0},
+    {"id":"camel_up","type":"straight","length":12.0,"rise":4.0},
+    {"id":"camel_down","type":"straight","length":12.0,"rise":-4.0},
+    {"id":"turn_2","type":"quarter_curve","radius":18.0,"left":true},
+    {"id":"back","type":"straight","length":56.0,"rise":0.0},
+    {"id":"hill_up","type":"straight","length":12.0,"rise":3.0},
+    {"id":"hill_down","type":"straight","length":12.0,"rise":-3.0},
+    {"id":"turn_3","type":"quarter_curve","radius":18.0,"left":true},
+    {"id":"return","type":"straight","length":52.0,"rise":0.0},
+    {"id":"brake","type":"straight","length":12.0,"rise":0.0,"driveMode":"brake","targetSpeedMps":7.0},
+    {"id":"turn_4","type":"quarter_curve","radius":18.0,"left":true,"driveMode":"brake","targetSpeedMps":5.0}
+  ],
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "fullLapRequired": true,
+    "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+    "stressProfile": "wide_long_duration"
+  }
+}
