@@ -73,8 +73,13 @@ jobs:
           fi
           echo "Resolved Qt architecture: $QT_ARCH"
           python3 -m aqt install-qt linux desktop 6.8.3 "$QT_ARCH" -O "$HOME/Qt"
-          QT_PREFIX="$HOME/Qt/6.8.3/$QT_ARCH"
-          test -f "$QT_PREFIX/lib/cmake/Qt6/Qt6Config.cmake"
+          QT_CONFIG="$(find "$HOME/Qt/6.8.3" -type f -path '*/lib/cmake/Qt6/Qt6Config.cmake' -print -quit)"
+          if [ -z "$QT_CONFIG" ]; then
+            echo 'Qt6Config.cmake not found after successful aqt install' >&2
+            exit 1
+          fi
+          QT_PREFIX="${QT_CONFIG%/lib/cmake/Qt6/Qt6Config.cmake}"
+          echo "Resolved Qt prefix: $QT_PREFIX"
           echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
           echo "QT_PLUGIN_PATH=$QT_PREFIX/plugins" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$QT_PREFIX/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
