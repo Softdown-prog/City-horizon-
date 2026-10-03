@@ -99,7 +99,8 @@ PYBIND11_MODULE(city_horizon_native, m) {
           py::arg("tile_x"), py::arg("tile_y"), py::arg("footprint_width"), py::arg("footprint_height"),
           py::arg("rotation") = ch::CameraRotation::r0);
     m.def("camera_depth_key", &ch::camera_depth_key, py::arg("world_x"), py::arg("world_y"), py::arg("camera"));
-    m.def("world_to_screen_point", &ch::world_to_screen_point,
+    m.def("world_to_screen_point",
+          static_cast<ch::ScreenPoint (*)(float, float, const ch::CameraState&, float, float)>(&ch::world_to_screen_point),
           py::arg("world_x"), py::arg("world_y"), py::arg("camera"), py::arg("viewport_w"), py::arg("viewport_h"));
     m.def("screen_to_tile_coord", &ch::screen_to_tile_coord,
           py::arg("screen_x"), py::arg("screen_y"), py::arg("camera"), py::arg("viewport_w"), py::arg("viewport_h"));
