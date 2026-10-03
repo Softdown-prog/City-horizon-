@@ -1,0 +1,108 @@
+{
+  "contract": "CH_VIKING_SHIP_FULLSCALE_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "authoringPolicy": {
+    "fromScratch": true,
+    "legacyVikingImportsAllowed": false,
+    "legacyRecipeInheritanceAllowed": false,
+    "referencePriority": "user supplied real amusement park pirate ship photographs",
+    "intent": "Build a full-size permanent amusement-park pirate/Viking ship ride from generic Blender primitives and newly-authored hull geometry only."
+  },
+  "visualLanguage": {
+    "mustReadAs": [
+      "large permanent amusement park attraction",
+      "very tall broad A-frame",
+      "high heavy axle and bearing housings",
+      "long deep passenger ship",
+      "many full-size passenger rows",
+      "long suspension members",
+      "raised boarding platform with underframe",
+      "wide stairs and perimeter railings"
+    ],
+    "rejectIfReadsAs": [
+      "miniature",
+      "toy",
+      "keychain",
+      "diorama",
+      "compact pad ride",
+      "small boat inside oversized frame"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 7,
+    "depthTiles": 6
+  },
+  "geometry": {
+    "unitsPerTile": 3.0,
+    "siteWidth": 20.4,
+    "siteDepth": 17.4,
+    "platformTopZ": 1.65,
+    "platformWidth": 18.8,
+    "platformDepth": 14.6,
+    "platformSlabHeight": 0.32,
+    "underframeHeight": 1.49,
+    "pivotZ": 22.8,
+    "supportFootHalfX": 9.0,
+    "supportPlaneHalfY": 6.35,
+    "supportTopHalfX": 1.05,
+    "supportBeamWidth": 1.18,
+    "supportBeamDepth": 0.86,
+    "axleRadius": 0.52,
+    "bearingRadius": 1.18,
+    "bearingDepth": 0.46,
+    "boatDrop": 14.7,
+    "shipLength": 18.4,
+    "shipHalfWidth": 2.75,
+    "shipBodyDepth": 3.55,
+    "seatRows": 13,
+    "seatSpan": 14.4,
+    "suspensionAttachHalfX": 7.15,
+    "suspensionTopHalfX": 1.05,
+    "suspensionHalfY": 2.18,
+    "suspensionWidth": 0.50,
+    "suspensionDepth": 0.40,
+    "stairWidth": 4.8,
+    "stairRun": 5.1,
+    "stairSteps": 10,
+    "railingHeight": 1.15,
+    "previewSwingDegrees": 0.0
+  },
+  "reviewTargets": {
+    "masterCanvasPx": 1280,
+    "firstGate": "Approve only overall scale, A-frame stance, hull mass, suspension length, platform scale and seat density before decorative detailing or animation.",
+    "silhouette": "full-size park pirate ship, tall broad frame, long heavy hull, real station platform"
+  },
+  "animation": {
+    "enabled": false,
+    "prepared": true,
+    "pivotObject": "SwingPivot",
+    "rotationAxis": "Y",
+    "frameCount": null,
+    "fps": null
+  },
+  "materials": {
+    "steelDark": {"name":"FullscaleSteelDark","rgba":[0.025,0.036,0.055,1.0],"roughness":0.58,"metallic":0.76},
+    "steelMid": {"name":"FullscaleSteelMid","rgba":[0.08,0.11,0.15,1.0],"roughness":0.58,"metallic":0.68},
+    "steelLight": {"name":"FullscaleSteelLight","rgba":[0.44,0.47,0.50,1.0],"roughness":0.62,"metallic":0.58},
+    "steelBlue": {"name":"FullscaleFrameBlueBlack","rgba":[0.035,0.065,0.11,1.0],"roughness":0.58,"metallic":0.64},
+    "yellow": {"name":"FullscaleWarmGoldPaint","rgba":[0.78,0.46,0.07,1.0],"roughness":0.56,"metallic":0.28},
+    "red": {"name":"FullscaleBurgundy","rgba":[0.42,0.03,0.04,1.0],"roughness":0.64,"metallic":0.10},
+    "white": {"name":"FullscaleWarmLight","rgba":[0.78,0.78,0.74,1.0],"roughness":0.70,"metallic":0.04},
+    "gold": {"name":"FullscaleBrass","rgba":[0.58,0.34,0.06,1.0],"roughness":0.52,"metallic":0.52},
+    "teal": {"name":"FullscaleTeal","rgba":[0.03,0.22,0.27,1.0],"roughness":0.62,"metallic":0.18},
+    "woodDark": {"name":"FullscaleHullDarkWood","rgba":[0.07,0.018,0.008,1.0],"roughness":0.84,"metallic":0.0},
+    "wood": {"name":"FullscaleHullWood","rgba":[0.23,0.065,0.020,1.0],"roughness":0.82,"metallic":0.0},
+    "woodLight": {"name":"FullscaleHullTrim","rgba":[0.46,0.17,0.04,1.0],"roughness":0.76,"metallic":0.0},
+    "seatRed": {"name":"FullscaleSeatRed","rgba":[0.32,0.02,0.03,1.0],"roughness":0.70,"metallic":0.03},
+    "platform": {"name":"FullscalePlatformSteel","rgba":[0.12,0.14,0.17,1.0],"roughness":0.72,"metallic":0.48},
+    "platformWhite": {"name":"FullscalePlatformFloor","rgba":[0.34,0.36,0.38,1.0],"roughness":0.76,"metallic":0.30},
+    "panelCream": {"name":"FullscalePanelNeutral","rgba":[0.44,0.36,0.24,1.0],"roughness":0.72,"metallic":0.03},
+    "lampWarm": {"name":"FullscaleLampWarm","rgba":[0.92,0.60,0.15,1.0],"roughness":0.32,"metallic":0.04},
+    "lampRed": {"name":"FullscaleLampRed","rgba":[0.70,0.05,0.04,1.0],"roughness":0.34,"metallic":0.04},
+    "lampCyan": {"name":"FullscaleLampCyan","rgba":[0.05,0.55,0.54,1.0],"roughness":0.34,"metallic":0.04},
+    "lampPink": {"name":"FullscaleLampPink","rgba":[0.68,0.08,0.23,1.0],"roughness":0.34,"metallic":0.04}
+  }
+}
