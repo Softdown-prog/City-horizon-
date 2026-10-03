@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/ch_render/map_renderer.h"
+#include "src/ch_core/terrain_projection.h"
 #include "src/runtime_procedural_road_renderer.h"
 #include "src/ch_core/ground_surface.h"
 #include "src/ch_core/shoreline_autotile.h"
@@ -545,7 +546,8 @@ public:
                                const CropCatalog& crops,
                                const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
                                const std::filesystem::path& root, const CameraState& camera,
-                               const float viewport_width, const float viewport_height) {
+                               const float viewport_width, const float viewport_height,
+                               const MapDocument* document = nullptr) {
         (void)crops;
         (void)find_texture;
         (void)root;
@@ -554,6 +556,15 @@ public:
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
         if (!visible.valid) return;
+
+        const auto ground_point = [&](const float world_x, const float world_y) -> ScreenPoint {
+            if (document != nullptr) {
+                return terrain_world_to_screen_point(
+                    world_x, world_y, document->terrain_heightfield(),
+                    camera, viewport_width, viewport_height);
+            }
+            return ground_point(world_x, world_y);
+        };
 
         const auto soil_color = [](const float world_x, const float world_y) -> SDL_FColor {
             const float broad = std::sin(world_x * 0.52F + world_y * 0.38F) * 0.022F;
@@ -571,14 +582,10 @@ public:
         for (int y = visible.min_y; y <= visible.max_y; ++y) {
             for (int x = visible.min_x; x <= visible.max_x; ++x) {
                 if (farming.tile_at(x, y) == nullptr) continue;
-                const ScreenPoint top = world_to_screen_point(static_cast<float>(x), static_cast<float>(y),
-                                                              camera, viewport_width, viewport_height);
-                const ScreenPoint right = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y),
-                                                                camera, viewport_width, viewport_height);
-                const ScreenPoint bottom = world_to_screen_point(static_cast<float>(x + 1), static_cast<float>(y + 1),
-                                                                 camera, viewport_width, viewport_height);
-                const ScreenPoint left = world_to_screen_point(static_cast<float>(x), static_cast<float>(y + 1),
-                                                               camera, viewport_width, viewport_height);
+                const ScreenPoint top = ground_point(static_cast<float>(x), static_cast<float>(y));
+                const ScreenPoint right = ground_point(static_cast<float>(x + 1), static_cast<float>(y));
+                const ScreenPoint bottom = ground_point(static_cast<float>(x + 1), static_cast<float>(y + 1));
+                const ScreenPoint left = ground_point(static_cast<float>(x), static_cast<float>(y + 1));
                 SDL_Vertex vertices[4] = {};
                 vertices[0].position = {top.x, top.y};
                 vertices[1].position = {right.x, right.y};
@@ -605,22 +612,14 @@ public:
                 const int run_end_x = x - 1;
 
                 for (const float offset : kFurrowOffsets) {
-                    const ScreenPoint highlight_start = world_to_screen_point(
-                        static_cast<float>(run_start_x), static_cast<float>(y) + offset - kHighlightOffset,
-                        camera, viewport_width, viewport_height);
-                    const ScreenPoint highlight_end = world_to_screen_point(
-                        static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset - kHighlightOffset,
-                        camera, viewport_width, viewport_height);
+                    const ScreenPoint highlight_start = ground_point(static_cast<float>(run_start_x), static_cast<float>(y) + offset - kHighlightOffset);
+                    const ScreenPoint highlight_end = ground_point(static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset - kHighlightOffset);
                     SDL_SetRenderDrawColor(renderer, 154, 108, 68, 88);
                     SDL_RenderLine(renderer, highlight_start.x, highlight_start.y,
                                    highlight_end.x, highlight_end.y);
 
-                    const ScreenPoint shadow_start = world_to_screen_point(
-                        static_cast<float>(run_start_x), static_cast<float>(y) + offset,
-                        camera, viewport_width, viewport_height);
-                    const ScreenPoint shadow_end = world_to_screen_point(
-                        static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset,
-                        camera, viewport_width, viewport_height);
+                    const ScreenPoint shadow_start = ground_point(static_cast<float>(run_start_x), static_cast<float>(y) + offset);
+                    const ScreenPoint shadow_end = ground_point(static_cast<float>(run_end_x + 1), static_cast<float>(y) + offset);
                     SDL_SetRenderDrawColor(renderer, 78, 47, 29, 188);
                     SDL_RenderLine(renderer, shadow_start.x, shadow_start.y,
                                    shadow_end.x, shadow_end.y);
@@ -633,14 +632,15 @@ public:
                                const CropCatalog& crops,
                                const std::unordered_map<std::string, TextureAsset>& texture_lookup,
                                const std::filesystem::path& root, const CameraState& camera,
-                               const float viewport_width, const float viewport_height) {
+                               const float viewport_width, const float viewport_height,
+                               const MapDocument* document = nullptr) {
         RuntimeMapRenderer::render_farming(
             renderer, farming, crops,
             [&texture_lookup](const std::filesystem::path& path) -> const TextureAsset* {
                 const auto found = texture_lookup.find(path.generic_string());
                 return found == texture_lookup.end() ? nullptr : &found->second;
             },
-            root, camera, viewport_width, viewport_height);
+            root, camera, viewport_width, viewport_height, document);
     }
 
     static void render_buildings(SDL_Renderer* renderer, const BuildingManager& manager,
