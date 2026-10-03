@@ -1,5 +1,6 @@
 #include "../../../src/coaster_centerline_route.h"
 #include "../../../src/coaster_train_runtime.h"
+#include "../../../src/rail_system.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -21,17 +22,17 @@ namespace {
 constexpr int kWidth = 1280;
 constexpr int kHeight = 720;
 constexpr int kFps = 30;
-constexpr int kFrameCount = 240; // 8 seconds
-constexpr double kTrainSpeedMps = 7.5;
-constexpr double kTrackSampleStepM = 0.35;
-constexpr double kWorldScale = 13.0;
-constexpr double kHeightScale = 18.0;
+constexpr int kFrameCount = 360; // 12 seconds
+constexpr double kTrainSpeedMps = 11.0;
+constexpr double kTrackSampleStepM = 0.28;
+constexpr double kWorldScale = 10.6;
+constexpr double kHeightScale = 27.0;
+constexpr double kSupportSpacingM = 2.5;
 
 QPointF project(const double x, const double y, const double z) {
-    // CH_CAMERA_V1-compatible 2:1 ground projection for this deterministic proof.
     return {
         kWidth * 0.5 + (x - y) * kWorldScale,
-        kHeight * 0.56 + (x + y) * (kWorldScale * 0.5) - z * kHeightScale,
+        kHeight * 0.64 + (x + y) * (kWorldScale * 0.5) - z * kHeightScale,
     };
 }
 
@@ -39,29 +40,50 @@ ch::coaster::CenterlineRoute build_route() {
     using ch::coaster::DriveMode;
     using ch::coaster::RoutePoint;
 
-    // A compact closed demonstration circuit: station straight -> lift -> crest ->
-    // descending back straight -> broad ground curves.  Extra points make the
-    // centerline tangent interpolation smooth while keeping the vertical sections
-    // predominantly cardinal, matching CH_COASTER_TRACK_V1's current contract.
+    // Full park-coaster proof:
+    // station -> long lift hill -> crest -> first drop -> camelback -> high turn ->
+    // second drop -> sweeping ground turns -> brake run -> station.
+    // Vertical changes stay close to the procedural rail safety envelope instead of
+    // faking impossible slopes.
     std::vector<RoutePoint> points = {
-        {-15.0, -9.0, 0.0, DriveMode::Station, 5.0},
-        {-8.0,  -9.0, 0.0, DriveMode::Lift,    7.5},
-        {-2.0,  -9.0, 1.4, DriveMode::Lift,    7.5},
-        { 4.0,  -9.0, 3.8, DriveMode::Lift,    7.5},
-        {10.0,  -9.0, 6.0, DriveMode::Free,   -1.0},
-        {15.0,  -7.0, 6.0, DriveMode::Free,   -1.0},
-        {18.0,  -3.0, 5.2, DriveMode::Free,   -1.0},
-        {19.0,   2.0, 3.4, DriveMode::Free,   -1.0},
-        {18.0,   7.0, 1.2, DriveMode::Free,   -1.0},
-        {15.0,  10.0, 0.0, DriveMode::Free,   -1.0},
-        { 9.0,  11.0, 0.0, DriveMode::Free,   -1.0},
-        { 2.0,  11.0, 0.0, DriveMode::Free,   -1.0},
-        {-5.0,  11.0, 0.0, DriveMode::Free,   -1.0},
-        {-11.0, 10.0, 0.0, DriveMode::Free,   -1.0},
-        {-16.0,  7.0, 0.0, DriveMode::Brake,   7.0},
-        {-19.0,  2.0, 0.0, DriveMode::Brake,   6.0},
-        {-19.0, -3.0, 0.0, DriveMode::Free,   -1.0},
-        {-18.0, -7.0, 0.0, DriveMode::Free,   -1.0},
+        {-31.0, -13.0, 0.0, DriveMode::Station, 4.5},
+        {-24.0, -13.0, 0.0, DriveMode::Lift,    6.0},
+        {-16.0, -13.0, 1.2, DriveMode::Lift,    6.0},
+        { -8.0, -13.0, 2.6, DriveMode::Lift,    6.0},
+        {  0.0, -13.0, 4.0, DriveMode::Lift,    6.0},
+        {  8.0, -13.0, 5.4, DriveMode::Lift,    6.0},
+        { 16.0, -13.0, 6.8, DriveMode::Lift,    6.0},
+        { 23.0, -13.0, 7.8, DriveMode::Free,   -1.0},
+        { 28.0, -11.0, 7.8, DriveMode::Free,   -1.0},
+        { 31.0,  -7.0, 6.9, DriveMode::Free,   -1.0},
+        { 32.0,  -2.0, 5.6, DriveMode::Free,   -1.0},
+        { 31.0,   3.0, 4.0, DriveMode::Free,   -1.0},
+        { 28.0,   7.0, 2.2, DriveMode::Free,   -1.0},
+        { 23.0,   9.0, 0.7, DriveMode::Free,   -1.0},
+
+        // Camelback across the back straight.
+        { 16.0,  10.0, 0.4, DriveMode::Free,   -1.0},
+        {  9.0,  10.0, 1.5, DriveMode::Free,   -1.0},
+        {  2.0,  10.0, 2.7, DriveMode::Free,   -1.0},
+        { -5.0,  10.0, 1.5, DriveMode::Free,   -1.0},
+        {-12.0,  10.0, 0.4, DriveMode::Free,   -1.0},
+
+        // Elevated turnaround and second descent.
+        {-18.0,   9.0, 0.7, DriveMode::Free,   -1.0},
+        {-24.0,   7.0, 1.5, DriveMode::Free,   -1.0},
+        {-28.0,   3.0, 2.2, DriveMode::Free,   -1.0},
+        {-29.0,  -2.0, 1.5, DriveMode::Free,   -1.0},
+        {-27.0,  -7.0, 0.5, DriveMode::Free,   -1.0},
+
+        // Ground helix-ish return and brake run.
+        {-22.0,  -9.0, 0.0, DriveMode::Free,   -1.0},
+        {-16.0,  -7.0, 0.0, DriveMode::Free,   -1.0},
+        {-13.0,  -3.0, 0.0, DriveMode::Free,   -1.0},
+        {-15.0,   1.0, 0.0, DriveMode::Free,   -1.0},
+        {-20.0,   2.0, 0.0, DriveMode::Free,   -1.0},
+        {-25.0,   0.0, 0.0, DriveMode::Brake,   7.0},
+        {-29.0,  -4.0, 0.0, DriveMode::Brake,   5.5},
+        {-31.0,  -9.0, 0.0, DriveMode::Station, 4.5},
     };
 
     ch::coaster::CenterlineRoute route;
@@ -70,13 +92,13 @@ ch::coaster::CenterlineRoute build_route() {
 }
 
 void draw_grid(QPainter& painter) {
-    painter.fillRect(QRect(0, 0, kWidth, kHeight), QColor(56, 104, 55));
-    QPen grid(QColor(255, 255, 255, 24));
+    painter.fillRect(QRect(0, 0, kWidth, kHeight), QColor(59, 111, 61));
+    QPen grid(QColor(255, 255, 255, 18));
     grid.setWidthF(1.0);
     painter.setPen(grid);
-    for (int i = -26; i <= 26; ++i) {
-        painter.drawLine(project(i, -20, 0), project(i, 20, 0));
-        painter.drawLine(project(-26, i, 0), project(26, i, 0));
+    for (int i = -40; i <= 40; ++i) {
+        painter.drawLine(project(i, -28, 0), project(i, 28, 0));
+        painter.drawLine(project(-40, i, 0), project(40, i, 0));
     }
 }
 
@@ -92,56 +114,128 @@ std::vector<ch::coaster::CenterlineSample> sample_track(const ch::coaster::Cente
     return samples;
 }
 
-void draw_track(QPainter& painter, const std::vector<ch::coaster::CenterlineSample>& samples) {
+void draw_supports(QPainter& painter,
+                   const ch::coaster::CenterlineRoute& route) {
+    QPen supportPen(QColor(82, 87, 90));
+    supportPen.setWidthF(3.0);
+    painter.setPen(supportPen);
+
+    const double length = route.length_m();
+    for (double d = 0.0; d < length; d += kSupportSpacingM) {
+        const auto s = route.sample(d);
+        if (!s || s->z < 0.45) continue;
+
+        const QPointF top = project(s->x, s->y, s->z - 0.08);
+        const QPointF base = project(s->x, s->y, 0.0);
+        painter.drawLine(top, base);
+
+        const double tangentLen = std::hypot(s->tangent_x, s->tangent_y);
+        const double nx = tangentLen > 1e-6 ? -s->tangent_y / tangentLen : -1.0;
+        const double ny = tangentLen > 1e-6 ?  s->tangent_x / tangentLen :  0.0;
+        const QPointF footA = project(s->x + nx * 0.65, s->y + ny * 0.65, 0.0);
+        const QPointF footB = project(s->x - nx * 0.65, s->y - ny * 0.65, 0.0);
+        painter.drawLine(top, footA);
+        painter.drawLine(top, footB);
+    }
+}
+
+void draw_station(QPainter& painter) {
+    QPolygonF platform;
+    platform << project(-34.0, -15.4, 0.02)
+             << project(-20.5, -15.4, 0.02)
+             << project(-20.5, -10.7, 0.02)
+             << project(-34.0, -10.7, 0.02);
+    painter.setPen(QPen(QColor(88, 71, 52), 2.0));
+    painter.setBrush(QColor(184, 153, 111));
+    painter.drawPolygon(platform);
+
+    // Simple station canopy silhouette, deliberately secondary to the coaster.
+    QPen post(QColor(90, 54, 37));
+    post.setWidthF(3.0);
+    painter.setPen(post);
+    for (double x : {-32.5, -28.5, -24.5, -21.5}) {
+        painter.drawLine(project(x, -15.0, 0.0), project(x, -15.0, 1.8));
+        painter.drawLine(project(x, -11.0, 0.0), project(x, -11.0, 1.8));
+    }
+    QPolygonF roof;
+    roof << project(-33.0, -15.5, 1.8)
+         << project(-21.0, -15.5, 1.8)
+         << project(-21.0, -10.5, 1.8)
+         << project(-33.0, -10.5, 1.8);
+    painter.setBrush(QColor(126, 37, 34));
+    painter.setPen(QPen(QColor(78, 28, 25), 2.0));
+    painter.drawPolygon(roof);
+}
+
+void draw_track(QPainter& painter,
+                const ch::coaster::CenterlineRoute& route,
+                const std::vector<ch::coaster::CenterlineSample>& samples) {
     if (samples.size() < 2) return;
 
-    // Thick dark bed, then twin steel rails and sleepers. This stays intentionally
-    // readable at tycoon scale instead of trying to mimic a live 3D mesh.
+    RailProfile profile{};
+    const double gauge = profile.gauge * 0.72;
+
     QPainterPath bed;
     bed.moveTo(project(samples.front().x, samples.front().y, samples.front().z));
     for (std::size_t i = 1; i < samples.size(); ++i)
         bed.lineTo(project(samples[i].x, samples[i].y, samples[i].z));
     bed.closeSubpath();
 
-    QPen bedPen(QColor(49, 45, 42));
-    bedPen.setWidthF(13.0);
-    bedPen.setCapStyle(Qt::RoundCap);
-    bedPen.setJoinStyle(Qt::RoundJoin);
-    painter.setPen(bedPen);
+    QPen spinePen(QColor(67, 44, 39));
+    spinePen.setWidthF(10.0);
+    spinePen.setCapStyle(Qt::RoundCap);
+    spinePen.setJoinStyle(Qt::RoundJoin);
+    painter.setPen(spinePen);
     painter.drawPath(bed);
 
-    // Build two rail polylines by offsetting perpendicular to the horizontal tangent.
     QPainterPath railA, railB;
     bool first = true;
     for (const auto& s : samples) {
         const double len = std::hypot(s.tangent_x, s.tangent_y);
         const double nx = len > 1e-6 ? -s.tangent_y / len : -1.0;
         const double ny = len > 1e-6 ?  s.tangent_x / len :  0.0;
-        constexpr double gauge = 0.38;
-        const QPointF a = project(s.x + nx * gauge, s.y + ny * gauge, s.z + 0.08);
-        const QPointF b = project(s.x - nx * gauge, s.y - ny * gauge, s.z + 0.08);
+        const QPointF a = project(s.x + nx * gauge, s.y + ny * gauge, s.z + profile.rail_height);
+        const QPointF b = project(s.x - nx * gauge, s.y - ny * gauge, s.z + profile.rail_height);
         if (first) { railA.moveTo(a); railB.moveTo(b); first = false; }
         else { railA.lineTo(a); railB.lineTo(b); }
     }
-    QPen railPen(QColor(178, 184, 189));
-    railPen.setWidthF(3.2);
+    QPen railPen(QColor(193, 199, 201));
+    railPen.setWidthF(3.0);
     railPen.setCapStyle(Qt::RoundCap);
     railPen.setJoinStyle(Qt::RoundJoin);
     painter.setPen(railPen);
     painter.drawPath(railA);
     painter.drawPath(railB);
 
-    QPen sleeperPen(QColor(75, 61, 47));
-    sleeperPen.setWidthF(3.0);
+    // Sleepers follow the canonical rail profile instead of arbitrary proof spacing.
+    const int sleeperStep = std::max(1, static_cast<int>(std::round(profile.sleeper_spacing / kTrackSampleStepM)));
+    QPen sleeperPen(QColor(91, 58, 38));
+    sleeperPen.setWidthF(3.2);
     painter.setPen(sleeperPen);
-    for (std::size_t i = 0; i < samples.size(); i += 5) {
+    for (std::size_t i = 0; i < samples.size(); i += static_cast<std::size_t>(sleeperStep)) {
         const auto& s = samples[i];
         const double len = std::hypot(s.tangent_x, s.tangent_y);
         const double nx = len > 1e-6 ? -s.tangent_y / len : -1.0;
         const double ny = len > 1e-6 ?  s.tangent_x / len :  0.0;
-        painter.drawLine(project(s.x + nx * 0.65, s.y + ny * 0.65, s.z + 0.03),
-                         project(s.x - nx * 0.65, s.y - ny * 0.65, s.z + 0.03));
+        painter.drawLine(project(s.x + nx * 0.62, s.y + ny * 0.62, s.z + 0.02),
+                         project(s.x - nx * 0.62, s.y - ny * 0.62, s.z + 0.02));
     }
+
+    // Lift chain highlight on the long first hill.
+    QPen liftPen(QColor(226, 179, 63));
+    liftPen.setWidthF(2.0);
+    liftPen.setStyle(Qt::DashLine);
+    painter.setPen(liftPen);
+    QPainterPath lift;
+    bool liftStarted = false;
+    for (double d = 7.0; d <= 54.0; d += 0.35) {
+        const auto s = route.sample(d);
+        if (!s) continue;
+        const QPointF p = project(s->x, s->y, s->z + 0.13);
+        if (!liftStarted) { lift.moveTo(p); liftStarted = true; }
+        else lift.lineTo(p);
+    }
+    painter.drawPath(lift);
 }
 
 void draw_train(QPainter& painter,
@@ -162,7 +256,6 @@ void draw_train(QPainter& painter,
         const auto sample = route.sample(d);
         if (!sample) continue;
         auto pose = ch::coaster::make_car_runtime_pose(i, *sample, kTrainSpeedMps, 0, cfg.physics);
-        // Isometric painter order: farther north/west first, plus height contribution.
         cars.push_back({pose, pose.world_x + pose.world_y + pose.world_z * 0.2});
     }
     std::sort(cars.begin(), cars.end(), [](const DrawCar& a, const DrawCar& b) {
@@ -172,14 +265,23 @@ void draw_train(QPainter& painter,
     for (const DrawCar& car : cars) {
         const auto& r = car.pose.sprite_pose.source_rect;
         const QRect src(r.x, r.y, r.w, r.h);
-        const QPointF anchor = project(car.pose.world_x, car.pose.world_y, car.pose.world_z + 0.12);
-        constexpr double spriteScale = 0.62;
+        const QPointF anchor = project(car.pose.world_x, car.pose.world_y, car.pose.world_z + 0.15);
+        constexpr double spriteScale = 0.58;
         const QSizeF size(r.w * spriteScale, r.h * spriteScale);
         const QRectF dst(anchor.x() - size.width() * 0.5,
                          anchor.y() - size.height() * 0.62,
                          size.width(), size.height());
         painter.drawImage(dst, atlas, src);
     }
+}
+
+void draw_title(QPainter& painter) {
+    painter.setBrush(QColor(22, 26, 28, 205));
+    painter.setPen(Qt::NoPen);
+    painter.drawRoundedRect(QRectF(22.0, 20.0, 448.0, 66.0), 10.0, 10.0);
+    painter.setPen(QColor(245, 247, 240));
+    painter.drawText(QPointF(39.0, 48.0), QStringLiteral("CITY HORIZON - FLAME COASTER RUNTIME PROOF"));
+    painter.drawText(QPointF(39.0, 70.0), QStringLiteral("4 articulated cars | lift + first drop + camelback + return"));
 }
 
 } // namespace
@@ -217,12 +319,15 @@ int main(int argc, char** argv) {
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
         draw_grid(painter);
-        draw_track(painter, trackSamples);
+        draw_station(painter);
+        draw_supports(painter, route);
+        draw_track(painter, route, trackSamples);
 
         const double seconds = static_cast<double>(frame) / kFps;
         const double leadDistance = ch::coaster::normalize_route_distance(
             seconds * kTrainSpeedMps, route.length_m(), true);
         draw_train(painter, atlas, route, leadDistance);
+        draw_title(painter);
         painter.end();
 
         const QString path = QStringLiteral("%1/frame_%2.png")
@@ -234,7 +339,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::printf("CH_COASTER_VIDEO_PROOF_V1 frames=%d fps=%d cars=%d route_m=%.3f\n",
+    std::printf("CH_COASTER_VIDEO_PROOF_V2 frames=%d fps=%d cars=%d route_m=%.3f\n",
                 kFrameCount, kFps, ch::coaster::kCoasterTrainCarCount, route.length_m());
     return 0;
 }
