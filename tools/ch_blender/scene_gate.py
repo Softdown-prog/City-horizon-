@@ -7,11 +7,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import os
+import sys
 from pathlib import Path
 
 import bpy
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tycoon_photo_studio"))
+from render_geometry import proxy_resolution_for, scene_studio_state
 
 PREFLIGHT_CONTRACT = "CH_SCENE_PREFLIGHT_V1"
 PROXY_CONTRACT = "CH_PROXY_RENDER_V1"
@@ -31,7 +37,7 @@ DEFAULT_PROFILE = {
         "footRoles": ["character.foot_left", "character.foot_right"],
         "handRoles": ["character.hand_left", "character.hand_right"],
     },
-    "proxy": {"resolution": 256, "engine": "BLENDER_EEVEE_NEXT"},
+    "proxy": {"resolution": 256, "engine": "CYCLES", "samples": 8},
 }
 
 
@@ -56,7 +62,8 @@ def _mesh_objects(authored=None):
 
 
 def _world_bbox(obj):
-    return [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    return [evaluated.matrix_world @ Vector(corner) for corner in evaluated.bound_box]
 
 
 def _bounds(objects):
@@ -96,19 +103,48 @@ def _violation(code, message, *, obj=None, metrics=None):
     return value
 
 
-def run_preflight(*, scene=None, authored=None, footprint=None, profile=None, asset_id=None, report_path=None) -> dict:
+def run_preflight(*, scene=None, authored=None, footprint=None, profile=None, asset_id=None, report_path=None, requirements=None) -> dict:
     scene = scene or bpy.context.scene
     profile = profile or dict(DEFAULT_PROFILE)
-    objects = _mesh_objects(authored)
+    objects = [obj for obj in _mesh_objects(authored) if not obj.hide_render]
     footprint = footprint or {"widthTiles": 1, "depthTiles": 1}
+    requirements = requirements or json.loads(os.environ.get("CH_ASSET_REQUIREMENTS", "{}"))
     violations = []
 
     root = bpy.data.objects.get("AssetRoot")
     if root is None:
         violations.append(_violation("CH_PREFLIGHT_ASSET_ROOT", "AssetRoot is required as the canonical rotation/pivot root."))
+    else:
+        for obj in objects:
+            parent = obj.parent
+            while parent is not None and parent != root:
+                parent = parent.parent
+            if parent != root:
+                violations.append(_violation("CH_PREFLIGHT_UNPARENTED", "Authored geometry must rotate with AssetRoot.", obj=obj))
 
     if scene.camera is None or scene.camera.data.type != "ORTHO":
         violations.append(_violation("CH_PREFLIGHT_CAMERA", "Canonical authoring requires an orthographic scene camera."))
+    elif scene.camera is not None:
+        forward = scene.camera.matrix_world.to_quaternion() @ Vector((0.0, 0.0, -1.0))
+        elevation = math.degrees(math.asin(max(-1.0, min(1.0, -forward.z))))
+        # Studio yaw is measured clockwise: camera location is (+cos, -sin).
+        yaw = math.degrees(math.atan2(forward.y, -forward.x)) % 360.0
+        if abs(elevation - 30.0) > 0.1 or abs(yaw - 45.0) > 0.1:
+            violations.append(_violation("CH_PREFLIGHT_CAMERA", "Actual camera must obey CH_CAMERA_V1, not just name it.",
+                                         metrics={"yawDegrees": yaw, "elevationDegrees": elevation}))
+        if abs(scene.render.pixel_aspect_x - scene.render.pixel_aspect_y) > 0.0001:
+            violations.append(_violation("CH_PREFLIGHT_CAMERA", "Game sprites require square pixels."))
+
+    baseline = scene.get("ch.studioLightingState")
+    if baseline:
+        actual = json.dumps([
+            {"name": obj.name, "matrix": [list(row) for row in obj.matrix_world],
+             "energy": obj.data.energy, "color": list(obj.data.color), "type": obj.data.type}
+            for obj in scene.objects if obj.type == "LIGHT"], sort_keys=True)
+        if actual != baseline:
+            violations.append(_violation("CH_PREFLIGHT_STUDIO_DRIFT", "Builder changed the configured studio lights."))
+    if scene.get("ch.studioState") and scene_studio_state(scene) != scene["ch.studioState"]:
+        violations.append(_violation("CH_PREFLIGHT_STUDIO_DRIFT", "Builder changed the configured camera/world/color management."))
 
     if scene.render.image_settings.color_mode != "RGBA" or not scene.render.film_transparent:
         violations.append(_violation(
@@ -134,6 +170,23 @@ def run_preflight(*, scene=None, authored=None, footprint=None, profile=None, as
             violations.append(_violation("CH_PREFLIGHT_FOOTPRINT", "Authored Y extent is too large for the declared footprint.", metrics={"actual": depth, "allowed": expected_d * max_scale}))
 
     semantics = _semantic_map(objects)
+    if requirements.get("assetId") and requirements["assetId"] != asset_id:
+        violations.append(_violation("CH_PREFLIGHT_REQUIREMENTS", "Asset identity differs from the job request."))
+    if requirements.get("footprint") and any(
+        footprint.get(key) != value for key, value in requirements["footprint"].items()
+    ):
+        violations.append(_violation("CH_PREFLIGHT_REQUIREMENTS", "Footprint differs from the job request."))
+    for role in requirements.get("requiredRoles", []):
+        if role not in semantics:
+            violations.append(_violation("CH_PREFLIGHT_REQUIREMENTS", f"Requested semantic role is missing: {role}."))
+    if bounds:
+        dimensions = [bounds["max"][i] - bounds["min"][i] for i in range(3)]
+        for field, compare in (("minDimensions", lambda actual, limit: actual < limit),
+                               ("maxDimensions", lambda actual, limit: actual > limit)):
+            for axis, limit in enumerate(requirements.get(field, [])):
+                if limit is not None and compare(dimensions[axis], float(limit)):
+                    violations.append(_violation("CH_PREFLIGHT_REQUIREMENTS", f"Authored dimension violates {field}.",
+                                                 metrics={"axis": axis, "actual": dimensions[axis], "limit": limit}))
     character_roles = {role for role in semantics if role.startswith("character.")}
     if character_roles:
         char = profile.get("character", {})
@@ -173,22 +226,28 @@ def run_preflight(*, scene=None, authored=None, footprint=None, profile=None, as
         if nearest > tol:
             violations.append(_violation("CH_PREFLIGHT_GROUND_CONTACT", "No declared ground-contact object is close enough to Z=0.", metrics={"nearestAbsMinZ": nearest, "tolerance": tol}))
 
+    projected_views = {}
     if scene.camera is not None and objects:
         margin = float(profile.get("cameraMargin", 0.015))
-        projected = []
-        for obj in objects:
-            for pt in _world_bbox(obj):
-                projected.append(world_to_camera_view(scene, scene.camera, pt))
-        min_x = min(p.x for p in projected)
-        max_x = max(p.x for p in projected)
-        min_y = min(p.y for p in projected)
-        max_y = max(p.y for p in projected)
-        if min_x < -margin or max_x > 1.0 + margin or min_y < -margin or max_y > 1.0 + margin:
-            violations.append(_violation(
-                "CH_PREFLIGHT_CAMERA_CROP",
-                "Authored geometry extends outside the camera frame.",
-                metrics={"minX": min_x, "maxX": max_x, "minY": min_y, "maxY": max_y, "margin": margin},
-            ))
+        original_rotation = root.rotation_euler[2] if root is not None else None
+        try:
+            for direction, degrees in (("south", 0), ("east", 90), ("west", 270), ("north", 180)):
+                if root is not None:
+                    root.rotation_euler[2] = math.radians(degrees)
+                    bpy.context.view_layer.update()
+                projected = [world_to_camera_view(scene, scene.camera, pt)
+                             for obj in objects for pt in _world_bbox(obj)]
+                values = {"minX": min(p.x for p in projected), "maxX": max(p.x for p in projected),
+                          "minY": min(p.y for p in projected), "maxY": max(p.y for p in projected)}
+                projected_views[direction] = values
+                if (values["minX"] < -margin or values["maxX"] > 1.0 + margin or
+                        values["minY"] < -margin or values["maxY"] > 1.0 + margin or min(p.z for p in projected) <= 0):
+                    violations.append(_violation("CH_PREFLIGHT_CAMERA_CROP",
+                        f"Evaluated geometry is cropped in {direction.upper()}.", metrics={**values, "margin": margin}))
+        finally:
+            if root is not None:
+                root.rotation_euler[2] = original_rotation
+                bpy.context.view_layer.update()
 
     report = {
         "contract": PREFLIGHT_CONTRACT,
@@ -199,6 +258,10 @@ def run_preflight(*, scene=None, authored=None, footprint=None, profile=None, as
         "semanticRoles": sorted(semantics.keys()),
         "footprint": footprint,
         "bounds": bounds,
+        "projectedViews": projected_views,
+        "studioFingerprint": scene.get("ch.studioFingerprint"),
+        "sourceFingerprint": os.environ.get("CH_SOURCE_FINGERPRINT"),
+        "requirements": requirements,
         "violations": violations,
     }
     if report_path:
@@ -245,7 +308,7 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
     }
 
     proxy_cfg = profile.get("proxy", {})
-    resolution = int(proxy_cfg.get("resolution", 256))
+    resolution = proxy_resolution_for((old["x"], old["y"]), int(proxy_cfg.get("resolution", 256)))
     requested_engine = str(proxy_cfg.get("engine", "BLENDER_EEVEE_NEXT"))
     engine_used = requested_engine
 
@@ -260,16 +323,21 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
             if old["cycles_samples"] is not None:
                 scene.cycles.samples = 1
 
-        scene.render.resolution_x = resolution
-        scene.render.resolution_y = resolution
+        if engine_used == "CYCLES" and old["cycles_samples"] is not None:
+            scene.cycles.samples = max(1, int(proxy_cfg.get("samples", min(old["cycles_samples"], 8))))
+
+        scene.render.resolution_x, scene.render.resolution_y = resolution
         scene.render.resolution_percentage = 100
         scene.render.image_settings.file_format = "PNG"
         scene.render.image_settings.color_mode = "RGBA"
         scene.render.film_transparent = True
         scene.render.filepath = str(output)
-        for obj in authored:
-            obj.hide_render = False
+        # Respect intentionally hidden authoring/alternate geometry.
         bpy.ops.render.render(write_still=True)
+        origin = world_to_camera_view(scene, scene.camera, Vector((0.0, 0.0, 0.0)))
+        tile_points = [world_to_camera_view(scene, scene.camera, Vector(pt)) for pt in
+                       ((0, 0, 0), (3, 0, 0), (3, 3, 0), (0, 3, 0))]
+        tile_width = (max(p.x for p in tile_points) - min(p.x for p in tile_points)) * resolution[0]
     finally:
         scene.render.engine = old["engine"]
         scene.render.resolution_x = old["x"]
@@ -292,7 +360,11 @@ def render_proxy(*, scene=None, authored=None, output_path, profile=None, asset_
         "assetId": asset_id,
         "direction": direction,
         "engine": engine_used,
-        "resolution": [resolution, resolution],
+        "resolution": list(resolution),
+        "groundOriginPx": {"x": origin.x * resolution[0], "y": (1.0 - origin.y) * resolution[1]},
+        "projectedTileWidthPx": tile_width,
+        "studioFingerprint": scene.get("ch.studioFingerprint"),
+        "sourceFingerprint": os.environ.get("CH_SOURCE_FINGERPRINT"),
         "path": str(output),
         "bytes": output.stat().st_size,
         "sha256": _sha256(output),

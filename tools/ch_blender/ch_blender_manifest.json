@@ -29,7 +29,11 @@
     "shapeHelperModule": "tools/ch_blender/shape_authoring.py",
     "metricSceneUnits": true,
     "nonDestructiveModifierStages": true,
-    "persistentSelectionChannels": ["vertex_groups", "named_attributes", "material_slots"],
+    "persistentSelectionChannels": [
+      "vertex_groups",
+      "named_attributes",
+      "material_slots"
+    ],
     "deterministicProceduralGenerators": true,
     "deterministicSilhouettePrimitives": true,
     "machineReadableShapeDiagnostics": true,
@@ -46,15 +50,24 @@
     "classes": {
       "compact_256": {
         "preset": "tools/tycoon_photo_studio/render_pipelines/compact_256/studio.json",
-        "finalResolution": [256, 256]
+        "finalResolution": [
+          256,
+          256
+        ]
       },
       "large_asset_1024": {
         "preset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
-        "finalResolution": [1024, 1024]
+        "finalResolution": [
+          1024,
+          1024
+        ]
       },
       "large_asset_2048": {
         "preset": "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_2048.json",
-        "finalResolution": [2048, 2048]
+        "finalResolution": [
+          2048,
+          2048
+        ]
       }
     }
   },
@@ -65,7 +78,11 @@
     "worker": "tools/ch_blender/agent_worker.py",
     "machineReadable": true,
     "interactiveUiRequired": false,
-    "operations": ["guarded_blender_script", "canonical_bake", "blender_script"]
+    "operations": [
+      "guarded_blender_script",
+      "canonical_bake",
+      "blender_script"
+    ]
   },
   "internalBuild": {
     "contract": "CH_BLENDER_SOURCE_BUILD_V1",
@@ -82,7 +99,10 @@
     "revision": 1,
     "githubAction": ".github/actions/setup-ch-blender/action.yml",
     "sharedAcrossWorkflows": true,
-    "invalidateWhen": ["upstream.tag changes", "cache.revision changes"]
+    "invalidateWhen": [
+      "upstream.tag changes",
+      "cache.revision changes"
+    ]
   },
   "policy": {
     "vendorFullUpstreamSource": false,
@@ -108,6 +128,11 @@
     "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
     "policy": "preflight_then_proxy_then_explicit_human_approval_then_final",
     "newAgentAssetsMustUseGuardedBuilder": true,
-    "directFinalAllowedByDefault": false
+    "directFinalAllowedByDefault": false,
+    "assetRequirements": "CH_ASSET_REQUIREMENTS_V1",
+    "pixelReview": "CH_PROXY_PIXEL_REVIEW_V1",
+    "fourDirectionEvaluatedGeometry": true,
+    "proxyPreservesBakeAspect": true,
+    "proxyUsesProductionRenderer": true
   }
 }

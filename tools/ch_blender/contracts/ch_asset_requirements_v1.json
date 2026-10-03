@@ -1,0 +1,20 @@
+{
+  "contract": "CH_ASSET_REQUIREMENTS_V1",
+  "status": "active",
+  "purpose": "Turn explicit authoring requirements into measurable preflight checks without pretending to judge artistic quality.",
+  "jobField": "assetRequirements",
+  "required": ["contract", "assetId"],
+  "optional": {
+    "footprint": "Exact widthTiles/depthTiles requested for this asset; positive integers.",
+    "requiredRoles": "Semantic parts that must exist in visible, evaluated geometry.",
+    "minDimensions": "Minimum X/Y/Z world extent. Array of three non-negative numbers; null means unconstrained.",
+    "maxDimensions": "Maximum X/Y/Z world extent. Array of three non-negative numbers; null means unconstrained."
+  },
+  "units": "Blender world units; canonical production uses 3 units per tile.",
+  "policy": {
+    "assetSpecificBoundsOnly": true,
+    "doNotInferMinimumSizeFromFootprint": true,
+    "doNotTreatAestheticIntentAsMeasuredGeometry": true,
+    "humanVisualReviewRequired": true
+  }
+}

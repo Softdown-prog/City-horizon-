@@ -62,7 +62,12 @@ jobs:
 
           sort -u "$jobs_file" -o "$jobs_file"
           sed -i '/^[[:space:]]*$/d' "$jobs_file"
-          test -s "$jobs_file"
+          if [[ ! -s "$jobs_file" ]]; then
+            echo "has-jobs=false" >> "$GITHUB_OUTPUT"
+            echo "No active jobs changed; historical deletions do not queue renders."
+            exit 0
+          fi
+          echo "has-jobs=true" >> "$GITHUB_OUTPUT"
 
           while IFS= read -r job; do
             case "$job" in
@@ -81,6 +86,7 @@ jobs:
           cat "$jobs_file"
 
       - name: Validate jobs before setting up Blender
+        if: steps.jobs.outputs.has-jobs == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -94,12 +100,14 @@ jobs:
           exit "$failed"
 
       - name: Install worker dependencies
+        if: steps.jobs.outputs.has-jobs == 'true'
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade pillow
 
       - name: Setup shared cached CH Blender
+        if: steps.jobs.outputs.has-jobs == 'true'
         id: ch-blender
         uses: ./.github/actions/setup-ch-blender
 
@@ -126,6 +134,7 @@ jobs:
           bash tools/character_forge/bootstrap_makehuman_assets.sh
 
       - name: Validate CH Blender agent interface
+        if: steps.jobs.outputs.has-jobs == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -133,6 +142,7 @@ jobs:
           python tools/ch_blender/ch_blender_cli.py print-contract > out/ch_blender_agent/contract.json
 
       - name: Execute deterministic jobs
+        if: steps.jobs.outputs.has-jobs == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -147,6 +157,7 @@ jobs:
           exit "$failed"
 
       - name: Build animation preview GIFs
+        if: steps.jobs.outputs.has-jobs == 'true'
         shell: bash
         run: |
           set -euo pipefail

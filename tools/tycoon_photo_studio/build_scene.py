@@ -65,6 +65,7 @@ DIRECTIONS = (
 
 # Canonical scale constants — defined once in studio_constants.py (BL-1).
 from studio_constants import BLENDER_UNITS_PER_TILE, TILE_PX_W, TILE_PX_H  # noqa: E402
+from render_geometry import fit_ortho_scale, source_resolution_for, require_same_aspect, validate_studio_camera, studio_fingerprint, scene_studio_state
 
 
 # ---------------------------------------------------------------------------
@@ -133,13 +134,15 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
     is built using the full procedural node graph for that recipe (brick, plaster,
     concrete, timber, stone, metal_panel, glass).
 
-    Falls back silently to flat Principled BSDF when the library is unavailable
-    (e.g. during unit tests outside Blender) or when recipe=None/'solid'.
+    Flat Principled BSDF is used only for an explicitly solid/default material.
+    A requested procedural recipe must succeed rather than silently lose its texture.
     """
     if recipe == "water_classic":
         return make_water_classic_material(name, rgba, roughness, metallic, seed, strength)
 
-    if recipe and recipe != "solid" and _MAT_LIB_AVAILABLE:
+    if recipe and recipe != "solid":
+        if not _MAT_LIB_AVAILABLE:
+            raise RuntimeError(f"CH_MATERIAL_RECIPE_FAILED: material library unavailable for {recipe!r}")
         try:
             return _mat_lib.make(
                 recipe_name=recipe,
@@ -151,7 +154,7 @@ def make_material(name, rgba, roughness=0.72, metallic=0.0, recipe=None, seed=0,
                 strength=strength,
             )
         except Exception as exc:
-            print(f"[WARN][material] Recipe '{recipe}' failed ({exc}); falling back to flat BSDF.")
+            raise RuntimeError(f"CH_MATERIAL_RECIPE_FAILED: {recipe!r}: {exc}") from exc
 
     # ── Flat Principled BSDF fallback ────────────────────────────────────
     mat = bpy.data.materials.new(name=name)
@@ -599,33 +602,33 @@ def calibrate_ortho_scale(scene, authored, safety_margin=0.12):
     root_obj = bpy.data.objects.get("AssetRoot")
     original_z = root_obj.rotation_euler[2] if root_obj else 0.0
 
-    for direction in DIRECTIONS:
+    try:
+        for direction in DIRECTIONS:
+            if root_obj:
+                root_obj.rotation_euler[2] = math.radians(direction["rotationDegrees"])
+                bpy.context.view_layer.update()
+
+            for obj in authored:
+                if obj.type != "MESH" or obj.hide_render:
+                    continue
+                evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+                for corner in evaluated.bound_box:
+                    world_pt = evaluated.matrix_world @ Vector(corner)
+                    cam_pt = cam_mat_inv @ world_pt
+                    max_half_x = max(max_half_x, abs(cam_pt.x))
+                    max_half_y = max(max_half_y, abs(cam_pt.y))
+    finally:
         if root_obj:
-            root_obj.rotation_euler[2] = math.radians(direction["rotationDegrees"])
+            root_obj.rotation_euler[2] = original_z
             bpy.context.view_layer.update()
-
-        for obj in authored:
-            if obj.type != "MESH":
-                continue
-            for corner in obj.bound_box:
-                world_pt = obj.matrix_world @ Vector(corner)
-                cam_pt = cam_mat_inv @ world_pt
-                max_half_x = max(max_half_x, abs(cam_pt.x))
-                max_half_y = max(max_half_y, abs(cam_pt.y))
-
-    # Restore original rotation
-    if root_obj:
-        root_obj.rotation_euler[2] = original_z
-        bpy.context.view_layer.update()
 
     if max_half_x == 0.0 and max_half_y == 0.0:
         return cam.data.ortho_scale
 
-    aspect = scene.render.resolution_x / max(1, scene.render.resolution_y)
-    needed_from_x = (max_half_x * 2.0) / aspect
-    needed_from_y = max_half_y * 2.0
-    needed = max(needed_from_x, needed_from_y)
-    new_scale = needed * (1.0 + safety_margin)
+    new_scale = fit_ortho_scale(
+        max_half_x, max_half_y,
+        (scene.render.resolution_x, scene.render.resolution_y), safety_margin,
+        cam.data.sensor_fit, (scene.render.pixel_aspect_x, scene.render.pixel_aspect_y))
 
     old_scale = cam.data.ortho_scale
     cam.data.ortho_scale = new_scale
@@ -681,13 +684,11 @@ def compute_dynamic_resolution(asset, studio, min_src=(1024, 1024), min_final=(2
     final_w = _round_to(final_w, 32)
     final_h = _round_to(final_h, 32)
 
-    # Source resolution — 4× final for Cycles supersampling, rounded to next power of 2
+    # Source resolution — uniform integer supersampling: preserve the final aspect exactly
     preset_min_src = studio.get("render", {}).get("sourceResolution", list(min_src))
-    src_w = _next_pow2(max(min_src[0], preset_min_src[0], final_w * 4))
-    src_h = _next_pow2(max(min_src[1], preset_min_src[1], final_h * 4))
-    # Cap at 4096 for reasonable render times
-    src_w = min(4096, src_w)
-    src_h = min(4096, src_h)
+    src_w, src_h = source_resolution_for(
+        (final_w, final_h),
+        (max(min_src[0], preset_min_src[0]), max(min_src[1], preset_min_src[1])))
 
     print(
         f"[resolution] footprint={w_tiles}×{d_tiles} floors={floors} → "
@@ -756,7 +757,10 @@ def add_camera(camera):
 def configure_scene(studio, src_resolution, output_dir):
     if studio.get("id") != "CH_TYCOON_STUDIO_V1":
         raise RuntimeError("This baker expects frozen studio preset CH_TYCOON_STUDIO_V1")
+    validate_studio_camera(studio)
     scene = bpy.context.scene
+    scene.unit_settings.system = "METRIC"
+    scene.unit_settings.scale_length = 1.0
     render = studio["render"]
     scene.render.engine = render["engine"]
     scene.cycles.device = render["device"]
@@ -771,12 +775,12 @@ def configure_scene(studio, src_resolution, output_dir):
 
     try:
         scene.view_settings.view_transform = render["viewTransform"]
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"Unsupported studio viewTransform: {render['viewTransform']}") from exc
     try:
         scene.view_settings.look = render["look"]
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"Unsupported studio look: {render['look']}") from exc
     scene.view_settings.exposure = float(render["exposure"])
     scene.view_settings.gamma = float(render["gamma"])
 
@@ -790,6 +794,14 @@ def configure_scene(studio, src_resolution, output_dir):
     add_camera(studio["camera"])
     for light in studio["lights"]:
         add_area_light(light)
+    # Actual preset identity accompanies the scene and all review reports.
+    scene["ch.studioFingerprint"] = studio_fingerprint(studio)
+    bpy.context.view_layer.update()
+    scene["ch.studioLightingState"] = json.dumps([
+        {"name": obj.name, "matrix": [list(row) for row in obj.matrix_world],
+         "energy": obj.data.energy, "color": list(obj.data.color), "type": obj.data.type}
+        for obj in scene.objects if obj.type == "LIGHT"], sort_keys=True)
+    scene["ch.studioState"] = scene_studio_state(scene)
     os.makedirs(output_dir, exist_ok=True)
     return scene
 
@@ -812,6 +824,9 @@ def create_asset_root(authored):
 def set_direction(root, direction):
     root.rotation_euler[2] = math.radians(direction["rotationDegrees"])
     bpy.context.view_layer.update()
+    scene = bpy.context.scene
+    if scene.get("ch.studioState") and scene_studio_state(scene) != scene["ch.studioState"]:
+        raise RuntimeError("CH_STUDIO_DRIFT: asset rotation changed the fixed camera, lighting or color management")
 
 
 def ground_origin_source_px(scene):
@@ -828,15 +843,18 @@ def ground_origin_source_px(scene):
 
 
 def render_color_pass(scene, authored, ground, path):
+    hidden = ground.hide_render
+    shadow_catcher = getattr(ground, "is_shadow_catcher", None)
     ground.hide_render = True
     if hasattr(ground, "is_shadow_catcher"):
         ground.is_shadow_catcher = False
-    for obj in authored:
-        obj.hide_render = False
-        if hasattr(obj, "visible_camera"):
-            obj.visible_camera = True
-    scene.render.filepath = path
-    bpy.ops.render.render(write_still=True)
+    try:
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+    finally:
+        ground.hide_render = hidden
+        if shadow_catcher is not None:
+            ground.is_shadow_catcher = shadow_catcher
 
 
 def _shadow_render_overrides():
@@ -862,11 +880,14 @@ def _shadow_render_overrides():
 
 
 def render_shadow_pass(scene, authored, ground, path):
+    hidden = ground.hide_render
+    shadow_catcher = getattr(ground, "is_shadow_catcher", None)
+    visibility = [(obj, getattr(obj, "visible_camera", None), getattr(obj, "visible_shadow", None))
+                  for obj in authored]
     ground.hide_render = False
     if hasattr(ground, "is_shadow_catcher"):
         ground.is_shadow_catcher = True
     for obj in authored:
-        obj.hide_render = False
         if hasattr(obj, "visible_camera"):
             obj.visible_camera = False
         if hasattr(obj, "visible_shadow"):
@@ -884,6 +905,14 @@ def render_shadow_pass(scene, authored, ground, path):
         scene.render.filepath = path
         bpy.ops.render.render(write_still=True)
     finally:
+        ground.hide_render = hidden
+        if shadow_catcher is not None:
+            ground.is_shadow_catcher = shadow_catcher
+        for obj, camera, shadow in visibility:
+            if camera is not None:
+                obj.visible_camera = camera
+            if shadow is not None:
+                obj.visible_shadow = shadow
         # The next color pass must always return to the frozen studio quality.
         scene.cycles.samples = original_samples
         scene.cycles.use_denoising = original_denoising
@@ -967,6 +996,7 @@ def main():
     auto_src, auto_final = compute_dynamic_resolution(asset, studio)
     src_res = src_res or auto_src
     final_res = final_res or auto_final
+    require_same_aspect(src_res, final_res)
 
     # ── Build scene with the computed source resolution ───────────────────
     clear_scene()
@@ -1034,6 +1064,7 @@ def main():
         "footprint": asset["footprint"],
         "assetConfig": os.path.basename(args.asset_config),
         "studioPreset": studio["id"],
+        "studioFingerprint": studio_fingerprint(studio),
         "blenderVersion": bpy.app.version_string,
         "renderEngine": scene.render.engine,
         "renderDevice": studio["render"]["device"],

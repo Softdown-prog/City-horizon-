@@ -5,9 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import math
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from render_geometry import require_same_aspect, ortho_spans, studio_fingerprint
 
 FINAL_SIZE = (256, 256)
 # Review-only palette budget used by optional retro comparison variants 02-04.
@@ -263,72 +268,93 @@ def draw_pivot(draw, pivot):
     draw.line((x, y - 5, x, y + 5), fill=(230, 72, 58, 255), width=1)
 
 
-def make_direction_review(candidates, pivots, title="Tycoon Asset Baker V1 - four rotations, one source, frozen studio"):
-    board = Image.new("RGBA", (4 * 300, 380), (247, 245, 239, 255))
+def make_direction_review(candidates, pivots, title="CH Blender - four rotations at native pixel size"):
+    width = max(image.width for image in candidates.values())
+    height = max(image.height for image in candidates.values())
+    cell_w, cell_h = width + 32, height + 60
+    board = Image.new("RGBA", (4 * cell_w, cell_h + 44), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((20, 14), title, fill=(32, 32, 32, 255))
+    draw.text((16, 12), title, fill=(32, 32, 32, 255))
     for index, direction in enumerate(DIRECTION_ORDER):
-        x0 = index * 300 + 22
-        y0 = 62
-        panel = checker_panel()
-        pdraw = ImageDraw.Draw(panel)
-        pivot = pivots[direction]
-        draw_diamond(pdraw, pivot["x"], pivot["y"])
+        x0, y0 = index * cell_w + 16, 44
+        panel = checker_panel((width, height))
         panel.alpha_composite(candidates[direction])
-        draw_pivot(pdraw, pivot)
+        draw_pivot(ImageDraw.Draw(panel), pivots[direction])
         board.alpha_composite(panel, (x0, y0))
-        draw.text((x0, 326), direction.upper(), fill=(40, 40, 40, 255))
-        draw.text((x0, 344), f"pivot {pivot['x']},{pivot['y']}", fill=(72, 72, 72, 255))
+        draw.text((x0, y0 + height + 8), direction.upper(), fill=(40, 40, 40, 255))
+        draw.text((x0, y0 + height + 26), f"pivot {pivots[direction]['x']},{pivots[direction]['y']}", fill=(72, 72, 72, 255))
     return board
 
 
 def make_style_matrix(all_variants):
-    labels = (
-        "01 Full Color [PRODUCTION]",
-        "02 Retro Palette [REVIEW]",
-        "03 Retro Palette+Dither [REVIEW]",
-        "04 Retro +Edge Cleanup [REVIEW]",
-    )
-    cell = 276
-    left = 110
-    top = 62
-    board = Image.new("RGBA", (left + 4 * cell, top + 4 * cell + 36), (247, 245, 239, 255))
+    labels = ("01 Full Color [PRODUCTION]", "02 Retro Palette [REVIEW]",
+              "03 Retro Palette+Dither [REVIEW]", "04 Retro +Edge Cleanup [REVIEW]")
+    width = max(image.width for variants in all_variants.values() for image in variants)
+    height = max(image.height for variants in all_variants.values() for image in variants)
+    cell_w, cell_h = max(276, width + 20), height + 20
+    left, top = 110, 62
+    board = Image.new("RGBA", (left + 4 * cell_w, top + 4 * cell_h + 16), (247, 245, 239, 255))
     draw = ImageDraw.Draw(board)
-    draw.text((18, 14), "Four-direction style matrix - production vs optional retro review", fill=(32, 32, 32, 255))
+    draw.text((18, 14), "Native-size production vs optional retro review", fill=(32, 32, 32, 255))
     for column, label in enumerate(labels):
-        draw.text((left + column * cell + 8, 40), label, fill=(55, 55, 55, 255))
+        draw.text((left + column * cell_w + 8, 40), label, fill=(55, 55, 55, 255))
     for row, direction in enumerate(DIRECTION_ORDER):
-        draw.text((18, top + row * cell + 118), direction.upper(), fill=(45, 45, 45, 255))
+        draw.text((18, top + row * cell_h + height // 2), direction.upper(), fill=(45, 45, 45, 255))
         for column, sprite in enumerate(all_variants[direction]):
-            panel = checker_panel()
+            panel = checker_panel((width, height))
             panel.alpha_composite(sprite)
-            board.alpha_composite(panel, (left + column * cell, top + row * cell))
+            board.alpha_composite(panel, (left + column * cell_w, top + row * cell_h))
     return board
 
 
-def make_context_panel(sprite, pivot, label):
-    panel = Image.new("RGBA", (420, 320), (185, 198, 171, 255))
+def make_context_panel(sprite, pivot, label, footprint=None, baked_tile_width=None):
+    # The bake may fit a 7x7 landmark into its image. Its PNG size is NOT its
+    # gameplay size: project one actual world tile to calibrate the review.
+    scale = 128.0 / baked_tile_width if baked_tile_width else 1.0
+    size = (max(1, round(sprite.width * scale)), max(1, round(sprite.height * scale)))
+    sprite = sprite.resize(size, Image.Resampling.LANCZOS)
+    px, py = round(pivot["x"] * scale), round(pivot["y"] * scale)
+    footprint = footprint or {"widthTiles": 1, "depthTiles": 1}
+    w, d = footprint.get("widthTiles", 1), footprint.get("depthTiles", 1)
+    if label.lower() in ("east", "west"):
+        w, d = d, w
+    radius_x, radius_y = math.ceil(w / 2) + 1, math.ceil(d / 2) + 1
+    grid_x = (radius_x + radius_y) * 64
+    grid_y = (radius_x + radius_y) * 32
+    left, top = min(-px, -grid_x) - 20, min(-py, -grid_y) - 52
+    right, bottom = max(sprite.width - px, grid_x) + 20, max(sprite.height - py, grid_y) + 20
+    panel = Image.new("RGBA", (right - left, bottom - top), (185, 198, 171, 255))
     draw = ImageDraw.Draw(panel)
-    origin_x, origin_y = 210, 196
-    for gy in range(-2, 3):
-        for gx in range(-2, 3):
-            sx = origin_x + (gx - gy) * 64
-            sy = origin_y + (gx + gy) * 32
-            draw_diamond(draw, sx, sy, fill=(110, 139, 79, 255), outline=(81, 105, 61, 255))
-    panel.alpha_composite(sprite, (origin_x - pivot["x"], origin_y - pivot["y"]))
-    draw.rectangle((8, 8, 146, 32), fill=(245, 242, 233, 230))
-    draw.text((16, 15), label, fill=(42, 42, 42, 255))
+    origin_x, origin_y = -left, -top
+    for gy in range(-radius_y, radius_y):
+        for gx in range(-radius_x, radius_x):
+            corners = [(origin_x + (x - y) * 64, origin_y + (x + y) * 32)
+                       for x, y in ((gx, gy), (gx + 1, gy), (gx + 1, gy + 1), (gx, gy + 1))]
+            draw.polygon(corners, fill=(110, 139, 79, 255), outline=(81, 105, 61, 255))
+    panel.alpha_composite(sprite, (origin_x - px, origin_y - py))
+    draw_pivot(draw, {"x": origin_x, "y": origin_y})
+    caption = "tile 128x64 / zoom 1" if baked_tile_width else "native PNG size / scale not calibrated"
+    draw.rectangle((8, 8, min(panel.width - 8, 330), 42), fill=(245, 242, 233, 240))
+    draw.text((16, 12), label, fill=(42, 42, 42, 255))
+    draw.text((16, 27), caption, fill=(42, 42, 42, 255))
     return panel
 
 
-def make_context_board(candidates, pivots):
-    board = Image.new("RGBA", (840, 680), (185, 198, 171, 255))
+def make_context_board(candidates, pivots, metadata=None):
+    metadata = metadata or {}
+    tile_width = None
+    if metadata.get("orthoScaleCalibrated"):
+        span_x, _ = ortho_spans(metadata["orthoScaleCalibrated"], FINAL_SIZE)
+        tile_width = metadata.get("blenderUnitsPerTile", 3.0) * math.sqrt(2) * FINAL_SIZE[0] / span_x
+    panels = [make_context_panel(candidates[direction], pivots[direction], direction.upper(),
+                                metadata.get("footprint"), tile_width) for direction in DIRECTION_ORDER]
+    width, height = max(p.width for p in panels), max(p.height for p in panels)
+    board = Image.new("RGBA", (2 * width, 2 * height + 40), (185, 198, 171, 255))
     draw = ImageDraw.Draw(board)
-    draw.rectangle((0, 0, 840, 40), fill=(245, 242, 233, 245))
-    draw.text((16, 14), "Synthetic CH_CAMERA_V1 gameplay-scale context - not a runtime screenshot", fill=(42, 42, 42, 255))
-    positions = ((0, 40), (420, 40), (0, 360), (420, 360))
-    for direction, pos in zip(DIRECTION_ORDER, positions):
-        board.alpha_composite(make_context_panel(candidates[direction], pivots[direction], direction.upper()), pos)
+    draw.rectangle((0, 0, board.width, 40), fill=(245, 242, 233, 245))
+    draw.text((16, 14), "Synthetic grid review - not a runtime screenshot", fill=(42, 42, 42, 255))
+    for index, panel in enumerate(panels):
+        board.alpha_composite(panel, ((index % 2) * width, 40 + (index // 2) * height))
     return board
 
 
@@ -386,6 +412,10 @@ def main():
         global FINAL_SIZE
         FINAL_SIZE = tuple(map(int, metadata["finalResolution"]))
         print(f"[postprocess] Using dynamic finalResolution from metadata: {FINAL_SIZE[0]}×{FINAL_SIZE[1]}")
+
+    require_same_aspect(metadata["renderResolution"], FINAL_SIZE)
+    if metadata.get("studioFingerprint") and metadata["studioFingerprint"] != studio_fingerprint(preset):
+        raise RuntimeError("Source lighting/color fingerprint differs from the post-process preset")
 
     asset_id = metadata["sourceObject"]
     terrain_surface = metadata.get("assetType") == "terrain_surface"
@@ -463,7 +493,7 @@ def main():
     style_matrix = make_style_matrix(all_variants)
     style_matrix.save(output_dir / f"{asset_id}_style_matrix.png")
     style_matrix.save(output_dir / "tycoon_photo_studio_comparison_board.png")
-    context = make_context_board(candidates, pivots)
+    context = make_context_board(candidates, pivots, metadata)
     context.save(output_dir / f"{asset_id}_4dir_context.png")
     context.save(output_dir / "tycoon_photo_studio_in_game_context.png")
     if mask_enabled:
@@ -489,6 +519,10 @@ def main():
         "sourceContract": metadata.get("sourceContract"),
         "assetConfig": metadata.get("assetConfig"),
         "studioPreset": metadata.get("studioPreset"),
+        "studioFingerprint": metadata.get("studioFingerprint"),
+        "sourceFingerprint": metadata.get("sourceFingerprint"),
+        "orthoScaleCalibrated": metadata.get("orthoScaleCalibrated"),
+        "blenderUnitsPerTile": metadata.get("blenderUnitsPerTile", 3.0),
         "cameraContract": metadata.get("cameraContract", "CH_CAMERA_V1"),
         "gridContract": metadata.get("gridContract", "CH_GRID_V1"),
         "projection": metadata.get("projection", "orthographic_dimetric_2_to_1"),

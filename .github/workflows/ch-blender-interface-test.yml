@@ -7,6 +7,16 @@ on:
       - "tools/ch_blender/agent_worker.py"
       - "tools/ch_blender/ch_blender_cli.py"
       - "tools/ch_blender/scene_gate.py"
+      - "tools/ch_blender/proxy_review.py"
+      - "tools/ch_blender/contracts/**"
+      - "tools/ch_blender/preflight_profiles/**"
+      - "tools/ch_blender/ch_blender_manifest.json"
+      - "tools/ch_blender/jobs/**"
+      - "tools/ch_blender/jobs_ground/**"
+      - "tools/tycoon_photo_studio/render_geometry.py"
+      - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/validate_package.py"
       - "tools/ch_blender/tests/**"
       - ".github/workflows/ch-blender-agent-worker.yml"
       - ".github/workflows/ch-blender-ground-worker.yml"
@@ -19,11 +29,27 @@ permissions:
 jobs:
   validate-interface:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install image review dependency
+        run: python -m pip install pillow
       - name: Test all existing job contracts and error paths without Blender
         run: python -m unittest discover -s tools/ch_blender/tests -v
+      - name: Setup shared cached CH Blender
+        uses: ./.github/actions/setup-ch-blender
+      - name: Compare framing and validate actual Blender geometry
+        run: >-
+          "$CH_BLENDER_EXE" --background --factory-startup --python-exit-code 1
+          --python tools/ch_blender/tests/blender_render_quality_probe.py
+          -- --output out/ch_blender_quality/regression
+      - name: Upload render comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Blender-Render-Quality-${{ github.run_id }}
+          path: out/ch_blender_quality/regression
+          if-no-files-found: warn

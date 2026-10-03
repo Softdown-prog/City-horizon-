@@ -21,7 +21,7 @@ python tools/ch_blender/ch_blender_cli.py run-job --job tools/ch_blender/jobs/<i
 
 The CLI emits JSON. Treat JSON status and process exit code as the machine contract. Do not scrape prose from Blender logs to decide whether the operation succeeded.
 
-Run `validate-job` before queuing a job. It checks the job contract, input files, profile, output paths, stage and review fields without finding or launching Blender. Guarded jobs must provide exactly one `--output` value that resolves to the declared `outputDir`. This catches a common expensive mistake before rendering. The GitHub agent and ground workflows run this check before setting up Blender, and continue through all selected jobs if one render fails so each gets a report. They still fail the workflow if any job fails.
+Run `validate-job` before queuing a job. It checks the job contract, input files (including recipe/config/preset arguments), profile, output paths, stage and review fields without finding or launching Blender. Guarded jobs must provide exactly one `--output` value that resolves to the declared `outputDir`. This catches a common expensive mistake before rendering. The GitHub agent and ground workflows run this check before setting up Blender, and continue through all selected jobs if one render fails so each gets a report. They still fail the workflow if any job fails.
 
 Binary resolution order:
 
@@ -60,7 +60,9 @@ Stable rejection codes include:
 - `CH_PREFLIGHT_BODY_LAYOUT`
 - `CH_PREFLIGHT_DETACHED_BODY_PART`
 - `CH_PREFLIGHT_GROUND_CONTACT`
-- `CH_PREFLIGHT_CAMERA_CROP`
+- `CH_PREFLIGHT_CAMERA_CROP` (all four canonical directions, evaluated modifier geometry)
+- `CH_PREFLIGHT_STUDIO_DRIFT`
+- `CH_PREFLIGHT_REQUIREMENTS`
 
 An agent must stop on failure and make one targeted correction.
 
@@ -68,13 +70,15 @@ An agent must stop on failure and make one targeted correction.
 
 After preflight passes, run the same guarded builder with `qualityStage: "proxy"`.
 
-The proxy is intentionally cheap: gameplay-sized, one direction, and uses the preflight profile's proxy renderer. It exists to judge silhouette, proportions, pose, composition and obvious occlusion before spending on four-direction final output.
+The proxy is intentionally cheap: one direction, low samples, the exact bake aspect, and the production Cycles renderer by default. Its canvas size is not a gameplay scale claim. It exists to judge silhouette, proportions, pose, composition and obvious occlusion before spending on four-direction final output.
 
 The builder writes:
 
 - `preflight_report.json`
 - `proxy_south.png`
-- `proxy_report.json` (`CH_PROXY_RENDER_V1`, including SHA-256)
+- `proxy_report.json` (`CH_PROXY_RENDER_V1`, including SHA-256, projected tile size and source/studio fingerprints)
+- worker-generated `proxy_review.png` (light/dark backgrounds and a calibrated synthetic 128×64 gameplay grid)
+- worker-generated `proxy_review_report.json` (`CH_PROXY_PIXEL_REVIEW_V1`; empty alpha is rejected)
 
 A green proxy job is not artistic approval.
 
@@ -87,10 +91,13 @@ Final is rejected by the worker unless the job records explicit review:
   "qualityStage": "final",
   "approval": {
     "proxyReviewed": true,
-    "approvedProxySha256": "<sha256 from reviewed proxy_report.json>"
+    "approvedProxySha256": "<sha256 from reviewed proxy_report.json>",
+    "sourceFingerprint": "<sourceFingerprint from reviewed worker/proxy report>"
   }
 }
 ```
+
+`sourceFingerprint` binds review to the recipe, preset, local Python dependencies, profile and ordered authoring arguments. Changing output location alone does not invalidate it. It is mandatory for new final jobs that declare `assetRequirements`; older jobs remain compatible. If authoring inputs change, run and review a new proxy. External files read dynamically by scripts must still be tracked explicitly; this is not a sandbox.
 
 This is provenance for the human review. It prevents an agent from accidentally paying the cost of a final bake immediately after authoring new geometry.
 
@@ -119,6 +126,8 @@ This authoring contract does not by itself mean runtime SDL tinting is implement
 ## Job contract
 
 Every job uses `CH_BLENDER_AGENT_JOB_V1` and has a unique `jobId`.
+
+For new guarded assets, record measurable request constraints with `assetRequirements` (`CH_ASSET_REQUIREMENTS_V1`): asset ID, tile footprint, required semantic roles and optional world-space min/max dimensions. Tag the requested roles on authored objects. The gate compares the scene to these values; it cannot infer unrecorded artistic instructions from prose. Read `contracts/ch_asset_requirements_v1.json` and `docs/CH_BLENDER_RENDER_QUALITY_V1.md`. Requested procedural material recipes must succeed; do not substitute flat materials after errors.
 
 ### Guarded Blender script — preferred for new assets
 
@@ -163,7 +172,7 @@ A push of `*.job.json` triggers `.github/workflows/ch-blender-agent-worker.yml`.
 
 Do not reuse one global `active.job.json`: multiple ChatGPT/Claude/other agent sessions may be working concurrently. Unique immutable-ish job files reduce collisions and preserve provenance.
 
-After an asset is approved, jobs may be retained for provenance or removed in a later housekeeping commit. Generated `out/` data is not committed by this contract.
+After an asset is approved, jobs may be retained for provenance or removed in a later housekeeping commit. Generated `out/` data is not committed by this contract. Invalid historical requests with deleted sources or invalid review records are preserved under `retired_jobs/`, with per-job reasons; never fabricate an approval to reactivate one.
 
 ## Shared Blender cache
 

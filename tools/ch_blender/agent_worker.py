@@ -9,7 +9,9 @@ and proxy review.
 from __future__ import annotations
 
 import hashlib
+import ast
 import json
+import math
 import os
 import platform
 import re
@@ -43,6 +45,71 @@ EXIT = {
     "EXPECTED_OUTPUT_MISSING": 22,
     "PACKAGE_INVALID": 23,
 }
+
+
+def _argument_inputs(args: list[str]) -> list[Path]:
+    """Resolve actual authoring inputs before downloading or starting Blender."""
+    inputs = []
+    for flag in ("--recipe", "--asset-config", "--studio-preset"):
+        values = []
+        for index, item in enumerate(args):
+            if item == flag:
+                if index + 1 >= len(args) or args[index + 1].startswith("--"):
+                    raise WorkerError("JOB_INVALID", f"{flag} requires an input file")
+                values.append(args[index + 1])
+            elif item.startswith(flag + "="):
+                values.append(item.split("=", 1)[1])
+        if len(values) > 1:
+            raise WorkerError("JOB_INVALID", f"Repeated authoring input: {flag}")
+        for value in values:
+            path = _repo_path(value)
+            if not path.is_file():
+                raise WorkerError("JOB_INVALID", f"{flag} must refer to a file")
+            data = _load_json(path)
+            if flag == "--studio-preset":
+                sys.path.insert(0, str(REPO_ROOT / "tools/tycoon_photo_studio"))
+                from render_geometry import validate_studio_camera
+                try:
+                    validate_studio_camera(data)
+                except ValueError as exc:
+                    raise WorkerError("CONTRACT_MISMATCH", str(exc)) from exc
+            inputs.append(path)
+    return inputs
+
+
+def _input_records(script: Path, profile: Path, args: list[str]) -> list[dict[str, str]]:
+    # Local module dependencies matter: editing geometry in an imported helper
+    # changes the asset even when the thin guarded builder did not change.
+    paths = {script, profile, *_argument_inputs(args)}
+    search = (script.parent, REPO_ROOT / "tools/ch_blender", REPO_ROOT / "tools/tycoon_photo_studio")
+    pending = [script]
+    while pending:
+        current = pending.pop()
+        tree = ast.parse(current.read_text(encoding="utf-8"))
+        modules = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module]
+        modules += [alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names]
+        for module in modules:
+            for directory in (current.parent, *search):
+                candidate = (directory / (module.replace(".", "/") + ".py")).resolve()
+                if candidate.is_file() and candidate.is_relative_to(REPO_ROOT) and candidate not in paths:
+                    paths.add(candidate)
+                    pending.append(candidate)
+    return [{"path": path.relative_to(REPO_ROOT).as_posix(), "sha256": _sha256(path)} for path in sorted(paths)]
+
+
+def _source_fingerprint(inputs: list[dict[str, str]], args: list[str] | None = None) -> str:
+    # Output location is not authoring; every other ordered option affects identity.
+    authoring_args = []
+    skip = False
+    for arg in args or []:
+        if skip:
+            skip = False
+        elif arg == "--output":
+            skip = True
+        elif not arg.startswith("--output="):
+            authoring_args.append(arg)
+    payload = {"inputs": inputs, "args": authoring_args}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 class WorkerError(RuntimeError):
@@ -221,6 +288,7 @@ def validate_job(job_path: Path) -> dict[str, Any]:
         args = job.get("args", [])
         if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
             raise WorkerError("JOB_INVALID", "args must be an ordered array of strings")
+        _argument_inputs(args)
         if operation == "guarded_blender_script":
             _repo_path(str(job.get("qualityProfile") or DEFAULT_PREFLIGHT_PROFILE.relative_to(REPO_ROOT)))
             reserved = ("--stage", "--preflight-profile", "--approval-proxy-sha")
@@ -232,6 +300,29 @@ def validate_job(job_path: Path) -> dict[str, Any]:
             if builder_output != output_root:
                 raise WorkerError("JOB_INVALID", "Builder --output and outputDir must match",
                                   {"builderOutput": str(builder_output), "outputDir": str(output_root)})
+
+    requirements = job.get("assetRequirements", {})
+    if requirements:
+        if not isinstance(requirements, dict) or requirements.get("contract") != "CH_ASSET_REQUIREMENTS_V1":
+            raise WorkerError("CONTRACT_MISMATCH", "assetRequirements must use CH_ASSET_REQUIREMENTS_V1")
+        if not isinstance(requirements.get("assetId"), str) or not requirements["assetId"]:
+            raise WorkerError("JOB_INVALID", "assetRequirements requires assetId")
+        if operation == "guarded_blender_script" and job.get("qualityStage") == "final":
+            fingerprint = job.get("approval", {}).get("sourceFingerprint", "")
+            if not re.fullmatch(r"[0-9a-f]{64}", str(fingerprint)):
+                raise WorkerError("QUALITY_GATE_REQUIRED", "Final jobs with assetRequirements require the reviewed sourceFingerprint")
+        footprint = requirements.get("footprint")
+        if footprint is not None and (not isinstance(footprint, dict) or
+                any(type(footprint.get(key)) is not int or footprint[key] <= 0 for key in ("widthTiles", "depthTiles"))):
+            raise WorkerError("JOB_INVALID", "assetRequirements footprint must contain positive tile dimensions")
+        roles = requirements.get("requiredRoles", [])
+        if not isinstance(roles, list) or not all(isinstance(role, str) and role for role in roles):
+            raise WorkerError("JOB_INVALID", "requiredRoles must be an array of semantic roles")
+        for key in ("minDimensions", "maxDimensions"):
+            values = requirements.get(key)
+            if values is not None and (not isinstance(values, list) or len(values) != 3 or
+                    any(value is not None and (type(value) not in (int, float) or not math.isfinite(value) or value < 0) for value in values)):
+                raise WorkerError("JOB_INVALID", f"{key} must contain three non-negative dimensions or null")
 
     expected = job.get("expectedOutputs", [])
     if not isinstance(expected, list) or not all(isinstance(item, str) for item in expected):
@@ -276,6 +367,8 @@ def _canonical_bake(job: dict[str, Any], blender_exe: Path, started_ns: int):
         "--background",
         "--factory-startup",
         "--python-use-system-env",
+        "--python-exit-code",
+        "1",
         "--python",
         str(BUILD_SCENE),
         "--",
@@ -372,6 +465,8 @@ def _blender_script(job: dict[str, Any], blender_exe: Path, started_ns: int):
         "--background",
         "--factory-startup",
         "--python-use-system-env",
+        "--python-exit-code",
+        "1",
         "--python",
         str(script),
         "--",
@@ -407,6 +502,12 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
             "JOB_INVALID",
             "guarded_blender_script args must be an ordered array of strings",
         )
+    inputs = _input_records(script, profile, args)
+    source_fingerprint = _source_fingerprint(inputs, args)
+    reviewed_source = job.get("approval", {}).get("sourceFingerprint")
+    if stage == "final" and reviewed_source and reviewed_source != source_fingerprint:
+        raise WorkerError("QUALITY_GATE_REQUIRED", "Authoring inputs changed since proxy review; render a new proxy",
+                          {"reviewed": reviewed_source, "current": source_fingerprint})
     reserved = {"--stage", "--preflight-profile", "--approval-proxy-sha"}
     if any(item in reserved for item in args):
         raise WorkerError(
@@ -419,6 +520,8 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
         "--background",
         "--factory-startup",
         "--python-use-system-env",
+        "--python-exit-code",
+        "1",
         "--python",
         str(script),
         "--",
@@ -441,6 +544,8 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
         "LIBGL_ALWAYS_SOFTWARE": os.environ.get("LIBGL_ALWAYS_SOFTWARE", "1"),
         "CH_AGENT_OUTPUT_DIR": str(output_root),
         "CH_QUALITY_STAGE": stage,
+        "CH_ASSET_REQUIREMENTS": json.dumps(job.get("assetRequirements", {})),
+        "CH_SOURCE_FINGERPRINT": source_fingerprint,
     }
     _run(command, error_code="BLENDER_FAILED", env=env)
 
@@ -471,6 +576,7 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
         "preflightContract": preflight.get("contract"),
         "preflightStatus": preflight.get("status"),
         "profile": profile.relative_to(REPO_ROOT).as_posix(),
+        "sourceFingerprint": source_fingerprint,
     }
     if stage == "proxy":
         proxy = _load_json(output_root / "proxy_report.json")
@@ -486,6 +592,11 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
             )
         quality["proxySha256"] = proxy.get("sha256")
         quality["proxyDirection"] = proxy.get("direction")
+        from proxy_review import write_proxy_review
+        try:
+            quality["proxyReview"] = write_proxy_review(output_root, proxy, preflight)
+        except ValueError as exc:
+            raise WorkerError("PACKAGE_INVALID", str(exc)) from exc
     elif stage == "final":
         approval_record = _load_json(output_root / "proxy_approval.json")
         if (approval_record.get("contract") != "CH_PROXY_APPROVAL_V1" or
@@ -496,11 +607,16 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
                               {"approval": approval_record, "assetId": preflight.get("assetId")})
         quality["approvedProxySha256"] = approval_sha
         quality["proxyReviewed"] = True
+        metadata_path = output_root / "studio_metadata.json"
+        metadata = _load_json(metadata_path)
+        actual_studio = preflight.get("studioFingerprint")
+        if metadata.get("studioFingerprint") and metadata["studioFingerprint"] != actual_studio:
+            raise WorkerError("PACKAGE_INVALID", "Final metadata differs from the preflight studio")
+        if actual_studio:
+            metadata["studioFingerprint"] = actual_studio
+        metadata["sourceFingerprint"] = source_fingerprint
+        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
-    inputs = [
-        {"path": script.relative_to(REPO_ROOT).as_posix(), "sha256": _sha256(script)},
-        {"path": profile.relative_to(REPO_ROOT).as_posix(), "sha256": _sha256(profile)},
-    ]
     return output_root, inputs, quality
 
 

@@ -1,0 +1,129 @@
+[
+  {
+    "file": "attraction.park_viking_ship.proxy.001.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.proxy.003.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.proxy.004.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.proxy.005.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.proxy.006.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.proxy.007.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.viking.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.002.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v2_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.003.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v3_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.004.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v4_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.004.retry.001.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v4_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.004.swing_preview.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/assets/park_viking_ship_5x4.rebuild_v4.json"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.v5_fresh.proxy.001.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v5_fresh_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.v5_fresh.proxy.retry.001.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v5_fresh_guarded.py"
+    }
+  },
+  {
+    "file": "attraction.park_viking_ship.rebuild.v6_target.proxy.001.job.json",
+    "reason": "Required path does not exist",
+    "details": {
+      "path": "tools/tycoon_photo_studio/build_viking_ship_rebuild_v6_target_guarded.py"
+    }
+  },
+  {
+    "file": "effect.steam_train.vapor_overlay.final.001.job.json",
+    "reason": "Quality-stage arguments are owned by the CH Blender worker",
+    "details": {}
+  },
+  {
+    "file": "rail.prerendered.straight.final.001.job.json",
+    "reason": "Final render requires explicit human proxy review.",
+    "details": {
+      "required": "approval.proxyReviewed=true"
+    }
+  },
+  {
+    "file": "rail.prerendered.straight.final.002.job.json",
+    "reason": "Final render requires the SHA-256 from the reviewed proxy report.",
+    "details": {
+      "required": "approval.approvedProxySha256"
+    }
+  },
+  {
+    "file": "rail.prerendered.straight.final.003.job.json",
+    "reason": "Quality-stage arguments are owned by the CH Blender worker",
+    "details": {}
+  },
+  {
+    "file": "vehicle.steam_train.cab_7coaches.final.001.job.json",
+    "reason": "Quality-stage arguments are owned by the CH Blender worker",
+    "details": {}
+  }
+]

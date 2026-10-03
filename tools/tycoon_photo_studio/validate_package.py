@@ -6,9 +6,13 @@ import argparse
 import base64
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 from PIL import Image
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from render_geometry import require_same_aspect, studio_fingerprint
 
 EXPECTED_ORDER = ["south", "east", "west", "north"]
 EXPECTED_TURNS = {"south": 0, "east": 1, "west": 3, "north": 2}
@@ -96,6 +100,10 @@ def main():
             all(type(value) is int and value > 0 for value in frame_size), "Invalid final frame resolution")
     require(all(actual >= minimum for actual, minimum in zip(frame_size, minimum_size)),
             "Final resolution is smaller than the studio preset minimum")
+    if manifest.get("renderResolution"):
+        require_same_aspect(manifest["renderResolution"], frame_size)
+    if manifest.get("studioFingerprint"):
+        require(manifest["studioFingerprint"] == studio_fingerprint(studio), "Studio lighting/color settings changed")
     require(manifest.get("paletteColorCount") == studio["postProcess"]["paletteColors"], "Palette size differs from studio preset")
     require(
         manifest.get("candidatePostProcess", {}).get("variantId") == studio["postProcess"]["candidateVariant"],

@@ -23,6 +23,7 @@
   },
   "proxy": {
     "resolution": 256,
-    "engine": "BLENDER_EEVEE_NEXT"
+    "engine": "CYCLES",
+    "samples": 8
   }
 }

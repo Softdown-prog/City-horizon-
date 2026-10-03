@@ -156,6 +156,8 @@ def cmd_contract(_: argparse.Namespace) -> int:
             "preflight": "CH_SCENE_PREFLIGHT_V1",
             "proxy": "CH_PROXY_RENDER_V1",
             "approval": "CH_PROXY_APPROVAL_V1",
+            "assetRequirements": "CH_ASSET_REQUIREMENTS_V1",
+            "pixelReview": "CH_PROXY_PIXEL_REVIEW_V1",
             "defaultProfile": "tools/ch_blender/preflight_profiles/ch_asset_default_v1.json",
         },
         "parametricAuthoring": parametric_contract_summary(),
@@ -174,7 +176,9 @@ def cmd_contract(_: argparse.Namespace) -> int:
                     "outputDir",
                     "qualityProfile",
                     "approval",
+                    "assetRequirements",
                 ],
+                "sourceReviewBinding": "approval.sourceFingerprint from the reviewed proxy qualityGate",
             },
             "canonical_bake": {
                 "legacyForNewAgentAssets": True,
