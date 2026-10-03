@@ -11,9 +11,11 @@ on:
       - "assets/audio/**"
       - ".github/workflows/ctest-worker-pool.yml"
 
+# Keep validation for each commit independent. This repo receives concurrent commits,
+# so a newer push must not cancel an already-running CTest pool for an older SHA.
 concurrency:
-  group: ctest-worker-pool-${{ github.ref }}
-  cancel-in-progress: true
+  group: ctest-worker-pool-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   build-tests:
