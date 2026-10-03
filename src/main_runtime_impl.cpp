@@ -656,11 +656,11 @@ void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, 
 
 void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const CropCatalog& crops,
                     const TextureCache& textures, const std::filesystem::path& root, const Camera& camera,
-                    float viewport_width, float viewport_height) {
+                    float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
     ch::MapRenderer::render_farming(renderer, farming, crops,
                                     [&textures](const std::filesystem::path& p) { return textures.find(p); },
-                                    root, cs, viewport_width, viewport_height);
+                                    root, cs, viewport_width, viewport_height, document);
 }
 
 [[nodiscard]] bool building_overlaps_road(const BuildingDefinition& definition, BuildingRotation rotation,
@@ -997,7 +997,8 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
 
 void render_crosswalks(SDL_Renderer* renderer, const CrosswalkManager& crosswalks,
                        TextureCache& textures, const std::filesystem::path& asset_root,
-                       const Camera& camera, const float viewport_width, const float viewport_height) {
+                       const Camera& camera, const float viewport_width, const float viewport_height,
+                       const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
     const bool quarter_turn = (camera_rotation_turns(camera.rotation) % 2U) != 0U;
     for (const CrosswalkPortal& portal : crosswalks.portals()) {
@@ -1010,8 +1011,14 @@ void render_crosswalks(SDL_Renderer* renderer, const CrosswalkManager& crosswalk
             (visual_axis == CrosswalkAxis::north_south ? "crosswalk_south.png" : "crosswalk_east.png");
         const TextureAsset* texture = textures.load(renderer, path);
         if (texture != nullptr) {
-            ch::MapRenderer::render_road_sprite(renderer, *texture, portal.tile_x, portal.tile_y,
-                                                cs, viewport_width, viewport_height);
+            if (document != nullptr) {
+                ch::MapRenderer::render_heightfield_terrain_tile(
+                    renderer, *texture, portal.tile_x, portal.tile_y, *document,
+                    cs, viewport_width, viewport_height, false);
+            } else {
+                ch::MapRenderer::render_road_sprite(renderer, *texture, portal.tile_x, portal.tile_y,
+                                                    cs, viewport_width, viewport_height);
+            }
         }
     }
 }
@@ -3830,12 +3837,14 @@ int main() {
                      static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                      active_map_doc ? &*active_map_doc : nullptr);
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
-                          static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                          static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                          active_map_doc ? &*active_map_doc : nullptr);
         render_sidewalks(renderer, sidewalks, textures, asset_root, camera,
                          static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                          active_map_doc ? &*active_map_doc : nullptr);
         render_farming(renderer, farming, crop_catalog, textures, asset_root, camera,
-                       static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                       static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                       active_map_doc ? &*active_map_doc : nullptr);
 
         if (road_mode) {
             const SDL_FColor preview_color = road_preview_valid
