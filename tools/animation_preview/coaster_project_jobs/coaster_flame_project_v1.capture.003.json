@@ -1,0 +1,9 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_CAPTURE_V1",
+  "project": "C++/MapForge2/projects/coaster_flame_01.mapforge.json",
+  "video": "coaster_flame_mapforge_project_v1.mp4",
+  "frameCount": 360,
+  "fps": 30,
+  "carCount": 4,
+  "retry": 3
+}
