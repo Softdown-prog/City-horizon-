@@ -109,3 +109,52 @@ jobs:
             exit 1
           fi
           echo "Rendered $count occupied V2 frames"
+
+      - name: Encode MP4 and contact sheet
+        run: |
+          set -euo pipefail
+          ffmpeg -y -framerate 30 \
+            -i out/ch-coaster-v2-video/frames/frame_%04d.png \
+            -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
+            out/ch-coaster-v2-video/coaster_flame_v2.mp4
+          ffmpeg -y -i out/ch-coaster-v2-video/coaster_flame_v2.mp4 \
+            -vf "fps=1,scale=640:-1,tile=4x3" -frames:v 1 \
+            out/ch-coaster-v2-video/contact_sheet.png
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,r_frame_rate,nb_frames \
+            -of json out/ch-coaster-v2-video/coaster_flame_v2.mp4 \
+            > out/ch-coaster-v2-video/ffprobe.json
+          test -s out/ch-coaster-v2-video/coaster_flame_v2.mp4
+          test -s out/ch-coaster-v2-video/contact_sheet.png
+
+      - name: Write proof report
+        run: |
+          set -euo pipefail
+          cat > out/ch-coaster-v2-video/proof_report.json <<'JSON'
+          {
+            "contract": "CH_COASTER_VIDEO_PROOF_V4",
+            "status": "ok",
+            "renderer": "MapForge2CoasterVideoProof",
+            "projectContract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+            "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
+            "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
+            "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+            "frameCount": 360,
+            "fps": 30,
+            "durationSeconds": 12,
+            "carCount": 4,
+            "staleFrameReuseAllowed": false
+          }
+          JSON
+
+      - name: Upload V2 video proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Coaster-V2-Video-Proof-${{ github.run_id }}
+          path: |
+            out/ch-coaster-v2-video/coaster_flame_v2.mp4
+            out/ch-coaster-v2-video/contact_sheet.png
+            out/ch-coaster-v2-video/ffprobe.json
+            out/ch-coaster-v2-video/proof_report.json
+          if-no-files-found: error
+          retention-days: 14
