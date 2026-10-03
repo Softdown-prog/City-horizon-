@@ -71,6 +71,62 @@ bool validate_route_pose_coverage(
     return true;
 }
 
+void draw_train_continuous(
+    QPainter& painter,
+    const Projection& projection,
+    const QImage& atlas,
+    const ch::coaster::CenterlineRoute& route,
+    const double leadDistance,
+    std::array<ch::coaster::CarPoseSelection, ch::coaster::kCoasterTrainCarCount>& previousPoses,
+    std::array<bool, ch::coaster::kCoasterTrainCarCount>& hasPreviousPose) {
+    ch::coaster::TrainRuntimeConfig cfg;
+    cfg.route_length_m = route.length_m();
+    cfg.closed_route = true;
+    cfg.car_spacing_m = ch::coaster::kFlameCarCenterSpacingM;
+
+    struct DrawCar { ch::coaster::CarRuntimePose pose; double depth; };
+    std::vector<DrawCar> cars;
+    cars.reserve(ch::coaster::kCoasterTrainCarCount);
+
+    for (int i = 0; i < ch::coaster::kCoasterTrainCarCount; ++i) {
+        const auto index = static_cast<std::size_t>(i);
+        const double d = ch::coaster::car_route_distance(leadDistance, i, cfg);
+        const auto sample = route.sample(d);
+        if (!sample) continue;
+        const ch::coaster::CarPoseSelection* previous =
+            hasPreviousPose[index] ? &previousPoses[index] : nullptr;
+        auto pose = ch::coaster::make_car_runtime_pose(
+            i, *sample, kTrainSpeedMps, 0, cfg.physics, previous);
+        previousPoses[index] = pose.sprite_pose;
+        hasPreviousPose[index] = true;
+        cars.push_back({pose, pose.world_x - pose.world_y + pose.world_z * 0.816496580927726});
+    }
+
+    std::sort(cars.begin(), cars.end(), [](const DrawCar& a, const DrawCar& b) {
+        return a.depth < b.depth;
+    });
+
+    for (const auto& car : cars) {
+        const auto& r = car.pose.sprite_pose.source_rect;
+        const QRect src(r.x, r.y, r.w, r.h);
+        const QPointF anchor = projection.map(
+            car.pose.world_x, car.pose.world_y, car.pose.world_z);
+
+        // Frozen CH_CAMERA_V1 / CH Blender physical rail anchor. Continuity may
+        // change only which approved V2 pose is selected; it must never move the
+        // rail anchor or introduce screen-space correction.
+        constexpr double kSpriteScaleCoefficient = 0.035976898743442;
+        constexpr double kRailAnchorSourceX = 128.0;
+        constexpr double kRailAnchorSourceY = 154.212752736043740;
+        const double spriteScale = projection.scale * kSpriteScaleCoefficient;
+        const QSizeF size(r.w * spriteScale, r.h * spriteScale);
+        const QRectF dst(anchor.x() - kRailAnchorSourceX * spriteScale,
+                         anchor.y() - kRailAnchorSourceY * spriteScale,
+                         size.width(), size.height());
+        painter.drawImage(dst, atlas, src);
+    }
+}
+
 bool write_capture_metadata(const QString& outputDir,
                             const ch::coaster::CenterlineRoute& route,
                             const int frameCount,
@@ -120,11 +176,14 @@ int main(int argc, char** argv) {
     const Projection projection = fit_projection(samples);
 
     // A proof is only valid after the lead car has traversed the entire closed
-    // route and returned exactly to its starting distance.  The previous fixed
+    // route and returned exactly to its starting distance. The previous fixed
     // 360-frame/12-second capture could end mid-lap on larger coasters.
     const double lapSeconds = route.length_m() / kTrainSpeedMps;
     const int frameCount = std::max(2, static_cast<int>(std::ceil(lapSeconds * kFps)) + 1);
     if (!write_capture_metadata(outputDir, route, frameCount, lapSeconds)) return 7;
+
+    std::array<ch::coaster::CarPoseSelection, ch::coaster::kCoasterTrainCarCount> previousPoses{};
+    std::array<bool, ch::coaster::kCoasterTrainCarCount> hasPreviousPose{};
 
     for (int frame = 0; frame < frameCount; ++frame) {
         QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
@@ -141,7 +200,8 @@ int main(int argc, char** argv) {
                                    static_cast<double>(frameCount - 1);
         const double lead = ch::coaster::normalize_route_distance(
             lapProgress * route.length_m(), route.length_m(), true);
-        draw_train(painter, projection, atlas, route, lead);
+        draw_train_continuous(
+            painter, projection, atlas, route, lead, previousPoses, hasPreviousPose);
         painter.end();
         const QString path = QStringLiteral("%1/frame_%2.png")
                                  .arg(outputDir).arg(frame, 4, 10, QLatin1Char('0'));
