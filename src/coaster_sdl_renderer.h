@@ -10,13 +10,13 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <vector>
 
 namespace ch::coaster {
 
 // CH_COASTER_SDL_RENDERER_V1
-// Final presentation bridge for the pre-rendered Flame atlas. The simulation
-// remains entirely independent from SDL; this layer only resolves one texture,
-// projects each car anchor and submits source/destination rectangles.
+// Final presentation bridge for the pre-rendered Flame atlas and the dedicated
+// world-space coaster track. Simulation remains independent from SDL.
 struct CarSpriteGeometry {
     ScreenPoint screen_anchor{};
     SDL_FRect source{};
@@ -68,6 +68,62 @@ struct CarSpriteGeometry {
             return left.car_index < right.car_index;
         });
     return order;
+}
+
+[[nodiscard]] inline int track_line_layer(const TrackLineKind kind) noexcept {
+    switch (kind) {
+        case TrackLineKind::support: return 0;
+        case TrackLineKind::spine: return 1;
+        case TrackLineKind::tie: return 2;
+        case TrackLineKind::left_rail:
+        case TrackLineKind::right_rail: return 3;
+    }
+    return 0;
+}
+
+inline void set_track_line_color(SDL_Renderer* renderer, const TrackLineKind kind) {
+    switch (kind) {
+        case TrackLineKind::support:
+            SDL_SetRenderDrawColor(renderer, 102, 111, 116, 255);
+            break;
+        case TrackLineKind::spine:
+            SDL_SetRenderDrawColor(renderer, 151, 47, 39, 255);
+            break;
+        case TrackLineKind::tie:
+            SDL_SetRenderDrawColor(renderer, 61, 61, 63, 255);
+            break;
+        case TrackLineKind::left_rail:
+        case TrackLineKind::right_rail:
+            SDL_SetRenderDrawColor(renderer, 226, 230, 232, 255);
+            break;
+    }
+}
+
+// Draws the exact CH_COASTER_TRACK_GEOMETRY_V1 representation. The same world
+// points can therefore be consumed by the game and proof renderers without
+// falling back to the railway max-grade contract or a screen-space mock track.
+inline void render_coaster_track(
+    SDL_Renderer* renderer,
+    const CoasterTrackGeometry& geometry,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height) {
+    if (renderer == nullptr || !geometry.valid()) return;
+
+    TrackRenderPlan plan = build_track_render_plan(geometry, camera);
+    std::stable_sort(plan.lines.begin(), plan.lines.end(),
+        [](const TrackLineRenderCommand& left, const TrackLineRenderCommand& right) {
+            if (left.depth_key != right.depth_key) return left.depth_key < right.depth_key;
+            return track_line_layer(left.kind) < track_line_layer(right.kind);
+        });
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (const TrackLineRenderCommand& command : plan.lines) {
+        const TrackScreenLine line = project_track_line(
+            command, camera, viewport_width, viewport_height);
+        set_track_line_color(renderer, line.kind);
+        SDL_RenderLine(renderer, line.a.x, line.a.y, line.b.x, line.b.y);
+    }
 }
 
 inline void render_flame_train(

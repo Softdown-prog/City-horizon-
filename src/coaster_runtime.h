@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coaster_centerline_route.h"
+#include "coaster_track_geometry.h"
 
 #include <utility>
 #include <vector>
@@ -8,15 +8,20 @@
 namespace ch::coaster {
 
 // CH_COASTER_RUNTIME_V1
-// Small production facade that binds one validated centerline route to the
-// articulated four-car Flame train, the gravity/energy solver and the 40-frame
-// pose selector. Rendering remains 2D and is driven by TrainStepResult::cars.
+// Production facade binding one validated centerline route to the articulated
+// four-car Flame train, gravity/energy solver, pose selector and the dedicated
+// CH_COASTER_TRACK_GEOMETRY_V1 world geometry consumed by presentation.
 class CoasterRuntime final {
 public:
     [[nodiscard]] bool set_route(std::vector<RoutePoint> points, const bool closed_route) {
         CenterlineRoute candidate;
         if (!candidate.rebuild(std::move(points), closed_route)) return false;
+
+        CoasterTrackGeometry candidate_track = build_coaster_track_geometry(candidate);
+        if (!candidate_track.valid()) return false;
+
         route_ = std::move(candidate);
+        track_geometry_ = std::move(candidate_track);
         config_.route_length_m = route_.length_m();
         config_.closed_route = route_.closed();
         reset();
@@ -25,6 +30,7 @@ public:
 
     void clear_route() {
         route_.clear();
+        track_geometry_.clear();
         config_.route_length_m = 0.0;
         state_ = {};
         last_step_ = {};
@@ -70,8 +76,13 @@ public:
         return step_train(state_, config_, sampler, 0.0, camera_quarter_turns);
     }
 
-    [[nodiscard]] bool ready() const noexcept { return route_.valid(); }
+    [[nodiscard]] bool ready() const noexcept {
+        return route_.valid() && track_geometry_.valid();
+    }
     [[nodiscard]] const CenterlineRoute& route() const noexcept { return route_; }
+    [[nodiscard]] const CoasterTrackGeometry& track_geometry() const noexcept {
+        return track_geometry_;
+    }
     [[nodiscard]] const TrainRuntimeState& state() const noexcept { return state_; }
     [[nodiscard]] const TrainStepResult& last_step() const noexcept { return last_step_; }
     [[nodiscard]] TrainRuntimeConfig& config() noexcept { return config_; }
@@ -79,6 +90,7 @@ public:
 
 private:
     CenterlineRoute route_{};
+    CoasterTrackGeometry track_geometry_{};
     TrainRuntimeConfig config_{};
     TrainRuntimeState state_{};
     TrainStepResult last_step_{};
