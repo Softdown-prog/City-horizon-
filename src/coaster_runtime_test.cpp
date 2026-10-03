@@ -70,6 +70,49 @@ int main() {
     }
     if (!articulated) return fail("four cars must articulate independently on a curved route");
 
+    // Tight hairpins used to make incoming + outgoing tangents nearly cancel.
+    // The old normalizer then substituted world +Y, which could make a car flip
+    // sideways/backwards even though its route distance kept moving forward.
+    CenterlineRoute hairpin;
+    std::vector<RoutePoint> hairpin_points = {
+        {0.0, 0.0, 0.0},
+        {0.0, 4.0, 0.0},
+        {0.20, 0.0, 0.0},
+        {4.0, 0.0, 0.0},
+    };
+    if (!hairpin.rebuild(hairpin_points, false))
+        return fail("hairpin route must validate");
+
+    const double first_segment = 4.0;
+    const double second_dx = 0.20;
+    const double second_dy = -4.0;
+    const double second_length = std::hypot(second_dx, second_dy);
+    const double forward_x = second_dx / second_length;
+    const double forward_y = second_dy / second_length;
+    for (int i = 1; i <= 9; ++i) {
+        const double d = first_segment + second_length * (static_cast<double>(i) / 10.0);
+        const auto sample = hairpin.sample(d);
+        if (!sample) return fail("hairpin sample unexpectedly failed");
+        const double alignment = sample->tangent_x * forward_x + sample->tangent_y * forward_y;
+        if (!(alignment > 0.0))
+            return fail("hairpin tangent must remain in the forward travel hemisphere");
+    }
+
+    // Exact reversal is the strongest regression case: the vertex average is zero.
+    CenterlineRoute reversal;
+    std::vector<RoutePoint> reversal_points = {
+        {0.0, 0.0, 0.0},
+        {0.0, 4.0, 0.0},
+        {0.0, 0.5, 0.0},
+        {3.0, 0.5, 0.0},
+    };
+    if (!reversal.rebuild(reversal_points, false))
+        return fail("reversal route must validate");
+    const auto reversal_sample = reversal.sample(4.0 + 1.0);
+    if (!reversal_sample) return fail("reversal sample unexpectedly failed");
+    if (!(reversal_sample->tangent_y < 0.0))
+        return fail("reversal tangent must follow the outgoing -Y segment, never fixed +Y");
+
     // Open lift route proves that drive semantics survive the route bridge.
     std::vector<RoutePoint> lift_points;
     for (int i = 0; i <= 12; ++i) {
