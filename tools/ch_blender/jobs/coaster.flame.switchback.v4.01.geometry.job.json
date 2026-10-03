@@ -1,0 +1,17 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "coaster.flame.switchback.v4.01.geometry",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/coaster_switchback_v4_pool.py",
+  "args": [
+    "--task", "geometry",
+    "--project", "C++/MapForge2/projects/coaster_flame_switchback_02.mapforge.json",
+    "--output", "out/ch_blender_agent/coaster.flame.switchback.v4.01.geometry"
+  ],
+  "outputDir": "out/ch_blender_agent/coaster.flame.switchback.v4.01.geometry",
+  "expectedOutputs": [
+    "out/ch_blender_agent/coaster.flame.switchback.v4.01.geometry/coaster_flame_switchback_03.mapforge.json",
+    "out/ch_blender_agent/coaster.flame.switchback.v4.01.geometry/geometry_report.json",
+    "out/ch_blender_agent/coaster.flame.switchback.v4.01.geometry/worker_summary.json"
+  ]
+}

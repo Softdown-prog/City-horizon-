@@ -1,0 +1,17 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "coaster.flame.switchback.v4.03.motion",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/coaster_switchback_v4_pool.py",
+  "args": [
+    "--task", "motion",
+    "--project", "C++/MapForge2/projects/coaster_flame_switchback_02.mapforge.json",
+    "--output", "out/ch_blender_agent/coaster.flame.switchback.v4.03.motion"
+  ],
+  "outputDir": "out/ch_blender_agent/coaster.flame.switchback.v4.03.motion",
+  "expectedOutputs": [
+    "out/ch_blender_agent/coaster.flame.switchback.v4.03.motion/coaster_video_proof_main_v4.cpp",
+    "out/ch_blender_agent/coaster.flame.switchback.v4.03.motion/motion_report.json",
+    "out/ch_blender_agent/coaster.flame.switchback.v4.03.motion/worker_summary.json"
+  ]
+}
