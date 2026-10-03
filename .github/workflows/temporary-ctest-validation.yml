@@ -1,0 +1,25 @@
+name: Temporary CTest Validation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/temporary-ctest-validation.yml"
+      - "CMakeLists.txt"
+      - "src/**"
+  workflow_dispatch:
+
+jobs:
+  ctest:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure tests
+        shell: pwsh
+        run: cmake -S . -B build-ctest -DBUILD_TESTING=ON
+      - name: Build tests and game
+        shell: pwsh
+        run: cmake --build build-ctest --config Release --parallel 2
+      - name: Run CTest
+        shell: pwsh
+        run: ctest --test-dir build-ctest -C Release --output-on-failure
