@@ -8,7 +8,7 @@
   "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
   "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas.png",
   "atlasPromotionCommit": "4e7bc7abfcfc782e2c019145a7b924497fa5c207",
-  "rendererFixCommit": "b1b718ac5bb74110f9958b437cbe3a769ba0fc9f",
+  "rendererFixCommit": "c2403215ca5e513e2de4b9830862c70356dcc2db",
   "carCount": 4,
   "carSpacingMeters": 2.445,
   "fps": 30,
