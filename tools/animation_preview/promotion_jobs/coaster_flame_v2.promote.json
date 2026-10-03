@@ -8,5 +8,6 @@
   "sourceFingerprint": "b7fc3f6c56d782bdb1ac0ee074a8ccc674c86dfe13b76504b4ab9c9491b00cc7",
   "targetContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
   "expectedFrameCount": 192,
-  "attempt": 2
+  "attempt": 2,
+  "retryNonce": "2026-10-03T15:43:00Z"
 }
