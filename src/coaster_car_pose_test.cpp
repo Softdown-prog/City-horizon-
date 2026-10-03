@@ -107,6 +107,36 @@ int main() {
         inverted.requires_extended_orientation)
         return fail("inverted h08 must use V2 inverted frame 184");
 
+    // Temporal continuity: tiny oscillation around a 16-way heading boundary
+    // must not flip h00/h01 every frame. A clearly better orientation still
+    // switches promptly once the motion has moved beyond the hysteresis band.
+    const CarPoseSelection continuity_h00 = select_car_pose_v2(0.0, 0.0, 0.0);
+    const CarPoseSelection raw_boundary = select_car_pose_v2(11.4, 0.0, 0.0);
+    if (raw_boundary.atlas_index != 49)
+        return fail("raw heading quantizer must cross to h01 above 11.25 degrees");
+    const CarPoseSelection stable_boundary = select_car_pose_v2_continuous(
+        11.4, 0.0, 0.0, &continuity_h00);
+    if (stable_boundary.atlas_index != 48 || stable_boundary.visual_heading_index != 0)
+        return fail("continuity selector must suppress one-frame heading chatter");
+    const CarPoseSelection stable_clear_turn = select_car_pose_v2_continuous(
+        16.0, 0.0, 0.0, &continuity_h00);
+    if (stable_clear_turn.atlas_index != 49 || stable_clear_turn.visual_heading_index != 1)
+        return fail("continuity selector must switch after leaving heading hysteresis band");
+
+    // The same protection applies to pitch-family boundaries so crest/valley
+    // noise cannot alternate flat and slope sprites from frame to frame.
+    const CarPoseSelection raw_pitch_boundary = select_car_pose_v2(0.0, 7.1, 0.0);
+    if (raw_pitch_boundary.atlas_index != 64)
+        return fail("raw pitch selector must cross to +14 family above 7 degrees");
+    const CarPoseSelection stable_pitch_boundary = select_car_pose_v2_continuous(
+        0.0, 7.1, 0.0, &continuity_h00);
+    if (stable_pitch_boundary.atlas_index != 48)
+        return fail("continuity selector must suppress flat/slope chatter near pitch boundary");
+    const CarPoseSelection stable_clear_pitch = select_car_pose_v2_continuous(
+        0.0, 10.0, 0.0, &continuity_h00);
+    if (stable_clear_pitch.atlas_index != 64)
+        return fail("continuity selector must switch to +14 family after clear pitch change");
+
     if (kCarPoseFrameCount != 192 || kCarPoseAtlasColumns != 16 || kCarPoseAtlasRows != 12)
         return fail("V2 atlas contract must remain 192 frames in a 16x12 grid");
     if (kCarPoseAtlasColumns * kCarPoseAtlasRows != kCarPoseFrameCount)
