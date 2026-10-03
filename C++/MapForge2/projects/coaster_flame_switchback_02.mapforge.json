@@ -1,0 +1,53 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "projectId": "coaster.flame.switchback.02",
+  "assetId": "ride.coaster.flame_switchback_02",
+  "name": "Flame Switchback",
+  "mapForge": {
+    "tileMeters": 3.0,
+    "footprintTiles": {"width": 32, "depth": 32},
+    "closedRoute": true,
+    "start": {"x": 12.0, "y": 0.0, "z": 0.0, "headingDegrees": 0.0}
+  },
+  "train": {
+    "carCount": 4,
+    "carSpacingMeters": 2.445,
+    "passengersPerCar": 2
+  },
+  "track": {
+    "contract": "CH_COASTER_TRACK_V1",
+    "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"
+  },
+  "pieces": [
+    {"id":"station_run","type":"straight","length":20.0,"rise":0.0,"driveMode":"station","targetSpeedMps":4.5},
+    {"id":"switchback_turn_1","type":"quarter_curve","radius":10.0,"left":true},
+    {"id":"lift_hill","type":"straight","length":20.0,"rise":10.0,"driveMode":"lift","targetSpeedMps":6.0},
+    {"id":"switchback_turn_2","type":"quarter_curve","radius":10.0,"left":false},
+    {"id":"first_drop","type":"straight","length":20.0,"rise":-10.0},
+    {"id":"switchback_turn_3","type":"quarter_curve","radius":10.0,"left":true},
+    {"id":"airtime_climb","type":"straight","length":20.0,"rise":6.0},
+    {"id":"switchback_turn_4","type":"quarter_curve","radius":10.0,"left":true},
+    {"id":"mid_run","type":"straight","length":20.0,"rise":0.0},
+    {"id":"switchback_turn_5","type":"quarter_curve","radius":10.0,"left":true},
+    {"id":"second_climb","type":"straight","length":20.0,"rise":6.0},
+    {"id":"switchback_turn_6","type":"quarter_curve","radius":10.0,"left":false},
+    {"id":"second_drop","type":"straight","length":20.0,"rise":-8.0},
+    {"id":"switchback_turn_7","type":"quarter_curve","radius":10.0,"left":true},
+    {"id":"brake_descent","type":"straight","length":20.0,"rise":-4.0,"driveMode":"brake","targetSpeedMps":7.0},
+    {"id":"switchback_turn_8","type":"quarter_curve","radius":10.0,"left":true,"driveMode":"brake","targetSpeedMps":5.5}
+  ],
+  "authoredModulesAvailable": [
+    "vertical_loop",
+    "helix_up_left",
+    "helix_up_right",
+    "corkscrew_left",
+    "corkscrew_right"
+  ],
+  "captureRequest": "distinct-switchback-video-2026-10-03-01",
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+    "deferCombinedPitchRollModules": true,
+    "reason": "Second authored coaster layout intentionally changes plan geometry and elevation profile while remaining inside occupied V2 pose coverage."
+  }
+}
