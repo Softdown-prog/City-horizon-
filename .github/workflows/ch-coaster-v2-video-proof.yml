@@ -1,6 +1,7 @@
 name: CH Coaster V2 Video Proof
 
 # Verification trigger: promoted CH_CAMERA_V1 rail placement must pass end-to-end.
+# Re-run V5 after wiring temporal pose continuity into the actual train/proof path.
 on:
   push:
     branches: [main]
