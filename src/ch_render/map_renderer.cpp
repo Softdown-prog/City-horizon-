@@ -1575,7 +1575,14 @@ void MapForgeNativeViewport::render_frame() {
         SDL_SetRenderDrawColor(renderer_, 255, 230, 80, 220);
         for (int dy = -hover_brush_radius_; dy <= hover_brush_radius_; ++dy) {
             for (int dx = -hover_brush_radius_; dx <= hover_brush_radius_; ++dx) {
-                MapRenderer::render_tile_outline(renderer_, hover_tile_x_ + dx, hover_tile_y_ + dy, camera_, vw, vh);
+                if (current_document_.has_value()) {
+                    MapRenderer::render_heightfield_tile_outline(
+                        renderer_, hover_tile_x_ + dx, hover_tile_y_ + dy,
+                        *current_document_, camera_, vw, vh);
+                } else {
+                    MapRenderer::render_tile_outline(
+                        renderer_, hover_tile_x_ + dx, hover_tile_y_ + dy, camera_, vw, vh);
+                }
             }
         }
     }
