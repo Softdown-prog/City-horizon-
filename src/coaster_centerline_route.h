@@ -114,11 +114,20 @@ public:
         result.y = lerp(a.y, b.y, t);
         result.z = lerp(a.z, b.z, t);
 
-        const Vec3 tangent = normalized({
+        // A rendered car must never face against the segment it is travelling on.
+        // Vertex tangent averaging can collapse to almost zero on a tight hairpin;
+        // falling back to a fixed world axis in that case makes the sprite suddenly
+        // turn sideways/backwards.  Use the actual outgoing segment as the fallback
+        // and reject an interpolated tangent if it points into the opposite hemisphere.
+        const Vec3 segment_forward = outgoing_segment_tangent(segment);
+        const Vec3 blended = {
             lerp(tangents_[segment].x, tangents_[next].x, t),
             lerp(tangents_[segment].y, tangents_[next].y, t),
             lerp(tangents_[segment].z, tangents_[next].z, t),
-        });
+        };
+        Vec3 tangent = normalized_or(blended, segment_forward);
+        if (dot(tangent, segment_forward) <= 0.0) tangent = segment_forward;
+
         result.tangent_x = tangent.x;
         result.tangent_y = tangent.y;
         result.tangent_z = tangent.z;
@@ -152,10 +161,25 @@ private:
         return a + (b - a) * t;
     }
 
-    [[nodiscard]] static Vec3 normalized(const Vec3 value) noexcept {
-        const double length = std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
-        if (!(length > kMinimumSegmentLength) || !finite(length)) return {0.0, 1.0, 0.0};
+    [[nodiscard]] static double dot(const Vec3& a, const Vec3& b) noexcept {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    [[nodiscard]] static double length_squared(const Vec3& value) noexcept {
+        return dot(value, value);
+    }
+
+    [[nodiscard]] static Vec3 normalized_or(const Vec3 value, const Vec3 fallback) noexcept {
+        const double squared = length_squared(value);
+        if (!(squared > kMinimumSegmentLength * kMinimumSegmentLength) || !finite(squared)) {
+            return fallback;
+        }
+        const double length = std::sqrt(squared);
         return {value.x / length, value.y / length, value.z / length};
+    }
+
+    [[nodiscard]] static Vec3 normalized(const Vec3 value) noexcept {
+        return normalized_or(value, {0.0, 1.0, 0.0});
     }
 
     [[nodiscard]] static double wrapped_angle_delta(double value) noexcept {
@@ -187,11 +211,15 @@ private:
             const std::size_t previous = (i + points_.size() - 1U) % points_.size();
             const Vec3 incoming = outgoing_segment_tangent(previous);
             const Vec3 outgoing = outgoing_segment_tangent(i);
-            tangents_[i] = normalized({
+            const Vec3 averaged = {
                 incoming.x + outgoing.x,
                 incoming.y + outgoing.y,
                 incoming.z + outgoing.z,
-            });
+            };
+            // Near a 180-degree reversal the average is undefined.  Preserve the
+            // authored direction of travel instead of snapping to a world axis.
+            tangents_[i] = normalized_or(averaged, outgoing);
+            if (dot(tangents_[i], outgoing) <= 0.0) tangents_[i] = outgoing;
         }
     }
 
@@ -212,7 +240,7 @@ private:
             const double after_pitch = std::atan2(after.z, std::hypot(after.x, after.y));
 
             const double previous_length = segment_lengths_[previous % segment_lengths_.size()];
-            const double next_segment_index = std::min(i, segment_lengths_.size() - 1U);
+            const std::size_t next_segment_index = std::min(i, segment_lengths_.size() - 1U);
             const double next_length = segment_lengths_[next_segment_index];
             const double span = std::max(kMinimumSegmentLength, 0.5 * (previous_length + next_length));
             horizontal_curvature_[i] = wrapped_angle_delta(after_heading - before_heading) / (2.0 * span);
