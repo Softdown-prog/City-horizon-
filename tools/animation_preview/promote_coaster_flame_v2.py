@@ -181,12 +181,14 @@ def main() -> int:
     payload = load_json(PAYLOAD)
     if payload.get("contract") != "CH_COASTER_V2_TEXT_PROMOTION_PAYLOAD_V1":
         raise RuntimeError("unexpected text promotion payload contract")
-    for relative, content in payload.get("files", {}).items():
+    for relative, source_relative in payload.get("files", {}).items():
         live_path = (REPO / relative).resolve()
-        if not live_path.is_relative_to(REPO) or not isinstance(content, str):
-            raise RuntimeError(f"invalid staged text destination: {relative}")
+        source_path = (REPO / source_relative).resolve()
+        if (not live_path.is_relative_to(REPO) or not source_path.is_relative_to(REPO)
+                or not source_path.is_file()):
+            raise RuntimeError(f"invalid staged text source/destination: {source_relative} -> {relative}")
         live_path.parent.mkdir(parents=True, exist_ok=True)
-        live_path.write_text(content, encoding="utf-8")
+        live_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
 
     runtime_catalog_path = REPO / "assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json"
     runtime_catalog = load_json(runtime_catalog_path)
