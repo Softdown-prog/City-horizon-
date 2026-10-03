@@ -177,6 +177,22 @@ bool load_project_route(const QString& path,
         std::fprintf(stderr, "MapForge coaster project does not close: %.6f m\n", closure);
         return false;
     }
+
+    // A closed authored route may sample its final piece exactly at the start
+    // position. CenterlineRoute itself closes last->first, so retaining that
+    // duplicate endpoint would create a near-zero closing segment and correctly
+    // trip the V2 minimum-segment regression. Remove only a numerically identical
+    // endpoint; the closure tolerance above remains strict and unchanged.
+    if (points.size() >= 2U) {
+        const auto& first = points.front();
+        const auto& last = points.back();
+        const double dx = last.x - first.x;
+        const double dy = last.y - first.y;
+        const double dz = last.z - first.z;
+        if (dx * dx + dy * dy + dz * dz < 1.0e-12) {
+            points.pop_back();
+        }
+    }
     return route.rebuild(std::move(points), true);
 }
 
