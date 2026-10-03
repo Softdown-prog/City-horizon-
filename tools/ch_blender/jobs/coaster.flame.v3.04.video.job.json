@@ -2,7 +2,7 @@
   "contract": "CH_BLENDER_AGENT_JOB_V1",
   "jobId": "coaster.flame.v3.04.video",
   "operation": "blender_script",
-  "script": "tools/ch_blender/coaster_worker_task.py",
+  "script": "tools/ch_blender/coaster_video_worker4.py",
   "args": [
     "--task",
     "video",
@@ -21,5 +21,5 @@
     "out/ch_blender_agent/coaster.flame.v3.04.video/capture_meta.json",
     "out/ch_blender_agent/coaster.flame.v3.04.video/coaster_flame_01_v3.mapforge.json"
   ],
-  "retryRevision": 2
+  "retryRevision": 3
 }
