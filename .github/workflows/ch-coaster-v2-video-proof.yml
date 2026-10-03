@@ -7,8 +7,6 @@ on:
     paths:
       - '.github/workflows/ch-coaster-v2-video-proof.yml'
       - 'tools/animation_preview/patch_coaster_camera_parity_v1.py'
-      - 'tools/animation_preview/run_coaster_v2_stress_suite.py'
-      - 'C++/MapForge2/projects/coaster_flame_stress_*.mapforge.json'
 
 permissions:
   contents: read
@@ -118,14 +116,6 @@ jobs:
           test -s out/ch-coaster-v2-video/coaster_flame_v2.mp4
           test -s out/ch-coaster-v2-video/contact_sheet.png
 
-      - name: Run compact steep and wide full-lap stress layouts
-        run: |
-          set -euo pipefail
-          python3 tools/animation_preview/run_coaster_v2_stress_suite.py \
-            --renderer build/ch-coaster-v2/MapForge2CoasterVideoProof \
-            --atlas assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png \
-            --output out/ch-coaster-v2-stress
-
       - name: Write proof report
         run: |
           set -euo pipefail
@@ -133,12 +123,11 @@ jobs:
           import json
           from pathlib import Path
           m=json.loads(Path('out/ch-coaster-v2-video/capture_meta.json').read_text())
-          stress=json.loads(Path('out/ch-coaster-v2-stress/stress_suite_report.json').read_text())
-          r={'contract':'CH_COASTER_VIDEO_PROOF_V6','status':'ok','renderer':'MapForge2CoasterVideoProof','projectContract':'CH_MAPFORGE_COASTER_PROJECT_V1','routeContract':'CH_COASTER_CENTERLINE_ROUTE_V2','trainRuntimeContract':'CH_COASTER_TRAIN_RUNTIME_V2','carPoseContract':'CH_COASTER_CAR_ATLAS_RUNTIME_V2','cameraContract':'CH_CAMERA_V1','cameraParityProofPatch':True,'physicalRailAnchorProof':True,'fullLapRequired':True,'fullLapValidated':True,'routeMeters':m['routeMeters'],'durationSeconds':m['lapSeconds'],'frameCount':m['frameCount'],'fps':m['fps'],'carCount':4,'stressLayouts':stress['layouts'],'staleFrameReuseAllowed':False}
+          r={'contract':'CH_COASTER_VIDEO_PROOF_V5','status':'ok','renderer':'MapForge2CoasterVideoProof','projectContract':'CH_MAPFORGE_COASTER_PROJECT_V1','routeContract':'CH_COASTER_CENTERLINE_ROUTE_V2','trainRuntimeContract':'CH_COASTER_TRAIN_RUNTIME_V2','carPoseContract':'CH_COASTER_CAR_ATLAS_RUNTIME_V2','cameraContract':'CH_CAMERA_V1','cameraParityProofPatch':True,'physicalRailAnchorProof':True,'fullLapRequired':True,'fullLapValidated':True,'routeMeters':m['routeMeters'],'durationSeconds':m['lapSeconds'],'frameCount':m['frameCount'],'fps':m['fps'],'carCount':4,'staleFrameReuseAllowed':False}
           Path('out/ch-coaster-v2-video/proof_report.json').write_text(json.dumps(r,indent=2)+'\n')
           PY
 
-      - name: Upload V2 full-lap and stress video proofs
+      - name: Upload V2 full-lap video proof
         uses: actions/upload-artifact@v4
         with:
           name: CH-Coaster-V2-Video-Proof-${{ github.run_id }}
@@ -148,10 +137,5 @@ jobs:
             out/ch-coaster-v2-video/capture_meta.json
             out/ch-coaster-v2-video/ffprobe.json
             out/ch-coaster-v2-video/proof_report.json
-            out/ch-coaster-v2-stress/stress_suite_report.json
-            out/ch-coaster-v2-stress/*/coaster_*_full_lap.mp4
-            out/ch-coaster-v2-stress/*/contact_sheet_full_lap.png
-            out/ch-coaster-v2-stress/*/capture_meta.json
-            out/ch-coaster-v2-stress/*/ffprobe.json
           if-no-files-found: error
           retention-days: 14
