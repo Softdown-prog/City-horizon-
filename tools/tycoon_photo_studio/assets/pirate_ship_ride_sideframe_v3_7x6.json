@@ -1,0 +1,80 @@
+{
+  "contract": "CH_PIRATE_SHIP_SIDEFRAME_V3",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "authoringPolicy": {
+    "cleanSheet": true,
+    "geometryComesFromRecipe": true,
+    "legacyVikingGeometryAllowed": false,
+    "forbidReferenceDrivenV2Topology": true,
+    "designIntent": "full-size permanent amusement-park pirate ship with open triangular side frames, large passenger ship, heavy cradle, and lateral boarding station",
+    "rejectVisualFamilies": [
+      "arched rectangular cage",
+      "stacked horizontal ladder braces",
+      "four thin diagonal hangers",
+      "small boat floating inside oversized frame",
+      "large empty square platform",
+      "old City Horizon Viking silhouette"
+    ]
+  },
+  "footprint": {"widthTiles": 7, "depthTiles": 6},
+  "station": {
+    "deckWidth": 19.0,
+    "deckDepth": 5.8,
+    "deckCenterY": -5.35,
+    "topZ": 1.65,
+    "stairsWidth": 5.8,
+    "stairsRun": 4.8,
+    "steps": 9,
+    "railHeight": 1.20
+  },
+  "structure": {
+    "frameY": 4.75,
+    "pivotZ": 20.6,
+    "footX": 8.9,
+    "topHalfX": 1.15,
+    "mainBeamWidth": 1.32,
+    "mainBeamDepth": 1.05,
+    "topTieDepth": 0.95,
+    "axleRadius": 0.72,
+    "bearingRadius": 1.55,
+    "concretePad": [2.2, 2.0, 0.34]
+  },
+  "boat": {
+    "centerZ": 7.35,
+    "stations": [
+      {"x":-9.8,"halfWidth":0.55,"floorZ":2.55,"gunwaleZ":5.35},
+      {"x":-8.7,"halfWidth":1.55,"floorZ":1.45,"gunwaleZ":4.15},
+      {"x":-6.8,"halfWidth":2.45,"floorZ":0.45,"gunwaleZ":3.05},
+      {"x":-3.8,"halfWidth":2.95,"floorZ":-0.35,"gunwaleZ":2.45},
+      {"x":0.0,"halfWidth":3.15,"floorZ":-0.72,"gunwaleZ":2.25},
+      {"x":3.8,"halfWidth":2.95,"floorZ":-0.35,"gunwaleZ":2.45},
+      {"x":6.8,"halfWidth":2.45,"floorZ":0.45,"gunwaleZ":3.05},
+      {"x":8.7,"halfWidth":1.55,"floorZ":1.45,"gunwaleZ":4.15},
+      {"x":9.8,"halfWidth":0.55,"floorZ":2.55,"gunwaleZ":5.35}
+    ],
+    "seatRows": 14,
+    "seatSpan": 14.6,
+    "cradle": {
+      "pivotLocalZ": 0.0,
+      "upperHalfX": 1.65,
+      "lowerHalfX": 6.85,
+      "sideY": 3.45,
+      "lowerZWorld": 9.25,
+      "beamWidth": 0.92,
+      "beamDepth": 0.72,
+      "underBoatZWorld": 6.35,
+      "underBoatHalfX": 6.9
+    }
+  },
+  "materials": {
+    "frame": {"name":"SideFrameSteel","rgba":[0.035,0.055,0.085,1.0],"roughness":0.50,"metallic":0.70},
+    "accent": {"name":"SideFrameAccent","rgba":[0.82,0.44,0.055,1.0],"roughness":0.46,"metallic":0.36},
+    "wood": {"name":"SideFrameHull","rgba":[0.28,0.075,0.022,1.0],"roughness":0.75,"metallic":0.0},
+    "trim": {"name":"SideFrameTrim","rgba":[0.55,0.13,0.035,1.0],"roughness":0.58,"metallic":0.06},
+    "seat": {"name":"SideFrameSeat","rgba":[0.075,0.09,0.115,1.0],"roughness":0.64,"metallic":0.12},
+    "platform": {"name":"SideFramePlatform","rgba":[0.32,0.34,0.36,1.0],"roughness":0.76,"metallic":0.20},
+    "concrete": {"name":"SideFrameConcrete","rgba":[0.42,0.43,0.44,1.0],"roughness":0.90,"metallic":0.0}
+  }
+}
