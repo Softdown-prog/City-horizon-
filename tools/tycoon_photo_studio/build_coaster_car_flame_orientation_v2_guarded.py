@@ -35,9 +35,6 @@ TRACK_CONTRACT = "CH_COASTER_TRACK_V1"
 STYLE_ID = "flame_01"
 FOOTPRINT = {"widthTiles": 1, "depthTiles": 1}
 
-# Three human-review poses.  The primary proxy is the loop apex because the
-# previous heading+pitch atlas could not distinguish horizontal-upright from
-# horizontal-inverted at that location.
 REVIEW_POSES = (
     {"id": "normal", "heading": 45.0, "pitch": 0.0, "roll": 0.0},
     {"id": "vertical", "heading": 0.0, "pitch": 90.0, "roll": 0.0},
@@ -78,12 +75,6 @@ def capture_base_matrices(authored):
 
 
 def apply_orientation(authored, base_matrices, heading_deg: float, pitch_deg: float, roll_deg: float):
-    """Apply local roll, local pitch, then world yaw around the rail-center anchor.
-
-    Flame's authored forward axis is +Y.  Roll therefore rotates around local +Y;
-    right-multiplication keeps that axis local before pitch/yaw transform it into
-    the track frame.
-    """
     anchor_z = track.RAIL_Z
     to_anchor = Matrix.Translation((0.0, 0.0, anchor_z))
     from_anchor = Matrix.Translation((0.0, 0.0, -anchor_z))
@@ -103,16 +94,17 @@ def pose_by_id(pose_id: str):
     raise KeyError(pose_id)
 
 
-def render_pose(scene, authored, profile, output: Path, pose, filename: str):
+def render_pose(scene, authored, profile, output: Path, pose, filename: str, direction: str | None = None):
+    render_direction = direction or (
+        f"{pose['id']}_h{pose['heading']:+.0f}_p{pose['pitch']:+.0f}_r{pose['roll']:+.0f}"
+    )
     return scene_gate.render_proxy(
         scene=scene,
         authored=authored,
         output_path=output / filename,
         profile=profile,
         asset_id=ASSET_ID,
-        direction=(
-            f"{pose['id']}_h{pose['heading']:+.0f}_p{pose['pitch']:+.0f}_r{pose['roll']:+.0f}"
-        ),
+        direction=render_direction,
     )
 
 
@@ -159,7 +151,6 @@ def main():
     root["qualityGateContract"] = "CH_SCENE_PREFLIGHT_V1"
 
     base_matrices = capture_base_matrices(authored)
-    # Calibrate against the vertical case, which is the tallest projected extent.
     calibration_pose = pose_by_id("vertical")
     apply_orientation(authored, base_matrices, calibration_pose["heading"], calibration_pose["pitch"], calibration_pose["roll"])
     bs.calibrate_ortho_scale(scene, authored, safety_margin=0.30)
@@ -176,14 +167,13 @@ def main():
     scene_gate.require_pass(report)
 
     if args.stage == "proxy":
-        # Auxiliary references first.
         for pose in REVIEW_POSES:
             apply_orientation(authored, base_matrices, pose["heading"], pose["pitch"], pose["roll"])
             render_pose(scene, authored, profile, output, pose, f"proxy_{pose['id']}.png")
 
         primary = pose_by_id(PRIMARY_PROXY_ID)
         apply_orientation(authored, base_matrices, primary["heading"], primary["pitch"], primary["roll"])
-        proxy = render_pose(scene, authored, profile, output, primary, "proxy_south.png")
+        proxy = render_pose(scene, authored, profile, output, primary, "proxy_south.png", direction="south")
         proxy["pose"] = primary
         proxy["orientationContract"] = CAR_CONTRACT
         proxy["auxiliaryReviewImages"] = [
