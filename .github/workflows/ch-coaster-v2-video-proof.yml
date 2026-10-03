@@ -93,3 +93,19 @@ jobs:
 
       - name: Build renderer
         run: cmake --build build/ch-coaster-v2 --target MapForge2CoasterVideoProof --parallel
+
+      - name: Render occupied V2 MapForge proof frames
+        run: |
+          set -euo pipefail
+          rm -rf out/ch-coaster-v2-video
+          mkdir -p out/ch-coaster-v2-video/frames
+          ./build/ch-coaster-v2/MapForge2CoasterVideoProof \
+            out/ch-coaster-v2-video/frames \
+            assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png \
+            C++/MapForge2/projects/coaster_flame_01.mapforge.json
+          count="$(find out/ch-coaster-v2-video/frames -type f -name 'frame_*.png' | wc -l)"
+          if [ "$count" -ne 360 ]; then
+            echo "Expected 360 proof frames, got $count" >&2
+            exit 1
+          fi
+          echo "Rendered $count occupied V2 frames"
