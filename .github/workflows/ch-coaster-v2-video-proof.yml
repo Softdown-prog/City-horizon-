@@ -1,5 +1,6 @@
 name: CH Coaster V2 Video Proof
 
+# Verification trigger: promoted CH_CAMERA_V1 rail placement must pass end-to-end.
 on:
   push:
     branches: [main]
