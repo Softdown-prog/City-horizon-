@@ -70,6 +70,8 @@ jobs:
           sed -i '/^[[:space:]]*$/d' "$jobs_file"
           if [[ ! -s "$jobs_file" ]]; then
             echo "has-jobs=false" >> "$GITHUB_OUTPUT"
+            echo "needs-character-forge=false" >> "$GITHUB_OUTPUT"
+            echo "needs-coaster-video=false" >> "$GITHUB_OUTPUT"
             echo "No active jobs changed; historical deletions do not queue renders."
             exit 0
           fi
@@ -87,6 +89,11 @@ jobs:
             echo "needs-character-forge=true" >> "$GITHUB_OUTPUT"
           else
             echo "needs-character-forge=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -q 'coaster\.flame\.v3\.04\.video' "$jobs_file"; then
+            echo "needs-coaster-video=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs-coaster-video=false" >> "$GITHUB_OUTPUT"
           fi
           echo "Jobs selected:"
           cat "$jobs_file"
@@ -111,6 +118,14 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pillow
+
+      - name: Install coaster video dependencies
+        if: steps.jobs.outputs.needs-coaster-video == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev ffmpeg
 
       - name: Setup shared cached CH Blender
         if: steps.jobs.outputs.has-jobs == 'true'
