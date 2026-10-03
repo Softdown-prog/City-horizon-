@@ -33,6 +33,7 @@
 #include "building_visit_runtime.h"
 #include "economy_system.h"
 #include "land_system.h"
+#include "mission_system.h"
 #include "park_fence_runtime.h"
 #include "park_fence_save_manager.h"
 #include "pedestrian_decision.h"
@@ -129,27 +130,6 @@ public:
 
 private:
     inline static ChPopulationSystem* active_instance_ = nullptr;
-};
-
-class ChBuildingManager : public BuildingManager {
-public:
-    using BuildingManager::BuildingManager;
-
-    [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,
-                                                     const BuildingColorTint tint) {
-        return set_wall_color(instance_id, tint);
-    }
-
-    [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,
-                                                     const BuildingColorTint tint) {
-        return set_roof_color(instance_id, tint);
-    }
-
-    [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {
-        const bool wall_changed = clear_wall_color(instance_id);
-        const bool roof_changed = clear_roof_color(instance_id);
-        return wall_changed || roof_changed;
-    }
 };
 
 class ChPedestrianDecisionNode {
@@ -495,7 +475,6 @@ private:
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
-#define BuildingManager ChBuildingManager
 #define MapRenderer RuntimeMapRenderer
 #define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
@@ -515,7 +494,6 @@ private:
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
-#undef BuildingManager
 #undef rotate_placement
 #undef play_sound
 #undef mobile_render_entities

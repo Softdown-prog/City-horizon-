@@ -397,6 +397,21 @@ public:
     [[nodiscard]] bool set_roof_color(std::uint64_t instance_id, BuildingColorTint tint);
     [[nodiscard]] bool clear_wall_color(std::uint64_t instance_id);
     [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);
+    // Runtime/UI compatibility names. Keep these on the canonical manager
+    // so wrappers never change BuildingManager's type in mission/power APIs.
+    [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,
+                                                     const BuildingColorTint tint) {
+        return set_wall_color(instance_id, tint);
+    }
+    [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,
+                                                     const BuildingColorTint tint) {
+        return set_roof_color(instance_id, tint);
+    }
+    [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {
+        const bool wall_changed = clear_wall_color(instance_id);
+        const bool roof_changed = clear_roof_color(instance_id);
+        return wall_changed || roof_changed;
+    }
     [[nodiscard]] bool link_ticket_booth(std::uint64_t booth_instance_id, std::uint64_t attraction_instance_id);
     [[nodiscard]] std::optional<std::uint64_t> linked_attraction_for_ticket_booth(std::uint64_t booth_instance_id) const;
     [[nodiscard]] std::optional<std::uint64_t> linked_ticket_booth_for_attraction(std::uint64_t attraction_instance_id) const;
