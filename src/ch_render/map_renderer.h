@@ -92,6 +92,10 @@ public:
 
     // Color-only ground quad following the same shared terrain vertices used by
     // textured heightfield tiles. Useful for seam-hiding underlays and overlays.
+    static void render_heightfield_tile_outline(SDL_Renderer* renderer, int tile_x, int tile_y,
+                                                const MapDocument& document, const CameraState& camera,
+                                                float viewport_width, float viewport_height);
+
     static void render_heightfield_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y,
                                              const MapDocument& document, const CameraState& camera,
                                              float viewport_width, float viewport_height, SDL_FColor color);
