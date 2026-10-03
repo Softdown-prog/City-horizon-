@@ -13,6 +13,28 @@ RAIL_ANCHOR_SOURCE_X = 128.0
 RAIL_ANCHOR_SOURCE_Y = 154.21275273604374
 SPRITE_SCALE_COEFF = 0.035976898743441864  # orthoScale*sqrt(2)/256
 
+# Once a successful proof promotes the same code into the live renderer this
+# helper becomes an invariant checker. That lets the final proof run against
+# the promoted source instead of failing because the legacy text disappeared.
+already_promoted = (
+    "kSpriteScaleCoefficient = 0.035976898743442" in text
+    and "kRailAnchorSourceY = 154.212752736043741" in text
+    and text.count("1.224744871391589") >= 2
+    and "pose.world_x - pose.world_y + pose.world_z * 0.816496580927726" in text
+)
+if already_promoted:
+    for legacy in (
+        "const double u = x - y",
+        "constexpr double zFactor = 3.2",
+        "projection.scale / 14.0",
+        "world_z + 0.12",
+        "size.height()*0.62",
+    ):
+        if legacy in text:
+            raise SystemExit(f"promoted renderer still contains legacy placement: {legacy}")
+    print("CH_CAMERA_V1 + occupied V2 rail-anchor/scale already promoted")
+    raise SystemExit(0)
+
 replacements = [
     (
         "    double zFactor = 3.2;\n\n    [[nodiscard]] QPointF map(double x, double y, double z) const {\n        const double u = x - y;\n        const double v = 0.5 * (x + y) - z * zFactor;",
@@ -38,8 +60,6 @@ for old, new in replacements:
         raise SystemExit(f"camera/anchor parity patch anchor count changed: expected 1, got {count}: {old[:100]!r}")
     text = text.replace(old, new)
 
-# Proof-time invariants: fail rather than silently rendering a mixed camera or
-# falling back to the historical hand-tuned sprite placement.
 for legacy in (
     "const double u = x - y",
     "constexpr double zFactor = 3.2",
