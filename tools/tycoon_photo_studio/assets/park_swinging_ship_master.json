@@ -1,0 +1,72 @@
+{
+  "contract": "CH_SWINGING_SHIP_MASTER_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "authoringPolicy": {
+    "freshStart": true,
+    "noVersionLineage": true,
+    "noLegacyVikingImports": true,
+    "noPriorPirateShipBuilderImports": true,
+    "referenceIntent": "full-size amusement-park swinging pirate ship based on real-world reference photographs",
+    "mustReadAs": [
+      "large permanent amusement-park ride",
+      "long passenger ship",
+      "heavy industrial support towers",
+      "substantial pivot and bearing machinery",
+      "boarding structure integrated with ride"
+    ],
+    "mustNotReadAs": [
+      "miniature",
+      "keychain",
+      "compact canoe",
+      "small boat inside oversized frame",
+      "four-stick A-frame",
+      "arched cage",
+      "ladder-braced portal"
+    ]
+  },
+  "footprint": {"widthTiles": 7, "depthTiles": 6},
+  "dimensions": {
+    "siteWidth": 22.0,
+    "siteDepth": 18.5,
+    "pivotZ": 21.0,
+    "shipCenterZ": 8.4,
+    "shipLength": 19.2,
+    "shipMaxHalfWidth": 3.35,
+    "supportSideY": 5.7,
+    "supportFootX": 9.2
+  },
+  "shipStations": [
+    {"x":-9.6,"halfWidth":0.70,"keelZ":1.95,"gunwaleZ":5.30},
+    {"x":-8.6,"halfWidth":1.55,"keelZ":1.05,"gunwaleZ":4.20},
+    {"x":-6.8,"halfWidth":2.45,"keelZ":0.10,"gunwaleZ":3.10},
+    {"x":-4.0,"halfWidth":3.00,"keelZ":-0.55,"gunwaleZ":2.45},
+    {"x":0.0,"halfWidth":3.35,"keelZ":-0.95,"gunwaleZ":2.20},
+    {"x":4.0,"halfWidth":3.00,"keelZ":-0.55,"gunwaleZ":2.45},
+    {"x":6.8,"halfWidth":2.45,"keelZ":0.10,"gunwaleZ":3.10},
+    {"x":8.6,"halfWidth":1.55,"keelZ":1.05,"gunwaleZ":4.20},
+    {"x":9.6,"halfWidth":0.70,"keelZ":1.95,"gunwaleZ":5.30}
+  ],
+  "supportFrames": {
+    "left": [[-9.2,0.35],[-8.7,7.0],[-7.5,13.8],[-5.2,18.6],[-2.0,21.0]],
+    "right": [[9.2,0.35],[8.7,7.0],[7.5,13.8],[5.2,18.6],[2.0,21.0]]
+  },
+  "boarding": {
+    "platformWidth": 18.8,
+    "platformDepth": 5.4,
+    "centerY": -6.1,
+    "topZ": 1.7,
+    "stairsWidth": 5.6,
+    "stairsRun": 5.0,
+    "steps": 10
+  },
+  "materials": {
+    "frame": {"name":"RideSteel","rgba":[0.03,0.05,0.08,1.0],"roughness":0.52,"metallic":0.72},
+    "bearing": {"name":"BearingMetal","rgba":[0.76,0.42,0.07,1.0],"roughness":0.44,"metallic":0.45},
+    "wood": {"name":"ShipWood","rgba":[0.26,0.07,0.02,1.0],"roughness":0.78,"metallic":0.0},
+    "trim": {"name":"ShipTrim","rgba":[0.50,0.10,0.03,1.0],"roughness":0.60,"metallic":0.06},
+    "seat": {"name":"SeatMaterial","rgba":[0.07,0.08,0.10,1.0],"roughness":0.67,"metallic":0.10},
+    "platform": {"name":"PlatformMaterial","rgba":[0.33,0.35,0.37,1.0],"roughness":0.77,"metallic":0.18}
+  }
+}
