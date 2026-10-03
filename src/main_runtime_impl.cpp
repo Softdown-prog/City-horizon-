@@ -528,34 +528,79 @@ void render_tile_outline(SDL_Renderer* renderer, int x, int y, const Camera& cam
     ch::MapRenderer::render_tile_outline(renderer, x, y, cs, viewport_width, viewport_height);
 }
 
+[[nodiscard]] SDL_FPoint terrain_world_to_screen(const float world_x, const float world_y,
+                                                const Camera& camera, const float viewport_width,
+                                                const float viewport_height, const ch::MapDocument* document) {
+    SDL_FPoint point = world_to_screen(world_x, world_y, camera, viewport_width, viewport_height);
+    if (document != nullptr) {
+        point.y -= document->terrain_heightfield().sample(world_x, world_y) *
+                   ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+    }
+    return point;
+}
+
+void render_heightfield_tile_outline(SDL_Renderer* renderer, const int x, const int y,
+                                     const Camera& camera, const float viewport_width, const float viewport_height,
+                                     const ch::MapDocument* document) {
+    if (document == nullptr) {
+        render_tile_outline(renderer, x, y, camera, viewport_width, viewport_height);
+        return;
+    }
+    const SDL_FPoint p0 = terrain_world_to_screen(static_cast<float>(x), static_cast<float>(y),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p1 = terrain_world_to_screen(static_cast<float>(x + 1), static_cast<float>(y),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p2 = terrain_world_to_screen(static_cast<float>(x + 1), static_cast<float>(y + 1),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p3 = terrain_world_to_screen(static_cast<float>(x), static_cast<float>(y + 1),
+                                                  camera, viewport_width, viewport_height, document);
+    SDL_RenderLine(renderer, p0.x, p0.y, p1.x, p1.y);
+    SDL_RenderLine(renderer, p1.x, p1.y, p2.x, p2.y);
+    SDL_RenderLine(renderer, p2.x, p2.y, p3.x, p3.y);
+    SDL_RenderLine(renderer, p3.x, p3.y, p0.x, p0.y);
+}
+
 void render_navigation_debug_path(SDL_Renderer* renderer, const NavigationPathResult& path,
-                                  const Camera& camera, float viewport_width, float viewport_height) {
+                                  const Camera& camera, float viewport_width, float viewport_height,
+                                  const ch::MapDocument* document = nullptr) {
     if (path.status != NavigationPathStatus::found || path.tiles.empty()) return;
 
     SDL_SetRenderDrawColor(renderer, 78, 212, 255, SDL_ALPHA_OPAQUE);
     SDL_FPoint previous{};
     bool has_previous = false;
     for (const NavigationTile& tile : path.tiles) {
-        render_tile_outline(renderer, tile.x, tile.y, camera, viewport_width, viewport_height);
-        const SDL_FPoint center = world_to_screen(static_cast<float>(tile.x) + 0.5F, static_cast<float>(tile.y) + 0.5F,
-                                                  camera, viewport_width, viewport_height);
+        render_heightfield_tile_outline(renderer, tile.x, tile.y, camera, viewport_width, viewport_height, document);
+        const SDL_FPoint center = terrain_world_to_screen(static_cast<float>(tile.x) + 0.5F, static_cast<float>(tile.y) + 0.5F,
+                                                          camera, viewport_width, viewport_height, document);
         if (has_previous) SDL_RenderLine(renderer, previous.x, previous.y, center.x, center.y);
         previous = center;
         has_previous = true;
     }
 
     SDL_SetRenderDrawColor(renderer, 98, 238, 112, SDL_ALPHA_OPAQUE);
-    render_tile_outline(renderer, path.tiles.front().x, path.tiles.front().y, camera, viewport_width, viewport_height);
+    render_heightfield_tile_outline(renderer, path.tiles.front().x, path.tiles.front().y, camera, viewport_width, viewport_height, document);
     SDL_SetRenderDrawColor(renderer, 255, 194, 74, SDL_ALPHA_OPAQUE);
-    render_tile_outline(renderer, path.tiles.back().x, path.tiles.back().y, camera, viewport_width, viewport_height);
+    render_heightfield_tile_outline(renderer, path.tiles.back().x, path.tiles.back().y, camera, viewport_width, viewport_height, document);
 }
 
 void render_footprint_outline(SDL_Renderer* renderer, const BuildingDefinition& definition, BuildingRotation rotation,
                               int tile_x, int tile_y,
                               const Camera& camera, float viewport_width, float viewport_height,
-                              Uint8 red = 255, Uint8 green = 208, Uint8 blue = 92) {
-    const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_footprint_outline(renderer, definition, rotation, tile_x, tile_y, cs, viewport_width, viewport_height, red, green, blue);
+                              Uint8 red = 255, Uint8 green = 208, Uint8 blue = 92,
+                              const ch::MapDocument* document = nullptr) {
+    if (document == nullptr) {
+        const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+        ch::MapRenderer::render_footprint_outline(renderer, definition, rotation, tile_x, tile_y, cs,
+                                                  viewport_width, viewport_height, red, green, blue);
+        return;
+    }
+    SDL_SetRenderDrawColor(renderer, red, green, blue, SDL_ALPHA_OPAQUE);
+    const BuildingFootprint footprint = rotated_footprint(definition, rotation);
+    for (int y = tile_y; y < tile_y + footprint.height; ++y) {
+        for (int x = tile_x; x < tile_x + footprint.width; ++x) {
+            render_heightfield_tile_outline(renderer, x, y, camera, viewport_width, viewport_height, document);
+        }
+    }
 }
 
 [[nodiscard]] TileCoordinate road_access_offset(const GridDirection direction) {
@@ -988,7 +1033,8 @@ void render_anchor_cross(SDL_Renderer* renderer, const SDL_FPoint point, const f
 void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDefinition& definition,
                                        const BuildingInstance& instance, const BuildingRotation visual_rotation,
                                        const TextureAsset& texture, const RoadManager& roads,
-                                       const Camera& camera, const float viewport_width, const float viewport_height) {
+                                       const Camera& camera, const float viewport_width, const float viewport_height,
+                                       const ch::MapDocument* document = nullptr) {
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
 
     // A deliberately small 2:1 reference grid makes a bad base/asset obvious
@@ -996,17 +1042,23 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
     SDL_SetRenderDrawColor(renderer, 54, 134, 164, 175);
     for (int y = instance.tile_y - 2; y < instance.tile_y + footprint.height + 2; ++y) {
         for (int x = instance.tile_x - 2; x < instance.tile_x + footprint.width + 2; ++x) {
-            render_tile_outline(renderer, x, y, camera, viewport_width, viewport_height);
+            render_heightfield_tile_outline(renderer, x, y, camera, viewport_width, viewport_height, document);
         }
     }
 
     render_footprint_outline(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
-                             camera, viewport_width, viewport_height, 255, 208, 92);
+                             camera, viewport_width, viewport_height, 255, 208, 92, document);
     render_road_access_candidates(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
                                   roads, camera, viewport_width, viewport_height);
 
-    const BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
-                                                                       viewport_width, viewport_height);
+    BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
+                                                                viewport_width, viewport_height);
+    if (document != nullptr) {
+        const float height = document->terrain_heightfield().sample(geometry.ground_world.x, geometry.ground_world.y);
+        const float elevation = height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
+        geometry.screen_anchor.y -= elevation;
+        geometry.sprite_bounds.y -= elevation;
+    }
     SDL_SetRenderDrawColor(renderer, 238, 94, 224, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &geometry.sprite_bounds);
     render_anchor_cross(renderer, geometry.screen_anchor, 8.0F, 72, 236, 255);
@@ -1014,9 +1066,9 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
     // The two projected world axes start at the logical footprint centre.
     const float centre_x = static_cast<float>(instance.tile_x) + static_cast<float>(footprint.width) * 0.5F;
     const float centre_y = static_cast<float>(instance.tile_y) + static_cast<float>(footprint.height) * 0.5F;
-    const SDL_FPoint centre = world_to_screen(centre_x, centre_y, camera, viewport_width, viewport_height);
-    const SDL_FPoint axis_x = world_to_screen(centre_x + 1.0F, centre_y, camera, viewport_width, viewport_height);
-    const SDL_FPoint axis_y = world_to_screen(centre_x, centre_y + 1.0F, camera, viewport_width, viewport_height);
+    const SDL_FPoint centre = terrain_world_to_screen(centre_x, centre_y, camera, viewport_width, viewport_height, document);
+    const SDL_FPoint axis_x = terrain_world_to_screen(centre_x + 1.0F, centre_y, camera, viewport_width, viewport_height, document);
+    const SDL_FPoint axis_y = terrain_world_to_screen(centre_x, centre_y + 1.0F, camera, viewport_width, viewport_height, document);
     render_anchor_cross(renderer, centre, 5.0F, 255, 255, 255);
     SDL_SetRenderDrawColor(renderer, 255, 92, 92, SDL_ALPHA_OPAQUE);
     SDL_RenderLine(renderer, centre.x, centre.y, axis_x.x, axis_x.y);
@@ -3928,7 +3980,8 @@ int main() {
             const bool valid_preview = placement_validation.valid();
             render_footprint_outline(renderer, *placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second, camera,
                                      static_cast<float>(viewport_width), static_cast<float>(viewport_height),
-                                      valid_preview ? 116 : 255, valid_preview ? 238 : 90, 90);
+                                      valid_preview ? 116 : 255, valid_preview ? 238 : 90, 90,
+                                      active_map_doc ? &*active_map_doc : nullptr);
             if (debug_visible) {
                 render_road_access_candidates(renderer, *placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second,
                                               roads, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
@@ -3991,7 +4044,8 @@ int main() {
         }
         if (navigation_debug_path) {
             render_navigation_debug_path(renderer, *navigation_debug_path, camera,
-                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                         active_map_doc ? &*active_map_doc : nullptr);
         }
 
         if (placement_definition != nullptr) {
@@ -4011,19 +4065,22 @@ int main() {
         if (hovered_instance != nullptr) {
             if (const BuildingDefinition* definition = catalog.find(hovered_instance->definition_id)) {
                 render_footprint_outline(renderer, *definition, hovered_instance->rotation, hovered_instance->tile_x, hovered_instance->tile_y, camera,
-                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height), 92, 206, 255);
+                                         static_cast<float>(viewport_width), static_cast<float>(viewport_height), 92, 206, 255,
+                                         active_map_doc ? &*active_map_doc : nullptr);
             }
         }
         if (selected_instance_id) {
             if (const BuildingInstance* selected = buildings.find_by_id(*selected_instance_id)) {
                 if (const BuildingDefinition* definition = catalog.find(selected->definition_id)) {
                     render_footprint_outline(renderer, *definition, selected->rotation, selected->tile_x, selected->tile_y, camera,
-                                             static_cast<float>(viewport_width), static_cast<float>(viewport_height), 255, 208, 92);
+                                             static_cast<float>(viewport_width), static_cast<float>(viewport_height), 255, 208, 92,
+                                             active_map_doc ? &*active_map_doc : nullptr);
                     if (debug_visible) {
                         const BuildingRotation visual_rotation = camera_visual_rotation(*definition, selected->rotation, camera.rotation);
                         if (const TextureAsset* texture = textures.find(asset_root / definition->texture_path_for(visual_rotation, selected->current_level))) {
                             render_building_calibration_debug(renderer, *definition, *selected, visual_rotation, *texture, roads, camera,
-                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                                                              static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                                              active_map_doc ? &*active_map_doc : nullptr);
                         }
                     }
                 }
