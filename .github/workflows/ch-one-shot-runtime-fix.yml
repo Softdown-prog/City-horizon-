@@ -55,6 +55,12 @@ jobs:
           text = text.replace("#define BuildingManager ChBuildingManager\n", "", 1)
           assert text.count("#undef BuildingManager\n") == 1
           text = text.replace("#undef BuildingManager\n", "", 1)
+
+          mission_include = '#include "mission_system.h"\n'
+          if mission_include not in text:
+              include_anchor = '#include "land_system.h"\n'
+              assert text.count(include_anchor) == 1, "land_system include anchor drifted"
+              text = text.replace(include_anchor, include_anchor + mission_include, 1)
           main.write_text(text, encoding="utf-8")
 
           header = Path("src/building_system.h")
@@ -104,6 +110,6 @@ jobs:
           git add src/main.cpp src/building_system.h
           git diff --cached --check
           if (git diff --cached --quiet) { exit 0 }
-          git commit -m "fix: keep building color compatibility on canonical manager"
+          git commit -m "fix: preserve canonical runtime ABI across compatibility wrappers"
           git pull --rebase origin main
           git push origin HEAD:main
