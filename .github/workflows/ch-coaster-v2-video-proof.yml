@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Apply CH_CAMERA_V1 parity patch for proof
+        run: python3 tools/animation_preview/patch_coaster_camera_parity_v1.py
+
       - name: Validate occupied V2 atlas
         run: |
           set -euo pipefail
@@ -139,6 +142,8 @@ jobs:
             "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
             "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
             "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+            "cameraContract": "CH_CAMERA_V1",
+            "cameraParityProofPatch": true,
             "frameCount": 360,
             "fps": 30,
             "durationSeconds": 12,
