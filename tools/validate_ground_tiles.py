@@ -65,7 +65,13 @@ def validate_tile(path: Path, profile_name: str, profile: dict[str, Any]) -> lis
 
 
 def coast_paths(contract: dict[str, Any]) -> list[Path]:
-    catalog_path = ROOT / contract["profiles"]["coast"]["catalog"]
+    profile = contract["profiles"]["coast"]
+    catalog = profile.get("catalog")
+    if not isinstance(catalog, str) or not catalog:
+        return []
+    catalog_path = ROOT / catalog
+    if not catalog_path.is_file():
+        return []
     document = json.loads(catalog_path.read_text(encoding="utf-8"))
     paths: set[Path] = set()
 
@@ -98,7 +104,7 @@ def report(path: Path, profile: str, problems: list[str], debug: bool) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--all", action="store_true", help="validate every canonical ground-tile profile")
+    parser.add_argument("--all", action="store_true", help="validate every active canonical ground-tile profile")
     parser.add_argument("--profile", help="profile for one or more explicit --file entries")
     parser.add_argument("--file", type=Path, action="append", default=[], help="candidate PNG to validate")
     parser.add_argument("--directory", type=Path, action="append", default=[],
@@ -115,8 +121,12 @@ def main() -> None:
     targets: list[tuple[Path, str]] = []
     if args.all:
         targets.extend((ROOT / profiles[name]["reference"], name)
-                       for name in ("grass", "prepared-soil", "plowed-soil"))
-        targets.extend((path, "coast") for path in coast_paths(contract))
+                       for name in ("grass", "prepared-soil", "plowed-soil")
+                       if profiles[name].get("enabledInAll", True))
+        if profiles.get("coast", {}).get("enabledInAll", True):
+            targets.extend((path, "coast") for path in coast_paths(contract))
+        elif args.debug:
+            print("[GROUND TILE SKIPPED] coast [disabled in canonical --all contract]")
     else:
         targets.extend((path, args.profile) for path in args.file)
         for directory in args.directory:
