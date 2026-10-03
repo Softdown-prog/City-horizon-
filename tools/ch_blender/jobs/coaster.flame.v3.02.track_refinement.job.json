@@ -1,0 +1,21 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "coaster.flame.v3.02.track_refinement",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/coaster_worker_task.py",
+  "args": [
+    "--task",
+    "improve",
+    "--project",
+    "C++/MapForge2/projects/coaster_flame_01.mapforge.json",
+    "--output",
+    "out/ch_blender_agent/coaster.flame.v3.02.track_refinement",
+    "--samples",
+    "128"
+  ],
+  "outputDir": "out/ch_blender_agent/coaster.flame.v3.02.track_refinement",
+  "expectedOutputs": [
+    "out/ch_blender_agent/coaster.flame.v3.02.track_refinement/coaster_flame_01_v3.mapforge.json",
+    "out/ch_blender_agent/coaster.flame.v3.02.track_refinement/track_refinement_report.json"
+  ]
+}
