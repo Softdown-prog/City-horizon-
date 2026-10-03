@@ -382,7 +382,8 @@ public:
     static void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands,
                                      const LandParcel* hovered_parcel, const bool land_mode,
                                      const CameraState& camera, const float viewport_width,
-                                     const float viewport_height) {
+                                     const float viewport_height,
+                                     const MapDocument* document = nullptr) {
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
         if (!visible.valid) return;
@@ -409,8 +410,14 @@ public:
 
             for (int y = min_y; y <= max_y; ++y) {
                 for (int x = min_x; x <= max_x; ++x) {
-                    MapRenderer::render_tile_fill(renderer, x, y, camera,
-                                                  viewport_width, viewport_height, color);
+                    if (document != nullptr) {
+                        MapRenderer::render_heightfield_tile_fill(
+                            renderer, x, y, *document, camera,
+                            viewport_width, viewport_height, color);
+                    } else {
+                        MapRenderer::render_tile_fill(renderer, x, y, camera,
+                                                      viewport_width, viewport_height, color);
+                    }
                 }
             }
         }
