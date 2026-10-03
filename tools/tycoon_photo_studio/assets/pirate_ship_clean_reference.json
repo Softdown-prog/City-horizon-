@@ -19,7 +19,10 @@
     "stronger_bow_stern_identity",
     "visible_bearing_and_ship_attachment_hardware",
     "higher_material_contrast_at_game_scale",
-    "finished_boarding_platform_with_stairs"
+    "finished_boarding_platform_with_stairs",
+    "gold_decorative_cuffs_on_auxiliary_pendulum_arms",
+    "segmented_gold_collars_on_central_round_mast",
+    "decorated_suspension_without_changing_approved_topology"
   ],
   "forbiddenTopology":[
     "end_portals_at_bow_and_stern",
@@ -40,7 +43,9 @@
     "centralMastAttachZ":5.75,
     "axleRadius":0.62,
     "bearingRadius":1.38,
-    "deckZ":1.35
+    "deckZ":1.35,
+    "armDecorationFractions":[0.22,0.48,0.74],
+    "mastDecorationFractions":[0.24,0.46,0.68,0.86]
   },
   "materials":{
     "structure":{"name":"WarmRideSteel","rgba":[0.16,0.065,0.028,1],"roughness":0.50,"metallic":0.52},
