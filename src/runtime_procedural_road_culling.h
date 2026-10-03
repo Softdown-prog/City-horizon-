@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/ch_core/projection.h"
+#include "src/ch_core/terrain_projection.h"
 #include "src/ch_render/procedural_road_network_renderer.h"
 #include "src/procedural_road_ground_render_plan.h"
 
@@ -211,7 +212,8 @@ namespace ch {
     const CameraState& camera,
     const float viewport_width,
     const float viewport_height,
-    const ProceduralRoad2DWorldBounds& bounds) {
+    const ProceduralRoad2DWorldBounds& bounds,
+    const TerrainHeightField* heightfield = nullptr) {
     if (renderer == nullptr) return false;
     const ProceduralRoadGraph& graph = bridge.graph();
 
@@ -258,10 +260,14 @@ namespace ch {
             const float t_b = begin_t + (end_t - begin_t) * alpha_b;
             const ProceduralRoad2DPoint point_a = procedural_road_sample_cubic_2d(*spline, t_a);
             const ProceduralRoad2DPoint point_b = procedural_road_sample_cubic_2d(*spline, t_b);
-            const ScreenPoint screen_a = world_to_screen_point(
-                point_a.x, point_a.y, camera, viewport_width, viewport_height);
-            const ScreenPoint screen_b = world_to_screen_point(
-                point_b.x, point_b.y, camera, viewport_width, viewport_height);
+            const ScreenPoint screen_a = heightfield != nullptr
+                ? terrain_world_to_screen_point(point_a.x, point_a.y, *heightfield,
+                                                camera, viewport_width, viewport_height)
+                : world_to_screen_point(point_a.x, point_a.y, camera, viewport_width, viewport_height);
+            const ScreenPoint screen_b = heightfield != nullptr
+                ? terrain_world_to_screen_point(point_b.x, point_b.y, *heightfield,
+                                                camera, viewport_width, viewport_height)
+                : world_to_screen_point(point_b.x, point_b.y, camera, viewport_width, viewport_height);
             if (!SDL_RenderLine(renderer, screen_a.x, screen_a.y, screen_b.x, screen_b.y)) ok = false;
         }
     }

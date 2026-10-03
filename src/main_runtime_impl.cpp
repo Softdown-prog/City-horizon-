@@ -638,11 +638,11 @@ void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int
 
 void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVisualCatalog& visuals,
                   const TextureCache& textures, const std::filesystem::path& asset_root, const Camera& camera,
-                  float viewport_width, float viewport_height) {
+                  float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
     ch::MapRenderer::render_roads(renderer, roads, visuals,
                                   [&textures](const std::filesystem::path& p) { return textures.find(p); },
-                                  asset_root, cs, viewport_width, viewport_height);
+                                  asset_root, cs, viewport_width, viewport_height, document);
 }
 
 void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, const TextureCache& textures,
@@ -3826,7 +3826,8 @@ int main() {
         render_land_overlays(renderer, lands, hovered_parcel, land_mode, camera,
                              static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
-                     static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                     static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                     active_map_doc ? &*active_map_doc : nullptr);
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         render_sidewalks(renderer, sidewalks, textures, asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));

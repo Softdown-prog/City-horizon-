@@ -23,7 +23,8 @@ namespace ch {
     const RoadManager& roads,
     const CameraState& camera,
     const float viewport_width,
-    const float viewport_height) {
+    const float viewport_height,
+    const TerrainHeightField* heightfield = nullptr) {
     if (renderer == nullptr || roads.tiles().empty()) return false;
 
     const ProceduralRoad2DWorldBounds visible_bounds =
@@ -74,7 +75,7 @@ namespace ch {
     if (!complete_ground_plan) return false;
 
     if (!render_procedural_road_ground_plan(
-            renderer, plan, camera, viewport_width, viewport_height)) {
+            renderer, plan, camera, viewport_width, viewport_height, {}, heightfield)) {
         return false;
     }
 
@@ -82,7 +83,7 @@ namespace ch {
     // asphalt surface. Once asphalt has been submitted, a cosmetic line failure
     // must not redraw legacy tiles on top of the procedural road.
     (void)render_visible_procedural_road_center_markings(
-        renderer, mirror, camera, viewport_width, viewport_height, visible_bounds);
+        renderer, mirror, camera, viewport_width, viewport_height, visible_bounds, heightfield);
     return true;
 }
 

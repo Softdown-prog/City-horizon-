@@ -419,13 +419,16 @@ public:
                              const RoadVisualCatalog& visuals,
                              const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture,
                              const std::filesystem::path& asset_root, const CameraState& camera,
-                             const float viewport_width, const float viewport_height) {
+                             const float viewport_width, const float viewport_height,
+                             const MapDocument* document = nullptr) {
         const runtime_render_detail::TileCullBounds visible =
             runtime_render_detail::visible_tile_bounds(camera, viewport_width, viewport_height, 1);
         if (!visible.valid || roads.tiles().empty()) return;
 
+        const TerrainHeightField* heightfield = document == nullptr
+            ? nullptr : &document->terrain_heightfield();
         if (try_render_procedural_roads_runtime(
-                renderer, roads, camera, viewport_width, viewport_height)) {
+                renderer, roads, camera, viewport_width, viewport_height, heightfield)) {
             return;
         }
 
@@ -455,8 +458,13 @@ public:
 
         constexpr SDL_FColor kRoadAsphalt = {52.0F / 255.0F, 57.0F / 255.0F, 60.0F / 255.0F, 1.0F};
         for (const RoadTile* tile : visible_tiles) {
-            MapRenderer::render_tile_fill(renderer, tile->tile_x, tile->tile_y, camera,
-                                          viewport_width, viewport_height, kRoadAsphalt);
+            if (document != nullptr) {
+                MapRenderer::render_heightfield_tile_fill(renderer, tile->tile_x, tile->tile_y, *document,
+                                                          camera, viewport_width, viewport_height, kRoadAsphalt);
+            } else {
+                MapRenderer::render_tile_fill(renderer, tile->tile_x, tile->tile_y, camera,
+                                              viewport_width, viewport_height, kRoadAsphalt);
+            }
         }
         for (const RoadTile* tile : visible_tiles) {
             const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
@@ -465,12 +473,23 @@ public:
             const TextureAsset* texture = visual == nullptr
                 ? nullptr : find_texture(asset_root / visual->texture_path);
             if (texture != nullptr) {
-                MapRenderer::render_road_sprite(renderer, *texture, tile->tile_x, tile->tile_y,
-                                                camera, viewport_width, viewport_height);
+                if (document != nullptr) {
+                    MapRenderer::render_heightfield_terrain_tile(renderer, *texture, tile->tile_x, tile->tile_y,
+                                                                *document, camera, viewport_width, viewport_height, false);
+                } else {
+                    MapRenderer::render_road_sprite(renderer, *texture, tile->tile_x, tile->tile_y,
+                                                    camera, viewport_width, viewport_height);
+                }
             } else {
-                MapRenderer::render_road_tile(renderer, tile->tile_x, tile->tile_y, camera,
-                    viewport_width, viewport_height,
-                    runtime_render_detail::road_placeholder_color(roads.visual_type(tile->tile_x, tile->tile_y)));
+                const SDL_FColor placeholder = runtime_render_detail::road_placeholder_color(
+                    roads.visual_type(tile->tile_x, tile->tile_y));
+                if (document != nullptr) {
+                    MapRenderer::render_heightfield_tile_fill(renderer, tile->tile_x, tile->tile_y, *document,
+                                                              camera, viewport_width, viewport_height, placeholder);
+                } else {
+                    MapRenderer::render_road_tile(renderer, tile->tile_x, tile->tile_y, camera,
+                                                  viewport_width, viewport_height, placeholder);
+                }
             }
         }
     }
