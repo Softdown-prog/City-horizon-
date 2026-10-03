@@ -1,3 +1,4 @@
+# Runtime gate green at d311ebd846c23f068d4ea1d72ed024c21e6fdb32; trigger fresh V2 capture.
 # Registered V2 proof workflow; touching this file intentionally triggers capture.
 name: CH Coaster V2 Video Proof
 
