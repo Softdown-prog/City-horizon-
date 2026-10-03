@@ -44,8 +44,10 @@ int main() {
     straight_state.lead.speed_mps = 5.0;
     const TrainStepResult straight = step_train(straight_state, config, straight_sampler, 0.0);
     for (const CarRuntimePose& car : straight.cars) {
-        if (car.sprite_pose.atlas_index != 0)
-            return fail("straight +Y train must use flat h00 for every car");
+        if (car.sprite_pose.atlas_index != 48)
+            return fail("straight +Y train must use V2 flat h00 frame 48 for every car");
+        if (car.sprite_pose.requires_extended_orientation)
+            return fail("flat straight car must be fully covered by occupied V2 atlas");
     }
     if (!near(straight.cars[1].route_distance_m, 12.0 - kFlameCarCenterSpacingM, 0.001))
         return fail("car center spacing changed unexpectedly");
@@ -77,6 +79,8 @@ int main() {
         return fail("front and rear cars must articulate to different curve headings");
     if (curve.cars[0].sprite_pose.logical_heading_index != 4)
         return fail("quarter-circle lead car must reach authored h04");
+    if (curve.cars[0].sprite_pose.atlas_index != 52)
+        return fail("quarter-circle lead car must use V2 flat h04 frame 52");
     if (!(curve.cars[0].forces.lateral_g > 1.0))
         return fail("curve car must expose lateral G telemetry");
 
@@ -87,8 +91,8 @@ int main() {
     if (!(wrapped.cars[1].route_distance_m > 38.0 && wrapped.cars[1].route_distance_m < 39.0))
         return fail("closed route must wrap rear-car distance");
 
-    // The pose selector and train runtime must use the approved +30 degree
-    // vertical supplement when the route tangent climbs at 30 degrees.
+    // V2 contains +30-degree slopes in all 16 headings, so h00 uses frame 80
+    // and must not fall back to the old cardinal vertical supplement.
     const auto slope_sampler = [](const double distance) {
         CenterlineSample s;
         s.distance_m = distance;
@@ -104,9 +108,34 @@ int main() {
     slope_state.lead.distance_m = 10.0;
     slope_state.lead.speed_mps = 6.0;
     const TrainStepResult slope = step_train(slope_state, config, slope_sampler, 0.0);
-    if (slope.cars[0].sprite_pose.atlas_index != 32 ||
+    if (slope.cars[0].sprite_pose.atlas_index != 80 ||
+        slope.cars[0].sprite_pose.vertical_supplement ||
+        slope.cars[0].sprite_pose.snapped_to_cardinal_heading ||
         !near(slope.cars[0].sprite_pose.snapped_pitch_degrees, 30.0))
-        return fail("+30 degree route must select approved vertical frame 32");
+        return fail("+30 degree route must select occupied V2 16-way slope frame 80");
+
+    // A banked flat route must preserve the local up vector and select the
+    // dedicated +24-degree bank family rather than rendering an unbanked car.
+    const auto bank_sampler = [](const double distance) {
+        CenterlineSample s;
+        s.distance_m = distance;
+        s.y = distance;
+        s.tangent_y = 1.0;
+        constexpr double kDeg24 = 0.41887902047863906;
+        s.up_x = std::sin(kDeg24);
+        s.up_y = 0.0;
+        s.up_z = std::cos(kDeg24);
+        s.roll_degrees = 24.0;
+        return s;
+    };
+    TrainRuntimeState bank_state;
+    bank_state.lead.distance_m = 12.0;
+    bank_state.lead.speed_mps = 7.0;
+    const TrainStepResult banked = step_train(bank_state, config, bank_sampler, 0.0);
+    if (banked.cars[0].sprite_pose.atlas_index != 160 ||
+        !near(banked.cars[0].sprite_pose.snapped_roll_degrees, 24.0) ||
+        banked.cars[0].sprite_pose.requires_extended_orientation)
+        return fail("+24 degree bank route must select occupied V2 bank frame 160");
 
     // Longitudinal gravity is averaged across all four cars, not taken only
     // from the lead car. Here every car is descending so train speed must rise.
@@ -132,8 +161,6 @@ int main() {
 
     // A mixed profile verifies the important train-level behavior: the first
     // two cars can already be descending while the rear two are still climbing.
-    // The solver averages gravity over the complete train, avoiding a fake
-    // acceleration jump when only the leading part crosses a crest.
     const auto mixed_sampler = [](const double distance) {
         CenterlineSample s;
         s.distance_m = distance;
@@ -165,7 +192,7 @@ int main() {
         !near(open_samples[3].distance_m, 0.0, 0.001))
         return fail("open route rear cars must clamp to route start");
 
-    std::cout << "CH_COASTER_TRAIN_RUNTIME_V1 regression: OK\n";
+    std::cout << "CH_COASTER_TRAIN_RUNTIME_V2 regression: OK\n";
     std::cout << "curve_front_frame=" << curve.cars[0].sprite_pose.atlas_index << '\n';
     std::cout << "curve_rear_frame=" << curve.cars[3].sprite_pose.atlas_index << '\n';
     std::cout << "downhill_speed=" << downhill.state.lead.speed_mps << " m/s\n";
