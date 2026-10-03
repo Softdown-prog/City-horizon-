@@ -37,7 +37,7 @@ set(SDLMIXER_GME OFF CACHE BOOL "Disable unused GME decoder" FORCE)
 set(SDLMIXER_MIDI OFF CACHE BOOL "Disable unused MIDI decoder" FORCE)
 set(SDLMIXER_MOD OFF CACHE BOOL "Disable unused MOD decoder" FORCE)
 set(SDLMIXER_MP3 OFF CACHE BOOL "Disable unused MP3 decoder" FORCE)
-set(SDLMIXER_OPUS OFF CACHE BOOL "Disable unused Opus decoder" FORCE)
+set(SDLMIXER_OPUS OFF CACHE BOOL "Disable unused OpUS decoder" FORCE)
 set(SDLMIXER_VOC OFF CACHE BOOL "Disable unused VOC decoder" FORCE)
 set(SDLMIXER_WAVE OFF CACHE BOOL "Disable unused WAV decoder" FORCE)
 set(SDLMIXER_WAVPACK OFF CACHE BOOL "Disable unused WavPack decoder" FORCE)
@@ -455,9 +455,11 @@ if(BUILD_TESTING)
     add_executable(ui_manager_test
         src/ui_manager_test.cpp
         src/ui_manager.cpp
+        src/fence_system.cpp
+        src/fence_placement_controller.cpp
     )
     target_include_directories(ui_manager_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(ui_manager_test PRIVATE SDL3::SDL3)
+    target_link_libraries(ui_manager_test PRIVATE ch_core SDL3::SDL3)
     add_test(
         NAME ui_manager_test
         COMMAND ui_manager_test
