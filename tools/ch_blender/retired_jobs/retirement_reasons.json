@@ -98,6 +98,13 @@
     }
   },
   {
+    "file": "coaster.car_flame_occupied_atlas_v2.final.001.job.json",
+    "reason": "Final render requires explicit human proxy review.",
+    "details": {
+      "required": "approval.proxyReviewed=true"
+    }
+  },
+  {
     "file": "effect.steam_train.vapor_overlay.final.001.job.json",
     "reason": "Quality-stage arguments are owned by the CH Blender worker",
     "details": {}
