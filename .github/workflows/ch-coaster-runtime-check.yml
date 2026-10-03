@@ -189,7 +189,7 @@ jobs:
           expected_families = {
               'heading_pitch_16way': 112,
               'vertical_16way': 32,
-              'bank_16way': 32,
+              'banked_16way': 32,
               'inverted_16way': 16,
           }
           if family_counts != expected_families:
