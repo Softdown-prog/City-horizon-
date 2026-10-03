@@ -5,6 +5,7 @@
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/terrain_heightfield.h"
+#include "src/ch_core/terrain_projection.h"
 #include "src/ch_core/terrain_semantics_catalog.h"
 #include "src/ch_core/validation.h"
 #include "src/ch_render/map_renderer.h"
