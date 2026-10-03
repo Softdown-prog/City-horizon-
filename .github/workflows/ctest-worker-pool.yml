@@ -1,6 +1,6 @@
 name: CTest Worker Pool
 
-# 32 logical workers: 21 active tests today + 11 reserve slots.
+# Build once, then shard every registered CTest deterministically across 32 logical workers.
 on:
   workflow_dispatch:
   push:
@@ -27,25 +27,31 @@ jobs:
         shell: pwsh
         run: cmake -S . -B build-ctest -DBUILD_TESTING=ON
 
-      - name: Build registered CTest targets
+      - name: Build project and all registered tests
         shell: pwsh
-        run: >-
-          cmake --build build-ctest --config Debug --parallel 2 --target
-          ch_core_test terrain_heightfield_test procedural_road_lane_connector_test
-          building_system_test audio_manager_test economy_simulation_test
-          road_visual_catalog_test sidewalk_topology_test mobile_animation_test
-          navigation_network_test pedestrian_system_test vehicle_traffic_test
-          weather_system_test land_system_test save_manager_test
-          population_system_test power_system_test mission_system_test
-          ui_manager_test transaction_test shoreline_autotile_test
+        run: cmake --build build-ctest --config Debug --parallel 2
 
-      - name: Stage portable CTest bundle
+      - name: Stage portable CTest bundle and discover tests
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force ctest-bundle/Debug | Out-Null
           Copy-Item build-ctest/CTestTestfile.cmake ctest-bundle/CTestTestfile.cmake
           Copy-Item build-ctest/Debug/*.exe ctest-bundle/Debug/
           Copy-Item build-ctest/_deps/sdl3-build/Debug/SDL3.dll ctest-bundle/Debug/
+
+          $list = ctest --test-dir build-ctest -C Debug -N
+          $tests = @(
+            $list | ForEach-Object {
+              if ($_ -match '^\s*Test\s+#\d+:\s+(.+)$') { $Matches[1].Trim() }
+            }
+          )
+          if ($tests.Count -eq 0) {
+            throw "CTest discovery returned zero tests."
+          }
+          $tests | Set-Content -Encoding utf8 ctest-bundle/test-names.txt
+          Write-Host "Discovered $($tests.Count) CTests for the worker pool."
+          $tests | ForEach-Object { Write-Host " - $_" }
 
       - name: Upload CTest bundle
         uses: actions/upload-artifact@v4
@@ -85,42 +91,25 @@ jobs:
           $ErrorActionPreference = "Stop"
           $worker = [int]$env:CH_CTEST_WORKER
           $poolSize = [int]$env:CH_CTEST_POOL_SIZE
+          $tests = @(Get-Content build-ctest/test-names.txt | Where-Object { $_.Trim().Length -gt 0 })
 
-          $tests = @(
-            "ch_core_test",
-            "terrain_heightfield_test",
-            "procedural_road_lane_connector_test",
-            "building_system_test",
-            "audio_manager_test",
-            "economy_simulation_test",
-            "road_visual_catalog_test",
-            "sidewalk_topology_test",
-            "mobile_animation_test",
-            "navigation_network_test",
-            "pedestrian_system_test",
-            "vehicle_traffic_test",
-            "weather_system_test",
-            "land_system_test",
-            "save_manager_test",
-            "population_system_test",
-            "power_system_test",
-            "mission_system_test",
-            "ui_manager_test",
-            "transaction_test",
-            "shoreline_autotile_test"
-          )
+          $assigned = @()
+          for ($i = $worker - 1; $i -lt $tests.Count; $i += $poolSize) {
+            $assigned += $tests[$i]
+          }
 
-          if ($worker -gt $tests.Count) {
+          if ($assigned.Count -eq 0) {
             Write-Host "Worker $worker/$poolSize is reserve capacity. Current suite has $($tests.Count) tests."
             exit 0
           }
 
-          $testName = $tests[$worker - 1]
           $sdlRuntime = (Resolve-Path "build-ctest/Debug").Path
           $env:PATH = "$sdlRuntime;$env:PATH"
+          $pattern = '^(' + (($assigned | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')$'
 
-          Write-Host "Worker $worker/$poolSize running: $testName"
-          ctest --test-dir build-ctest -C Debug --output-on-failure --timeout 30 -R "^$testName$"
+          Write-Host "Worker $worker/$poolSize running $($assigned.Count) test(s):"
+          $assigned | ForEach-Object { Write-Host " - $_" }
+          ctest --test-dir build-ctest -C Debug --output-on-failure --timeout 30 -R $pattern
 
   pool-gate:
     name: CTest Pool Gate
