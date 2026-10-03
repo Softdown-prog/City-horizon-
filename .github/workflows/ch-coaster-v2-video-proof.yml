@@ -1,3 +1,4 @@
+# Registered V2 proof workflow; touching this file intentionally triggers capture.
 name: CH Coaster V2 Video Proof
 
 on:
