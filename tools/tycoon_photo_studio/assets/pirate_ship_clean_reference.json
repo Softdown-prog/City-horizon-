@@ -9,7 +9,7 @@
     "primaryRead":"full_scale_pirate_ship_amusement_ride",
     "supportTopology":"two_side_A_frames_centered_on_ship_midpoint",
     "pivot":"single_transverse_axle_across_ship_width_at_center",
-    "suspension":"triangulated_pendulum_arms_from_central_axle_to_ship_ends",
+    "suspension":"two_auxiliary_trussed_arms_plus_one_central_round_pendulum_mast",
     "ship":"dominant_deep_long_passenger_hull",
     "station":"independent_raised_boarding_deck"
   },
@@ -28,6 +28,8 @@
     "shipLength":20.0,
     "shipHalfWidth":3.15,
     "shipCenterZ":5.3,
+    "centralMastRadius":0.46,
+    "centralMastAttachZ":5.75,
     "deckZ":1.35
   },
   "materials":{
