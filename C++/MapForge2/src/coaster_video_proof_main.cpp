@@ -1,3 +1,4 @@
+#include "../../../src/coaster_canonical_layout.h"
 #include "../../../src/coaster_centerline_route.h"
 #include "../../../src/coaster_train_runtime.h"
 #include "../../../src/rail_system.h"
@@ -38,48 +39,7 @@ QPointF project(const double x, const double y, const double z) {
 }
 
 ch::coaster::CenterlineRoute build_route() {
-    using ch::coaster::DriveMode;
-    using ch::coaster::RoutePoint;
-
-    std::vector<RoutePoint> points = {
-        {-31.0, -13.0, 0.0, DriveMode::Station, 4.5},
-        {-24.0, -13.0, 0.0, DriveMode::Lift,    6.0},
-        {-16.0, -13.0, 1.2, DriveMode::Lift,    6.0},
-        { -8.0, -13.0, 2.6, DriveMode::Lift,    6.0},
-        {  0.0, -13.0, 4.0, DriveMode::Lift,    6.0},
-        {  8.0, -13.0, 5.4, DriveMode::Lift,    6.0},
-        { 16.0, -13.0, 6.8, DriveMode::Lift,    6.0},
-        { 23.0, -13.0, 7.8, DriveMode::Free,   -1.0},
-        { 28.0, -11.0, 7.8, DriveMode::Free,   -1.0},
-        { 31.0,  -7.0, 6.9, DriveMode::Free,   -1.0},
-        { 32.0,  -2.0, 5.6, DriveMode::Free,   -1.0},
-        { 31.0,   3.0, 4.0, DriveMode::Free,   -1.0},
-        { 28.0,   7.0, 2.2, DriveMode::Free,   -1.0},
-        { 23.0,   9.0, 0.7, DriveMode::Free,   -1.0},
-        { 16.0,  10.0, 0.4, DriveMode::Free,   -1.0},
-        {  9.0,  10.0, 1.5, DriveMode::Free,   -1.0},
-        {  2.0,  10.0, 2.7, DriveMode::Free,   -1.0},
-        { -5.0,  10.0, 1.5, DriveMode::Free,   -1.0},
-        {-12.0,  10.0, 0.4, DriveMode::Free,   -1.0},
-        {-18.0,   9.0, 0.7, DriveMode::Free,   -1.0},
-        {-24.0,   7.0, 1.5, DriveMode::Free,   -1.0},
-        {-28.0,   3.0, 2.2, DriveMode::Free,   -1.0},
-        {-29.0,  -2.0, 1.5, DriveMode::Free,   -1.0},
-        {-27.0,  -7.0, 0.5, DriveMode::Free,   -1.0},
-        {-22.0,  -9.0, 0.0, DriveMode::Free,   -1.0},
-        {-16.0,  -7.0, 0.0, DriveMode::Free,   -1.0},
-        {-13.0,  -3.0, 0.0, DriveMode::Free,   -1.0},
-        {-15.0,   1.0, 0.0, DriveMode::Free,   -1.0},
-        {-20.0,   2.0, 0.0, DriveMode::Free,   -1.0},
-        {-25.0,   0.0, 0.0, DriveMode::Brake,   7.0},
-        {-29.0,  -4.0, 0.0, DriveMode::Brake,   5.5},
-        {-31.0,  -9.0, 0.0, DriveMode::Station, 4.5},
-    };
-
-    ch::coaster::CenterlineRoute route;
-    const bool rebuilt = route.rebuild(std::move(points), true);
-    if (!rebuilt) route.clear();
-    return route;
+    return ch::coaster::make_canonical_flame_route();
 }
 
 void draw_grid(QPainter& painter) {
@@ -207,18 +167,26 @@ void draw_track(QPainter& painter,
                          project(s.x - nx * 0.62, s.y - ny * 0.62, s.z + 0.02));
     }
 
+    // Lift-chain proof follows the route semantics instead of a hard-coded
+    // distance range. This keeps the video aligned with the canonical layout.
     QPen liftPen(QColor(226, 179, 63));
     liftPen.setWidthF(2.0);
     liftPen.setStyle(Qt::DashLine);
     painter.setPen(liftPen);
     QPainterPath lift;
-    bool liftStarted = false;
-    for (double d = 7.0; d <= 54.0; d += 0.35) {
-        const auto s = route.sample(d);
-        if (!s) continue;
-        const QPointF p = project(s->x, s->y, s->z + 0.13);
-        if (!liftStarted) { lift.moveTo(p); liftStarted = true; }
-        else lift.lineTo(p);
+    bool inLift = false;
+    for (const auto& s : samples) {
+        if (s.drive_mode != ch::coaster::DriveMode::Lift) {
+            inLift = false;
+            continue;
+        }
+        const QPointF p = project(s.x, s.y, s.z + 0.13);
+        if (!inLift) {
+            lift.moveTo(p);
+            inLift = true;
+        } else {
+            lift.lineTo(p);
+        }
     }
     painter.drawPath(lift);
 }
@@ -283,7 +251,7 @@ int main(int argc, char** argv) {
 
     const auto route = build_route();
     if (!route.valid()) {
-        std::fprintf(stderr, "failed to construct CH_COASTER_CENTERLINE_ROUTE_V1 proof route\n");
+        std::fprintf(stderr, "failed to construct CH_COASTER_CANONICAL_LAYOUT_V1 route\n");
         return 4;
     }
     const auto trackSamples = sample_track(route);
@@ -314,7 +282,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::printf("CH_COASTER_VIDEO_PROOF_V2 frames=%d fps=%d cars=%d route_m=%.3f\n",
+    std::printf("CH_COASTER_VIDEO_PROOF_V3 layout=CH_COASTER_CANONICAL_LAYOUT_V1 frames=%d fps=%d cars=%d route_m=%.3f\n",
                 kFrameCount, kFps, ch::coaster::kCoasterTrainCarCount, route.length_m());
     return 0;
 }
