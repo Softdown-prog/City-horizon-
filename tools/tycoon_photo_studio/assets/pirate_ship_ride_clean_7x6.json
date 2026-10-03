@@ -1,0 +1,38 @@
+{
+  "contract": "CH_PIRATE_SHIP_CLEAN_SHEET_V1",
+  "assetId": "attraction.park_viking_ship.01",
+  "assetType": "animated_attraction",
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "authoringPolicy": {
+    "cleanSheet": true,
+    "useLegacyVikingGeometry": false,
+    "referenceSource": "user supplied real amusement park pirate ship photographs",
+    "designRule": "derive silhouette and mechanical proportions from full-size park rides, never from previous City Horizon Viking assets"
+  },
+  "footprint": {"widthTiles": 7, "depthTiles": 6},
+  "geometry": {
+    "platformWidth": 19.2,
+    "platformDepth": 15.4,
+    "platformTopZ": 1.8,
+    "towerFootHalfX": 8.4,
+    "towerHalfY": 6.0,
+    "pivotZ": 22.5,
+    "portalShoulderZ": 15.8,
+    "boatCenterZ": 8.1,
+    "boatLength": 18.0,
+    "boatHalfWidth": 3.1,
+    "boatDepth": 4.2,
+    "seatRows": 12,
+    "stairWidth": 5.2,
+    "stairRun": 5.4
+  },
+  "materials": {
+    "frame": {"name":"CleanFrame","rgba":[0.025,0.045,0.075,1.0],"roughness":0.55,"metallic":0.72},
+    "gold": {"name":"CleanGold","rgba":[0.82,0.48,0.07,1.0],"roughness":0.48,"metallic":0.40},
+    "wood": {"name":"CleanHull","rgba":[0.22,0.055,0.018,1.0],"roughness":0.78,"metallic":0.0},
+    "trim": {"name":"CleanTrim","rgba":[0.48,0.08,0.05,1.0],"roughness":0.62,"metallic":0.10},
+    "seat": {"name":"CleanSeat","rgba":[0.08,0.09,0.11,1.0],"roughness":0.68,"metallic":0.15},
+    "platform": {"name":"CleanPlatform","rgba":[0.30,0.32,0.34,1.0],"roughness":0.74,"metallic":0.28}
+  }
+}
