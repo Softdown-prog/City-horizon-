@@ -44,6 +44,11 @@ def main():
     # Fail before rendering if the authored route is not actually closed.
     base.build_route(project)
 
+    # Stage the exact authored source up front so the worker contract cannot
+    # report a false failure after a successful render/encode.
+    staged_project = outdir / "coaster_flame_switchback_02.mapforge.json"
+    shutil.copy2(project_path, staged_project)
+
     build = base.REPO / "build/ch-coaster-switchback-worker4"
     temp = base.REPO / "out/ch_blender_agent/.coaster_switchback_video_tmp"
     frames = temp / "frames"
@@ -70,7 +75,6 @@ def main():
     vf = f"select='not(mod(n\\,{interval}))',scale=640:-1,tile=4x3"
     run(["ffmpeg", "-y", "-i", video, "-vf", vf, "-frames:v", "1", sheet])
 
-    shutil.copy2(project_path, outdir / "coaster_flame_switchback_02.mapforge.json")
     shutil.copy2(frames / "capture_meta.json", outdir / "capture_meta.json")
     base.write_json(outdir / "video_report.json", {
         "contract": "CH_COASTER_WORKER4_VIDEO_REPORT_V1",
