@@ -20,9 +20,9 @@
     "visible_bearing_and_ship_attachment_hardware",
     "higher_material_contrast_at_game_scale",
     "finished_boarding_platform_with_stairs",
-    "gold_decorative_cuffs_on_auxiliary_pendulum_arms",
-    "segmented_gold_collars_on_central_round_mast",
-    "decorated_suspension_without_changing_approved_topology"
+    "alternating_red_blue_yellow_cuffs_on_auxiliary_pendulum_arms",
+    "segmented_red_blue_yellow_collars_on_central_round_mast",
+    "amusement_park_color_energy_without_changing_approved_topology"
   ],
   "forbiddenTopology":[
     "end_portals_at_bow_and_stern",
@@ -53,6 +53,9 @@
     "hull":{"name":"DeepWoodHull","rgba":[0.19,0.055,0.018,1],"roughness":0.72,"metallic":0},
     "trim":{"name":"WarmRedTrim","rgba":[0.68,0.050,0.020,1],"roughness":0.52,"metallic":0.12},
     "gold":{"name":"RideGoldAccent","rgba":[0.78,0.43,0.070,1],"roughness":0.42,"metallic":0.42},
+    "funRed":{"name":"ParkFunRed","rgba":[0.86,0.045,0.025,1],"roughness":0.40,"metallic":0.18},
+    "funBlue":{"name":"ParkFunBlue","rgba":[0.035,0.28,0.88,1],"roughness":0.40,"metallic":0.16},
+    "funYellow":{"name":"ParkFunYellow","rgba":[0.98,0.70,0.035,1],"roughness":0.38,"metallic":0.12},
     "seat":{"name":"SeatRed","rgba":[0.52,0.028,0.020,1],"roughness":0.62,"metallic":0.05},
     "deck":{"name":"BoardingDeck","rgba":[0.18,0.16,0.14,1],"roughness":0.82,"metallic":0.05},
     "rail":{"name":"RailSteel","rgba":[0.055,0.045,0.04,1],"roughness":0.55,"metallic":0.45}
