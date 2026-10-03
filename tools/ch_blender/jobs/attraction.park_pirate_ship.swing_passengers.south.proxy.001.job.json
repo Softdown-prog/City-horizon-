@@ -8,7 +8,10 @@
   "assetRequirements": {
     "contract": "CH_ASSET_REQUIREMENTS_V1",
     "assetId": "attraction.park_pirate_ship.clean_reference",
-    "footprint": {"widthTiles": 7, "depthTiles": 6},
+    "footprint": {
+      "widthTiles": 7,
+      "depthTiles": 6
+    },
     "minDimensions": [19, 10, 19],
     "maxDimensions": [30, 20, 29]
   },
@@ -25,6 +28,9 @@
     "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/proxy_report.json",
     "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/studio_metadata.json",
     "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/passenger_overlay_manifest.json",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/color_mask_manifest.json",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/mask_primary_south.png",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/mask_secondary_south_00.png",
     "out/ch_blender_agent/pirate_ship_swing_passengers_south_001/swing_frames_south.json"
   ]
 }
