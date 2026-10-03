@@ -8,7 +8,7 @@
   "poseContract": "CH_COASTER_CAR_V1",
   "runtimeRepresentation": "2D_RGBA_sprite_sheet",
   "spriteSheet": "car_pose_atlas.png",
-  "spriteSheetSha256": "b3620943806f163c0ccf1976029fa5af4cd2a38c6a63e5c6403d126ac0ecdeef",
+  "spriteSheetSha256": "eff78118ddf28175ce18c81e5b9ed90ae3a1ed9d3fda0bb31b8bf6e41ecfb861",
   "frameWidth": 256,
   "frameHeight": 256,
   "columns": 8,
@@ -24,10 +24,11 @@
   ],
   "frameOrder": "source_pose_manifest",
   "occupancy": {
-    "mode": "baked_passenger_overlay",
+    "mode": "blender_depth_correct_composite",
     "occupiedComposite": true,
     "capacityPerCar": 2,
     "defaultOccupiedSeatsPerCar": 2,
+    "occlusionContract": "CH_COASTER_PASSENGER_OCCLUSION_V2",
     "overlayContract": "CH_COASTER_PASSENGER_OVERLAY_V1",
     "overlaySpriteSheet": "passenger_pose_atlas.png",
     "overlayManifest": "passenger_pose_atlas_runtime.json"
@@ -55,8 +56,10 @@
       ],
       "baseFrameSha256": "6cbe30379b24ff46d5c74adabed422fa8634c5f98e5fb016ff576d0d84b37607",
       "passengerOverlayFile": "passengers_car_h00_p000.png",
-      "passengerOverlaySha256": "df125ced8f30d8ec5ba878d5c19b6c43eac30e806498234dab969211c4cfb20f",
-      "sha256": "48d44cff228cb4bb05f3930ccadf4a4d8cd427beaeafe5e8dd1ee91239e5f4b2"
+      "passengerOverlaySha256": "23e16148ad96d88ff1dcee53577fa18d811553f4764319016272fd3a9756f05e",
+      "sha256": "496a1f93a6aa75d0a2f8fe6b482408a6a91f763d66ee0cf35b3161ad88683369",
+      "occupiedCompositeFile": "occupied_car_h00_p000.png",
+      "occupiedCompositeSha256": "496a1f93a6aa75d0a2f8fe6b482408a6a91f763d66ee0cf35b3161ad88683369"
     },
     {
       "file": "car_h01_p000.png",
@@ -80,8 +83,10 @@
       ],
       "baseFrameSha256": "21268a0a8d9352bb3b2d64b23aa5ccc4b1a25bf114de1a8e135709cf55faf704",
       "passengerOverlayFile": "passengers_car_h01_p000.png",
-      "passengerOverlaySha256": "33d6ce24fb5510e12ea0dbc4819482f3a30b2a5a34c5b423be42a98ff48391a7",
-      "sha256": "6bdc10bddad515dbf7e727acb58f6b75b2976eefabbf674d5fddf4a295ccc527"
+      "passengerOverlaySha256": "f2e25a5ecec7acac864088036ee5530e31a07315602feff84d2efe920b0007ca",
+      "sha256": "cefefc1eaa3b510091024fbbc963708c582a9a1465e1df4796e7ab13d103882d",
+      "occupiedCompositeFile": "occupied_car_h01_p000.png",
+      "occupiedCompositeSha256": "cefefc1eaa3b510091024fbbc963708c582a9a1465e1df4796e7ab13d103882d"
     },
     {
       "file": "car_h02_p000.png",
@@ -105,8 +110,10 @@
       ],
       "baseFrameSha256": "073c9a828303c5f008ff20405cd45c806e35ec7ee13a2d2d655580c537aa29d2",
       "passengerOverlayFile": "passengers_car_h02_p000.png",
-      "passengerOverlaySha256": "7f9e0e67db861ccfa3437bcb30b80f53e1972c4864619ba71fca9179a5cc81e1",
-      "sha256": "97b768272de0688d5a12a6e025c9bae945a185e8e449c559ca2c9d36edece797"
+      "passengerOverlaySha256": "c131cbf3f5b13f2258a319877dbb5833095b3ffa9e486275a2cf4797c23922fd",
+      "sha256": "c4cf15bef6a34bcc520409f52b6ae707b7fd798045ca85671d3cc179a3372878",
+      "occupiedCompositeFile": "occupied_car_h02_p000.png",
+      "occupiedCompositeSha256": "c4cf15bef6a34bcc520409f52b6ae707b7fd798045ca85671d3cc179a3372878"
     },
     {
       "file": "car_h03_p000.png",
@@ -130,8 +137,10 @@
       ],
       "baseFrameSha256": "b13c59871eee266df8cf337c126fb6d97501919d388138d4e269580b3f309017",
       "passengerOverlayFile": "passengers_car_h03_p000.png",
-      "passengerOverlaySha256": "8f41d266fad99f02ecbd908273005edaa94cbf59b073470c7782a80096818775",
-      "sha256": "ac7a1ba12f8de2b959f40162f4a3cb71093735824b789ba8a38d69564a169fc7"
+      "passengerOverlaySha256": "5599dfeaf347a4997a45187e8038abf8f46fd02e642ddef6c3ac3e6277a91573",
+      "sha256": "c5f0a4c9307a2284798acf87f02c095daf7a38c129998001de49e5a0cc8a6369",
+      "occupiedCompositeFile": "occupied_car_h03_p000.png",
+      "occupiedCompositeSha256": "c5f0a4c9307a2284798acf87f02c095daf7a38c129998001de49e5a0cc8a6369"
     },
     {
       "file": "car_h04_p000.png",
@@ -155,8 +164,10 @@
       ],
       "baseFrameSha256": "daf74f38581c09647ba83f2f607149e3b9cc276bedee19952155c914e272c2af",
       "passengerOverlayFile": "passengers_car_h04_p000.png",
-      "passengerOverlaySha256": "f402e5b603bc1401ad23caffc85ae367edb458f8faec9ce0af037ba006925a07",
-      "sha256": "c3444ebe6962822b546714747b941f4ada094d2f0435719407ec735f32e92e68"
+      "passengerOverlaySha256": "2190dc56edc5b838109c4c37f34533ff28cbee2b808edf31f5802f5e96a67264",
+      "sha256": "2170427f2cda0a530f87f4b47d434d6d9408146611f2683625dc60d323aa7f6b",
+      "occupiedCompositeFile": "occupied_car_h04_p000.png",
+      "occupiedCompositeSha256": "2170427f2cda0a530f87f4b47d434d6d9408146611f2683625dc60d323aa7f6b"
     },
     {
       "file": "car_h05_p000.png",
@@ -180,8 +191,10 @@
       ],
       "baseFrameSha256": "6f6ee908a62c70d0bda3d4464b10c55189a09eb4cedf98447d7f104d3c7adf9e",
       "passengerOverlayFile": "passengers_car_h05_p000.png",
-      "passengerOverlaySha256": "5f5e2e91fb8b330209c51439465880d8a54adc87f9d06fe83cf275a6a27269bc",
-      "sha256": "c1fcf2f63cc90f49a01619e4dbc84c59826089902afd8349a1da887184ccdb21"
+      "passengerOverlaySha256": "54eadcf36754b437f5327681432bc4207fb7abccbedc404ddca3c4ab6e336f34",
+      "sha256": "0ed6aa65d203fe3162aa787882de9efd16251f46d429b84b5cb71e3564bf0352",
+      "occupiedCompositeFile": "occupied_car_h05_p000.png",
+      "occupiedCompositeSha256": "0ed6aa65d203fe3162aa787882de9efd16251f46d429b84b5cb71e3564bf0352"
     },
     {
       "file": "car_h06_p000.png",
@@ -205,8 +218,10 @@
       ],
       "baseFrameSha256": "7541eff37bdff242ec41b078f23d84e0ecbc3c9808636ce64f7cb3433bc7ab29",
       "passengerOverlayFile": "passengers_car_h06_p000.png",
-      "passengerOverlaySha256": "df476439034df913c753bc19824f7c9211e42d9ca36fbb7d4ae8f3b2b1eb7b14",
-      "sha256": "07f60b552b0d25490d60a06acbc2f1d23115f9b5b5c97a6d33890a1a3644287b"
+      "passengerOverlaySha256": "4833fcf4ccfbad6c09b53f5e71d75b2ece911c5934305569ecf397e451d733bc",
+      "sha256": "efa58b0d7ab82da2e27e0bdb33f233dcaa785486ba3a39fe421e01cd40306445",
+      "occupiedCompositeFile": "occupied_car_h06_p000.png",
+      "occupiedCompositeSha256": "efa58b0d7ab82da2e27e0bdb33f233dcaa785486ba3a39fe421e01cd40306445"
     },
     {
       "file": "car_h07_p000.png",
@@ -230,8 +245,10 @@
       ],
       "baseFrameSha256": "5ee496a16ce1e09b506c8c4ab91c9b72d4d5082a910dcc13d2e804df0e6e965a",
       "passengerOverlayFile": "passengers_car_h07_p000.png",
-      "passengerOverlaySha256": "0edecb4cc1cd7310f923491bea8e0e77614ba1398a2d0232658ab62088c151eb",
-      "sha256": "2bc8b2e2341e3d1f3a7a5f1021fe0cf98fec34dcbd9615d4377eaa5ce6151c36"
+      "passengerOverlaySha256": "c521a95112db8d1e3f6cdff533b699d8700a7c3fd169b8a00bc71f036b36e68a",
+      "sha256": "ebda113aad2e08920cc1cac4d4cd17198a728d91b9bc52ac815be0c19d0b8a64",
+      "occupiedCompositeFile": "occupied_car_h07_p000.png",
+      "occupiedCompositeSha256": "ebda113aad2e08920cc1cac4d4cd17198a728d91b9bc52ac815be0c19d0b8a64"
     },
     {
       "file": "car_h08_p000.png",
@@ -255,8 +272,10 @@
       ],
       "baseFrameSha256": "d43d0e9e4eca79a66ed9e3eec9885934b05a99fbb5f3f299eb997efe3ea0c007",
       "passengerOverlayFile": "passengers_car_h08_p000.png",
-      "passengerOverlaySha256": "063fc79ede880adfe2f06bffa936c24c08e1a83d4f15b386ae6a569f59de5731",
-      "sha256": "68d8ae3af467844c8cab383ad033885039bb5311452c1cb8c631f2e48296b401"
+      "passengerOverlaySha256": "9bb38cf0845d1498eb08a7042a56daa4ec3941b9ce0d4c61425f0909c24a1079",
+      "sha256": "68526134e0ee0d884e48eedfb5e842b7a73e6d9027689bdb8f78587462128993",
+      "occupiedCompositeFile": "occupied_car_h08_p000.png",
+      "occupiedCompositeSha256": "68526134e0ee0d884e48eedfb5e842b7a73e6d9027689bdb8f78587462128993"
     },
     {
       "file": "car_h09_p000.png",
@@ -280,8 +299,10 @@
       ],
       "baseFrameSha256": "40cd965a6abea687f2d0ce6268e9f16aadd9496160a2881b7ae3732a03bc4f57",
       "passengerOverlayFile": "passengers_car_h09_p000.png",
-      "passengerOverlaySha256": "0f6b4263d7cddffd0e4da0b97545b6b8d9d8ef2e901adc59a57d98bef68f7ab2",
-      "sha256": "dd81333c05c2a8d776b3aed1698a4262c46626e25eca9a20dd8e62a07a4b9fab"
+      "passengerOverlaySha256": "fc49fc40348d428c6594475767964a5fcf88583c262cd5b549956d176d332403",
+      "sha256": "c4ca0723070f846c9ff77a3dc1a360e23f3997bf108915a7301f16d343920a49",
+      "occupiedCompositeFile": "occupied_car_h09_p000.png",
+      "occupiedCompositeSha256": "c4ca0723070f846c9ff77a3dc1a360e23f3997bf108915a7301f16d343920a49"
     },
     {
       "file": "car_h10_p000.png",
@@ -305,8 +326,10 @@
       ],
       "baseFrameSha256": "68cbff19696a9b19c7a13c7159eba2d9e7477c867bcfd17887f66233aa11e0c3",
       "passengerOverlayFile": "passengers_car_h10_p000.png",
-      "passengerOverlaySha256": "b3469905a0fb9e3c79a9accf536ef5d0c6bcdae48c2b67fde46426d9c3055404",
-      "sha256": "348fe8df6f02349f92269ce83dd510fb5c8e86b5f30280d5b3b21a4947a19ba0"
+      "passengerOverlaySha256": "c29656c2d59bf1ba658e95b52d42be3b438affe1922a552f662e29b6bdb56472",
+      "sha256": "767b8a8fce33ab71d9e213ce9ebc3618f60160051e744134e296ae77d75bb032",
+      "occupiedCompositeFile": "occupied_car_h10_p000.png",
+      "occupiedCompositeSha256": "767b8a8fce33ab71d9e213ce9ebc3618f60160051e744134e296ae77d75bb032"
     },
     {
       "file": "car_h11_p000.png",
@@ -330,8 +353,10 @@
       ],
       "baseFrameSha256": "8f7a444781536062c637247ac82b6f692f488397dab5669e03e3e10c6e2071dd",
       "passengerOverlayFile": "passengers_car_h11_p000.png",
-      "passengerOverlaySha256": "42ad7ab227897a8c63d826374f312d3aea158727dcb6cd99cea6fa03d3170e75",
-      "sha256": "35b5dc571283a071226db7321a5cd9303d42560090986ed7bdcea2be2f4312b7"
+      "passengerOverlaySha256": "b6603cb57979836f586a7a44a3366af41be75be567e3efdbe9c93f68507098d7",
+      "sha256": "24ce2ec070f299451763b690c3b2d7c97d20f00ecd3192a6345c8e15d12351d4",
+      "occupiedCompositeFile": "occupied_car_h11_p000.png",
+      "occupiedCompositeSha256": "24ce2ec070f299451763b690c3b2d7c97d20f00ecd3192a6345c8e15d12351d4"
     },
     {
       "file": "car_h12_p000.png",
@@ -355,8 +380,10 @@
       ],
       "baseFrameSha256": "6331f2fee9e8d0a948d022e595b273318a2c25f02fc774993a4cc6630108ecb4",
       "passengerOverlayFile": "passengers_car_h12_p000.png",
-      "passengerOverlaySha256": "8e3b7faf8c7d8004ff1611d289fa57d2d4eae85270abbefe27b9c56882ccb6ae",
-      "sha256": "01471fe1db0bd2053fb7b2386b3ce46cbf8e2ffe4234226fb4ec0f778fbae494"
+      "passengerOverlaySha256": "c674a53647dad831500337aa9b730b32e417666511e53718143ba504ae1ed249",
+      "sha256": "683befa577c0a5d43257a57eb2a6054b2a8a6fdbeda051a3b03b85da11b94679",
+      "occupiedCompositeFile": "occupied_car_h12_p000.png",
+      "occupiedCompositeSha256": "683befa577c0a5d43257a57eb2a6054b2a8a6fdbeda051a3b03b85da11b94679"
     },
     {
       "file": "car_h13_p000.png",
@@ -380,8 +407,10 @@
       ],
       "baseFrameSha256": "a18d48447ff8863d42646ac51c0dc505d2d533b9f8ade62b3406291249f4834c",
       "passengerOverlayFile": "passengers_car_h13_p000.png",
-      "passengerOverlaySha256": "d5c9075cdfbd67be5f0a2fed1777243cd0f02f89aba8af5433ac59938e1423b8",
-      "sha256": "1adb0e37ada9c777da3a1f028130d3aca00c78ce72342c0ce2e4114cfb88c28b"
+      "passengerOverlaySha256": "b94a6e98c108c53c16a94d4242c48f076053f612113e1844914abb62ce97be55",
+      "sha256": "c627ec48fc828d1749b9e688a215290da9bbbb2fb49a2661f3044a3b1ba380ba",
+      "occupiedCompositeFile": "occupied_car_h13_p000.png",
+      "occupiedCompositeSha256": "c627ec48fc828d1749b9e688a215290da9bbbb2fb49a2661f3044a3b1ba380ba"
     },
     {
       "file": "car_h14_p000.png",
@@ -405,8 +434,10 @@
       ],
       "baseFrameSha256": "64aeb57f0813f71853d89812fc3d4955554e3408e10ab236db4cefeccf69c745",
       "passengerOverlayFile": "passengers_car_h14_p000.png",
-      "passengerOverlaySha256": "da4bd98c51b4aa2715c5994e1839ccbc19a3276effdabaf35612e1cd639ba0c5",
-      "sha256": "a4721b4c881e6444f758d545f3b0f4928a1290e346bbc71bf840dd3c7045a20d"
+      "passengerOverlaySha256": "60bd61c86e800fbbe18b77c0ff816d7a8b6449d3b4613109af4a20dbe4a0db5a",
+      "sha256": "96a3328945e58a63959bb7a287d4eb370e8d7f974a68dbdda3f976d9ed917d58",
+      "occupiedCompositeFile": "occupied_car_h14_p000.png",
+      "occupiedCompositeSha256": "96a3328945e58a63959bb7a287d4eb370e8d7f974a68dbdda3f976d9ed917d58"
     },
     {
       "file": "car_h15_p000.png",
@@ -430,8 +461,10 @@
       ],
       "baseFrameSha256": "0041c74c22c2f6d8a67081093a0f6ef4d0cc0ccf4c7a8afd7711e1fbdaddc33e",
       "passengerOverlayFile": "passengers_car_h15_p000.png",
-      "passengerOverlaySha256": "a0357737b9aa62aed32d24f13f98df5a3ebf69bf3d6a8146534481c24697edfa",
-      "sha256": "65aec454c17252309598498df1cc47856de19fd656abf83341ef0782e0a8158a"
+      "passengerOverlaySha256": "839d910ca3f0485a8a2aeeee87c9778b188b0330e000b4366c71437ebd3c1d7e",
+      "sha256": "6504fa3e2794af4db97387554c03d02ff4bbe14b390a0dcbd2a3b0029b74a475",
+      "occupiedCompositeFile": "occupied_car_h15_p000.png",
+      "occupiedCompositeSha256": "6504fa3e2794af4db97387554c03d02ff4bbe14b390a0dcbd2a3b0029b74a475"
     },
     {
       "file": "car_h00_m046.png",
@@ -460,8 +493,10 @@
       ],
       "baseFrameSha256": "125a25c834c9173ff82c571f176494a200f9fe9618028bace2cf56659584bb2e",
       "passengerOverlayFile": "passengers_car_h00_m046.png",
-      "passengerOverlaySha256": "7cd25c4bc6b6d68121e48b2391d04c9d00fa4fc5b0ad2b7bc6cb12d32ce5933b",
-      "sha256": "e52f5b4986a7811523ab50be0134bb60fa2efce5ef985e05118d508015350ac6"
+      "passengerOverlaySha256": "efce794cb0b81003ded3ad803d1b715e103185ecfe607f8d76684443c061313b",
+      "sha256": "6c954d94ccae48b3b936dbc72da62af8ed71814e66a78898c3e0d37f4e0d510d",
+      "occupiedCompositeFile": "occupied_car_h00_m046.png",
+      "occupiedCompositeSha256": "6c954d94ccae48b3b936dbc72da62af8ed71814e66a78898c3e0d37f4e0d510d"
     },
     {
       "file": "car_h04_m046.png",
@@ -490,8 +525,10 @@
       ],
       "baseFrameSha256": "6a0a3be9432284eb793eb2aa7d1e378a1db10d9db7801f36d89aaa580e7e7d1f",
       "passengerOverlayFile": "passengers_car_h04_m046.png",
-      "passengerOverlaySha256": "97d94a319214a32fab1660de6c4540c93e7c86cc6885d40857733abbf6321c2e",
-      "sha256": "9552efef14fd7ddf6b2005ce7b2b3c70ba56718885395280e255eea50b40a38c"
+      "passengerOverlaySha256": "18e16da4f6966077f9f28ef02210a1c0ce7cf1bfeac8c1d7541e7bb6526b97c9",
+      "sha256": "600383302dbda1e7a3f800d0e04ac82c1a3bdbb68f16600b7f5b7c92a7b85dc6",
+      "occupiedCompositeFile": "occupied_car_h04_m046.png",
+      "occupiedCompositeSha256": "600383302dbda1e7a3f800d0e04ac82c1a3bdbb68f16600b7f5b7c92a7b85dc6"
     },
     {
       "file": "car_h08_m046.png",
@@ -520,8 +557,10 @@
       ],
       "baseFrameSha256": "0674a99cce703764359fd14973e48d018916707a075bdf0d8e195ce5cfe27c20",
       "passengerOverlayFile": "passengers_car_h08_m046.png",
-      "passengerOverlaySha256": "091b79f7941c4fd1c4afb103326912b2461198926ad58b99e45ca9d9469ffea9",
-      "sha256": "493be1504a9e52df7732b24c4152b955021e59947297241a27c78a1560878c98"
+      "passengerOverlaySha256": "fe5b5acea413e6da9e58103de49db56fd3f05260315b4a21a6f513eff5dff5a7",
+      "sha256": "bf5d30c6920355bce515d15ae15538373ca024f5deb5f6cff43fda32c57c3941",
+      "occupiedCompositeFile": "occupied_car_h08_m046.png",
+      "occupiedCompositeSha256": "bf5d30c6920355bce515d15ae15538373ca024f5deb5f6cff43fda32c57c3941"
     },
     {
       "file": "car_h12_m046.png",
@@ -550,8 +589,10 @@
       ],
       "baseFrameSha256": "f773bf8be036ead5aa5337db4dcd847b6dcaeaf23b15138d55597b5b36f73d8b",
       "passengerOverlayFile": "passengers_car_h12_m046.png",
-      "passengerOverlaySha256": "9bd098ab3a5da1f20c55761872e6431c9155ab94c727a1a1eaeeb2504ae733f3",
-      "sha256": "9d6cd673dd549cd7c901c16273a057f3bc3601e455886e7a3b59e3b32dc777c2"
+      "passengerOverlaySha256": "7f0f26bc60f63ff683448ec58c06a78c550a32e64c51e754643ffbd1c475e123",
+      "sha256": "2a0c675bead9d2cc9e52331cd5687832ad4994595cfa80de4abb7ea7155fdb73",
+      "occupiedCompositeFile": "occupied_car_h12_m046.png",
+      "occupiedCompositeSha256": "2a0c675bead9d2cc9e52331cd5687832ad4994595cfa80de4abb7ea7155fdb73"
     },
     {
       "file": "car_h00_m030.png",
@@ -580,8 +621,10 @@
       ],
       "baseFrameSha256": "835b868d9221715b2e8645b9c22af2fbb7c1a27bc621cc895f248d84432bdfa0",
       "passengerOverlayFile": "passengers_car_h00_m030.png",
-      "passengerOverlaySha256": "feb0d16c05611c15c480da2fe4bb0b35b2603ff11abbbcc1c1818ba1c6189a22",
-      "sha256": "a3874e4b9cf033c1aa50b83bfb6394e804c71bcac182a69f41315cb990040234"
+      "passengerOverlaySha256": "722e82f8ba1b61ed2fab7a746140e574f1a95c0abe01a8ee08eabc8243af6534",
+      "sha256": "67c202660d3631a623082a0228c9288603b5a9a3317b484f4f722f87b65ef15c",
+      "occupiedCompositeFile": "occupied_car_h00_m030.png",
+      "occupiedCompositeSha256": "67c202660d3631a623082a0228c9288603b5a9a3317b484f4f722f87b65ef15c"
     },
     {
       "file": "car_h04_m030.png",
@@ -610,8 +653,10 @@
       ],
       "baseFrameSha256": "fa0b23b0ea593758c6fd3cb9ca91cd5bf93b8ce0c380bf68351daa2711ad6df9",
       "passengerOverlayFile": "passengers_car_h04_m030.png",
-      "passengerOverlaySha256": "3771e1feb1d2f85b0981d0c42a613cc10e49e311b55295b248eb4f8db3d6c682",
-      "sha256": "934842b3b4b4979f5d81cf9fa82ce402a2fb76d0bff7d51b74a5960b39b902c8"
+      "passengerOverlaySha256": "1219a4a2841b76dc08ae355f77d3a90fc06a3f7b17b7c0c3c129c7e88692eda1",
+      "sha256": "082948e5257abbc6da1486f0517565ba9bb67e10c156f49d3293d023cf253989",
+      "occupiedCompositeFile": "occupied_car_h04_m030.png",
+      "occupiedCompositeSha256": "082948e5257abbc6da1486f0517565ba9bb67e10c156f49d3293d023cf253989"
     },
     {
       "file": "car_h08_m030.png",
@@ -640,8 +685,10 @@
       ],
       "baseFrameSha256": "7778517afa8f607d33958918faa5e666ed9dd100bad556571d3b74e9313d978e",
       "passengerOverlayFile": "passengers_car_h08_m030.png",
-      "passengerOverlaySha256": "bbc4ac05defd61a0f2543cf9df11128795379eb9526523ab17f34ab0739a26d4",
-      "sha256": "49b2dbe99293803cae912d92d13600c3cebeca710edc70652167d0f39de36ac8"
+      "passengerOverlaySha256": "d2775cfeee950e8fce12380df98f0cc104e6fb32deed44b1d5d7b429922092eb",
+      "sha256": "2e8ef1096aeb109aea7d8d2921486293b1974b7e1d91b975103393066db86d3d",
+      "occupiedCompositeFile": "occupied_car_h08_m030.png",
+      "occupiedCompositeSha256": "2e8ef1096aeb109aea7d8d2921486293b1974b7e1d91b975103393066db86d3d"
     },
     {
       "file": "car_h12_m030.png",
@@ -670,8 +717,10 @@
       ],
       "baseFrameSha256": "d09578a1a9affa5181942cfe3fd74c083e771fd629fe69a39da789f198fde2b4",
       "passengerOverlayFile": "passengers_car_h12_m030.png",
-      "passengerOverlaySha256": "492232b482cc0c5da4c6b8a6b9c20a5af48df62e6fdeeb847cc907cc95d0e9c7",
-      "sha256": "961f985dfc57f386bc83759a441a0e53174e2fffa0a7d58a572c5effcd7e80bd"
+      "passengerOverlaySha256": "b21a30aaf5f4bd4c4df57c44527645336865c0c5d59f3b7e2b61377c96f05176",
+      "sha256": "00dd97c4af4c881b0d04538643fcc7ec6b2621ec0edd69d03501a1b961d884de",
+      "occupiedCompositeFile": "occupied_car_h12_m030.png",
+      "occupiedCompositeSha256": "00dd97c4af4c881b0d04538643fcc7ec6b2621ec0edd69d03501a1b961d884de"
     },
     {
       "file": "car_h00_m014.png",
@@ -700,8 +749,10 @@
       ],
       "baseFrameSha256": "e275e583d698679420aff43b5326e97723294000b7257a9f178102364f5ae312",
       "passengerOverlayFile": "passengers_car_h00_m014.png",
-      "passengerOverlaySha256": "17250e82656ba5604159b521561cb20d75a682cc7861881b638ca1560667ff3d",
-      "sha256": "aba21f750c29b802e44cbce660265c9c6a89d0a5e0203036739d08660a64ce0c"
+      "passengerOverlaySha256": "d157c618d14ff5102dfefa9eb3f2756b589060293f3a09c51b1b415fec98e314",
+      "sha256": "086564d485149ce34010554e24a89cb0b8da26a1bcb06515282c1ee8a52f8037",
+      "occupiedCompositeFile": "occupied_car_h00_m014.png",
+      "occupiedCompositeSha256": "086564d485149ce34010554e24a89cb0b8da26a1bcb06515282c1ee8a52f8037"
     },
     {
       "file": "car_h04_m014.png",
@@ -730,8 +781,10 @@
       ],
       "baseFrameSha256": "c6eff216e11e1b9c0afcdb098b9beb179823fd7a27da74e2c26016018e9db823",
       "passengerOverlayFile": "passengers_car_h04_m014.png",
-      "passengerOverlaySha256": "89f11abaa86d98dfc86a60b4256fa378455cedaf566818565583191cf11aeaf7",
-      "sha256": "5940bd28832d72972daedf51804d538643354e694f9c134a365190dddfa7e8c6"
+      "passengerOverlaySha256": "7e669e758f929c01780b37a722c96d6c2e1ee5ee36a091475319c3833cb51787",
+      "sha256": "d1cd983c5285926e66c79dcddd639df9da3200b593e2f4431cf007274fef0589",
+      "occupiedCompositeFile": "occupied_car_h04_m014.png",
+      "occupiedCompositeSha256": "d1cd983c5285926e66c79dcddd639df9da3200b593e2f4431cf007274fef0589"
     },
     {
       "file": "car_h08_m014.png",
@@ -760,8 +813,10 @@
       ],
       "baseFrameSha256": "078ac4b6c3a88a11ab5e32f1b570ab15e11a361f768e7144f8f2b177f7c7f08a",
       "passengerOverlayFile": "passengers_car_h08_m014.png",
-      "passengerOverlaySha256": "845a98a04e1682ab8a056d2faaae8884f646faab1682ab6f38eb50b1c8a2496f",
-      "sha256": "7c5f2953534a38f71beb5f2f0af6e576c18e25666a0d27898a2add4e96c5bc76"
+      "passengerOverlaySha256": "eddde0a56017f1cf9e7b676de135976f34e5c774326d3e89dd1d8dbd16986006",
+      "sha256": "97d41404566866707c8fc6cfd11089a708c9d1345a44e0c0b792b263ce3485b4",
+      "occupiedCompositeFile": "occupied_car_h08_m014.png",
+      "occupiedCompositeSha256": "97d41404566866707c8fc6cfd11089a708c9d1345a44e0c0b792b263ce3485b4"
     },
     {
       "file": "car_h12_m014.png",
@@ -790,8 +845,10 @@
       ],
       "baseFrameSha256": "dde3917957e78ff7497473669c94cb9a32e8363489eff4d46d0bf93203713d09",
       "passengerOverlayFile": "passengers_car_h12_m014.png",
-      "passengerOverlaySha256": "63cd37d17f5555b4f4ff18bc1839f9ebc48f47af5a0f0636cf8a7a621c3c9feb",
-      "sha256": "99b34bd54ad154ff93c626894afef5290ecbbb697f8ac1d459a8d0842188bf9f"
+      "passengerOverlaySha256": "4ea615dfe8c9882ae9073746e973154e068c6257610276d8038af4d962898159",
+      "sha256": "1c6ffbcb90339a23d5b81329095225796dc7cfaa29518d809338956a8983d71d",
+      "occupiedCompositeFile": "occupied_car_h12_m014.png",
+      "occupiedCompositeSha256": "1c6ffbcb90339a23d5b81329095225796dc7cfaa29518d809338956a8983d71d"
     },
     {
       "file": "car_h00_p014.png",
@@ -820,8 +877,10 @@
       ],
       "baseFrameSha256": "f90771bde29e05c17ffada737181ac5fd8c37c2218620639487336b237cc5760",
       "passengerOverlayFile": "passengers_car_h00_p014.png",
-      "passengerOverlaySha256": "17c6c599116e231012f044508b081c99cf1cb65ab771462102f88221eb528efa",
-      "sha256": "7320defdafdaced78b5aaa465f3e2459ed2822f942b89c45b91fa1ee570161fb"
+      "passengerOverlaySha256": "9dc33daa2e9a5257464139599457e5c9f97f34ace5463c0126d44240acd90f10",
+      "sha256": "26c3b3eb66bfbe864d2c825d1fdb4ca7272a9b83692b51e428d70c70aa79ad53",
+      "occupiedCompositeFile": "occupied_car_h00_p014.png",
+      "occupiedCompositeSha256": "26c3b3eb66bfbe864d2c825d1fdb4ca7272a9b83692b51e428d70c70aa79ad53"
     },
     {
       "file": "car_h04_p014.png",
@@ -850,8 +909,10 @@
       ],
       "baseFrameSha256": "94d5981c5f93506afcc5477e03d564c2b2008cd88d8824c2ea4212decdd50873",
       "passengerOverlayFile": "passengers_car_h04_p014.png",
-      "passengerOverlaySha256": "647228ea2a6834a8c6e1eaaa2bb6eac222253a52047d8f8e662e56ea96a30118",
-      "sha256": "3a86beb6abf5394bb80206ebb38db05786f7f30dc70d2ea07a13b01bee77cb9f"
+      "passengerOverlaySha256": "79ed0a9dc89b979a99196fb74582f5a6e788c717f9e44f5a169baf36d9cf1572",
+      "sha256": "86c8cca8d68a000b62cebab62e580104c164752456c1814e9a21e9fa45a0fb53",
+      "occupiedCompositeFile": "occupied_car_h04_p014.png",
+      "occupiedCompositeSha256": "86c8cca8d68a000b62cebab62e580104c164752456c1814e9a21e9fa45a0fb53"
     },
     {
       "file": "car_h08_p014.png",
@@ -880,8 +941,10 @@
       ],
       "baseFrameSha256": "1768a6fc29489232a06a92e997703bf30cc49fc6ef3e73a3ba282f88575b5ff6",
       "passengerOverlayFile": "passengers_car_h08_p014.png",
-      "passengerOverlaySha256": "001c114757fac671fa415160e0506afd56c82ae4db90ca29ef0315218a9d89cb",
-      "sha256": "da86a09cdb87ac1619bfb3b036946b18991d6fc4524d255cdcddcee3bdf21040"
+      "passengerOverlaySha256": "f5ed03f1b077a0859185c3fa02cc5e9a599fe8a6914c6d816199c1cea98d645a",
+      "sha256": "cabba800952cc9e4582503d3b9b1b9ed46a232e35d1933529aabc8c29f29d4ba",
+      "occupiedCompositeFile": "occupied_car_h08_p014.png",
+      "occupiedCompositeSha256": "cabba800952cc9e4582503d3b9b1b9ed46a232e35d1933529aabc8c29f29d4ba"
     },
     {
       "file": "car_h12_p014.png",
@@ -910,8 +973,10 @@
       ],
       "baseFrameSha256": "70d7a1c97af3e39ac25fd2012e92c45db57a9e47a118bf94f0500051d4018928",
       "passengerOverlayFile": "passengers_car_h12_p014.png",
-      "passengerOverlaySha256": "8da2a3df30cf8d6897aca81770a5c87ad7157cffa0b1fc330217e8f926de7cc9",
-      "sha256": "3eba1e42f20976ad0fc7df544d7ef07fb6838e79e376c15d87480229dd45e64e"
+      "passengerOverlaySha256": "584e462b3b324e1a66b526bcb0f03749d40b8506bdc48165f794152503af7a90",
+      "sha256": "b00aa5876939e9b36739f04e054dd31dd3d155ccf5e3464f6489e6fb9d397195",
+      "occupiedCompositeFile": "occupied_car_h12_p014.png",
+      "occupiedCompositeSha256": "b00aa5876939e9b36739f04e054dd31dd3d155ccf5e3464f6489e6fb9d397195"
     },
     {
       "file": "car_h00_p030.png",
@@ -940,8 +1005,10 @@
       ],
       "baseFrameSha256": "11df9c8078787cc717fa8ce33babb904037196eef80e5e87ccd36fb691f71799",
       "passengerOverlayFile": "passengers_car_h00_p030.png",
-      "passengerOverlaySha256": "629bc90559ded5a41efdebbde7cd4d203d7750e261e5ab01e87ae15d2a73de49",
-      "sha256": "41915f557fc9a5387a785ca66f69ae95f9794f28fcfb6916fc23883b23bf9f61"
+      "passengerOverlaySha256": "f1804d52a24426f776a1d298ac461ad0f88f54594ebcc0190b52bfb56d98b11e",
+      "sha256": "36067513e1dbab8fe99b35cb4c3ca34d054925d6c42a52574386d43338837fae",
+      "occupiedCompositeFile": "occupied_car_h00_p030.png",
+      "occupiedCompositeSha256": "36067513e1dbab8fe99b35cb4c3ca34d054925d6c42a52574386d43338837fae"
     },
     {
       "file": "car_h04_p030.png",
@@ -970,8 +1037,10 @@
       ],
       "baseFrameSha256": "f9da8dea621ce10835ad8878d7236e203f148d3db0be07f192d9bbf29d753c3c",
       "passengerOverlayFile": "passengers_car_h04_p030.png",
-      "passengerOverlaySha256": "75aa6103dc368901aefc815fbec8aecfe5d67bf6fc5c4fc7d4733843446dcf74",
-      "sha256": "d48640fbf033741870bc56cd2a7c353be6106666fa803e6d375762d6cf1d8801"
+      "passengerOverlaySha256": "cf1af2145451336cdb3625bcd8fe9b02124d1f3b4aa24c5d0d984d8b509d9f0e",
+      "sha256": "531b3c46e034541b6ee28d35564ccf63de6525840ad47280ff736c83bcbde410",
+      "occupiedCompositeFile": "occupied_car_h04_p030.png",
+      "occupiedCompositeSha256": "531b3c46e034541b6ee28d35564ccf63de6525840ad47280ff736c83bcbde410"
     },
     {
       "file": "car_h08_p030.png",
@@ -1000,8 +1069,10 @@
       ],
       "baseFrameSha256": "f5222eb53006560288d8c0598e58f8b782f0cb3fa45e4100da1b91cdf89d1680",
       "passengerOverlayFile": "passengers_car_h08_p030.png",
-      "passengerOverlaySha256": "3943b1db54aea95cb0f617778af50156f7c9c50890739faf11f22600436f8ab0",
-      "sha256": "ef4c5883018f23fa27b567adbe71fd7fc4f8f1a7ca654c99bf34cf93e913ae06"
+      "passengerOverlaySha256": "6fa8314de1ee67c6e0463dcafa7b9684d350644a7e3d3f4aae997eabd20cafe5",
+      "sha256": "c4e84678b7fcd15bfa5844a0b9be106118c643af5bc688c25755369b480a117b",
+      "occupiedCompositeFile": "occupied_car_h08_p030.png",
+      "occupiedCompositeSha256": "c4e84678b7fcd15bfa5844a0b9be106118c643af5bc688c25755369b480a117b"
     },
     {
       "file": "car_h12_p030.png",
@@ -1030,8 +1101,10 @@
       ],
       "baseFrameSha256": "41eb3519f7dacc6042d14e529289478df8af4bfc0c2b12fcdb86556f06f0b4c1",
       "passengerOverlayFile": "passengers_car_h12_p030.png",
-      "passengerOverlaySha256": "6a543efb76523c6ff62e97865c20b925f9922ad0a928756a2d5b1455b72a516f",
-      "sha256": "7183e3508b3c242eec486ae2bd7414fddbc13d6c3062d1abe282c70cb28e3d30"
+      "passengerOverlaySha256": "7d4d58b0a857042ac445e0cc1c7ab0df60e6111d39dabfd9f7173ea2ec756ce2",
+      "sha256": "79c565558beca5ce72565bd489a21c641702fbba0d021859053647b67a9c0c7e",
+      "occupiedCompositeFile": "occupied_car_h12_p030.png",
+      "occupiedCompositeSha256": "79c565558beca5ce72565bd489a21c641702fbba0d021859053647b67a9c0c7e"
     },
     {
       "file": "car_h00_p046.png",
@@ -1060,8 +1133,10 @@
       ],
       "baseFrameSha256": "b5cffc313e6d52cddae403e167e5508a758c12728a28d4a579f722795f67cbc3",
       "passengerOverlayFile": "passengers_car_h00_p046.png",
-      "passengerOverlaySha256": "194dda3ce3ad40632fe5b5136ea8ac6c3c66e47673ed7ca76c97e28acaba3adb",
-      "sha256": "a158676b31f6346744c5f8bd34556e5df4076449047cb02dab116ed281b4f0ad"
+      "passengerOverlaySha256": "5ef02ad4c5215deeaf99c1f8de7cb6ec6aaf0901230079ffbd8bcdd026f5f854",
+      "sha256": "0f102226f1be47ce76c4b07865064b874094df6ab7a3df1ddf33077ba0846289",
+      "occupiedCompositeFile": "occupied_car_h00_p046.png",
+      "occupiedCompositeSha256": "0f102226f1be47ce76c4b07865064b874094df6ab7a3df1ddf33077ba0846289"
     },
     {
       "file": "car_h04_p046.png",
@@ -1090,8 +1165,10 @@
       ],
       "baseFrameSha256": "5b52c68a74188bca7f7dcf76b71230c8f5132168e304be057f346aa9365b4f00",
       "passengerOverlayFile": "passengers_car_h04_p046.png",
-      "passengerOverlaySha256": "1a49126230970319baf81c79aabf61d8d1472546fbe58296d130e7de6eea6e8a",
-      "sha256": "e671f153b8a8353813551f336698697bbb8237d6ee305b171f28aba05628c3f8"
+      "passengerOverlaySha256": "496c084a6dc13f08bd9bbb42e6320329a5b0407ace7e1cc4c91bb7f64a7dfa58",
+      "sha256": "8c7562a3f115aa0d3ba6aa03aeb6933e9650e55452d771f7c448cc4c19a72e97",
+      "occupiedCompositeFile": "occupied_car_h04_p046.png",
+      "occupiedCompositeSha256": "8c7562a3f115aa0d3ba6aa03aeb6933e9650e55452d771f7c448cc4c19a72e97"
     },
     {
       "file": "car_h08_p046.png",
@@ -1120,8 +1197,10 @@
       ],
       "baseFrameSha256": "0ffe1af1dbca8ea3994aeef1960a63dd64ef79e5804fd2ea80c0272b4241aa0c",
       "passengerOverlayFile": "passengers_car_h08_p046.png",
-      "passengerOverlaySha256": "e52b93035a274c7711aecebbe34a4691c51a92a1611e9b86452232e3a35756b2",
-      "sha256": "447e48e1ec708e282a6c40ab02d8cb8634a152a8431a10550fdaa0a7398567d5"
+      "passengerOverlaySha256": "94c394c99803dbdfa592fa26dceb75fc8cd11c496ee1265002896ebfbeaca542",
+      "sha256": "9b97fefd5e4f34e91ae3cf89dc927c2417094ffd1758db7ae1105468350f29f1",
+      "occupiedCompositeFile": "occupied_car_h08_p046.png",
+      "occupiedCompositeSha256": "9b97fefd5e4f34e91ae3cf89dc927c2417094ffd1758db7ae1105468350f29f1"
     },
     {
       "file": "car_h12_p046.png",
@@ -1150,8 +1229,10 @@
       ],
       "baseFrameSha256": "d19003ca2758746b87cefa1417d9be1e7b0de9c83953e842db1a7508d50c2ff8",
       "passengerOverlayFile": "passengers_car_h12_p046.png",
-      "passengerOverlaySha256": "70835994f75e50c861d844f8a1ee6adbf372ba5b8f9329369a696321ae4807bd",
-      "sha256": "e0a70f7273dd4780f9bc5a8a0601a6752c7da639e7993b652d990a90fa936009"
+      "passengerOverlaySha256": "2b2d50f590357b8032ee0e9a56fef5964b515d279500d2e0e2a119bc6abe354a",
+      "sha256": "a4bbcdbeeb73ec95c4643db7d8762ee402931c15049f085fd7839135bf596d8e",
+      "occupiedCompositeFile": "occupied_car_h12_p046.png",
+      "occupiedCompositeSha256": "a4bbcdbeeb73ec95c4643db7d8762ee402931c15049f085fd7839135bf596d8e"
     }
   ],
   "basePoseSource": {
@@ -1170,5 +1251,14 @@
     "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
     "overlaySpriteSheetSha256": "c53686643cc66db8dd9fa57438caf49ff7910c285273228b8347afbc5d931e9e"
   },
-  "approvedForRuntime": true
+  "approvedForRuntime": true,
+  "passengerOcclusionSource": {
+    "sourceCommit": "6133a26fa68a3b1cceec982918d75a6303ecb756",
+    "sourceWorkflowRun": 37073965181,
+    "sourceArtifactId": 11256668327,
+    "sourceArtifactDigest": "sha256:829cbad7fcbd84565be8ebe3f7596d45d1a2a14610cc8ddd940b7deca55b6ada",
+    "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
+    "renderContract": "CH_COASTER_PASSENGER_OCCLUSION_V2",
+    "occupiedSpriteSheetSha256": "eff78118ddf28175ce18c81e5b9ed90ae3a1ed9d3fda0bb31b8bf6e41ecfb861"
+  }
 }

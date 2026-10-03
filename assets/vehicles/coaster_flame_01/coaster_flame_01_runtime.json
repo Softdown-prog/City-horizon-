@@ -79,8 +79,9 @@
     "passengerOverlaySpriteSheet": "passenger_pose_atlas.png",
     "passengerOverlayManifest": "passenger_pose_atlas_runtime.json",
     "passengerOverlayFrameCount": 40,
-    "passengerRuntimeMode": "baked_into_pose_atlas",
-    "occupiedComposite": true
+    "passengerRuntimeMode": "blender_depth_correct_composite",
+    "occupiedComposite": true,
+    "passengerOcclusionContract": "CH_COASTER_PASSENGER_OCCLUSION_V2"
   },
   "sourceCommit": "ac8699478d7ddc62f56d0d26555eee328a9c30e0",
   "sourceWorkflowRun": 36903309772,
@@ -98,12 +99,13 @@
     "occupiedCompositeSpriteSheetSha256": "b3620943806f163c0ccf1976029fa5af4cd2a38c6a63e5c6403d126ac0ecdeef"
   },
   "passengerOverlaySource": {
-    "sourceCommit": "ac1fa84e92919cb87680d5c355b5a9a2596da519",
-    "sourceWorkflowRun": 37070846550,
-    "sourceArtifactId": 11255655197,
-    "sourceArtifactDigest": "sha256:ed1452f1cee300d0e82dcbb70d796960043ad3c4f9033d683cfcb828779adec4",
+    "sourceCommit": "6133a26fa68a3b1cceec982918d75a6303ecb756",
+    "sourceWorkflowRun": 37073965181,
+    "sourceArtifactId": 11256668327,
+    "sourceArtifactDigest": "sha256:829cbad7fcbd84565be8ebe3f7596d45d1a2a14610cc8ddd940b7deca55b6ada",
     "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
-    "spriteSheetSha256": "c53686643cc66db8dd9fa57438caf49ff7910c285273228b8347afbc5d931e9e",
-    "occupiedCompositeSpriteSheetSha256": "b3620943806f163c0ccf1976029fa5af4cd2a38c6a63e5c6403d126ac0ecdeef"
+    "renderContract": "CH_COASTER_PASSENGER_OCCLUSION_V2",
+    "spriteSheetSha256": "5a732d963dec672838e4eb5c26837964addc55dcb9d89a2e0f3679a677c7e4ae",
+    "occupiedCompositeSpriteSheetSha256": "eff78118ddf28175ce18c81e5b9ed90ae3a1ed9d3fda0bb31b8bf6e41ecfb861"
   }
 }

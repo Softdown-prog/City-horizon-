@@ -8,7 +8,7 @@
   "styleId": "flame_01",
   "runtimeRepresentation": "2D_RGBA_sprite_sheet_overlay",
   "spriteSheet": "passenger_pose_atlas.png",
-  "spriteSheetSha256": "c53686643cc66db8dd9fa57438caf49ff7910c285273228b8347afbc5d931e9e",
+  "spriteSheetSha256": "5a732d963dec672838e4eb5c26837964addc55dcb9d89a2e0f3679a677c7e4ae",
   "frameWidth": 256,
   "frameHeight": 256,
   "columns": 8,
@@ -18,7 +18,8 @@
   "visualRecipeSource": "CH_VIKING_PASSENGER_OVERLAY_V1",
   "compositionMode": "alpha_overlay_on_matching_car_pose",
   "frameAlignment": "one_to_one_by_atlasIndex_heading_pitch",
-  "activeRuntimeMode": "baked_into_car_pose_atlas",
+  "activeRuntimeMode": "blender_depth_correct_composite",
+  "occlusionContract": "CH_COASTER_PASSENGER_OCCLUSION_V2",
   "frames": [
     {
       "frameIndex": 0,
@@ -33,6 +34,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_p000.png",
       "atlasIndex": 0,
       "row": 0,
       "column": 0,
@@ -42,7 +44,7 @@
         256,
         256
       ],
-      "sha256": "df125ced8f30d8ec5ba878d5c19b6c43eac30e806498234dab969211c4cfb20f"
+      "sha256": "23e16148ad96d88ff1dcee53577fa18d811553f4764319016272fd3a9756f05e"
     },
     {
       "frameIndex": 1,
@@ -57,6 +59,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h01_p000.png",
       "atlasIndex": 1,
       "row": 0,
       "column": 1,
@@ -66,7 +69,7 @@
         256,
         256
       ],
-      "sha256": "33d6ce24fb5510e12ea0dbc4819482f3a30b2a5a34c5b423be42a98ff48391a7"
+      "sha256": "f2e25a5ecec7acac864088036ee5530e31a07315602feff84d2efe920b0007ca"
     },
     {
       "frameIndex": 2,
@@ -81,6 +84,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h02_p000.png",
       "atlasIndex": 2,
       "row": 0,
       "column": 2,
@@ -90,7 +94,7 @@
         256,
         256
       ],
-      "sha256": "7f9e0e67db861ccfa3437bcb30b80f53e1972c4864619ba71fca9179a5cc81e1"
+      "sha256": "c131cbf3f5b13f2258a319877dbb5833095b3ffa9e486275a2cf4797c23922fd"
     },
     {
       "frameIndex": 3,
@@ -105,6 +109,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h03_p000.png",
       "atlasIndex": 3,
       "row": 0,
       "column": 3,
@@ -114,7 +119,7 @@
         256,
         256
       ],
-      "sha256": "8f41d266fad99f02ecbd908273005edaa94cbf59b073470c7782a80096818775"
+      "sha256": "5599dfeaf347a4997a45187e8038abf8f46fd02e642ddef6c3ac3e6277a91573"
     },
     {
       "frameIndex": 4,
@@ -129,6 +134,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_p000.png",
       "atlasIndex": 4,
       "row": 0,
       "column": 4,
@@ -138,7 +144,7 @@
         256,
         256
       ],
-      "sha256": "f402e5b603bc1401ad23caffc85ae367edb458f8faec9ce0af037ba006925a07"
+      "sha256": "2190dc56edc5b838109c4c37f34533ff28cbee2b808edf31f5802f5e96a67264"
     },
     {
       "frameIndex": 5,
@@ -153,6 +159,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h05_p000.png",
       "atlasIndex": 5,
       "row": 0,
       "column": 5,
@@ -162,7 +169,7 @@
         256,
         256
       ],
-      "sha256": "5f5e2e91fb8b330209c51439465880d8a54adc87f9d06fe83cf275a6a27269bc"
+      "sha256": "54eadcf36754b437f5327681432bc4207fb7abccbedc404ddca3c4ab6e336f34"
     },
     {
       "frameIndex": 6,
@@ -177,6 +184,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h06_p000.png",
       "atlasIndex": 6,
       "row": 0,
       "column": 6,
@@ -186,7 +194,7 @@
         256,
         256
       ],
-      "sha256": "df476439034df913c753bc19824f7c9211e42d9ca36fbb7d4ae8f3b2b1eb7b14"
+      "sha256": "4833fcf4ccfbad6c09b53f5e71d75b2ece911c5934305569ecf397e451d733bc"
     },
     {
       "frameIndex": 7,
@@ -201,6 +209,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h07_p000.png",
       "atlasIndex": 7,
       "row": 0,
       "column": 7,
@@ -210,7 +219,7 @@
         256,
         256
       ],
-      "sha256": "0edecb4cc1cd7310f923491bea8e0e77614ba1398a2d0232658ab62088c151eb"
+      "sha256": "c521a95112db8d1e3f6cdff533b699d8700a7c3fd169b8a00bc71f036b36e68a"
     },
     {
       "frameIndex": 8,
@@ -225,6 +234,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_p000.png",
       "atlasIndex": 8,
       "row": 1,
       "column": 0,
@@ -234,7 +244,7 @@
         256,
         256
       ],
-      "sha256": "063fc79ede880adfe2f06bffa936c24c08e1a83d4f15b386ae6a569f59de5731"
+      "sha256": "9bb38cf0845d1498eb08a7042a56daa4ec3941b9ce0d4c61425f0909c24a1079"
     },
     {
       "frameIndex": 9,
@@ -249,6 +259,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h09_p000.png",
       "atlasIndex": 9,
       "row": 1,
       "column": 1,
@@ -258,7 +269,7 @@
         256,
         256
       ],
-      "sha256": "0f6b4263d7cddffd0e4da0b97545b6b8d9d8ef2e901adc59a57d98bef68f7ab2"
+      "sha256": "fc49fc40348d428c6594475767964a5fcf88583c262cd5b549956d176d332403"
     },
     {
       "frameIndex": 10,
@@ -273,6 +284,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h10_p000.png",
       "atlasIndex": 10,
       "row": 1,
       "column": 2,
@@ -282,7 +294,7 @@
         256,
         256
       ],
-      "sha256": "b3469905a0fb9e3c79a9accf536ef5d0c6bcdae48c2b67fde46426d9c3055404"
+      "sha256": "c29656c2d59bf1ba658e95b52d42be3b438affe1922a552f662e29b6bdb56472"
     },
     {
       "frameIndex": 11,
@@ -297,6 +309,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h11_p000.png",
       "atlasIndex": 11,
       "row": 1,
       "column": 3,
@@ -306,7 +319,7 @@
         256,
         256
       ],
-      "sha256": "42ad7ab227897a8c63d826374f312d3aea158727dcb6cd99cea6fa03d3170e75"
+      "sha256": "b6603cb57979836f586a7a44a3366af41be75be567e3efdbe9c93f68507098d7"
     },
     {
       "frameIndex": 12,
@@ -321,6 +334,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_p000.png",
       "atlasIndex": 12,
       "row": 1,
       "column": 4,
@@ -330,7 +344,7 @@
         256,
         256
       ],
-      "sha256": "8e3b7faf8c7d8004ff1611d289fa57d2d4eae85270abbefe27b9c56882ccb6ae"
+      "sha256": "c674a53647dad831500337aa9b730b32e417666511e53718143ba504ae1ed249"
     },
     {
       "frameIndex": 13,
@@ -345,6 +359,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h13_p000.png",
       "atlasIndex": 13,
       "row": 1,
       "column": 5,
@@ -354,7 +369,7 @@
         256,
         256
       ],
-      "sha256": "d5c9075cdfbd67be5f0a2fed1777243cd0f02f89aba8af5433ac59938e1423b8"
+      "sha256": "b94a6e98c108c53c16a94d4242c48f076053f612113e1844914abb62ce97be55"
     },
     {
       "frameIndex": 14,
@@ -369,6 +384,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h14_p000.png",
       "atlasIndex": 14,
       "row": 1,
       "column": 6,
@@ -378,7 +394,7 @@
         256,
         256
       ],
-      "sha256": "da4bd98c51b4aa2715c5994e1839ccbc19a3276effdabaf35612e1cd639ba0c5"
+      "sha256": "60bd61c86e800fbbe18b77c0ff816d7a8b6449d3b4613109af4a20dbe4a0db5a"
     },
     {
       "frameIndex": 15,
@@ -393,6 +409,7 @@
         "curve_left",
         "curve_right"
       ],
+      "occupiedCompositeFile": "occupied_car_h15_p000.png",
       "atlasIndex": 15,
       "row": 1,
       "column": 7,
@@ -402,7 +419,7 @@
         256,
         256
       ],
-      "sha256": "a0357737b9aa62aed32d24f13f98df5a3ebf69bf3d6a8146534481c24697edfa"
+      "sha256": "839d910ca3f0485a8a2aeeee87c9778b188b0330e000b4366c71437ebd3c1d7e"
     },
     {
       "frameIndex": 16,
@@ -422,6 +439,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_m046.png",
       "atlasIndex": 16,
       "row": 2,
       "column": 0,
@@ -431,7 +449,7 @@
         256,
         256
       ],
-      "sha256": "7cd25c4bc6b6d68121e48b2391d04c9d00fa4fc5b0ad2b7bc6cb12d32ce5933b"
+      "sha256": "efce794cb0b81003ded3ad803d1b715e103185ecfe607f8d76684443c061313b"
     },
     {
       "frameIndex": 17,
@@ -451,6 +469,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_m046.png",
       "atlasIndex": 17,
       "row": 2,
       "column": 1,
@@ -460,7 +479,7 @@
         256,
         256
       ],
-      "sha256": "97d94a319214a32fab1660de6c4540c93e7c86cc6885d40857733abbf6321c2e"
+      "sha256": "18e16da4f6966077f9f28ef02210a1c0ce7cf1bfeac8c1d7541e7bb6526b97c9"
     },
     {
       "frameIndex": 18,
@@ -480,6 +499,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_m046.png",
       "atlasIndex": 18,
       "row": 2,
       "column": 2,
@@ -489,7 +509,7 @@
         256,
         256
       ],
-      "sha256": "091b79f7941c4fd1c4afb103326912b2461198926ad58b99e45ca9d9469ffea9"
+      "sha256": "fe5b5acea413e6da9e58103de49db56fd3f05260315b4a21a6f513eff5dff5a7"
     },
     {
       "frameIndex": 19,
@@ -509,6 +529,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_m046.png",
       "atlasIndex": 19,
       "row": 2,
       "column": 3,
@@ -518,7 +539,7 @@
         256,
         256
       ],
-      "sha256": "9bd098ab3a5da1f20c55761872e6431c9155ab94c727a1a1eaeeb2504ae733f3"
+      "sha256": "7f0f26bc60f63ff683448ec58c06a78c550a32e64c51e754643ffbd1c475e123"
     },
     {
       "frameIndex": 20,
@@ -538,6 +559,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_m030.png",
       "atlasIndex": 20,
       "row": 2,
       "column": 4,
@@ -547,7 +569,7 @@
         256,
         256
       ],
-      "sha256": "feb0d16c05611c15c480da2fe4bb0b35b2603ff11abbbcc1c1818ba1c6189a22"
+      "sha256": "722e82f8ba1b61ed2fab7a746140e574f1a95c0abe01a8ee08eabc8243af6534"
     },
     {
       "frameIndex": 21,
@@ -567,6 +589,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_m030.png",
       "atlasIndex": 21,
       "row": 2,
       "column": 5,
@@ -576,7 +599,7 @@
         256,
         256
       ],
-      "sha256": "3771e1feb1d2f85b0981d0c42a613cc10e49e311b55295b248eb4f8db3d6c682"
+      "sha256": "1219a4a2841b76dc08ae355f77d3a90fc06a3f7b17b7c0c3c129c7e88692eda1"
     },
     {
       "frameIndex": 22,
@@ -596,6 +619,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_m030.png",
       "atlasIndex": 22,
       "row": 2,
       "column": 6,
@@ -605,7 +629,7 @@
         256,
         256
       ],
-      "sha256": "bbc4ac05defd61a0f2543cf9df11128795379eb9526523ab17f34ab0739a26d4"
+      "sha256": "d2775cfeee950e8fce12380df98f0cc104e6fb32deed44b1d5d7b429922092eb"
     },
     {
       "frameIndex": 23,
@@ -625,6 +649,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_m030.png",
       "atlasIndex": 23,
       "row": 2,
       "column": 7,
@@ -634,7 +659,7 @@
         256,
         256
       ],
-      "sha256": "492232b482cc0c5da4c6b8a6b9c20a5af48df62e6fdeeb847cc907cc95d0e9c7"
+      "sha256": "b21a30aaf5f4bd4c4df57c44527645336865c0c5d59f3b7e2b61377c96f05176"
     },
     {
       "frameIndex": 24,
@@ -654,6 +679,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_m014.png",
       "atlasIndex": 24,
       "row": 3,
       "column": 0,
@@ -663,7 +689,7 @@
         256,
         256
       ],
-      "sha256": "17250e82656ba5604159b521561cb20d75a682cc7861881b638ca1560667ff3d"
+      "sha256": "d157c618d14ff5102dfefa9eb3f2756b589060293f3a09c51b1b415fec98e314"
     },
     {
       "frameIndex": 25,
@@ -683,6 +709,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_m014.png",
       "atlasIndex": 25,
       "row": 3,
       "column": 1,
@@ -692,7 +719,7 @@
         256,
         256
       ],
-      "sha256": "89f11abaa86d98dfc86a60b4256fa378455cedaf566818565583191cf11aeaf7"
+      "sha256": "7e669e758f929c01780b37a722c96d6c2e1ee5ee36a091475319c3833cb51787"
     },
     {
       "frameIndex": 26,
@@ -712,6 +739,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_m014.png",
       "atlasIndex": 26,
       "row": 3,
       "column": 2,
@@ -721,7 +749,7 @@
         256,
         256
       ],
-      "sha256": "845a98a04e1682ab8a056d2faaae8884f646faab1682ab6f38eb50b1c8a2496f"
+      "sha256": "eddde0a56017f1cf9e7b676de135976f34e5c774326d3e89dd1d8dbd16986006"
     },
     {
       "frameIndex": 27,
@@ -741,6 +769,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_m014.png",
       "atlasIndex": 27,
       "row": 3,
       "column": 3,
@@ -750,7 +779,7 @@
         256,
         256
       ],
-      "sha256": "63cd37d17f5555b4f4ff18bc1839f9ebc48f47af5a0f0636cf8a7a621c3c9feb"
+      "sha256": "4ea615dfe8c9882ae9073746e973154e068c6257610276d8038af4d962898159"
     },
     {
       "frameIndex": 28,
@@ -770,6 +799,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_p014.png",
       "atlasIndex": 28,
       "row": 3,
       "column": 4,
@@ -779,7 +809,7 @@
         256,
         256
       ],
-      "sha256": "17c6c599116e231012f044508b081c99cf1cb65ab771462102f88221eb528efa"
+      "sha256": "9dc33daa2e9a5257464139599457e5c9f97f34ace5463c0126d44240acd90f10"
     },
     {
       "frameIndex": 29,
@@ -799,6 +829,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_p014.png",
       "atlasIndex": 29,
       "row": 3,
       "column": 5,
@@ -808,7 +839,7 @@
         256,
         256
       ],
-      "sha256": "647228ea2a6834a8c6e1eaaa2bb6eac222253a52047d8f8e662e56ea96a30118"
+      "sha256": "79ed0a9dc89b979a99196fb74582f5a6e788c717f9e44f5a169baf36d9cf1572"
     },
     {
       "frameIndex": 30,
@@ -828,6 +859,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_p014.png",
       "atlasIndex": 30,
       "row": 3,
       "column": 6,
@@ -837,7 +869,7 @@
         256,
         256
       ],
-      "sha256": "001c114757fac671fa415160e0506afd56c82ae4db90ca29ef0315218a9d89cb"
+      "sha256": "f5ed03f1b077a0859185c3fa02cc5e9a599fe8a6914c6d816199c1cea98d645a"
     },
     {
       "frameIndex": 31,
@@ -857,6 +889,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_p014.png",
       "atlasIndex": 31,
       "row": 3,
       "column": 7,
@@ -866,7 +899,7 @@
         256,
         256
       ],
-      "sha256": "8da2a3df30cf8d6897aca81770a5c87ad7157cffa0b1fc330217e8f926de7cc9"
+      "sha256": "584e462b3b324e1a66b526bcb0f03749d40b8506bdc48165f794152503af7a90"
     },
     {
       "frameIndex": 32,
@@ -886,6 +919,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_p030.png",
       "atlasIndex": 32,
       "row": 4,
       "column": 0,
@@ -895,7 +929,7 @@
         256,
         256
       ],
-      "sha256": "629bc90559ded5a41efdebbde7cd4d203d7750e261e5ab01e87ae15d2a73de49"
+      "sha256": "f1804d52a24426f776a1d298ac461ad0f88f54594ebcc0190b52bfb56d98b11e"
     },
     {
       "frameIndex": 33,
@@ -915,6 +949,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_p030.png",
       "atlasIndex": 33,
       "row": 4,
       "column": 1,
@@ -924,7 +959,7 @@
         256,
         256
       ],
-      "sha256": "75aa6103dc368901aefc815fbec8aecfe5d67bf6fc5c4fc7d4733843446dcf74"
+      "sha256": "cf1af2145451336cdb3625bcd8fe9b02124d1f3b4aa24c5d0d984d8b509d9f0e"
     },
     {
       "frameIndex": 34,
@@ -944,6 +979,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_p030.png",
       "atlasIndex": 34,
       "row": 4,
       "column": 2,
@@ -953,7 +989,7 @@
         256,
         256
       ],
-      "sha256": "3943b1db54aea95cb0f617778af50156f7c9c50890739faf11f22600436f8ab0"
+      "sha256": "6fa8314de1ee67c6e0463dcafa7b9684d350644a7e3d3f4aae997eabd20cafe5"
     },
     {
       "frameIndex": 35,
@@ -973,6 +1009,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_p030.png",
       "atlasIndex": 35,
       "row": 4,
       "column": 3,
@@ -982,7 +1019,7 @@
         256,
         256
       ],
-      "sha256": "6a543efb76523c6ff62e97865c20b925f9922ad0a928756a2d5b1455b72a516f"
+      "sha256": "7d4d58b0a857042ac445e0cc1c7ab0df60e6111d39dabfd9f7173ea2ec756ce2"
     },
     {
       "frameIndex": 36,
@@ -1002,6 +1039,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h00_p046.png",
       "atlasIndex": 36,
       "row": 4,
       "column": 4,
@@ -1011,7 +1049,7 @@
         256,
         256
       ],
-      "sha256": "194dda3ce3ad40632fe5b5136ea8ac6c3c66e47673ed7ca76c97e28acaba3adb"
+      "sha256": "5ef02ad4c5215deeaf99c1f8de7cb6ec6aaf0901230079ffbd8bcdd026f5f854"
     },
     {
       "frameIndex": 37,
@@ -1031,6 +1069,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h04_p046.png",
       "atlasIndex": 37,
       "row": 4,
       "column": 5,
@@ -1040,7 +1079,7 @@
         256,
         256
       ],
-      "sha256": "1a49126230970319baf81c79aabf61d8d1472546fbe58296d130e7de6eea6e8a"
+      "sha256": "496c084a6dc13f08bd9bbb42e6320329a5b0407ace7e1cc4c91bb7f64a7dfa58"
     },
     {
       "frameIndex": 38,
@@ -1060,6 +1099,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h08_p046.png",
       "atlasIndex": 38,
       "row": 4,
       "column": 6,
@@ -1069,7 +1109,7 @@
         256,
         256
       ],
-      "sha256": "e52b93035a274c7711aecebbe34a4691c51a92a1611e9b86452232e3a35756b2"
+      "sha256": "94c394c99803dbdfa592fa26dceb75fc8cd11c496ee1265002896ebfbeaca542"
     },
     {
       "frameIndex": 39,
@@ -1089,6 +1129,7 @@
         "airtime_hill_small",
         "airtime_hill_large"
       ],
+      "occupiedCompositeFile": "occupied_car_h12_p046.png",
       "atlasIndex": 39,
       "row": 4,
       "column": 7,
@@ -1098,13 +1139,14 @@
         256,
         256
       ],
-      "sha256": "70835994f75e50c861d844f8a1ee6adbf372ba5b8f9329369a696321ae4807bd"
+      "sha256": "2b2d50f590357b8032ee0e9a56fef5964b515d279500d2e0e2a119bc6abe354a"
     }
   ],
-  "sourceCommit": "ac1fa84e92919cb87680d5c355b5a9a2596da519",
-  "sourceWorkflowRun": 37070846550,
-  "sourceArtifactId": 11255655197,
-  "sourceArtifactDigest": "sha256:ed1452f1cee300d0e82dcbb70d796960043ad3c4f9033d683cfcb828779adec4",
+  "sourceCommit": "6133a26fa68a3b1cceec982918d75a6303ecb756",
+  "sourceWorkflowRun": 37073965181,
+  "sourceArtifactId": 11256668327,
+  "sourceArtifactDigest": "sha256:829cbad7fcbd84565be8ebe3f7596d45d1a2a14610cc8ddd940b7deca55b6ada",
   "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
+  "renderContract": "CH_COASTER_PASSENGER_OCCLUSION_V2",
   "promotedForRuntimeReuse": true
 }
