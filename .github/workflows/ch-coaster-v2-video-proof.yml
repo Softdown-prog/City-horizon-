@@ -14,7 +14,7 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -37,26 +37,18 @@ jobs:
                   raise SystemExit(f'missing V2 input: {path}')
           manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
           runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
-          if manifest.get('contract') != 'CH_COASTER_CAR_ATLAS_RUNTIME_V2':
-              raise SystemExit('wrong V2 atlas contract')
-          if manifest.get('poseContract') != 'CH_COASTER_CAR_ORIENTATION_V2':
-              raise SystemExit('wrong V2 orientation contract')
-          if (manifest.get('frameCount'), manifest.get('columns'), manifest.get('rows')) != (192, 16, 12):
-              raise SystemExit('wrong V2 atlas layout')
+          if manifest.get('contract') != 'CH_COASTER_CAR_ATLAS_RUNTIME_V2': raise SystemExit('wrong V2 atlas contract')
+          if manifest.get('poseContract') != 'CH_COASTER_CAR_ORIENTATION_V2': raise SystemExit('wrong V2 orientation contract')
+          if (manifest.get('frameCount'), manifest.get('columns'), manifest.get('rows')) != (192, 16, 12): raise SystemExit('wrong V2 atlas layout')
           families = Counter(f.get('family') for f in manifest.get('frames', []))
           expected = {'heading_pitch_16way':112,'vertical_16way':32,'banked_16way':32,'inverted_16way':16}
-          if families != expected:
-              raise SystemExit(f'wrong V2 pose families: {dict(families)}')
+          if families != expected: raise SystemExit(f'wrong V2 pose families: {dict(families)}')
           header = atlas.read_bytes()[:24]
-          if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
-              raise SystemExit('V2 atlas is not PNG')
-          if struct.unpack('>II', header[16:24]) != (4096, 3072):
-              raise SystemExit('wrong V2 atlas dimensions')
+          if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR': raise SystemExit('V2 atlas is not PNG')
+          if struct.unpack('>II', header[16:24]) != (4096, 3072): raise SystemExit('wrong V2 atlas dimensions')
           actual = hashlib.sha256(atlas.read_bytes()).hexdigest()
-          if actual != manifest.get('spriteSheetSha256'):
-              raise SystemExit('V2 atlas SHA mismatch')
-          if runtime.get('poseAtlasSource', {}).get('occupiedCompositeSpriteSheetSha256') != actual:
-              raise SystemExit('runtime catalog V2 SHA mismatch')
+          if actual != manifest.get('spriteSheetSha256'): raise SystemExit('V2 atlas SHA mismatch')
+          if runtime.get('poseAtlasSource', {}).get('occupiedCompositeSpriteSheetSha256') != actual: raise SystemExit('runtime catalog V2 SHA mismatch')
           print('occupied V2 atlas validated', actual)
           PY
 
@@ -66,25 +58,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build ffmpeg libgl1-mesa-dev
           python3 -m pip install --user --upgrade aqtinstall
-          echo 'Available Qt 6.8.3 Linux desktop architectures:'
-          python3 -m aqt list-qt linux desktop --arch 6.8.3
           QT_ARCH="$(python3 -m aqt list-qt linux desktop --arch 6.8.3 | tr ' ' '\n' | grep -E '(^|_)(gcc_64|linux_gcc_64)$' | head -n1 || true)"
-          if [ -z "$QT_ARCH" ]; then
-            QT_ARCH="$(python3 -m aqt list-qt linux desktop --arch 6.8.3 | tr ' ' '\n' | grep -E 'gcc.*64|64.*gcc' | head -n1 || true)"
-          fi
-          if [ -z "$QT_ARCH" ]; then
-            echo 'Could not resolve a supported 64-bit GCC Qt architecture for 6.8.3' >&2
-            exit 1
-          fi
-          echo "Resolved Qt architecture: $QT_ARCH"
+          if [ -z "$QT_ARCH" ]; then QT_ARCH="$(python3 -m aqt list-qt linux desktop --arch 6.8.3 | tr ' ' '\n' | grep -E 'gcc.*64|64.*gcc' | head -n1 || true)"; fi
+          if [ -z "$QT_ARCH" ]; then echo 'Could not resolve Qt architecture' >&2; exit 1; fi
           python3 -m aqt install-qt linux desktop 6.8.3 "$QT_ARCH" -O "$HOME/Qt"
           QT_CONFIG="$(find "$HOME/Qt/6.8.3" -type f -path '*/lib/cmake/Qt6/Qt6Config.cmake' -print -quit)"
-          if [ -z "$QT_CONFIG" ]; then
-            echo 'Qt6Config.cmake not found after successful aqt install' >&2
-            exit 1
-          fi
+          if [ -z "$QT_CONFIG" ]; then echo 'Qt6Config.cmake not found' >&2; exit 1; fi
           QT_PREFIX="${QT_CONFIG%/lib/cmake/Qt6/Qt6Config.cmake}"
-          echo "Resolved Qt prefix: $QT_PREFIX"
           echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
           echo "QT_PLUGIN_PATH=$QT_PREFIX/plugins" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$QT_PREFIX/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
@@ -92,14 +72,12 @@ jobs:
       - name: Configure renderer
         run: |
           set -euo pipefail
-          cmake -S tools/animation_preview/coaster_video_proof \
-            -B build/ch-coaster-v2 -G Ninja \
-            -DCMAKE_PREFIX_PATH="$QT_PREFIX"
+          cmake -S tools/animation_preview/coaster_video_proof -B build/ch-coaster-v2 -G Ninja -DCMAKE_PREFIX_PATH="$QT_PREFIX"
 
       - name: Build renderer
         run: cmake --build build/ch-coaster-v2 --target MapForge2CoasterVideoProof --parallel
 
-      - name: Render occupied V2 MapForge proof frames
+      - name: Render occupied V2 complete lap
         run: |
           set -euo pipefail
           rm -rf out/ch-coaster-v2-video
@@ -108,60 +86,55 @@ jobs:
             out/ch-coaster-v2-video/frames \
             assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png \
             C++/MapForge2/projects/coaster_flame_01.mapforge.json
+          mv out/ch-coaster-v2-video/frames/capture_meta.json out/ch-coaster-v2-video/capture_meta.json
           count="$(find out/ch-coaster-v2-video/frames -type f -name 'frame_*.png' | wc -l)"
-          if [ "$count" -ne 360 ]; then
-            echo "Expected 360 proof frames, got $count" >&2
-            exit 1
-          fi
-          echo "Rendered $count occupied V2 frames"
+          python3 - out/ch-coaster-v2-video/capture_meta.json "$count" <<'PY'
+          import json, math, sys
+          from pathlib import Path
+          meta=json.loads(Path(sys.argv[1]).read_text())
+          actual=int(sys.argv[2])
+          expected=math.ceil(meta['routeMeters']/meta['trainSpeedMps']*meta['fps'])+1
+          if meta.get('contract')!='CH_COASTER_FULL_LAP_CAPTURE_V1' or meta.get('fullLap') is not True: raise SystemExit('not a full-lap capture')
+          if actual!=expected or meta.get('frameCount')!=expected: raise SystemExit(f'frame mismatch actual={actual} expected={expected}')
+          if abs(meta.get('firstLeadDistanceMeters',1))>1e-9 or abs(meta.get('lastLeadDistanceMeters',1))>1e-9: raise SystemExit('lead car did not return to route origin')
+          print(f'full lap validated: {meta["routeMeters"]:.3f}m {meta["lapSeconds"]:.3f}s {actual} frames')
+          PY
 
-      - name: Encode MP4 and contact sheet
+      - name: Encode full-lap MP4 and evenly sampled contact sheet
         run: |
           set -euo pipefail
-          ffmpeg -y -framerate 30 \
-            -i out/ch-coaster-v2-video/frames/frame_%04d.png \
-            -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
-            out/ch-coaster-v2-video/coaster_flame_v2.mp4
-          ffmpeg -y -i out/ch-coaster-v2-video/coaster_flame_v2.mp4 \
-            -vf "fps=1,scale=640:-1,tile=4x3" -frames:v 1 \
-            out/ch-coaster-v2-video/contact_sheet.png
-          ffprobe -v error -select_streams v:0 \
-            -show_entries stream=width,height,r_frame_rate,nb_frames \
-            -of json out/ch-coaster-v2-video/coaster_flame_v2.mp4 \
-            > out/ch-coaster-v2-video/ffprobe.json
+          ffmpeg -y -framerate 30 -i out/ch-coaster-v2-video/frames/frame_%04d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart out/ch-coaster-v2-video/coaster_flame_v2.mp4
+          SAMPLE_FPS="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('out/ch-coaster-v2-video/capture_meta.json').read_text())
+          print(16.0/max(m['lapSeconds'],0.001))
+          PY
+          )"
+          ffmpeg -y -i out/ch-coaster-v2-video/coaster_flame_v2.mp4 -vf "fps=${SAMPLE_FPS},scale=480:-1,tile=4x4" -frames:v 1 out/ch-coaster-v2-video/contact_sheet.png
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of json out/ch-coaster-v2-video/coaster_flame_v2.mp4 > out/ch-coaster-v2-video/ffprobe.json
           test -s out/ch-coaster-v2-video/coaster_flame_v2.mp4
           test -s out/ch-coaster-v2-video/contact_sheet.png
 
       - name: Write proof report
         run: |
           set -euo pipefail
-          cat > out/ch-coaster-v2-video/proof_report.json <<'JSON'
-          {
-            "contract": "CH_COASTER_VIDEO_PROOF_V4",
-            "status": "ok",
-            "renderer": "MapForge2CoasterVideoProof",
-            "projectContract": "CH_MAPFORGE_COASTER_PROJECT_V1",
-            "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V2",
-            "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V2",
-            "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
-            "cameraContract": "CH_CAMERA_V1",
-            "cameraParityProofPatch": true,
-            "physicalRailAnchorProof": true,
-            "frameCount": 360,
-            "fps": 30,
-            "durationSeconds": 12,
-            "carCount": 4,
-            "staleFrameReuseAllowed": false
-          }
-          JSON
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('out/ch-coaster-v2-video/capture_meta.json').read_text())
+          r={'contract':'CH_COASTER_VIDEO_PROOF_V5','status':'ok','renderer':'MapForge2CoasterVideoProof','projectContract':'CH_MAPFORGE_COASTER_PROJECT_V1','routeContract':'CH_COASTER_CENTERLINE_ROUTE_V2','trainRuntimeContract':'CH_COASTER_TRAIN_RUNTIME_V2','carPoseContract':'CH_COASTER_CAR_ATLAS_RUNTIME_V2','cameraContract':'CH_CAMERA_V1','cameraParityProofPatch':True,'physicalRailAnchorProof':True,'fullLapRequired':True,'fullLapValidated':True,'routeMeters':m['routeMeters'],'durationSeconds':m['lapSeconds'],'frameCount':m['frameCount'],'fps':m['fps'],'carCount':4,'staleFrameReuseAllowed':False}
+          Path('out/ch-coaster-v2-video/proof_report.json').write_text(json.dumps(r,indent=2)+'\n')
+          PY
 
-      - name: Upload V2 video proof
+      - name: Upload V2 full-lap video proof
         uses: actions/upload-artifact@v4
         with:
           name: CH-Coaster-V2-Video-Proof-${{ github.run_id }}
           path: |
             out/ch-coaster-v2-video/coaster_flame_v2.mp4
             out/ch-coaster-v2-video/contact_sheet.png
+            out/ch-coaster-v2-video/capture_meta.json
             out/ch-coaster-v2-video/ffprobe.json
             out/ch-coaster-v2-video/proof_report.json
           if-no-files-found: error
