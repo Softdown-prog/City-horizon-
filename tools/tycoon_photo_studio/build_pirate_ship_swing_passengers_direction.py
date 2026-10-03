@@ -54,11 +54,14 @@ def main() -> None:
     root["proceduralContract"] = core.base.CONTRACT
     root["animationContract"] = core.ANIMATION_CONTRACT
     root["passengerOverlayContract"] = core.PASSENGER_CONTRACT
+    root["colorMaskContract"] = core.COLOR_MASK_CONTRACT
     root["rideCapacity"] = core.CAPACITY
 
     core.base.build(root, c, M)
     pivot = core._make_swing_pivot(root, c)
     slots = core._add_passengers(pivot, c)
+    mask_counts = core._tag_color_masks()
+    overlay_validation = core._assert_passenger_binding(c)
 
     recv = studio["shadowReceiver"]
     rm = core.base.bs.make_material(
@@ -86,12 +89,25 @@ def main() -> None:
         "frameCount": core.FRAME_COUNT,
         "fps": core.FPS,
         "amplitudeDegrees": core.AMPLITUDE_DEGREES,
+        "anglesDegrees": core.APPROVED_SWING_ANGLES,
         "rotationAxis": "Y",
-        "motion": "pendulum_sinusoidal",
+        "motion": "approved_viking_v15",
+        "swingApproval": {
+            "commit": "a9f6e02b63a06462f10133b405ee85921f172e40",
+            "reviewWorkflowRun": 36350851439,
+            "approvedProxySha256": "c92f1feac2c816599edfac0bf00aa1a645389b7cca86f3350b6b73bd9d33e89b",
+        },
         "passengerOverlayContract": core.PASSENGER_CONTRACT,
         "passengerVisualRecipeSource": "CH_COASTER_PASSENGER_OVERLAY_V1 / approved Viking V15 CHActor recipe",
         "capacity": core.CAPACITY,
         "seatSlots": slots,
+        "overlayValidation": overlay_validation,
+        "colorMaskContract": core.COLOR_MASK_CONTRACT,
+        "colorMasks": {
+            "primary": "fixed A-frame supports / muletas",
+            "secondary": "boat hull, seats and boat decoration",
+            "taggedObjectCounts": mask_counts,
+        },
         "parallelBake": True,
     }
     (out / "studio_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
@@ -105,6 +121,23 @@ def main() -> None:
         "visualRecipeSource": "CH_COASTER_PASSENGER_OVERLAY_V1",
         "motionParent": "SwingPivot",
         "compositionMode": "depth_correct_blender_composite_plus_transparent_overlay",
+        "frameCount": core.FRAME_COUNT,
+        "validation": overlay_validation,
+    }, indent=2), encoding="utf-8")
+    (out / "color_mask_manifest.json").write_text(json.dumps({
+        "contract": core.COLOR_MASK_CONTRACT,
+        "assetId": core.base.ASSET,
+        "direction": direction_id,
+        "primaryColor": {
+            "target": "A-frame supports / muletas",
+            "file": f"mask_primary_{direction_id}.png",
+            "animated": False,
+        },
+        "secondaryColor": {
+            "target": "boat",
+            "filePattern": f"mask_secondary_{direction_id}_%02d.png",
+            "animated": True,
+        },
         "frameCount": core.FRAME_COUNT,
     }, indent=2), encoding="utf-8")
 
@@ -123,6 +156,12 @@ def main() -> None:
     cycle = core.angles()
     frames = []
     canonical_report = None
+
+    # Primary mask is stationary and is baked once per direction.
+    pivot.rotation_euler[1] = 0.0
+    bpy.context.view_layer.update()
+    core.render_color_mask(scene, out / f"mask_primary_{direction_id}.png", "primary")
+
     for index, angle in enumerate(cycle):
         pivot.rotation_euler[1] = math.radians(angle)
         bpy.context.view_layer.update()
@@ -151,12 +190,17 @@ def main() -> None:
         )
         core._restore_visibility(states)
 
+        secondary_mask = f"mask_secondary_{direction_id}_{index:02d}.png"
+        core.render_color_mask(scene, out / secondary_mask, "secondary")
+
         frames.append({
             "direction": direction_id,
             "frameIndex": index,
             "angleDegrees": round(angle, 6),
             "occupiedFile": occupied_name,
             "passengerOverlayFile": overlay_name,
+            "primaryMaskFile": f"mask_primary_{direction_id}.png",
+            "secondaryMaskFile": secondary_mask,
             "sha256": report["sha256"],
         })
 
@@ -171,7 +215,8 @@ def main() -> None:
         "frameCount": core.FRAME_COUNT,
         "fps": core.FPS,
         "amplitudeDegrees": core.AMPLITUDE_DEGREES,
-        "anglesDegrees": [round(x, 6) for x in cycle],
+        "anglesDegrees": cycle,
+        "swingApproval": "Viking V15 / human reviewed",
         "frames": frames,
     }, indent=2), encoding="utf-8")
 

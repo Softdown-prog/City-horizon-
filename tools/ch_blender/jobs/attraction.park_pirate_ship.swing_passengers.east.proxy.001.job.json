@@ -25,6 +25,9 @@
     "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/proxy_report.json",
     "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/studio_metadata.json",
     "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/passenger_overlay_manifest.json",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/color_mask_manifest.json",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/mask_primary_east.png",
+    "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/mask_secondary_east_00.png",
     "out/ch_blender_agent/pirate_ship_swing_passengers_east_001/swing_frames_east.json"
   ]
 }
