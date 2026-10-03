@@ -1,0 +1,59 @@
+name: CH Ground Overlays Heightfield Repair
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-ground-overlays-heightfield-repair.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair-test-commit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto latest main
+        shell: pwsh
+        run: git pull --rebase origin main
+
+      - name: Validate and apply guarded patch
+        shell: pwsh
+        run: |
+          python -m py_compile tools/ground_overlays_heightfield_patch.py
+          python tools/ground_overlays_heightfield_patch.py
+          git diff --check
+
+      - name: Configure focused validation
+        shell: pwsh
+        run: cmake -S . -B build/ground-overlay-validation -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build sidewalk topology test
+        shell: pwsh
+        run: cmake --build build/ground-overlay-validation --config Debug --target sidewalk_topology_test --parallel
+
+      - name: Run sidewalk topology test
+        shell: pwsh
+        run: ctest --test-dir build/ground-overlay-validation -C Debug -R "^sidewalk_topology_test$" --output-on-failure
+
+      - name: Build real City Builder
+        shell: pwsh
+        run: cmake --build build/ground-overlay-validation --config Release --target city_builder --parallel
+
+      - name: Commit validated ground overlay repair
+        shell: pwsh
+        run: |
+          git config user.name "City Horizon CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/ch_render/map_renderer.h src/ch_render/map_renderer.cpp src/runtime_map_renderer.h src/main_runtime_impl.cpp
+          git rm .github/workflows/ch-ground-overlays-heightfield-repair.yml tools/ground_overlays_heightfield_patch.py
+          git diff --cached --check
+          git commit -m "terrain: keep sidewalks and crosswalks on sculpted ground"
+          git pull --rebase origin main
+          git push origin HEAD:main
