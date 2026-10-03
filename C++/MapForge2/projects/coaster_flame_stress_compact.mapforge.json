@@ -1,0 +1,38 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "projectId": "coaster.flame.stress.compact",
+  "assetId": "ride.coaster.flame_01",
+  "name": "Flame Coaster - Compact Stress",
+  "mapForge": {
+    "tileMeters": 3.0,
+    "footprintTiles": {"width": 20, "depth": 20},
+    "closedRoute": true,
+    "start": {"x": 9.0, "y": 0.0, "z": 0.0, "headingDegrees": 0.0}
+  },
+  "train": {"carCount": 4, "carSpacingMeters": 2.445, "passengersPerCar": 2},
+  "track": {"contract": "CH_COASTER_TRACK_V1", "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"},
+  "pieces": [
+    {"id":"station","type":"straight","length":8.0,"rise":0.0,"driveMode":"station","targetSpeedMps":4.5},
+    {"id":"lift","type":"straight","length":16.0,"rise":6.0,"driveMode":"lift","targetSpeedMps":5.0},
+    {"id":"crest","type":"straight","length":8.0,"rise":0.0},
+    {"id":"turn_1","type":"quarter_curve","radius":7.0,"left":true},
+    {"id":"drop","type":"straight","length":12.0,"rise":-6.0},
+    {"id":"valley","type":"straight","length":4.0,"rise":0.0},
+    {"id":"hop_up","type":"straight","length":4.0,"rise":1.5},
+    {"id":"hop_down","type":"straight","length":4.0,"rise":-1.5},
+    {"id":"turn_2","type":"quarter_curve","radius":7.0,"left":true},
+    {"id":"back","type":"straight","length":16.0,"rise":0.0},
+    {"id":"hill_up","type":"straight","length":8.0,"rise":2.0},
+    {"id":"hill_down","type":"straight","length":8.0,"rise":-2.0},
+    {"id":"turn_3","type":"quarter_curve","radius":7.0,"left":true},
+    {"id":"return","type":"straight","length":12.0,"rise":0.0},
+    {"id":"brake","type":"straight","length":12.0,"rise":0.0,"driveMode":"brake","targetSpeedMps":5.5},
+    {"id":"turn_4","type":"quarter_curve","radius":7.0,"left":true,"driveMode":"brake","targetSpeedMps":4.5}
+  ],
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "fullLapRequired": true,
+    "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+    "stressProfile": "compact_tight_radius"
+  }
+}
