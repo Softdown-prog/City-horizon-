@@ -10,8 +10,10 @@ on:
       - "C++/MapForge2/projects/coaster_flame_01.mapforge.json"
       - "C++/MapForge2/src/coaster_video_proof_main.cpp"
       - "C++/MapForge2/src/coaster_project_video_main.cpp"
-      - "assets/vehicles/coaster_flame_01/car_pose_atlas.png"
-      - "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json"
+      - "src/coaster_car_pose.h"
+      - "assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png"
+      - "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json"
+      - "assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json"
   workflow_dispatch:
     inputs:
       job_path:
@@ -54,10 +56,12 @@ jobs:
           if (-not (Test-Path $jobPath)) { throw "Coaster video job does not exist: $jobPath" }
           $job = Get-Content $jobPath -Raw | ConvertFrom-Json
           if ($job.contract -ne "CH_COASTER_VIDEO_PROOF_V1") { throw "Unsupported coaster video proof contract" }
+          if ($job.carPoseContract -ne "CH_COASTER_CAR_ATLAS_RUNTIME_V2") { throw "Coaster video must use promoted V2 car poses" }
           if ($job.carCount -ne 4) { throw "Runtime contract requires exactly four articulated cars" }
           if ($job.fps -ne 30 -or $job.durationSeconds -ne 12 -or $job.frameCount -ne 360) { throw "Proof timing contract mismatch" }
-          if ([string]::IsNullOrWhiteSpace($job.project) -or -not (Test-Path $job.project)) { throw "MapForge coaster project is missing" }
-          if (-not (Test-Path "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json")) { throw "Coaster atlas manifest is missing" }
+          foreach ($path in @($job.project, $job.atlas, $job.atlasManifest)) {
+            if ([string]::IsNullOrWhiteSpace($path) -or -not (Test-Path $path)) { throw "Coaster proof input missing: $path" }
+          }
           "CH_COASTER_VIDEO_JOB=$jobPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Qt and FFmpeg
@@ -83,17 +87,14 @@ jobs:
         shell: pwsh
         run: |
           $job = Get-Content $env:CH_COASTER_VIDEO_JOB -Raw | ConvertFrom-Json
-          $atlas = $job.atlas
-          if ([string]::IsNullOrWhiteSpace($atlas)) { $atlas = "assets/vehicles/coaster_flame_01/car_pose_atlas.png" }
-          $manifest = "assets/vehicles/coaster_flame_01/car_pose_atlas_runtime.json"
-          foreach ($path in @($env:CH_COASTER_VIDEO_JOB, $job.project, $atlas, $manifest)) {
+          foreach ($path in @($env:CH_COASTER_VIDEO_JOB, $job.project, $job.atlas, $job.atlasManifest)) {
             if (-not (Test-Path $path)) { throw "Fingerprint input missing: $path" }
           }
           $parts = @(
             (Get-FileHash $env:CH_COASTER_VIDEO_JOB -Algorithm SHA256).Hash,
             (Get-FileHash $job.project -Algorithm SHA256).Hash,
-            (Get-FileHash $atlas -Algorithm SHA256).Hash,
-            (Get-FileHash $manifest -Algorithm SHA256).Hash,
+            (Get-FileHash $job.atlas -Algorithm SHA256).Hash,
+            (Get-FileHash $job.atlasManifest -Algorithm SHA256).Hash,
             "CH_COASTER_CENTERLINE_ROUTE_V2",
             "CH_COASTER_TRAIN_RUNTIME_V2",
             $job.carPoseContract
@@ -112,9 +113,7 @@ jobs:
           QT_PLUGIN_PATH: C:/Qt/6.8.3/msvc2022_64/plugins
         run: |
           $job = Get-Content $env:CH_COASTER_VIDEO_JOB -Raw | ConvertFrom-Json
-          $atlas = $job.atlas
-          if ([string]::IsNullOrWhiteSpace($atlas)) { $atlas = "assets/vehicles/coaster_flame_01/car_pose_atlas.png" }
-          build/ch-coaster-video/Release/MapForge2CoasterVideoProof.exe out/ch-coaster-video/frames $atlas
+          build/ch-coaster-video/Release/MapForge2CoasterVideoProof.exe out/ch-coaster-video/frames $job.atlas $job.project
           $frames = Get-ChildItem out/ch-coaster-video/frames -Filter "frame_*.png" -File
           if ($frames.Count -ne 360) { throw "Expected 360 proof frames, got $($frames.Count)" }
 
@@ -147,6 +146,7 @@ jobs:
             fps = 30
             durationSeconds = 12
             atlas = $job.atlas
+            atlasManifest = $job.atlasManifest
             video = "coaster_flame_train_4car_mapforge.mp4"
           }
           $report | ConvertTo-Json -Depth 8 | Set-Content -Path out/ch-coaster-video/proof_report.json -Encoding utf8
