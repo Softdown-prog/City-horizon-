@@ -1,0 +1,7 @@
+{
+  "contract": "CH_COASTER_PASSENGER_OCCLUSION_PROMOTION_REQUEST_V2",
+  "sourceRunId": 37073965181,
+  "sourceCommit": "6133a26fa68a3b1cceec982918d75a6303ecb756",
+  "approvedProxySha256": "8f30a2bdffe62df42c014cffac0b272091dc3f9abe6a84a2fb2ea2f2181818eb",
+  "purpose": "Promote depth-correct occupied Flame coaster passenger composites for runtime and video proof."
+}
