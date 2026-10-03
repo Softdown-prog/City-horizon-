@@ -646,11 +646,12 @@ void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVi
 }
 
 void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, const TextureCache& textures,
-                      const std::filesystem::path& root, const Camera& camera, float vw, float vh) {
+                      const std::filesystem::path& root, const Camera& camera, float vw, float vh,
+                      const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
     ch::MapRenderer::render_sidewalks(renderer, sidewalks,
                                      [&textures](const std::filesystem::path& p) { return textures.find(p); },
-                                     root, cs, vw, vh);
+                                     root, cs, vw, vh, document);
 }
 
 void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const CropCatalog& crops,
@@ -3830,7 +3831,9 @@ int main() {
                      active_map_doc ? &*active_map_doc : nullptr);
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-        render_sidewalks(renderer, sidewalks, textures, asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        render_sidewalks(renderer, sidewalks, textures, asset_root, camera,
+                         static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                         active_map_doc ? &*active_map_doc : nullptr);
         render_farming(renderer, farming, crop_catalog, textures, asset_root, camera,
                        static_cast<float>(viewport_width), static_cast<float>(viewport_height));
 
