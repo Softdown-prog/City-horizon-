@@ -184,6 +184,45 @@ int main() {
     if (!near(mixed_track.tangent_z, 0.0, 0.001))
         return fail("opposing car gravity components must average across train");
 
+    // Runtime integration regression: temporal hysteresis must survive through
+    // TrainRuntimeState, not only exist as an isolated selector helper. A tiny
+    // move over the h00/h01 boundary remains h00; a clear turn then advances.
+    TrainRuntimeState continuity_state;
+    continuity_state.lead.distance_m = 12.0;
+    continuity_state.lead.speed_mps = 0.0;
+    for (std::size_t i = 0; i < continuity_state.previous_sprite_poses.size(); ++i) {
+        continuity_state.previous_sprite_poses[i] = select_car_pose_v2(0.0, 0.0, 0.0);
+        continuity_state.has_previous_sprite_pose[i] = true;
+    }
+    const auto boundary_sampler = [](const double distance) {
+        CenterlineSample s;
+        s.distance_m = distance;
+        constexpr double kHeading = 11.4 * kPi / 180.0;
+        s.tangent_x = -std::sin(kHeading);
+        s.tangent_y = std::cos(kHeading);
+        return s;
+    };
+    const TrainStepResult stable_boundary = step_train(
+        continuity_state, config, boundary_sampler, 0.0);
+    if (stable_boundary.cars[0].sprite_pose.atlas_index != 48 ||
+        stable_boundary.state.previous_sprite_poses[0].atlas_index != 48 ||
+        !stable_boundary.state.has_previous_sprite_pose[0])
+        return fail("train runtime must preserve h00 through heading-boundary chatter");
+
+    const auto clear_turn_sampler = [](const double distance) {
+        CenterlineSample s;
+        s.distance_m = distance;
+        constexpr double kHeading = 16.0 * kPi / 180.0;
+        s.tangent_x = -std::sin(kHeading);
+        s.tangent_y = std::cos(kHeading);
+        return s;
+    };
+    const TrainStepResult stable_clear_turn = step_train(
+        stable_boundary.state, config, clear_turn_sampler, 0.0);
+    if (stable_clear_turn.cars[0].sprite_pose.atlas_index != 49 ||
+        stable_clear_turn.state.previous_sprite_poses[0].atlas_index != 49)
+        return fail("train runtime must switch to h01 after leaving hysteresis band");
+
     // Open routes clamp rear cars at the start instead of wrapping to the end.
     TrainRuntimeConfig open_config = config;
     open_config.closed_route = false;
