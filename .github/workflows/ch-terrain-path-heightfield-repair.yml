@@ -1,0 +1,246 @@
+name: CH Terrain Path Heightfield Repair
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ch-terrain-path-heightfield-repair.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair-test-commit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto latest main
+        shell: pwsh
+        run: git pull --rebase origin main
+
+      - name: Apply guarded terrain projection repair
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          terrain_projection = Path("src/ch_core/terrain_projection.h")
+          assert not terrain_projection.exists(), "terrain_projection.h already exists; review before replacing"
+          terrain_projection.write_text(r'''#pragma once
+
+#include "src/ch_core/projection.h"
+#include "src/ch_core/terrain_heightfield.h"
+
+namespace ch {
+
+// Visual scale for sculpted terrain. This is intentionally gentler than the
+// object/world Z scale so hills remain readable without becoming cliffs.
+inline constexpr float kTerrainHeightPixelsPerUnit = 16.0F;
+
+[[nodiscard]] inline ScreenPoint terrain_world_to_screen_point(
+    const float world_x, const float world_y, const TerrainHeightField& heightfield,
+    const CameraState& camera, const float viewport_width, const float viewport_height) {
+    ScreenPoint point = world_to_screen_point(
+        world_x, world_y, camera, viewport_width, viewport_height);
+    point.y -= heightfield.sample(world_x, world_y) *
+               kTerrainHeightPixelsPerUnit * camera.zoom;
+    return point;
+}
+
+} // namespace ch
+''', encoding="utf-8")
+
+          header = Path("src/ch_render/map_renderer.h")
+          text = header.read_text(encoding="utf-8")
+          old = '''    static void render_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y, const CameraState& camera,
+                                float viewport_width, float viewport_height, SDL_FColor color);
+
+    static void render_road_tile'''
+          new = '''    static void render_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y, const CameraState& camera,
+                                float viewport_width, float viewport_height, SDL_FColor color);
+
+    // Color-only ground quad following the same shared terrain vertices used by
+    // textured heightfield tiles. Useful for seam-hiding underlays and overlays.
+    static void render_heightfield_tile_fill(SDL_Renderer* renderer, int tile_x, int tile_y,
+                                             const MapDocument& document, const CameraState& camera,
+                                             float viewport_width, float viewport_height, SDL_FColor color);
+
+    static void render_road_tile'''
+          assert text.count(old) == 1, f"MapRenderer fill declaration anchor drifted: {text.count(old)}"
+          header.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          cpp = Path("src/ch_render/map_renderer.cpp")
+          text = cpp.read_text(encoding="utf-8")
+          include_anchor = '#include "src/ch_render/map_renderer.h"\n'
+          assert text.count(include_anchor) == 1
+          text = text.replace(include_anchor, include_anchor + '#include "src/ch_core/terrain_projection.h"\n', 1)
+          constant = 'constexpr float kTerrainHeightPixelsPerUnit = 16.0F;\n'
+          assert text.count(constant) == 1, f"terrain scale constant drifted: {text.count(constant)}"
+          text = text.replace(constant, '', 1)
+
+          fill_anchor = '''void MapRenderer::render_road_tile(SDL_Renderer* renderer, const int tile_x, const int tile_y, const CameraState& camera,
+'''
+          fill_impl = '''void MapRenderer::render_heightfield_tile_fill(
+    SDL_Renderer* renderer, const int tile_x, const int tile_y, const MapDocument& document,
+    const CameraState& camera, const float viewport_width, const float viewport_height,
+    const SDL_FColor color) {
+    if (renderer == nullptr) return;
+    const TerrainHeightField& heightfield = document.terrain_heightfield();
+    const ScreenPoint top = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint right = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint bottom = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint left = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = {top.x, top.y};
+    vertices[1].position = {right.x, right.y};
+    vertices[2].position = {bottom.x, bottom.y};
+    vertices[3].position = {left.x, left.y};
+    for (SDL_Vertex& vertex : vertices) vertex.color = color;
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+}
+
+'''
+          assert text.count(fill_anchor) == 1, "render_road_tile implementation anchor drifted"
+          text = text.replace(fill_anchor, fill_impl + fill_anchor, 1)
+
+          old_corner = '''    const auto screen_corner = [&](const int grid_x, const int grid_y) {
+        ScreenPoint point = world_to_screen_point(static_cast<float>(grid_x), static_cast<float>(grid_y),
+                                                  camera, viewport_width, viewport_height);
+        point.y -= document.terrain_height_at(grid_x, grid_y) *
+                   kTerrainHeightPixelsPerUnit * camera.zoom;
+        return point;
+    };
+'''
+          new_corner = '''    const TerrainHeightField& heightfield = document.terrain_heightfield();
+    const auto screen_corner = [&](const int grid_x, const int grid_y) {
+        return terrain_world_to_screen_point(
+            static_cast<float>(grid_x), static_cast<float>(grid_y), heightfield,
+            camera, viewport_width, viewport_height);
+    };
+'''
+          assert text.count(old_corner) == 1, f"heightfield corner projection drifted: {text.count(old_corner)}"
+          text = text.replace(old_corner, new_corner, 1)
+
+          old_paths = '''    constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
+    for (const auto& tile : dirt_path_tiles) {
+        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height, kDirtUnderlay);
+    }
+    for (const auto& tile : dirt_path_tiles) {
+        const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
+        if (const TextureAsset* sprite = find_texture(dirt_path_sprite(visual_connections))) {
+            render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+        }
+    }
+'''
+          new_paths = '''    constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
+    for (const auto& tile : dirt_path_tiles) {
+        render_heightfield_tile_fill(renderer, tile.tile_x, tile.tile_y, document,
+                                     camera, viewport_width, viewport_height, kDirtUnderlay);
+    }
+    for (const auto& tile : dirt_path_tiles) {
+        const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
+        if (const TextureAsset* sprite = find_texture(dirt_path_sprite(visual_connections))) {
+            render_heightfield_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, document,
+                                            camera, viewport_width, viewport_height, false);
+        }
+    }
+'''
+          assert text.count(old_paths) == 1, f"canonical dirt-path block drifted: {text.count(old_paths)}"
+          text = text.replace(old_paths, new_paths, 1)
+          cpp.write_text(text, encoding="utf-8")
+
+          runtime = Path("src/runtime_map_renderer.h")
+          text = runtime.read_text(encoding="utf-8")
+          old_runtime_paths = '''        constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
+        for (const auto& tile : dirt_path_tiles) {
+            MapRenderer::render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera,
+                                          viewport_width, viewport_height, kDirtUnderlay);
+        }
+        for (const auto& tile : dirt_path_tiles) {
+            const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
+                tile.connections, camera.rotation);
+            if (const TextureAsset* sprite = find_texture(runtime_render_detail::dirt_path_sprite(connections))) {
+                MapRenderer::render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y,
+                                                        camera, viewport_width, viewport_height);
+            }
+        }
+'''
+          new_runtime_paths = '''        constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
+        for (const auto& tile : dirt_path_tiles) {
+            MapRenderer::render_heightfield_tile_fill(renderer, tile.tile_x, tile.tile_y, document,
+                                                      camera, viewport_width, viewport_height, kDirtUnderlay);
+        }
+        for (const auto& tile : dirt_path_tiles) {
+            const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
+                tile.connections, camera.rotation);
+            if (const TextureAsset* sprite = find_texture(runtime_render_detail::dirt_path_sprite(connections))) {
+                MapRenderer::render_heightfield_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, document,
+                                                            camera, viewport_width, viewport_height, false);
+            }
+        }
+'''
+          assert text.count(old_runtime_paths) == 1, f"runtime dirt-path block drifted: {text.count(old_runtime_paths)}"
+          runtime.write_text(text.replace(old_runtime_paths, new_runtime_paths, 1), encoding="utf-8")
+
+          test = Path("src/ch_core/ch_core_test.cpp")
+          text = test.read_text(encoding="utf-8")
+          include_test = '#include "src/ch_core/map_document.h"\n'
+          assert text.count(include_test) == 1
+          text = text.replace(include_test, include_test + '#include "src/ch_core/terrain_projection.h"\n', 1)
+          sample_assert = '''    assert(std::abs(inline_doc.terrain_heightfield().sample(0.5F, 0.0F) - 0.5F) < 0.001F);
+'''
+          projection_assert = '''    assert(std::abs(inline_doc.terrain_heightfield().sample(0.5F, 0.0F) - 0.5F) < 0.001F);
+    ch::CameraState terrain_camera{};
+    terrain_camera.zoom = 1.0F;
+    const ch::ScreenPoint flat_mid = ch::world_to_screen_point(0.5F, 0.0F, terrain_camera, 1280.0F, 720.0F);
+    const ch::ScreenPoint raised_mid = ch::terrain_world_to_screen_point(
+        0.5F, 0.0F, inline_doc.terrain_heightfield(), terrain_camera, 1280.0F, 720.0F);
+    assert(std::abs((flat_mid.y - raised_mid.y) - 8.0F) < 0.001F);
+'''
+          assert text.count(sample_assert) == 1, "terrain interpolation assertion anchor drifted"
+          test.write_text(text.replace(sample_assert, projection_assert, 1), encoding="utf-8")
+          '@ | python -
+
+          git diff --check
+
+      - name: Configure tests and game
+        shell: pwsh
+        run: cmake -S . -B build/terrain-path-validation -G "Visual Studio 18 2026" -A x64 -DBUILD_TESTING=ON
+
+      - name: Build core terrain contract test
+        shell: pwsh
+        run: cmake --build build/terrain-path-validation --config Debug --target ch_core_test --parallel
+
+      - name: Run core terrain contract test
+        shell: pwsh
+        run: ctest --test-dir build/terrain-path-validation -C Debug -R "^ch_core_test$" --output-on-failure
+
+      - name: Build real City Builder
+        shell: pwsh
+        run: cmake --build build/terrain-path-validation --config Release --target city_builder --parallel
+
+      - name: Commit validated terrain repair and remove this workflow
+        shell: pwsh
+        run: |
+          git config user.name "City Horizon CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/ch_core/terrain_projection.h src/ch_core/ch_core_test.cpp src/ch_render/map_renderer.h src/ch_render/map_renderer.cpp src/runtime_map_renderer.h
+          git rm .github/workflows/ch-terrain-path-heightfield-repair.yml
+          git diff --cached --check
+          git commit -m "terrain: keep dirt paths attached to sculpted ground"
+          git pull --rebase origin main
+          git push origin HEAD:main
