@@ -5,6 +5,18 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/procedural_road_ground_render_plan.h'
+      - 'src/ch_render/procedural_road_network_renderer.h'
+      - 'src/runtime_procedural_road_renderer.h'
+      - 'src/runtime_procedural_road_culling.h'
+      - 'src/procedural_road_placement_bridge.h'
+      - 'src/road_system.h'
+      - 'src/runtime_map_renderer.h'
+      - 'src/main.cpp'
+      - 'C++/MapForge2/**'
+      - 'tools/ch_math_worker/**'
+      - '.github/workflows/ch-procedural-road-proof.yml'
 
 permissions:
   contents: read
