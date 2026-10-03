@@ -78,10 +78,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!require(buildings.set_service_price(*coffee_id, *coffee, 325), "valid service-price step is accepted") ||
+    if (!require(buildings.set_service_price(*coffee_id, *coffee, 325), "service price update is accepted") ||
         !require(buildings.find_by_id(*coffee_id)->service_price.minor_units == 325,
                  "per-instance service price is stored") ||
-        !require(!buildings.set_service_price(*coffee_id, *coffee, 326), "off-step service price is rejected")) {
+        !require(buildings.set_service_price(*coffee_id, *coffee, 326), "arbitrary in-range service price is accepted") ||
+        !require(buildings.find_by_id(*coffee_id)->service_price.minor_units == 326,
+                 "in-range service price is preserved exactly") ||
+        !require(buildings.set_service_price(*coffee_id, *coffee, 10), "below-range service price is clamped") ||
+        !require(buildings.find_by_id(*coffee_id)->service_price.minor_units == 50,
+                 "service price clamps to configured minimum") ||
+        !require(buildings.set_service_price(*coffee_id, *coffee, 5000), "above-range service price is clamped") ||
+        !require(buildings.find_by_id(*coffee_id)->service_price.minor_units == 2000,
+                 "service price clamps to configured maximum")) {
         return 1;
     }
 
