@@ -10,7 +10,7 @@
     "supportTopology":"two_side_A_frames_centered_on_ship_midpoint",
     "pivot":"round_transverse_axle_with_mechanical_bearing_housings",
     "suspension":"two_auxiliary_trussed_arms_plus_one_central_round_pendulum_mast",
-    "ship":"dominant_deep_long_passenger_hull_with_high_bow_stern_and_visible_trim",
+    "ship":"dominant_deep_long_passenger_hull_with_high_bow_stern_and_integrated_carnival_trim",
     "station":"flush_independent_boarding_deck_without_stairs"
   },
   "refinementGoals":[
@@ -22,8 +22,11 @@
     "flush_boarding_platform_without_rear_staircase",
     "alternating_red_blue_yellow_cuffs_on_auxiliary_pendulum_arms",
     "segmented_red_blue_yellow_collars_on_central_round_mast",
-    "colorful_hull_badges_and_bow_stern_insets",
+    "flush_hull_color_panels_instead_of_floating_badges",
+    "integrated_sheer_line_carnival_lamps",
     "colorful_A_frame_clamps_without_changing_structure",
+    "top_center_carnival_crest_on_axle_frame",
+    "finished_boarding_deck_fascia_without_stairs",
     "amusement_park_color_energy_without_changing_approved_topology"
   ],
   "forbiddenTopology":[
@@ -33,6 +36,7 @@
     "box_frame_around_ship",
     "compact_toy_scale",
     "boarding_staircase",
+    "floating_hull_badges",
     "legacy_viking_recipe_import"
   ],
   "dimensions":{
