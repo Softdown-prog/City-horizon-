@@ -42,8 +42,6 @@ int main() {
     runtime.reset(0.0, 8.0);
     const TrainStepResult south = runtime.snapshot(0);
     if (!south.valid) return fail("valid centerline snapshot must be marked renderable");
-    // The authored circle starts at (0,+R) and advances toward +X. In the
-    // Flame +Y-forward convention that tangent is heading 270 degrees = h12.
     if (south.cars[0].sprite_pose.logical_heading_index != 12)
         return fail("circle start tangent must select h12");
     if (south.cars[0].sprite_pose.atlas_index < 0 || south.cars[0].sprite_pose.atlas_index >= kCarPoseFrameCount)
@@ -70,9 +68,6 @@ int main() {
     }
     if (!articulated) return fail("four cars must articulate independently on a curved route");
 
-    // Tight hairpins used to make incoming + outgoing tangents nearly cancel.
-    // The old normalizer then substituted world +Y, which could make a car flip
-    // sideways/backwards even though its route distance kept moving forward.
     CenterlineRoute hairpin;
     std::vector<RoutePoint> hairpin_points = {
         {0.0, 0.0, 0.0},
@@ -98,7 +93,6 @@ int main() {
             return fail("hairpin tangent must remain in the forward travel hemisphere");
     }
 
-    // Exact reversal is the strongest regression case: the vertex average is zero.
     CenterlineRoute reversal;
     std::vector<RoutePoint> reversal_points = {
         {0.0, 0.0, 0.0},
@@ -113,7 +107,34 @@ int main() {
     if (!(reversal_sample->tangent_y < 0.0))
         return fail("reversal tangent must follow the outgoing -Y segment, never fixed +Y");
 
-    // Open lift route proves that drive semantics survive the route bridge.
+    // Full-frame regression: at the apex of a vertical loop the tangent is
+    // horizontal again, but the vehicle is upside down. Heading+pitch cannot
+    // distinguish this from ordinary flat track; transported up/roll must.
+    std::vector<RoutePoint> loop_points;
+    constexpr int kLoopSamples = 257;
+    constexpr double kLoopRadius = 4.05;
+    loop_points.reserve(kLoopSamples);
+    for (int i = 0; i < kLoopSamples; ++i) {
+        const double theta = 2.0 * kPi * static_cast<double>(i) /
+                             static_cast<double>(kLoopSamples - 1);
+        RoutePoint point;
+        point.y = kLoopRadius * std::sin(theta);
+        point.z = kLoopRadius * (1.0 - std::cos(theta));
+        loop_points.push_back(point);
+    }
+    CenterlineRoute loop_route;
+    if (!loop_route.rebuild(loop_points, false))
+        return fail("vertical loop route must validate");
+    const auto apex = loop_route.sample(loop_route.length_m() * 0.5);
+    if (!apex) return fail("vertical loop apex sample unexpectedly failed");
+    if (!(apex->up_z < -0.85))
+        return fail("loop apex local up must be inverted, not world-up");
+    if (!(std::abs(apex->roll_degrees) > 150.0))
+        return fail("loop apex must report approximately 180 degrees of roll state");
+    const CarRuntimePose apex_pose = make_car_runtime_pose(0, *apex, 10.0, 0, PhysicsConfig{});
+    if (!apex_pose.sprite_pose.requires_extended_orientation)
+        return fail("loop apex must reject the 40-frame heading+pitch atlas as sufficient");
+
     std::vector<RoutePoint> lift_points;
     for (int i = 0; i <= 12; ++i) {
         RoutePoint point;
@@ -131,12 +152,11 @@ int main() {
         return fail("lift route must pull train toward target speed");
     if (!lift_step.valid) return fail("lift route must continue producing renderable cars");
 
-    // Invalid duplicate points fail closed instead of poisoning runtime state.
     std::vector<RoutePoint> invalid = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
     CenterlineRoute invalid_route;
     if (invalid_route.rebuild(invalid, false)) return fail("zero-length route segment must be rejected");
 
-    std::cout << "CH_COASTER_RUNTIME_V1 regression: OK\n";
+    std::cout << "CH_COASTER_RUNTIME_V2 regression: OK\n";
     std::cout << "circle_length=" << runtime.route().length_m() << " m\n";
     std::cout << "lift_speed=" << runtime.state().lead.speed_mps << " m/s\n";
     return 0;
