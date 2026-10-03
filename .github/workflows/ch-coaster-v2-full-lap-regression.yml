@@ -1,5 +1,6 @@
 name: CH Coaster V2 Full-Lap Regression
 
+# Registered trigger for complete-lap multi-layout validation.
 on:
   push:
     branches: [main]
