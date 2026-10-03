@@ -25,8 +25,17 @@ struct CoasterTrackStyle {
     double tie_spacing_m = 0.78;
     double support_spacing_m = 4.80;
     double minimum_support_height_m = 0.72;
+    double support_top_half_width_m = 0.62;
+    double support_base_half_width_m = 1.05;
+    double support_flare_per_height = 0.055;
+    double support_max_base_half_width_m = 1.85;
+    double support_tower_threshold_m = 4.80;
+    double support_bay_height_m = 3.20;
+    double inverted_support_up_z_threshold = -0.10;
     std::size_t max_frame_samples = 8192U;
     std::size_t max_ties = 4096U;
+    // Maximum structural members, not support stations. One A-frame station
+    // emits three members; tall tower stations additionally emit bracing bays.
     std::size_t max_supports = 2048U;
 };
 
@@ -51,6 +60,9 @@ struct CoasterCrossTie {
     CoasterTrackPoint3 right{};
 };
 
+// One structural member belonging to a support station. Keeping the member as
+// the same two-point primitive used by V1 means proof and live renderers consume
+// identical geometry while a station can now form an A-frame or braced tower.
 struct CoasterSupport {
     double distance_m = 0.0;
     CoasterTrackPoint3 top{};
@@ -92,9 +104,20 @@ struct CoasterTrackGeometry {
            finite_positive(style.support_spacing_m) &&
            std::isfinite(style.minimum_support_height_m) &&
            style.minimum_support_height_m >= 0.0 &&
+           finite_positive(style.support_top_half_width_m) &&
+           finite_positive(style.support_base_half_width_m) &&
+           std::isfinite(style.support_flare_per_height) &&
+           style.support_flare_per_height >= 0.0 &&
+           finite_positive(style.support_max_base_half_width_m) &&
+           style.support_max_base_half_width_m >= style.support_base_half_width_m &&
+           finite_positive(style.support_tower_threshold_m) &&
+           finite_positive(style.support_bay_height_m) &&
+           std::isfinite(style.inverted_support_up_z_threshold) &&
+           style.inverted_support_up_z_threshold >= -1.0 &&
+           style.inverted_support_up_z_threshold <= 1.0 &&
            style.max_frame_samples >= 2U &&
            style.max_ties >= 1U &&
-           style.max_supports >= 1U;
+           style.max_supports >= 3U;
 }
 
 [[nodiscard]] inline CoasterTrackPoint3 track_point(
@@ -105,6 +128,17 @@ struct CoasterTrackGeometry {
         sample.x + sample.right_x * right_offset + sample.up_x * up_offset,
         sample.y + sample.right_y * right_offset + sample.up_y * up_offset,
         sample.z + sample.right_z * right_offset + sample.up_z * up_offset,
+    };
+}
+
+[[nodiscard]] inline CoasterTrackPoint3 lerp_track_point(
+    const CoasterTrackPoint3& a,
+    const CoasterTrackPoint3& b,
+    const double t) noexcept {
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t,
     };
 }
 
@@ -129,6 +163,108 @@ struct CoasterTrackGeometry {
         ? static_cast<double>(count)
         : static_cast<double>(count - 1U);
     return route_length_m * static_cast<double>(index) / denominator;
+}
+
+[[nodiscard]] inline bool append_support_member(
+    CoasterTrackGeometry& geometry,
+    const CoasterTrackStyle& style,
+    const double distance_m,
+    const CoasterTrackPoint3& a,
+    const CoasterTrackPoint3& b) {
+    if (geometry.supports.size() >= style.max_supports) return false;
+    geometry.supports.push_back({distance_m, a, b});
+    return true;
+}
+
+[[nodiscard]] inline bool append_support_station(
+    CoasterTrackGeometry& geometry,
+    const CoasterTrackStyle& style,
+    const CenterlineSample& sample,
+    const double distance_m,
+    const double ground_z) {
+    // When transported local up points below world, a conventional ground tower
+    // would cross through inverted track. Leave those stations unsupported until
+    // a dedicated inversion/hanger support family is authored.
+    if (sample.up_z < style.inverted_support_up_z_threshold) return true;
+
+    const CoasterTrackPoint3 top_center =
+        track_point(sample, 0.0, -style.spine_drop_m);
+    const double height = top_center.z - ground_z;
+    if (height < style.minimum_support_height_m) return true;
+
+    const CoasterTrackPoint3 top_left = track_point(
+        sample, style.support_top_half_width_m, -style.spine_drop_m);
+    const CoasterTrackPoint3 top_right = track_point(
+        sample, -style.support_top_half_width_m, -style.spine_drop_m);
+
+    double axis_x = sample.right_x;
+    double axis_y = sample.right_y;
+    double axis_length = std::hypot(axis_x, axis_y);
+    if (!(axis_length > 1.0e-6)) {
+        axis_x = -sample.tangent_y;
+        axis_y = sample.tangent_x;
+        axis_length = std::hypot(axis_x, axis_y);
+    }
+    if (!(axis_length > 1.0e-6)) {
+        axis_x = 1.0;
+        axis_y = 0.0;
+        axis_length = 1.0;
+    }
+    axis_x /= axis_length;
+    axis_y /= axis_length;
+
+    const double base_half_width = std::min(
+        style.support_max_base_half_width_m,
+        style.support_base_half_width_m +
+            height * style.support_flare_per_height);
+    const CoasterTrackPoint3 foot_left = {
+        top_center.x + axis_x * base_half_width,
+        top_center.y + axis_y * base_half_width,
+        ground_z,
+    };
+    const CoasterTrackPoint3 foot_right = {
+        top_center.x - axis_x * base_half_width,
+        top_center.y - axis_y * base_half_width,
+        ground_z,
+    };
+
+    // Open-base A-frame: two splayed legs plus a cap beam beneath the track.
+    if (!append_support_member(geometry, style, distance_m, foot_left, top_left) ||
+        !append_support_member(geometry, style, distance_m, foot_right, top_right) ||
+        !append_support_member(geometry, style, distance_m, top_left, top_right)) {
+        return false;
+    }
+
+    if (height < style.support_tower_threshold_m) return true;
+
+    const auto bay_count = static_cast<std::size_t>(std::max(
+        2.0, std::ceil(height / style.support_bay_height_m)));
+    CoasterTrackPoint3 previous_left = foot_left;
+    CoasterTrackPoint3 previous_right = foot_right;
+    for (std::size_t bay = 1U; bay <= bay_count; ++bay) {
+        const double t = static_cast<double>(bay) / static_cast<double>(bay_count);
+        const CoasterTrackPoint3 level_left = lerp_track_point(foot_left, top_left, t);
+        const CoasterTrackPoint3 level_right = lerp_track_point(foot_right, top_right, t);
+
+        // The cap beam already supplies the final horizontal member.
+        if (bay < bay_count &&
+            !append_support_member(
+                geometry, style, distance_m, level_left, level_right)) {
+            return false;
+        }
+
+        // X-bracing keeps tall supports readable as towers rather than long
+        // isolated sticks. Both diagonals stay in the support station plane.
+        if (!append_support_member(
+                geometry, style, distance_m, previous_left, level_right) ||
+            !append_support_member(
+                geometry, style, distance_m, previous_right, level_left)) {
+            return false;
+        }
+        previous_left = level_left;
+        previous_right = level_right;
+    }
+    return true;
 }
 
 [[nodiscard]] inline CoasterTrackGeometry build_coaster_track_geometry(
@@ -192,28 +328,27 @@ struct CoasterTrackGeometry {
         });
     }
 
-    const std::size_t support_count = coaster_track_sample_count(
+    const std::size_t support_station_count = coaster_track_sample_count(
         geometry.route_length_m, style.support_spacing_m, geometry.closed);
-    if (support_count > style.max_supports) {
+    if (support_station_count > style.max_supports) {
         geometry.clear();
         return geometry;
     }
-    geometry.supports.reserve(support_count);
-    for (std::size_t i = 0; i < support_count; ++i) {
+    geometry.supports.reserve(std::min(
+        style.max_supports, support_station_count * 5U));
+    for (std::size_t i = 0; i < support_station_count; ++i) {
         const double distance = coaster_track_sample_distance(
-            i, support_count, geometry.route_length_m, geometry.closed);
+            i, support_station_count, geometry.route_length_m, geometry.closed);
         const auto sample = route.sample(distance);
         if (!sample) {
             geometry.clear();
             return geometry;
         }
-        const CoasterTrackPoint3 top = track_point(*sample, 0.0, -style.spine_drop_m);
-        if (top.z - ground_z < style.minimum_support_height_m) continue;
-        geometry.supports.push_back({
-            distance,
-            top,
-            {top.x, top.y, ground_z},
-        });
+        if (!append_support_station(
+                geometry, style, *sample, distance, ground_z)) {
+            geometry.clear();
+            return geometry;
+        }
     }
 
     return geometry;
