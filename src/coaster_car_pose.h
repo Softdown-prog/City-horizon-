@@ -17,6 +17,7 @@ inline constexpr char kCoasterCarAtlasContract[] = "CH_COASTER_CAR_ATLAS_RUNTIME
 inline constexpr char kCoasterCarOrientationContract[] = "CH_COASTER_CAR_ORIENTATION_V2";
 inline constexpr int kCarPoseHeadingCount = 16;
 inline constexpr double kCarPoseHeadingStepDegrees = 22.5;
+inline constexpr double kCarPoseContinuityHysteresisDegrees = 3.0;
 inline constexpr std::array<double, 7> kCarPosePitchBinsDegrees = {
     -46.0, -30.0, -14.0, 0.0, 14.0, 30.0, 46.0,
 };
@@ -256,6 +257,73 @@ struct CarPoseCandidate {
     return result;
 }
 
+[[nodiscard]] inline double car_pose_orientation_error_score(
+    const CarPoseSelection& selection,
+    const double authored_heading_degrees,
+    const double pitch_degrees,
+    const double roll_degrees,
+    const int camera_quarter_turns = 0) noexcept {
+    const double desired_visual_heading = normalize_degrees(
+        normalize_degrees(authored_heading_degrees) -
+        static_cast<double>(normalize_camera_quarter_turns(camera_quarter_turns)) * 90.0);
+    const double selected_visual_heading =
+        static_cast<double>(normalize_heading_index(selection.visual_heading_index)) *
+        kCarPoseHeadingStepDegrees;
+    const double heading_error = angular_distance_degrees(
+        desired_visual_heading, selected_visual_heading);
+    const double safe_pitch = std::isfinite(pitch_degrees) ? pitch_degrees : 0.0;
+    const double safe_roll = std::isfinite(roll_degrees) ? signed_degrees(roll_degrees) : 0.0;
+    const double pitch_error = safe_pitch - selection.snapped_pitch_degrees;
+    const double roll_error = angular_distance_degrees(safe_roll, selection.snapped_roll_degrees);
+    return heading_error * heading_error + pitch_error * pitch_error + roll_error * roll_error;
+}
+
+[[nodiscard]] inline CarPoseSelection select_car_pose_v2_continuous(
+    const double authored_heading_degrees,
+    const double pitch_degrees,
+    const double roll_degrees,
+    const CarPoseSelection* previous_selection,
+    const int camera_quarter_turns = 0,
+    const double hysteresis_degrees = kCarPoseContinuityHysteresisDegrees) noexcept {
+    CarPoseSelection selected = select_car_pose_v2(
+        authored_heading_degrees, pitch_degrees, roll_degrees, camera_quarter_turns);
+    if (previous_selection == nullptr || previous_selection->atlas_index < 0 ||
+        previous_selection->atlas_index >= kCarPoseFrameCount ||
+        previous_selection->requires_extended_orientation) {
+        return selected;
+    }
+
+    const double safe_hysteresis = std::max(0.0,
+        std::isfinite(hysteresis_degrees) ? hysteresis_degrees : 0.0);
+    const double selected_error = car_pose_orientation_error_score(
+        selected, authored_heading_degrees, pitch_degrees, roll_degrees,
+        camera_quarter_turns);
+    const double previous_error = car_pose_orientation_error_score(
+        *previous_selection, authored_heading_degrees, pitch_degrees, roll_degrees,
+        camera_quarter_turns);
+
+    if (previous_error > selected_error + safe_hysteresis * safe_hysteresis) {
+        return selected;
+    }
+
+    selected.visual_heading_index = previous_selection->visual_heading_index;
+    selected.atlas_index = previous_selection->atlas_index;
+    selected.row = previous_selection->row;
+    selected.column = previous_selection->column;
+    selected.snapped_pitch_degrees = previous_selection->snapped_pitch_degrees;
+    selected.snapped_roll_degrees = previous_selection->snapped_roll_degrees;
+    selected.vertical_supplement = previous_selection->vertical_supplement;
+    selected.snapped_to_cardinal_heading = previous_selection->snapped_to_cardinal_heading;
+    selected.source_rect = previous_selection->source_rect;
+
+    const double pitch_error = std::abs(
+        selected.sampled_pitch_degrees - selected.snapped_pitch_degrees);
+    const double roll_error = angular_distance_degrees(
+        selected.sampled_roll_degrees, selected.snapped_roll_degrees);
+    selected.requires_extended_orientation = pitch_error > 8.01 || roll_error > 12.01;
+    return selected;
+}
+
 [[nodiscard]] inline CarPoseSelection select_car_pose(const double authored_heading_degrees,
                                                       const double pitch_degrees,
                                                       const int camera_quarter_turns = 0) noexcept {
@@ -286,6 +354,23 @@ struct CarPoseCandidate {
         pitch_degrees_from_tangent(tangent_x, tangent_y, tangent_z),
         roll_degrees_from_frame(tangent_x, tangent_y, tangent_z, up_x, up_y, up_z),
         camera_quarter_turns);
+}
+
+[[nodiscard]] inline CarPoseSelection select_car_pose_from_frame_continuous(
+    const double tangent_x,
+    const double tangent_y,
+    const double tangent_z,
+    const double up_x,
+    const double up_y,
+    const double up_z,
+    const CarPoseSelection* previous_selection,
+    const int camera_quarter_turns = 0,
+    const double hysteresis_degrees = kCarPoseContinuityHysteresisDegrees) noexcept {
+    return select_car_pose_v2_continuous(
+        heading_degrees_from_tangent(tangent_x, tangent_y),
+        pitch_degrees_from_tangent(tangent_x, tangent_y, tangent_z),
+        roll_degrees_from_frame(tangent_x, tangent_y, tangent_z, up_x, up_y, up_z),
+        previous_selection, camera_quarter_turns, hysteresis_degrees);
 }
 
 }  // namespace ch::coaster
