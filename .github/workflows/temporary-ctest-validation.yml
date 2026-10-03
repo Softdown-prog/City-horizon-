@@ -11,15 +11,15 @@ on:
 jobs:
   ctest:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Configure tests
         shell: pwsh
         run: cmake -S . -B build-ctest -DBUILD_TESTING=ON
-      - name: Build focused CTest targets
+      - name: Build remaining CTest targets
         shell: pwsh
-        run: cmake --build build-ctest --config Debug --parallel 2 --target building_system_test audio_manager_test economy_simulation_test mobile_animation_test land_system_test ui_manager_test
-      - name: Run focused CTest
+        run: cmake --build build-ctest --config Debug --parallel 2 --target building_system_test audio_manager_test ui_manager_test
+      - name: Run remaining CTest targets verbosely
         shell: pwsh
-        run: ctest --test-dir build-ctest -C Debug --output-on-failure --timeout 30 -R "^(building_system_test|audio_manager_test|economy_simulation_test|mobile_animation_test|land_system_test|ui_manager_test)$"
+        run: ctest --test-dir build-ctest -C Debug -V --timeout 30 -R "^(building_system_test|audio_manager_test|ui_manager_test)$"
