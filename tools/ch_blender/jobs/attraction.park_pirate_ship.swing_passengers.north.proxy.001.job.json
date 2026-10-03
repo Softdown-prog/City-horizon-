@@ -10,7 +10,7 @@
     "assetId": "attraction.park_pirate_ship.clean_reference",
     "footprint": {"widthTiles": 7, "depthTiles": 6},
     "minDimensions": [19, 10, 19],
-    "maxDimensions": [30, 20, 28]
+    "maxDimensions": [30, 20, 29]
   },
   "args": [
     "--recipe", "tools/tycoon_photo_studio/assets/pirate_ship_clean_reference.json",
