@@ -4,7 +4,7 @@
   "tolerancePixels": 0,
   "profiles": {
     "grass": {
-      "reference": "assets/terrain/grass_isometric_01_clean.png",
+      "reference": "assets/terrain/grass_isometric_01.png",
       "canvas": { "width": 1280, "height": 640 },
       "opaqueBounds": { "left": 53, "top": 23, "right": 1228, "bottom": 618 }
     },
@@ -22,7 +22,10 @@
     },
     "coast": {
       "catalog": "assets/terrain/coast/coast_tiles.json",
-      "canvas": { "width": 170, "height": 85 }
+      "enabledInAll": false,
+      "status": "legacy-catalog-absent",
+      "canvas": { "width": 170, "height": 85 },
+      "note": "Excluded from --all until a tracked shoreline catalog replaces the removed legacy coast set. Runtime currently tolerates missing shoreline textures through semantic water rendering."
     },
     "atomic-path": {
       "canvas": { "width": 128, "height": 64 },
