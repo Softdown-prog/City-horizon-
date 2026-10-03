@@ -321,13 +321,12 @@ def main():
     if asset.get("studioPreset") != studio.get("id"):
         raise RuntimeError("Tree source and studio preset do not match")
 
-    # B-2: extract source render resolution from studio preset before calling
-    # configure_scene, which requires it as the second positional argument.
-    src_resolution = tuple(int(v) for v in studio["render"]["srcResolution"])
+    src_resolution, final_resolution = studio_base.compute_dynamic_resolution(asset, studio)
     studio_base.clear_scene()
     scene = studio_base.configure_scene(studio, src_resolution, output_dir)
     authored, branch_count, leaf_count = build_tree(asset)
     root = studio_base.create_asset_root(authored)
+    calibrated_scale = studio_base.calibrate_ortho_scale(scene, authored)
 
     receiver = studio["shadowReceiver"]
     ground_material = studio_base.make_material(
@@ -361,6 +360,8 @@ def main():
         "footprint": asset["footprint"],
         "assetConfig": os.path.basename(args.asset_config),
         "studioPreset": studio["id"],
+        "studioFingerprint": scene.get("ch.studioFingerprint"),
+        "blenderUnitsPerTile": studio_base.BLENDER_UNITS_PER_TILE,
         "blenderVersion": bpy.app.version_string,
         "renderEngine": scene.render.engine,
         "renderDevice": studio["render"]["device"],
@@ -373,7 +374,8 @@ def main():
         "tileWidth": TILE_PX_W,
         "tileHeight": TILE_PX_H,
         "renderResolution": [scene.render.resolution_x, scene.render.resolution_y],
-        "finalResolution": studio["render"]["finalResolution"],
+        "finalResolution": list(final_resolution),
+        "orthoScaleCalibrated": calibrated_scale,
         "orthoScale": scene.camera.data.ortho_scale,
         "directionOrder": [direction["id"] for direction in studio_base.DIRECTIONS],
         "directions": direction_metadata,

@@ -15,6 +15,8 @@ on:
       - "tools/ch_blender/jobs_ground/**"
       - "tools/tycoon_photo_studio/render_geometry.py"
       - "tools/tycoon_photo_studio/build_scene.py"
+      - "tools/tycoon_photo_studio/build_classic_tree.py"
+      - "tools/tycoon_photo_studio/build_character.py"
       - "tools/tycoon_photo_studio/postprocess.py"
       - "tools/tycoon_photo_studio/validate_package.py"
       - "tools/ch_blender/tests/**"
@@ -46,6 +48,11 @@ jobs:
           "$CH_BLENDER_EXE" --background --factory-startup --python-exit-code 1
           --python tools/ch_blender/tests/blender_render_quality_probe.py
           -- --output out/ch_blender_quality/regression
+      - name: Validate tree and character builder integration
+        run: >-
+          "$CH_BLENDER_EXE" --background --factory-startup --python-exit-code 1
+          --python tools/ch_blender/tests/blender_legacy_builder_probe.py
+          -- --output out/ch_blender_quality/regression/legacy
       - name: Upload render comparison
         if: always()
         uses: actions/upload-artifact@v4

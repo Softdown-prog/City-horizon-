@@ -284,7 +284,9 @@ def main():
         )
 
     studio_base.clear_scene()
-    scene = studio_base.configure_scene(studio, output_dir)
+    final_resolution = tuple(studio["render"]["finalResolution"])
+    src_resolution = studio_base.source_resolution_for(final_resolution, studio["render"]["sourceResolution"])
+    scene = studio_base.configure_scene(studio, src_resolution, output_dir)
     authored, rig = build_character(asset)
 
     receiver = studio["shadowReceiver"]
@@ -349,6 +351,8 @@ def main():
         "footprint": asset["footprint"],
         "assetConfig": os.path.basename(args.asset_config),
         "studioPreset": studio["id"],
+        "studioFingerprint": scene.get("ch.studioFingerprint"),
+        "blenderUnitsPerTile": studio_base.BLENDER_UNITS_PER_TILE,
         "blenderVersion": bpy.app.version_string,
         "renderEngine": scene.render.engine,
         "renderDevice": studio["render"]["device"],

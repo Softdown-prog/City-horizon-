@@ -60,3 +60,9 @@ Dimensions are world axes in Blender units (3 units/tile), measured from evaluat
 ## Limits
 
 These corrections remove demonstrated distortion, cropping, misleading previews and silent failures. They do not invent coherent silhouettes, architectural details or correct object semantics. Those still depend on authored recipes and visual review. Low-sample proxy noise remains possible. A synthetic tile grid is not a MapForge/runtime capture. Dynamically loaded assets, textures, external modules and arbitrary script behavior are not comprehensively captured by local Python-import hashing. Existing final jobs without request constraints retain legacy approval compatibility. No runtime art was automatically promoted or reapproved.
+
+## Additional compatibility failures exposed by CI
+
+The new interface/real-Blender workflow passed on the published change. Other older workflows revealed existing mismatches: classic trees read removed `srcResolution` before the compatibility wrapper ran; characters called the scene API with two arguments; kiosk CI still demanded the retired `CH_TYCOON_MINIATURE_V1`; the internal Blender identity patch had a corrupt hunk count. These callers now use the current scene API and current style contract, and the identity patch validates against the exact frozen upstream source. Trees now record calibrated framing and actual studio identity. Character resolution preserves the existing preset scale and exact source/final aspect.
+
+`blender_legacy_builder_probe.py` exercises the actual tree and character main entrypoints in Blender 4.2.3: **4 tree directions and 64 character direction/pose combinations** with evaluated bounds and fixed studio checks, plus a cheap render for each builder. Remaining passes are intercepted for validation rather than performing full production bakes; this is explicitly an integration probe, not final art approval. The probe passed locally and is included in the interface CI artifact.
