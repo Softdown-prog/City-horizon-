@@ -5,11 +5,9 @@
   "name": "Flame Coaster",
   "mapForge": {
     "tileMeters": 3.0,
-    "footprintTiles": {
-      "width": 28,
-      "depth": 28
-    },
-    "closedRoute": true
+    "footprintTiles": {"width": 28, "depth": 28},
+    "closedRoute": true,
+    "start": {"x": 12.0, "y": 0.0, "z": 0.0, "headingDegrees": 0.0}
   },
   "train": {
     "carCount": 4,
@@ -20,39 +18,34 @@
     "contract": "CH_COASTER_TRACK_V1",
     "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"
   },
-  "layout": {
-    "station": true,
-    "liftHill": true,
-    "firstDrop": true,
-    "camelbacks": 2,
-    "brakeRun": true,
-    "activeInversionPieces": [],
-    "authoredModulesAvailable": [
-      "vertical_loop",
-      "helix_up_left",
-      "helix_up_right",
-      "corkscrew_left",
-      "corkscrew_right"
-    ],
-    "note": "Inversion/banked modules stay out of this first runtime-valid MapForge capture until the extended occupied car atlas is promoted."
-  },
-  "pieceSpans": [
-    {"piece":"station_run","startIndex":1,"endIndex":24},
-    {"piece":"lift_hill","startIndex":25,"endIndex":108},
-    {"piece":"lift_crest","startIndex":109,"endIndex":120},
-    {"piece":"elevated_turn","startIndex":121,"endIndex":152},
-    {"piece":"first_drop","startIndex":153,"endIndex":200},
-    {"piece":"valley","startIndex":201,"endIndex":216},
-    {"piece":"camelback_up","startIndex":217,"endIndex":240},
-    {"piece":"camelback_down","startIndex":241,"endIndex":264},
-    {"piece":"back_turn","startIndex":265,"endIndex":296},
-    {"piece":"back_straight","startIndex":297,"endIndex":368},
-    {"piece":"second_hill_up","startIndex":369,"endIndex":392},
-    {"piece":"second_hill_down","startIndex":393,"endIndex":416},
-    {"piece":"return_turn_1","startIndex":417,"endIndex":448},
-    {"piece":"return_straight","startIndex":449,"endIndex":536},
-    {"piece":"brake_run","startIndex":537,"endIndex":560},
-    {"piece":"return_turn_2","startIndex":561,"endIndex":592}
+  "pieces": [
+    {"id":"station_run","type":"straight","length":12.0,"rise":0.0,"driveMode":"station","targetSpeedMps":4.5},
+    {"id":"lift_hill","type":"straight","length":42.0,"rise":12.0,"driveMode":"lift","targetSpeedMps":6.0},
+    {"id":"lift_crest","type":"straight","length":6.0,"rise":0.0},
+    {"id":"elevated_turn","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"first_drop","type":"straight","length":24.0,"rise":-12.0},
+    {"id":"valley","type":"straight","length":8.0,"rise":0.0},
+    {"id":"camelback_up","type":"straight","length":12.0,"rise":4.0},
+    {"id":"camelback_down","type":"straight","length":12.0,"rise":-4.0},
+    {"id":"back_turn","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"back_straight","type":"straight","length":36.0,"rise":0.0},
+    {"id":"second_hill_up","type":"straight","length":12.0,"rise":3.0},
+    {"id":"second_hill_down","type":"straight","length":12.0,"rise":-3.0},
+    {"id":"return_turn_1","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"return_straight","type":"straight","length":44.0,"rise":0.0},
+    {"id":"brake_run","type":"straight","length":12.0,"rise":0.0,"driveMode":"brake","targetSpeedMps":7.0},
+    {"id":"return_turn_2","type":"quarter_curve","radius":12.0,"left":true,"driveMode":"brake","targetSpeedMps":5.5}
   ],
-  "routePoints": []
+  "authoredModulesAvailable": [
+    "vertical_loop",
+    "helix_up_left",
+    "helix_up_right",
+    "corkscrew_left",
+    "corkscrew_right"
+  ],
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "deferModulesRequiringExtendedOccupiedPoseAtlas": true,
+    "reason": "Do not fake loop/corkscrew orientation with the legacy 40-frame atlas."
+  }
 }
