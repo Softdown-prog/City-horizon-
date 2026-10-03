@@ -10,15 +10,21 @@
     },
     "prepared-soil": {
       "reference": "assets/farming/prepared_soil/prepared_soil_01.png",
+      "enabledInAll": false,
+      "status": "legacy-reference-absent",
       "canvas": { "width": 1254, "height": 1254 },
       "opaqueBounds": { "left": 16, "top": 151, "right": 1236, "bottom": 917 },
-      "maxContentY": 916
+      "maxContentY": 916,
+      "note": "Excluded from --all because the old prepared-soil sprite is no longer tracked; the current runtime farming ground is procedural."
     },
     "plowed-soil": {
       "reference": "assets/agriculture/soil_plowed_01/soil_plowed_01.png",
+      "enabledInAll": false,
+      "status": "legacy-reference-absent",
       "canvas": { "width": 1254, "height": 1254 },
       "opaqueBounds": { "left": 16, "top": 151, "right": 1236, "bottom": 917 },
-      "maxContentY": 916
+      "maxContentY": 916,
+      "note": "Excluded from --all because the old plowed-soil sprite is no longer tracked; the current runtime farming ground is procedural."
     },
     "coast": {
       "catalog": "assets/terrain/coast/coast_tiles.json",
