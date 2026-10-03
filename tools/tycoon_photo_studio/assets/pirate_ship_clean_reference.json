@@ -11,7 +11,8 @@
     "pivot":"round_transverse_axle_with_mechanical_bearing_housings",
     "suspension":"two_auxiliary_trussed_arms_plus_one_central_round_pendulum_mast",
     "ship":"dominant_deep_long_passenger_hull_with_high_bow_stern_and_integrated_carnival_trim",
-    "station":"flush_independent_boarding_deck_without_stairs"
+    "station":"flush_independent_boarding_deck_without_stairs",
+    "topTotem":"large_stylized_tricorn_pirate_hat_above_axle_center"
   },
   "refinementGoals":[
     "round_mechanical_axle_not_square_top_beam",
@@ -26,6 +27,8 @@
     "integrated_sheer_line_carnival_lamps",
     "colorful_A_frame_clamps_without_changing_structure",
     "top_center_carnival_crest_on_axle_frame",
+    "large_pirate_tricorn_hat_totem_above_main_axle",
+    "pirate_hat_red_blue_yellow_trim_and_skull_medallion",
     "finished_boarding_deck_fascia_without_stairs",
     "amusement_park_color_energy_without_changing_approved_topology"
   ],
