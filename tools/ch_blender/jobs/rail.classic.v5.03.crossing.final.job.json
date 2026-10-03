@@ -1,0 +1,16 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "rail.classic.v5.03.crossing.final",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/rail_crossing_final_v5.py",
+  "args": ["--output", "out/ch_blender_agent/rail.classic.v5.03.crossing.final"],
+  "outputDir": "out/ch_blender_agent/rail.classic.v5.03.crossing.final",
+  "expectedOutputs": [
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/transport.rail_track.classic.crossing.01_S_source.png",
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/transport.rail_track.classic.crossing.01_E_source.png",
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/transport.rail_track.classic.crossing.01_N_source.png",
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/transport.rail_track.classic.crossing.01_W_source.png",
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/rail_track_source_manifest.json",
+    "out/ch_blender_agent/rail.classic.v5.03.crossing.final/worker_summary.json"
+  ]
+}
