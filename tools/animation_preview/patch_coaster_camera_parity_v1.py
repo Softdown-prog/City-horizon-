@@ -14,11 +14,13 @@ RAIL_ANCHOR_SOURCE_Y = 154.21275273604374
 SPRITE_SCALE_COEFF = 0.035976898743441864  # orthoScale*sqrt(2)/256
 
 # Once a successful proof promotes the same code into the live renderer this
-# helper becomes an invariant checker. That lets the final proof run against
-# the promoted source instead of failing because the legacy text disappeared.
+# helper becomes an invariant checker. Match stable significant digits instead
+# of the final decimal emitted by Python formatting: the promoted C++ literal
+# may round the last representable decimal without changing the double value.
 already_promoted = (
     "kSpriteScaleCoefficient = 0.035976898743442" in text
-    and "kRailAnchorSourceY = 154.212752736043741" in text
+    and "kRailAnchorSourceX = 128.0" in text
+    and "kRailAnchorSourceY = 154.212752736043" in text
     and text.count("1.224744871391589") >= 2
     and "pose.world_x - pose.world_y + pose.world_z * 0.816496580927726" in text
 )
