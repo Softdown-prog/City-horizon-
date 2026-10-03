@@ -19,6 +19,7 @@ function(add_city_horizon_ui_capture target_name source_name)
         "${CITY_HORIZON_ROOT}/src/ui_manager.cpp"
         "${CITY_HORIZON_ROOT}/src/fence_system.cpp"
         "${CITY_HORIZON_ROOT}/src/fence_placement_controller.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/weather_ui_capture_stub.cpp"
     )
     target_include_directories(${target_name} PRIVATE "${CITY_HORIZON_ROOT}")
     target_link_libraries(${target_name} PRIVATE ch_core SDL3::SDL3)
