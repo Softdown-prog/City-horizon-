@@ -96,8 +96,7 @@ jobs:
             tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json \
             assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png \
             assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json \
-            assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json \
-            .github/workflows/ch-mapforge-coaster-video-proof.yml
+            assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json
           git diff --cached --check
           git commit -m "coaster: promote approved occupied pose atlas V2"
           for attempt in 1 2 3; do
