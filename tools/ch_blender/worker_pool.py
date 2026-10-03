@@ -217,7 +217,6 @@ def run_pool(
     identity = blender_identity(blender)
     worker_count = min(max_workers, len(prepared))
     started = time.time()
-    results: list[dict[str, Any]] = []
 
     with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ch-blender-worker") as executor:
         futures: dict[Future[dict[str, Any]], int] = {}
@@ -251,7 +250,12 @@ def _collect_jobs(args: argparse.Namespace) -> list[Path]:
     if args.job:
         return [_repo_path(item, must_exist=True) for item in args.job]
     if args.jobs_file:
-        list_path = _repo_path(args.jobs_file, must_exist=True)
+        # GitHub Actions writes the discovered queue to RUNNER_TEMP, which is
+        # intentionally outside the repository. Only the queue-list file may be
+        # external; every job path read from it is still forced through _repo_path.
+        list_path = Path(args.jobs_file).expanduser().resolve()
+        if not list_path.is_file():
+            raise WorkerError("JOB_INVALID", "--jobs-file must be a readable file", {"path": str(list_path)})
         jobs = []
         for raw in list_path.read_text(encoding="utf-8").splitlines():
             value = raw.strip()
