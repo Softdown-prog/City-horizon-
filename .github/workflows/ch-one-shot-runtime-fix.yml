@@ -1,4 +1,4 @@
-name: CH Runtime Compile Validation
+name: CH Runtime Linker Contract Repair
 
 on:
   push:
@@ -8,14 +8,85 @@ on:
       - ".github/workflows/ch-one-shot-runtime-fix.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
+  repair-and-validate:
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply guarded linker repair
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          main = Path("src/main.cpp")
+          text = main.read_text(encoding="utf-8")
+          adapter = '''class ChBuildingManager : public BuildingManager {
+          public:
+              using BuildingManager::BuildingManager;
+
+              [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,
+                                                               const BuildingColorTint tint) {
+                  return set_wall_color(instance_id, tint);
+              }
+
+              [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,
+                                                               const BuildingColorTint tint) {
+                  return set_roof_color(instance_id, tint);
+              }
+
+              [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {
+                  const bool wall_changed = clear_wall_color(instance_id);
+                  const bool roof_changed = clear_roof_color(instance_id);
+                  return wall_changed || roof_changed;
+              }
+          };
+
+          '''
+          assert text.count(adapter) == 1, f"expected one ChBuildingManager adapter, found {text.count(adapter)}"
+          text = text.replace(adapter, "", 1)
+          assert text.count("#define BuildingManager ChBuildingManager\n") == 1
+          text = text.replace("#define BuildingManager ChBuildingManager\n", "", 1)
+          assert text.count("#undef BuildingManager\n") == 1
+          text = text.replace("#undef BuildingManager\n", "", 1)
+          main.write_text(text, encoding="utf-8")
+
+          header = Path("src/building_system.h")
+          text = header.read_text(encoding="utf-8")
+          anchor = '''    [[nodiscard]] bool clear_wall_color(std::uint64_t instance_id);
+              [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);
+          '''
+          replacement = '''    [[nodiscard]] bool clear_wall_color(std::uint64_t instance_id);
+              [[nodiscard]] bool clear_roof_color(std::uint64_t instance_id);
+              // Runtime/UI compatibility names. Keep these on the canonical manager
+              // so wrappers never change BuildingManager's type in mission/power APIs.
+              [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,
+                                                               const BuildingColorTint tint) {
+                  return set_wall_color(instance_id, tint);
+              }
+              [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,
+                                                               const BuildingColorTint tint) {
+                  return set_roof_color(instance_id, tint);
+              }
+              [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {
+                  const bool wall_changed = clear_wall_color(instance_id);
+                  const bool roof_changed = clear_roof_color(instance_id);
+                  return wall_changed || roof_changed;
+              }
+          '''
+          assert text.count(anchor) == 1, f"BuildingManager color anchor drifted: {text.count(anchor)}"
+          assert "set_wall_color_customization" not in text, "canonical aliases already present"
+          text = text.replace(anchor, replacement, 1)
+          header.write_text(text, encoding="utf-8")
+          '@ | python -
+
+          git diff --check
 
       - name: Configure City Builder
         shell: pwsh
@@ -24,3 +95,14 @@ jobs:
       - name: Build real City Builder
         shell: pwsh
         run: cmake --build build/runtime-validation --config Release --target city_builder --parallel
+
+      - name: Commit validated repair
+        shell: pwsh
+        run: |
+          git config user.name "City Horizon CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/main.cpp src/building_system.h
+          git diff --cached --check
+          if (git diff --cached --quiet) { exit 0 }
+          git commit -m "fix: keep building color compatibility on canonical manager"
+          git push origin HEAD:main
