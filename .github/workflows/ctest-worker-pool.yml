@@ -1,5 +1,6 @@
 name: CTest Worker Pool
 
+# 32 logical workers: 21 active tests today + 11 reserve slots.
 on:
   workflow_dispatch:
   push:
