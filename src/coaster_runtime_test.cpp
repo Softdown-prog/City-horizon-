@@ -108,8 +108,9 @@ int main() {
         return fail("reversal tangent must follow the outgoing -Y segment, never fixed +Y");
 
     // Full-frame regression: at the apex of a vertical loop the tangent is
-    // horizontal again, but the vehicle is upside down. Heading+pitch cannot
-    // distinguish this from ordinary flat track; transported up/roll must.
+    // horizontal again, but the vehicle is upside down. V2 must consume the
+    // dedicated inverted family; falling back to a flat or extended/missing
+    // pose is a regression.
     std::vector<RoutePoint> loop_points;
     constexpr int kLoopSamples = 257;
     constexpr double kLoopRadius = 4.05;
@@ -132,8 +133,15 @@ int main() {
     if (!(std::abs(apex->roll_degrees) > 150.0))
         return fail("loop apex must report approximately 180 degrees of roll state");
     const CarRuntimePose apex_pose = make_car_runtime_pose(0, *apex, 10.0, 0, PhysicsConfig{});
-    if (!apex_pose.sprite_pose.requires_extended_orientation)
-        return fail("loop apex must reject the 40-frame heading+pitch atlas as sufficient");
+    if (apex_pose.sprite_pose.requires_extended_orientation)
+        return fail("loop apex must be covered by occupied V2 inverted family");
+    if (apex_pose.sprite_pose.atlas_index != 184 ||
+        apex_pose.sprite_pose.visual_heading_index != 8 ||
+        !near(std::abs(apex_pose.sprite_pose.snapped_roll_degrees), 180.0, 0.1))
+        return fail("loop apex must select occupied V2 inverted h08 frame 184");
+    if (apex_pose.sprite_pose.source_rect.x != 2048 ||
+        apex_pose.sprite_pose.source_rect.y != 2816)
+        return fail("loop apex V2 source rectangle drifted");
 
     std::vector<RoutePoint> lift_points;
     for (int i = 0; i <= 12; ++i) {
