@@ -113,15 +113,17 @@ jobs:
               raise SystemExit('Flame cars are not submitted through the shared world depth queue')
           if 'SDL_RenderTexture(renderer, atlas->texture' not in runtime:
               raise SystemExit('Flame atlas is not submitted to SDL from the world queue')
-          print('CH_COASTER_RENDER_LINK_V1 integration: OK')
+          print('CH_COASTER_RENDER_LINK_V2 integration: OK')
           PY
 
-      - name: Validate promoted Flame atlas
+      - name: Validate promoted occupied Flame V2 atlas
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import hashlib
           import json
           import struct
+          from collections import Counter
           from pathlib import Path
 
           root = Path('assets/vehicles/coaster_flame_01')
@@ -130,30 +132,102 @@ jobs:
               raise SystemExit('missing coaster Flame runtime manifest')
           runtime = json.loads(runtime_path.read_text(encoding='utf-8'))
           motion = runtime.get('motionPlan', {})
-          if motion.get('poseAtlasStatus') != 'ready':
-              raise SystemExit('Flame pose atlas is not runtime-ready')
-          if motion.get('poseAtlasFrameCount') != 40 or motion.get('flatHeadingCount') != 16:
-              raise SystemExit('unexpected Flame runtime pose counts')
+
+          expected_motion = {
+              'poseAtlasStatus': 'ready',
+              'poseAtlasContract': 'CH_COASTER_CAR_ORIENTATION_V2',
+              'poseAtlasRuntimeContract': 'CH_COASTER_CAR_ATLAS_RUNTIME_V2',
+              'poseAtlasSpriteSheet': 'car_pose_atlas_v2.png',
+              'poseAtlasManifest': 'car_pose_atlas_runtime_v2.json',
+              'poseAtlasFrameCount': 192,
+              'headingCount': 16,
+              'headingPitchFrames': 112,
+              'verticalSupplementFrames': 32,
+              'bankSupplementFrames': 32,
+              'invertedSupplementFrames': 16,
+              'selectionPolicy': 'nearest_heading_pitch_roll_without_cardinal_slope_snap',
+              'passengerRuntimeMode': 'baked_into_occupied_v2_atlas',
+          }
+          for key, expected in expected_motion.items():
+              if motion.get(key) != expected:
+                  raise SystemExit(f'Flame V2 runtime mismatch for {key}: {motion.get(key)!r} != {expected!r}')
           if motion.get('wholeTrainSpriteUsedForCurves') is not False:
               raise SystemExit('moving coaster must use articulated individual cars')
+          if motion.get('occupiedComposite') is not True:
+              raise SystemExit('runtime must use the occupied composite atlas')
 
-          atlas_path = root / motion['poseAtlasManifest']
+          manifest_path = root / motion['poseAtlasManifest']
           sheet_path = root / motion['poseAtlasSpriteSheet']
-          if not atlas_path.is_file() or not sheet_path.is_file():
-              raise SystemExit('ready atlas references missing runtime files')
-          atlas = json.loads(atlas_path.read_text(encoding='utf-8'))
-          if atlas.get('contract') != 'CH_COASTER_CAR_ATLAS_RUNTIME_V1':
-              raise SystemExit('unexpected runtime atlas contract')
-          if atlas.get('frameCount') != 40 or len(atlas.get('frames', [])) != 40:
-              raise SystemExit('runtime atlas frame count mismatch')
-          if [frame.get('atlasIndex') for frame in atlas['frames']] != list(range(40)):
-              raise SystemExit('runtime atlas ordering is not deterministic')
+          if not manifest_path.is_file() or not sheet_path.is_file():
+              raise SystemExit('ready V2 atlas references missing runtime files')
+          atlas = json.loads(manifest_path.read_text(encoding='utf-8'))
+
+          expected_manifest = {
+              'contract': 'CH_COASTER_CAR_ATLAS_RUNTIME_V2',
+              'poseContract': 'CH_COASTER_CAR_ORIENTATION_V2',
+              'trackContract': 'CH_COASTER_TRACK_V1',
+              'frameCount': 192,
+              'columns': 16,
+              'rows': 12,
+              'frameWidth': 256,
+              'frameHeight': 256,
+              'headingCount': 16,
+              'headingStepDegrees': 22.5,
+              'selectionPolicy': 'nearest_heading_pitch_roll_without_cardinal_slope_snap',
+          }
+          for key, expected in expected_manifest.items():
+              if atlas.get(key) != expected:
+                  raise SystemExit(f'V2 atlas mismatch for {key}: {atlas.get(key)!r} != {expected!r}')
+
+          frames = atlas.get('frames', [])
+          if len(frames) != 192:
+              raise SystemExit(f'V2 manifest must contain 192 frames, got {len(frames)}')
+          if [frame.get('frameIndex') for frame in frames] != list(range(192)):
+              raise SystemExit('V2 runtime atlas ordering is not deterministic')
+
+          family_counts = Counter(frame.get('family') for frame in frames)
+          expected_families = {
+              'heading_pitch_16way': 112,
+              'vertical_16way': 32,
+              'bank_16way': 32,
+              'inverted_16way': 16,
+          }
+          if family_counts != expected_families:
+              raise SystemExit(f'unexpected V2 pose family counts: {dict(family_counts)}')
+
+          for index, frame in enumerate(frames):
+              expected_rect = [(index % 16) * 256, (index // 16) * 256, 256, 256]
+              if frame.get('sourceRect') != expected_rect:
+                  raise SystemExit(f'frame {index} sourceRect drifted: {frame.get("sourceRect")} != {expected_rect}')
+              sha = frame.get('sha256', '')
+              if len(sha) != 64:
+                  raise SystemExit(f'frame {index} has invalid source SHA')
+
+          approval = atlas.get('approval', {})
+          if approval.get('proxyReviewed') is not True:
+              raise SystemExit('V2 atlas lacks explicit reviewed proxy approval')
+          if len(approval.get('approvedProxySha256', '')) != 64:
+              raise SystemExit('V2 atlas lacks approved proxy SHA-256')
+          if len(approval.get('sourceFingerprint', '')) != 64:
+              raise SystemExit('V2 atlas lacks source fingerprint')
+
+          occupancy = atlas.get('occupancy', {})
+          if occupancy.get('mode') != 'blender_depth_correct_composite' or occupancy.get('capacityPerCar') != 2:
+              raise SystemExit('occupied V2 atlas passenger contract is incomplete')
 
           header = sheet_path.read_bytes()[:24]
           if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
-              raise SystemExit('runtime atlas is not a PNG')
+              raise SystemExit('runtime V2 atlas is not a PNG')
           width, height = struct.unpack('>II', header[16:24])
-          if (width, height) != (2048, 1280):
-              raise SystemExit(f'unexpected runtime atlas size: {(width, height)}')
-          print('Promoted Flame pose atlas runtime package: OK')
+          if (width, height) != (4096, 3072):
+              raise SystemExit(f'unexpected V2 runtime atlas size: {(width, height)}')
+
+          actual_sha = hashlib.sha256(sheet_path.read_bytes()).hexdigest()
+          if actual_sha != atlas.get('spriteSheetSha256'):
+              raise SystemExit('V2 runtime atlas PNG SHA-256 does not match manifest')
+          source = runtime.get('poseAtlasSource', {})
+          if source.get('occupiedCompositeSpriteSheetSha256') != actual_sha:
+              raise SystemExit('runtime catalog V2 atlas SHA-256 does not match promoted PNG')
+
+          print('Promoted occupied Flame V2 pose atlas runtime package: OK')
           PY
