@@ -23,7 +23,18 @@ struct CoasterTrackStyle {
     double tie_drop_m = 0.08;
     double sample_spacing_m = 0.24;
     double tie_spacing_m = 0.78;
+
+    // support_spacing_m is the relaxed spacing used by low/straight track.
+    // The adaptive fields tighten station spacing where the route is taller,
+    // more curved, or steeper so structural density follows visual/mechanical
+    // demand instead of forming a uniform forest of columns.
     double support_spacing_m = 4.80;
+    double support_min_spacing_m = 2.70;
+    double support_height_reference_m = 8.00;
+    double support_curvature_reference_per_m = 0.055;
+    double support_grade_reference = 0.55;
+    double support_density_gain = 0.45;
+
     double minimum_support_height_m = 0.72;
     double support_top_half_width_m = 0.62;
     double support_base_half_width_m = 1.05;
@@ -102,6 +113,14 @@ struct CoasterTrackGeometry {
            finite_positive(style.sample_spacing_m) &&
            finite_positive(style.tie_spacing_m) &&
            finite_positive(style.support_spacing_m) &&
+           finite_positive(style.support_min_spacing_m) &&
+           style.support_min_spacing_m <= style.support_spacing_m &&
+           finite_positive(style.support_height_reference_m) &&
+           finite_positive(style.support_curvature_reference_per_m) &&
+           finite_positive(style.support_grade_reference) &&
+           std::isfinite(style.support_density_gain) &&
+           style.support_density_gain >= 0.0 &&
+           style.support_density_gain < 1.0 &&
            std::isfinite(style.minimum_support_height_m) &&
            style.minimum_support_height_m >= 0.0 &&
            finite_positive(style.support_top_half_width_m) &&
@@ -163,6 +182,33 @@ struct CoasterTrackGeometry {
         ? static_cast<double>(count)
         : static_cast<double>(count - 1U);
     return route_length_m * static_cast<double>(index) / denominator;
+}
+
+[[nodiscard]] inline double adaptive_support_spacing_m(
+    const CoasterTrackStyle& style,
+    const CenterlineSample& sample,
+    const double ground_z) noexcept {
+    const CoasterTrackPoint3 top_center =
+        track_point(sample, 0.0, -style.spine_drop_m);
+    const double height = std::max(0.0, top_center.z - ground_z);
+    const double curvature = std::hypot(
+        sample.horizontal_curvature_per_m,
+        sample.vertical_curvature_per_m);
+
+    const double height_load = std::clamp(
+        height / style.support_height_reference_m, 0.0, 1.0);
+    const double curvature_load = std::clamp(
+        curvature / style.support_curvature_reference_per_m, 0.0, 1.0);
+    const double grade_load = std::clamp(
+        std::abs(sample.tangent_z) / style.support_grade_reference, 0.0, 1.0);
+
+    const double structural_load = std::clamp(
+        height_load * 0.45 + curvature_load * 0.35 + grade_load * 0.20,
+        0.0, 1.0);
+    const double spacing = style.support_spacing_m *
+        (1.0 - style.support_density_gain * structural_load);
+    return std::clamp(
+        spacing, style.support_min_spacing_m, style.support_spacing_m);
 }
 
 [[nodiscard]] inline bool append_support_member(
@@ -328,24 +374,35 @@ struct CoasterTrackGeometry {
         });
     }
 
-    const std::size_t support_station_count = coaster_track_sample_count(
-        geometry.route_length_m, style.support_spacing_m, geometry.closed);
-    if (support_station_count > style.max_supports) {
-        geometry.clear();
-        return geometry;
-    }
+    const auto support_station_estimate = static_cast<std::size_t>(
+        std::ceil(geometry.route_length_m / style.support_min_spacing_m)) + 1U;
     geometry.supports.reserve(std::min(
-        style.max_supports, support_station_count * 5U));
-    for (std::size_t i = 0; i < support_station_count; ++i) {
-        const double distance = coaster_track_sample_distance(
-            i, support_station_count, geometry.route_length_m, geometry.closed);
-        const auto sample = route.sample(distance);
+        style.max_supports, support_station_estimate * 6U));
+
+    double support_distance = 0.0;
+    std::size_t support_station_count = 0U;
+    while (support_distance < geometry.route_length_m &&
+           support_station_count < style.max_supports) {
+        const auto sample = route.sample(support_distance);
         if (!sample) {
             geometry.clear();
             return geometry;
         }
         if (!append_support_station(
-                geometry, style, *sample, distance, ground_z)) {
+                geometry, style, *sample, support_distance, ground_z)) {
+            geometry.clear();
+            return geometry;
+        }
+        const double spacing = adaptive_support_spacing_m(
+            style, *sample, ground_z);
+        support_distance += spacing;
+        ++support_station_count;
+    }
+
+    if (!geometry.closed) {
+        const auto end_sample = route.sample(geometry.route_length_m);
+        if (!end_sample || !append_support_station(
+                geometry, style, *end_sample, geometry.route_length_m, ground_z)) {
             geometry.clear();
             return geometry;
         }
