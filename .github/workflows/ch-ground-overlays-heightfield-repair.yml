@@ -23,10 +23,11 @@ jobs:
         shell: pwsh
         run: git pull --rebase origin main
 
-      - name: Validate and apply guarded patch
+      - name: Validate and apply guarded patches
         shell: pwsh
         run: |
-          python -m py_compile tools/ground_overlays_heightfield_patch.py
+          python -m py_compile tools/fix_sidewalk_test_gate.py tools/ground_overlays_heightfield_patch.py
+          python tools/fix_sidewalk_test_gate.py
           python tools/ground_overlays_heightfield_patch.py
           git diff --check
 
@@ -51,8 +52,8 @@ jobs:
         run: |
           git config user.name "City Horizon CI"
           git config user.email "actions@users.noreply.github.com"
-          git add src/ch_render/map_renderer.h src/ch_render/map_renderer.cpp src/runtime_map_renderer.h src/main_runtime_impl.cpp
-          git rm .github/workflows/ch-ground-overlays-heightfield-repair.yml tools/ground_overlays_heightfield_patch.py
+          git add CMakeLists.txt src/ch_render/map_renderer.h src/ch_render/map_renderer.cpp src/runtime_map_renderer.h src/main_runtime_impl.cpp
+          git rm .github/workflows/ch-ground-overlays-heightfield-repair.yml tools/ground_overlays_heightfield_patch.py tools/fix_sidewalk_test_gate.py
           git diff --cached --check
           git commit -m "terrain: keep sidewalks and crosswalks on sculpted ground"
           git pull --rebase origin main
