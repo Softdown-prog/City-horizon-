@@ -27,7 +27,7 @@ constexpr int kFrameCount = 360;
 constexpr double kTrainSpeedMps = 11.0;
 constexpr double kTrackSampleStepM = 0.28;
 constexpr double kWorldScale = 10.6;
-constexpr double kHeightScale = 27.0;
+constexpr double kHeightScale = 38.0;
 constexpr double kSupportSpacingM = 2.5;
 
 QPointF project(const double x, const double y, const double z) {
@@ -160,6 +160,7 @@ void draw_track(QPainter& painter,
 
     RailProfile profile{};
     const double gauge = profile.gauge * 0.72;
+    painter.setBrush(Qt::NoBrush);
 
     QPainterPath bed;
     bed.moveTo(project(samples.front().x, samples.front().y, samples.front().z));
