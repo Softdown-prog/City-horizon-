@@ -1,14 +1,16 @@
 {
   "contract": "CH_COASTER_VIDEO_PROOF_V1",
-  "id": "coaster.flame.train_4car.mapforge.v2",
+  "id": "coaster.flame.train_4car.mapforge.canonical.v1",
   "reviewOnly": true,
   "trackContract": "CH_COASTER_TRACK_V1",
   "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V1",
+  "canonicalLayoutContract": "CH_COASTER_CANONICAL_LAYOUT_V1",
   "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V1",
   "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
   "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas.png",
   "atlasPromotionCommit": "4e7bc7abfcfc782e2c019145a7b924497fa5c207",
-  "rendererFixCommit": "c2403215ca5e513e2de4b9830862c70356dcc2db",
+  "routeFixCommit": "0a9746493214ff7af7b7be1ac03389a8e94d4574",
+  "headingFixCommit": "608d91714c296a6ead3a2c1c4d0ad0acd4f2a156",
   "carCount": 4,
   "carSpacingMeters": 2.445,
   "fps": 30,
@@ -18,11 +20,12 @@
     "station": true,
     "liftHill": true,
     "firstDrop": true,
-    "camelback": true,
-    "elevatedTurn": true,
-    "secondDrop": true,
+    "verticalLoop": true,
+    "ascendingHelix": true,
     "brakeRun": true,
-    "supports": true
+    "supports": true,
+    "closedRoute": true,
+    "corkscrew": false
   },
-  "purpose": "Validate the promoted depth-correct Flame atlas on a full park-coaster silhouette with a visible lift hill, first drop, camelback, elevated turnaround, second descent, sweeping return and station."
+  "purpose": "Validate four articulated Flame cars on CH_COASTER_CANONICAL_LAYOUT_V1 using the approved vertical-loop and helix centerline dimensions, a continuous station return, and the corrected travel-aligned tangent contract. Corkscrew is deferred until car roll poses exist."
 }
