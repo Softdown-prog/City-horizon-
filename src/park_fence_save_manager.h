@@ -1,6 +1,8 @@
 #pragma once
 
+#include "economy_system.h"
 #include "park_fence_runtime.h"
+#include "runtime_game_state.h"
 #include "save_manager.h"
 
 #include <cstdint>
@@ -11,9 +13,9 @@
 #include <sstream>
 #include <string>
 
-// Fence persistence is layered over the existing city save contract so old
-// saveVersion 1..12 files remain readable without rewriting SaveManager's JSON
-// parser. Each city save owns one small deterministic sidecar next to it.
+// Runtime-only persistence is layered over the existing city save contract so
+// old saveVersion 1..12 files remain readable without rewriting SaveManager's
+// JSON parser. Each city save owns one small deterministic sidecar next to it.
 class ParkFenceSaveManager : public SaveManager {
 public:
     [[nodiscard]] SaveOperationResult save(const std::filesystem::path& path,
@@ -52,11 +54,11 @@ public:
             return result;
         }
 
-        if (!write_fence_sidecar(staged_fence, *city_digest)) {
+        if (!write_fence_sidecar(staged_fence, *city_digest, economy)) {
             cleanup_file(staged_city);
             cleanup_file(staged_fence);
             result.success = false;
-            result.message = "city and Park fences were not committed because fence staging failed";
+            result.message = "city and runtime sidecar were not committed because sidecar staging failed";
             return result;
         }
 
@@ -74,7 +76,7 @@ public:
             if (error) {
                 restore_backup(backup_city, path);
                 return staging_failure(result, staged_city, staged_fence,
-                                       "existing Park fence sidecar could not be staged for replacement");
+                                       "existing runtime sidecar could not be staged for replacement");
             }
         }
 
@@ -94,12 +96,12 @@ public:
             restore_backup(backup_city, path);
             restore_backup(backup_fence, fence_path);
             return staging_failure(result, staged_city, staged_fence,
-                                   "staged Park fence sidecar could not be committed; previous save restored");
+                                   "staged runtime sidecar could not be committed; previous save restored");
         }
 
         cleanup_file(backup_city);
         cleanup_file(backup_fence);
-        result.message += " + Park fences (transactional V3)";
+        result.message += " + Park fences/bankruptcy (transactional V4)";
         return result;
     }
 
@@ -119,12 +121,13 @@ public:
                                                        terrain_heights);
         if (!result.success) return result;
 
+        // Canonical/legacy saves have no bankruptcy streak. SaveManager restores
+        // funds through the runtime economy wrapper, which resets Game Over.
+        // A V4 sidecar below may restore and re-publish the bankruptcy state.
         park_fence_runtime::clear();
         const std::filesystem::path fence_path = sidecar_path(path);
         std::ifstream input(fence_path, std::ios::binary);
         if (!input) {
-            // Existing saves predate fence persistence. An absent sidecar is a
-            // valid empty fence network, not a load failure.
             return result;
         }
 
@@ -133,15 +136,16 @@ public:
         const bool legacy_v1 = header == "CH_PARK_FENCE_V1";
         const bool legacy_v2 = header == "CH_PARK_FENCE_V2";
         const bool bound_v3 = header == "CH_PARK_FENCE_V3";
-        if (!legacy_v1 && !legacy_v2 && !bound_v3) {
-            result.message += " | Park fence sidecar ignored: unsupported format";
+        const bool bound_v4 = header == "CH_PARK_FENCE_V4";
+        if (!legacy_v1 && !legacy_v2 && !bound_v3 && !bound_v4) {
+            result.message += " | runtime sidecar ignored: unsupported format";
             return result;
         }
 
-        if (bound_v3) {
+        if (bound_v3 || bound_v4) {
             std::string digest_line;
             if (!std::getline(input, digest_line)) {
-                result.message += " | Park fence sidecar ignored: missing city digest";
+                result.message += " | runtime sidecar ignored: missing city digest";
                 return result;
             }
             std::istringstream digest_row(digest_line);
@@ -150,9 +154,28 @@ public:
             digest_row >> marker >> expected_hex;
             const std::optional<std::uint64_t> current_digest = file_digest(path);
             if (marker != "D" || !current_digest.has_value() || digest_hex(*current_digest) != expected_hex) {
-                result.message += " | Park fence sidecar ignored: it belongs to a different city-save state";
+                result.message += " | runtime sidecar ignored: it belongs to a different city-save state";
                 return result;
             }
+        }
+
+        if (bound_v4) {
+            std::string economy_line;
+            if (!std::getline(input, economy_line)) {
+                result.message += " | runtime sidecar ignored: missing bankruptcy state";
+                return result;
+            }
+            std::istringstream economy_row(economy_line);
+            char marker = '\0';
+            int negative_months = 0;
+            int bankrupt = 0;
+            if (!(economy_row >> marker >> negative_months >> bankrupt) || marker != 'E' ||
+                negative_months < 0 || negative_months > 3 || bankrupt < 0 || bankrupt > 1) {
+                result.message += " | runtime sidecar ignored: invalid bankruptcy state";
+                return result;
+            }
+            economy.restore_bankruptcy_state(negative_months, bankrupt != 0);
+            ch::runtime_game_state::update(economy.bankrupt(), economy.consecutive_negative_months());
         }
 
         struct PendingGate { FenceVertex from; FenceVertex to; };
@@ -221,6 +244,9 @@ public:
         result.message += " | Park fences " + std::to_string(restored_nodes) +
                           " nodes, " + std::to_string(restored_gates) + " open gates";
         if (!legacy_v1) result.message += ", " + std::to_string(restored_styles) + " styled segments";
+        if (bound_v4) {
+            result.message += ", bankruptcy streak " + std::to_string(economy.consecutive_negative_months());
+        }
         if (skipped_entries != 0) {
             result.message += " (" + std::to_string(skipped_entries) + " invalid fence entries skipped)";
         }
@@ -295,12 +321,15 @@ private:
     }
 
     [[nodiscard]] static bool write_fence_sidecar(const std::filesystem::path& path,
-                                                  const std::uint64_t city_digest) {
+                                                  const std::uint64_t city_digest,
+                                                  const CityEconomy& economy) {
         std::ofstream output(path, std::ios::binary | std::ios::trunc);
         if (!output) return false;
 
-        output << "CH_PARK_FENCE_V3\n";
+        output << "CH_PARK_FENCE_V4\n";
         output << "D " << digest_hex(city_digest) << '\n';
+        output << "E " << economy.consecutive_negative_months() << ' '
+               << (economy.bankrupt() ? 1 : 0) << '\n';
         for (const FenceNode& node : park_fence_runtime::fences().nodes()) {
             output << "N " << node.vertex_x << ' ' << node.vertex_y << ' '
                    << static_cast<int>(node.orientation_hint) << '\n';
