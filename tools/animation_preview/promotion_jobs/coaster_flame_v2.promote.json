@@ -1,0 +1,11 @@
+{
+  "contract": "CH_COASTER_ATLAS_PROMOTION_V1",
+  "sourceRunId": 37127887004,
+  "sourceArtifactId": 11275786461,
+  "sourceArtifactName": "CH-Blender-Agent-37127887004-1",
+  "sourceJobId": "coaster.car_flame_occupied_atlas_v2.final.002",
+  "approvedProxySha256": "70461e8fa0a2435e98fc22f47154381909d78f84fcec45fa1fb3e4d286c2ba58",
+  "sourceFingerprint": "b7fc3f6c56d782bdb1ac0ee074a8ccc674c86dfe13b76504b4ab9c9491b00cc7",
+  "targetContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+  "expectedFrameCount": 192
+}
