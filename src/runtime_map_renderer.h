@@ -184,10 +184,6 @@ struct ShorelineOverlay {
 
 }  // namespace runtime_render_detail
 
-// Runtime-only presentation facade. It preserves MapRenderer's public contract
-// but builds a conservative camera-visible working set before expensive sorting,
-// texture lookup and per-tile geometry. Map Forge keeps using canonical
-// MapRenderer directly, so editor/geometry verification behavior is unchanged.
 class RuntimeMapRenderer : public MapRenderer {
 public:
     static void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
@@ -314,7 +310,7 @@ public:
                     const std::string piece_path =
                         ShorelineCatalog::get_piece_texture_path(piece, "coast_adjusted");
                     if (const TextureAsset* texture = find_texture(piece_path)) {
-                        shoreline_overlays.push_back({edit.tile.x, edit.tile.y, texture});
+                        shoreline_overlays.push_back({edit.tile.x, edit.tile_y, texture});
                     }
                 }
             }
@@ -447,7 +443,7 @@ public:
             }
         }
 
-        std::sort(visible_tiles.begin(), visible_instances.end(), [&camera](const RoadTile* left, const RoadTile* right) {
+        std::sort(visible_tiles.begin(), visible_tiles.end(), [&camera](const RoadTile* left, const RoadTile* right) {
             const float left_depth = camera_depth_key(static_cast<float>(left->tile_x + 1),
                                                       static_cast<float>(left->tile_y + 1), camera);
             const float right_depth = camera_depth_key(static_cast<float>(right->tile_x + 1),
