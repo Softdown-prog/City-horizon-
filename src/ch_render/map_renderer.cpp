@@ -1,4 +1,5 @@
 #include "src/ch_render/map_renderer.h"
+#include "src/ch_core/terrain_projection.h"
 #include "src/ch_render/semantic_renderer.h"
 #include "src/ch_core/shoreline_autotile.h"
 #include "src/ch_core/ground_surface.h"
@@ -37,7 +38,6 @@ constexpr float kGrassOpaqueLeft = 53.0F;
 constexpr float kGrassOpaqueTop = 23.0F;
 constexpr float kGrassOpaqueWidth = 1175.0F;
 constexpr float kGrassOpaqueHeight = 587.0F;
-constexpr float kTerrainHeightPixelsPerUnit = 16.0F;
 
 
 constexpr TileCoordinate road_access_offset(const GridDirection direction) {
@@ -169,6 +169,34 @@ void MapRenderer::render_tile_fill(SDL_Renderer* renderer, const int tile_x, con
     (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
 }
 
+void MapRenderer::render_heightfield_tile_fill(
+    SDL_Renderer* renderer, const int tile_x, const int tile_y, const MapDocument& document,
+    const CameraState& camera, const float viewport_width, const float viewport_height,
+    const SDL_FColor color) {
+    if (renderer == nullptr) return;
+    const TerrainHeightField& heightfield = document.terrain_heightfield();
+    const ScreenPoint top = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint right = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint bottom = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint left = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = {top.x, top.y};
+    vertices[1].position = {right.x, right.y};
+    vertices[2].position = {bottom.x, bottom.y};
+    vertices[3].position = {left.x, left.y};
+    for (SDL_Vertex& vertex : vertices) vertex.color = color;
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+}
+
 void MapRenderer::render_road_tile(SDL_Renderer* renderer, const int tile_x, const int tile_y, const CameraState& camera,
                                   const float viewport_width, const float viewport_height, const SDL_FColor color) {
     render_tile_fill(renderer, tile_x, tile_y, camera, viewport_width, viewport_height, color);
@@ -228,12 +256,11 @@ void MapRenderer::render_heightfield_terrain_tile(
         return;
     }
 
+    const TerrainHeightField& heightfield = document.terrain_heightfield();
     const auto screen_corner = [&](const int grid_x, const int grid_y) {
-        ScreenPoint point = world_to_screen_point(static_cast<float>(grid_x), static_cast<float>(grid_y),
-                                                  camera, viewport_width, viewport_height);
-        point.y -= document.terrain_height_at(grid_x, grid_y) *
-                   kTerrainHeightPixelsPerUnit * camera.zoom;
-        return point;
+        return terrain_world_to_screen_point(
+            static_cast<float>(grid_x), static_cast<float>(grid_y), heightfield,
+            camera, viewport_width, viewport_height);
     };
     const ScreenPoint top = screen_corner(x, y);
     const ScreenPoint right = screen_corner(x + 1, y);
@@ -492,12 +519,14 @@ void MapRenderer::render_world_terrain_and_water(
     // grass/alpha hairline at any camera zoom.
     constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
     for (const auto& tile : dirt_path_tiles) {
-        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height, kDirtUnderlay);
+        render_heightfield_tile_fill(renderer, tile.tile_x, tile.tile_y, document,
+                                     camera, viewport_width, viewport_height, kDirtUnderlay);
     }
     for (const auto& tile : dirt_path_tiles) {
         const TileConnectionMask visual_connections = camera_visual_connections(tile.connections, camera.rotation);
         if (const TextureAsset* sprite = find_texture(dirt_path_sprite(visual_connections))) {
-            render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height);
+            render_heightfield_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, document,
+                                            camera, viewport_width, viewport_height, false);
         }
     }
 

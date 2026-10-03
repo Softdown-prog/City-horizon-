@@ -322,15 +322,15 @@ public:
 
         constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
         for (const auto& tile : dirt_path_tiles) {
-            MapRenderer::render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera,
-                                          viewport_width, viewport_height, kDirtUnderlay);
+            MapRenderer::render_heightfield_tile_fill(renderer, tile.tile_x, tile.tile_y, document,
+                                                      camera, viewport_width, viewport_height, kDirtUnderlay);
         }
         for (const auto& tile : dirt_path_tiles) {
             const TileConnectionMask connections = runtime_render_detail::camera_visual_connections(
                 tile.connections, camera.rotation);
             if (const TextureAsset* sprite = find_texture(runtime_render_detail::dirt_path_sprite(connections))) {
-                MapRenderer::render_custom_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y,
-                                                        camera, viewport_width, viewport_height);
+                MapRenderer::render_heightfield_terrain_tile(renderer, *sprite, tile.tile_x, tile.tile_y, document,
+                                                             camera, viewport_width, viewport_height, false);
             }
         }
 

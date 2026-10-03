@@ -1,4 +1,5 @@
 #include "src/ch_core/terrain_heightfield.h"
+#include "src/ch_core/terrain_projection.h"
 
 #include <cassert>
 #include <cmath>
@@ -11,6 +12,13 @@ int main() {
     field.set_height(0, 0, 1.0F);
     field.set_height(1, 0, 2.0F);
     assert(std::abs(field.sample(0.5F, 0.0F) - 1.5F) < 0.001F);
+
+    ch::CameraState camera{};
+    camera.zoom = 1.0F;
+    const ch::ScreenPoint flat_mid = ch::world_to_screen_point(0.5F, 0.0F, camera, 1280.0F, 720.0F);
+    const ch::ScreenPoint raised_mid = ch::terrain_world_to_screen_point(
+        0.5F, 0.0F, field, camera, 1280.0F, 720.0F);
+    assert(std::abs((flat_mid.y - raised_mid.y) - 24.0F) < 0.001F);
 
     field.apply_brush(0.5F, 0.5F, 2.5F, 0.75F, ch::TerrainBrushMode::raise);
     assert(field.height_at(0, 0) > 1.0F);
