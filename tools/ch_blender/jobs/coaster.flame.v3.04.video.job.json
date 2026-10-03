@@ -20,5 +20,6 @@
     "out/ch_blender_agent/coaster.flame.v3.04.video/video_report.json",
     "out/ch_blender_agent/coaster.flame.v3.04.video/capture_meta.json",
     "out/ch_blender_agent/coaster.flame.v3.04.video/coaster_flame_01_v3.mapforge.json"
-  ]
+  ],
+  "retryRevision": 2
 }

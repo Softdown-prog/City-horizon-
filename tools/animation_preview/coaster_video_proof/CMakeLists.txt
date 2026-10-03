@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui)
+# Ubuntu 24.04 GitHub runners provide Qt 6.4.2. This proof only uses stable
+# Qt6 Core/Gui APIs, so requiring 6.5 unnecessarily blocks the CI capture.
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui)
 
 get_filename_component(CH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 
