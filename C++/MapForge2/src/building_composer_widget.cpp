@@ -1,4 +1,5 @@
 #include "building_composer_widget.h"
+#include "authoring_projection.h"
 #include "building_export_pipeline.h"
 #include "building_facade_renderer.h"
 #include "building_footprint_model.h"
@@ -103,22 +104,24 @@ BuildingFacadeModuleKind moduleKindFromIndex(const int index) {
 
 struct PreviewPoint { float x = 0.0F; float y = 0.0F; };
 
-PreviewPoint rotatePreviewPoint(const PreviewPoint point, const BuildingView view) {
+int quarterTurns(const BuildingView view) {
     switch (view) {
-        case BuildingView::East: return {-point.y, point.x};
-        case BuildingView::North: return {-point.x, -point.y};
-        case BuildingView::West: return {point.y, -point.x};
-        case BuildingView::South: return point;
+        case BuildingView::South: return 0;
+        case BuildingView::East: return 1;
+        case BuildingView::West: return 3;
+        case BuildingView::North: return 2;
     }
-    return point;
+    return 0;
 }
 
 QPointF projectPreviewPoint(const PreviewPoint point, const BuildingView view, const QSize canvas) {
-    const PreviewPoint rotated = rotatePreviewPoint(point, view);
-    return {
-        static_cast<float>(canvas.width()) * 0.5F + (rotated.x - rotated.y) * ch::contracts::kTileWidth * 0.5F,
-        static_cast<float>(canvas.height()) - 42.0F + (rotated.x + rotated.y) * ch::contracts::kTileHeight * 0.5F,
-    };
+    return projectAuthoringGround(
+        point.x,
+        point.y,
+        quarterTurns(view),
+        QSizeF(canvas),
+        QPointF(static_cast<qreal>(canvas.width()) * 0.5,
+                static_cast<qreal>(canvas.height()) - 42.0));
 }
 
 QPolygonF previewQuad(const float x0, const float y0, const float x1, const float y1,
