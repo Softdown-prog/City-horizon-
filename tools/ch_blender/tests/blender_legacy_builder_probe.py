@@ -1,6 +1,6 @@
-"""Exercise actual tree/character main paths and all poses, with one cheap render each.
+"""Exercise tree/character main paths and all poses, with cheap character color renders.
 
-Other passes check evaluated bounds and studio state instead of spending on full bakes.
+Character shadows are transparent diagnostic placeholders; the framing probe tests real shadow passes.
 No candidate is approved or promoted.
 """
 import argparse
@@ -43,19 +43,28 @@ def main():
                     for corner in mesh.bound_box:
                         point = world_to_camera_view(scene, scene.camera, mesh.matrix_world @ Vector(corner))
                         assert -0.015 <= point.x <= 1.015 and -0.015 <= point.y <= 1.015, (obj.name, tuple(point))
-                if count[0] == 0:
+                if count[0] == 0 or builder is build_character:
                     resolution = (scene.render.resolution_x, scene.render.resolution_y)
                     samples = scene.cycles.samples
                     scene.render.resolution_x, scene.render.resolution_y = proxy_resolution_for(resolution, 256)
                     scene.cycles.samples = 2
                     try:
-                        original_color(scene, authored, ground, str(directory / "integration_proxy.png"))
+                        destination = path if builder is build_character else str(directory / "integration_proxy.png")
+                        original_color(scene, authored, ground, destination)
                     finally:
                         scene.render.resolution_x, scene.render.resolution_y = resolution
                         scene.cycles.samples = samples
                 count[0] += 1
             bs.render_color_pass = check_and_render
-            bs.render_shadow_pass = lambda *a, **k: None
+            def diagnostic_shadow(scene, authored, ground, path):
+                if builder is build_character:
+                    image = bpy.data.images.new("DiagnosticEmptyShadow", width=256, height=256, alpha=True)
+                    image.pixels.foreach_set([0.0] * (256 * 256 * 4))
+                    image.filepath_raw = path
+                    image.file_format = "PNG"
+                    image.save()
+                    bpy.data.images.remove(image)
+            bs.render_shadow_pass = diagnostic_shadow
             sys.argv = ["blender", "--", "--output", str(directory), "--asset-config",
                         str(ROOT / "tools/tycoon_photo_studio/assets" / config), "--studio-preset",
                         str(ROOT / "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json")]
@@ -64,6 +73,16 @@ def main():
             assert count[0] == expected_count, (builder.__name__, count)
             assert metadata["studioFingerprint"] == bpy.context.scene["ch.studioFingerprint"]
             assert metadata["renderResolution"][0] * metadata["finalResolution"][1] == metadata["renderResolution"][1] * metadata["finalResolution"][0]
+            if builder is build_character:
+                native = metadata["renderResolution"]
+                for direction in metadata["directions"]:
+                    for frame in direction["frames"]:
+                        pivot = frame["groundOriginSourcePx"]
+                        pivot["x"] *= 256 / native[0]
+                        pivot["y"] *= 256 / native[1]
+                metadata["renderResolution"] = [256, 256]
+                metadata["diagnosticProbe"] = {"samples": 2, "emptyShadows": True, "productionBake": False}
+                (directory / metadata_name).write_text(json.dumps(metadata, indent=2))
             results.append({"builder": builder.__name__, "checkedPoses": count[0], "studioFingerprint": metadata["studioFingerprint"]})
     finally:
         bs.render_color_pass, bs.render_shadow_pass = original_color, original_shadow

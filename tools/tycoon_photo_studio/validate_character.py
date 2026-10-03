@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from PIL import Image
+from render_geometry import require_same_aspect, studio_fingerprint
 
 EXPECTED_DIRECTIONS = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
 
@@ -25,10 +26,13 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def validate_png(path: Path):
+def validate_png(path: Path, size=None):
     require(path.is_file(), f"Missing PNG: {path}")
     with Image.open(path) as image:
         require(image.format == "PNG", f"Not a PNG: {path}")
+        require(image.mode == "RGBA", f"PNG must preserve RGBA pixels: {path}")
+        if size is not None:
+            require(image.size == tuple(size), f"PNG frame size differs from manifest: {path}")
         image.verify()
 
 
@@ -52,6 +56,11 @@ def main():
     require(manifest.get("assetId") == asset.get("assetId"), "Asset ID mismatch")
     require(manifest.get("studioPreset") == studio.get("id") == "CH_TYCOON_STUDIO_V1", "Frozen studio mismatch")
     require(manifest.get("cameraContract") == "CH_CAMERA_V1", "Camera contract changed")
+    frame_size = manifest.get("finalFrameResolution")
+    require(isinstance(frame_size, list) and len(frame_size) == 2 and all(type(v) is int and v > 0 for v in frame_size), "Invalid final frame size")
+    require_same_aspect(manifest["renderResolution"], frame_size)
+    if manifest.get("studioFingerprint"):
+        require(manifest["studioFingerprint"] == studio_fingerprint(studio), "Studio lighting/color fingerprint differs")
     require(tuple(manifest.get("directionOrder", [])) == EXPECTED_DIRECTIONS, "8-direction order changed")
     require(manifest.get("directionCount") == 8, "Character must bake exactly 8 directions")
 
@@ -69,6 +78,7 @@ def main():
 
     directions = manifest.get("directions", [])
     require(len(directions) == 8, "Manifest must contain 8 directional sequences")
+    require([d.get("direction") for d in directions] == list(EXPECTED_DIRECTIONS), "Directional sequences are duplicated or reordered")
 
     validation = asset.get("validation", {})
     minimum_distinct = int(validation.get("minimumDistinctFramesPerDirection", 6))
@@ -90,15 +100,17 @@ def main():
         object_heights = []
         for frame in frames:
             file_path = base / frame["file"]
-            validate_png(file_path)
-            validate_png(base / frame["colorPass"])
-            validate_png(base / frame["shadowPass"])
+            validate_png(file_path, frame_size)
+            validate_png(base / frame["colorPass"], frame_size)
+            validate_png(base / frame["shadowPass"], frame_size)
             pivot = frame.get("pivot", {})
             pivots.add((pivot.get("x"), pivot.get("y")))
 
             bounds = frame.get("objectAlphaBounds")
             require(isinstance(bounds, list) and len(bounds) == 4, f"Missing object bounds: {direction} f{frame['frame']:02d}")
             require(bounds[2] > bounds[0] and bounds[3] > bounds[1], f"Empty object bounds: {direction} f{frame['frame']:02d}")
+            with Image.open(base / frame["colorPass"]) as color:
+                require(list(color.getchannel("A").getbbox() or []) == bounds, "Object alpha bounds differ from actual frame pixels")
             object_widths.append(bounds[2] - bounds[0])
             object_heights.append(bounds[3] - bounds[1])
 
@@ -123,11 +135,17 @@ def main():
 
     require(total_frames == 64, f"Expected 64 final character frames, got {total_frames}")
     require(len(pivots) == 1, f"All directions and frames must share one pivot, got {sorted(pivots)}")
+    shared = manifest.get("sharedPivot", {})
+    require((shared.get("x"), shared.get("y")) == next(iter(pivots)), "Declared runtime pivot differs from the actual sequence pivots")
+    treatment = manifest.get("candidatePostProcess", {})
+    if int(studio["postProcess"].get("candidateVariant", 1)) == 1:
+        require(treatment.get("mode") == "full_rgba" and treatment.get("dither") == "none", "Character treatment must describe the actual full-color production pixels")
     require(len(set(first_frame_digests)) == 8, "The 8 directional views are not all visually distinct")
 
     files = manifest.get("files", {})
     for key in ("spriteSheet", "atlas", "sequenceReview", "context8Dir"):
         validate_png(base / files[key])
+    validate_png(base / files["spriteSheet"], (frame_size[0] * 8, frame_size[1] * 8))
 
     atlas = manifest.get("atlas", {})
     atlas_frames = atlas.get("frames", [])

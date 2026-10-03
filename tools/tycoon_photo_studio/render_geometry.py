@@ -49,10 +49,17 @@ def require_same_aspect(source, final):
 
 def validate_studio_camera(studio):
     camera = studio.get("camera", {})
+    if not isinstance(camera, dict):
+        raise ValueError("CH_CAMERA_V1 requires a camera object")
+    try:
+        yaw = float(camera.get("yawDegrees", 0))
+        elevation = float(camera.get("elevationDegrees", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("CH_CAMERA_V1 requires numeric camera angles") from exc
     if (camera.get("contract") != "CH_CAMERA_V1" or
             camera.get("projection") != "orthographic_dimetric_2_to_1" or
-            not math.isclose(float(camera.get("yawDegrees", 0)), 45.0, abs_tol=0.001) or
-            not math.isclose(float(camera.get("elevationDegrees", 0)), 30.0, abs_tol=0.001)):
+            not math.isclose(yaw, 45.0, abs_tol=0.001) or
+            not math.isclose(elevation, 30.0, abs_tol=0.001)):
         raise ValueError("CH_CAMERA_V1 requires orthographic 45 degree yaw / 30 degree elevation")
 
 

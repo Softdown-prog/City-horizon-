@@ -52,6 +52,15 @@ class PackageValidationTests(unittest.TestCase):
     def test_dynamic_frame_larger_than_studio_minimum_passes(self):
         self.validate()
 
+    def test_current_full_rgba_contract_does_not_require_legacy_palette_field(self):
+        self.manifest.pop("paletteColorCount")
+        self.manifest.update(productionColorMode="PNG_RGBA_FULL_COLOR", productionPaletteLimit=None)
+        self.manifest["candidatePostProcess"].update(mode="full_rgba", paletteReduced=False, dither="none")
+        self.validate()
+        self.manifest["candidatePostProcess"]["paletteReduced"] = True
+        with self.assertRaisesRegex(RuntimeError, "full-color RGBA"):
+            self.validate()
+
     def test_alpha_bounds_must_match_png(self):
         self.views[0]["spriteAlphaBounds"] = [0, 0, 3, 3]
         with self.assertRaisesRegex(RuntimeError, "Sprite alpha bounds differ"):

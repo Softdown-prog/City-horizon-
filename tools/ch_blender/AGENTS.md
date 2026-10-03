@@ -152,7 +152,7 @@ The worker owns `--stage`, `--preflight-profile` and `--approval-proxy-sha`; do 
 
 ### Canonical source bake
 
-`canonical_bake` remains available for established canonical sources and compatibility. New agent-authored direct Blender geometry should prefer the guarded operation until the generic canonical baker itself is migrated to the same three-stage gate.
+`canonical_bake` validates source contract, asset ID and studio camera before starting Blender, and checks fresh metadata plus declared `expectedOutputs` before success. It remains available for established canonical sources and compatibility. New agent-authored direct Blender geometry should prefer the guarded operation until the generic canonical baker itself is migrated to the same three-stage gate.
 
 ### Repository Blender script
 
@@ -201,6 +201,9 @@ Do not add independent Blender download/cache blocks to new workflows.
 - record output hashes from the worker report;
 - declared outputs and package files must be generated in the current job; reused files from an earlier output directory are rejected;
 - a canonical postprocessed bake must pass `validate_package.py` before the job succeeds;
+- every declared source pass must be an RGBA PNG at the recorded source dimensions; reject empty color renders and reused source files before postprocessing;
+- animation source directions and frame indices must match their declared order exactly;
+- spritesheets and post-treatment review boards must use actual image dimensions and preserve calibrated tile scale;
 - the SOUTH proxy report SHA must match its PNG, and the final approval record must match the reviewed SHA and asset ID;
 - use unique job IDs for concurrent agent sessions;
 - keep official 4.2.3 available as the baseline until the internal CH Blender build passes equivalence gates;

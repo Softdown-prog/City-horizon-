@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,8 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import postprocess as base
+from source_validation import validate_sources
+from render_geometry import ortho_spans
 
 
 def parse_args():
@@ -123,30 +126,27 @@ def draw_grid_diamond(draw, cx, cy, width=128, height=64):
     draw.polygon(pts, fill=(109, 137, 79, 255), outline=(77, 101, 59, 255))
 
 
-def make_direction_context(frames_by_direction, pivots, direction_order):
-    panel_w, panel_h = 320, 260
-    board = Image.new("RGBA", (panel_w * 4, panel_h * 2 + 44), (181, 196, 168, 255))
+def make_direction_context(frames_by_direction, pivots, direction_order, metadata=None):
+    metadata = metadata or {}
+    size = next(iter(frames_by_direction.values()))[0].size
+    scale = metadata.get("orthoScaleCalibrated", metadata.get("orthoScale"))
+    tile_width = None
+    if scale:
+        span_x, _ = ortho_spans(scale, size)
+        tile_width = metadata.get("blenderUnitsPerTile", 3.0) * math.sqrt(2) * size[0] / span_x
+    panels = [base.make_context_panel(frames_by_direction[d][0], pivots[(d, 0)], d.upper(),
+                                      metadata.get("footprint"), tile_width) for d in direction_order]
+    panel_w, panel_h = max(p.width for p in panels), max(p.height for p in panels)
+    rows = math.ceil(len(direction_order) / 4)
+    board = Image.new("RGBA", (panel_w * 4, panel_h * rows + 44), (181, 196, 168, 255))
     draw = ImageDraw.Draw(board)
     draw.rectangle((0, 0, board.width, 44), fill=(244, 240, 228, 245))
-    draw.text((14, 14), "Visitor NPC - 8 directions, frame 00, CH_CAMERA_V1 synthetic gameplay context", fill=(35, 35, 35, 255))
+    draw.text((14, 14), "Visitor NPC - synthetic grid review, not a runtime capture", fill=(35, 35, 35, 255))
 
     for index, direction in enumerate(direction_order):
         x0 = (index % 4) * panel_w
         y0 = 44 + (index // 4) * panel_h
-        panel = Image.new("RGBA", (panel_w, panel_h), (181, 196, 168, 255))
-        pdraw = ImageDraw.Draw(panel)
-        origin_x, origin_y = panel_w // 2, 180
-        for gy in range(-1, 2):
-            for gx in range(-1, 2):
-                sx = origin_x + (gx - gy) * 64
-                sy = origin_y + (gx + gy) * 32
-                draw_grid_diamond(pdraw, sx, sy)
-        sprite = frames_by_direction[direction][0]
-        pivot = pivots[(direction, 0)]
-        panel.alpha_composite(sprite, (origin_x - pivot["x"], origin_y - pivot["y"]))
-        pdraw.rectangle((8, 8, 48, 30), fill=(244, 240, 228, 235))
-        pdraw.text((18, 14), direction.upper(), fill=(35, 35, 35, 255))
-        board.alpha_composite(panel, (x0, y0))
+        board.alpha_composite(panels[index], (x0, y0))
     return board
 
 
@@ -160,7 +160,7 @@ def make_sequence_review(frames_by_direction, direction_order, frame_count):
         (245, 242, 233, 255),
     )
     draw = ImageDraw.Draw(board)
-    draw.text((12, 12), "Golden sequence candidate - one canonical visitor, 8 directions x 8 walk frames", fill=(35, 35, 35, 255))
+    draw.text((12, 12), f"Sequence candidate - {len(direction_order)} directions x {frame_count} walk frames", fill=(35, 35, 35, 255))
     for frame_index in range(frame_count):
         draw.text((label_w + frame_index * thumb + 54, 35), f"{frame_index}", fill=(75, 75, 75, 255))
     for row, direction in enumerate(direction_order):
@@ -169,8 +169,9 @@ def make_sequence_review(frames_by_direction, direction_order, frame_count):
         for frame_index in range(frame_count):
             sprite = frames_by_direction[direction][frame_index]
             panel = checker_panel((thumb, thumb))
-            reduced = sprite.resize((thumb, thumb), Image.Resampling.LANCZOS)
-            panel.alpha_composite(reduced)
+            reduced = sprite.copy()
+            reduced.thumbnail((thumb, thumb), Image.Resampling.LANCZOS)
+            panel.alpha_composite(reduced, ((thumb - reduced.width) // 2, (thumb - reduced.height) // 2))
             board.alpha_composite(panel, (label_w + frame_index * thumb, y))
     return board
 
@@ -188,6 +189,7 @@ def main():
         raise RuntimeError("Character source metadata and post-process studio preset do not match")
     if metadata.get("contract") != "TYCOON_CHARACTER_BAKE_V1":
         raise RuntimeError("Expected TYCOON_CHARACTER_BAKE_V1 source metadata")
+    base.FINAL_SIZE = validate_sources(input_dir, metadata, preset, character=True)
 
     asset_id = metadata["sourceObject"]
     direction_order = tuple(metadata["directionOrder"])
@@ -247,7 +249,7 @@ def main():
     if len(all_pivots) != 1:
         raise RuntimeError(f"All character directions/frames must share one projected world-origin pivot, got {sorted(all_pivots)}")
 
-    sheet_name = f"{asset_id}_walk_8dir_8frame.png"
+    sheet_name = f"{asset_id}_walk_{len(direction_order)}dir_{frame_count}frame.png"
     atlas_name = f"{asset_id}_walk_atlas.png"
     review_name = f"{asset_id}_sequence_review.png"
     context_name = f"{asset_id}_8dir_context.png"
@@ -258,7 +260,7 @@ def main():
     )
     atlas.save(output_dir / atlas_name)
     make_sequence_review(frames_by_direction, direction_order, frame_count).save(output_dir / review_name)
-    make_direction_context(frames_by_direction, pivots, direction_order).save(output_dir / context_name)
+    make_direction_context(frames_by_direction, pivots, direction_order, metadata).save(output_dir / context_name)
 
     manifest = {
         "contract": "TYCOON_CHARACTER_SEQUENCE_V1",
@@ -273,6 +275,9 @@ def main():
         }),
         "assetConfig": metadata.get("assetConfig"),
         "studioPreset": metadata.get("studioPreset"),
+        "studioFingerprint": metadata.get("studioFingerprint"),
+        "orthoScale": metadata.get("orthoScale"),
+        "blenderUnitsPerTile": metadata.get("blenderUnitsPerTile", 3.0),
         "cameraContract": metadata.get("cameraContract", "CH_CAMERA_V1"),
         "gridContract": metadata.get("gridContract", "CH_GRID_V1"),
         "projection": metadata.get("projection"),
@@ -293,18 +298,18 @@ def main():
         },
         "pivotPolicy": "projected world origin (0,0,0), identical for every direction and walk frame",
         "sharedPivot": {"x": next(iter(all_pivots))[0], "y": next(iter(all_pivots))[1]},
-        "paletteColorCount": base.PALETTE_COLORS,
+        "productionColorMode": preset["postProcess"].get("productionColorMode", "PNG_RGBA_FULL_COLOR"),
+        "productionPaletteLimit": preset["postProcess"].get("productionPaletteLimit"),
+        "retroComparison": {"paletteColors": base.PALETTE_COLORS, "purpose": "review_only"},
         "candidatePostProcess": {
+            **base.postprocess_variant_metadata(base.CANDIDATE_VARIANT_ID),
             "variantId": base.CANDIDATE_VARIANT_ID,
-            "mode": "palette_reduced",
-            "dither": "floyd_steinberg",
-            "edgeCleanup": "none",
             "studioPreset": metadata.get("studioPreset"),
         },
         "directions": direction_records,
         "atlas": {
             "file": atlas_name,
-            "packing": "deterministic_8x8_trimmed_grid_v1",
+            "packing": f"deterministic_{frame_count}x{len(direction_order)}_trimmed_grid_v1",
             "paddingPx": 2,
             **cell,
             "frames": atlas_records,
@@ -320,6 +325,9 @@ def main():
         "githubSha": os.environ.get("GITHUB_SHA", "local"),
         "approvalRule": "Do not add a second NPC until this first character is visually approved for silhouette, eight-direction identity and walk-frame continuity.",
     }
+
+    if metadata.get("diagnosticProbe"):
+        manifest["diagnosticProbe"] = metadata["diagnosticProbe"]
 
     manifest_path = output_dir / f"{asset_id}_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

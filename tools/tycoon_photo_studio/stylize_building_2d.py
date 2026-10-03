@@ -298,7 +298,7 @@ def main():
     atlas, atlas_records = package_tools.make_trimmed_atlas(candidates, pivots)
     atlas.save(package / f"{asset_id}_atlas.png")
     package_tools.make_direction_review(candidates, pivots).save(package / f"{asset_id}_review.png")
-    context = package_tools.make_context_board(candidates, pivots)
+    context = package_tools.make_context_board(candidates, pivots, manifest)
     context.save(package / f"{asset_id}_4dir_context.png")
     context.save(package / "tycoon_photo_studio_in_game_context.png")
 

@@ -13,6 +13,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from render_geometry import require_same_aspect, ortho_spans, studio_fingerprint
+from source_validation import validate_sources
 
 FINAL_SIZE = (256, 256)
 # Review-only palette budget used by optional retro comparison variants 02-04.
@@ -343,9 +344,11 @@ def make_context_panel(sprite, pivot, label, footprint=None, baked_tile_width=No
 def make_context_board(candidates, pivots, metadata=None):
     metadata = metadata or {}
     tile_width = None
-    if metadata.get("orthoScaleCalibrated"):
-        span_x, _ = ortho_spans(metadata["orthoScaleCalibrated"], FINAL_SIZE)
-        tile_width = metadata.get("blenderUnitsPerTile", 3.0) * math.sqrt(2) * FINAL_SIZE[0] / span_x
+    frame_size = next(iter(candidates.values())).size
+    scale = metadata.get("orthoScaleCalibrated", metadata.get("orthoScale"))
+    if scale:
+        span_x, _ = ortho_spans(scale, frame_size)
+        tile_width = metadata.get("blenderUnitsPerTile", 3.0) * math.sqrt(2) * frame_size[0] / span_x
     panels = [make_context_panel(candidates[direction], pivots[direction], direction.upper(),
                                 metadata.get("footprint"), tile_width) for direction in DIRECTION_ORDER]
     width, height = max(p.width for p in panels), max(p.height for p in panels)
@@ -359,9 +362,12 @@ def make_context_board(candidates, pivots, metadata=None):
 
 
 def make_fixed_sheet(candidates):
-    sheet = Image.new("RGBA", (FINAL_SIZE[0] * 4, FINAL_SIZE[1]), (0, 0, 0, 0))
+    width, height = next(iter(candidates.values())).size
+    if any(image.size != (width, height) for image in candidates.values()):
+        raise ValueError("All direction frames must have the same pixel dimensions")
+    sheet = Image.new("RGBA", (width * 4, height), (0, 0, 0, 0))
     for index, direction in enumerate(DIRECTION_ORDER):
-        sheet.alpha_composite(candidates[direction], (index * FINAL_SIZE[0], 0))
+        sheet.alpha_composite(candidates[direction], (index * width, 0))
     return sheet
 
 
@@ -413,6 +419,7 @@ def main():
         FINAL_SIZE = tuple(map(int, metadata["finalResolution"]))
         print(f"[postprocess] Using dynamic finalResolution from metadata: {FINAL_SIZE[0]}×{FINAL_SIZE[1]}")
 
+    validate_sources(input_dir, metadata, preset)
     require_same_aspect(metadata["renderResolution"], FINAL_SIZE)
     if metadata.get("studioFingerprint") and metadata["studioFingerprint"] != studio_fingerprint(preset):
         raise RuntimeError("Source lighting/color fingerprint differs from the post-process preset")

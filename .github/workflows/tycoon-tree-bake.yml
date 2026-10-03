@@ -135,9 +135,9 @@ jobs:
           from pathlib import Path
           m = json.loads(Path('out/tree/final/park_tree_broadleaf_01_manifest.json').read_text())
           pp = m['candidatePostProcess']
-          assert pp['mode'] == 'classic_prerendered_foliage_v2'
+          assert pp['mode'] == 'stylized_prerender_foliage_wood_split_v1'
           assert pp['paletteColors'] == 64
-          assert pp['dither'] == 'floyd_steinberg'
+          assert pp['dither'] == 'floyd_steinberg_foliage_only'
           assert pp['expectsLeafMicrogeometry'] is True
           assert pp['shadowAlphaMax'] == 54
           print('classicPrerenderedFoliageGate: PASS')

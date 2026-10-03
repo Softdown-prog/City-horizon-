@@ -279,8 +279,12 @@ def validate_job(job_path: Path) -> dict[str, Any]:
 
     if operation == "canonical_bake":
         asset_config = _repo_path(str(job.get("assetConfig", "")))
-        _load_json(asset_config)
-        _repo_path(str(job.get("studioPreset") or DEFAULT_STUDIO.relative_to(REPO_ROOT)))
+        asset = _load_json(asset_config)
+        if asset.get("contract") != "TYCOON_ASSET_SOURCE_V1":
+            raise WorkerError("CONTRACT_MISMATCH", "canonical_bake requires TYCOON_ASSET_SOURCE_V1")
+        if not isinstance(asset.get("assetId"), str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", asset["assetId"]):
+            raise WorkerError("JOB_INVALID", "assetConfig requires a safe, non-empty assetId")
+        _argument_inputs(["--studio-preset", str(job.get("studioPreset") or DEFAULT_STUDIO.relative_to(REPO_ROOT))])
     else:
         script = _repo_path(str(job.get("script", "")))
         if not script.is_file() or script.suffix != ".py":
@@ -428,6 +432,7 @@ def _canonical_bake(job: dict[str, Any], blender_exe: Path, started_ns: int):
             "--asset-config", str(asset_config),
             "--studio-preset", str(studio_preset),
         ], error_code="PACKAGE_INVALID")
+    _validate_expected_outputs(job, started_ns, [f"{output_root.relative_to(REPO_ROOT).as_posix()}/source/studio_metadata.json"])
     return output_root, inputs, None
 
 

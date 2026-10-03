@@ -104,7 +104,15 @@ def main():
         require_same_aspect(manifest["renderResolution"], frame_size)
     if manifest.get("studioFingerprint"):
         require(manifest["studioFingerprint"] == studio_fingerprint(studio), "Studio lighting/color settings changed")
-    require(manifest.get("paletteColorCount") == studio["postProcess"]["paletteColors"], "Palette size differs from studio preset")
+    treatment = manifest.get("candidatePostProcess", {})
+    if studio["postProcess"].get("candidateVariant", 1) == 1 and "productionColorMode" in manifest:
+        require(manifest["productionColorMode"] == studio["postProcess"].get("productionColorMode", "PNG_RGBA_FULL_COLOR"), "Production color mode differs from studio preset")
+        require(manifest.get("productionPaletteLimit") == studio["postProcess"].get("productionPaletteLimit"), "Production palette limit differs from studio preset")
+        require(treatment.get("mode") == "full_rgba" and treatment.get("paletteReduced") is False and treatment.get("dither") == "none", "Production treatment must describe full-color RGBA pixels")
+    else:
+        # Legacy records and explicitly eligible retro variants still carry a palette budget.
+        budget = manifest.get("paletteColorCount", manifest.get("retroComparison", {}).get("paletteColors"))
+        require(budget == studio["postProcess"]["paletteColors"], "Palette size differs from studio preset")
     require(
         manifest.get("candidatePostProcess", {}).get("variantId") == studio["postProcess"]["candidateVariant"],
         "Candidate post-process variant differs from studio preset",

@@ -18,8 +18,14 @@ on:
       - "tools/tycoon_photo_studio/build_classic_tree.py"
       - "tools/tycoon_photo_studio/build_character.py"
       - "tools/tycoon_photo_studio/postprocess.py"
+      - "tools/tycoon_photo_studio/postprocess_character.py"
+      - "tools/tycoon_photo_studio/source_validation.py"
+      - "tools/tycoon_photo_studio/validate_character.py"
+      - "tools/tycoon_photo_studio/stylize_foliage_2d.py"
+      - "tools/tycoon_photo_studio/stylize_building_2d.py"
       - "tools/tycoon_photo_studio/validate_package.py"
       - "tools/ch_blender/tests/**"
+      - "tools/tycoon_photo_studio/tests/**"
       - ".github/workflows/ch-blender-agent-worker.yml"
       - ".github/workflows/ch-blender-ground-worker.yml"
       - ".github/workflows/ch-blender-interface-test.yml"
@@ -41,6 +47,8 @@ jobs:
         run: python -m pip install pillow
       - name: Test all existing job contracts and error paths without Blender
         run: python -m unittest discover -s tools/ch_blender/tests -v
+      - name: Test studio package and production color contracts
+        run: PYTHONPATH=tools/tycoon_photo_studio python -m unittest discover -s tools/tycoon_photo_studio/tests -v
       - name: Setup shared cached CH Blender
         uses: ./.github/actions/setup-ch-blender
       - name: Compare framing and validate actual Blender geometry
@@ -53,6 +61,16 @@ jobs:
           "$CH_BLENDER_EXE" --background --factory-startup --python-exit-code 1
           --python tools/ch_blender/tests/blender_legacy_builder_probe.py
           -- --output out/ch_blender_quality/regression/legacy
+      - name: Validate character pixels, frame identity and package
+        run: |
+          python tools/tycoon_photo_studio/postprocess_character.py \
+            --input out/ch_blender_quality/regression/legacy/build_character \
+            --output out/ch_blender_quality/regression/legacy/character_package \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
+          python tools/tycoon_photo_studio/validate_character.py \
+            --manifest out/ch_blender_quality/regression/legacy/character_package/visitor_male_red_02_manifest.json \
+            --asset-config tools/tycoon_photo_studio/assets/visitor_male_red_02.json \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json
       - name: Upload render comparison
         if: always()
         uses: actions/upload-artifact@v4

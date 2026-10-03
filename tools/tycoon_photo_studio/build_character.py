@@ -252,8 +252,11 @@ def apply_walk_pose(rig, animation, frame_index):
 
     rig["hipL"].rotation_euler = (left_wave * stride, 0.0, 0.0)
     rig["hipR"].rotation_euler = (right_wave * stride, 0.0, 0.0)
-    rig["kneeL"].rotation_euler = (max(0.0, left_wave) * knee_bend, 0.0, 0.0)
-    rig["kneeR"].rotation_euler = (max(0.0, right_wave) * knee_bend, 0.0, 0.0)
+    # Flex during forward recovery, using velocity rather than hip position.
+    # The old sin-only pose repeated frames 1/3, 0/4 and 5/7 in an eight-frame loop.
+    recovery = math.cos(phase)
+    rig["kneeL"].rotation_euler = (max(0.0, -recovery) * knee_bend, 0.0, 0.0)
+    rig["kneeR"].rotation_euler = (max(0.0, recovery) * knee_bend, 0.0, 0.0)
 
     rig["shoulderL"].rotation_euler = (-left_wave * arm_swing, 0.0, 0.0)
     rig["shoulderR"].rotation_euler = (-right_wave * arm_swing, 0.0, 0.0)
