@@ -9,18 +9,22 @@
 #include <optional>
 #include <vector>
 
-inline constexpr const char* kChRailPlacementGraphContract = "CH_RAIL_PLACEMENT_GRAPH_V1";
+inline constexpr const char* kChRailPlacementGraphContract = "CH_RAIL_PLACEMENT_GRAPH_V2";
 
 using RailPlacementNodeId = std::uint32_t;
 using RailPlacementEdgeId = std::uint32_t;
+using RailPlacementPieceId = std::uint32_t;
 inline constexpr RailPlacementNodeId kInvalidRailPlacementNodeId = std::numeric_limits<RailPlacementNodeId>::max();
 inline constexpr RailPlacementEdgeId kInvalidRailPlacementEdgeId = std::numeric_limits<RailPlacementEdgeId>::max();
+inline constexpr RailPlacementPieceId kInvalidRailPlacementPieceId = std::numeric_limits<RailPlacementPieceId>::max();
 
 enum class RailPlacementEdgeKind {
     straight,
     curve,
     turnout_through,
     turnout_diverging,
+    crossing_primary,
+    crossing_secondary,
 };
 
 struct RailPlacementNode {
@@ -35,6 +39,9 @@ struct RailPlacementEdge {
     RailPlacementNodeId to = kInvalidRailPlacementNodeId;
     RailPlacementEdgeKind kind = RailPlacementEdgeKind::straight;
     RailSplineSegment segment{};
+    // Multiple graph edges may belong to one logical track piece. Straight and
+    // curve edges own their group; turnout/crossing route edges share a group.
+    RailPlacementPieceId piece_group = kInvalidRailPlacementPieceId;
 };
 
 struct RailPlacementAppendResult {
@@ -60,18 +67,32 @@ struct RailPlacementTurnoutResult {
     }
 };
 
+struct RailPlacementCrossingResult {
+    RailPlacementNodeId primary_node = kInvalidRailPlacementNodeId;
+    RailPlacementNodeId secondary_entry_node = kInvalidRailPlacementNodeId;
+    RailPlacementNodeId secondary_exit_node = kInvalidRailPlacementNodeId;
+    RailPlacementEdgeId primary_edge = kInvalidRailPlacementEdgeId;
+    RailPlacementEdgeId secondary_edge = kInvalidRailPlacementEdgeId;
+
+    [[nodiscard]] bool ok() const {
+        return primary_node != kInvalidRailPlacementNodeId &&
+               secondary_entry_node != kInvalidRailPlacementNodeId &&
+               secondary_exit_node != kInvalidRailPlacementNodeId &&
+               primary_edge != kInvalidRailPlacementEdgeId &&
+               secondary_edge != kInvalidRailPlacementEdgeId;
+    }
+};
+
 struct RailPlacementCheckpoint {
     std::size_t node_count = 0U;
     std::size_t edge_count = 0U;
 };
 
-// CH_RAIL_PLACEMENT_GRAPH_V1
+// CH_RAIL_PLACEMENT_GRAPH_V2
 //
-// Transactional staging graph for the editor. It deliberately does not own
-// gameplay occupancy or persistence yet. Every edge is fully validated and
-// mesh-buildable before it is committed, and rollback truncates only objects
-// created after a checkpoint. This keeps failed/cancelled authoring operations
-// from leaving orphaned rail geometry behind.
+// Transactional staging graph for the editor. Every route edge is validated and
+// mesh-buildable before commit. piece_group identifies the logical modular piece
+// represented by one route (straight/curve) or multiple routes (turnout/crossing).
 class RailPlacementGraph final {
 public:
     explicit RailPlacementGraph(RailProfile profile = {}) : profile_(profile) {}
@@ -148,10 +169,70 @@ public:
         }
 
         const RailPlacementEdgeId through_edge = static_cast<RailPlacementEdgeId>(edges_.size());
-        edges_.push_back({through_edge, from, *through_node, RailPlacementEdgeKind::turnout_through, authored.through});
+        const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(through_edge);
+        edges_.push_back({through_edge, from, *through_node, RailPlacementEdgeKind::turnout_through, authored.through, piece_group});
         const RailPlacementEdgeId diverging_edge = static_cast<RailPlacementEdgeId>(edges_.size());
-        edges_.push_back({diverging_edge, from, *diverging_node, RailPlacementEdgeKind::turnout_diverging, authored.diverging});
+        edges_.push_back({diverging_edge, from, *diverging_node, RailPlacementEdgeKind::turnout_diverging, authored.diverging, piece_group});
         return RailPlacementTurnoutResult{*through_node, *diverging_node, through_edge, diverging_edge};
+    }
+
+    // At-grade diamond crossing. The primary route continues from `from`; the
+    // perpendicular route is authored as a second route in the same logical
+    // piece and exposes both side nodes for later extension.
+    [[nodiscard]] std::optional<RailPlacementCrossingResult> append_crossing(
+        const RailPlacementNodeId from,
+        const float length,
+        const int subdivisions = 32) {
+        constexpr float kHalfPi = 1.57079632679489661923F;
+        constexpr float kPi = 3.14159265358979323846F;
+
+        const RailPlacementNode* source = node(from);
+        if (source == nullptr || !std::isfinite(length) || length <= 0.0F) return std::nullopt;
+        const RailPathBuildResult primary = RailPathBuilder::straight(
+            source->position, source->heading_radians, length, subdivisions, profile_);
+        if (!primary.ok() || !mesh_safe(primary.segment)) return std::nullopt;
+
+        const RailWorldPoint3 center = RailMeshBuilder::sample_cubic(primary.segment, 0.5F);
+        const float secondary_heading = source->heading_radians + kHalfPi;
+        const float sx = std::cos(secondary_heading);
+        const float sy = std::sin(secondary_heading);
+        const RailWorldPoint3 secondary_start{
+            center.x - sx * (length * 0.5F),
+            center.y - sy * (length * 0.5F),
+            center.z,
+        };
+        const RailPathBuildResult secondary = RailPathBuilder::straight(
+            secondary_start, secondary_heading, length, subdivisions, profile_);
+        if (!secondary.ok() || !mesh_safe(secondary.segment)) return std::nullopt;
+
+        if (nodes_.size() > static_cast<std::size_t>(std::numeric_limits<RailPlacementNodeId>::max()) - 3U ||
+            edges_.size() > static_cast<std::size_t>(std::numeric_limits<RailPlacementEdgeId>::max()) - 2U) {
+            return std::nullopt;
+        }
+
+        const RailPlacementCheckpoint before = checkpoint();
+        const auto primary_node = add_root(primary.segment.end, source->heading_radians);
+        const auto secondary_entry_node = add_root(secondary.segment.start, secondary_heading + kPi);
+        const auto secondary_exit_node = add_root(secondary.segment.end, secondary_heading);
+        if (!primary_node || !secondary_entry_node || !secondary_exit_node) {
+            const bool rolled_back = rollback(before);
+            (void)rolled_back;
+            return std::nullopt;
+        }
+
+        const RailPlacementEdgeId primary_edge = static_cast<RailPlacementEdgeId>(edges_.size());
+        const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(primary_edge);
+        edges_.push_back({primary_edge, from, *primary_node, RailPlacementEdgeKind::crossing_primary, primary.segment, piece_group});
+        const RailPlacementEdgeId secondary_edge = static_cast<RailPlacementEdgeId>(edges_.size());
+        edges_.push_back({secondary_edge, *secondary_entry_node, *secondary_exit_node, RailPlacementEdgeKind::crossing_secondary, secondary.segment, piece_group});
+
+        return RailPlacementCrossingResult{
+            *primary_node,
+            *secondary_entry_node,
+            *secondary_exit_node,
+            primary_edge,
+            secondary_edge,
+        };
     }
 
     [[nodiscard]] RailPlacementCheckpoint checkpoint() const {
@@ -219,7 +300,8 @@ private:
         if (!to) return std::nullopt;
 
         const RailPlacementEdgeId edge_id = static_cast<RailPlacementEdgeId>(edges_.size());
-        edges_.push_back({edge_id, from, *to, kind, segment});
+        const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(edge_id);
+        edges_.push_back({edge_id, from, *to, kind, segment, piece_group});
         if (edge(edge_id) == nullptr) {
             const bool rolled_back = rollback(before);
             (void)rolled_back;
