@@ -38,7 +38,7 @@ int main() {
     for (std::size_t i = 0; i < kCoasterTrainCarCount; ++i) {
         const CarRenderCommand& command = plan.cars[i];
         const int expected_atlas_index = 48 + static_cast<int>(i);
-        const int expected_x = expected_atlas_index * kCarPoseFrameWidth;
+        const int expected_x = static_cast<int>(i) * kCarPoseFrameWidth;
         const int expected_y = 3 * kCarPoseFrameHeight;
         if (command.car_index != i) return fail("car ordering changed");
         if (command.atlas_path != kFlameCarPoseAtlasPath) return fail("unexpected V2 atlas path");
