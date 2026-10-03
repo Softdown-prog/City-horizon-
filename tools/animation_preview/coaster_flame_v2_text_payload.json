@@ -1,0 +1,11 @@
+{
+  "contract": "CH_COASTER_V2_TEXT_PROMOTION_PAYLOAD_V1",
+  "files": {
+    "src/coaster_car_pose.h": "tools/animation_preview/promotion_staging/flame_v2/src_coaster_car_pose.h",
+    "C++/MapForge2/src/coaster_video_proof_main.cpp": "tools/animation_preview/promotion_staging/flame_v2/coaster_video_proof_main.cpp",
+    "tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json": "tools/animation_preview/promotion_staging/flame_v2/proof_job.json",
+    "C++/MapForge2/projects/coaster_flame_01.mapforge.json": "tools/animation_preview/promotion_staging/flame_v2/project.json",
+    "assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json": "tools/animation_preview/promotion_staging/flame_v2/runtime.json",
+    ".github/workflows/ch-mapforge-coaster-video-proof.yml": "tools/animation_preview/promotion_staging/flame_v2/proof_workflow.yml"
+  }
+}
