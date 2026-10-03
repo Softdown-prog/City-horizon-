@@ -169,6 +169,29 @@ void MapRenderer::render_tile_fill(SDL_Renderer* renderer, const int tile_x, con
     (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
 }
 
+void MapRenderer::render_heightfield_tile_outline(
+    SDL_Renderer* renderer, const int tile_x, const int tile_y, const MapDocument& document,
+    const CameraState& camera, const float viewport_width, const float viewport_height) {
+    if (renderer == nullptr) return;
+    const TerrainHeightField& heightfield = document.terrain_heightfield();
+    const ScreenPoint top = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint right = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint bottom = terrain_world_to_screen_point(
+        static_cast<float>(tile_x + 1), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    const ScreenPoint left = terrain_world_to_screen_point(
+        static_cast<float>(tile_x), static_cast<float>(tile_y + 1), heightfield,
+        camera, viewport_width, viewport_height);
+    SDL_RenderLine(renderer, top.x, top.y, right.x, right.y);
+    SDL_RenderLine(renderer, right.x, right.y, bottom.x, bottom.y);
+    SDL_RenderLine(renderer, bottom.x, bottom.y, left.x, left.y);
+    SDL_RenderLine(renderer, left.x, left.y, top.x, top.y);
+}
+
 void MapRenderer::render_heightfield_tile_fill(
     SDL_Renderer* renderer, const int tile_x, const int tile_y, const MapDocument& document,
     const CameraState& camera, const float viewport_width, const float viewport_height,
@@ -220,19 +243,8 @@ void MapRenderer::render_road_access_candidates(SDL_Renderer* renderer, const Bu
             render_tile_outline(renderer, road_x, road_y, camera, viewport_width, viewport_height);
             continue;
         }
-        const TerrainHeightField& heightfield = document->terrain_heightfield();
-        const ScreenPoint p0 = terrain_world_to_screen_point(static_cast<float>(road_x), static_cast<float>(road_y),
-                                                             heightfield, camera, viewport_width, viewport_height);
-        const ScreenPoint p1 = terrain_world_to_screen_point(static_cast<float>(road_x + 1), static_cast<float>(road_y),
-                                                             heightfield, camera, viewport_width, viewport_height);
-        const ScreenPoint p2 = terrain_world_to_screen_point(static_cast<float>(road_x + 1), static_cast<float>(road_y + 1),
-                                                             heightfield, camera, viewport_width, viewport_height);
-        const ScreenPoint p3 = terrain_world_to_screen_point(static_cast<float>(road_x), static_cast<float>(road_y + 1),
-                                                             heightfield, camera, viewport_width, viewport_height);
-        SDL_RenderLine(renderer, p0.x, p0.y, p1.x, p1.y);
-        SDL_RenderLine(renderer, p1.x, p1.y, p2.x, p2.y);
-        SDL_RenderLine(renderer, p2.x, p2.y, p3.x, p3.y);
-        SDL_RenderLine(renderer, p3.x, p3.y, p0.x, p0.y);
+        render_heightfield_tile_outline(renderer, road_x, road_y, *document,
+                                        camera, viewport_width, viewport_height);
     }
 }
 
