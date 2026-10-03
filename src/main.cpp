@@ -27,6 +27,7 @@
 //     presentation-only speed-of-sound propagation delay.
 // 20. Aggregate residential population materializes bounded, persistent citizen
 //     actors whose autonomous decisions are sharded across simulation ticks.
+// 21. The shared procedural railway graph is authorable and rendered by the live runtime.
 
 #include "audio_manager.h"
 #include "building_system.h"
@@ -44,6 +45,7 @@
 #include "src/runtime_map_renderer.h"
 #include "src/runtime_game_state.h"
 #include "src/runtime_game_ui.h"
+#include "src/rail_runtime_bridge.h"
 
 #include <algorithm>
 #include <cmath>
@@ -68,6 +70,7 @@ public:
     void restore_funds(const std::int64_t funds) {
         CityEconomy::restore_funds(funds);
         ch::runtime_game_state::reset();
+        ch::rail_runtime::reset();
     }
 
     void on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
@@ -475,7 +478,7 @@ private:
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
-#define MapRenderer RuntimeMapRenderer
+#define MapRenderer ChRailRuntimeMapRenderer
 #define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
     ch_runtime_update_layout((viewport_width), (viewport_height), (model), \
@@ -486,11 +489,37 @@ private:
             gameplay_ui.bind_selection_context( \
                 &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \
                 placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
-                !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
+                !agriculture_mode && !decoration_mode && !ch::rail_runtime::tool_active() && \
+                active_overlay == UiOverlay::none); \
         })
+
+// The city-builder target intentionally keeps the runtime entrypoint as a
+// compatibility/unity wrapper. Rail geometry was previously test-only and is
+// linked here without changing unrelated CMake targets or their test linkage.
+#include "rail_system.cpp"
+#include "ch_render/procedural_rail_renderer.cpp"
+
+#define SDL_PollEvent(event_ptr) \
+    ([&]() { \
+        const bool ch_rail_interaction_allowed = \
+            !startup_main_menu && active_overlay == UiOverlay::none; \
+        const ch::rail_runtime::InteractionContext ch_rail_context{ \
+            &lands, &buildings, &roads, &sidewalks, &farming, \
+            active_map_doc ? &active_map_doc->terrain_heightfield() : nullptr}; \
+        const bool ch_has_runtime_event = ch::rail_runtime::poll_event( \
+            (event_ptr), ch_rail_interaction_allowed, ch_rail_context); \
+        if (ch::rail_runtime::tool_active()) { \
+            clear_map_modes(); \
+            build_panel_open = false; \
+            selected_instance_id.reset(); \
+            status = ch::rail_runtime::status_text(); \
+        } \
+        return ch_has_runtime_event; \
+    }())
 
 #include "main_runtime_impl.cpp"
 
+#undef SDL_PollEvent
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
