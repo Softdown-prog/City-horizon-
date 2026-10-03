@@ -104,6 +104,8 @@ jobs:
               'atlas preload': 'kFlameCarPoseAtlasPath',
               'runtime update': 'coaster_runtime.update',
               'camera-aware snapshot': 'coaster_runtime.snapshot',
+              'owned track geometry': 'coaster_runtime.track_geometry()',
+              'native track renderer': 'render_coaster_track(',
               'preview toggle': 'SDL_SCANCODE_P',
           }
           missing = [name for name, token in required.items() if token not in runtime]
@@ -113,7 +115,7 @@ jobs:
               raise SystemExit('Flame cars are not submitted through the shared world depth queue')
           if 'SDL_RenderTexture(renderer, atlas->texture' not in runtime:
               raise SystemExit('Flame atlas is not submitted to SDL from the world queue')
-          print('CH_COASTER_RENDER_LINK_V2 integration: OK')
+          print('CH_COASTER_RENDER_LINK_V3 track + train integration: OK')
           PY
 
       - name: Validate promoted occupied Flame V2 atlas
