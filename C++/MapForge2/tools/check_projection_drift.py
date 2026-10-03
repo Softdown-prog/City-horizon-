@@ -2,8 +2,10 @@
 """Fail closed when MapForge introduces a second CH_CAMERA_V1 projection formula.
 
 This check is intentionally source based. Runtime/editor projection parity is covered by
-mapforge_camera_parity_test.cpp; this script protects the authoring tools from quietly
+focused parity tests; this script protects product authoring tools from quietly
 re-introducing local 2:1 math after they have been migrated to canonical bridges.
+Independent test implementations are intentionally excluded so they can compare the
+canonical adapter against a separately-computed expected result.
 """
 
 from __future__ import annotations
@@ -21,6 +23,12 @@ SRC = MAPFORGE_ROOT / "src"
 QA_PROOF_ONLY_ALLOWLIST = {
     "composer_preview_main.cpp",
 }
+
+# Parity/compatibility tests are expected to contain independent projection math.
+# Scanning them as product code makes the guard self-contradictory: a useful test must
+# not merely call the same implementation on both the expected and actual sides.
+def is_independent_test(path: Path) -> bool:
+    return path.name.endswith("_test.cpp") or path.name.endswith("_test.h")
 
 MIGRATED_REQUIREMENTS = {
     "asset_grid_preview_widget.cpp": ("authoring_projection.h", "projectAuthoringGround"),
@@ -75,7 +83,7 @@ def main() -> int:
     for path in sorted(SRC.glob("*")):
         if path.suffix not in {".cpp", ".h", ".hpp"}:
             continue
-        if path.name in QA_PROOF_ONLY_ALLOWLIST:
+        if path.name in QA_PROOF_ONLY_ALLOWLIST or is_independent_test(path):
             continue
         text = path.read_text(encoding="utf-8")
         for pattern in DRIFT_PATTERNS:
@@ -87,6 +95,7 @@ def main() -> int:
 
     print("PASS CH_MAPFORGE_PROJECTION_DRIFT_GUARD_V1")
     print("product projection users are canonical")
+    print("independent parity tests are excluded from product-source scanning")
     print("qa-only exception: " + ", ".join(sorted(QA_PROOF_ONLY_ALLOWLIST)))
     return 0
 
