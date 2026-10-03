@@ -1,0 +1,96 @@
+name: CH MapForge Promote Flame Coaster V2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/animation_preview/promotion_jobs/coaster_flame_v2.promote.json"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout promotion request
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto latest main before touching runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install promotion dependency
+        shell: bash
+        run: python -m pip install --upgrade pillow
+
+      - name: Resolve approved source artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('tools/animation_preview/promotion_jobs/coaster_flame_v2.promote.json')
+          j=json.loads(p.read_text())
+          if j.get('contract') != 'CH_COASTER_ATLAS_PROMOTION_V1':
+              raise SystemExit('bad promotion contract')
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as f:
+              f.write(f"SOURCE_RUN_ID={j['sourceRunId']}\n")
+              f.write(f"SOURCE_ARTIFACT_NAME={j['sourceArtifactName']}\n")
+          PY
+
+      - name: Download approved CH Blender final bake
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf out/flame-v2-source
+          mkdir -p out/flame-v2-source
+          gh run download "$SOURCE_RUN_ID" --repo "${{ github.repository }}" --name "$SOURCE_ARTIFACT_NAME" --dir out/flame-v2-source
+
+      - name: Promote atlas and runtime bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/animation_preview/promote_coaster_flame_v2.py \
+            --artifact-root out/flame-v2-source \
+            --trigger tools/animation_preview/promotion_jobs/coaster_flame_v2.promote.json
+
+      - name: Commit one coherent V2 runtime state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/coaster_car_pose.h \
+            src/coaster_train_runtime.h \
+            C++/MapForge2/src/coaster_project_video_main.cpp \
+            C++/MapForge2/src/coaster_video_proof_main.cpp \
+            C++/MapForge2/projects/coaster_flame_01.mapforge.json \
+            tools/animation_preview/examples/coaster_flame_train_4car_mapforge.json \
+            assets/vehicles/coaster_flame_01/car_pose_atlas_v2.png \
+            assets/vehicles/coaster_flame_01/car_pose_atlas_runtime_v2.json \
+            assets/vehicles/coaster_flame_01/coaster_flame_01_runtime.json \
+            .github/workflows/ch-mapforge-coaster-video-proof.yml
+          git diff --cached --check
+          git commit -m "coaster: promote approved occupied pose atlas V2"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            git pull --rebase origin main
+          done
