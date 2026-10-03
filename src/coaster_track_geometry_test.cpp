@@ -54,6 +54,31 @@ int main() {
     if (!near(distance(first.left_rail, first.right_rail), style.gauge_m, 0.01))
         return fail("rail gauge drifted from coaster style");
 
+    // Support spacing should stay relaxed on low/straight track and tighten as
+    // height, curvature and grade increase. This keeps valleys visually clean
+    // while giving elevated/loaded sections enough structure.
+    CenterlineSample relaxed_sample{};
+    relaxed_sample.z = 1.5;
+    relaxed_sample.up_z = 1.0;
+    relaxed_sample.tangent_x = 1.0;
+
+    CenterlineSample loaded_sample = relaxed_sample;
+    loaded_sample.z = 9.0;
+    loaded_sample.tangent_x = 0.8;
+    loaded_sample.tangent_z = 0.6;
+    loaded_sample.horizontal_curvature_per_m = 0.075;
+    loaded_sample.vertical_curvature_per_m = 0.035;
+
+    const double relaxed_spacing = adaptive_support_spacing_m(
+        style, relaxed_sample, 0.0);
+    const double loaded_spacing = adaptive_support_spacing_m(
+        style, loaded_sample, 0.0);
+    if (!(loaded_spacing < relaxed_spacing))
+        return fail("loaded coaster sections must receive denser supports");
+    if (loaded_spacing < style.support_min_spacing_m - 1.0e-9 ||
+        relaxed_spacing > style.support_spacing_m + 1.0e-9)
+        return fail("adaptive support spacing escaped configured bounds");
+
     // Verify that a vertical loop uses the transported local up/right frame.
     // At the apex local up points down; therefore the structural spine, offset
     // in -up, must move upward in world Z instead of staying beneath the car.
@@ -116,6 +141,8 @@ int main() {
     std::cout << kCoasterTrackGeometryContract << " regression: OK\n";
     std::cout << "steep_frames=" << steep_geometry.frames.size()
               << " loop_frames=" << loop_geometry.frames.size()
-              << " render_lines=" << render_plan.lines.size() << '\n';
+              << " render_lines=" << render_plan.lines.size()
+              << " relaxed_support_spacing=" << relaxed_spacing
+              << " loaded_support_spacing=" << loaded_spacing << '\n';
     return 0;
 }
