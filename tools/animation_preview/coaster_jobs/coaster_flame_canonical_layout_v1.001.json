@@ -1,0 +1,27 @@
+{
+  "contract": "CH_COASTER_VIDEO_PROOF_V1",
+  "id": "coaster.flame.canonical_layout_v1.001",
+  "reviewOnly": true,
+  "trackContract": "CH_COASTER_TRACK_V1",
+  "routeContract": "CH_COASTER_CENTERLINE_ROUTE_V1",
+  "layoutContract": "CH_COASTER_CANONICAL_LAYOUT_V1",
+  "trainRuntimeContract": "CH_COASTER_TRAIN_RUNTIME_V1",
+  "carPoseContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V1",
+  "atlas": "assets/vehicles/coaster_flame_01/car_pose_atlas.png",
+  "carCount": 4,
+  "carSpacingMeters": 2.445,
+  "fps": 30,
+  "durationSeconds": 12,
+  "frameCount": 360,
+  "layout": {
+    "station": true,
+    "liftHill": true,
+    "firstDrop": true,
+    "verticalLoop": true,
+    "ascendingHelix": true,
+    "brakeRun": true,
+    "supports": true,
+    "source": "src/coaster_canonical_layout.h"
+  },
+  "purpose": "Validate the four-car Flame train on the canonical modular coaster route assembled from the approved City Horizon track vocabulary, with heading regression fixes active."
+}
