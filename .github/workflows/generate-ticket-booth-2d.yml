@@ -1,16 +1,6 @@
 name: Generate Building Composer 2D Ticket Booth
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "C++/MapForge2/src/building_composer.h"
-      - "C++/MapForge2/src/building_facade_renderer.cpp"
-      - "C++/MapForge2/src/building_roof_editor_renderer.cpp"
-      - "C++/MapForge2/src/composer_preview_main.cpp"
-      - "C++/MapForge2/CMakeLists.txt"
-      - ".github/workflows/generate-ticket-booth-2d.yml"
   workflow_dispatch:
 
 jobs:
