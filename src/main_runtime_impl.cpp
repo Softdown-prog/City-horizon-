@@ -563,10 +563,6 @@ void render_heightfield_tile_outline(SDL_Renderer* renderer, const int x, const 
 void render_heightfield_tile_fill(SDL_Renderer* renderer, const int x, const int y,
                                   const Camera& camera, const float viewport_width, const float viewport_height,
                                   const SDL_FColor color, const ch::MapDocument* document) {
-    if (document == nullptr) {
-        render_tile_fill(renderer, x, y, camera, viewport_width, viewport_height, color);
-        return;
-    }
     const SDL_FPoint p0 = terrain_world_to_screen(static_cast<float>(x), static_cast<float>(y),
                                                   camera, viewport_width, viewport_height, document);
     const SDL_FPoint p1 = terrain_world_to_screen(static_cast<float>(x + 1), static_cast<float>(y),
