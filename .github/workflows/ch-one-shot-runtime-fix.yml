@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Apply guarded linker repair
         shell: pwsh
@@ -105,4 +105,5 @@ jobs:
           git diff --cached --check
           if (git diff --cached --quiet) { exit 0 }
           git commit -m "fix: keep building color compatibility on canonical manager"
+          git pull --rebase origin main
           git push origin HEAD:main
