@@ -20,37 +20,14 @@ jobs:
       - name: Build remaining CTest targets
         shell: pwsh
         run: cmake --build build-ctest --config Debug --parallel 2 --target building_system_test audio_manager_test ui_manager_test
-      - name: Verify building test
-        shell: pwsh
-        run: ctest --test-dir build-ctest -C Debug --output-on-failure -R "^building_system_test$"
-      - name: Diagnose audio and UI executables directly
+      - name: Expose SDL runtime DLLs
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          $failed = $false
-          $cases = @(
-            @{ Name = "audio_manager_test"; Exe = "build-ctest/Debug/audio_manager_test.exe"; Args = @("assets/audio"); AudioDummy = $true },
-            @{ Name = "ui_manager_test"; Exe = "build-ctest/Debug/ui_manager_test.exe"; Args = @(); AudioDummy = $false }
-          )
-          foreach ($case in $cases) {
-            $stdout = "$($case.Name).stdout.log"
-            $stderr = "$($case.Name).stderr.log"
-            Remove-Item $stdout,$stderr -ErrorAction SilentlyContinue
-            if ($case.AudioDummy) { $env:SDL_AUDIO_DRIVER = "dummy" } else { Remove-Item Env:SDL_AUDIO_DRIVER -ErrorAction SilentlyContinue }
-            Write-Host "=== START $($case.Name) ==="
-            $process = Start-Process -FilePath $case.Exe -ArgumentList $case.Args -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-            if (-not $process.WaitForExit(10000)) {
-              Write-Host "TIMEOUT: $($case.Name) did not exit within 10 seconds"
-              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-              $failed = $true
-            } else {
-              Write-Host "EXIT: $($case.Name) -> $($process.ExitCode)"
-              if ($process.ExitCode -ne 0) { $failed = $true }
-            }
-            Write-Host "--- stdout ---"
-            if (Test-Path $stdout) { Get-Content $stdout }
-            Write-Host "--- stderr ---"
-            if (Test-Path $stderr) { Get-Content $stderr }
-            Write-Host "=== END $($case.Name) ==="
-          }
-          if ($failed) { exit 1 }
+          $sdlRuntime = (Resolve-Path "build-ctest/_deps/sdl3-build/Debug").Path
+          Write-Host "Adding SDL runtime directory to PATH: $sdlRuntime"
+          $sdlRuntime | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Run remaining CTest targets
+        shell: pwsh
+        env:
+          SDL_AUDIO_DRIVER: dummy
+        run: ctest --test-dir build-ctest -C Debug --output-on-failure --timeout 30 -R "^(building_system_test|audio_manager_test|ui_manager_test)$"
