@@ -1,0 +1,52 @@
+{
+  "contract": "CH_MAPFORGE_COASTER_PROJECT_V1",
+  "projectId": "coaster.flame.01",
+  "assetId": "ride.coaster.flame_01",
+  "name": "Flame Coaster",
+  "mapForge": {
+    "tileMeters": 3.0,
+    "footprintTiles": {"width": 28, "depth": 28},
+    "closedRoute": true,
+    "start": {"x": 12.0, "y": 0.0, "z": 0.0, "headingDegrees": 0.0}
+  },
+  "train": {
+    "carCount": 4,
+    "carSpacingMeters": 2.445,
+    "passengersPerCar": 2
+  },
+  "track": {
+    "contract": "CH_COASTER_TRACK_V1",
+    "centerlineContract": "CH_COASTER_CENTERLINE_ROUTE_V2"
+  },
+  "pieces": [
+    {"id":"station_run","type":"straight","length":12.0,"rise":0.0,"driveMode":"station","targetSpeedMps":4.5},
+    {"id":"lift_hill","type":"straight","length":42.0,"rise":12.0,"driveMode":"lift","targetSpeedMps":6.0},
+    {"id":"lift_crest","type":"straight","length":6.0,"rise":0.0},
+    {"id":"elevated_turn","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"first_drop","type":"straight","length":24.0,"rise":-12.0},
+    {"id":"valley","type":"straight","length":8.0,"rise":0.0},
+    {"id":"camelback_up","type":"straight","length":12.0,"rise":4.0},
+    {"id":"camelback_down","type":"straight","length":12.0,"rise":-4.0},
+    {"id":"back_turn","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"back_straight","type":"straight","length":36.0,"rise":0.0},
+    {"id":"second_hill_up","type":"straight","length":12.0,"rise":3.0},
+    {"id":"second_hill_down","type":"straight","length":12.0,"rise":-3.0},
+    {"id":"return_turn_1","type":"quarter_curve","radius":12.0,"left":true},
+    {"id":"return_straight","type":"straight","length":44.0,"rise":0.0},
+    {"id":"brake_run","type":"straight","length":12.0,"rise":0.0,"driveMode":"brake","targetSpeedMps":7.0},
+    {"id":"return_turn_2","type":"quarter_curve","radius":12.0,"left":true,"driveMode":"brake","targetSpeedMps":5.5}
+  ],
+  "authoredModulesAvailable": [
+    "vertical_loop",
+    "helix_up_left",
+    "helix_up_right",
+    "corkscrew_left",
+    "corkscrew_right"
+  ],
+  "capturePolicy": {
+    "runtimeValidOnly": true,
+    "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
+    "deferCombinedPitchRollModules": true,
+    "reason": "Occupied V2 covers 16-way slopes, vertical, +/-24 degree bank and inverted apex. Combined pitch+roll corkscrew transitions remain explicit follow-up coverage instead of using a silent fallback."
+  }
+}
