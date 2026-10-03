@@ -30,6 +30,13 @@ def beam(n,a,b,w,d,m,parent):
 def cyl_x(n,loc,r,depth,m,parent):
     bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=r,depth=depth,location=loc,rotation=(0,math.pi/2,0))
     o=bpy.context.object;o.name=n;o.data.materials.append(m);o.parent=parent;return o
+def round_mast(n,a,b,r,m,parent):
+    a=Vector(a); b=Vector(b); v=b-a
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=r,depth=v.length,location=tuple((a+b)*.5))
+    o=bpy.context.object; o.name=n; o.data.materials.append(m); o.parent=parent
+    o.rotation_mode='QUATERNION'; o.rotation_quaternion=v.to_track_quat('Z','Y')
+    bev=o.modifiers.new("MastEdge","BEVEL"); bev.width=.035; bev.segments=2
+    return o
 
 def hull(root,M,L,HW,cz):
     xs=[-L/2,-L*.43,-L*.30,-L*.12,0,L*.12,L*.30,L*.43,L/2]
@@ -53,20 +60,15 @@ def hull(root,M,L,HW,cz):
 
 def build(root,c,M):
     d=c["dimensions"]; pz=d["pivotZ"]; sy=d["sideFrameHalfY"]; lx=d["sideLegHalfX"]; cz=d["shipCenterZ"]
-    # Correct ride topology: two side A-frames centered at the ship midpoint.
-    # Each side frame sits on port/starboard; the ship swings longitudinally between them.
     for y,label in ((-sy,"NearSide"),(sy,"FarSide")):
         apex=(0,y,pz)
         beam(label+"_FrontLeg",(-lx,y,0.25),apex,1.0,1.0,M["structure"],root)
         beam(label+"_RearLeg",(lx,y,0.25),apex,1.0,1.0,M["structure"],root)
         beam(label+"_LowTie",(-lx*.72,y,5.0),(lx*.72,y,5.0),.40,.40,M["truss"],root)
         beam(label+"_MidTie",(-lx*.46,y,11.2),(lx*.46,y,11.2),.34,.34,M["truss"],root)
-    # Single transverse pivot axle through the two side-frame apexes.
     beam("TransversePivotAxle",(0,-sy,pz),(0,sy,pz),1.05,1.05,M["structure"],root)
     for y,label in ((-sy,"Near"),(sy,"Far")):
         cyl_x(label+"BearingHousing",(0,y,pz),1.35,1.10,M["truss"],root)
-    # Long triangulated pendulum arms descend from the central axle toward bow/stern attachment zones.
-    # This is the characteristic real pirate-ship mechanism visible in the supplied references.
     attach_z=cz+.35; attach_x=d["shipLength"]*.40
     for y,label in ((-1.2,"NearPendulum"),(1.2,"FarPendulum")):
         beam(label+"_BowMain",(0,y,pz),(-attach_x,y,attach_z),.62,.62,M["truss"],root)
@@ -78,8 +80,12 @@ def build(root,c,M):
             bx=-attach_x*t; sx=attach_x*t; z=pz+(attach_z-pz)*t
             beam(label+"_BowTie"+str(k),(bx,y-.22,z),(bx,y+.22,z),.16,.16,M["truss"],root)
             beam(label+"_SternTie"+str(k),(sx,y-.22,z),(sx,y+.22,z),.16,.16,M["truss"],root)
+    # Central round pendulum mast: descends from the axle center and carries the ship at its midpoint.
+    mast_attach_z=float(d.get("centralMastAttachZ",cz+.45)); mast_r=float(d.get("centralMastRadius",.46))
+    round_mast("CentralRoundPendulumMast",(0,0,pz-.55),(0,0,mast_attach_z),mast_r,M["truss"],root)
+    cyl_x("CentralPivotCollar",(0,0,pz-.18),mast_r*1.55,1.35,M["structure"],root)
+    cyl_x("CentralShipMount",(0,0,mast_attach_z),mast_r*1.35,1.80,M["truss"],root)
     hull(root,M,d["shipLength"],d["shipHalfWidth"],cz)
-    # Independent boarding platform beside the hull, not a structural cage under the ride.
     deckZ=d["deckZ"];box("BoardingDeck",(0,-5.15,deckZ*.5),(18.5,2.4,deckZ),M["deck"],root,.08)
     beam("DeckOuterRail",(-9.0,-6.25,deckZ+1),(9.0,-6.25,deckZ+1),.10,.10,M["rail"],root)
     for x in range(-8,9,2): beam("DeckPost"+str(x),(x,-6.25,deckZ),(x,-6.25,deckZ+1),.10,.10,M["rail"],root)
@@ -97,7 +103,7 @@ def main():
     ground=bs.add_box("ShadowReceiverPlane",recv["location"],[28,20,float(recv["dimensions"][2])],rm,0)
     authored=[o for o in bpy.context.scene.objects if o.type=="MESH" and o!=ground]
     bs.calibrate_ortho_scale(scene,authored,safety_margin=.14);bs.set_direction(root,bs.DIRECTIONS[0]);bpy.context.view_layer.update()
-    (out/"studio_metadata.json").write_text(json.dumps({"contract":CONTRACT,"assetId":ASSET,"modelingMethod":"two_side_A_frames_central_transverse_axle_triangulated_pendulum","reference":"user supplied real ride photos"},indent=2))
+    (out/"studio_metadata.json").write_text(json.dumps({"contract":CONTRACT,"assetId":ASSET,"modelingMethod":"two_side_A_frames_central_transverse_axle_auxiliary_trusses_plus_round_center_mast","reference":"user supplied real ride photos"},indent=2))
     profile=scene_gate.load_profile(a.preflight_profile);pre=scene_gate.run_preflight(scene=scene,authored=authored,footprint=c["footprint"],profile=profile,asset_id=ASSET,report_path=out/"preflight_report.json");scene_gate.require_pass(pre)
     if a.stage=="proxy":
         rep=scene_gate.render_proxy(scene=scene,authored=authored,output_path=out/"proxy_south.png",profile=profile,asset_id=ASSET,direction="south");(out/"proxy_report.json").write_text(json.dumps(rep,indent=2))
