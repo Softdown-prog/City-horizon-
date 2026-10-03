@@ -44,11 +44,14 @@ struct Projection {
     double scale = 1.0;
     double offsetX = 0.0;
     double offsetY = 0.0;
-    double zFactor = 3.2;
+    // CH_CAMERA_V1: orthographic, yaw 45 degrees, elevation 30 degrees.
+    // With the 2:1 ground diamond normalized to u=x+y, the world-Z screen
+    // coefficient is sqrt(3/2). Keep this identical to fit_projection().
+    double zFactor = 1.224744871391589;
 
     [[nodiscard]] QPointF map(double x, double y, double z) const {
-        const double u = x - y;
-        const double v = 0.5 * (x + y) - z * zFactor;
+        const double u = x + y;
+        const double v = 0.5 * (x - y) - z * zFactor;
         return {offsetX + u * scale, offsetY + v * scale};
     }
 };
@@ -209,10 +212,13 @@ std::vector<ch::coaster::CenterlineSample> sample_track(const ch::coaster::Cente
 
 Projection fit_projection(const std::vector<ch::coaster::CenterlineSample>& samples) {
     double minU = 1.0e30, maxU = -1.0e30, minV = 1.0e30, maxV = -1.0e30;
-    constexpr double zFactor = 3.2;
+    // Must match the frozen CH_CAMERA_V1 used by CH Blender. The prior
+    // 3.2 coefficient and x-y horizontal basis described a different camera,
+    // so correctly selected car sprites could never sit visually on the rail.
+    constexpr double zFactor = 1.224744871391589;
     for (const auto& s : samples) {
-        const double u = s.x - s.y;
-        const double v = 0.5 * (s.x + s.y) - s.z * zFactor;
+        const double u = s.x + s.y;
+        const double v = 0.5 * (s.x - s.y) - s.z * zFactor;
         minU = std::min(minU, u); maxU = std::max(maxU, u);
         minV = std::min(minV, v); maxV = std::max(maxV, v);
     }
@@ -320,16 +326,32 @@ void draw_train(QPainter& painter, const Projection& projection, const QImage& a
         const auto sample = route.sample(d);
         if (!sample) continue;
         auto pose = ch::coaster::make_car_runtime_pose(i, *sample, kTrainSpeedMps, 0, cfg.physics);
-        cars.push_back({pose, pose.world_x + pose.world_y + pose.world_z * 0.25});
+        // Camera is at +X/-Y and 30 degrees elevation. Draw farther cars
+        // first using the same view basis as CH_CAMERA_V1. sqrt(2/3) is the
+        // world-Z depth coefficient after normalizing the X/Y terms to +/-1.
+        cars.push_back({pose, pose.world_x - pose.world_y + pose.world_z * 0.816496580927726});
     }
     std::sort(cars.begin(), cars.end(), [](const DrawCar& a, const DrawCar& b){ return a.depth < b.depth; });
     for (const auto& car : cars) {
         const auto& r = car.pose.sprite_pose.source_rect;
         const QRect src(r.x,r.y,r.w,r.h);
-        const QPointF anchor = projection.map(car.pose.world_x, car.pose.world_y, car.pose.world_z + 0.12);
-        const double spriteScale = std::clamp(projection.scale / 14.0, 0.34, 0.68);
+        // The route sample itself is the rail centerline. Never add a screen-space
+        // or world-Z fudge here: all occupied V2 frames were baked around the same
+        // physical local rail anchor (0,0,0.48 m).
+        const QPointF anchor = projection.map(car.pose.world_x, car.pose.world_y, car.pose.world_z);
+
+        // Preserve CH Blender world scale exactly. For CH_CAMERA_V1, the source
+        // horizontal coordinate is (x+y)/sqrt(2), so source pixels per normalized
+        // MapForge u unit are 256/(orthoScale*sqrt(2)).
+        constexpr double kBakedOrthoScale = 6.512514321292677;
+        constexpr double kSpriteScaleCoefficient = 0.035976898743442;
+        constexpr double kRailAnchorSourceX = 128.0;
+        constexpr double kRailAnchorSourceY = 154.212752736043740;
+        static_assert(kBakedOrthoScale > 6.5 && kBakedOrthoScale < 6.53);
+        const double spriteScale = projection.scale * kSpriteScaleCoefficient;
         const QSizeF size(r.w * spriteScale, r.h * spriteScale);
-        const QRectF dst(anchor.x() - size.width()*0.5, anchor.y() - size.height()*0.62,
+        const QRectF dst(anchor.x() - kRailAnchorSourceX * spriteScale,
+                         anchor.y() - kRailAnchorSourceY * spriteScale,
                          size.width(), size.height());
         painter.drawImage(dst, atlas, src);
     }
