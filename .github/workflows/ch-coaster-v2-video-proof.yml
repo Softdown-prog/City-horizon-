@@ -55,21 +55,36 @@ jobs:
           print('occupied V2 atlas validated', actual)
           PY
 
-      - name: Install renderer dependencies and Qt 6.8.3
+      - name: Install renderer dependencies and compatible Qt
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build ffmpeg libgl1-mesa-dev
           python3 -m pip install --user --upgrade aqtinstall
-          python3 -m aqt install-qt linux desktop 6.8.3 gcc_64 -O "$HOME/Qt"
-          test -f "$HOME/Qt/6.8.3/gcc_64/lib/cmake/Qt6/Qt6Config.cmake"
+          echo 'Available Qt 6.8.3 Linux desktop architectures:'
+          python3 -m aqt list-qt linux desktop --arch 6.8.3
+          QT_ARCH="$(python3 -m aqt list-qt linux desktop --arch 6.8.3 | tr ' ' '\n' | grep -E '(^|_)(gcc_64|linux_gcc_64)$' | head -n1 || true)"
+          if [ -z "$QT_ARCH" ]; then
+            QT_ARCH="$(python3 -m aqt list-qt linux desktop --arch 6.8.3 | tr ' ' '\n' | grep -E 'gcc.*64|64.*gcc' | head -n1 || true)"
+          fi
+          if [ -z "$QT_ARCH" ]; then
+            echo 'Could not resolve a supported 64-bit GCC Qt architecture for 6.8.3' >&2
+            exit 1
+          fi
+          echo "Resolved Qt architecture: $QT_ARCH"
+          python3 -m aqt install-qt linux desktop 6.8.3 "$QT_ARCH" -O "$HOME/Qt"
+          QT_PREFIX="$HOME/Qt/6.8.3/$QT_ARCH"
+          test -f "$QT_PREFIX/lib/cmake/Qt6/Qt6Config.cmake"
+          echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
+          echo "QT_PLUGIN_PATH=$QT_PREFIX/plugins" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$QT_PREFIX/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Configure renderer
         run: |
           set -euo pipefail
           cmake -S tools/animation_preview/coaster_video_proof \
             -B build/ch-coaster-v2 -G Ninja \
-            -DCMAKE_PREFIX_PATH="$HOME/Qt/6.8.3/gcc_64"
+            -DCMAKE_PREFIX_PATH="$QT_PREFIX"
 
       - name: Build renderer
         run: cmake --build build/ch-coaster-v2 --target MapForge2CoasterVideoProof --parallel
