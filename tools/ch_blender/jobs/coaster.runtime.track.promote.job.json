@@ -5,5 +5,6 @@
   "script": "tools/ch_blender/promote_coaster_track_runtime.py",
   "args": [],
   "outputDir": "out/ch_blender_agent/coaster.runtime.track.promote.v1",
-  "expectedOutputs": []
+  "expectedOutputs": [],
+  "revision": 2
 }
