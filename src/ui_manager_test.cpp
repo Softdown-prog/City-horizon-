@@ -6,6 +6,12 @@
 #include <cstdlib>
 #include <iostream>
 
+// The UI unit test does not run the simulation. Keep the presentation bridge
+// deterministic instead of linking the full weather runtime into this harness.
+int ch_weather_ui_state_code() {
+    return 0;
+}
+
 namespace {
 
 void require(bool condition, const char* message) {
