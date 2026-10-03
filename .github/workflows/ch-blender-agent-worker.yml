@@ -188,9 +188,10 @@ jobs:
             exit 1
           fi
           git diff --check
+          git restore -- .github/workflows/ch-coaster-runtime-check.yml
           git config user.name 'Softdown-prog'
           git config user.email 'rutsdrigo@gmail.com'
-          git add src/main_runtime_impl.cpp .github/workflows/ch-coaster-runtime-check.yml
+          git add src/main_runtime_impl.cpp
           git commit -m 'coaster: promote native track geometry to runtime preview'
           git push origin HEAD:main
 
