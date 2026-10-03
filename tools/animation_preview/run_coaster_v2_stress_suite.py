@@ -31,6 +31,27 @@ def validate_meta(meta_path: Path, frames_dir: Path):
     return meta
 
 
+def validate_encoded_outputs(video: Path, sheet: Path, probe: Path, expected_frames: int):
+    for path in (video, sheet, probe):
+        if not path.is_file() or path.stat().st_size <= 0:
+            raise RuntimeError(f"missing or empty stress proof output: {path}")
+
+    payload = json.loads(probe.read_text(encoding="utf-8"))
+    streams = payload.get("streams", [])
+    if len(streams) != 1:
+        raise RuntimeError(f"expected exactly one video stream in {probe}")
+    stream = streams[0]
+    if stream.get("r_frame_rate") != "30/1":
+        raise RuntimeError(f"stress proof must remain 30 fps, got {stream.get('r_frame_rate')}")
+    encoded_frames = stream.get("nb_frames")
+    if encoded_frames is not None and int(encoded_frames) != expected_frames:
+        raise RuntimeError(
+            f"encoded stress proof frame mismatch encoded={encoded_frames} expected={expected_frames}"
+        )
+    if int(stream.get("width", 0)) <= 0 or int(stream.get("height", 0)) <= 0:
+        raise RuntimeError("stress proof has invalid encoded dimensions")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--renderer", required=True)
@@ -42,7 +63,7 @@ def main():
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
-    summary = {"contract": "CH_COASTER_V2_STRESS_SUITE_V1", "status": "ok", "layouts": {}}
+    summary = {"contract": "CH_COASTER_V2_STRESS_SUITE_V2", "status": "ok", "layouts": {}}
 
     for slug, project in LAYOUTS.items():
         out = root / slug
@@ -66,12 +87,15 @@ def main():
             subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
                             "-show_entries", "stream=width,height,r_frame_rate,nb_frames",
                             "-of", "json", video], check=True, stdout=fh)
+        validate_encoded_outputs(video, sheet, probe, meta["frameCount"])
+
         summary["layouts"][slug] = {
             "project": project,
             "routeMeters": meta["routeMeters"],
             "lapSeconds": meta["lapSeconds"],
             "frameCount": meta["frameCount"],
             "fullLapValidated": True,
+            "encodedOutputValidated": True,
             "video": video.name,
             "contactSheet": sheet.name,
         }
