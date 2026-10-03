@@ -1,0 +1,137 @@
+name: CTest Worker Pool
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "src/**"
+      - "assets/definitions/**"
+      - "assets/audio/**"
+      - ".github/workflows/ctest-worker-pool.yml"
+
+concurrency:
+  group: ctest-worker-pool-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-tests:
+    name: Build CTest bundle
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure tests
+        shell: pwsh
+        run: cmake -S . -B build-ctest -DBUILD_TESTING=ON
+
+      - name: Build registered CTest targets
+        shell: pwsh
+        run: >-
+          cmake --build build-ctest --config Debug --parallel 2 --target
+          ch_core_test terrain_heightfield_test procedural_road_lane_connector_test
+          building_system_test audio_manager_test economy_simulation_test
+          road_visual_catalog_test sidewalk_topology_test mobile_animation_test
+          navigation_network_test pedestrian_system_test vehicle_traffic_test
+          weather_system_test land_system_test save_manager_test
+          population_system_test power_system_test mission_system_test
+          ui_manager_test transaction_test shoreline_autotile_test
+
+      - name: Stage portable CTest bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ctest-bundle/Debug | Out-Null
+          Copy-Item build-ctest/CTestTestfile.cmake ctest-bundle/CTestTestfile.cmake
+          Copy-Item build-ctest/Debug/*.exe ctest-bundle/Debug/
+          Copy-Item build-ctest/_deps/sdl3-build/Debug/SDL3.dll ctest-bundle/Debug/
+
+      - name: Upload CTest bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-debug-bundle
+          path: ctest-bundle
+          if-no-files-found: error
+          retention-days: 2
+
+  workers:
+    name: Worker ${{ matrix.worker }} / 32
+    needs: build-tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 32
+      matrix:
+        worker: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download CTest bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ctest-debug-bundle
+          path: build-ctest
+
+      - name: Run assigned CTest shard
+        shell: pwsh
+        env:
+          SDL_AUDIO_DRIVER: dummy
+          CH_CTEST_WORKER: ${{ matrix.worker }}
+          CH_CTEST_POOL_SIZE: 32
+        run: |
+          $ErrorActionPreference = "Stop"
+          $worker = [int]$env:CH_CTEST_WORKER
+          $poolSize = [int]$env:CH_CTEST_POOL_SIZE
+
+          $tests = @(
+            "ch_core_test",
+            "terrain_heightfield_test",
+            "procedural_road_lane_connector_test",
+            "building_system_test",
+            "audio_manager_test",
+            "economy_simulation_test",
+            "road_visual_catalog_test",
+            "sidewalk_topology_test",
+            "mobile_animation_test",
+            "navigation_network_test",
+            "pedestrian_system_test",
+            "vehicle_traffic_test",
+            "weather_system_test",
+            "land_system_test",
+            "save_manager_test",
+            "population_system_test",
+            "power_system_test",
+            "mission_system_test",
+            "ui_manager_test",
+            "transaction_test",
+            "shoreline_autotile_test"
+          )
+
+          if ($worker -gt $tests.Count) {
+            Write-Host "Worker $worker/$poolSize is reserve capacity. Current suite has $($tests.Count) tests."
+            exit 0
+          }
+
+          $testName = $tests[$worker - 1]
+          $sdlRuntime = (Resolve-Path "build-ctest/Debug").Path
+          $env:PATH = "$sdlRuntime;$env:PATH"
+
+          Write-Host "Worker $worker/$poolSize running: $testName"
+          ctest --test-dir build-ctest -C Debug --output-on-failure --timeout 30 -R "^$testName$"
+
+  pool-gate:
+    name: CTest Pool Gate
+    if: always()
+    needs: workers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all workers green
+        shell: bash
+        run: |
+          if [ "${{ needs.workers.result }}" != "success" ]; then
+            echo "One or more CTest workers failed."
+            exit 1
+          fi
+          echo "CTest worker pool passed."
