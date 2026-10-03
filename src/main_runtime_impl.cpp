@@ -636,9 +636,11 @@ void render_footprint_outline(SDL_Renderer* renderer, const BuildingDefinition& 
 void render_road_access_candidates(SDL_Renderer* renderer, const BuildingDefinition& definition,
                                    const BuildingRotation rotation, const int tile_x, const int tile_y,
                                    const RoadManager& roads, const Camera& camera,
-                                   const float viewport_width, const float viewport_height) {
+                                   const float viewport_width, const float viewport_height,
+                                   const ch::MapDocument* document = nullptr) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_road_access_candidates(renderer, definition, rotation, tile_x, tile_y, roads, cs, viewport_width, viewport_height);
+    ch::MapRenderer::render_road_access_candidates(renderer, definition, rotation, tile_x, tile_y, roads, cs,
+                                                   viewport_width, viewport_height, document);
 }
 
 void render_grass_tile(SDL_Renderer* renderer, const TextureAsset& grass, int x, int y,
@@ -1070,7 +1072,7 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
     render_footprint_outline(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
                              camera, viewport_width, viewport_height, 255, 208, 92, document);
     render_road_access_candidates(renderer, definition, instance.rotation, instance.tile_x, instance.tile_y,
-                                  roads, camera, viewport_width, viewport_height);
+                                  roads, camera, viewport_width, viewport_height, document);
 
     BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
                                                                 viewport_width, viewport_height);
@@ -4008,7 +4010,8 @@ int main() {
                                       active_map_doc ? &*active_map_doc : nullptr);
             if (debug_visible) {
                 render_road_access_candidates(renderer, *placement_definition, placement_rotation, mouse_tile.first, mouse_tile.second,
-                                              roads, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                                              roads, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                              active_map_doc ? &*active_map_doc : nullptr);
             }
         }
         if (agriculture_mode) {
