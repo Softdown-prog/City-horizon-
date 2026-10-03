@@ -13,7 +13,7 @@
 
 namespace ch::track {
 
-inline constexpr const char* kTrackGraphContract = "CH_TRACK_GRAPH_V1";
+inline constexpr const char* kTrackGraphContract = "CH_TRACK_GRAPH_V2";
 
 using PieceInstanceId = std::uint32_t;
 using ConnectionId = std::uint32_t;
@@ -211,8 +211,6 @@ public:
                 point.target_speed_mps = source.target_speed_mps;
 
                 if (!output.points.empty() && squared_distance(output.points.back().position, point.position) <= join_tolerance_sq) {
-                    // The outgoing piece owns behavior at a shared junction so station/lift/brake
-                    // metadata starts exactly at its entry instead of one sample late.
                     output.points.back() = point;
                 } else {
                     output.points.push_back(point);
@@ -294,17 +292,37 @@ private:
         return std::nullopt;
     }
 
-    [[nodiscard]] static std::optional<TraversalChoice> route_for_entry(const PieceInstance& instance,
-                                                                        const std::size_t port) noexcept {
-        if (instance.active_route >= instance.descriptor.routes.size()) return std::nullopt;
-        const RouteDescriptor& active = instance.descriptor.routes[instance.active_route];
-        if (active.entry_port == port) {
-            return TraversalChoice{instance.active_route, active.exit_port, false};
+    [[nodiscard]] static std::optional<TraversalChoice> choice_for_route(
+        const RouteDescriptor& route,
+        const std::size_t route_index,
+        const std::size_t port) noexcept {
+        if (route.entry_port == port) {
+            return TraversalChoice{route_index, route.exit_port, false};
         }
-        if (active.reversible && active.exit_port == port) {
-            return TraversalChoice{instance.active_route, active.entry_port, true};
+        if (route.reversible && route.exit_port == port) {
+            return TraversalChoice{route_index, route.entry_port, true};
         }
         return std::nullopt;
+    }
+
+    [[nodiscard]] static std::optional<TraversalChoice> route_for_entry(const PieceInstance& instance,
+                                                                        const std::size_t port) noexcept {
+        // Switches expose exactly one selected route. Non-switch multi-route
+        // pieces (notably crossings) route by the port used to enter, allowing
+        // both independent paths to remain live without mutable switch state.
+        if (has_flag(instance.descriptor, PieceFlag::switch_piece)) {
+            if (instance.active_route >= instance.descriptor.routes.size()) return std::nullopt;
+            return choice_for_route(instance.descriptor.routes[instance.active_route], instance.active_route, port);
+        }
+
+        std::optional<TraversalChoice> match;
+        for (std::size_t route_index = 0U; route_index < instance.descriptor.routes.size(); ++route_index) {
+            const auto candidate = choice_for_route(instance.descriptor.routes[route_index], route_index, port);
+            if (!candidate) continue;
+            if (match) return std::nullopt; // ambiguous descriptor: fail closed
+            match = candidate;
+        }
+        return match;
     }
 
     std::vector<PieceInstance> pieces_;

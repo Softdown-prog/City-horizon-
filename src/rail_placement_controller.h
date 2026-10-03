@@ -5,7 +5,7 @@
 #include <cmath>
 #include <optional>
 
-inline constexpr const char* kChRailPlacementControllerContract = "CH_RAIL_PLACEMENT_CONTROLLER_V1";
+inline constexpr const char* kChRailPlacementControllerContract = "CH_RAIL_PLACEMENT_CONTROLLER_V2";
 
 enum class RailPlacementMode {
     straight,
@@ -13,6 +13,7 @@ enum class RailPlacementMode {
     curve_right,
     turnout_left,
     turnout_right,
+    crossing,
 };
 
 struct RailPlacementPreview {
@@ -21,6 +22,7 @@ struct RailPlacementPreview {
     RailPlacementEdgeId primary_edge = kInvalidRailPlacementEdgeId;
     RailPlacementNodeId secondary_node = kInvalidRailPlacementNodeId;
     RailPlacementEdgeId secondary_edge = kInvalidRailPlacementEdgeId;
+    RailPlacementNodeId auxiliary_node = kInvalidRailPlacementNodeId;
 
     [[nodiscard]] bool ok() const {
         return primary_node != kInvalidRailPlacementNodeId &&
@@ -31,15 +33,18 @@ struct RailPlacementPreview {
         return secondary_node != kInvalidRailPlacementNodeId &&
                secondary_edge != kInvalidRailPlacementEdgeId;
     }
+
+    [[nodiscard]] bool has_auxiliary_node() const {
+        return auxiliary_node != kInvalidRailPlacementNodeId;
+    }
 };
 
-// CH_RAIL_PLACEMENT_CONTROLLER_V1
+// CH_RAIL_PLACEMENT_CONTROLLER_V2
 //
 // Transactional editor controller for mouse/pen drag authoring. It does not
-// interpret screen coordinates; the MapForge adapter will convert input through
-// the canonical projection and provide a world-space drag metric. Every preview
-// first rolls the graph back to the operation checkpoint, so repeated mouse-move
-// events replace the previous preview instead of accumulating geometry.
+// interpret screen coordinates; the MapForge adapter converts input through
+// CH_CAMERA_V1 and provides a world-space metric. Repeated previews replace the
+// previous staging geometry. Crossing uses drag length as its diamond span.
 class RailPlacementController final {
 public:
     explicit RailPlacementController(RailPlacementGraph& graph) : graph_(graph) {}
@@ -54,11 +59,9 @@ public:
         return true;
     }
 
-    // metric_world is deliberately simple in V1:
-    //   straight -> requested length
-    //   curve/turnout -> requested radius
-    // Invalid metrics fail closed and leave the graph exactly at the begin()
-    // checkpoint, ready for the next mouse-move event or cancel().
+    // metric_world:
+    //   straight/crossing -> requested length
+    //   curve/turnout     -> requested radius
     [[nodiscard]] std::optional<RailPlacementPreview> preview(const float metric_world) {
         if (!active_ || !std::isfinite(metric_world)) return std::nullopt;
         if (!reset_to_checkpoint()) return std::nullopt;
@@ -100,6 +103,20 @@ public:
             }
             break;
         }
+        case RailPlacementMode::crossing: {
+            const auto result = graph_.append_crossing(source_, metric_world);
+            if (result && result->ok()) {
+                candidate = RailPlacementPreview{
+                    mode_,
+                    result->primary_node,
+                    result->primary_edge,
+                    result->secondary_exit_node,
+                    result->secondary_edge,
+                    result->secondary_entry_node,
+                };
+            }
+            break;
+        }
         }
 
         if (!candidate) {
@@ -113,8 +130,6 @@ public:
         return preview_;
     }
 
-    // Commit is only legal after a valid preview. Geometry is already present
-    // in the staging graph, so commit merely seals the transaction.
     [[nodiscard]] bool commit() {
         if (!active_ || !preview_ || !preview_->ok()) return false;
         finish_operation();
