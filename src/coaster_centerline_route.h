@@ -10,10 +10,11 @@
 
 namespace ch::coaster {
 
-// CH_COASTER_CENTERLINE_ROUTE_V1
+// CH_COASTER_CENTERLINE_ROUTE_V2
 // Runtime representation shared by modular coaster pieces and the articulated
-// train. Authoring/build tools may produce the points however they want; once
-// promoted here the train sees one continuous distance-addressable 3D route.
+// train. V2 transports a rotation-minimizing local frame along the route so a
+// car can distinguish ordinary horizontal track from the inverted top of a
+// vertical loop even when both have similar forward tangents.
 struct RoutePoint {
     double x = 0.0;
     double y = 0.0;
@@ -63,6 +64,7 @@ public:
         }
 
         build_vertex_tangents();
+        build_vertex_frames();
         build_vertex_curvatures();
         valid_ = true;
         return true;
@@ -73,6 +75,8 @@ public:
         segment_lengths_.clear();
         cumulative_.clear();
         tangents_.clear();
+        right_vectors_.clear();
+        up_vectors_.clear();
         horizontal_curvature_.clear();
         vertical_curvature_.clear();
         route_length_m_ = 0.0;
@@ -114,11 +118,6 @@ public:
         result.y = lerp(a.y, b.y, t);
         result.z = lerp(a.z, b.z, t);
 
-        // A rendered car must never face against the segment it is travelling on.
-        // Vertex tangent averaging can collapse to almost zero on a tight hairpin;
-        // falling back to a fixed world axis in that case makes the sprite suddenly
-        // turn sideways/backwards.  Use the actual outgoing segment as the fallback
-        // and reject an interpolated tangent if it points into the opposite hemisphere.
         const Vec3 segment_forward = outgoing_segment_tangent(segment);
         const Vec3 blended = {
             lerp(tangents_[segment].x, tangents_[next].x, t),
@@ -128,16 +127,35 @@ public:
         Vec3 tangent = normalized_or(blended, segment_forward);
         if (dot(tangent, segment_forward) <= 0.0) tangent = segment_forward;
 
+        // Interpolate the transported up axis, remove any component that leaked
+        // into forward, then rebuild an orthonormal right/up pair. This preserves
+        // the inversion state continuously between authored centerline vertices.
+        Vec3 up = {
+            lerp(up_vectors_[segment].x, up_vectors_[next].x, t),
+            lerp(up_vectors_[segment].y, up_vectors_[next].y, t),
+            lerp(up_vectors_[segment].z, up_vectors_[next].z, t),
+        };
+        up = subtract(up, scale(tangent, dot(up, tangent)));
+        up = normalized_or(up, transported_reference_up(tangent));
+        Vec3 right = normalized_or(cross(tangent, up), right_vectors_[segment]);
+        up = normalized_or(cross(right, tangent), up);
+
         result.tangent_x = tangent.x;
         result.tangent_y = tangent.y;
         result.tangent_z = tangent.z;
+        result.right_x = right.x;
+        result.right_y = right.y;
+        result.right_z = right.z;
+        result.up_x = up.x;
+        result.up_y = up.y;
+        result.up_z = up.z;
+        result.roll_degrees = roll_degrees_from_frame(
+            tangent.x, tangent.y, tangent.z, up.x, up.y, up.z);
         result.horizontal_curvature_per_m = lerp(
             horizontal_curvature_[segment], horizontal_curvature_[next], t);
         result.vertical_curvature_per_m = lerp(
             vertical_curvature_[segment], vertical_curvature_[next], t);
 
-        // Drive semantics belong to the outgoing segment. This prevents a lift
-        // or brake from bleeding backwards across a geometric interpolation.
         result.drive_mode = a.drive_mode;
         result.target_speed_mps = a.target_speed_mps;
         return result;
@@ -161,8 +179,28 @@ private:
         return a + (b - a) * t;
     }
 
+    [[nodiscard]] static Vec3 add(const Vec3 a, const Vec3 b) noexcept {
+        return {a.x + b.x, a.y + b.y, a.z + b.z};
+    }
+
+    [[nodiscard]] static Vec3 subtract(const Vec3 a, const Vec3 b) noexcept {
+        return {a.x - b.x, a.y - b.y, a.z - b.z};
+    }
+
+    [[nodiscard]] static Vec3 scale(const Vec3 a, const double s) noexcept {
+        return {a.x * s, a.y * s, a.z * s};
+    }
+
     [[nodiscard]] static double dot(const Vec3& a, const Vec3& b) noexcept {
         return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    [[nodiscard]] static Vec3 cross(const Vec3 a, const Vec3 b) noexcept {
+        return {
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x,
+        };
     }
 
     [[nodiscard]] static double length_squared(const Vec3& value) noexcept {
@@ -180,6 +218,38 @@ private:
 
     [[nodiscard]] static Vec3 normalized(const Vec3 value) noexcept {
         return normalized_or(value, {0.0, 1.0, 0.0});
+    }
+
+    [[nodiscard]] static Vec3 transported_reference_up(const Vec3 tangent) noexcept {
+        Vec3 up = {0.0, 0.0, 1.0};
+        up = subtract(up, scale(tangent, dot(up, tangent)));
+        if (length_squared(up) <= kMinimumSegmentLength * kMinimumSegmentLength) {
+            up = {1.0, 0.0, 0.0};
+            up = subtract(up, scale(tangent, dot(up, tangent)));
+        }
+        return normalized_or(up, {0.0, 1.0, 0.0});
+    }
+
+    [[nodiscard]] static Vec3 rotate_minimal(const Vec3 vector,
+                                             const Vec3 from,
+                                             const Vec3 to) noexcept {
+        const Vec3 axis_raw = cross(from, to);
+        const double axis_sq = length_squared(axis_raw);
+        const double cosine = std::clamp(dot(from, to), -1.0, 1.0);
+        if (axis_sq <= 1.0e-12) {
+            if (cosine >= 0.0) return vector;
+            // Exact reversal: choose an axis perpendicular to travel and preserve
+            // deterministic frame continuity rather than introducing world yaw.
+            Vec3 axis = cross(from, transported_reference_up(from));
+            axis = normalized_or(axis, {1.0, 0.0, 0.0});
+            return subtract(scale(axis, 2.0 * dot(axis, vector)), vector);
+        }
+        const double axis_len = std::sqrt(axis_sq);
+        const Vec3 axis = scale(axis_raw, 1.0 / axis_len);
+        const double sine = axis_len;
+        // Rodrigues rotation from previous tangent to next tangent.
+        return add(add(scale(vector, cosine), scale(cross(axis, vector), sine)),
+                   scale(axis, dot(axis, vector) * (1.0 - cosine)));
     }
 
     [[nodiscard]] static double wrapped_angle_delta(double value) noexcept {
@@ -211,15 +281,29 @@ private:
             const std::size_t previous = (i + points_.size() - 1U) % points_.size();
             const Vec3 incoming = outgoing_segment_tangent(previous);
             const Vec3 outgoing = outgoing_segment_tangent(i);
-            const Vec3 averaged = {
-                incoming.x + outgoing.x,
-                incoming.y + outgoing.y,
-                incoming.z + outgoing.z,
-            };
-            // Near a 180-degree reversal the average is undefined.  Preserve the
-            // authored direction of travel instead of snapping to a world axis.
+            const Vec3 averaged = add(incoming, outgoing);
             tangents_[i] = normalized_or(averaged, outgoing);
             if (dot(tangents_[i], outgoing) <= 0.0) tangents_[i] = outgoing;
+        }
+    }
+
+    void build_vertex_frames() {
+        right_vectors_.resize(points_.size());
+        up_vectors_.resize(points_.size());
+        if (points_.empty()) return;
+
+        up_vectors_[0] = transported_reference_up(tangents_[0]);
+        right_vectors_[0] = normalized_or(cross(tangents_[0], up_vectors_[0]), {1.0, 0.0, 0.0});
+        up_vectors_[0] = normalized_or(cross(right_vectors_[0], tangents_[0]), up_vectors_[0]);
+
+        for (std::size_t i = 1; i < points_.size(); ++i) {
+            Vec3 up = rotate_minimal(up_vectors_[i - 1U], tangents_[i - 1U], tangents_[i]);
+            up = subtract(up, scale(tangents_[i], dot(up, tangents_[i])));
+            up = normalized_or(up, transported_reference_up(tangents_[i]));
+            Vec3 right = normalized_or(cross(tangents_[i], up), right_vectors_[i - 1U]);
+            up = normalized_or(cross(right, tangents_[i]), up);
+            right_vectors_[i] = right;
+            up_vectors_[i] = up;
         }
     }
 
@@ -259,6 +343,8 @@ private:
     std::vector<double> segment_lengths_;
     std::vector<double> cumulative_;
     std::vector<Vec3> tangents_;
+    std::vector<Vec3> right_vectors_;
+    std::vector<Vec3> up_vectors_;
     std::vector<double> horizontal_curvature_;
     std::vector<double> vertical_curvature_;
     double route_length_m_ = 0.0;
