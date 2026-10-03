@@ -310,7 +310,7 @@ public:
                     const std::string piece_path =
                         ShorelineCatalog::get_piece_texture_path(piece, "coast_adjusted");
                     if (const TextureAsset* texture = find_texture(piece_path)) {
-                        shoreline_overlays.push_back({edit.tile.x, edit.tile_y, texture});
+                        shoreline_overlays.push_back({edit.tile.x, edit.tile.y, texture});
                     }
                 }
             }

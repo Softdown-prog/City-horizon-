@@ -131,6 +131,27 @@ private:
     inline static ChPopulationSystem* active_instance_ = nullptr;
 };
 
+class ChBuildingManager : public BuildingManager {
+public:
+    using BuildingManager::BuildingManager;
+
+    [[nodiscard]] bool set_wall_color_customization(const std::uint64_t instance_id,
+                                                     const BuildingColorTint tint) {
+        return set_wall_color(instance_id, tint);
+    }
+
+    [[nodiscard]] bool set_roof_color_customization(const std::uint64_t instance_id,
+                                                     const BuildingColorTint tint) {
+        return set_roof_color(instance_id, tint);
+    }
+
+    [[nodiscard]] bool clear_color_customization(const std::uint64_t instance_id) {
+        const bool wall_changed = clear_wall_color(instance_id);
+        const bool roof_changed = clear_roof_color(instance_id);
+        return wall_changed || roof_changed;
+    }
+};
+
 class ChPedestrianDecisionNode {
 public:
     void reset() {
@@ -358,6 +379,13 @@ class ChRuntimeSelectableGameplayUi : public ChRuntimeGameplayUi {
 public:
     using ChRuntimeGameplayUi::ChRuntimeGameplayUi;
 
+    template <typename PrepareFn>
+    void ch_runtime_update_layout(const int viewport_width, const int viewport_height,
+                                  GameplayUiModel model, PrepareFn&& prepare) {
+        prepare(model);
+        ChRuntimeGameplayUi::update_layout(viewport_width, viewport_height, model);
+    }
+
     void bind_selection_context(const PedestrianSystem* pedestrians,
                                 const ch::CameraState& camera,
                                 const int viewport_width,
@@ -467,26 +495,27 @@ private:
         (void)play_sound(SoundEvent::ui_click); \
     }())
 
+#define BuildingManager ChBuildingManager
 #define MapRenderer RuntimeMapRenderer
 #define GameplayUi ChRuntimeSelectableGameplayUi
 #define update_layout(viewport_width, viewport_height, model) \
-    ([&]() { \
-        auto ch_ui_model = (model); \
-        ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \
-        const ch::CameraState ch_selection_camera{ \
-            camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \
-        gameplay_ui.bind_selection_context( \
-            &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \
-            placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
-            !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
-        update_layout((viewport_width), (viewport_height), ch_ui_model); \
-    }())
+    ch_runtime_update_layout((viewport_width), (viewport_height), (model), \
+        [&](GameplayUiModel& ch_ui_model) { \
+            ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \
+            const ch::CameraState ch_selection_camera{ \
+                camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \
+            gameplay_ui.bind_selection_context( \
+                &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \
+                placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
+                !agriculture_mode && !decoration_mode && active_overlay == UiOverlay::none); \
+        })
 
 #include "main_runtime_impl.cpp"
 
 #undef update_layout
 #undef GameplayUi
 #undef MapRenderer
+#undef BuildingManager
 #undef rotate_placement
 #undef play_sound
 #undef mobile_render_entities
