@@ -102,7 +102,8 @@ public:
     static void render_road_access_candidates(SDL_Renderer* renderer, const BuildingDefinition& definition,
                                               BuildingRotation rotation, int tile_x, int tile_y,
                                               const RoadManager& roads, const CameraState& camera,
-                                              float viewport_width, float viewport_height);
+                                              float viewport_width, float viewport_height,
+                                              const MapDocument* document = nullptr);
 
     static void render_grass_tile(SDL_Renderer* renderer, const TextureAsset& grass, int x, int y,
                                  const CameraState& camera, float viewport_width, float viewport_height);
