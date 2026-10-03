@@ -192,7 +192,8 @@ class RuntimeMapRenderer : public MapRenderer {
 public:
     static void render_map(SDL_Renderer* renderer, const TextureAsset* grass,
                            const std::unordered_map<std::uint64_t, const TextureAsset*>& scenario_terrain_textures,
-                           const CameraState& camera, const float viewport_width, const float viewport_height) {
+                           const CameraState& camera, const float viewport_width, const float viewport_height,
+                           const MapDocument* document = nullptr) {
         SDL_SetRenderDrawColor(renderer, 74, 104, 83, SDL_ALPHA_OPAQUE);
         const SDL_FRect background = {0.0F, 0.0F, viewport_width, viewport_height};
         SDL_RenderFillRect(renderer, &background);
@@ -218,8 +219,16 @@ public:
                 const int y = depth - x;
                 const auto it = scenario_terrain_textures.find(tile_key(x, y));
                 if (it != scenario_terrain_textures.end() && it->second != nullptr) {
-                    MapRenderer::render_custom_terrain_tile(renderer, *it->second, x, y, camera,
-                                                            viewport_width, viewport_height);
+                    if (document != nullptr) {
+                        MapRenderer::render_heightfield_terrain_tile(renderer, *it->second, x, y, *document,
+                                                                    camera, viewport_width, viewport_height, false);
+                    } else {
+                        MapRenderer::render_custom_terrain_tile(renderer, *it->second, x, y, camera,
+                                                                viewport_width, viewport_height);
+                    }
+                } else if (document != nullptr) {
+                    MapRenderer::render_heightfield_terrain_tile(renderer, *grass, x, y, *document,
+                                                                camera, viewport_width, viewport_height, true);
                 } else {
                     MapRenderer::render_grass_tile(renderer, *grass, x, y, camera,
                                                   viewport_width, viewport_height);
@@ -305,14 +314,14 @@ public:
                     const std::string piece_path =
                         ShorelineCatalog::get_piece_texture_path(piece, "coast_adjusted");
                     if (const TextureAsset* texture = find_texture(piece_path)) {
-                        shoreline_overlays.push_back({edit.tile.x, edit.tile_y, texture});
+                        shoreline_overlays.push_back({edit.tile.x, edit.tile.y, texture});
                     }
                 }
             }
         }
 
         RuntimeMapRenderer::render_map(renderer, grass_base, scenario_terrain_textures,
-                                       camera, viewport_width, viewport_height);
+                                       camera, viewport_width, viewport_height, &document);
         if (!visible.valid) return;
 
         constexpr SDL_FColor kDirtUnderlay = {0.50F, 0.35F, 0.20F, 1.0F};
@@ -438,7 +447,7 @@ public:
             }
         }
 
-        std::sort(visible_tiles.begin(), visible_tiles.end(), [&camera](const RoadTile* left, const RoadTile* right) {
+        std::sort(visible_tiles.begin(), visible_instances.end(), [&camera](const RoadTile* left, const RoadTile* right) {
             const float left_depth = camera_depth_key(static_cast<float>(left->tile_x + 1),
                                                       static_cast<float>(left->tile_y + 1), camera);
             const float right_depth = camera_depth_key(static_cast<float>(right->tile_x + 1),
