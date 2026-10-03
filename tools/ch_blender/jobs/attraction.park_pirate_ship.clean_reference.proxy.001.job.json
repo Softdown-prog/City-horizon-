@@ -1,12 +1,12 @@
 {
  "contract":"CH_BLENDER_AGENT_JOB_V1",
- "jobId":"attraction.park_pirate_ship.clean_reference.proxy.006",
+ "jobId":"attraction.park_pirate_ship.clean_reference.proxy.007",
  "operation":"guarded_blender_script",
  "script":"tools/tycoon_photo_studio/build_pirate_ship_decorated_suspension.py",
  "qualityStage":"proxy",
  "qualityProfile":"tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
  "assetRequirements":{"contract":"CH_ASSET_REQUIREMENTS_V1","assetId":"attraction.park_pirate_ship.clean_reference","footprint":{"widthTiles":7,"depthTiles":6},"minDimensions":[19,10,19],"maxDimensions":[30,20,25]},
- "args":["--recipe","tools/tycoon_photo_studio/assets/pirate_ship_clean_reference.json","--studio-preset","tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_large_ride_1k.json","--output","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k","--save-blend","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/pirate_ship_clean_reference.blend"],
- "outputDir":"out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k",
- "expectedOutputs":["out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/preflight_report.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/proxy_south.png","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/proxy_report.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/studio_metadata.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_006_1k/pirate_ship_clean_reference.blend"]
+ "args":["--recipe","tools/tycoon_photo_studio/assets/pirate_ship_clean_reference.json","--studio-preset","tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_large_ride_1k.json","--output","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k","--save-blend","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/pirate_ship_clean_reference.blend"],
+ "outputDir":"out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k",
+ "expectedOutputs":["out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/preflight_report.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/proxy_south.png","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/proxy_report.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/studio_metadata.json","out/ch_blender_agent/attraction.park_pirate_ship.clean_reference_007_1k/pirate_ship_clean_reference.blend"]
 }
