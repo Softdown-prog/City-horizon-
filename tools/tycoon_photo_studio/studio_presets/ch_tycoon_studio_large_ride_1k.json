@@ -1,0 +1,89 @@
+{
+  "id": "CH_TYCOON_STUDIO_V1",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "camera": {
+    "contract": "CH_CAMERA_V1",
+    "projection": "orthographic_dimetric_2_to_1",
+    "yawDegrees": 45.0,
+    "elevationDegrees": 30.0,
+    "target": [0.0, 0.0, 8.0],
+    "horizontalDistance": 42.0,
+    "orthoScale": 34.0
+  },
+  "render": {
+    "engine": "CYCLES",
+    "device": "CPU",
+    "samples": 48,
+    "denoising": true,
+    "sourceResolution": [1280, 1280],
+    "finalResolution": [1280, 1280],
+    "viewTransform": "Standard",
+    "look": "Medium High Contrast",
+    "exposure": 0.0,
+    "gamma": 1.0,
+    "transparent": true,
+    "outputFormat": "PNG_RGBA_FULL_COLOR"
+  },
+  "world": {
+    "color": [0.13, 0.16, 0.20, 1.0],
+    "strength": 0.42
+  },
+  "lights": [
+    {
+      "name": "Key_Warm_NW",
+      "type": "AREA",
+      "location": [-18.0, -20.0, 28.0],
+      "energy": 1600.0,
+      "color": [1.0, 0.79, 0.60],
+      "size": 10.0,
+      "useShadow": true,
+      "target": [0.0, 0.0, 8.0]
+    },
+    {
+      "name": "Fill_Cool_SE",
+      "type": "AREA",
+      "location": [18.0, 16.0, 18.0],
+      "energy": 650.0,
+      "color": [0.52, 0.68, 1.0],
+      "size": 12.0,
+      "useShadow": false,
+      "target": [0.0, 0.0, 8.0]
+    }
+  ],
+  "shadowReceiver": {
+    "location": [0.0, 0.0, -0.055],
+    "dimensions": [24.0, 21.0, 0.10],
+    "materialColor": [0.82, 0.82, 0.82, 1.0],
+    "roughness": 1.0
+  },
+  "postProcess": {
+    "productionMode": "stylized_prerendered_full_rgba",
+    "productionColorMode": "PNG_RGBA_FULL_COLOR",
+    "productionPaletteLimit": null,
+    "candidateVariant": 1,
+    "paletteColors": 128,
+    "paletteColorsScope": "retro_comparison_review_only_not_production",
+    "paletteReductionRequired": false,
+    "ditherRequired": false,
+    "strictRetroEmulation": false,
+    "optionalRetroProfilesAllowed": true,
+    "shadowColor": [29, 33, 37],
+    "shadowAlphaScale": 0.72,
+    "shadowAlphaMax": 132,
+    "shadowBlurRadius": 1.4,
+    "fallbackShadowThreshold": 12,
+    "fallbackShadowScale": 2.05,
+    "fallbackShadowAlphaMax": 118,
+    "fallbackShadowBlurRadius": 2.2,
+    "edgeAlphaThreshold": 92,
+    "edgeOpacityScale": 0.38,
+    "edgeOpacityMax": 96
+  },
+  "styleIntent": {
+    "target": "modern_pre_rendered_3d_with_classic_tycoon_influence",
+    "runtimeRemains2D": true,
+    "preferMaterialStructureOverPixelSimulation": true,
+    "preferSubtleStylizationOverHeavyRetroFilters": true,
+    "manualPerAssetPixelCleanup": "exception_only"
+  }
+}
