@@ -1962,10 +1962,11 @@ int main() {
 
     Camera camera;
 
-    // CH_COASTER_RENDER_LINK_V1: until the track construction system owns a
+    // CH_COASTER_RENDER_LINK_V3: until the track construction system owns a
     // production centerline, P toggles a deterministic render-validation loop.
-    // The train still uses the real articulated runtime, pose atlas and world
-    // entity depth queue; only the temporary route source is developer-only.
+    // Track and train now share the real coaster runtime route, native
+    // CH_COASTER_TRACK_GEOMETRY_V1 geometry, camera, and articulated cars.
+    // Only the temporary preview route source remains developer-only.
     ch::coaster::CoasterRuntime coaster_runtime;
     bool coaster_preview_enabled = false;
     {
@@ -4050,6 +4051,14 @@ int main() {
         const ch::coaster::TrainStepResult coaster_train = coaster_preview_enabled && coaster_runtime.ready()
             ? coaster_runtime.snapshot(static_cast<int>(camera_rotation_turns(camera.rotation)))
             : ch::coaster::TrainStepResult{};
+        if (coaster_preview_enabled && coaster_runtime.ready()) {
+            const ch::CameraState coaster_camera{
+                camera.pan_x, camera.pan_y, camera.zoom,
+                static_cast<ch::CameraRotation>(camera.rotation)};
+            ch::coaster::render_coaster_track(
+                renderer, coaster_runtime.track_geometry(), coaster_camera,
+                static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        }
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
                               coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
