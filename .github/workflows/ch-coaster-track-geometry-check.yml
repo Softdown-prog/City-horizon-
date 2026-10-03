@@ -6,6 +6,9 @@ on:
       - 'src/coaster_track_geometry.h'
       - 'src/coaster_track_geometry_test.cpp'
       - 'src/coaster_render_adapter.h'
+      - 'src/coaster_runtime.h'
+      - 'src/coaster_runtime_test.cpp'
+      - 'src/coaster_sdl_renderer.h'
       - 'src/coaster_centerline_route.h'
       - 'src/coaster_train_runtime.h'
       - 'src/coaster_physics.h'
@@ -17,6 +20,9 @@ on:
       - 'src/coaster_track_geometry.h'
       - 'src/coaster_track_geometry_test.cpp'
       - 'src/coaster_render_adapter.h'
+      - 'src/coaster_runtime.h'
+      - 'src/coaster_runtime_test.cpp'
+      - 'src/coaster_sdl_renderer.h'
       - 'src/coaster_centerline_route.h'
       - 'src/coaster_train_runtime.h'
       - 'src/coaster_physics.h'
@@ -41,7 +47,17 @@ jobs:
       - name: Run coaster track geometry regression
         run: /tmp/coaster_track_geometry_test
 
-      - name: Guard dedicated coaster contract
+      - name: Compile coaster runtime with owned track geometry
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pedantic \
+            -Isrc src/coaster_runtime_test.cpp \
+            -o /tmp/coaster_runtime_track_test
+
+      - name: Run coaster runtime with owned track geometry
+        run: /tmp/coaster_runtime_track_test
+
+      - name: Guard dedicated coaster contract and renderer bridge
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -49,6 +65,9 @@ jobs:
 
           geometry = Path('src/coaster_track_geometry.h').read_text(encoding='utf-8')
           adapter = Path('src/coaster_render_adapter.h').read_text(encoding='utf-8')
+          runtime = Path('src/coaster_runtime.h').read_text(encoding='utf-8')
+          renderer = Path('src/coaster_sdl_renderer.h').read_text(encoding='utf-8')
+
           required = {
               'contract': 'CH_COASTER_TRACK_GEOMETRY_V1',
               'local right frame': 'sample.right_x',
@@ -64,7 +83,11 @@ jobs:
               raise SystemExit('coaster geometry contract incomplete: ' + ', '.join(missing))
           if 'build_track_render_plan' not in adapter:
               raise SystemExit('coaster track is not bridged to the runtime render adapter')
+          if 'track_geometry_' not in runtime or 'track_geometry()' not in runtime:
+              raise SystemExit('CoasterRuntime does not own/expose dedicated track geometry')
+          if 'render_coaster_track' not in renderer:
+              raise SystemExit('SDL renderer does not expose dedicated coaster track rendering')
           if 'max_grade' in geometry:
               raise SystemExit('coaster geometry must not inherit railway max_grade')
-          print('CH_COASTER_TRACK_GEOMETRY_V1 integration: OK')
+          print('CH_COASTER_TRACK_GEOMETRY_V1 runtime integration: OK')
           PY
