@@ -71,6 +71,25 @@ bool validate_route_pose_coverage(
     return true;
 }
 
+bool write_capture_metadata(const QString& outputDir,
+                            const ch::coaster::CenterlineRoute& route,
+                            const int frameCount,
+                            const double lapSeconds) {
+    QJsonObject meta;
+    meta.insert(QStringLiteral("contract"), QStringLiteral("CH_COASTER_FULL_LAP_CAPTURE_V1"));
+    meta.insert(QStringLiteral("fullLap"), true);
+    meta.insert(QStringLiteral("routeMeters"), route.length_m());
+    meta.insert(QStringLiteral("trainSpeedMps"), kTrainSpeedMps);
+    meta.insert(QStringLiteral("fps"), kFps);
+    meta.insert(QStringLiteral("frameCount"), frameCount);
+    meta.insert(QStringLiteral("lapSeconds"), lapSeconds);
+    meta.insert(QStringLiteral("firstLeadDistanceMeters"), 0.0);
+    meta.insert(QStringLiteral("lastLeadDistanceMeters"), 0.0);
+    QFile file(QStringLiteral("%1/capture_meta.json").arg(outputDir));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) return false;
+    return file.write(QJsonDocument(meta).toJson(QJsonDocument::Indented)) > 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -100,7 +119,14 @@ int main(int argc, char** argv) {
     if (!validate_route_pose_coverage(samples)) return 6;
     const Projection projection = fit_projection(samples);
 
-    for (int frame = 0; frame < kFrameCount; ++frame) {
+    // A proof is only valid after the lead car has traversed the entire closed
+    // route and returned exactly to its starting distance.  The previous fixed
+    // 360-frame/12-second capture could end mid-lap on larger coasters.
+    const double lapSeconds = route.length_m() / kTrainSpeedMps;
+    const int frameCount = std::max(2, static_cast<int>(std::ceil(lapSeconds * kFps)) + 1);
+    if (!write_capture_metadata(outputDir, route, frameCount, lapSeconds)) return 7;
+
+    for (int frame = 0; frame < frameCount; ++frame) {
         QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::transparent);
         QPainter painter(&image);
@@ -110,9 +136,11 @@ int main(int argc, char** argv) {
         draw_station(painter, projection);
         draw_supports(painter, projection, route);
         draw_track(painter, projection, samples);
-        const double seconds = static_cast<double>(frame) / kFps;
+
+        const double lapProgress = static_cast<double>(frame) /
+                                   static_cast<double>(frameCount - 1);
         const double lead = ch::coaster::normalize_route_distance(
-            seconds * kTrainSpeedMps, route.length_m(), true);
+            lapProgress * route.length_m(), route.length_m(), true);
         draw_train(painter, projection, atlas, route, lead);
         painter.end();
         const QString path = QStringLiteral("%1/frame_%2.png")
@@ -120,8 +148,8 @@ int main(int argc, char** argv) {
         if (!image.save(path, "PNG")) return 5;
     }
 
-    std::printf("CH_MAPFORGE_COASTER_PROJECT_V1 atlas=%s frames=%d fps=%d cars=%d route_m=%.3f points=%zu\n",
-                ch::coaster::kCoasterCarAtlasContract, kFrameCount, kFps,
+    std::printf("CH_MAPFORGE_COASTER_PROJECT_V1 atlas=%s full_lap=1 frames=%d fps=%d lap_s=%.3f cars=%d route_m=%.3f points=%zu\n",
+                ch::coaster::kCoasterCarAtlasContract, frameCount, kFps, lapSeconds,
                 ch::coaster::kCoasterTrainCarCount, route.length_m(), route.point_count());
     return 0;
 }
