@@ -43,6 +43,7 @@
     "corkscrew_left",
     "corkscrew_right"
   ],
+  "captureRequest": "occupied-v2-project-video-2026-10-03-01",
   "capturePolicy": {
     "runtimeValidOnly": true,
     "occupiedPoseAtlasContract": "CH_COASTER_CAR_ATLAS_RUNTIME_V2",
