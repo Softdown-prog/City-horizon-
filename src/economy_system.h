@@ -3,6 +3,7 @@
 #include "building_system.h"
 #include "simulation_clock.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -66,6 +67,14 @@ public:
     void earn_agricultural_sale(std::int64_t amount, const GameDate& date);
     void restore_funds(std::int64_t funds);
     void restore_last_property_tax_year(int year);
+    // Save/load boundary for the bankruptcy streak. Keep the counter bounded to
+    // the rule threshold and derive bankruptcy from the persisted flag or a
+    // completed three-month streak so malformed saves cannot inject arbitrary
+    // internal economy state.
+    void restore_bankruptcy_state(const int consecutive_negative_months, const bool bankrupt) noexcept {
+        consecutive_negative_months_ = std::clamp(consecutive_negative_months, 0, kBankruptcyMonths);
+        bankrupt_ = bankrupt || consecutive_negative_months_ >= kBankruptcyMonths;
+    }
     [[nodiscard]] int last_property_tax_year() const;
     void rebuild_monthly_summary(const BuildingManager& buildings, const BuildingCatalog& catalog,
                                  const PopulationSystem& population, const FarmingSystem* farming = nullptr);
