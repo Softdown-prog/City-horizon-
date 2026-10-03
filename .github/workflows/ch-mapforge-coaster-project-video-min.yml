@@ -1,0 +1,15 @@
+name: CH MapForge Coaster Project Video Minimal
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/animation_preview/coaster_project_jobs/*.json"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo MAPFORGE_COASTER_WORKFLOW_OK
