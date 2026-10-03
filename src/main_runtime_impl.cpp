@@ -560,6 +560,30 @@ void render_heightfield_tile_outline(SDL_Renderer* renderer, const int x, const 
     SDL_RenderLine(renderer, p3.x, p3.y, p0.x, p0.y);
 }
 
+void render_heightfield_tile_fill(SDL_Renderer* renderer, const int x, const int y,
+                                  const Camera& camera, const float viewport_width, const float viewport_height,
+                                  const SDL_FColor color, const ch::MapDocument* document) {
+    if (document == nullptr) {
+        render_tile_fill(renderer, x, y, camera, viewport_width, viewport_height, color);
+        return;
+    }
+    const SDL_FPoint p0 = terrain_world_to_screen(static_cast<float>(x), static_cast<float>(y),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p1 = terrain_world_to_screen(static_cast<float>(x + 1), static_cast<float>(y),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p2 = terrain_world_to_screen(static_cast<float>(x + 1), static_cast<float>(y + 1),
+                                                  camera, viewport_width, viewport_height, document);
+    const SDL_FPoint p3 = terrain_world_to_screen(static_cast<float>(x), static_cast<float>(y + 1),
+                                                  camera, viewport_width, viewport_height, document);
+    SDL_Vertex vertices[4] = {};
+    vertices[0].position = p0; vertices[0].color = color;
+    vertices[1].position = p1; vertices[1].color = color;
+    vertices[2].position = p2; vertices[2].color = color;
+    vertices[3].position = p3; vertices[3].color = color;
+    const int indices[] = {0, 1, 2, 0, 2, 3};
+    (void)SDL_RenderGeometry(renderer, nullptr, vertices, 4, indices, 6);
+}
+
 void render_navigation_debug_path(SDL_Renderer* renderer, const NavigationPathResult& path,
                                   const Camera& camera, float viewport_width, float viewport_height,
                                   const ch::MapDocument* document = nullptr) {
@@ -671,9 +695,10 @@ void render_water_v2_layers(SDL_Renderer* renderer, const std::vector<WaterSurfa
 }
 
 void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands, const LandParcel* hovered_parcel,
-                          const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height) {
+                          const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height,
+                          const ch::MapDocument* document = nullptr) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height);
+    ch::MapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height, document);
 }
 
 void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
@@ -3920,7 +3945,8 @@ int main() {
         }
         const LandParcel* hovered_parcel = lands.parcel_at(mouse_tile.first, mouse_tile.second);
         render_land_overlays(renderer, lands, hovered_parcel, land_mode, camera,
-                             static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                             static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                             active_map_doc ? &*active_map_doc : nullptr);
         render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
                      static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                      active_map_doc ? &*active_map_doc : nullptr);
@@ -3950,17 +3976,18 @@ int main() {
                 SDL_SetRenderDrawColor(renderer, road_preview_valid ? 240 : 235,
                                        road_preview_valid ? 174 : 70, road_preview_valid ? 66 : 66, SDL_ALPHA_OPAQUE);
                 for (int x = min_x; x <= max_x; ++x) {
-                    render_tile_outline(renderer, x, min_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-                    if (max_y != min_y) render_tile_outline(renderer, x, max_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                    render_heightfield_tile_outline(renderer, x, min_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height), active_map_doc ? &*active_map_doc : nullptr);
+                    if (max_y != min_y) render_heightfield_tile_outline(renderer, x, max_y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height), active_map_doc ? &*active_map_doc : nullptr);
                 }
                 for (int y = min_y + 1; y < max_y; ++y) {
-                    render_tile_outline(renderer, min_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-                    if (max_x != min_x) render_tile_outline(renderer, max_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                    render_heightfield_tile_outline(renderer, min_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height), active_map_doc ? &*active_map_doc : nullptr);
+                    if (max_x != min_x) render_heightfield_tile_outline(renderer, max_x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height), active_map_doc ? &*active_map_doc : nullptr);
                 }
             } else {
                 for (const TileCoordinate& tile : road_preview) {
-                    render_road_tile(renderer, tile.x, tile.y, camera, static_cast<float>(viewport_width),
-                                     static_cast<float>(viewport_height), preview_color);
+                    render_heightfield_tile_fill(renderer, tile.x, tile.y, camera, static_cast<float>(viewport_width),
+                                                 static_cast<float>(viewport_height), preview_color,
+                                                 active_map_doc ? &*active_map_doc : nullptr);
                 }
             }
         }
@@ -3971,8 +3998,9 @@ int main() {
                     (failure == SidewalkPlacementFailure::none || failure == SidewalkPlacementFailure::sidewalk_occupied) &&
                     !farming.is_occupied(tile.x, tile.y);
                 SDL_SetRenderDrawColor(renderer, valid ? 112 : 245, valid ? 232 : 82, 96, SDL_ALPHA_OPAQUE);
-                render_tile_outline(renderer, tile.x, tile.y, camera,
-                                    static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                render_heightfield_tile_outline(renderer, tile.x, tile.y, camera,
+                                                static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+                                                active_map_doc ? &*active_map_doc : nullptr);
             }
         }
 
@@ -4000,7 +4028,9 @@ int main() {
                     valid = farm_tile != nullptr && farm_tile->state == FarmTileState::prepared_soil;
                 }
                 SDL_SetRenderDrawColor(renderer, valid ? 112 : 245, valid ? 232 : 82, 96, SDL_ALPHA_OPAQUE);
-                render_tile_outline(renderer, x, y, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                render_heightfield_tile_outline(renderer, x, y, camera, static_cast<float>(viewport_width),
+                                                static_cast<float>(viewport_height),
+                                                active_map_doc ? &*active_map_doc : nullptr);
             };
             const TileCoordinate* drag_start = planting_dragging ? &planting_drag_start :
                 (harvest_dragging ? &harvest_drag_start : nullptr);
