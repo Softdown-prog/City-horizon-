@@ -37,9 +37,14 @@ int main() {
 
     for (std::size_t i = 0; i < kCoasterTrainCarCount; ++i) {
         const CarRenderCommand& command = plan.cars[i];
+        const int expected_atlas_index = 48 + static_cast<int>(i);
+        const int expected_x = expected_atlas_index * kCarPoseFrameWidth;
+        const int expected_y = 3 * kCarPoseFrameHeight;
         if (command.car_index != i) return fail("car ordering changed");
-        if (command.atlas_path != kFlameCarPoseAtlasPath) return fail("unexpected atlas path");
-        if (command.atlas_index != static_cast<int>(i)) return fail("flat heading atlas mapping changed");
+        if (command.atlas_path != kFlameCarPoseAtlasPath) return fail("unexpected V2 atlas path");
+        if (command.atlas_index != expected_atlas_index) return fail("V2 flat heading atlas mapping changed");
+        if (command.source_rect.x != expected_x || command.source_rect.y != expected_y)
+            return fail("V2 flat heading source rectangle changed");
         if (command.source_rect.width != kCarPoseFrameWidth || command.source_rect.height != kCarPoseFrameHeight)
             return fail("atlas source rectangle dimensions changed");
         if (!near(command.world_anchor.x, 10.0F + static_cast<float>(i))) return fail("world X changed");
@@ -58,6 +63,6 @@ int main() {
     if (!near(kFlameCarSpriteAnchorX, 0.5F) || !near(kFlameCarSpriteAnchorY, 0.5F))
         return fail("approved atlas root anchor changed");
 
-    std::cout << "CH_COASTER_RENDER_ADAPTER_V1 regression: OK\n";
+    std::cout << "CH_COASTER_RENDER_ADAPTER_V2 regression: OK\n";
     return 0;
 }
