@@ -66,9 +66,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/animation_preview/promote_coaster_flame_v2.py \
-            --artifact-root out/flame-v2-source \
-            --trigger tools/animation_preview/promotion_jobs/coaster_flame_v2.promote.json
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('tools/animation_preview').resolve()))
+          import promote_coaster_flame_v2 as promotion
+          promotion.REPO = Path.cwd().resolve()
+          promotion.PAYLOAD = promotion.REPO / 'tools/animation_preview/coaster_flame_v2_text_payload.json'
+          sys.argv = [
+              'promote_coaster_flame_v2.py',
+              '--artifact-root', 'out/flame-v2-source',
+              '--trigger', 'tools/animation_preview/promotion_jobs/coaster_flame_v2.promote.json',
+          ]
+          raise SystemExit(promotion.main())
+          PY
 
       - name: Commit one coherent V2 runtime state
         shell: bash
