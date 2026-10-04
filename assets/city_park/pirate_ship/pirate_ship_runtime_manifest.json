@@ -17,8 +17,8 @@
     "east"
   ],
   "footprint": {
-    "widthTiles": 7,
-    "depthTiles": 6
+    "widthTiles": 4,
+    "depthTiles": 3
   },
   "animation": {
     "contract": "CH_PIRATE_SHIP_SWING_RUNTIME_V1",
