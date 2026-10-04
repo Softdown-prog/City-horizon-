@@ -5,7 +5,9 @@
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/validation.h"
+#include "src/developer_console.h"
 #include "src/ride_state_machine.h"
+#include "src/scenario_test_harness.h"
 
 #include <cassert>
 #include <cmath>
@@ -58,6 +60,8 @@ int main(int argc, char** argv) {
     assert(std::string(ch::contracts::kGridContract) == "CH_GRID_V1");
     assert(std::string(ch::kGameCommandContract) == "CH_GAME_COMMAND_V1");
     assert(std::string(kRideStateMachineContract) == "CH_RIDE_STATE_MACHINE_V1");
+    assert(std::string(kDeveloperConsoleContract) == "CH_DEVELOPER_CONSOLE_V1");
+    assert(std::string(kScenarioTestHarnessContract) == "CH_SCENARIO_TEST_HARNESS_V1");
 
     // 2. Verify Grid Math
     ch::GridCoord c1{5, -10};
@@ -210,6 +214,44 @@ int main(int argc, char** argv) {
     ride.update(2800);
     assert(ride.snapshot().state == RideOperatingState::idle);
     assert(!ride.snapshot().dispatch_requested);
+
+    // 8. Developer console parses quoted read-only commands without game coupling.
+    DeveloperConsoleRegistry console;
+    assert(console.register_command("echo", [](const DeveloperConsoleRegistry::Arguments& args) {
+        std::string joined;
+        for (const std::string& arg : args) {
+            if (!joined.empty()) joined += '|';
+            joined += arg;
+        }
+        return DeveloperConsoleResult{true, joined};
+    }));
+    const DeveloperConsoleResult console_result = console.execute("echo citizen \"Roda Gigante\"");
+    assert(console_result.success);
+    assert(console_result.output == "citizen|Roda Gigante");
+    assert(!console.execute("unknown").success);
+
+    // 9. Scenario harness stops deterministically at the first failed step.
+    ScenarioTestHarness scenario;
+    int scenario_state = 0;
+    assert(scenario.add_step("prepare", [&]() {
+        scenario_state = 1;
+        return ScenarioStepResult{true, {}};
+    }));
+    assert(scenario.add_step("validate", [&]() {
+        return ScenarioStepResult{scenario_state == 1, "state not prepared"};
+    }));
+    const ScenarioRunResult scenario_result = scenario.run();
+    assert(scenario_result.success);
+    assert(scenario_result.completed_steps == 2);
+
+    ScenarioTestHarness failing_scenario;
+    assert(failing_scenario.add_step("fail-here", []() {
+        return ScenarioStepResult{false, "expected failure"};
+    }));
+    const ScenarioRunResult failed_scenario = failing_scenario.run();
+    assert(!failed_scenario.success);
+    assert(failed_scenario.failed_step == "fail-here");
+    assert(failed_scenario.completed_steps == 0);
 
     std::cout << "ch_core_test passed successfully!\n";
     return 0;
