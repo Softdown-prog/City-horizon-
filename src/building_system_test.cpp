@@ -24,9 +24,11 @@ int main(int argc, char** argv) {
     const BuildingDefinition* coffee = catalog.find("coffee_shop_01");
     const BuildingDefinition* bakery = catalog.find("bakery_01");
     const BuildingDefinition* house = catalog.find("residential_popular_house_01");
+    const BuildingDefinition* carousel = catalog.find("carousel_city_horizon_01");
     if (!require(coffee != nullptr, "coffee shop definition exists") ||
         !require(bakery != nullptr, "bakery definition exists") ||
-        !require(house != nullptr, "popular house definition exists")) {
+        !require(house != nullptr, "popular house definition exists") ||
+        !require(carousel != nullptr, "carousel definition exists")) {
         return 1;
     }
 
@@ -53,7 +55,21 @@ int main(int argc, char** argv) {
                  "bakery retains its current service economy") ||
         !require(house->category == "residential" && house->footprint_width == 3 && house->footprint_height == 3 &&
                      house->residential_capacity == 5 && house->rotatable,
-                 "popular house uses the current 3x3 residential contract")) {
+                 "popular house uses the current 3x3 residential contract") ||
+        !require(carousel->category == "city_park" && carousel->player_buildable && carousel->rotatable,
+                 "carousel is exposed as a buildable city-park attraction") ||
+        !require(carousel->footprint_width == 4 && carousel->footprint_height == 4 && carousel->build_cost == 15000,
+                 "carousel keeps the approved 4x4 footprint and provisional build price") ||
+        !require(carousel->default_service_price.minor_units == 5 &&
+                     carousel->minimum_service_price.minor_units == 1 &&
+                     carousel->maximum_service_price.minor_units == 30,
+                 "carousel ticket price range loads from runtime JSON") ||
+        !require(carousel->animation.has_value() && carousel->animation->frame_count == 48 &&
+                     carousel->animation->frame_duration_ms == 100 &&
+                     carousel->animation->playback == "activity_loop",
+                 "carousel exposes the promoted 48-frame activity animation") ||
+        !require(carousel->color_mask.has_value() && carousel->color_mask->enabled,
+                 "carousel primary color mask is available to runtime")) {
         return 1;
     }
 
