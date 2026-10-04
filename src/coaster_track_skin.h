@@ -64,11 +64,10 @@ struct CoasterTrackSkin {
     float cap_offset_x_px = -0.14F;
     float cap_offset_y_px = -0.30F;
 
-    // Future optional overlay atlas. The runtime currently uses the fully
-    // procedural vector skin above; this path is reserved for Blender-baked
-    // joint plates, chain-lift caps, brake fins and other ornamental modules.
+    // Blender-baked detail atlas layered over the procedural vector skin.
+    // Runtime loaders gracefully fall back to the vector skin if the atlas is
+    // missing, so presentation can never invalidate route/physics geometry.
     std::string_view overlay_atlas_path = "assets/coasters/skins/classic_steel_01/track_skin_atlas.png";
-    // Enabled only after the atlas asset is promoted alongside its manifest.\n    // Runtime loaders must gracefully fall back to the vector skin if missing.\n    // Blender-baked visual modules layered over the procedural rail geometry.
     int overlay_cell_width_px = 96;
     int overlay_cell_height_px = 72;
     float overlay_sprite_scale = 0.56F;
