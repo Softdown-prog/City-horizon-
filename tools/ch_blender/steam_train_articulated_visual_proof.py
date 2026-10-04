@@ -11,11 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 import bpy
-from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FPS = 12
@@ -44,23 +45,13 @@ def load_manifest(relative: str) -> dict:
     return data
 
 
-def crop_runtime_views(manifest: dict, root: Path, output: Path, slug: str) -> dict[str, Path]:
+def runtime_views(manifest: dict, root: Path) -> dict[str, Path]:
     views: dict[str, Path] = {}
     for direction, record in manifest["views"].items():
-        source = root / record["file"]
-        image = Image.open(source).convert("RGBA")
-        bbox = image.getchannel("A").getbbox()
-        if bbox is None:
-            raise RuntimeError(f"Empty runtime sprite: {source}")
-        pad = 8
-        left = max(0, bbox[0] - pad)
-        top = max(0, bbox[1] - pad)
-        right = min(image.width, bbox[2] + pad)
-        bottom = min(image.height, bbox[3] + pad)
-        cropped = image.crop((left, top, right, bottom))
-        target = output / f"{slug}_{direction}_crop.png"
-        cropped.save(target)
-        views[direction] = target
+        source = (root / record["file"]).resolve()
+        if not source.is_file():
+            raise RuntimeError(f"Missing runtime sprite: {source}")
+        views[direction] = source
     return views
 
 
@@ -85,7 +76,6 @@ def add_flat_box(name: str, x: float, y: float, sx: float, sy: float, z: float, 
 
 
 def route_point(theta: float) -> tuple[float, float]:
-    # Rounded review loop large enough for a 1+7 consist.
     return 11.0 * math.cos(theta), 6.1 * math.sin(theta)
 
 
@@ -141,14 +131,13 @@ def make_sprite_material(name: str, image_path: Path):
     links.new(transparent.outputs[0], mix.inputs[1])
     links.new(emission.outputs[0], mix.inputs[2])
     links.new(mix.outputs[0], output.inputs[0])
-    return material, image.size[0], image.size[1]
+    return material
 
 
 def add_sprite_plane(name: str, image_path: Path, length_world: float, z: float):
-    material, width_px, height_px = make_sprite_material(name + "_mat", image_path)
-    aspect = width_px / max(1.0, float(height_px))
-    height = max(1.2, length_world * 0.62)
-    width = height * aspect
+    material = make_sprite_material(name + "_mat", image_path)
+    width = max(1.7, length_world)
+    height = max(1.5, length_world * 0.72)
     mesh = bpy.data.meshes.new(name + "_mesh")
     verts = [(-width/2, -height/2, 0), (width/2, -height/2, 0), (width/2, height/2, 0), (-width/2, height/2, 0)]
     mesh.from_pydata(verts, [], [(0,1,2,3)])
@@ -177,7 +166,6 @@ def key_bool(obj, attr: str, value: bool, frame: int) -> None:
 
 
 def movement_distance(frame: int, total: float) -> float:
-    # One deliberate one-second station dwell around the front platform.
     u = (frame - 1) / max(1, FRAME_COUNT - 1)
     if u < 0.38:
         progress = (u / 0.38) * 0.48
@@ -186,6 +174,26 @@ def movement_distance(frame: int, total: float) -> float:
     else:
         progress = 0.48 + ((u - 0.52) / 0.48) * 0.52
     return progress * total
+
+
+def encode_video(frames_dir: Path, output: Path) -> tuple[Path, Path]:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required for MP4/GIF proof encoding")
+    source = str(frames_dir / "frame_%04d.png")
+    mp4_path = output / "steam_train_articulated.mp4"
+    gif_path = output / "steam_train_articulated.gif"
+    subprocess.run([
+        ffmpeg, "-y", "-framerate", str(FPS), "-i", source,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        str(mp4_path),
+    ], check=True)
+    subprocess.run([
+        ffmpeg, "-y", "-framerate", str(FPS), "-i", source,
+        "-vf", "fps=12,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer",
+        "-loop", "0", str(gif_path),
+    ], check=True)
+    return mp4_path, gif_path
 
 
 def main() -> None:
@@ -199,8 +207,8 @@ def main() -> None:
 
     loco_manifest = load_manifest("assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json")
     coach_manifest = load_manifest("assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json")
-    loco_views = crop_runtime_views(loco_manifest, REPO_ROOT / "assets/vehicles/steam_train_locomotive_01", output, "locomotive")
-    coach_views = crop_runtime_views(coach_manifest, REPO_ROOT / "assets/vehicles/steam_train_coach_01", output, "coach")
+    loco_views = runtime_views(loco_manifest, REPO_ROOT / "assets/vehicles/steam_train_locomotive_01")
+    coach_views = runtime_views(coach_manifest, REPO_ROOT / "assets/vehicles/steam_train_coach_01")
 
     clear_scene()
     scene = bpy.context.scene
@@ -229,14 +237,13 @@ def main() -> None:
 
     points, cumulative = build_route()
     total = cumulative[-1]
-    for i in range(0, 96):
+    for i in range(96):
         d = total * i / 96.0
         x, y, tx, ty = sample_route(points, cumulative, d)
         nx, ny = -ty, tx
         add_flat_box(f"ballast_{i:03d}", x, y, 0.78, 0.38, 0.0, ballast)
         angle = math.atan2(ty, tx)
-        obj = bpy.context.object
-        obj.rotation_euler.z = angle
+        bpy.context.object.rotation_euler.z = angle
         if i % 2 == 0:
             add_flat_box(f"sleeper_{i:03d}", x, y, 0.18, 1.05, 0.05, sleeper)
             bpy.context.object.rotation_euler.z = angle
@@ -256,8 +263,7 @@ def main() -> None:
         units.append(create_unit(i + 1, "coach", coach_views, 3.0))
 
     offsets = [0.0]
-    first = LOCOMOTIVE_LENGTH_M / 2.0 + COUPLING_GAP_M + COACH_LENGTH_M / 2.0
-    offsets.append(first)
+    offsets.append(LOCOMOTIVE_LENGTH_M / 2.0 + COUPLING_GAP_M + COACH_LENGTH_M / 2.0)
     for _ in range(1, COACH_COUNT):
         offsets.append(offsets[-1] + COACH_LENGTH_M + COUPLING_GAP_M)
 
@@ -270,27 +276,13 @@ def main() -> None:
                 obj.location.x = x
                 obj.location.y = y
                 obj.keyframe_insert(data_path="location", frame=frame, options={"INSERTKEY_NEEDED"})
-                visible = key == direction
-                key_bool(obj, "hide_render", not visible, frame)
+                key_bool(obj, "hide_render", key != direction, frame)
 
     scene.render.image_settings.file_format = "PNG"
     scene.render.filepath = str(frames_dir / "frame_")
     bpy.ops.render.render(animation=True)
 
-    frame_paths = [frames_dir / f"frame_{frame:04d}.png" for frame in range(1, FRAME_COUNT + 1)]
-    gif_frames = [Image.open(path).convert("P", palette=Image.Palette.ADAPTIVE, colors=128) for path in frame_paths]
-    gif_path = output / "steam_train_articulated.gif"
-    gif_frames[0].save(gif_path, save_all=True, append_images=gif_frames[1:], duration=round(1000 / FPS), loop=0, optimize=False)
-    for image in gif_frames:
-        image.close()
-
-    scene.render.image_settings.file_format = "FFMPEG"
-    scene.render.ffmpeg.format = "MPEG4"
-    scene.render.ffmpeg.codec = "H264"
-    scene.render.ffmpeg.constant_rate_factor = "MEDIUM"
-    scene.render.filepath = str(output / "steam_train_articulated.mp4")
-    bpy.ops.render.render(animation=True)
-
+    mp4_path, gif_path = encode_video(frames_dir, output)
     report = {
         "contract": "CH_RAIL_ARTICULATED_VISUAL_PROOF_V1",
         "status": "success",
@@ -299,7 +291,7 @@ def main() -> None:
         "frames": FRAME_COUNT,
         "consist": {"locomotives": 1, "coaches": COACH_COUNT, "couplingGapM": COUPLING_GAP_M},
         "stationDwellIncluded": True,
-        "outputs": {"mp4": gif_path.with_suffix('.mp4').name, "gif": gif_path.name},
+        "outputs": {"mp4": mp4_path.name, "gif": gif_path.name},
     }
     (output / "visual_proof_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
