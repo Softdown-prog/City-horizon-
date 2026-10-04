@@ -11,6 +11,7 @@
 #include "src/ch_core/contracts.h"
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
+#include "src/ch_core/resource_cache.h"
 #include "src/runtime_view_state.h"
 #include "src/building_system.h"
 #include "src/farming_system.h"
@@ -261,8 +262,8 @@ private:
     int physical_height_ = 600;
     std::filesystem::path asset_root_;
     std::optional<MapDocument> current_document_;
-    std::unordered_map<std::string, TextureAsset> texture_cache_;
-    std::unordered_map<std::string, TextureAsset> overlay_texture_cache_;
+    ResourceCache<std::string, TextureAsset> texture_cache_;
+    ResourceCache<std::string, TextureAsset> overlay_texture_cache_;
     int view_mode_ = 0; // 0 = ART, 1 = LOGIC, 2 = ART_AND_LOGIC
     uint32_t active_channels_ = 0x1FFF; // All channels active by default
     float channel_opacity_ = 0.75F;
