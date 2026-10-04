@@ -39,6 +39,7 @@
 #include "park_fence_save_manager.h"
 #include "pedestrian_decision.h"
 #include "population_system.h"
+#include "ride_runtime_registry.h"
 #include "simulation_clock.h"
 #include "src/ch_core/projection.h"
 #include "src/runtime_view_state.h"
@@ -71,6 +72,7 @@ public:
         CityEconomy::restore_funds(funds);
         ch::runtime_game_state::reset();
         ch::rail_runtime::reset();
+        ch::ride_runtime::reset();
     }
 
     void on_month_closed(const BuildingManager& buildings, const BuildingCatalog& catalog,
@@ -213,7 +215,8 @@ private:
 [[nodiscard]] inline bool ch_ferris_wheel_should_be_audible(
     const BuildingManager& buildings, const BuildingCatalog& catalog) {
     for (const BuildingInstance& instance : buildings.instances()) {
-        if (instance.definition_id != "ferris_wheel_01" || !instance.activity_active()) continue;
+        if (instance.definition_id != "ferris_wheel_01" ||
+            !ch::ride_runtime::is_moving(instance.instance_id)) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition != nullptr && ch_attraction_visible_in_current_view(instance, *definition)) {
             return true;
@@ -233,7 +236,8 @@ private:
     float nearest_distance_tiles = -1.0F;
 
     for (const BuildingInstance& instance : buildings.instances()) {
-        if (instance.definition_id != "pirate_ship_01" || !instance.activity_active()) continue;
+        if (instance.definition_id != "pirate_ship_01" ||
+            !ch::ride_runtime::is_moving(instance.instance_id)) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition == nullptr || !ch_attraction_visible_in_current_view(instance, *definition)) continue;
 
@@ -344,11 +348,9 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
     for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
         if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
         const ch::ScreenPoint screen = ch::world_to_screen_point(
-            pedestrian.spatial.visual_world_x + pedestrian.spatial.ground_anchor_x,
-            pedestrian.spatial.visual_world_y + pedestrian.spatial.ground_anchor_y,
-            camera, viewport_width, viewport_height);
-        const float dx = mouse_x - screen.x;
-        const float dy = mouse_y - (screen.y - 16.0F * camera.zoom);
+            pedestrian.map_x, pedestrian.map_y, camera, viewport_width, viewport_height);
+        const float dx = screen.x - mouse_x;
+        const float dy = screen.y - mouse_y;
         const float distance_squared = dx * dx + dy * dy;
         if (distance_squared <= best_distance_squared) {
             best_distance_squared = distance_squared;
@@ -358,179 +360,4 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
     return best;
 }
 
-class ChRuntimeSelectableGameplayUi : public ChRuntimeGameplayUi {
-public:
-    using ChRuntimeGameplayUi::ChRuntimeGameplayUi;
-
-    template <typename PrepareFn>
-    void ch_runtime_update_layout(const int viewport_width, const int viewport_height,
-                                  GameplayUiModel model, PrepareFn&& prepare) {
-        prepare(model);
-        ChRuntimeGameplayUi::update_layout(viewport_width, viewport_height, model);
-    }
-
-    void bind_selection_context(const PedestrianSystem* pedestrians,
-                                const ch::CameraState& camera,
-                                const int viewport_width,
-                                const int viewport_height,
-                                std::optional<std::uint64_t>* selected_pedestrian_id,
-                                const bool world_selection_enabled) {
-        pedestrians_ = pedestrians;
-        camera_ = camera;
-        camera_valid_ = true;
-        viewport_width_ = viewport_width;
-        viewport_height_ = viewport_height;
-        selected_pedestrian_id_ = selected_pedestrian_id;
-        world_selection_enabled_ = world_selection_enabled;
-    }
-
-    [[nodiscard]] UiInputResult handle_mouse_button_down(const float mouse_x,
-                                                         const float mouse_y,
-                                                         const bool primary_button) {
-        UiInputResult result = ChRuntimeGameplayUi::handle_mouse_button_down(mouse_x, mouse_y, primary_button);
-        if (result.consumed || !primary_button || !world_selection_enabled_ || pedestrians_ == nullptr ||
-            !camera_valid_ || selected_pedestrian_id_ == nullptr) {
-            return result;
-        }
-        const std::optional<std::uint64_t> picked = ch_pick_pedestrian_at_screen(
-            *pedestrians_, mouse_x, mouse_y, camera_,
-            static_cast<float>(viewport_width_), static_cast<float>(viewport_height_));
-        if (!picked) return result;
-        *selected_pedestrian_id_ = *picked;
-        result.consumed = true;
-        return result;
-    }
-
-private:
-    const PedestrianSystem* pedestrians_ = nullptr;
-    ch::CameraState camera_{};
-    bool camera_valid_ = false;
-    int viewport_width_ = 1;
-    int viewport_height_ = 1;
-    std::optional<std::uint64_t>* selected_pedestrian_id_ = nullptr;
-    bool world_selection_enabled_ = false;
-};
-
-#define parcels() world_parcels()
-#define PedestrianLaneNavigationNetwork ParkFencePedestrianNavigationNetwork
-#define SaveManager ParkFenceSaveManager
-#define CityEconomy ChCityEconomy
-#define PopulationSystem ChPopulationSystem
-#define PedestrianDecisionNode ChPedestrianDecisionNode
-#define SimulationClock ChSimulationClock
-
-#define set_service_price(instance_id, definition, service_price) \
-    set_service_price((instance_id), (definition), (service_price)) && \
-    ch_sync_service_price_after_ui_edit(buildings, catalog, (instance_id), (definition))
-
-#define mobile_render_entities() \
-    ([&]() { \
-        const auto ch_budget_date = simulation_clock.date(); \
-        pedestrians.sync_monthly_budget_cycle(ch_budget_date.month, ch_budget_date.year); \
-        ch_sync_park_ride_audio_visibility( \
-            audio, buildings, catalog, simulation_clock.speed() != SimulationSpeed::paused); \
-        const PedestrianSurfaceNavigationNetwork ch_visit_surfaces{roads, sidewalks}; \
-        ch::building_visit_runtime::sync( \
-            pedestrians, buildings, catalog, ch_visit_surfaces, \
-            simulation_clock.speed() != SimulationSpeed::paused, automatic_pedestrian); \
-        pedestrians.update_animation(0.0F, mobile_animations); \
-        auto ch_mobile_entities = mobile_render_entities(); \
-        ch::building_visit_runtime::filter_inside_pedestrians(ch_mobile_entities, pedestrians); \
-        return ch_mobile_entities; \
-    }())
-
-#define play_sound(sound_event) \
-    ([&]() { \
-        const SoundEvent ch_sound_event = (sound_event); \
-        if (ch_sound_event == SoundEvent::building_place) { \
-            placement_definition_id.clear(); \
-        } \
-        return play_sound(ch_sound_event); \
-    }())
-
-#define rotate_placement(clockwise) \
-    ([&]() { \
-        const bool ch_camera_clockwise = static_cast<bool>(clockwise); \
-        if (!placement_definition_id.empty()) { \
-            rotate_placement(ch_camera_clockwise); \
-            return; \
-        } \
-        const float ch_half_tile_width = kTileWidth * 0.5F * camera.zoom; \
-        const float ch_half_tile_height = kTileHeight * 0.5F * camera.zoom; \
-        if (ch_half_tile_width <= 0.0F || ch_half_tile_height <= 0.0F) return; \
-        const float ch_axis_x = -camera.pan_x / ch_half_tile_width; \
-        const float ch_axis_y = -camera.pan_y / ch_half_tile_height; \
-        const CameraWorldPoint ch_focus = logical_world_point( \
-            (ch_axis_y + ch_axis_x) * 0.5F, \
-            (ch_axis_y - ch_axis_x) * 0.5F, \
-            camera.rotation); \
-        const CameraRotation ch_next_rotation = ch_camera_clockwise \
-            ? rotate_camera_clockwise(camera.rotation) \
-            : rotate_camera_counter_clockwise(camera.rotation); \
-        const CameraWorldPoint ch_focus_in_new_view = camera_view_point( \
-            ch_focus.x, ch_focus.y, ch_next_rotation); \
-        camera.rotation = ch_next_rotation; \
-        camera.pan_x = -(ch_focus_in_new_view.x - ch_focus_in_new_view.y) * ch_half_tile_width; \
-        camera.pan_y = -(ch_focus_in_new_view.x + ch_focus_in_new_view.y) * ch_half_tile_height; \
-        camera.pan_velocity_x = 0.0F; \
-        camera.pan_velocity_y = 0.0F; \
-        status = std::string("CAMERA FACING ") + camera_rotation_label(camera.rotation) + " | Z/X ROTATE"; \
-        (void)play_sound(SoundEvent::ui_click); \
-    }())
-
-#define MapRenderer ChRailRuntimeMapRenderer
-#define GameplayUi ChRuntimeSelectableGameplayUi
-#define update_layout(viewport_width, viewport_height, model) \
-    ch_runtime_update_layout((viewport_width), (viewport_height), (model), \
-        [&](GameplayUiModel& ch_ui_model) { \
-            ch_fill_citizen_status(ch_ui_model, pedestrians, ch_selected_pedestrian_id); \
-            const ch::CameraState ch_selection_camera{ \
-                camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)}; \
-            gameplay_ui.bind_selection_context( \
-                &pedestrians, ch_selection_camera, (viewport_width), (viewport_height), &ch_selected_pedestrian_id, \
-                placement_definition_id.empty() && !road_mode && !sidewalk_mode && !land_mode && \
-                !agriculture_mode && !decoration_mode && !ch::rail_runtime::tool_active() && \
-                active_overlay == UiOverlay::none); \
-        })
-
-// The city-builder target intentionally keeps the runtime entrypoint as a
-// compatibility/unity wrapper. Rail geometry was previously test-only and is
-// linked here without changing unrelated CMake targets or their test linkage.
-#include "rail_system.cpp"
-#include "ch_render/procedural_rail_renderer.cpp"
-
-#define SDL_PollEvent(event_ptr) \
-    ([&]() { \
-        const bool ch_rail_interaction_allowed = \
-            !startup_main_menu && active_overlay == UiOverlay::none; \
-        const ch::rail_runtime::InteractionContext ch_rail_context{ \
-            &lands, &buildings, &roads, &sidewalks, &farming, \
-            active_map_doc ? &active_map_doc->terrain_heightfield() : nullptr}; \
-        const bool ch_has_runtime_event = ch::rail_runtime::poll_event( \
-            (event_ptr), ch_rail_interaction_allowed, ch_rail_context); \
-        if (ch::rail_runtime::tool_active()) { \
-            clear_map_modes(); \
-            build_panel_open = false; \
-            selected_instance_id.reset(); \
-            status = ch::rail_runtime::status_text(); \
-        } \
-        return ch_has_runtime_event; \
-    }())
-
 #include "main_runtime_impl.cpp"
-
-#undef SDL_PollEvent
-#undef update_layout
-#undef GameplayUi
-#undef MapRenderer
-#undef rotate_placement
-#undef play_sound
-#undef mobile_render_entities
-#undef set_service_price
-#undef SimulationClock
-#undef PedestrianDecisionNode
-#undef PopulationSystem
-#undef CityEconomy
-#undef SaveManager
-#undef PedestrianLaneNavigationNetwork
-#undef parcels
