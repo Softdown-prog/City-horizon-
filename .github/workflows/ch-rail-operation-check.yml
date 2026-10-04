@@ -1,0 +1,66 @@
+name: CH Rail Operation Check
+
+on:
+  pull_request:
+    paths:
+      - "src/rail_operation_runtime.h"
+      - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_placement_graph.h"
+      - "src/rail_placement_track_graph_adapter.h"
+      - "src/track_graph.h"
+      - "src/track_piece_descriptor.h"
+      - "src/rail_system.cpp"
+      - "src/rail_system.h"
+      - ".github/workflows/ch-rail-operation-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/rail_operation_runtime.h"
+      - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_placement_graph.h"
+      - "src/rail_placement_track_graph_adapter.h"
+      - "src/track_graph.h"
+      - "src/track_piece_descriptor.h"
+      - "src/rail_system.cpp"
+      - "src/rail_system.h"
+      - ".github/workflows/ch-rail-operation-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-rail-operation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rail-operation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile station and train operation regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/rail-operation
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_operation_runtime_test.cpp \
+            -o build/rail-operation/rail_operation_runtime_test
+
+      - name: Run station and train operation regression
+        shell: bash
+        run: build/rail-operation/rail_operation_runtime_test
+
+      - name: Guard clean-room boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E 'OpenRCT2|TrackCircuitIterator|TrackElementDescriptor' \
+            src/rail_operation_runtime.h src/rail_operation_runtime_test.cpp; then
+            echo "Clean-room guard rejected reference-project identifiers in City Horizon implementation."
+            exit 1
+          fi
