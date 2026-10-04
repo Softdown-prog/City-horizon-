@@ -186,11 +186,12 @@ const MobileAnimationClip* MobileAnimationCatalog::resolve_clip(const std::strin
         if (fallback.empty() || fallback == candidate) break;
         candidate = fallback;
     }
-    // Last-resort directional fallbacks keep a usable sprite on screen even
-    // when an incomplete future set omitted a requested state.
-    if (const MobileAnimationClip* idle = find_clip(*set, "idle", direction)) return idle;
-    if (const MobileAnimationClip* south = find_clip(*set, state, MobileEntityDirection::south)) return south;
-    return find_clip(*set, "idle", MobileEntityDirection::south);
+
+    // Direction is part of the authored visual contract. Never substitute a
+    // different compass view implicitly: doing so can make an incomplete actor
+    // appear to face the wrong way and hides a broken asset definition. State
+    // fallbacks above remain allowed because they are explicitly authored.
+    return nullptr;
 }
 
 const MobileAnimationClip* MobileAnimationCatalog::find_clip(const std::string_view set_id, const std::string_view clip_id) const {
