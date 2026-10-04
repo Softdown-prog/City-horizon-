@@ -1,0 +1,78 @@
+name: CH Rail Runtime Check
+
+on:
+  pull_request:
+    paths:
+      - "src/main.cpp"
+      - "src/main_runtime_impl.cpp"
+      - "src/rail_runtime_bridge.h"
+      - "src/rail_system.cpp"
+      - "src/rail_system.h"
+      - "src/rail_mapforge_input_adapter.h"
+      - "src/rail_drag_adapter.h"
+      - "src/rail_placement_controller.h"
+      - "src/rail_placement_graph.h"
+      - "src/rail_placement_track_graph_adapter.h"
+      - "src/track_graph.h"
+      - "src/ch_render/procedural_rail_renderer.cpp"
+      - "src/ch_render/procedural_rail_renderer.h"
+      - ".github/workflows/ch-rail-runtime-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/main.cpp"
+      - "src/main_runtime_impl.cpp"
+      - "src/rail_runtime_bridge.h"
+      - "src/rail_system.cpp"
+      - "src/rail_system.h"
+      - "src/rail_mapforge_input_adapter.h"
+      - "src/rail_drag_adapter.h"
+      - "src/rail_placement_controller.h"
+      - "src/rail_placement_graph.h"
+      - "src/rail_placement_track_graph_adapter.h"
+      - "src/track_graph.h"
+      - "src/ch_render/procedural_rail_renderer.cpp"
+      - "src/ch_render/procedural_rail_renderer.h"
+      - ".github/workflows/ch-rail-runtime-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-rail-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SDL desktop build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxfixes-dev libxi-dev libxss-dev libxkbcommon-dev libxtst-dev
+
+      - name: Configure City Builder
+        shell: bash
+        run: cmake -S . -B build/rail-runtime -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Build live City Builder
+        shell: bash
+        run: cmake --build build/rail-runtime --target city_builder --parallel 2
+
+      - name: Compile shared rail topology regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_placement_track_graph_adapter_test.cpp \
+            -o build/rail-runtime/rail_placement_track_graph_adapter_test
+          build/rail-runtime/rail_placement_track_graph_adapter_test

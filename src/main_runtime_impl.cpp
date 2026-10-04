@@ -1077,7 +1077,7 @@ void render_building_calibration_debug(SDL_Renderer* renderer, const BuildingDef
     BuildingSpriteGeometry geometry = building_sprite_geometry(definition, instance, visual_rotation, texture, camera,
                                                                 viewport_width, viewport_height);
     if (document != nullptr) {
-        const float height = document->terrain_heightfield().sample(geometry.ground_world.x, geometry.ground_world.y);
+        const float height = document->terrain_heightfield().sample(geometry.ground.x, geometry.ground.y);
         const float elevation = height * ch::kTerrainHeightPixelsPerUnit * camera.zoom;
         geometry.screen_anchor.y -= elevation;
         geometry.sprite_bounds.y -= elevation;
