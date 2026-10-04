@@ -1,9 +1,14 @@
 #include "mobile_animation.h"
+#include "ch_core/asset_registry.h"
+#include "ch_render/palette_bank.h"
+#include "ch_render/sprite_animation_runtime.h"
 
 #include <array>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -50,6 +55,91 @@ int main(int argc, char** argv) {
         const MobileAnimationClip* broom = catalog.resolve_clip("ch_actor_broom_01", "walking", direction);
         if (!require(broom != nullptr && broom->frames.size() == 8,
                      "approved broom equipment preserves the actor walk cadence")) return 1;
+    }
+
+    ch::AssetRegistry registry;
+    const ch::AssetDescriptor ride_descriptor{
+        .id = "ride.pirate_ship.01",
+        .kind = ch::AssetKind::Ride,
+        .logical_path = "assets/rides/pirate_ship_01",
+        .source_group = "rides",
+        .contract = "CH_AMUSEMENT_RIDE_V1",
+    };
+    if (!require(registry.register_asset(ride_descriptor) == ch::AssetRegistrationResult::Inserted,
+                 "asset registry accepts a valid typed asset") ||
+        !require(registry.register_asset(ride_descriptor) == ch::AssetRegistrationResult::DuplicateId,
+                 "asset registry rejects duplicate ids") ||
+        !require(registry.find("ride.pirate_ship.01") != nullptr && registry.ids(ch::AssetKind::Ride).size() == 1,
+                 "asset registry resolves ids and filters by kind")) {
+        return 1;
+    }
+
+    ch::PaletteBank palette(std::vector<ch::Rgba8>{
+        {0, 0, 0, 0},
+        {20, 40, 80, 255},
+        {30, 60, 110, 255},
+        {40, 80, 140, 255},
+        {220, 80, 40, 255},
+        {235, 120, 55, 255},
+    });
+    if (!require(palette.define_range("water_cycle", {1, 3}), "palette accepts a named semantic range") ||
+        !require(palette.define_range("primary", {4, 2}), "palette accepts a primary color range") ||
+        !require(palette.cycle_range("water_cycle", 1), "palette cycles a named range") ||
+        !require(palette.color(1) != nullptr && palette.color(1)->r == 40,
+                 "palette cycling rotates only the selected range") ||
+        !require(palette.replace_range("primary", {{120, 35, 170, 255}, {165, 70, 205, 255}}),
+                 "palette replaces a semantic color ramp") ||
+        !require(palette.color(4) != nullptr && palette.color(4)->b == 170,
+                 "primary color remap updates the expected entries")) {
+        return 1;
+    }
+
+    ch::SpriteAnimationClip clip;
+    clip.id = "validation.directional_trimmed";
+    ch::SpriteTrack east_track;
+    east_track.frames = {
+        ch::SpriteFrame{
+            .asset_path = "assets/validation/actor_atlas.png",
+            .source_rect = {0, 0, 20, 34},
+            .draw_offset_x = -4,
+            .draw_offset_y = -2,
+            .anchor_x = 10,
+            .anchor_y = 33,
+            .duration_ms = 80,
+        },
+        ch::SpriteFrame{
+            .asset_path = "assets/validation/actor_atlas.png",
+            .source_rect = {20, 0, 22, 36},
+            .draw_offset_x = -5,
+            .draw_offset_y = -3,
+            .anchor_x = 11,
+            .anchor_y = 35,
+            .duration_ms = 120,
+        },
+    };
+    if (!require(clip.set_track(ch::SpriteDirection::East, std::move(east_track)),
+                 "sprite runtime accepts valid trimmed frames") ||
+        !require(clip.set_alias(ch::SpriteDirection::West, {ch::SpriteDirection::East, true}),
+                 "sprite runtime accepts an explicit mirrored direction alias") ||
+        !require(!clip.resolve(ch::SpriteDirection::North),
+                 "sprite runtime does not invent undeclared direction fallbacks")) {
+        return 1;
+    }
+
+    ch::SpriteAnimationPlayer sprite_player;
+    sprite_player.bind(&clip);
+    sprite_player.set_direction(ch::SpriteDirection::West);
+    const ch::SpriteFrame* first_frame = sprite_player.current_frame();
+    if (!require(first_frame != nullptr && first_frame->source_rect.width == 20 && first_frame->draw_offset_x == -4,
+                 "sprite runtime preserves trim rectangle and draw offset") ||
+        !require(sprite_player.mirror_x(), "explicit direction alias exposes horizontal mirroring")) {
+        return 1;
+    }
+    sprite_player.advance(80);
+    const ch::SpriteFrame* second_frame = sprite_player.current_frame();
+    if (!require(sprite_player.frame_index() == 1 && second_frame != nullptr && second_frame->anchor_y == 35,
+                 "sprite player advances deterministically and preserves ground anchor metadata")) {
+        return 1;
     }
 
     std::cout << "mobile animation tests passed\n";
