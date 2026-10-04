@@ -34,6 +34,7 @@
 #include "simulation_clock.h"
 #include "simulation_scheduler.h"
 #include "sidewalk_system.h"
+#include "tool_cursor.h"
 #include "ui_manager.h"
 #include "vehicle_system.h"
 #include "weather_system.h"
@@ -1816,6 +1817,7 @@ int main() {
     BuildingManager buildings(kMapMin, kMapMax);
     RoadManager roads(kMapMin, kMapMax);
     SidewalkManager sidewalks(kMapMin, kMapMax);
+    ToolCursorManager tool_cursors;
     FarmingSystem farming(kMapMin, kMapMax);
     std::unordered_map<std::string, std::string> resource_storage_classes;
     for (const AgriculturalResourceDefinition& resource : resource_catalog.definitions()) resource_storage_classes[resource.id] = resource.storage_class;
@@ -3009,6 +3011,28 @@ int main() {
             : nearest_owned_tile(screen_to_tile(event_mouse_x, event_mouse_y, camera,
                                                 static_cast<float>(viewport_width), static_cast<float>(viewport_height)), lands);
         gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(event_mouse_tile));
+
+        // CH_TOOL_CURSOR_V1: active editing modes replace the generic pointer
+        // with a precise contextual cursor. This is presentation only; the
+        // existing screen_to_tile picking contract remains authoritative.
+        ToolCursorKind desired_cursor = ToolCursorKind::pointer;
+        if (!placement_definition_id.empty()) {
+            desired_cursor = ToolCursorKind::build;
+        } else if (terrain_relief_mode) {
+            desired_cursor = *terrain_relief_mode == ch::TerrainBrushMode::raise ? ToolCursorKind::raise_terrain :
+                (*terrain_relief_mode == ch::TerrainBrushMode::lower ? ToolCursorKind::lower_terrain : ToolCursorKind::smooth_terrain);
+        } else if (!water_terrain_id.empty()) {
+            desired_cursor = ToolCursorKind::water;
+        } else if (land_mode) {
+            desired_cursor = ToolCursorKind::land;
+        } else if (road_mode && road_removal_mode) {
+            desired_cursor = ToolCursorKind::demolish;
+        } else if (sidewalk_mode) {
+            desired_cursor = ToolCursorKind::floor;
+        } else if (road_mode) {
+            desired_cursor = ToolCursorKind::road;
+        }
+        tool_cursors.set(desired_cursor);
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
