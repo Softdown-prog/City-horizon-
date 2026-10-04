@@ -1,0 +1,49 @@
+name: CH Money Spend Video Proof
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/money_spend_fx.h"
+      - "tools/render_money_spend_fx_proof.py"
+      - ".github/workflows/ch-money-spend-video-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install proof dependencies
+        run: |
+          python -m pip install --upgrade pillow
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Render money-spend FX proof video
+        run: python tools/render_money_spend_fx_proof.py
+
+      - name: Verify MP4
+        run: |
+          test -f out/money-spend-fx-proof/money_spend_fx_test.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 out/money-spend-fx-proof/money_spend_fx_test.mp4
+
+      - name: Upload video proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Money-Spend-FX-Video-Proof-${{ github.run_id }}
+          path: out/money-spend-fx-proof/money_spend_fx_test.mp4
+          if-no-files-found: error
+          retention-days: 14
