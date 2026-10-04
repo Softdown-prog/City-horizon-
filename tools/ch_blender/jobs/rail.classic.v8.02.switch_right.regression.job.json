@@ -1,0 +1,13 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "rail.classic.v8.02.switch_right.regression",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/rail_worker_task_v8.py",
+  "args": ["--task", "switch_right", "--output", "out/ch_blender_agent/rail.classic.v8.02.switch_right.regression", "--revision", "8"],
+  "outputDir": "out/ch_blender_agent/rail.classic.v8.02.switch_right.regression",
+  "expectedOutputs": [
+    "out/ch_blender_agent/rail.classic.v8.02.switch_right.regression/proxy_south.png",
+    "out/ch_blender_agent/rail.classic.v8.02.switch_right.regression/preflight_report.json",
+    "out/ch_blender_agent/rail.classic.v8.02.switch_right.regression/worker_summary.json"
+  ]
+}
