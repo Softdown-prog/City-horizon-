@@ -1,0 +1,56 @@
+name: CH Stone Path Candidate
+
+on:
+  push:
+    branches:
+      - "feat/stone-path-01"
+    paths:
+      - "Converter/file_000000002c5c820ea492fb76b85d5fb1.png"
+      - "tools/generate_stone_paths.py"
+      - "tools/ground_tile_worker.py"
+      - "tools/normalize_atomic_path_tile.py"
+      - "tools/tile_geometry.py"
+      - ".github/workflows/ch-stone-path-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-stone-path-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Generate 16-mask stone path family
+        run: |
+          python tools/generate_stone_paths.py \
+            --source Converter/file_000000002c5c820ea492fb76b85d5fb1.png \
+            --output-root out/stone_path_01
+
+      - name: Validate canonical base tile
+        run: |
+          python tools/validate_ground_tiles.py out/stone_path_01/stone_path_base_128x64.png
+
+      - name: Publish validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stone-path-01-candidate
+          path: |
+            out/stone_path_01/stone_path_base_128x64.png
+            out/stone_path_01/stone_01/*.png
+            out/stone_path_01/stone_path_autotile_preview.png
+            out/stone_path_01/stone_path_repeat_preview.png
+            out/stone_path_01/stone_path_worker_report.json
+            out/stone_path_01/stone_path_01.json
+          if-no-files-found: error
+          retention-days: 14
