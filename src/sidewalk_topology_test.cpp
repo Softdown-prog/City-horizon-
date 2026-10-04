@@ -5,6 +5,18 @@
 #include <cstdint>
 
 int main() {
+    static_assert(kPathTopologyContract == "CH_PATH_TOPOLOGY_V1");
+    static_assert(tile_connection_all == 0x0F);
+    static_assert(connection_count(0) == 0);
+    static_assert(connection_count(tile_connection_north | tile_connection_east | tile_connection_west) == 3);
+    static_assert(classify_tile_topology(0) == TileTopologyKind::isolated);
+    static_assert(classify_tile_topology(tile_connection_north) == TileTopologyKind::endpoint);
+    static_assert(classify_tile_topology(tile_connection_north | tile_connection_south) == TileTopologyKind::straight);
+    static_assert(classify_tile_topology(tile_connection_north | tile_connection_east) == TileTopologyKind::corner);
+    static_assert(classify_tile_topology(tile_connection_north | tile_connection_east | tile_connection_west) == TileTopologyKind::tee);
+    static_assert(classify_tile_topology(tile_connection_all) == TileTopologyKind::cross);
+    static_assert(classify_tile_topology(0xFF) == TileTopologyKind::cross);
+
     RoadManager roads{-4, 4};
     SidewalkManager sidewalks{-4, 4};
 
@@ -16,6 +28,8 @@ int main() {
     assert(sidewalks.connection_mask(0, 0) == tile_connection_east);
     assert(sidewalks.connection_mask(1, 0) == (tile_connection_west | tile_connection_east));
     assert(sidewalks.connection_mask(2, 0) == tile_connection_west);
+    assert(classify_tile_topology(sidewalks.connection_mask(0, 0)) == TileTopologyKind::endpoint);
+    assert(classify_tile_topology(sidewalks.connection_mask(1, 0)) == TileTopologyKind::straight);
     assert(sidewalks.is_walkable(1, 0));
     assert(sidewalks.is_connected_to(1, 0, CardinalDirection::east));
     assert(!sidewalks.is_connected_to(1, 0, CardinalDirection::north));
@@ -25,6 +39,7 @@ int main() {
     assert(sidewalks.place_tile(1, -1, "concrete_01"));
     assert(sidewalks.connection_mask(1, 0) ==
            (tile_connection_north | tile_connection_east | tile_connection_west));
+    assert(classify_tile_topology(sidewalks.connection_mask(1, 0)) == TileTopologyKind::tee);
     assert(sidewalks.connection_mask(1, -1) == tile_connection_south);
     assert(sidewalks.remove_tile(1, -1));
     assert(sidewalks.connection_mask(1, 0) == (tile_connection_west | tile_connection_east));
@@ -44,6 +59,7 @@ int main() {
         assert(centre != nullptr);
         assert(centre->style_id == "dirt_path");
         assert(dirt.connection_mask(0, 0) == expected);
+        assert(connection_count(dirt.connection_mask(0, 0)) <= 4);
     }
 
     // Repainting connects only matching materials and refreshes both sides of
@@ -67,4 +83,5 @@ int main() {
     assert(roads.is_drivable(0, 0));
     assert(roads.is_connected_to(0, 0, CardinalDirection::south));
     assert(roads.is_connected_to(0, 1, CardinalDirection::north));
+    assert(classify_tile_topology(roads.connection_mask(0, 0)) == TileTopologyKind::endpoint);
 }
