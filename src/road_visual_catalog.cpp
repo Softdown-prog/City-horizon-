@@ -63,14 +63,16 @@ bool RoadVisualCatalog::load_from_file(const std::filesystem::path& path) {
             return false;
         }
         loaded[mask].texture_path = texture_path;
+        loaded[mask].topology = classify_tile_topology(mask);
     }
     visuals_ = std::move(loaded);
     loaded_from_file_ = true;
     return true;
 }
 
-const RoadVisual* RoadVisualCatalog::get_for_mask(const std::uint8_t mask) const {
-    return &visuals_[static_cast<std::size_t>(mask & 0x0F)];
+const RoadVisual* RoadVisualCatalog::get_for_mask(const TileConnectionMask mask) const {
+    const TileConnectionMask normalized = normalize_connection_mask(mask);
+    return &visuals_[static_cast<std::size_t>(normalized)];
 }
 
 bool RoadVisualCatalog::loaded_from_file() const {
@@ -80,5 +82,6 @@ bool RoadVisualCatalog::loaded_from_file() const {
 void RoadVisualCatalog::set_default_paths() {
     for (std::size_t mask = 0; mask < visuals_.size(); ++mask) {
         visuals_[mask].texture_path = "assets/roads/" + std::string(kDefaultSpriteNames[mask]);
+        visuals_[mask].topology = classify_tile_topology(static_cast<TileConnectionMask>(mask));
     }
 }
