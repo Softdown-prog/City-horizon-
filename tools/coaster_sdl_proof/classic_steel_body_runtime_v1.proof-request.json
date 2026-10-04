@@ -1,0 +1,13 @@
+{
+  "contract": "CH_COASTER_RUNTIME_PROOF_REQUEST_V1",
+  "assetId": "coaster.track_skin.classic_steel_01.body",
+  "runtimeContract": "CH_COASTER_TRACK_BODY_RUNTIME_V1",
+  "promotionCommit": "1c71a9fc5c6a4b7aff00549a1fabad80b19ffddf",
+  "baseMainCommit": "26455a4c52aa71821bfe66067265065ae6f5a27f",
+  "bakeRun": 37206595181,
+  "checks": [
+    "compile_coaster_sdl_visual_proof",
+    "render_canonical_switchback",
+    "load_classic_steel_body_pngs_with_procedural_fallback"
+  ]
+}
