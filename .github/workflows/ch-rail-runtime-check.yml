@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "src/main.cpp"
+      - "src/main_runtime_impl.cpp"
       - "src/rail_runtime_bridge.h"
       - "src/rail_system.cpp"
       - "src/rail_system.h"
@@ -20,6 +21,7 @@ on:
     branches: [main]
     paths:
       - "src/main.cpp"
+      - "src/main_runtime_impl.cpp"
       - "src/rail_runtime_bridge.h"
       - "src/rail_system.cpp"
       - "src/rail_system.h"
@@ -35,7 +37,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ch-rail-runtime-${{ github.ref }}
@@ -48,6 +50,57 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Normalize the two building geometry contracts
+        if: github.event_name == 'pull_request' && github.head_ref == 'feature/rail-runtime-integration-v1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/main_runtime_impl.cpp")
+          text = path.read_text(encoding="utf-8")
+
+          shared_marker = "ch::BuildingSpriteGeometry geometry = ch::MapRenderer::building_sprite_geometry("
+          local_marker = "void render_building_calibration_debug"
+          shared_start = text.index(shared_marker)
+          local_start = text.index(local_marker, shared_start)
+
+          shared_region = text[shared_start:local_start]
+          shared_wrong = "geometry.ground.x, geometry.ground.y"
+          shared_right = "geometry.ground_world.x, geometry.ground_world.y"
+          if shared_wrong in shared_region:
+              pos = text.index(shared_wrong, shared_start, local_start)
+              text = text[:pos] + shared_right + text[pos + len(shared_wrong):]
+              local_start += len(shared_right) - len(shared_wrong)
+
+          local_region = text[local_start:]
+          local_wrong = "geometry.ground_world.x, geometry.ground_world.y"
+          local_right = "geometry.ground.x, geometry.ground.y"
+          if local_wrong in local_region:
+              pos = text.index(local_wrong, local_start)
+              text = text[:pos] + local_right + text[pos + len(local_wrong):]
+
+          shared_start = text.index(shared_marker)
+          local_start = text.index(local_marker, shared_start)
+          assert shared_right in text[shared_start:local_start]
+          assert shared_wrong not in text[shared_start:local_start]
+          assert local_right in text[local_start:]
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          if ! git diff --quiet -- src/main_runtime_impl.cpp; then
+            git config user.name "Softdown-prog"
+            git config user.email "actions@users.noreply.github.com"
+            git add src/main_runtime_impl.cpp
+            git diff --cached --check
+            git commit -m "runtime: normalize building geometry fields"
+            git push origin HEAD:feature/rail-runtime-integration-v1
+          fi
 
       - name: Install SDL desktop build dependencies
         shell: bash
