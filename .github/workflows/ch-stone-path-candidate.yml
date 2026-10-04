@@ -9,6 +9,7 @@ on:
       - "Converter/file_00000000e7b4820ea8e8cdc823cfa927.png"
       - "tools/generate_stone_paths.py"
       - "tools/generate_wood_paths.py"
+      - "tools/promote_stone_floor_runtime.py"
       - "tools/promote_wood_path_runtime.py"
       - "tools/ground_tile_worker.py"
       - "tools/normalize_atomic_path_tile.py"
@@ -44,163 +45,19 @@ jobs:
         run: python -m pip install --upgrade pillow
 
       - name: Generate 16-mask stone path family
-        run: |
-          python tools/generate_stone_paths.py \
-            --source Converter/file_000000002c5c820ea492fb76b85d5fb1.png \
-            --output-root out/stone_path_01
+        run: python tools/generate_stone_paths.py --source Converter/file_000000002c5c820ea492fb76b85d5fb1.png --output-root out/stone_path_01
 
       - name: Validate canonical stone tile
-        run: |
-          python tools/tiles/validate_atomic_path_candidate.py \
-            out/stone_path_01/stone_path_base_128x64.png \
-            --debug
+        run: python tools/tiles/validate_atomic_path_candidate.py out/stone_path_01/stone_path_base_128x64.png --debug
 
       - name: Validate complete stone family
-        run: |
-          python tools/validate_path_tiles.py \
-            --directory out/stone_path_01/stone_01 \
-            --prefix stone_path \
-            --report out/stone_path_01/stone_path_family_validation.json
+        run: python tools/validate_path_tiles.py --directory out/stone_path_01/stone_01 --prefix stone_path --report out/stone_path_01/stone_path_family_validation.json
 
-      - name: Promote stone and wire priced floor catalog
+      - name: Promote stone and wire priced floors
+        run: python tools/promote_stone_floor_runtime.py --output-root out/stone_path_01
+
+      - name: Verify stone and wood UI pricing
         shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import json
-          import shutil
-
-          def replace_once(path: Path, old: str, new: str, already: str | None = None) -> None:
-              text = path.read_text(encoding='utf-8')
-              if old in text:
-                  text = text.replace(old, new, 1)
-                  path.write_text(text, encoding='utf-8')
-                  return
-              if already is not None and already in text:
-                  return
-              raise SystemExit(f'expected patch anchor not found in {path}: {old[:100]!r}')
-
-          # Runtime stone assets.
-          source = Path('out/stone_path_01/stone_01')
-          target = Path('assets/terrain/paths/stone_01')
-          target.mkdir(parents=True, exist_ok=True)
-          for png in source.glob('stone_path_*.png'):
-              shutil.copy2(png, target / png.name)
-          manifest = json.loads(Path('out/stone_path_01/stone_path_01.json').read_text(encoding='utf-8'))
-          manifest['styleId'] = 'stone_path'
-          manifest['promotionState'] = 'runtime'
-          (target / 'stone_path_01.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-
-          # UI: expose both premium paths with real per-tile prices.
-          ui = Path('src/ui_manager.cpp')
-          replace_once(ui,
-              '[[nodiscard]] std::array<UiBuildItem, 4> floor_catalog_items() {',
-              '[[nodiscard]] std::array<UiBuildItem, 5> floor_catalog_items() {',
-              '[[nodiscard]] std::array<UiBuildItem, 5> floor_catalog_items() {')
-          replace_once(ui,
-              '{"wood_path", "Caminho de Madeira", "PISO", "$0 / TILE", true,',
-              '{"wood_path", "Caminho de Madeira", "PISO", "$25 / TILE", true,',
-              '{"wood_path", "Caminho de Madeira", "PISO", "$25 / TILE", true,')
-          wood_block = '''        {"wood_path", "Caminho de Madeira", "PISO", "$25 / TILE", true,
-         runtime_asset_path("assets/terrain/paths/wood_01/wood_path_00_isolated.png"),
-         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
-'''
-          stone_block = '''        {"stone_path", "Caminho de Pedras", "PISO", "$40 / TILE", true,
-         runtime_asset_path("assets/terrain/paths/stone_01/stone_path_00_isolated.png"),
-         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
-'''
-          text = ui.read_text(encoding='utf-8')
-          if stone_block not in text:
-              if wood_block not in text:
-                  raise SystemExit('wood UI block not found while adding stone')
-              ui.write_text(text.replace(wood_block, wood_block + stone_block, 1), encoding='utf-8')
-
-          # Renderer: use the same 16-mask naming contract for stone.
-          renderer = Path('src/runtime_map_renderer.h')
-          renderer_text = renderer.read_text(encoding='utf-8')
-          if 'style_id == "stone_path"' not in renderer_text:
-              wood_renderer = '''    if (style_id == "wood_path") {
-        std::string filename = dirt_path_sprite(connections).substr(std::string("assets/terrain/paths/dirt_01/").size());
-        filename.replace(0, 4, "wood");
-        return "assets/terrain/paths/wood_01/" + filename;
-    }
-'''
-              stone_renderer = '''    if (style_id == "stone_path") {
-        std::string filename = dirt_path_sprite(connections).substr(std::string("assets/terrain/paths/dirt_01/").size());
-        filename.replace(0, 4, "stone");
-        return "assets/terrain/paths/stone_01/" + filename;
-    }
-'''
-              if wood_renderer not in renderer_text:
-                  raise SystemExit('wood renderer block not found while adding stone')
-              renderer.write_text(renderer_text.replace(wood_renderer, wood_renderer + stone_renderer, 1), encoding='utf-8')
-
-          # Runtime selection and authoritative economy charge.
-          runtime = Path('src/main_runtime_impl.cpp')
-          runtime_text = runtime.read_text(encoding='utf-8')
-          if 'action.payload == "stone_path"' not in runtime_text:
-              old = 'if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "wood_path" ||\n                    action.payload == "grass" || action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {'
-              new = 'if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "wood_path" ||\n                    action.payload == "stone_path" || action.payload == "grass" || action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {'
-              if old not in runtime_text:
-                  raise SystemExit('floor action whitelist anchor not found')
-              runtime_text = runtime_text.replace(old, new, 1)
-
-          if 'const auto floor_style_cost = ' not in runtime_text:
-              anchor = '''    const auto begin_sidewalk_mode = [&]() {
-        clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
-        status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
-    };
-'''
-              addition = '''    const auto floor_style_cost = [](const std::string& style) -> std::int64_t {
-        if (style == "wood_path") return 25;
-        if (style == "stone_path") return 40;
-        return 0;
-    };
-'''
-              if anchor not in runtime_text:
-                  raise SystemExit('sidewalk mode anchor not found')
-              runtime_text = runtime_text.replace(anchor, anchor + addition, 1)
-
-          if 'const std::int64_t tile_cost = floor_style_cost(sidewalk_style);' not in runtime_text:
-              old = '''                        bool changed_tile = false;
-                        if (sidewalk_style == "grass") {
-                            changed_tile = sidewalks.remove_tile(tile.x, tile.y);
-                        } else {
-                            changed_tile = sidewalks.paint_tile(tile.x, tile.y, sidewalk_style);
-                        }
-                        if (restore_grass(tile.x, tile.y)) changed_tile = true;
-                        if (changed_tile) ++changed;
-'''
-              new = '''                        const SidewalkTile* existing_floor = sidewalks.tile_at(tile.x, tile.y);
-                        const bool style_would_change = sidewalk_style == "grass"
-                            ? existing_floor != nullptr
-                            : existing_floor == nullptr || existing_floor->style_id != sidewalk_style;
-                        if (!style_would_change) continue;
-                        const std::int64_t tile_cost = floor_style_cost(sidewalk_style);
-                        if (tile_cost > 0 && !economy.can_afford(tile_cost)) {
-                            ++blocked;
-                            continue;
-                        }
-                        bool changed_tile = false;
-                        if (sidewalk_style == "grass") {
-                            changed_tile = sidewalks.remove_tile(tile.x, tile.y);
-                        } else {
-                            changed_tile = sidewalks.paint_tile(tile.x, tile.y, sidewalk_style);
-                        }
-                        if (restore_grass(tile.x, tile.y)) changed_tile = true;
-                        if (changed_tile) {
-                            if (tile_cost > 0) (void)economy.try_spend(tile_cost);
-                            ++changed;
-                        }
-'''
-              if old not in runtime_text:
-                  raise SystemExit('floor placement economy anchor not found')
-              runtime_text = runtime_text.replace(old, new, 1)
-          runtime.write_text(runtime_text, encoding='utf-8')
-          PY
-
-      - name: Sanity checks for stone, wood, UI and pricing
         run: |
           set -euo pipefail
           test -f assets/terrain/paths/stone_01/stone_path_00_isolated.png
@@ -209,8 +66,6 @@ jobs:
           grep -q 'action.payload == "stone_path"' src/main_runtime_impl.cpp
           grep -q '"stone_path", "Caminho de Pedras", "PISO", "$40 / TILE"' src/ui_manager.cpp
           grep -q '"wood_path", "Caminho de Madeira", "PISO", "$25 / TILE"' src/ui_manager.cpp
-          grep -q 'if (style == "wood_path") return 25;' src/main_runtime_impl.cpp
-          grep -q 'if (style == "stone_path") return 40;' src/main_runtime_impl.cpp
           git diff --check
 
       - name: Publish stone validation artifact
@@ -229,7 +84,9 @@ jobs:
           retention-days: 14
 
       - name: Commit stone runtime, UI and economy safely
+        shell: bash
         run: |
+          set -euo pipefail
           if git diff --quiet -- assets/terrain/paths/stone_01 src/ui_manager.cpp src/runtime_map_renderer.h src/main_runtime_impl.cpp; then
             echo "Stone/wood floor UI and pricing are already canonical."
             exit 0
@@ -258,32 +115,21 @@ jobs:
         run: python -m pip install --upgrade pillow
 
       - name: Generate wooden path through canonical tile worker
-        run: |
-          python tools/generate_wood_paths.py \
-            --source Converter/file_00000000e7b4820ea8e8cdc823cfa927.png \
-            --output-dir assets/terrain/paths/wood_01 \
-            --work-dir out/wood_path_01
+        run: python tools/generate_wood_paths.py --source Converter/file_00000000e7b4820ea8e8cdc823cfa927.png --output-dir assets/terrain/paths/wood_01 --work-dir out/wood_path_01
 
       - name: Validate atomic-path geometry
-        run: |
-          python tools/tiles/validate_atomic_path_candidate.py --debug \
-            assets/terrain/paths/wood_01/wood_path_00_isolated.png \
-            assets/terrain/paths/wood_01/wood_path_05_straight_ns.png \
-            assets/terrain/paths/wood_01/wood_path_10_straight_ew.png \
-            assets/terrain/paths/wood_01/wood_path_15_cross.png
+        run: python tools/tiles/validate_atomic_path_candidate.py --debug assets/terrain/paths/wood_01/wood_path_00_isolated.png assets/terrain/paths/wood_01/wood_path_05_straight_ns.png assets/terrain/paths/wood_01/wood_path_10_straight_ew.png assets/terrain/paths/wood_01/wood_path_15_cross.png
 
       - name: Validate complete 16-mask family
-        run: |
-          python tools/validate_path_tiles.py \
-            --directory assets/terrain/paths/wood_01 \
-            --prefix wood_path \
-            --report out/wood_path_01/wood_path_family_validation.json
+        run: python tools/validate_path_tiles.py --directory assets/terrain/paths/wood_01 --prefix wood_path --report out/wood_path_01/wood_path_family_validation.json
 
       - name: Register wooden path in runtime
         run: python tools/promote_wood_path_runtime.py
 
       - name: Sanity checks
+        shell: bash
         run: |
+          set -euo pipefail
           python -m py_compile tools/generate_wood_paths.py tools/promote_wood_path_runtime.py tools/validate_path_tiles.py
           git diff --check
           test -f assets/terrain/paths/wood_01/wood_path_00_isolated.png
@@ -306,7 +152,9 @@ jobs:
           retention-days: 14
 
       - name: Commit runtime assets and registration safely
+        shell: bash
         run: |
+          set -euo pipefail
           if git diff --quiet -- assets/terrain/paths/wood_01 src/runtime_map_renderer.h src/main_runtime_impl.cpp src/ui_manager.cpp; then
             echo "Wood path is already promoted; nothing to commit."
             exit 0
