@@ -8,7 +8,7 @@
   "assetRequirements": {
     "contract": "CH_ASSET_REQUIREMENTS_V1",
     "assetId": "attraction.park_pirate_ship.clean_reference",
-    "footprint": {"widthTiles": 7, "depthTiles": 6},
+    "footprint": {"widthTiles": 4, "depthTiles": 3},
     "minDimensions": [19, 10, 19],
     "maxDimensions": [30, 20, 29]
   },
