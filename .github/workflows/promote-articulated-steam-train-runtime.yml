@@ -96,6 +96,21 @@ jobs:
               source="$(find out/runtime_promotion/source -type d -name "$source_dir" -print -quit)"
             fi
             test -n "$source" && test -d "$source"
+
+            python - "$source" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          metadata_path = Path(sys.argv[1]) / 'studio_metadata.json'
+          metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
+          existing = metadata.get('contract')
+          if existing not in (None, 'TYCOON_ASSET_BAKE_V1'):
+              raise SystemExit(f'Unexpected bake contract: {existing}')
+          metadata['contract'] = 'TYCOON_ASSET_BAKE_V1'
+          metadata_path.write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
+          PY
+
             python tools/tycoon_photo_studio/postprocess.py \
               --input "$source" \
               --output "out/runtime_promotion/final/$unit" \
