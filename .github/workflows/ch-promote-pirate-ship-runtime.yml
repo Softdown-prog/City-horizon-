@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/ch-promote-pirate-ship-runtime.yml"
+      - "assets/city_park/pirate_ship/pirate_ship_runtime_manifest.json"
 
 permissions:
   contents: write
@@ -75,10 +76,6 @@ jobs:
 
               for index, frame in enumerate(frames):
                   sheet.paste(frame, (index * width, 0))
-
-                  # CH_COLOR_MASK_V1: R = Primary, G = Secondary, A = coverage.
-                  # Primary wins any accidental overlap so one pixel never receives
-                  # both player colors.
                   secondary_alpha = secondary[index].getchannel("A")
                   secondary_only = ImageChops.subtract(secondary_alpha, primary_alpha)
                   coverage = ImageChops.lighter(primary_alpha, secondary_only)
@@ -138,6 +135,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/city_park/pirate_ship
           git commit -m "assets: promote pirate ship runtime sprites [skip ci]"
+          git pull --rebase origin main
           git push origin HEAD:main
-
-# bootstrap trigger: workflow now exists on main
