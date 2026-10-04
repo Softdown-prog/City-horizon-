@@ -1,4 +1,5 @@
 #include "road_system.h"
+#include "road_topology_compat.h"
 #include "sidewalk_system.h"
 
 #include <cassert>
@@ -16,6 +17,12 @@ int main() {
     static_assert(classify_tile_topology(tile_connection_north | tile_connection_east | tile_connection_west) == TileTopologyKind::tee);
     static_assert(classify_tile_topology(tile_connection_all) == TileTopologyKind::cross);
     static_assert(classify_tile_topology(0xFF) == TileTopologyKind::cross);
+    static_assert(road_visual_type_topology(RoadVisualType::isolated) == TileTopologyKind::isolated);
+    static_assert(road_visual_type_topology(RoadVisualType::end) == TileTopologyKind::endpoint);
+    static_assert(road_visual_type_topology(RoadVisualType::straight) == TileTopologyKind::straight);
+    static_assert(road_visual_type_topology(RoadVisualType::curve) == TileTopologyKind::corner);
+    static_assert(road_visual_type_topology(RoadVisualType::tee) == TileTopologyKind::tee);
+    static_assert(road_visual_type_topology(RoadVisualType::intersection) == TileTopologyKind::cross);
 
     RoadManager roads{-4, 4};
     SidewalkManager sidewalks{-4, 4};
@@ -77,6 +84,45 @@ int main() {
     assert(repaint.paint_tile(0, 0, "sand_path"));
     assert(repaint.connection_mask(1, 0) == (tile_connection_west | tile_connection_east));
     assert(!repaint.paint_tile(5, 0, "sand_path"));
+
+    // Road compatibility gate: while RoadVisualType still exists, it must stay
+    // exactly equivalent to CH_PATH_TOPOLOGY_V1 for every topology family.
+    RoadManager endpoint{-4, 4};
+    assert(endpoint.place_tile(0, 0));
+    assert(endpoint.place_tile(0, 1));
+    assert(legacy_road_visual_matches_topology(endpoint, 0, 0));
+    assert(road_topology_kind(endpoint, 0, 0) == TileTopologyKind::endpoint);
+
+    RoadManager straight{-4, 4};
+    assert(straight.place_tile(-1, 0));
+    assert(straight.place_tile(0, 0));
+    assert(straight.place_tile(1, 0));
+    assert(legacy_road_visual_matches_topology(straight, 0, 0));
+    assert(road_topology_kind(straight, 0, 0) == TileTopologyKind::straight);
+
+    RoadManager corner{-4, 4};
+    assert(corner.place_tile(0, -1));
+    assert(corner.place_tile(0, 0));
+    assert(corner.place_tile(1, 0));
+    assert(legacy_road_visual_matches_topology(corner, 0, 0));
+    assert(road_topology_kind(corner, 0, 0) == TileTopologyKind::corner);
+
+    RoadManager tee{-4, 4};
+    assert(tee.place_tile(0, -1));
+    assert(tee.place_tile(-1, 0));
+    assert(tee.place_tile(0, 0));
+    assert(tee.place_tile(1, 0));
+    assert(legacy_road_visual_matches_topology(tee, 0, 0));
+    assert(road_topology_kind(tee, 0, 0) == TileTopologyKind::tee);
+
+    RoadManager cross{-4, 4};
+    assert(cross.place_tile(0, -1));
+    assert(cross.place_tile(-1, 0));
+    assert(cross.place_tile(0, 0));
+    assert(cross.place_tile(1, 0));
+    assert(cross.place_tile(0, 1));
+    assert(legacy_road_visual_matches_topology(cross, 0, 0));
+    assert(road_topology_kind(cross, 0, 0) == TileTopologyKind::cross);
 
     assert(roads.place_tile(0, 0));
     assert(roads.place_tile(0, 1));
