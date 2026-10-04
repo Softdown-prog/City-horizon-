@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Integrate spend feedback
+      - name: Integrate money feedback
         run: python tools/integrate_money_spend_fx.py
 
       - name: Static contract checks
@@ -39,19 +39,21 @@ jobs:
           grep -q '#include "money_spend_fx.h"' src/main_runtime_impl.cpp
           grep -q 'MoneySpendFx money_spend_fx' src/main_runtime_impl.cpp
           grep -q 'money_spend_fx.spawn(placement->build_cost' src/main_runtime_impl.cpp
+          grep -q 'money_spend_fx.spawn_income(revenue' src/main_runtime_impl.cpp
           grep -q 'money_spend_fx.render(renderer)' src/main_runtime_impl.cpp
-          grep -q 'CH_MONEY_SPEND_FX_V1' src/money_spend_fx.h
+          grep -q 'CH_MONEY_SPEND_FX_V2' src/money_spend_fx.h
+          grep -q '"+\$"' src/money_spend_fx.h
           git diff --check
 
       - name: Commit integration safely
         run: |
           if git diff --quiet -- src/main_runtime_impl.cpp; then
-            echo "Spend animation already integrated; nothing to commit."
+            echo "Money feedback already integrated; nothing to commit."
             exit 0
           fi
           git config user.name "city-horizon-worker"
           git config user.email "actions@users.noreply.github.com"
           git add src/main_runtime_impl.cpp
-          git commit -m "feat(ui): animate construction spending"
+          git commit -m "feat(ui): add positive income feedback"
           git pull --rebase origin main
           git push origin HEAD:main
