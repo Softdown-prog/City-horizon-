@@ -2,6 +2,7 @@
 
 #include "building_system.h"
 #include "economy_system.h"
+#include "land_system.h"
 #include "road_system.h"
 #include "src/ch_core/game_command.h"
 
@@ -10,9 +11,10 @@
 
 class RoadPlacementCommand final : public ch::IGameCommand {
 public:
-    RoadPlacementCommand(RoadManager& roads, const BuildingManager& buildings, CityEconomy& economy,
-                         const int tile_x, const int tile_y)
-        : roads_(roads), buildings_(buildings), economy_(economy), tile_x_(tile_x), tile_y_(tile_y) {}
+    RoadPlacementCommand(RoadManager& roads, const BuildingManager& buildings, const LandManager& lands,
+                         CityEconomy& economy, const int tile_x, const int tile_y)
+        : roads_(roads), buildings_(buildings), lands_(lands), economy_(economy),
+          tile_x_(tile_x), tile_y_(tile_y) {}
 
     [[nodiscard]] ch::GameCommandPlan prepare() const override {
         ch::GameCommandPlan plan;
@@ -46,6 +48,13 @@ public:
             return plan;
         }
 
+        if (!lands_.is_tile_owned(tile_x_, tile_y_)) {
+            plan.valid = false;
+            plan.failure = ch::GameCommandFailure::blocked;
+            plan.message = "road tile is not owned";
+            return plan;
+        }
+
         if (!economy_.can_afford(plan.cost_units)) {
             plan.valid = false;
             plan.failure = ch::GameCommandFailure::insufficient_funds;
@@ -64,7 +73,8 @@ public:
             error = "invalid prepared road command";
             return false;
         }
-        if (roads_.validate_placement(tile_x_, tile_y_, buildings_) != RoadPlacementFailure::none) {
+        if (roads_.validate_placement(tile_x_, tile_y_, buildings_) != RoadPlacementFailure::none ||
+            !lands_.is_tile_owned(tile_x_, tile_y_)) {
             error = "road placement changed after preview";
             return false;
         }
@@ -83,6 +93,7 @@ public:
 private:
     RoadManager& roads_;
     const BuildingManager& buildings_;
+    const LandManager& lands_;
     CityEconomy& economy_;
     int tile_x_ = 0;
     int tile_y_ = 0;
