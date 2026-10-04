@@ -6,6 +6,7 @@
 #include "land_system.h"
 #include "rail_construction_economy.h"
 #include "rail_mapforge_input_adapter.h"
+#include "rail_persistence.h"
 #include "rail_placement_track_graph_adapter.h"
 #include "road_system.h"
 #include "sidewalk_system.h"
@@ -28,7 +29,7 @@
 #include <unordered_set>
 #include <vector>
 
-inline constexpr const char* kChRailRuntimeBridgeContract = "CH_RAIL_RUNTIME_BRIDGE_V2";
+inline constexpr const char* kChRailRuntimeBridgeContract = "CH_RAIL_RUNTIME_BRIDGE_V3";
 
 namespace ch::rail_runtime {
 
@@ -52,14 +53,48 @@ public:
     [[nodiscard]] const std::string& status_text() const noexcept { return status_; }
     [[nodiscard]] const RailPlacementGraph& graph() const noexcept { return graph_; }
 
+    [[nodiscard]] RailPersistentState persistent_state() const {
+        RailPersistentState state;
+        state.nodes = graph_.nodes();
+        state.edges = graph_.edges();
+        state.actions = committed_actions_;
+        // A save captures only authoritative construction. A live ghost is
+        // append-only after gesture_checkpoint_ and is never persisted.
+        if (gesture_active_) {
+            if (gesture_checkpoint_.node_count <= state.nodes.size()) {
+                state.nodes.resize(gesture_checkpoint_.node_count);
+            }
+            if (gesture_checkpoint_.edge_count <= state.edges.size()) {
+                state.edges.resize(gesture_checkpoint_.edge_count);
+            }
+        }
+        return state;
+    }
+
+    [[nodiscard]] bool restore_persistent_state(const RailPersistentState& state) {
+        std::string validation_error;
+        if (!rail_persistence::validate(state, &validation_error)) return false;
+        cancel_gesture(false);
+        if (!graph_.restore_snapshot(state.nodes, state.edges)) return false;
+        committed_actions_ = state.actions;
+        selected_mode_ = RailPlacementMode::straight;
+        hovered_piece_.reset();
+        new_root_heading_radians_ = 0.0F;
+        tool_active_ = false;
+        preview_valid_ = false;
+        preview_cost_ = 0;
+        refresh_status();
+        return true;
+    }
+
     void reset() {
         cancel_gesture(false);
         graph_.clear();
         committed_actions_.clear();
+        hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
         new_root_heading_radians_ = 0.0F;
-        committed_edge_count_ = 0U;
         preview_valid_ = false;
         preview_cost_ = 0;
         refresh_status();
@@ -71,6 +106,7 @@ public:
         if (!interaction_allowed) {
             if (tool_active_) {
                 cancel_gesture(false);
+                hovered_piece_.reset();
                 tool_active_ = false;
                 status_ = "RAIL MODE CLOSED BY MODAL";
             }
@@ -81,6 +117,7 @@ public:
             if (event.key.scancode == SDL_SCANCODE_T) {
                 if (tool_active_) {
                     cancel_gesture(false);
+                    hovered_piece_.reset();
                     tool_active_ = false;
                     status_ = "RAIL MODE CLOSED";
                 } else {
@@ -105,6 +142,13 @@ public:
                     if (!gesture_active_) rotate_new_root_heading(1.0F);
                     return true;
                 case SDL_SCANCODE_DELETE:
+                    if (gesture_active_) {
+                        cancel_gesture(false);
+                        status_ = "RAIL PREVIEW CANCELLED";
+                    } else {
+                        demolish_hovered_piece();
+                    }
+                    return true;
                 case SDL_SCANCODE_BACKSPACE:
                     if (gesture_active_) {
                         cancel_gesture(false);
@@ -117,6 +161,7 @@ public:
                     if (gesture_active_) {
                         cancel_gesture(true);
                     } else {
+                        hovered_piece_.reset();
                         tool_active_ = false;
                         status_ = "RAIL MODE CLOSED";
                     }
@@ -136,6 +181,7 @@ public:
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
             if (gesture_active_) cancel_gesture(true);
             else {
+                hovered_piece_.reset();
                 tool_active_ = false;
                 status_ = "RAIL MODE CLOSED";
             }
@@ -147,8 +193,9 @@ public:
             return true;
         }
 
-        if (event.type == SDL_EVENT_MOUSE_MOTION && gesture_active_) {
-            update_gesture(event.motion.x, event.motion.y, view, context);
+        if (event.type == SDL_EVENT_MOUSE_MOTION) {
+            if (gesture_active_) update_gesture(event.motion.x, event.motion.y, view, context);
+            else update_hovered_piece(event.motion.x, event.motion.y, view);
             return true;
         }
 
@@ -167,6 +214,10 @@ public:
         if (renderer == nullptr || graph_.edges().empty()) return;
 
         ProceduralRailRenderer::Palette committed_palette{};
+        ProceduralRailRenderer::Palette hover_palette{};
+        hover_palette.ballast = SDL_Color{111, 121, 129, 235};
+        hover_palette.sleepers = SDL_Color{144, 111, 72, 255};
+        hover_palette.rails = SDL_Color{237, 218, 128, 255};
         ProceduralRailRenderer::Palette valid_preview_palette{};
         valid_preview_palette.ballast = SDL_Color{124, 111, 74, 220};
         valid_preview_palette.sleepers = SDL_Color{125, 83, 42, 235};
@@ -177,11 +228,14 @@ public:
         invalid_preview_palette.rails = SDL_Color{232, 91, 76, 255};
 
         for (const RailPlacementEdge& edge : graph_.edges()) {
+            if (!edge.active) continue;
             const bool staged = gesture_active_ &&
                 static_cast<std::size_t>(edge.id) >= gesture_checkpoint_.edge_count;
+            const bool hovered = !staged && hovered_piece_.has_value() &&
+                edge.piece_group == *hovered_piece_;
             const ProceduralRailRenderer::Palette& palette = staged
                 ? (preview_valid_ ? valid_preview_palette : invalid_preview_palette)
-                : committed_palette;
+                : (hovered ? hover_palette : committed_palette);
             (void)ProceduralRailRenderer::render_segment(
                 renderer, edge.segment, profile_, camera,
                 viewport_width, viewport_height, palette);
@@ -189,14 +243,10 @@ public:
     }
 
 private:
-    struct CommittedRailAction {
-        RailPlacementCheckpoint checkpoint{};
-        std::int64_t build_cost = 0;
-    };
-
     static constexpr float kPi = 3.14159265358979323846F;
     static constexpr float kHeadingStepRadians = kPi * 0.25F;
     static constexpr float kNodeSnapRadiusWorld = 0.36F;
+    static constexpr float kPieceHoverRadiusWorld = 0.34F;
     static constexpr float kTerrainLevelTolerance = 0.12F;
 
     [[nodiscard]] static const char* mode_label(const RailPlacementMode mode) {
@@ -235,7 +285,7 @@ private:
     [[nodiscard]] std::size_t piece_count() const {
         std::unordered_set<RailPlacementPieceId> pieces;
         for (const RailPlacementEdge& edge : graph_.edges()) {
-            if (edge.piece_group != kInvalidRailPlacementPieceId) pieces.insert(edge.piece_group);
+            if (edge.active && edge.piece_group != kInvalidRailPlacementPieceId) pieces.insert(edge.piece_group);
         }
         return pieces.size();
     }
@@ -247,13 +297,15 @@ private:
         }
         status_ = std::string("RAIL ") + mode_label(selected_mode_) +
             " | LMB DRAG | 1-6 PIECE | Q/E HEADING " + std::to_string(heading_degrees()) +
-            " | DEL UNDO | T EXIT | PIECES " + std::to_string(piece_count());
+            " | DEL HOVER REMOVE | BACKSPACE LAST | T EXIT | PIECES " + std::to_string(piece_count());
+        if (hovered_piece_) status_ += " | HOVER " + std::to_string(*hovered_piece_);
     }
 
     [[nodiscard]] std::optional<RailPlacementNodeId> nearest_node(const RailDragWorldPoint& point) const {
         std::optional<RailPlacementNodeId> best;
         float best_distance_squared = kNodeSnapRadiusWorld * kNodeSnapRadiusWorld;
         for (const RailPlacementNode& node : graph_.nodes()) {
+            if (!node.active) continue;
             const float dx = node.position.x - point.x;
             const float dy = node.position.y - point.y;
             const float distance_squared = dx * dx + dy * dy;
@@ -263,6 +315,51 @@ private:
             }
         }
         return best;
+    }
+
+    [[nodiscard]] static float point_segment_distance_squared(const RailDragWorldPoint& point,
+                                                               const RailWorldPoint3& a,
+                                                               const RailWorldPoint3& b) {
+        const float vx = b.x - a.x;
+        const float vy = b.y - a.y;
+        const float wx = point.x - a.x;
+        const float wy = point.y - a.y;
+        const float length_squared = vx * vx + vy * vy;
+        if (length_squared <= 1.0e-9F) return wx * wx + wy * wy;
+        const float t = std::clamp((wx * vx + wy * vy) / length_squared, 0.0F, 1.0F);
+        const float dx = point.x - (a.x + vx * t);
+        const float dy = point.y - (a.y + vy * t);
+        return dx * dx + dy * dy;
+    }
+
+    [[nodiscard]] std::optional<RailPlacementPieceId> nearest_piece(const RailDragWorldPoint& point) const {
+        std::optional<RailPlacementPieceId> best;
+        float best_distance_squared = kPieceHoverRadiusWorld * kPieceHoverRadiusWorld;
+        for (const RailPlacementEdge& edge : graph_.edges()) {
+            if (!edge.active || edge.piece_group == kInvalidRailPlacementPieceId) continue;
+            const int samples = std::clamp(edge.segment.subdivisions, 8, 64);
+            RailWorldPoint3 previous = RailMeshBuilder::sample_cubic(edge.segment, 0.0F);
+            for (int index = 1; index <= samples; ++index) {
+                const float t = static_cast<float>(index) / static_cast<float>(samples);
+                const RailWorldPoint3 current = RailMeshBuilder::sample_cubic(edge.segment, t);
+                const float distance_squared = point_segment_distance_squared(point, previous, current);
+                if (distance_squared <= best_distance_squared) {
+                    best_distance_squared = distance_squared;
+                    best = edge.piece_group;
+                }
+                previous = current;
+            }
+        }
+        return best;
+    }
+
+    void update_hovered_piece(const float screen_x,
+                              const float screen_y,
+                              const runtime_view::ViewSnapshot& view) {
+        const auto world = RailMapForgeInputAdapter::screen_to_world(
+            screen_x, screen_y, view.camera, view.viewport_width, view.viewport_height);
+        hovered_piece_ = world ? nearest_piece(*world) : std::nullopt;
+        refresh_status();
     }
 
     [[nodiscard]] static bool tile_available(const int tile_x,
@@ -306,7 +403,9 @@ private:
 
         for (std::size_t edge_index = gesture_checkpoint_.edge_count;
              edge_index < graph_.edges().size(); ++edge_index) {
-            const RailSplineSegment& segment = graph_.edges()[edge_index].segment;
+            const RailPlacementEdge& edge = graph_.edges()[edge_index];
+            if (!edge.active) continue;
+            const RailSplineSegment& segment = edge.segment;
             const int samples = std::clamp(segment.subdivisions, 8, 64);
             for (int index = 0; index <= samples; ++index) {
                 const float t = static_cast<float>(index) / static_cast<float>(samples);
@@ -331,6 +430,7 @@ private:
                        const runtime_view::ViewSnapshot& view,
                        const InteractionContext& context) {
         if (gesture_active_) cancel_gesture(false);
+        hovered_piece_.reset();
         const auto world = RailMapForgeInputAdapter::screen_to_world(
             screen_x, screen_y, view.camera, view.viewport_width, view.viewport_height);
         if (!world) {
@@ -445,6 +545,24 @@ private:
             status_ = "RAIL COMMIT BLOCKED: FUNDS CHANGED";
             return;
         }
+        if (gesture_checkpoint_.edge_count >= graph_.edges().size()) {
+            cancel_gesture(false);
+            status_ = "RAIL COMMIT FAILED: NO LOGICAL PIECE";
+            return;
+        }
+        const RailPlacementPieceId piece_group = graph_.edges()[gesture_checkpoint_.edge_count].piece_group;
+        if (piece_group == kInvalidRailPlacementPieceId) {
+            cancel_gesture(false);
+            status_ = "RAIL COMMIT FAILED: PIECE ID INVALID";
+            return;
+        }
+        for (std::size_t index = gesture_checkpoint_.edge_count; index < graph_.edges().size(); ++index) {
+            if (!graph_.edges()[index].active || graph_.edges()[index].piece_group != piece_group) {
+                cancel_gesture(false);
+                status_ = "RAIL COMMIT FAILED: MIXED PIECE GROUP";
+                return;
+            }
+        }
 
         if (!input_.confirm()) {
             cancel_gesture(false);
@@ -460,45 +578,73 @@ private:
             gesture_active_ = false;
             preview_valid_ = false;
             preview_cost_ = 0;
-            committed_edge_count_ = graph_.edges().size();
             status_ = "RAIL COMMIT ROLLED BACK: PAYMENT FAILED";
             return;
         }
 
-        committed_actions_.push_back({gesture_checkpoint_, committed_cost});
-        committed_edge_count_ = graph_.edges().size();
+        const std::int64_t refund = RailConstructionEconomy::demolition_refund(committed_cost);
+        committed_actions_.push_back({piece_group, committed_cost, refund, true});
         gesture_active_ = false;
         preview_valid_ = false;
         preview_cost_ = 0;
         status_ = "RAIL BUILT: " + money_label(committed_cost) +
-            " SPENT | DEL UNDO | PIECES " + std::to_string(piece_count());
+            " SPENT | DEL HOVER REMOVE | BACKSPACE LAST | PIECES " + std::to_string(piece_count());
     }
 
-    void demolish_last_committed_action() {
-        if (committed_actions_.empty()) {
-            status_ = "RAIL DEMOLISH: NO COMMITTED PIECE";
-            return;
+    [[nodiscard]] RailPersistentAction* active_action(const RailPlacementPieceId piece_group) {
+        for (RailPersistentAction& action : committed_actions_) {
+            if (action.active && action.piece_group == piece_group) return &action;
         }
+        return nullptr;
+    }
+
+    void demolish_piece(const RailPlacementPieceId piece_group) {
         CityEconomy* economy = CityEconomy::active_instance();
         if (economy == nullptr) {
             status_ = "RAIL DEMOLISH: ECONOMY UNAVAILABLE";
             return;
         }
-
-        const CommittedRailAction action = committed_actions_.back();
-        if (!graph_.rollback(action.checkpoint)) {
-            status_ = "RAIL DEMOLISH FAILED: CHECKPOINT REJECTED";
+        RailPersistentAction* action = active_action(piece_group);
+        if (action == nullptr) {
+            status_ = "RAIL DEMOLISH: PIECE HAS NO ACTIVE LEDGER ENTRY";
+            return;
+        }
+        if (graph_.remove_piece(piece_group) == 0U) {
+            status_ = "RAIL DEMOLISH FAILED: PIECE NOT LIVE";
             return;
         }
 
-        const std::int64_t refund = RailConstructionEconomy::demolition_refund(action.build_cost);
-        economy->credit_infrastructure_refund(refund);
-        committed_actions_.pop_back();
-        committed_edge_count_ = graph_.edges().size();
+        const rail::RailPlacementTopologyBuildResult topology = rail::build_track_graph(graph_);
+        if (!topology.valid) {
+            (void)graph_.set_piece_active(piece_group, true);
+            status_ = "RAIL DEMOLISH ROLLED BACK: TOPOLOGY REJECTED";
+            return;
+        }
+
+        economy->credit_infrastructure_refund(action->refund_value);
+        action->active = false;
+        hovered_piece_.reset();
         preview_valid_ = false;
         preview_cost_ = 0;
-        status_ = "RAIL DEMOLISHED | REFUND " + money_label(refund) +
+        status_ = "RAIL DEMOLISHED | REFUND " + money_label(action->refund_value) +
             " | PIECES " + std::to_string(piece_count());
+    }
+
+    void demolish_hovered_piece() {
+        if (!hovered_piece_) {
+            status_ = "RAIL DEMOLISH: HOVER A TRACK PIECE FIRST";
+            return;
+        }
+        demolish_piece(*hovered_piece_);
+    }
+
+    void demolish_last_committed_action() {
+        for (auto it = committed_actions_.rbegin(); it != committed_actions_.rend(); ++it) {
+            if (!it->active) continue;
+            demolish_piece(it->piece_group);
+            return;
+        }
+        status_ = "RAIL DEMOLISH: NO COMMITTED PIECE";
     }
 
     void cancel_gesture(const bool refresh) {
@@ -507,7 +653,6 @@ private:
         gesture_active_ = false;
         preview_valid_ = false;
         preview_cost_ = 0;
-        committed_edge_count_ = graph_.edges().size();
         if (refresh) refresh_status();
     }
 
@@ -518,8 +663,8 @@ private:
     RailMapForgeInputAdapter input_;
     RailPlacementMode selected_mode_ = RailPlacementMode::straight;
     RailPlacementCheckpoint gesture_checkpoint_{};
-    std::vector<CommittedRailAction> committed_actions_;
-    std::size_t committed_edge_count_ = 0U;
+    std::vector<RailPersistentAction> committed_actions_;
+    std::optional<RailPlacementPieceId> hovered_piece_;
     std::int64_t preview_cost_ = 0;
     float new_root_heading_radians_ = 0.0F;
     bool tool_active_ = false;
@@ -537,10 +682,28 @@ inline void reset() { state().reset(); }
 [[nodiscard]] inline bool tool_active() { return state().tool_active(); }
 [[nodiscard]] inline const std::string& status_text() { return state().status_text(); }
 [[nodiscard]] inline const RailPlacementGraph& graph() { return state().graph(); }
+[[nodiscard]] inline RailPersistentState persistent_state() { return state().persistent_state(); }
+[[nodiscard]] inline bool restore_persistent_state(const RailPersistentState& persistent) {
+    return state().restore_persistent_state(persistent);
+}
+
+[[nodiscard]] inline RailPersistentState capture_persistence_callback() {
+    return persistent_state();
+}
+
+[[nodiscard]] inline bool restore_persistence_callback(const RailPersistentState& persistent) {
+    return restore_persistent_state(persistent);
+}
+
+inline const bool kRailPersistenceRuntimeRegistered = []() {
+    rail_persistence::register_runtime(&capture_persistence_callback, &restore_persistence_callback);
+    return true;
+}();
 
 [[nodiscard]] inline bool poll_event(SDL_Event* event,
                                      const bool interaction_allowed,
                                      const InteractionContext& context) {
+    (void)kRailPersistenceRuntimeRegistered;
     if (event == nullptr) return false;
     while (SDL_PollEvent(event)) {
         if (state().consume_event(*event, interaction_allowed, context)) continue;
@@ -553,6 +716,7 @@ inline void render(SDL_Renderer* renderer,
                    const CameraState& camera,
                    const float viewport_width,
                    const float viewport_height) {
+    (void)kRailPersistenceRuntimeRegistered;
     state().render(renderer, camera, viewport_width, viewport_height);
 }
 
