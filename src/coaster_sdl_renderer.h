@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace ch::coaster {
@@ -323,6 +325,155 @@ inline void append_track_skin_overlay(
     }
 }
 
+enum class CoasterSkinOverlayModule : std::uint8_t {
+    joint_plate = 0,
+    chain_lift = 1,
+    brake_fin = 2,
+};
+
+struct CoasterSkinOverlayDraw {
+    SDL_FRect source{};
+    SDL_FRect destination{};
+    float depth_key = 0.0F;
+};
+
+[[nodiscard]] inline SDL_Texture* coaster_skin_overlay_texture(
+    SDL_Renderer* renderer,
+    const CoasterTrackSkin& skin) {
+    if (renderer == nullptr || !skin.overlay_atlas_enabled || skin.overlay_atlas_path.empty()) {
+        return nullptr;
+    }
+    static std::unordered_map<SDL_Renderer*, SDL_Texture*> cache;
+    if (const auto found = cache.find(renderer); found != cache.end()) return found->second;
+
+    const std::string path{skin.overlay_atlas_path};
+    SDL_Surface* surface = SDL_LoadPNG(path.c_str());
+    if (surface == nullptr) return nullptr;  // Vector skin remains the safe fallback.
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
+    if (texture == nullptr) return nullptr;
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+    cache.emplace(renderer, texture);
+    return texture;
+}
+
+[[nodiscard]] inline int coaster_overlay_direction_column(
+    const CoasterTrackGeometry& geometry,
+    const std::size_t index,
+    const CameraState& camera) noexcept {
+    if (geometry.frames.size() < 2U) return 0;
+    const std::size_t count = geometry.frames.size();
+    const std::size_t prev = index == 0U ? (geometry.closed ? count - 1U : 0U) : index - 1U;
+    const std::size_t next = index + 1U < count ? index + 1U : (geometry.closed ? 0U : count - 1U);
+    const auto& a = geometry.frames[prev].center;
+    const auto& b = geometry.frames[next].center;
+    const double angle = std::atan2(b.y - a.y, b.x - a.x);
+    constexpr double kHalfPi = 1.57079632679489661923;
+    int quarter_turns = static_cast<int>(std::lround(angle / kHalfPi));
+    quarter_turns = (quarter_turns % 4 + 4) % 4;
+    const int camera_turns = static_cast<int>(camera.rotation) & 3;
+    const int visual_turns = (quarter_turns - camera_turns + 4) % 4;
+    // Atlas order follows CH Blender DIRECTIONS: SOUTH, EAST, WEST, NORTH.
+    switch (visual_turns) {
+        case 0: return 0;
+        case 1: return 1;
+        case 2: return 3;
+        default: return 2;
+    }
+}
+
+[[nodiscard]] inline int coaster_overlay_module_row(const CoasterSkinOverlayModule module) noexcept {
+    return static_cast<int>(module);
+}
+
+inline void append_coaster_overlay_draw(
+    std::vector<CoasterSkinOverlayDraw>& draws,
+    const CoasterTrackGeometry& geometry,
+    const std::size_t frame_index,
+    const CoasterSkinOverlayModule module,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const CoasterTrackSkin& skin) {
+    const auto& frame = geometry.frames[frame_index];
+    const WorldPoint3 world = coaster_track_world_point(frame.center);
+    const ScreenPoint anchor = world_to_screen_point(
+        world, camera, viewport_width, viewport_height);
+    const int column = coaster_overlay_direction_column(geometry, frame_index, camera);
+    const int row = coaster_overlay_module_row(module);
+    const float sprite_scale = std::max(0.05F, skin.overlay_sprite_scale * std::max(0.0F, camera.zoom));
+    const float width = static_cast<float>(skin.overlay_cell_width_px) * sprite_scale;
+    const float height = static_cast<float>(skin.overlay_cell_height_px) * sprite_scale;
+
+    CoasterSkinOverlayDraw draw;
+    draw.source = {
+        static_cast<float>(column * skin.overlay_cell_width_px),
+        static_cast<float>(row * skin.overlay_cell_height_px),
+        static_cast<float>(skin.overlay_cell_width_px),
+        static_cast<float>(skin.overlay_cell_height_px),
+    };
+    draw.destination = {
+        anchor.x - width * 0.5F,
+        anchor.y - height * 0.5F,
+        width,
+        height,
+    };
+    draw.depth_key = camera_depth_key(world.x, world.y, camera);
+    draws.push_back(draw);
+}
+
+inline void render_coaster_track_overlay_modules(
+    SDL_Renderer* renderer,
+    const CoasterTrackGeometry& geometry,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const CoasterTrackSkin& skin) {
+    SDL_Texture* atlas = coaster_skin_overlay_texture(renderer, skin);
+    if (atlas == nullptr || geometry.frames.empty()) return;
+
+    std::vector<CoasterSkinOverlayDraw> draws;
+    draws.reserve(geometry.frames.size() / 8U + 32U);
+    double last_joint = -1.0e9;
+    double last_lift = -1.0e9;
+    double last_brake = -1.0e9;
+
+    for (std::size_t i = 0; i < geometry.frames.size(); ++i) {
+        const auto& frame = geometry.frames[i];
+        if (frame.drive_mode == DriveMode::Lift) {
+            if (frame.distance_m - last_lift >= skin.chain_lift_spacing_m) {
+                append_coaster_overlay_draw(draws, geometry, i, CoasterSkinOverlayModule::chain_lift,
+                                            camera, viewport_width, viewport_height, skin);
+                last_lift = frame.distance_m;
+            }
+            continue;
+        }
+        if (frame.drive_mode == DriveMode::Brake) {
+            if (frame.distance_m - last_brake >= skin.brake_fin_spacing_m) {
+                append_coaster_overlay_draw(draws, geometry, i, CoasterSkinOverlayModule::brake_fin,
+                                            camera, viewport_width, viewport_height, skin);
+                last_brake = frame.distance_m;
+            }
+            continue;
+        }
+        if (frame.distance_m - last_joint >= skin.joint_plate_spacing_m) {
+            append_coaster_overlay_draw(draws, geometry, i, CoasterSkinOverlayModule::joint_plate,
+                                        camera, viewport_width, viewport_height, skin);
+            last_joint = frame.distance_m;
+        }
+    }
+
+    std::stable_sort(draws.begin(), draws.end(), [](const auto& left, const auto& right) {
+        return left.depth_key < right.depth_key;
+    });
+    SDL_SetTextureColorMod(atlas, 255, 255, 255);
+    SDL_SetTextureAlphaMod(atlas, SDL_ALPHA_OPAQUE);
+    for (const auto& draw : draws) {
+        SDL_RenderTexture(renderer, atlas, &draw.source, &draw.destination);
+    }
+}
+
 // Hybrid track renderer. The procedural geometry underneath is the only source
 // of truth; Classic Steel 01 is merely a replaceable visual skin on top.
 inline void render_coaster_track(
@@ -363,6 +514,8 @@ inline void render_coaster_track(
         static_cast<int>(vertices.size()),
         indices.data(),
         static_cast<int>(indices.size()));
+    render_coaster_track_overlay_modules(
+        renderer, geometry, camera, viewport_width, viewport_height, skin);
 }
 
 inline void render_flame_train(

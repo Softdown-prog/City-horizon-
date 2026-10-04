@@ -1,52 +1,200 @@
 {
   "contract": "CH_COASTER_TRACK_SKIN_ATLAS_V1",
+  "assetId": "coaster.track_skin.classic_steel_01.modules",
   "skinId": "classic_steel_01",
-  "atlas": "track_skin_atlas.png",
-  "sizePx": [
-    384,
-    216
-  ],
-  "cellPx": [
-    96,
-    72
-  ],
-  "layout": {
-    "columns": [
-      "south",
-      "east",
-      "north",
-      "west"
-    ],
-    "rows": [
-      "joint_plate",
-      "chain_lift",
-      "brake_fin"
-    ]
+  "geometryAuthority": "CH_COASTER_TRACK_GEOMETRY_V1",
+  "skinContract": "CH_COASTER_TRACK_SKIN_V1",
+  "runtimeRepresentation": "2D_RGBA_overlay_atlas",
+  "atlas": {
+    "path": "assets/coasters/skins/classic_steel_01/track_skin_atlas.png",
+    "width": 384,
+    "height": 216,
+    "sha256": "4b1c77a6b8af892386597781f030e6af02cbabb1ebe114a2dbb864d2eb930d5c",
+    "cellWidth": 96,
+    "cellHeight": 72
   },
-  "placement": {
-    "joint_plate": {
-      "spacingMeters": 6,
-      "driveModes": [
-        "Free",
-        "Lift",
-        "Brake",
-        "Station"
+  "approvedProxySha256": "9a2c85510e56389211e6cac3e3f2b465f6ae8a61d48c71b9a0f0f6abfced4d0b",
+  "sourceFingerprint": "4611df3aed5ab3201eee32df8eba6e73a0553ac66fe040791c3b65b2c572e6ae",
+  "bakeRun": 37177174997,
+  "directions": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "modules": [
+    {
+      "module": "joint_plate",
+      "direction": "south",
+      "sourceRect": [
+        0,
+        0,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
       ]
     },
-    "chain_lift": {
-      "driveModes": [
-        "Lift"
+    {
+      "module": "joint_plate",
+      "direction": "east",
+      "sourceRect": [
+        96,
+        0,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
       ]
     },
-    "brake_fin": {
-      "driveModes": [
-        "Brake"
+    {
+      "module": "joint_plate",
+      "direction": "west",
+      "sourceRect": [
+        192,
+        0,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "joint_plate",
+      "direction": "north",
+      "sourceRect": [
+        288,
+        0,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "chain_lift",
+      "direction": "south",
+      "sourceRect": [
+        0,
+        72,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "chain_lift",
+      "direction": "east",
+      "sourceRect": [
+        96,
+        72,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "chain_lift",
+      "direction": "west",
+      "sourceRect": [
+        192,
+        72,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "chain_lift",
+      "direction": "north",
+      "sourceRect": [
+        288,
+        72,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "brake_fin",
+      "direction": "south",
+      "sourceRect": [
+        0,
+        144,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "brake_fin",
+      "direction": "east",
+      "sourceRect": [
+        96,
+        144,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "brake_fin",
+      "direction": "west",
+      "sourceRect": [
+        192,
+        144,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
+      ]
+    },
+    {
+      "module": "brake_fin",
+      "direction": "north",
+      "sourceRect": [
+        288,
+        144,
+        96,
+        72
+      ],
+      "anchorPx": [
+        48,
+        36
       ]
     }
-  },
-  "source": {
-    "pipeline": "CH Blender",
-    "bakeRun": 37177174997
-  },
-  "notes": "Visual-only overlay. CH_COASTER_TRACK_GEOMETRY_V1 remains authoritative for centerline, gauge, physics, ties and supports."
+  ],
+  "placement": {
+    "joint_plate": "repeat_on_free_or_station_track",
+    "chain_lift": "drive_mode_lift_only",
+    "brake_fin": "drive_mode_brake_only"
+  }
 }

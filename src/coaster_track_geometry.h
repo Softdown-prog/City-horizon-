@@ -73,6 +73,7 @@ struct CoasterTrackFrame {
     CoasterTrackPoint3 right_rail{};
     CoasterTrackPoint3 spine{};
     double roll_degrees = 0.0;
+    DriveMode drive_mode = DriveMode::Free;
 };
 
 struct CoasterCrossTie {
@@ -395,6 +396,7 @@ struct CoasterTrackGeometry {
             track_point(*sample, -half_gauge, style.rail_plane_offset_m),
             track_point(*sample, 0.0, -style.spine_drop_m),
             sample->roll_degrees,
+            sample->drive_mode,
         });
     }
 
