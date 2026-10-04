@@ -1,0 +1,57 @@
+name: CH Money Spend FX
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/money_spend_fx.h"
+      - "tools/integrate_money_spend_fx.py"
+      - ".github/workflows/ch-money-spend-fx.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ch-money-spend-fx-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  install-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Integrate spend feedback
+        run: python tools/integrate_money_spend_fx.py
+
+      - name: Static contract checks
+        run: |
+          python -m py_compile tools/integrate_money_spend_fx.py
+          grep -q '#include "money_spend_fx.h"' src/main_runtime_impl.cpp
+          grep -q 'MoneySpendFx money_spend_fx' src/main_runtime_impl.cpp
+          grep -q 'money_spend_fx.spawn(placement->build_cost' src/main_runtime_impl.cpp
+          grep -q 'money_spend_fx.render(renderer)' src/main_runtime_impl.cpp
+          grep -q 'CH_MONEY_SPEND_FX_V1' src/money_spend_fx.h
+          git diff --check
+
+      - name: Commit integration safely
+        run: |
+          if git diff --quiet -- src/main_runtime_impl.cpp; then
+            echo "Spend animation already integrated; nothing to commit."
+            exit 0
+          fi
+          git config user.name "city-horizon-worker"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/main_runtime_impl.cpp
+          git commit -m "feat(ui): animate construction spending"
+          git pull --rebase origin main
+          git push origin HEAD:main
