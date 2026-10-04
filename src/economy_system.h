@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 class PopulationSystem;
