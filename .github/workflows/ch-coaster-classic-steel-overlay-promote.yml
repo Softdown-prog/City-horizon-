@@ -1,0 +1,66 @@
+name: CH Coaster Classic Steel Overlay Promote
+
+on:
+  push:
+    paths:
+      - 'tools/runtime_promotion_requests/classic_steel_overlay_v1.request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image dependency
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Download approved CH Blender final artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf out/classic_steel_overlay_promotion
+          mkdir -p out/classic_steel_overlay_promotion
+          gh run download 37177174997 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name CH-Blender-Agent-37177174997-1 \
+            --dir out/classic_steel_overlay_promotion
+          test -n "$(find out/classic_steel_overlay_promotion -type d -name runtime_modules -print -quit)"
+
+      - name: Build compact atlas and patch runtime
+        run: python tools/runtime_promotion_requests/promote_classic_steel_overlay_v1.py
+
+      - name: Validate promoted files
+        run: |
+          test -s assets/coasters/skins/classic_steel_01/track_skin_atlas.png
+          test -s assets/coasters/skins/classic_steel_01/track_skin_atlas_runtime.json
+          grep -q 'overlay_atlas_enabled = true' src/coaster_track_skin.h
+          grep -q 'DriveMode drive_mode' src/coaster_track_geometry.h
+          grep -q 'render_coaster_track_overlay_modules' src/coaster_sdl_renderer.h
+
+      - name: Commit promoted runtime overlay
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            assets/coasters/skins/classic_steel_01/track_skin_atlas.png \
+            assets/coasters/skins/classic_steel_01/track_skin_atlas_runtime.json \
+            src/coaster_track_skin.h \
+            src/coaster_track_geometry.h \
+            src/coaster_sdl_renderer.h
+          git diff --cached --check
+          git commit -m 'coaster: promote Classic Steel Blender overlay modules'
+          git push origin HEAD:main
