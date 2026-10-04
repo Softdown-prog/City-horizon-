@@ -97,7 +97,20 @@ jobs:
           $normalizedCandidate = Join-Path (Resolve-Path "out/ch-mapforge-video").Path "candidate_normalized.png"
           $env:CH_VIDEO_RAW_CANDIDATE = $candidateRaw
           $env:CH_VIDEO_NORMALIZED_CANDIDATE = $normalizedCandidate
-          python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; dst=os.environ['CH_VIDEO_NORMALIZED_CANDIDATE']; im=Image.open(src).convert('RGBA'); im.save(dst, format='PNG', optimize=False)"
+
+          if ($null -ne $job.mapforgeFrameIndex) {
+            $frameIndex = [int]$job.mapforgeFrameIndex
+            $frameWidth = if ($null -ne $job.mapforgeFrameWidth) { [int]$job.mapforgeFrameWidth } else { 256 }
+            $frameHeight = if ($null -ne $job.mapforgeFrameHeight) { [int]$job.mapforgeFrameHeight } else { 256 }
+            if ($frameIndex -lt 0 -or $frameWidth -le 0 -or $frameHeight -le 0) { throw "Invalid MapForge frame crop contract" }
+            $env:CH_VIDEO_FRAME_INDEX = "$frameIndex"
+            $env:CH_VIDEO_FRAME_WIDTH = "$frameWidth"
+            $env:CH_VIDEO_FRAME_HEIGHT = "$frameHeight"
+            python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; dst=os.environ['CH_VIDEO_NORMALIZED_CANDIDATE']; idx=int(os.environ['CH_VIDEO_FRAME_INDEX']); fw=int(os.environ['CH_VIDEO_FRAME_WIDTH']); fh=int(os.environ['CH_VIDEO_FRAME_HEIGHT']); im=Image.open(src).convert('RGBA'); x=idx*fw; assert x+fw <= im.width and fh <= im.height, f'frame {idx} outside sheet {im.size}'; im.crop((x,0,x+fw,fh)).save(dst, format='PNG', optimize=False)"
+          } else {
+            python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; dst=os.environ['CH_VIDEO_NORMALIZED_CANDIDATE']; im=Image.open(src).convert('RGBA'); im.save(dst, format='PNG', optimize=False)"
+          }
+
           if (-not (Test-Path $normalizedCandidate)) { throw "Normalized candidate PNG missing" }
           $candidate = (Resolve-Path $normalizedCandidate).Path
           $baseRequest = (Resolve-Path $baseRequest).Path
