@@ -27,6 +27,16 @@ int main() {
     using namespace ch;
     using namespace ch::coaster;
 
+    if (std::string_view{kCoasterWorldScaleContract} != "CH_COASTER_WORLD_SCALE_V1")
+        return fail("coaster world-scale contract changed");
+    if (!near(kCoasterMetersPerWorldUnit, 3.0F) ||
+        !near(kCoasterWorldUnitsPerMeter, 1.0F / 3.0F))
+        return fail("coaster metre-to-world conversion changed");
+
+    const WorldPoint3 gauge_probe = coaster_meters_to_world(0.84, 0.0, 0.0);
+    if (!near(gauge_probe.x, 0.28F))
+        return fail("0.84 m coaster gauge must occupy 0.28 City Horizon world tiles");
+
     TrainStepResult train;
     train.valid = true;
     for (std::size_t i = 0; i < kCoasterTrainCarCount; ++i) {
@@ -54,8 +64,14 @@ int main() {
             return fail("V2 flat heading source rectangle changed");
         if (command.source_rect.width != kCarPoseFrameWidth || command.source_rect.height != kCarPoseFrameHeight)
             return fail("atlas source rectangle dimensions changed");
-        if (!near(command.world_anchor.x, 10.0F + static_cast<float>(i))) return fail("world X changed");
-        if (!near(command.world_anchor.z, 3.0F + static_cast<float>(i) * 0.25F)) return fail("world Z changed");
+        const float expected_world_x =
+            (10.0F + static_cast<float>(i)) * kCoasterWorldUnitsPerMeter;
+        const float expected_world_z =
+            (3.0F + static_cast<float>(i) * 0.25F) * kCoasterWorldUnitsPerMeter;
+        if (!near(command.world_anchor.x, expected_world_x))
+            return fail("car metre X was not converted to City Horizon world units");
+        if (!near(command.world_anchor.z, expected_world_z))
+            return fail("car metre Z was not converted to City Horizon world units");
     }
 
     const float r0_depth = plan.cars[0].depth_key;
@@ -126,8 +142,22 @@ int main() {
     if (support_line_count != support_geometry.supports.size())
         return fail("render adapter dropped coaster support members");
 
+    bool saw_scaled_support = false;
+    for (const TrackLineRenderCommand& line : support_plan.lines) {
+        if (line.kind != TrackLineKind::support) continue;
+        const float max_world_z = std::max(line.world_a.z, line.world_b.z);
+        if (max_world_z > 2.0F && max_world_z < 3.0F) {
+            saw_scaled_support = true;
+            break;
+        }
+    }
+    if (!saw_scaled_support)
+        return fail("support metres were not converted at the render boundary");
+
     std::cout << "CH_COASTER_RENDER_ADAPTER_V2 regression: OK\n";
-    std::cout << "support_members=" << support_geometry.supports.size()
+    std::cout << kCoasterWorldScaleContract
+              << " meters_per_world_unit=" << kCoasterMetersPerWorldUnit
+              << " support_members=" << support_geometry.supports.size()
               << " support_render_lines=" << support_line_count << '\n';
     return 0;
 }
