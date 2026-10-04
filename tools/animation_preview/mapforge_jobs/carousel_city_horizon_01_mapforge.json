@@ -1,0 +1,31 @@
+{
+  "contract": "CH_VIDEO_SCENARIO_V1",
+  "id": "mapforge.carousel_city_horizon_01.validation",
+  "reviewOnly": true,
+  "fps": 10,
+  "durationSeconds": 4.8,
+  "mapforgeCandidateFile": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_animation.png",
+  "mapforgeBaseRequestFile": "C++/MapForge2/examples/map_capture/carousel_city_horizon_01_request.json",
+  "events": [
+    {
+      "time": 0,
+      "set": {
+        "capture.candidate.showFootprint": true,
+        "capture.candidate.showAnchor": true,
+        "capture.stage.drawGrid": true
+      }
+    }
+  ],
+  "tracks": [],
+  "gif": {
+    "enabled": true,
+    "durationMs": 100,
+    "output": "carousel_city_horizon_01_mapforge.gif",
+    "contactSheet": "carousel_city_horizon_01_mapforge_contact_sheet.png"
+  },
+  "video": {
+    "enabled": true,
+    "fps": 10,
+    "output": "carousel_city_horizon_01_mapforge.mp4"
+  }
+}
