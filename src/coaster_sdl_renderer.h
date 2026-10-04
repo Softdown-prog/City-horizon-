@@ -1,6 +1,7 @@
 #pragma once
 
 #include "coaster_render_adapter.h"
+#include "coaster_track_skin.h"
 #include "src/ch_render/map_renderer.h"
 
 #include <SDL3/SDL.h>
@@ -16,17 +17,12 @@
 
 namespace ch::coaster {
 
-// CH_COASTER_SDL_RENDERER_V3
-// Final presentation bridge for the pre-rendered Flame atlas and the dedicated
-// world-space coaster track. Simulation remains independent from SDL.
-//
-// CH_COASTER_TRACK_PRESENTATION_V2 keeps CH_COASTER_TRACK_GEOMETRY_V1 fully
-// authoritative and improves only the screen-space material treatment. V2
-// softens the high-contrast white rail look, adds a subtle outer fringe,
-// strengthens the red spine's volume, reduces tie noise, and overlaps adjacent
-// rail/spine segments enough to hide tiny wedge gaps on projected curves.
+// CH_COASTER_SDL_RENDERER_V4
+// Hybrid presentation bridge: CH_COASTER_TRACK_GEOMETRY_V1 remains the
+// authoritative procedural track, while CH_COASTER_TRACK_SKIN_V1 supplies an
+// independent visual skin. Changing skin never changes route/physics/gauge.
 inline constexpr const char* kCoasterTrackPresentationContract =
-    "CH_COASTER_TRACK_PRESENTATION_V2";
+    "CH_COASTER_TRACK_PRESENTATION_V3";
 
 struct CarSpriteGeometry {
     ScreenPoint screen_anchor{};
@@ -93,17 +89,19 @@ struct CarSpriteGeometry {
 }
 
 enum class TrackPresentationPass : std::uint8_t {
-    fringe,
-    silhouette,
+    shadow,
+    side,
     body,
-    highlight,
+    cap,
 };
 
 [[nodiscard]] inline float coaster_track_presentation_scale(
     const CameraState& camera) noexcept {
-    // Width changes gently with zoom: track stays readable when zoomed out but
-    // does not balloon into a flat ribbon at close zoom levels.
     return std::clamp(0.84F + std::max(0.0F, camera.zoom) * 0.16F, 0.82F, 1.28F);
+}
+
+[[nodiscard]] inline SDL_FColor skin_color(const CoasterSkinColor color) noexcept {
+    return SDL_FColor{color.r, color.g, color.b, color.a};
 }
 
 [[nodiscard]] inline int presentation_pass_count(const TrackLineKind kind) noexcept {
@@ -123,85 +121,91 @@ enum class TrackPresentationPass : std::uint8_t {
     const TrackLineKind kind,
     const int pass_index) noexcept {
     if (kind == TrackLineKind::support || kind == TrackLineKind::tie) {
-        return pass_index == 0 ? TrackPresentationPass::silhouette
+        return pass_index == 0 ? TrackPresentationPass::shadow
                                : TrackPresentationPass::body;
     }
     switch (pass_index) {
-        case 0: return TrackPresentationPass::fringe;
-        case 1: return TrackPresentationPass::silhouette;
+        case 0: return TrackPresentationPass::shadow;
+        case 1: return TrackPresentationPass::side;
         case 2: return TrackPresentationPass::body;
-        default: return TrackPresentationPass::highlight;
+        default: return TrackPresentationPass::cap;
     }
 }
 
 [[nodiscard]] inline float presentation_line_width_px(
     const TrackLineKind kind,
     const TrackPresentationPass pass,
-    const float scale) noexcept {
+    const float scale,
+    const CoasterTrackSkin& skin) noexcept {
+    float width = 1.0F;
     switch (kind) {
         case TrackLineKind::support:
-            return (pass == TrackPresentationPass::silhouette ? 3.15F : 1.70F) * scale;
+            width = pass == TrackPresentationPass::shadow
+                ? skin.support_shadow_width_px : skin.support_body_width_px;
+            break;
         case TrackLineKind::spine:
-            if (pass == TrackPresentationPass::fringe) return 9.20F * scale;
-            if (pass == TrackPresentationPass::silhouette) return 7.90F * scale;
-            if (pass == TrackPresentationPass::body) return 5.35F * scale;
-            return std::max(0.70F, 0.88F * scale);
+            if (pass == TrackPresentationPass::shadow) width = skin.spine_shadow_width_px;
+            else if (pass == TrackPresentationPass::side) width = skin.spine_side_width_px;
+            else if (pass == TrackPresentationPass::body) width = skin.spine_body_width_px;
+            else width = skin.spine_cap_width_px;
+            break;
         case TrackLineKind::tie:
-            return (pass == TrackPresentationPass::silhouette ? 3.25F : 1.70F) * scale;
+            width = pass == TrackPresentationPass::shadow
+                ? skin.tie_shadow_width_px : skin.tie_body_width_px;
+            break;
         case TrackLineKind::left_rail:
         case TrackLineKind::right_rail:
-            if (pass == TrackPresentationPass::fringe) return 5.35F * scale;
-            if (pass == TrackPresentationPass::silhouette) return 4.35F * scale;
-            if (pass == TrackPresentationPass::body) return 2.55F * scale;
-            return std::max(0.52F, 0.64F * scale);
+            if (pass == TrackPresentationPass::shadow) width = skin.rail_shadow_width_px;
+            else if (pass == TrackPresentationPass::side) width = skin.rail_side_width_px;
+            else if (pass == TrackPresentationPass::body) width = skin.rail_body_width_px;
+            else width = skin.rail_head_width_px;
+            break;
     }
-    return 1.0F;
+    return std::max(0.35F, width * scale);
 }
 
 [[nodiscard]] inline SDL_FColor presentation_line_color(
     const TrackLineKind kind,
-    const TrackPresentationPass pass) noexcept {
-    const auto rgba = [](const float r, const float g, const float b, const float a = 1.0F) {
-        return SDL_FColor{r / 255.0F, g / 255.0F, b / 255.0F, a};
-    };
-
+    const TrackPresentationPass pass,
+    const CoasterTrackSkin& skin) noexcept {
     switch (kind) {
         case TrackLineKind::support:
-            if (pass == TrackPresentationPass::silhouette) return rgba(43.0F, 50.0F, 55.0F);
-            return rgba(111.0F, 122.0F, 128.0F);
+            return skin_color(pass == TrackPresentationPass::shadow
+                ? skin.support_shadow : skin.support_body);
         case TrackLineKind::spine:
-            if (pass == TrackPresentationPass::fringe) return rgba(38.0F, 16.0F, 17.0F, 0.22F);
-            if (pass == TrackPresentationPass::silhouette) return rgba(65.0F, 22.0F, 21.0F);
-            if (pass == TrackPresentationPass::body) return rgba(166.0F, 48.0F, 39.0F);
-            return rgba(221.0F, 86.0F, 63.0F, 0.58F);
+            if (pass == TrackPresentationPass::shadow) return skin_color(skin.spine_shadow);
+            if (pass == TrackPresentationPass::side) return skin_color(skin.spine_side);
+            if (pass == TrackPresentationPass::body) return skin_color(skin.spine_body);
+            return skin_color(skin.spine_cap);
         case TrackLineKind::tie:
-            if (pass == TrackPresentationPass::silhouette) return rgba(36.0F, 40.0F, 43.0F);
-            return rgba(88.0F, 96.0F, 101.0F);
+            return skin_color(pass == TrackPresentationPass::shadow
+                ? skin.tie_shadow : skin.tie_body);
         case TrackLineKind::left_rail:
         case TrackLineKind::right_rail:
-            if (pass == TrackPresentationPass::fringe) return rgba(31.0F, 37.0F, 41.0F, 0.18F);
-            if (pass == TrackPresentationPass::silhouette) return rgba(57.0F, 65.0F, 70.0F);
-            if (pass == TrackPresentationPass::body) return rgba(174.0F, 185.0F, 191.0F);
-            return rgba(228.0F, 235.0F, 238.0F, 0.54F);
+            if (pass == TrackPresentationPass::shadow) return skin_color(skin.rail_shadow);
+            if (pass == TrackPresentationPass::side) return skin_color(skin.rail_side);
+            if (pass == TrackPresentationPass::body) return skin_color(skin.rail_body);
+            return skin_color(skin.rail_head);
     }
-    return rgba(255.0F, 255.0F, 255.0F);
+    return SDL_FColor{1.0F, 1.0F, 1.0F, 1.0F};
 }
 
 [[nodiscard]] inline SDL_FPoint presentation_pass_offset(
     const TrackLineKind kind,
     const TrackPresentationPass pass,
-    const float scale) noexcept {
-    // The lower/right silhouette gives the member body depth. The restrained
-    // upper highlight reads as steel specular response without becoming a
-    // continuous white stripe at normal gameplay zoom.
-    if (pass == TrackPresentationPass::silhouette &&
+    const float scale,
+    const CoasterTrackSkin& skin) noexcept {
+    if (pass == TrackPresentationPass::side &&
         (kind == TrackLineKind::spine ||
          kind == TrackLineKind::left_rail ||
          kind == TrackLineKind::right_rail)) {
-        return {0.60F * scale, 0.88F * scale};
+        return {skin.side_offset_x_px * scale, skin.side_offset_y_px * scale};
     }
-    if (pass == TrackPresentationPass::highlight) {
-        return {-0.16F * scale, -0.34F * scale};
+    if (pass == TrackPresentationPass::cap &&
+        (kind == TrackLineKind::spine ||
+         kind == TrackLineKind::left_rail ||
+         kind == TrackLineKind::right_rail)) {
+        return {skin.cap_offset_x_px * scale, skin.cap_offset_y_px * scale};
     }
     return {0.0F, 0.0F};
 }
@@ -210,19 +214,16 @@ enum class TrackPresentationPass : std::uint8_t {
     const TrackLineKind kind,
     const TrackPresentationPass pass,
     const float width_px) noexcept {
-    // Rails/spine are emitted as many adjacent geometry members. Slightly
-    // extending the opaque body/silhouette hides wedge cracks at direction
-    // changes while keeping the translucent highlight from forming bright beads.
     if (kind != TrackLineKind::spine &&
         kind != TrackLineKind::left_rail &&
         kind != TrackLineKind::right_rail) {
         return 0.0F;
     }
-    if (pass == TrackPresentationPass::silhouette || pass == TrackPresentationPass::body) {
-        return std::min(1.65F, width_px * 0.38F);
+    if (pass == TrackPresentationPass::side || pass == TrackPresentationPass::body) {
+        return std::min(1.75F, width_px * 0.40F);
     }
-    if (pass == TrackPresentationPass::fringe) {
-        return std::min(0.90F, width_px * 0.16F);
+    if (pass == TrackPresentationPass::shadow) {
+        return std::min(1.05F, width_px * 0.18F);
     }
     return 0.0F;
 }
@@ -286,16 +287,51 @@ inline void append_track_presentation_quad(
     indices.push_back(base + 3);
 }
 
-// Draws the exact CH_COASTER_TRACK_GEOMETRY_V1 representation using the live
-// CH_COASTER_TRACK_PRESENTATION_V2 material pass. The geometry remains shared
-// with simulation/proof code; only final screen-space thickness, steel shading,
-// red structural spine, and projected join cleanup live here.
+// Base + skin are intentionally kept distinct even though they share one SDL
+// geometry batch. The base owns depth/readability; the skin owns appearance.
+// Future Blender-baked plates/caps can be added after this vector skin pass.
+inline void append_track_structural_base(
+    std::vector<SDL_Vertex>& vertices,
+    std::vector<int>& indices,
+    const TrackScreenLine& line,
+    const float scale,
+    const CoasterTrackSkin& skin) {
+    const TrackPresentationPass pass = TrackPresentationPass::shadow;
+    const float width_px = presentation_line_width_px(line.kind, pass, scale, skin);
+    append_track_presentation_quad(
+        vertices, indices, line, width_px,
+        presentation_line_color(line.kind, pass, skin),
+        presentation_pass_offset(line.kind, pass, scale, skin),
+        presentation_cap_extension_px(line.kind, pass, width_px));
+}
+
+inline void append_track_skin_overlay(
+    std::vector<SDL_Vertex>& vertices,
+    std::vector<int>& indices,
+    const TrackScreenLine& line,
+    const float scale,
+    const CoasterTrackSkin& skin) {
+    const int pass_count = presentation_pass_count(line.kind);
+    for (int pass_index = 1; pass_index < pass_count; ++pass_index) {
+        const TrackPresentationPass pass = presentation_pass_for_index(line.kind, pass_index);
+        const float width_px = presentation_line_width_px(line.kind, pass, scale, skin);
+        append_track_presentation_quad(
+            vertices, indices, line, width_px,
+            presentation_line_color(line.kind, pass, skin),
+            presentation_pass_offset(line.kind, pass, scale, skin),
+            presentation_cap_extension_px(line.kind, pass, width_px));
+    }
+}
+
+// Hybrid track renderer. The procedural geometry underneath is the only source
+// of truth; Classic Steel 01 is merely a replaceable visual skin on top.
 inline void render_coaster_track(
     SDL_Renderer* renderer,
     const CoasterTrackGeometry& geometry,
     const CameraState& camera,
     const float viewport_width,
-    const float viewport_height) {
+    const float viewport_height,
+    const CoasterTrackSkin& skin = default_coaster_track_skin()) {
     if (renderer == nullptr || !geometry.valid()) return;
 
     TrackRenderPlan plan = build_track_render_plan(geometry, camera);
@@ -314,19 +350,8 @@ inline void render_coaster_track(
     for (const TrackLineRenderCommand& command : plan.lines) {
         const TrackScreenLine line = project_track_line(
             command, camera, viewport_width, viewport_height);
-        const int pass_count = presentation_pass_count(line.kind);
-        for (int pass_index = 0; pass_index < pass_count; ++pass_index) {
-            const TrackPresentationPass pass = presentation_pass_for_index(line.kind, pass_index);
-            const float width_px = presentation_line_width_px(line.kind, pass, scale);
-            append_track_presentation_quad(
-                vertices,
-                indices,
-                line,
-                width_px,
-                presentation_line_color(line.kind, pass),
-                presentation_pass_offset(line.kind, pass, scale),
-                presentation_cap_extension_px(line.kind, pass, width_px));
-        }
+        append_track_structural_base(vertices, indices, line, scale, skin);
+        append_track_skin_overlay(vertices, indices, line, scale, skin);
     }
 
     if (vertices.empty() || indices.empty()) return;
