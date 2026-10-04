@@ -13,10 +13,14 @@ or inventing new material artwork.
 from __future__ import annotations
 
 import argparse
-import math
+import sys
 from pathlib import Path
 
 from PIL import Image
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from tools.tile_geometry import diamond_mask
 
