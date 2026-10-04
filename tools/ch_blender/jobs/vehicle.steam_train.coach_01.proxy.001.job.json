@@ -1,0 +1,18 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "vehicle.steam_train.coach_01.proxy.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_steam_train_articulated_unit_v1.py",
+  "qualityStage": "proxy",
+  "args": [
+    "--unit",
+    "coach",
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/steam_train_cab_7coaches_v1.train.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+    "--output",
+    "out/ch_blender_agent/vehicle.steam_train.coach_01.proxy.v1"
+  ],
+  "outputDir": "out/ch_blender_agent/vehicle.steam_train.coach_01.proxy.v1"
+}

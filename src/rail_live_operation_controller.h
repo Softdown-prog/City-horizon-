@@ -88,6 +88,9 @@ public:
         return stations_;
     }
     [[nodiscard]] const RailPlacementGraph& graph() const noexcept { return graph_; }
+    [[nodiscard]] const rail_operation::OperationalRoute* operational_route() const noexcept {
+        return operation_active_ && operational_route_.valid ? &operational_route_ : nullptr;
+    }
     [[nodiscard]] std::optional<rail_operation::TrainPose> train_pose() const noexcept {
         return operation_active_ ? train_.pose() : std::nullopt;
     }
@@ -104,6 +107,7 @@ private:
 
     [[nodiscard]] bool rebuild() {
         operation_active_ = false;
+        operational_route_ = {};
         train_ = rail_operation::TrainRuntime{};
         if (stations_.empty()) return true;
 
@@ -112,7 +116,9 @@ private:
             rail_operation::OperationalRoute route =
                 rail_operation::compile_route(graph_, edge.id, stations_);
             if (!route.valid) continue;
-            if (!train_.set_route(std::move(route))) continue;
+            rail_operation::OperationalRoute runtime_route = route;
+            if (!train_.set_route(std::move(runtime_route))) continue;
+            operational_route_ = std::move(route);
             train_.set_cruise_speed_mps(3.25);
             train_.set_acceleration_mps2(1.25);
             operation_active_ = true;
@@ -123,6 +129,7 @@ private:
 
     RailPlacementGraph graph_{};
     std::vector<rail_operation::StationDefinition> stations_;
+    rail_operation::OperationalRoute operational_route_{};
     rail_operation::TrainRuntime train_{};
     bool operation_active_ = false;
 };
