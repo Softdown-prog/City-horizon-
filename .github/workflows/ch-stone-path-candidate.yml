@@ -10,6 +10,7 @@ on:
       - "tools/ground_tile_worker.py"
       - "tools/normalize_atomic_path_tile.py"
       - "tools/tile_geometry.py"
+      - "tools/validate_ground_tiles.py"
       - ".github/workflows/ch-stone-path-candidate.yml"
   workflow_dispatch:
 
@@ -39,7 +40,10 @@ jobs:
 
       - name: Validate canonical base tile
         run: |
-          python tools/validate_ground_tiles.py out/stone_path_01/stone_path_base_128x64.png
+          python tools/validate_ground_tiles.py \
+            --profile atomic-path \
+            --file out/stone_path_01/stone_path_base_128x64.png \
+            --debug
 
       - name: Publish validation artifact
         uses: actions/upload-artifact@v4
