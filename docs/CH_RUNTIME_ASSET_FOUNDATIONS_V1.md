@@ -68,7 +68,25 @@ A `SpriteAnimationClip` stores authored directional tracks. Missing directions a
 
 `SpriteAnimationPlayer` advances by caller-supplied delta time, resets on clip/direction changes, supports looping and non-looping tracks, and exposes the current frame plus the explicit mirror flag. Large looped deltas are reduced by the clip cycle duration so a pause/debug stall does not require iterating once per missed cycle.
 
-## 4. First concrete consumer: water
+## 4. Shared resource cache foundation
+
+Header: `src/ch_core/resource_cache.h`
+
+`ch::ResourceCache<Key, Value>` is an ownership-neutral cache primitive for runtime resources. It provides:
+
+- lookup by stable key;
+- reuse of already-loaded values;
+- `get_or_load()` for load-on-first-use behavior;
+- failed-load handling without inserting invalid values;
+- deterministic telemetry for lookups, hits, misses, insertions, load attempts and load failures.
+
+The cache deliberately does not destroy resources by itself. SDL textures, audio buffers and other backend resources keep their existing ownership/destruction rules while sharing the same lookup and on-demand loading contract.
+
+The first concrete integration replaces the two ad-hoc texture maps inside `MapForgeNativeViewport` with `ResourceCache<std::string, TextureAsset>`. Existing texture creation, blend/scale setup and `SDL_DestroyTexture` cleanup remain unchanged, so this migration changes cache infrastructure without changing approved visuals or GPU ownership.
+
+This is the foundation for later unifying the live game texture cache, actor recolour variants and other reusable runtime resources. A residency/eviction policy is intentionally deferred until City Horizon has measured memory pressure and a safe frame-boundary release strategy.
+
+## 5. First concrete asset consumer: water
 
 Header: `src/ch_render/water_surface_runtime.h`
 
@@ -82,7 +100,7 @@ Header: `src/ch_render/water_surface_runtime.h`
 
 This does **not** replace the approved RGBA atlas with runtime per-pixel recolouring. The existing atlas already bakes the subtle palette-intensity cycle plus glint drift and is intentionally retained so SDL backends do not require indexed-texture support. The semantic palette is currently used for runtime coverage/fallback colour ownership and remains available for future indexed consumers where there is a measured benefit.
 
-## 5. Relationship to existing City Horizon systems
+## 6. Relationship to existing City Horizon systems
 
 These primitives are foundations, not competing replacements.
 
@@ -95,24 +113,25 @@ New integrations should migrate incrementally when a visible gameplay use requir
 
 After water, the highest-value consumers are animated rides and visitor directional sprites.
 
-## 6. Non-goals for V1
+## 7. Non-goals for V1
 
 This contract does not introduce:
 
 - a new archive/package file format;
 - automatic mirroring of every asset;
 - a replacement for the existing Asset Editor;
-- GPU texture residency/eviction policy;
+- a GPU texture residency/eviction policy;
 - legacy game-format compatibility;
 - a mass conversion of approved PNG assets.
 
 Those remain separate decisions and should only be added when City Horizon has a demonstrated runtime need.
 
-## 7. Validation
+## 8. Validation
 
 The existing `mobile_animation_test` also exercises these foundations so the normal CMake/CTest path checks:
 
 - typed registration and duplicate-ID rejection;
+- load-on-first-use resource caching, cache hits and failed-load telemetry;
 - semantic palette ranges, remapping and cycling;
 - loading the canonical `CH_WATER_SURFACE_V1` manifest;
 - preservation of water IDs, build costs and stable asset paths;
