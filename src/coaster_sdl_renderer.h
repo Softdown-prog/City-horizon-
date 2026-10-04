@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
@@ -14,9 +15,18 @@
 
 namespace ch::coaster {
 
-// CH_COASTER_SDL_RENDERER_V1
+// CH_COASTER_SDL_RENDERER_V2
 // Final presentation bridge for the pre-rendered Flame atlas and the dedicated
 // world-space coaster track. Simulation remains independent from SDL.
+//
+// CH_COASTER_TRACK_PRESENTATION_V1 promotes the approved V5.08 visual language
+// into the live renderer. Geometry is still owned exclusively by
+// CH_COASTER_TRACK_GEOMETRY_V1; this layer only gives those world-space members
+// a stable 2.5D material treatment instead of reducing them to one-pixel debug
+// lines.
+inline constexpr const char* kCoasterTrackPresentationContract =
+    "CH_COASTER_TRACK_PRESENTATION_V1";
+
 struct CarSpriteGeometry {
     ScreenPoint screen_anchor{};
     SDL_FRect source{};
@@ -81,27 +91,154 @@ struct CarSpriteGeometry {
     return 0;
 }
 
-inline void set_track_line_color(SDL_Renderer* renderer, const TrackLineKind kind) {
-    switch (kind) {
-        case TrackLineKind::support:
-            SDL_SetRenderDrawColor(renderer, 102, 111, 116, 255);
-            break;
-        case TrackLineKind::spine:
-            SDL_SetRenderDrawColor(renderer, 151, 47, 39, 255);
-            break;
-        case TrackLineKind::tie:
-            SDL_SetRenderDrawColor(renderer, 61, 61, 63, 255);
-            break;
-        case TrackLineKind::left_rail:
-        case TrackLineKind::right_rail:
-            SDL_SetRenderDrawColor(renderer, 226, 230, 232, 255);
-            break;
-    }
+enum class TrackPresentationPass : std::uint8_t {
+    silhouette,
+    body,
+    highlight,
+};
+
+[[nodiscard]] inline float coaster_track_presentation_scale(
+    const CameraState& camera) noexcept {
+    // Width changes gently with zoom: track stays readable when zoomed out but
+    // does not balloon into a flat ribbon at close zoom levels.
+    return std::clamp(0.84F + std::max(0.0F, camera.zoom) * 0.16F, 0.82F, 1.28F);
 }
 
-// Draws the exact CH_COASTER_TRACK_GEOMETRY_V1 representation. The same world
-// points can therefore be consumed by the game and proof renderers without
-// falling back to the railway max-grade contract or a screen-space mock track.
+[[nodiscard]] inline int presentation_pass_count(const TrackLineKind kind) noexcept {
+    switch (kind) {
+        case TrackLineKind::support:
+        case TrackLineKind::tie:
+            return 2;
+        case TrackLineKind::spine:
+        case TrackLineKind::left_rail:
+        case TrackLineKind::right_rail:
+            return 3;
+    }
+    return 2;
+}
+
+[[nodiscard]] inline float presentation_line_width_px(
+    const TrackLineKind kind,
+    const TrackPresentationPass pass,
+    const float scale) noexcept {
+    switch (kind) {
+        case TrackLineKind::support:
+            return (pass == TrackPresentationPass::silhouette ? 3.4F : 1.9F) * scale;
+        case TrackLineKind::spine:
+            if (pass == TrackPresentationPass::silhouette) return 8.0F * scale;
+            if (pass == TrackPresentationPass::body) return 5.2F * scale;
+            return std::max(1.0F, 1.25F * scale);
+        case TrackLineKind::tie:
+            return (pass == TrackPresentationPass::silhouette ? 4.2F : 2.35F) * scale;
+        case TrackLineKind::left_rail:
+        case TrackLineKind::right_rail:
+            if (pass == TrackPresentationPass::silhouette) return 5.0F * scale;
+            if (pass == TrackPresentationPass::body) return 3.0F * scale;
+            return std::max(1.0F, 1.0F * scale);
+    }
+    return 1.0F;
+}
+
+[[nodiscard]] inline SDL_FColor presentation_line_color(
+    const TrackLineKind kind,
+    const TrackPresentationPass pass) noexcept {
+    const auto rgba = [](const float r, const float g, const float b, const float a = 1.0F) {
+        return SDL_FColor{r / 255.0F, g / 255.0F, b / 255.0F, a};
+    };
+
+    switch (kind) {
+        case TrackLineKind::support:
+            if (pass == TrackPresentationPass::silhouette) return rgba(47.0F, 56.0F, 61.0F);
+            return rgba(121.0F, 132.0F, 138.0F);
+        case TrackLineKind::spine:
+            if (pass == TrackPresentationPass::silhouette) return rgba(70.0F, 24.0F, 22.0F);
+            if (pass == TrackPresentationPass::body) return rgba(177.0F, 53.0F, 42.0F);
+            return rgba(221.0F, 91.0F, 65.0F, 0.90F);
+        case TrackLineKind::tie:
+            if (pass == TrackPresentationPass::silhouette) return rgba(38.0F, 42.0F, 45.0F);
+            return rgba(104.0F, 111.0F, 116.0F);
+        case TrackLineKind::left_rail:
+        case TrackLineKind::right_rail:
+            if (pass == TrackPresentationPass::silhouette) return rgba(68.0F, 76.0F, 81.0F);
+            if (pass == TrackPresentationPass::body) return rgba(214.0F, 221.0F, 225.0F);
+            return rgba(250.0F, 251.0F, 252.0F, 0.92F);
+    }
+    return rgba(255.0F, 255.0F, 255.0F);
+}
+
+[[nodiscard]] inline SDL_FPoint presentation_pass_offset(
+    const TrackLineKind kind,
+    const TrackPresentationPass pass,
+    const float scale) noexcept {
+    // A tiny downward silhouette plus upper highlight is enough to turn the
+    // projected members into readable 2.5D material without changing their
+    // authoritative world-space position.
+    if (pass == TrackPresentationPass::silhouette &&
+        (kind == TrackLineKind::spine ||
+         kind == TrackLineKind::left_rail ||
+         kind == TrackLineKind::right_rail)) {
+        return {0.65F * scale, 0.85F * scale};
+    }
+    if (pass == TrackPresentationPass::highlight) {
+        return {-0.20F * scale, -0.45F * scale};
+    }
+    return {0.0F, 0.0F};
+}
+
+inline void append_track_presentation_quad(
+    std::vector<SDL_Vertex>& vertices,
+    std::vector<int>& indices,
+    const TrackScreenLine& line,
+    const float width_px,
+    const SDL_FColor color,
+    const SDL_FPoint offset) {
+    const float ax = line.a.x + offset.x;
+    const float ay = line.a.y + offset.y;
+    const float bx = line.b.x + offset.x;
+    const float by = line.b.y + offset.y;
+    const float dx = bx - ax;
+    const float dy = by - ay;
+    const float length = std::hypot(dx, dy);
+    if (!(length > 1.0e-4F) || !(width_px > 0.0F)) return;
+
+    const float half_width = width_px * 0.5F;
+    const float nx = -dy / length * half_width;
+    const float ny = dx / length * half_width;
+    const int base = static_cast<int>(vertices.size());
+
+    SDL_Vertex v0{};
+    v0.position = {ax + nx, ay + ny};
+    v0.color = color;
+    v0.tex_coord = {0.0F, 0.0F};
+    SDL_Vertex v1{};
+    v1.position = {ax - nx, ay - ny};
+    v1.color = color;
+    v1.tex_coord = {0.0F, 0.0F};
+    SDL_Vertex v2{};
+    v2.position = {bx - nx, by - ny};
+    v2.color = color;
+    v2.tex_coord = {0.0F, 0.0F};
+    SDL_Vertex v3{};
+    v3.position = {bx + nx, by + ny};
+    v3.color = color;
+    v3.tex_coord = {0.0F, 0.0F};
+    vertices.push_back(v0);
+    vertices.push_back(v1);
+    vertices.push_back(v2);
+    vertices.push_back(v3);
+
+    indices.push_back(base + 0);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 0);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
+}
+
+// Draws the exact CH_COASTER_TRACK_GEOMETRY_V1 representation using the live
+// CH_COASTER_TRACK_PRESENTATION_V1 material pass. The geometry remains shared
+// with simulation/proof code; only final screen-space thickness, steel shading
+// and the red structural spine live here.
 inline void render_coaster_track(
     SDL_Renderer* renderer,
     const CoasterTrackGeometry& geometry,
@@ -117,13 +254,37 @@ inline void render_coaster_track(
             return track_line_layer(left.kind) < track_line_layer(right.kind);
         });
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    const float scale = coaster_track_presentation_scale(camera);
+    std::vector<SDL_Vertex> vertices;
+    std::vector<int> indices;
+    vertices.reserve(plan.lines.size() * 10U);
+    indices.reserve(plan.lines.size() * 15U);
+
     for (const TrackLineRenderCommand& command : plan.lines) {
         const TrackScreenLine line = project_track_line(
             command, camera, viewport_width, viewport_height);
-        set_track_line_color(renderer, line.kind);
-        SDL_RenderLine(renderer, line.a.x, line.a.y, line.b.x, line.b.y);
+        const int pass_count = presentation_pass_count(line.kind);
+        for (int pass_index = 0; pass_index < pass_count; ++pass_index) {
+            const auto pass = static_cast<TrackPresentationPass>(pass_index);
+            append_track_presentation_quad(
+                vertices,
+                indices,
+                line,
+                presentation_line_width_px(line.kind, pass, scale),
+                presentation_line_color(line.kind, pass),
+                presentation_pass_offset(line.kind, pass, scale));
+        }
     }
+
+    if (vertices.empty() || indices.empty()) return;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_RenderGeometry(
+        renderer,
+        nullptr,
+        vertices.data(),
+        static_cast<int>(vertices.size()),
+        indices.data(),
+        static_cast<int>(indices.size()));
 }
 
 inline void render_flame_train(
