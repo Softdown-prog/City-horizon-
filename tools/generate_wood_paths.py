@@ -1,9 +1,13 @@
 """Generate the City Horizon wooden-path family from an authored source PNG.
 
 The authored source may be a presentation-sized pixel-art render on a black
-background.  This recipe rectifies only this material into the canonical 2:1
-128x64 diamond before handing it to the shared ground-tile worker.  It does not
+background. This recipe rectifies only this material into the canonical 2:1
+128x64 diamond before handing it to the shared ground-tile worker. It does not
 change the global atomic-path intake rules.
+
+This generator is the canonical wood_path_01 recipe and is intentionally kept
+separate from global terrain rules so materials that do not need path topology
+remain unaffected.
 """
 from __future__ import annotations
 
@@ -29,7 +33,7 @@ NAMES = (
 def rectify_authored_diamond(source_path: Path, output_path: Path, black_threshold: int = 20) -> None:
     """Fit this authored wooden diamond to the official 128x64 camera footprint.
 
-    The source is already approved art.  We remove only the near-black
+    The source is already approved art. We remove only the near-black
     presentation background, crop its authored silhouette, rectify that
     silhouette to the locked 2:1 footprint, and apply the shared diamond alpha.
     """
@@ -47,7 +51,7 @@ def rectify_authored_diamond(source_path: Path, output_path: Path, black_thresho
 
     cropped = source.crop(bounds)
     # This material was authored from an image-generation presentation canvas
-    # whose visible diamond is slightly too tall.  Rectifying the crop is the
+    # whose visible diamond is slightly too tall. Rectifying the crop is the
     # material-specific camera correction; the shared normalizer remains strict.
     rectified = cropped.resize((W, H), Image.Resampling.LANCZOS)
     rectified.putalpha(ImageChops.multiply(rectified.getchannel("A"), diamond_mask()))
@@ -107,10 +111,10 @@ def main() -> None:
         )
 
     prepared = Image.open(base).convert("RGBA")
-    # Wooden planks are a continuous floor material.  The logical 16-mask
+    # Wooden planks are a continuous floor material. The logical 16-mask
     # topology still controls navigation/neighbor selection, while preserving
     # one seam-safe plank surface avoids rotating or bending the boards at every
-    # junction.  Separate filenames keep the runtime contract identical to the
+    # junction. Separate filenames keep the runtime contract identical to the
     # other path families.
     tiles = {mask: prepared.copy() for mask in range(16)}
     for mask, tile in tiles.items():
