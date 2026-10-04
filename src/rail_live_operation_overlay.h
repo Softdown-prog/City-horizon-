@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <optional>
 
-inline constexpr const char* kChRailLiveOperationOverlayContract = "CH_RAIL_LIVE_OPERATION_OVERLAY_V1";
+inline constexpr const char* kChRailLiveOperationOverlayContract = "CH_RAIL_LIVE_OPERATION_OVERLAY_V2";
 
 namespace ch::rail_live_operation {
 
@@ -51,6 +51,12 @@ namespace detail {
         hash = mix(hash, quantize(edge.segment.start.y));
         hash = mix(hash, quantize(edge.segment.end.x));
         hash = mix(hash, quantize(edge.segment.end.y));
+    }
+    hash = mix(hash, state.stations.size());
+    for (const RailPersistentStation& station : state.stations) {
+        hash = mix(hash, station.piece_group);
+        hash = mix(hash, static_cast<std::uint64_t>(
+            static_cast<std::int64_t>(std::llround(station.dwell_seconds * 1000.0))));
     }
     return hash;
 }
@@ -124,7 +130,7 @@ public:
         const std::uint64_t signature = detail::state_signature(*captured);
         if (!state_ready_ || signature != state_signature_) {
             if (!controller_.sync_from_persistent_state(*captured)) return;
-            state_signature_ = signature;
+            state_signature_ = detail::state_signature(*rail_persistence::capture_runtime_state());
             state_ready_ = true;
             last_tick_ns_ = SDL_GetTicksNS();
         }
@@ -154,6 +160,9 @@ private:
             const std::optional<RailPlacementPieceId> group =
                 detail::nearest_piece(state, world.x, world.y);
             if (group) (void)controller_.toggle_station(*group, 3.0);
+            if (const std::optional<RailPersistentState> refreshed = rail_persistence::capture_runtime_state()) {
+                state_signature_ = detail::state_signature(*refreshed);
+            }
             last_tick_ns_ = SDL_GetTicksNS();
         }
         if (restart_down && !restart_key_was_down_) {

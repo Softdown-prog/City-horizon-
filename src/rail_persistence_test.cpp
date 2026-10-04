@@ -61,10 +61,17 @@ int main() {
         action_for(last_group, 500, true),
         action_for(turnout_group, 850, false),
     };
+    state.stations = {{last_group, 4.25}};
     std::string validation_error;
     if (!ch::rail_persistence::validate(state, &validation_error)) {
         std::cerr << validation_error << '\n';
         return fail("persistent state validation");
+    }
+
+    RailPersistentState invalid_station = state;
+    invalid_station.stations = {{middle_group, 3.0}};
+    if (ch::rail_persistence::validate(invalid_station)) {
+        return fail("station on tombstoned piece must fail validation");
     }
 
     const std::filesystem::path root_dir =
@@ -84,12 +91,17 @@ int main() {
     const ch::rail_persistence::ReadResult loaded =
         ch::rail_persistence::read_city_extension(city_file);
     if (!loaded.valid || !loaded.present || loaded.state.nodes.size() != state.nodes.size() ||
-        loaded.state.edges.size() != state.edges.size() || loaded.state.actions.size() != state.actions.size()) {
+        loaded.state.edges.size() != state.edges.size() || loaded.state.actions.size() != state.actions.size() ||
+        loaded.state.stations.size() != 1U) {
         return fail("city JSON rail round trip");
     }
     if (loaded.state.actions[1].build_cost != 500 || loaded.state.actions[1].refund_value != 325 ||
         loaded.state.actions[1].active || loaded.state.actions[3].refund_value != 552) {
         return fail("paid cost and historical refund round trip");
+    }
+    if (loaded.state.stations[0].piece_group != last_group ||
+        loaded.state.stations[0].dwell_seconds != 4.25) {
+        return fail("station designation and dwell round trip");
     }
 
     RailPlacementGraph restored;
@@ -106,6 +118,23 @@ int main() {
         return fail("new IDs must append after restored tombstones");
     }
 
+    const std::string v2_payload = ch::rail_persistence::serialize_payload(state);
+    const std::size_t first_newline = v2_payload.find('\n');
+    if (first_newline == std::string::npos) return fail("V2 payload header");
+    std::string v1_payload = std::string(kChRailPersistenceLegacyContract) +
+                             v2_payload.substr(first_newline);
+    const std::size_t station_row = v1_payload.find("\nS ");
+    if (station_row != std::string::npos) {
+        const std::size_t station_end = v1_payload.find('\n', station_row + 1U);
+        v1_payload.erase(station_row, station_end == std::string::npos
+            ? std::string::npos : station_end - station_row);
+    }
+    RailPersistentState loaded_v1;
+    if (!ch::rail_persistence::deserialize_payload(v1_payload, loaded_v1) ||
+        !loaded_v1.stations.empty() || loaded_v1.edges.size() != state.edges.size()) {
+        return fail("V1 payload compatibility");
+    }
+
     const ch::rail_persistence::ReadResult legacy = [&]() {
         const std::filesystem::path legacy_file = root_dir / "legacy.json";
         std::ofstream file(legacy_file, std::ios::binary | std::ios::trunc);
@@ -113,7 +142,7 @@ int main() {
         file.close();
         return ch::rail_persistence::read_city_extension(legacy_file);
     }();
-    if (!legacy.valid || legacy.present || !legacy.state.edges.empty()) {
+    if (!legacy.valid || legacy.present || !legacy.state.edges.empty() || !legacy.state.stations.empty()) {
         return fail("legacy save must map to empty rail state");
     }
 

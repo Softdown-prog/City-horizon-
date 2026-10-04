@@ -4,12 +4,13 @@
 #include "rail_persistence.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
 
-inline constexpr const char* kChRailLiveOperationControllerContract = "CH_RAIL_LIVE_OPERATION_CONTROLLER_V1";
+inline constexpr const char* kChRailLiveOperationControllerContract = "CH_RAIL_LIVE_OPERATION_CONTROLLER_V2";
 
 namespace ch::rail_live_operation {
 
@@ -20,12 +21,23 @@ public:
         if (!replacement.restore_snapshot(state.nodes, state.edges)) return false;
         graph_ = std::move(replacement);
 
-        stations_.erase(
-            std::remove_if(stations_.begin(), stations_.end(), [&](const rail_operation::StationDefinition& station) {
-                return !graph_.piece_active(station.piece_group);
-            }),
-            stations_.end());
-        return rebuild();
+        std::vector<rail_operation::StationDefinition> restored_stations;
+        restored_stations.reserve(state.stations.size());
+        for (const RailPersistentStation& station : state.stations) {
+            if (!std::isfinite(station.dwell_seconds) || station.dwell_seconds < 0.0) return false;
+            if (!graph_.piece_active(station.piece_group)) continue;
+            const auto duplicate = std::find_if(
+                restored_stations.begin(), restored_stations.end(),
+                [&](const rail_operation::StationDefinition& existing) {
+                    return existing.piece_group == station.piece_group;
+                });
+            if (duplicate != restored_stations.end()) return false;
+            restored_stations.push_back({station.piece_group, station.dwell_seconds});
+        }
+        stations_ = std::move(restored_stations);
+        if (!rebuild()) return false;
+        publish_stations();
+        return true;
     }
 
     [[nodiscard]] bool toggle_station(const RailPlacementPieceId piece_group,
@@ -41,8 +53,15 @@ public:
                 return station.piece_group == piece_group;
             });
         if (found != stations_.end()) {
+            const auto previous = stations_;
             stations_.erase(found);
-            return rebuild();
+            if (!rebuild()) {
+                stations_ = previous;
+                (void)rebuild();
+                return false;
+            }
+            publish_stations();
+            return true;
         }
 
         const auto previous = stations_;
@@ -52,6 +71,7 @@ public:
             (void)rebuild();
             return false;
         }
+        publish_stations();
         return true;
     }
 
@@ -73,6 +93,15 @@ public:
     }
 
 private:
+    void publish_stations() const {
+        std::vector<RailPersistentStation> persistent;
+        persistent.reserve(stations_.size());
+        for (const rail_operation::StationDefinition& station : stations_) {
+            persistent.push_back({station.piece_group, station.dwell_seconds});
+        }
+        rail_persistence::set_runtime_stations(std::move(persistent));
+    }
+
     [[nodiscard]] bool rebuild() {
         operation_active_ = false;
         train_ = rail_operation::TrainRuntime{};
