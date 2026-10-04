@@ -1,0 +1,231 @@
+name: Promote Articulated Steam Train Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/vehicle.steam_train.locomotive.01.runtime.json"
+      - "tools/ch_blender/promotions/vehicle.steam_train.coach.01.runtime.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-articulated-steam-train-runtime-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-articulated-steam-train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Validate promotion contracts
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          paths = [
+              Path('tools/ch_blender/promotions/vehicle.steam_train.locomotive.01.runtime.json'),
+              Path('tools/ch_blender/promotions/vehicle.steam_train.coach.01.runtime.json'),
+          ]
+          items = [json.loads(path.read_text(encoding='utf-8')) for path in paths]
+          expected = {
+              'vehicle.steam_train.locomotive.01': ('locomotive', 5.2, 1.9),
+              'vehicle.steam_train.coach.01': ('coach', 3.9, 1.82),
+          }
+          for item in items:
+              assert item['contract'] == 'CH_RUNTIME_ASSET_PROMOTION_V1'
+              assert item['approved'] is True
+              assert item['assetId'] in expected
+              role, length_m, width_m = expected[item['assetId']]
+              assert item['unitRole'] == role
+              assert abs(float(item['logicalLengthM']) - length_m) < 1e-9
+              assert abs(float(item['logicalWidthM']) - width_m) < 1e-9
+              assert item['finalSize'] == [1024, 1024]
+              assert item['format'] == 'PNG_RGBA'
+              assert item['transparentBackground'] is True
+              assert item['directionOrder'] == ['south', 'east', 'west', 'north']
+          run_ids = {int(item['sourceWorkflowRun']) for item in items}
+          artifact_ids = {int(item['sourceArtifactId']) for item in items}
+          assert len(run_ids) == 1 and len(artifact_ids) == 1
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"run_id={next(iter(run_ids))}\n")
+              output.write(f"artifact_id={next(iter(artifact_ids))}\n")
+          PY
+
+      - name: Download approved final artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_promotion/source
+
+      - name: Post-process articulated units
+        shell: bash
+        run: |
+          set -euo pipefail
+          for unit in locomotive coach; do
+            if [[ "$unit" == "locomotive" ]]; then
+              source_dir="vehicle.steam_train.locomotive_01.final.v1"
+            else
+              source_dir="vehicle.steam_train.coach_01.final.v1"
+            fi
+            source="out/runtime_promotion/source/$source_dir"
+            if [[ ! -d "$source" ]]; then
+              source="$(find out/runtime_promotion/source -type d -name "$source_dir" -print -quit)"
+            fi
+            test -n "$source" && test -d "$source"
+            python tools/tycoon_photo_studio/postprocess.py \
+              --input "$source" \
+              --output "out/runtime_promotion/final/$unit" \
+              --studio-preset tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json
+          done
+
+      - name: Validate and stage articulated runtime packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib
+          import json
+          import shutil
+
+          directions = ('south', 'east', 'west', 'north')
+          promotion_root = Path('tools/ch_blender/promotions')
+          units = [
+              {
+                  'promotion': promotion_root / 'vehicle.steam_train.locomotive.01.runtime.json',
+                  'asset_id': 'vehicle.steam_train.locomotive.01',
+                  'slug': 'locomotive',
+                  'destination': Path('assets/vehicles/steam_train_locomotive_01'),
+                  'definition': Path('assets/definitions/steam_train_locomotive_01.json'),
+                  'display_name': 'Trem a Vapor - Locomotiva',
+              },
+              {
+                  'promotion': promotion_root / 'vehicle.steam_train.coach.01.runtime.json',
+                  'asset_id': 'vehicle.steam_train.coach.01',
+                  'slug': 'coach',
+                  'destination': Path('assets/vehicles/steam_train_coach_01'),
+                  'definition': Path('assets/definitions/steam_train_coach_01.json'),
+                  'display_name': 'Trem a Vapor - Vagao de Passageiros',
+              },
+          ]
+
+          for unit in units:
+              promotion = json.loads(unit['promotion'].read_text(encoding='utf-8'))
+              src = Path('out/runtime_promotion/final') / unit['slug']
+              manifest_path = src / f"{unit['asset_id']}_manifest.json"
+              package = json.loads(manifest_path.read_text(encoding='utf-8'))
+              package_views = {view['direction']: view for view in package['views']}
+              dst = unit['destination']
+              dst.mkdir(parents=True, exist_ok=True)
+
+              views = {}
+              for direction in directions:
+                  source = src / f"{unit['asset_id']}_{direction}.png"
+                  target = dst / f"steam_train_{unit['slug']}_{direction}.png"
+                  image = Image.open(source)
+                  if image.mode != 'RGBA' or image.size != (1024, 1024):
+                      raise SystemExit(f'{source}: expected 1024x1024 RGBA, got {image.size} {image.mode}')
+                  alpha = image.getchannel('A')
+                  lo, hi = alpha.getextrema()
+                  if lo != 0 or hi != 255:
+                      raise SystemExit(f'{source}: invalid alpha range {(lo, hi)}')
+                  for x, y in ((0, 0), (1023, 0), (0, 1023), (1023, 1023)):
+                      if alpha.getpixel((x, y)) != 0:
+                          raise SystemExit(f'{source}: background corner is not transparent')
+                  shutil.copy2(source, target)
+                  views[direction] = {
+                      'file': target.name,
+                      'pivot': package_views[direction]['pivot'],
+                      'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                  }
+
+              runtime_manifest = {
+                  'contract': 'CH_RUNTIME_VEHICLE_TRAIN_UNIT_V1',
+                  'assetId': unit['asset_id'],
+                  'assetType': 'vehicle_train_unit',
+                  'unitRole': promotion['unitRole'],
+                  'visualContract': 'CH_STYLIZED_PRERENDER_V1',
+                  'cameraContract': 'CH_CAMERA_V1',
+                  'runtimeRepresentation': '2D_RGBA_pre_rendered_sprite',
+                  'format': 'PNG_RGBA',
+                  'frameSize': [1024, 1024],
+                  'transparentBackground': True,
+                  'directionOrder': list(directions),
+                  'logicalDimensionsM': {
+                      'length': promotion['logicalLengthM'],
+                      'width': promotion['logicalWidthM'],
+                  },
+                  'views': views,
+                  'sourceCommit': promotion['sourceCommit'],
+                  'sourceWorkflowRun': promotion['sourceWorkflowRun'],
+                  'sourceArtifactId': promotion['sourceArtifactId'],
+                  'approvedProxySha256': promotion['approvedProxySha256'],
+                  'approvedForRuntime': True,
+              }
+              runtime_path = dst / 'steam_train_unit_runtime.json'
+              runtime_path.write_text(json.dumps(runtime_manifest, indent=2) + '\n', encoding='utf-8')
+
+              definition = {
+                  'id': f"steam_train_{unit['slug']}_01",
+                  'name': unit['display_name'],
+                  'category': 'transport',
+                  'texture': str(dst / f"steam_train_{unit['slug']}_south.png"),
+                  'sprites': {
+                      '0': str(dst / f"steam_train_{unit['slug']}_south.png"),
+                      '1': str(dst / f"steam_train_{unit['slug']}_west.png"),
+                      '2': str(dst / f"steam_train_{unit['slug']}_north.png"),
+                      '3': str(dst / f"steam_train_{unit['slug']}_east.png"),
+                  },
+                  'rotatable': True,
+                  'playerBuildable': False,
+                  'productionStatus': 'runtime_vehicle_train_unit_approved',
+                  'runtimeRole': f"vehicle_train_{promotion['unitRole']}",
+                  'runtimeManifest': str(runtime_path),
+                  'sourceApprovedProxySha256': promotion['approvedProxySha256'],
+              }
+              unit['definition'].write_text(json.dumps(definition, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+              print(json.dumps(runtime_manifest, indent=2))
+          PY
+
+      - name: Commit promoted articulated train assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            assets/vehicles/steam_train_locomotive_01 \
+            assets/vehicles/steam_train_coach_01 \
+            assets/definitions/steam_train_locomotive_01.json \
+            assets/definitions/steam_train_coach_01.json
+          if git diff --cached --quiet; then
+            echo "Articulated steam train runtime assets already promoted; nothing to commit."
+            exit 0
+          fi
+          git commit -m "asset: promote articulated steam train runtime units"
+          git push origin HEAD:main

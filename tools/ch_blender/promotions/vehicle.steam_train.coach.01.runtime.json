@@ -1,0 +1,20 @@
+{
+  "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
+  "assetId": "vehicle.steam_train.coach.01",
+  "approved": true,
+  "promotionRevision": 1,
+  "sourceCommit": "992df6f34fea4bafd3eb3e1414ab00523b70c0c0",
+  "sourceWorkflowRun": 37194593044,
+  "sourceArtifactId": 11300772601,
+  "sourceArtifactName": "CH-Blender-Agent-37194593044-1",
+  "sourceDir": "vehicle.steam_train.coach_01.final.v1",
+  "destination": "assets/vehicles/steam_train_coach_01",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [1024, 1024],
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "unitRole": "coach",
+  "logicalLengthM": 3.9,
+  "logicalWidthM": 1.82,
+  "approvedProxySha256": "25708eb0efbd2486cc93bb016c3e0182d35cf0f39003f6102f847b18cfab1de1"
+}

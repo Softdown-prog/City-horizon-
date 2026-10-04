@@ -1,0 +1,20 @@
+{
+  "contract": "CH_RUNTIME_ASSET_PROMOTION_V1",
+  "assetId": "vehicle.steam_train.locomotive.01",
+  "approved": true,
+  "promotionRevision": 1,
+  "sourceCommit": "992df6f34fea4bafd3eb3e1414ab00523b70c0c0",
+  "sourceWorkflowRun": 37194593044,
+  "sourceArtifactId": 11300772601,
+  "sourceArtifactName": "CH-Blender-Agent-37194593044-1",
+  "sourceDir": "vehicle.steam_train.locomotive_01.final.v1",
+  "destination": "assets/vehicles/steam_train_locomotive_01",
+  "directionOrder": ["south", "east", "west", "north"],
+  "finalSize": [1024, 1024],
+  "format": "PNG_RGBA",
+  "transparentBackground": true,
+  "unitRole": "locomotive",
+  "logicalLengthM": 5.2,
+  "logicalWidthM": 1.9,
+  "approvedProxySha256": "c750f3874c943cd0443a54d8c186e0bb7b58b8cec58ad43d9b9d095e98fe906f"
+}
