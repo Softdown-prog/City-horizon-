@@ -1,5 +1,6 @@
 #include "mobile_animation.h"
 #include "ch_core/asset_registry.h"
+#include "ch_render/animated_prop_runtime.h"
 #include "ch_render/palette_bank.h"
 #include "ch_render/sprite_animation_runtime.h"
 #include "ch_render/water_surface_runtime.h"
@@ -200,6 +201,47 @@ int main(int argc, char** argv) {
     const ch::SpriteFrame* second_frame = sprite_player.current_frame();
     if (!require(sprite_player.frame_index() == 1 && second_frame != nullptr && second_frame->anchor_y == 35,
                  "sprite player advances deterministically and preserves ground anchor metadata")) {
+        return 1;
+    }
+
+    const ch::AnimatedPropAtlasDef ride_atlas{
+        .frame_count = 12,
+        .columns = 4,
+        .rows = 3,
+        .phase_offset = 0.0F,
+        .loop = true,
+    };
+    const auto atlas_frame_0 = ch::resolve_animated_prop_atlas_frame(ride_atlas, 0.0F);
+    const auto atlas_frame_5 = ch::resolve_animated_prop_atlas_frame(ride_atlas, 5.0F / 12.0F);
+    const auto atlas_wrap = ch::resolve_animated_prop_atlas_frame(ride_atlas, 1.0F);
+    if (!require(atlas_frame_0.has_value() && atlas_frame_0->index == 0 && atlas_frame_0->column == 0 && atlas_frame_0->row == 0,
+                 "animated prop atlas starts on frame zero") ||
+        !require(atlas_frame_5.has_value() && atlas_frame_5->index == 5 && atlas_frame_5->column == 1 && atlas_frame_5->row == 1,
+                 "animated prop atlas resolves row and column from normalized phase") ||
+        !require(atlas_wrap.has_value() && atlas_wrap->index == 0,
+                 "looping animated prop atlas wraps at phase one")) {
+        return 1;
+    }
+
+    const auto atlas_rect = atlas_frame_5.has_value()
+        ? ch::animated_prop_atlas_source_rect(ride_atlas, *atlas_frame_5, 1024.0F, 768.0F)
+        : std::nullopt;
+    if (!require(atlas_rect.has_value() && atlas_rect->x == 256.0F && atlas_rect->y == 256.0F &&
+                     atlas_rect->width == 256.0F && atlas_rect->height == 256.0F,
+                 "animated prop atlas exposes the exact source rectangle for the selected frame")) {
+        return 1;
+    }
+
+    const ch::AnimatedPropAtlasDef one_shot{
+        .frame_count = 4,
+        .columns = 4,
+        .rows = 1,
+        .phase_offset = 0.0F,
+        .loop = false,
+    };
+    const auto one_shot_end = ch::resolve_animated_prop_atlas_frame(one_shot, 1.5F);
+    if (!require(one_shot_end.has_value() && one_shot_end->index == 3,
+                 "non-looping animated prop atlas clamps to the final frame")) {
         return 1;
     }
 
