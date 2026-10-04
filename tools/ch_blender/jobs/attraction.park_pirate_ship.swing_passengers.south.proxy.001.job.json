@@ -2,16 +2,13 @@
   "contract": "CH_BLENDER_AGENT_JOB_V1",
   "jobId": "attraction.park_pirate_ship.swing_passengers.south.proxy.001",
   "operation": "guarded_blender_script",
-  "script": "tools/tycoon_photo_studio/build_pirate_ship_swing_passengers_direction.py",
+  "script": "tools/tycoon_photo_studio/build_pirate_ship_swing_passengers_direction_guarded.py",
   "qualityStage": "proxy",
   "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
   "assetRequirements": {
     "contract": "CH_ASSET_REQUIREMENTS_V1",
     "assetId": "attraction.park_pirate_ship.clean_reference",
-    "footprint": {
-      "widthTiles": 7,
-      "depthTiles": 6
-    },
+    "footprint": {"widthTiles": 7, "depthTiles": 6},
     "minDimensions": [19, 10, 19],
     "maxDimensions": [30, 20, 29]
   },
