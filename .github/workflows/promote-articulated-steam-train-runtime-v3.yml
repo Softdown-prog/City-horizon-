@@ -1,0 +1,96 @@
+name: Promote Articulated Steam Train Runtime V3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/promotions/vehicle.steam_train.locomotive.01.runtime.v3.json"
+      - "tools/ch_blender/promotions/vehicle.steam_train.coach.01.runtime.v3.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-articulated-steam-train-runtime-promotion-v3
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install post-process dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Resolve approved artifact
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          paths = [
+              Path('tools/ch_blender/promotions/vehicle.steam_train.locomotive.01.runtime.v3.json'),
+              Path('tools/ch_blender/promotions/vehicle.steam_train.coach.01.runtime.v3.json'),
+          ]
+          specs = [json.loads(path.read_text(encoding='utf-8')) for path in paths]
+          for spec in specs:
+              assert spec['contract'] == 'CH_RUNTIME_ASSET_PROMOTION_V1'
+              assert spec['approved'] is True
+              assert spec['promotionRevision'] == 3
+              assert spec['sourceWorkflowRun'] == 37194593044
+              assert spec['sourceArtifactId'] == 11300772601
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write('run_id=37194593044\n')
+              out.write('artifact_id=11300772601\n')
+          PY
+
+      - name: Download approved final artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.artifact.outputs.run_id }}
+          artifact-ids: ${{ steps.artifact.outputs.artifact_id }}
+          path: out/runtime_promotion_v3/source
+
+      - name: Promote approved articulated units
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/ch_blender/promote_articulated_train_runtime_v3.py \
+            --artifact-root out/runtime_promotion_v3/source \
+            --locomotive-spec tools/ch_blender/promotions/vehicle.steam_train.locomotive.01.runtime.v3.json \
+            --coach-spec tools/ch_blender/promotions/vehicle.steam_train.coach.01.runtime.v3.json
+
+      - name: Commit promoted runtime units
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            assets/vehicles/steam_train_locomotive_01 \
+            assets/vehicles/steam_train_coach_01 \
+            assets/definitions/steam_train_locomotive_01.json \
+            assets/definitions/steam_train_coach_01.json
+          if git diff --cached --quiet; then
+            echo "Articulated runtime units already match approved artifact."
+            exit 0
+          fi
+          git commit -m "asset: promote articulated steam train runtime units v3"
+          git pull --rebase origin main
+          git push origin HEAD:main
