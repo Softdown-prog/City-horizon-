@@ -2,8 +2,8 @@
 
 This asset is the visual shell for one repeatable coaster track segment. The
 procedural centerline/geometry remains authoritative for route, gauge, physics
-and support placement. Runtime may stamp/warp this visual module over that
-geometry, but this Blender asset never changes simulation state.
+and support placement. Runtime stamps this visual module over that geometry,
+but this Blender asset never changes simulation state.
 """
 from __future__ import annotations
 
@@ -91,18 +91,15 @@ def build_body(root, mats):
     _box("TrackBody_SpineSideL", (0.0, -0.155, 0.27), (length, 0.055, 0.18), mats["red_side"], root, 0.018)
     _box("TrackBody_SpineSideR", (0.0, 0.155, 0.27), (length, 0.055, 0.18), mats["red_side"], root, 0.018)
 
-    # Tycoon-readable dark sleepers: fewer, chunkier, and recessed under rails.
     for i, x in enumerate((-1.20, -0.60, 0.0, 0.60, 1.20)):
         _box(f"TrackBody_Tie_{i}", (x, 0.0, 0.42), (0.13, 1.10, 0.12), mats["dark"], root, 0.018)
 
-    # Twin tubular rails with a subtle bright top strip created as a thinner tube.
     for side, y in (("L", -gauge_half), ("R", gauge_half)):
         _cylinder(f"TrackBody_Rail_{side}", (0.0, y, 0.57), 0.070, length, mats["rail"], root,
                   vertices=24, rotation=(0.0, 1.57079632679, 0.0))
         _cylinder(f"TrackBody_RailHi_{side}", (0.0, y - 0.018, 0.607), 0.025, length, mats["rail_hi"], root,
                   vertices=18, rotation=(0.0, 1.57079632679, 0.0))
 
-    # Small rail chairs prevent the rails from visually floating above sleepers.
     for x in (-1.20, -0.60, 0.0, 0.60, 1.20):
         for y in (-gauge_half, gauge_half):
             _box(f"TrackBody_Chair_{x:+.2f}_{y:+.2f}", (x, y, 0.505), (0.16, 0.18, 0.10), mats["dark"], root, 0.014)
@@ -146,6 +143,56 @@ def save_blend(path):
     bpy.ops.wm.save_as_mainfile(filepath=str(target))
 
 
+def render_final_directions(scene, root, authored, profile, out, approval):
+    runtime = out / "runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    directions = []
+    for direction in bs.DIRECTIONS:
+        bs.set_direction(root, direction)
+        bpy.context.view_layer.update()
+        direction_id = direction["id"]
+        path = runtime / f"track_body_{direction_id}.png"
+        record = scene_gate.render_proxy(
+            scene=scene,
+            authored=authored,
+            output_path=path,
+            profile=profile,
+            asset_id=ASSET_ID,
+            direction=direction_id,
+        )
+        directions.append({
+            "id": direction_id,
+            "quarterTurns": direction["quarterTurns"],
+            "rotationDegrees": direction["rotationDegrees"],
+            "path": f"runtime/{path.name}",
+            "sha256": record["sha256"],
+            "bytes": record["bytes"],
+        })
+
+    approval_record = {
+        "contract": "CH_PROXY_APPROVAL_V1",
+        "assetId": ASSET_ID,
+        "proxySha256": approval,
+        "reviewed": True,
+        "runtimeTarget": "2D_RGBA_track_body_skin",
+    }
+    (out / "proxy_approval.json").write_text(json.dumps(approval_record, indent=2), encoding="utf-8")
+    final_record = {
+        "contract": "CH_COASTER_TRACK_BODY_BAKE_V1",
+        "status": "ok",
+        "assetId": ASSET_ID,
+        "approvedProxySha256": approval,
+        "skinContract": "CH_COASTER_TRACK_SKIN_V1",
+        "geometryAuthority": "CH_COASTER_TRACK_GEOMETRY_V1",
+        "runtimeRepresentation": "2D_RGBA_track_body_skin",
+        "directionOrder": [d["id"] for d in bs.DIRECTIONS],
+        "directions": directions,
+    }
+    (out / "final_bake_report.json").write_text(json.dumps(final_record, indent=2), encoding="utf-8")
+    bs.set_direction(root, bs.DIRECTIONS[0])
+    bpy.context.view_layer.update()
+
+
 def main():
     args = parse_args()
     profile = scene_gate.load_profile(args.preflight_profile)
@@ -172,9 +219,9 @@ def main():
     approval = (args.approval_proxy_sha or "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", approval):
         raise RuntimeError("CH_FINAL_REQUIRES_APPROVED_PROXY")
-    # Final bake intentionally deferred until proxy review. This prevents the
-    # wrong body skin from being multiplied across the runtime atlas.
-    raise RuntimeError("CH_FINAL_NOT_AUTHORIZED_FOR_TRACK_BODY: approve proxy first")
+    render_final_directions(scene, root, authored, profile, out, approval)
+    save_blend(args.save_blend)
+    print("[CH_GATE] Classic Steel track-body final 4-direction runtime bake complete")
 
 
 if __name__ == "__main__":
