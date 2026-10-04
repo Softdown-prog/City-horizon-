@@ -151,6 +151,11 @@ struct TileCullBounds {
         filename.replace(0, 4, "wood");
         return "assets/terrain/paths/wood_01/" + filename;
     }
+    if (style_id == "stone_path") {
+        std::string filename = dirt_path_sprite(connections).substr(std::string("assets/terrain/paths/dirt_01/").size());
+        filename.replace(0, 4, "stone");
+        return "assets/terrain/paths/stone_01/" + filename;
+    }
     const std::string base = "assets/sidewalks/" + style_id + "/sidewalk_concrete_";
     const int mask = static_cast<int>(connections);
     if (mask == 15) return base + "15_seamless.png";

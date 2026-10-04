@@ -58,7 +58,7 @@ std::unordered_map<std::string, CatalogCardInteractionFx> g_catalog_card_fx;
     return (root / relative).string();
 }
 
-[[nodiscard]] std::array<UiBuildItem, 4> floor_catalog_items() {
+[[nodiscard]] std::array<UiBuildItem, 5> floor_catalog_items() {
     return {{
         {"dirt_path", "Tile de Terra", "PISO", "$0 / TILE", true,
          runtime_asset_path("assets/terrain/paths/dirt_01/dirt_path_00_isolated.png"),
@@ -66,8 +66,11 @@ std::unordered_map<std::string, CatalogCardInteractionFx> g_catalog_card_fx;
         {"sand_path", "Tile de Areia", "PISO", "$0 / TILE", true,
          runtime_asset_path("assets/terrain/paths/sand_01/sand_path_00_isolated.png"),
          "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
-        {"wood_path", "Caminho de Madeira", "PISO", "$0 / TILE", true,
+        {"wood_path", "Caminho de Madeira", "PISO", "$25 / TILE", true,
          runtime_asset_path("assets/terrain/paths/wood_01/wood_path_00_isolated.png"),
+         "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
+        {"stone_path", "Caminho de Pedras", "PISO", "$40 / TILE", true,
+         runtime_asset_path("assets/terrain/paths/stone_01/stone_path_00_isolated.png"),
          "1x1", "TERRENO PROPRIO | CLIQUE E ARRASTE", 1},
         {"grass", "Tile de Grama", "PISO", "$0 / TILE", true,
          runtime_asset_path("assets/terrain/grass_isometric_01.png"),

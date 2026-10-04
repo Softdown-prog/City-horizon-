@@ -2244,6 +2244,11 @@ int main() {
         clear_map_modes(); build_panel_open = false; sidewalk_mode = true; selected_instance_id.reset();
         status = "FLOOR MODE: DRAG ON OWNED LAND"; (void)play_sound(SoundEvent::ui_select);
     };
+    const auto floor_style_cost = [](const std::string& style) -> std::int64_t {
+        if (style == "wood_path") return 25;
+        if (style == "stone_path") return 40;
+        return 0;
+    };
     const auto begin_water_mode = [&](const std::string& id) {
         const ch::TerrainSemanticsDefinition* definition =
             ch::TerrainSemanticsCatalog::global_instance().find(id);
@@ -2421,7 +2426,7 @@ int main() {
             case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
             case UiAction::select_sidewalk_style:
                 if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "wood_path" ||
-                    action.payload == "grass" || action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {
+                    action.payload == "stone_path" || action.payload == "grass" || action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {
                     sidewalk_style = action.payload;
                     begin_sidewalk_mode();
                 }
@@ -3441,6 +3446,16 @@ int main() {
                             ++blocked;
                             continue;
                         }
+                        const SidewalkTile* existing_floor = sidewalks.tile_at(tile.x, tile.y);
+                        const bool style_would_change = sidewalk_style == "grass"
+                            ? existing_floor != nullptr
+                            : existing_floor == nullptr || existing_floor->style_id != sidewalk_style;
+                        if (!style_would_change) continue;
+                        const std::int64_t tile_cost = floor_style_cost(sidewalk_style);
+                        if (tile_cost > 0 && !economy.can_afford(tile_cost)) {
+                            ++blocked;
+                            continue;
+                        }
                         bool changed_tile = false;
                         if (sidewalk_style == "grass") {
                             changed_tile = sidewalks.remove_tile(tile.x, tile.y);
@@ -3448,7 +3463,10 @@ int main() {
                             changed_tile = sidewalks.paint_tile(tile.x, tile.y, sidewalk_style);
                         }
                         if (restore_grass(tile.x, tile.y)) changed_tile = true;
-                        if (changed_tile) ++changed;
+                        if (changed_tile) {
+                            if (tile_cost > 0) (void)economy.try_spend(tile_cost);
+                            ++changed;
+                        }
                     }
                     status = changed == 0 ? "NENHUM PISO ALTERADO" :
                         "PISO ALTERADO: " + std::to_string(changed) + " TILE(S)" +

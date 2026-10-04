@@ -1,0 +1,60 @@
+{
+  "contract": "CH_ATOMIC_PATH_FAMILY_V1",
+  "id": "stone_path_01",
+  "displayName": "Caminho de Pedras",
+  "tileCanvas": {
+    "width": 128,
+    "height": 64,
+    "projection": "isometric_2_to_1"
+  },
+  "connectivity": {
+    "bits": {
+      "N": 1,
+      "E": 2,
+      "S": 4,
+      "W": 8
+    },
+    "variantCount": 16
+  },
+  "source": "Converter/file_000000002c5c820ea492fb76b85d5fb1.png",
+  "base": "stone_path_base_128x64.png",
+  "variants": [
+    "stone_path_00_isolated.png",
+    "stone_path_01_end_n.png",
+    "stone_path_02_end_e.png",
+    "stone_path_03_curve_ne.png",
+    "stone_path_04_end_s.png",
+    "stone_path_05_straight_ns.png",
+    "stone_path_06_curve_es.png",
+    "stone_path_07_tee_no_w.png",
+    "stone_path_08_end_w.png",
+    "stone_path_09_curve_nw.png",
+    "stone_path_10_straight_ew.png",
+    "stone_path_11_tee_no_s.png",
+    "stone_path_12_curve_sw.png",
+    "stone_path_13_tee_no_e.png",
+    "stone_path_14_tee_no_n.png",
+    "stone_path_15_cross.png"
+  ],
+  "workerReport": {
+    "schema": "CITY_HORIZON_GROUND_TILE_WORKER_V1",
+    "ok": true,
+    "source": "/tmp/tmpm_5w24l1/stone_source_transparent.png",
+    "output": "out/stone_path_01/stone_path_base_128x64.png",
+    "preview": "out/stone_path_01/stone_path_repeat_preview.png",
+    "width": 128,
+    "height": 64,
+    "mode": "RGBA",
+    "stripEdgePixels": 2,
+    "decontaminateEdgePixels": 2,
+    "decontaminatedPixels": 0,
+    "edgeHarmonization": "exact-border-only",
+    "edgeError": 0.1162,
+    "maxEdgeError": 6.0,
+    "nearBlackPixels": 0,
+    "maxNearBlackPixels": null
+  },
+  "promotionState": "runtime",
+  "styleId": "stone_path",
+  "buildCostPerTile": 40
+}
