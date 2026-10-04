@@ -1,0 +1,88 @@
+{
+  "id": "pirate_ship_01",
+  "name": "Barco Pirata",
+  "category": "city_park",
+  "texture": "assets/city_park/pirate_ship/pirate_ship_south_animation.png",
+  "sprites": {
+    "0": "assets/city_park/pirate_ship/pirate_ship_south_animation.png",
+    "1": "assets/city_park/pirate_ship/pirate_ship_west_animation.png",
+    "2": "assets/city_park/pirate_ship/pirate_ship_north_animation.png",
+    "3": "assets/city_park/pirate_ship/pirate_ship_east_animation.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "requiresTicketBooth": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    { "x": 3, "y": 5, "facing": "south" }
+  ],
+  "footprint": {
+    "width": 7,
+    "height": 6
+  },
+  "amusementRide": {
+    "contract": "CH_AMUSEMENT_RIDE_V1",
+    "capacity": 24,
+    "queue": {
+      "contract": "CH_AMUSEMENT_RIDE_QUEUE_V1",
+      "enabled": true,
+      "boardingPolicy": "fifo",
+      "dispatchPolicy": "full_or_timeout",
+      "boardingTimeoutMs": 2500
+    },
+    "cycle": {
+      "durationMs": 3500
+    },
+    "passengers": {
+      "seatCount": 24,
+      "overlayContract": "CH_RIDE_PASSENGER_OVERLAY_V1",
+      "actorSource": "ch_actor_green_01",
+      "paletteMode": "stable_per_visitor",
+      "seatAssignment": "queue_order_next_free_slot",
+      "seatLayoutManifest": "assets/city_park/pirate_ship/pirate_ship_passenger_seats_v2.json"
+    }
+  },
+  "buildCost": 25000,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "serviceName": "Ingresso do Barco Pirata",
+  "defaultServicePrice": 8,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 40,
+  "baseServiceCustomersPerMonth": 90,
+  "servicePopulationForFullDemand": 60,
+  "needsEffect": {
+    "fun": 75
+  },
+  "artScale": 0.5362,
+  "animation": {
+    "layout": "horizontal",
+    "frameCount": 12,
+    "frameDurationMs": 292,
+    "playback": "activity_loop"
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "primary",
+      "G": "secondary"
+    },
+    "alpha": "coverage",
+    "sprites": {
+      "0": "assets/city_park/pirate_ship/pirate_ship_south_mask_animation.png",
+      "1": "assets/city_park/pirate_ship/pirate_ship_west_mask_animation.png",
+      "2": "assets/city_park/pirate_ship/pirate_ship_north_mask_animation.png",
+      "3": "assets/city_park/pirate_ship/pirate_ship_east_mask_animation.png"
+    }
+  },
+  "playerBuildable": true,
+  "productionStatus": "runtime_animated_four_direction_v2",
+  "rideRuntimeStatus": "data_driven_amusement_ride_v1_seat_binding_ready",
+  "renderClass": "large_asset_1280",
+  "runtimeManifest": "assets/city_park/pirate_ship/pirate_ship_runtime_manifest.json",
+  "sourceWorkflowRun": 37167313390
+}
