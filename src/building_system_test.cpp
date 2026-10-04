@@ -112,9 +112,11 @@ int main(int argc, char** argv) {
     // CH_GAME_COMMAND_V1 vertical slice: preview does not spend or mutate;
     // execute consumes the exact previewed cost and produces the road tile.
     RoadManager roads(-16, 16);
-    LandManager lands(-16, 16);
     CityEconomy economy(1000);
-    RoadPlacementCommand road_command(roads, buildings, lands, economy, -2, -2);
+    const auto tile_owned = [](const int x, const int y) {
+        return x >= -16 && x <= 15 && y >= -16 && y <= 15;
+    };
+    RoadPlacementCommand road_command(roads, buildings, tile_owned, economy, -2, -2);
     const auto preview = ch::GameCommandExecutor::run(road_command, ch::GameCommandMode::preview);
     if (!require(preview.success && !preview.applied, "road command preview succeeds without applying") ||
         !require(preview.cost_units == kRoadCostPerTile && economy.funds() == 1000,
@@ -130,13 +132,22 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    RoadPlacementCommand occupied_command(roads, buildings, lands, economy, -2, -2);
+    RoadPlacementCommand occupied_command(roads, buildings, tile_owned, economy, -2, -2);
     const auto occupied = ch::GameCommandExecutor::run(occupied_command, ch::GameCommandMode::execute);
     if (!require(!occupied.success && !occupied.applied &&
                      occupied.failure == ch::GameCommandFailure::conflicting_state,
                  "road command rejects an occupied tile before spending") ||
         !require(economy.funds() == 1000 - kRoadCostPerTile,
                  "rejected road command leaves funds unchanged")) {
+        return 1;
+    }
+
+    RoadPlacementCommand locked_land(roads, buildings, tile_owned, economy, 16, 0);
+    const auto locked = ch::GameCommandExecutor::run(locked_land, ch::GameCommandMode::execute);
+    if (!require(!locked.success && !locked.applied && locked.failure == ch::GameCommandFailure::blocked,
+                 "road command rejects unowned land") ||
+        !require(economy.funds() == 1000 - kRoadCostPerTile,
+                 "unowned-land rejection leaves funds unchanged")) {
         return 1;
     }
 
