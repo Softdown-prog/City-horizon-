@@ -6,6 +6,8 @@ Para cada profundidade, `*_glint_overlay.png` preserva a fonte do brilho translu
 
 `water_surfaces.json` registra caminhos, paletas, ordem dos quadros e tempo de 125 ms por quadro (2 segundos por volta). Para um quadro de indice `i` em ordem de linha, seu retangulo util comeca em `((i % 4) * 258 + 1, (i // 4) * 258 + 1)` e mede 256x256. Amostre o quadro no espaco do mundo e limite o desenho aos tiles semanticamente definidos como agua; a rotacao de camera altera apenas as coordenadas de amostragem.
 
+`src/ch_render/water_surface_runtime.h` torna esse contrato executavel no runtime. `WaterSurfaceRuntimeCatalog` valida `CH_WATER_SURFACE_V1`, registra base/overlay/indexed overlay/atlas em `AssetRegistry`, expoe as cores opacas de cobertura por ranges semanticos de `PaletteBank` e calcula o frame corrente diretamente de `frameCount` + `frameDurationMs`. O loader recusa silenciosamente uma geometria de atlas diferente da 4x4 atualmente suportada, evitando que uma mudanca de manifesto seja desenhada com UVs errados. Se o manifesto nao puder ser carregado, o catalogo mantem os valores aprovados como fallback compativel; os PNGs aprovados nao sao reprocessados nem recoloridos.
+
 Fonte reproduzivel: receitas `water_surface_*_01.json` -> bake CH Blender -> `export_water_tiles.py` -> `prepare_water_world_preview.py` -> `promote_water_surface.py`. A ultima etapa recebe a pasta `out/water/continuous` aprovada e grava esta pasta:
 
 ```bash

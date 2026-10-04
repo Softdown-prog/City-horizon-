@@ -68,19 +68,34 @@ A `SpriteAnimationClip` stores authored directional tracks. Missing directions a
 
 `SpriteAnimationPlayer` advances by caller-supplied delta time, resets on clip/direction changes, supports looping and non-looping tracks, and exposes the current frame plus the explicit mirror flag. Large looped deltas are reduced by the clip cycle duration so a pause/debug stall does not require iterating once per missed cycle.
 
-## 4. Relationship to existing City Horizon systems
+## 4. First concrete consumer: water
+
+Header: `src/ch_render/water_surface_runtime.h`
+
+`WaterSurfaceRuntimeCatalog` is the first bridge from these foundations into an existing City Horizon asset contract. It reads the project's own `CH_WATER_SURFACE_V1` manifest and:
+
+- preserves `water_shallow` and `water_deep` as semantic runtime IDs;
+- registers their base, original overlay, indexed overlay and approved RGBA animation atlas through `AssetRegistry`;
+- exposes the seam-coverage colours through named `PaletteBank` ranges rather than creating a second water-specific colour container;
+- takes the animation cadence from the manifest (`16` frames at `125 ms` each) and resolves the current frame deterministically;
+- validates that the manifest still matches the currently supported 4x4/256px/1px-gutter atlas geometry before accepting it.
+
+This does **not** replace the approved RGBA atlas with runtime per-pixel recolouring. The existing atlas already bakes the subtle palette-intensity cycle plus glint drift and is intentionally retained so SDL backends do not require indexed-texture support. The semantic palette is currently used for runtime coverage/fallback colour ownership and remains available for future indexed consumers where there is a measured benefit.
+
+## 5. Relationship to existing City Horizon systems
 
 These primitives are foundations, not competing replacements.
 
 - `MobileAnimationCatalog` remains the active actor animation catalog.
 - `CH_ANIMATED_PROP_V1` / `AnimatedPropCatalog` remains the active animated-prop contract.
-- existing ride, water and overlay runtimes continue to work unchanged.
+- the approved water PNGs and RGBA animation atlas remain the visual source of truth.
+- existing ride and overlay runtimes continue to work unchanged until individually migrated.
 
 New integrations should migrate incrementally when a visible gameplay use requires them. Shared low-level behavior can move onto these primitives without invalidating already approved asset definitions.
 
-Recommended first consumers are the systems that already need the same concepts: animated rides, visitor directional sprites and palette-cycled water/overlays.
+After water, the highest-value consumers are animated rides and visitor directional sprites.
 
-## 5. Non-goals for V1
+## 6. Non-goals for V1
 
 This contract does not introduce:
 
@@ -93,12 +108,16 @@ This contract does not introduce:
 
 Those remain separate decisions and should only be added when City Horizon has a demonstrated runtime need.
 
-## 6. Validation
+## 7. Validation
 
 The existing `mobile_animation_test` also exercises these foundations so the normal CMake/CTest path checks:
 
 - typed registration and duplicate-ID rejection;
 - semantic palette ranges, remapping and cycling;
+- loading the canonical `CH_WATER_SURFACE_V1` manifest;
+- preservation of water IDs, build costs and stable asset paths;
+- the approved 16-frame / 125 ms water cadence and deterministic two-second loop;
+- semantic shallow/deep coverage colours;
 - trimmed frame metadata;
 - explicit direction aliases and mirroring;
 - refusal to invent undeclared directional fallbacks;
