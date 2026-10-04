@@ -9,7 +9,7 @@
 #include <optional>
 #include <vector>
 
-inline constexpr const char* kChRailPlacementGraphContract = "CH_RAIL_PLACEMENT_GRAPH_V2";
+inline constexpr const char* kChRailPlacementGraphContract = "CH_RAIL_PLACEMENT_GRAPH_V3";
 
 using RailPlacementNodeId = std::uint32_t;
 using RailPlacementEdgeId = std::uint32_t;
@@ -31,6 +31,10 @@ struct RailPlacementNode {
     RailPlacementNodeId id = kInvalidRailPlacementNodeId;
     RailWorldPoint3 position{};
     float heading_radians = 0.0F;
+    // V3 keeps vector indices stable. Nodes become inactive when no live edge
+    // references them, preventing deleted geometry from leaving invisible snap
+    // magnets behind while preserving IDs for save/load and later pieces.
+    bool active = true;
 };
 
 struct RailPlacementEdge {
@@ -42,6 +46,9 @@ struct RailPlacementEdge {
     // Multiple graph edges may belong to one logical track piece. Straight and
     // curve edges own their group; turnout/crossing route edges share a group.
     RailPlacementPieceId piece_group = kInvalidRailPlacementPieceId;
+    // Middle-of-network demolition never erases this record. The tombstone
+    // preserves every later ID and makes persisted references deterministic.
+    bool active = true;
 };
 
 struct RailPlacementAppendResult {
@@ -88,11 +95,12 @@ struct RailPlacementCheckpoint {
     std::size_t edge_count = 0U;
 };
 
-// CH_RAIL_PLACEMENT_GRAPH_V2
+// CH_RAIL_PLACEMENT_GRAPH_V3
 //
-// Transactional staging graph for the editor. Every route edge is validated and
-// mesh-buildable before commit. piece_group identifies the logical modular piece
-// represented by one route (straight/curve) or multiple routes (turnout/crossing).
+// Transactional staging graph for the editor. New geometry remains append-only
+// so preview rollback is cheap, while committed middle-of-network demolition
+// uses tombstones instead of vector erasure. This gives every node, edge and
+// logical piece a stable identity suitable for selection and persistence.
 class RailPlacementGraph final {
 public:
     explicit RailPlacementGraph(RailProfile profile = {}) : profile_(profile) {}
@@ -107,7 +115,7 @@ public:
             return std::nullopt;
         }
         const RailPlacementNodeId id = static_cast<RailPlacementNodeId>(nodes_.size());
-        nodes_.push_back({id, position, heading_radians});
+        nodes_.push_back({id, position, heading_radians, true});
         return id;
     }
 
@@ -170,9 +178,9 @@ public:
 
         const RailPlacementEdgeId through_edge = static_cast<RailPlacementEdgeId>(edges_.size());
         const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(through_edge);
-        edges_.push_back({through_edge, from, *through_node, RailPlacementEdgeKind::turnout_through, authored.through, piece_group});
+        edges_.push_back({through_edge, from, *through_node, RailPlacementEdgeKind::turnout_through, authored.through, piece_group, true});
         const RailPlacementEdgeId diverging_edge = static_cast<RailPlacementEdgeId>(edges_.size());
-        edges_.push_back({diverging_edge, from, *diverging_node, RailPlacementEdgeKind::turnout_diverging, authored.diverging, piece_group});
+        edges_.push_back({diverging_edge, from, *diverging_node, RailPlacementEdgeKind::turnout_diverging, authored.diverging, piece_group, true});
         return RailPlacementTurnoutResult{*through_node, *diverging_node, through_edge, diverging_edge};
     }
 
@@ -222,9 +230,9 @@ public:
 
         const RailPlacementEdgeId primary_edge = static_cast<RailPlacementEdgeId>(edges_.size());
         const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(primary_edge);
-        edges_.push_back({primary_edge, from, *primary_node, RailPlacementEdgeKind::crossing_primary, primary.segment, piece_group});
+        edges_.push_back({primary_edge, from, *primary_node, RailPlacementEdgeKind::crossing_primary, primary.segment, piece_group, true});
         const RailPlacementEdgeId secondary_edge = static_cast<RailPlacementEdgeId>(edges_.size());
-        edges_.push_back({secondary_edge, *secondary_entry_node, *secondary_exit_node, RailPlacementEdgeKind::crossing_secondary, secondary.segment, piece_group});
+        edges_.push_back({secondary_edge, *secondary_entry_node, *secondary_exit_node, RailPlacementEdgeKind::crossing_secondary, secondary.segment, piece_group, true});
 
         return RailPlacementCrossingResult{
             *primary_node,
@@ -245,6 +253,77 @@ public:
         }
         edges_.resize(checkpoint_value.edge_count);
         nodes_.resize(checkpoint_value.node_count);
+        recompute_node_activity();
+        return true;
+    }
+
+    // Stable committed-piece removal. Every route in the logical group is
+    // toggled together; no IDs after the piece move.
+    [[nodiscard]] std::size_t remove_piece(const RailPlacementPieceId piece_group) {
+        if (piece_group == kInvalidRailPlacementPieceId) return 0U;
+        std::size_t changed = 0U;
+        for (RailPlacementEdge& edge_value : edges_) {
+            if (edge_value.active && edge_value.piece_group == piece_group) {
+                edge_value.active = false;
+                ++changed;
+            }
+        }
+        if (changed != 0U) recompute_node_activity();
+        return changed;
+    }
+
+    [[nodiscard]] bool set_piece_active(const RailPlacementPieceId piece_group, const bool active) {
+        if (piece_group == kInvalidRailPlacementPieceId) return false;
+        bool found = false;
+        for (RailPlacementEdge& edge_value : edges_) {
+            if (edge_value.piece_group == piece_group) {
+                edge_value.active = active;
+                found = true;
+            }
+        }
+        if (found) recompute_node_activity();
+        return found;
+    }
+
+    [[nodiscard]] bool piece_active(const RailPlacementPieceId piece_group) const {
+        for (const RailPlacementEdge& edge_value : edges_) {
+            if (edge_value.piece_group == piece_group && edge_value.active) return true;
+        }
+        return false;
+    }
+
+    // Save/load boundary. The snapshot is fully validated in temporary storage
+    // before replacing live graph state; node activity is derived from live
+    // edges so malformed saves cannot resurrect invisible snap points.
+    [[nodiscard]] bool restore_snapshot(std::vector<RailPlacementNode> nodes,
+                                        std::vector<RailPlacementEdge> edges) {
+        if (nodes.size() >= static_cast<std::size_t>(std::numeric_limits<RailPlacementNodeId>::max()) ||
+            edges.size() >= static_cast<std::size_t>(std::numeric_limits<RailPlacementEdgeId>::max())) {
+            return false;
+        }
+        for (std::size_t index = 0U; index < nodes.size(); ++index) {
+            RailPlacementNode& node_value = nodes[index];
+            if (node_value.id != static_cast<RailPlacementNodeId>(index) ||
+                !finite_point(node_value.position) || !inside_world(node_value.position) ||
+                !std::isfinite(node_value.heading_radians)) {
+                return false;
+            }
+            node_value.active = false;
+        }
+        for (std::size_t index = 0U; index < edges.size(); ++index) {
+            const RailPlacementEdge& edge_value = edges[index];
+            if (edge_value.id != static_cast<RailPlacementEdgeId>(index) ||
+                edge_value.from >= nodes.size() || edge_value.to >= nodes.size() ||
+                edge_value.piece_group == kInvalidRailPlacementPieceId ||
+                edge_value.piece_group >= edges.size() || !valid_kind(edge_value.kind) ||
+                !mesh_safe(edge_value.segment)) {
+                return false;
+            }
+        }
+
+        nodes_ = std::move(nodes);
+        edges_ = std::move(edges);
+        recompute_node_activity();
         return true;
     }
 
@@ -254,12 +333,12 @@ public:
     }
 
     [[nodiscard]] const RailPlacementNode* node(const RailPlacementNodeId id) const {
-        if (id >= nodes_.size()) return nullptr;
+        if (id >= nodes_.size() || !nodes_[id].active) return nullptr;
         return &nodes_[id];
     }
 
     [[nodiscard]] const RailPlacementEdge* edge(const RailPlacementEdgeId id) const {
-        if (id >= edges_.size()) return nullptr;
+        if (id >= edges_.size() || !edges_[id].active) return nullptr;
         return &edges_[id];
     }
 
@@ -270,6 +349,19 @@ public:
 private:
     [[nodiscard]] static bool finite_point(const RailWorldPoint3& point) {
         return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
+    }
+
+    [[nodiscard]] static bool valid_kind(const RailPlacementEdgeKind kind) {
+        switch (kind) {
+            case RailPlacementEdgeKind::straight:
+            case RailPlacementEdgeKind::curve:
+            case RailPlacementEdgeKind::turnout_through:
+            case RailPlacementEdgeKind::turnout_diverging:
+            case RailPlacementEdgeKind::crossing_primary:
+            case RailPlacementEdgeKind::crossing_secondary:
+                return true;
+        }
+        return false;
     }
 
     [[nodiscard]] bool inside_world(const RailWorldPoint3& point) const {
@@ -287,6 +379,15 @@ private:
                RailMeshBuilder::validate_mesh(built.geometry.right_rail, profile_).ok();
     }
 
+    void recompute_node_activity() {
+        for (RailPlacementNode& node_value : nodes_) node_value.active = false;
+        for (const RailPlacementEdge& edge_value : edges_) {
+            if (!edge_value.active) continue;
+            if (edge_value.from < nodes_.size()) nodes_[edge_value.from].active = true;
+            if (edge_value.to < nodes_.size()) nodes_[edge_value.to].active = true;
+        }
+    }
+
     [[nodiscard]] std::optional<RailPlacementAppendResult> commit_single(
         const RailPlacementNodeId from,
         const RailSplineSegment& segment,
@@ -301,7 +402,7 @@ private:
 
         const RailPlacementEdgeId edge_id = static_cast<RailPlacementEdgeId>(edges_.size());
         const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(edge_id);
-        edges_.push_back({edge_id, from, *to, kind, segment, piece_group});
+        edges_.push_back({edge_id, from, *to, kind, segment, piece_group, true});
         if (edge(edge_id) == nullptr) {
             const bool rolled_back = rollback(before);
             (void)rolled_back;
