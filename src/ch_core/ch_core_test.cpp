@@ -51,7 +51,6 @@ private:
 }  // namespace
 
 int main(int argc, char** argv) {
-    // 1. Verify Contracts
     static_assert(ch::contracts::kTileWidth == 128);
     static_assert(ch::contracts::kTileHeight == 64);
     static_assert(ch::contracts::kDiamondRatio == 2.0);
@@ -63,7 +62,6 @@ int main(int argc, char** argv) {
     assert(std::string(kDeveloperConsoleContract) == "CH_DEVELOPER_CONSOLE_V1");
     assert(std::string(kScenarioTestHarnessContract) == "CH_SCENARIO_TEST_HARNESS_V1");
 
-    // 2. Verify Grid Math
     ch::GridCoord c1{5, -10};
     ch::GridCoord c2{5, -10};
     ch::GridCoord c3{5, 10};
@@ -75,10 +73,8 @@ int main(int argc, char** argv) {
     assert(bounds.contains(-80, 79));
     assert(!bounds.contains(-81, 0));
     assert(!bounds.contains(0, 80));
-
     assert(ch::tile_key(5, -10) != ch::tile_key(-10, 5));
 
-    // 3. Verify Projection & Rotation Math
     ch::CameraState camera;
     camera.pan_x = 100.0F;
     camera.pan_y = 50.0F;
@@ -95,34 +91,28 @@ int main(int argc, char** argv) {
 
     ch::WorldPoint top_r0 = ch::tile_visual_top_world(10, 5, ch::CameraRotation::r0);
     assert(top_r0.x == 10.0F && top_r0.y == 5.0F);
-
     ch::WorldPoint top_r90 = ch::tile_visual_top_world(10, 5, ch::CameraRotation::r90);
     assert(top_r90.x == 11.0F && top_r90.y == 5.0F);
-
     ch::WorldPoint b_ground = ch::building_visual_ground_world(10, 5, 2, 2, ch::CameraRotation::r0);
     assert(b_ground.x == 12.0F && b_ground.y == 7.0F);
 
-    // 4. Verify MapDocument & Validation
     if (argc > 1) {
         std::string scenario_path = argv[1];
         auto doc = ch::MapDocument::load_from_file(scenario_path);
         assert(doc.has_value());
         assert(!doc->terrain_tiles().empty());
         assert(!doc->buildings().empty());
-
         auto report = ch::validate_map_document(*doc);
         assert(report.valid);
         assert(report.errors.empty());
     }
 
-    // Inline raw JSON MapDocument verification
     std::string test_json = R"({
         "terrain": [{"tileX": 0, "tileY": 0, "texture": "grass"}],
         "terrainHeights": [{"x": 0, "y": 0, "height": 1.5}, {"x": 1, "y": 0, "height": -0.5}],
         "buildings": [{"instanceId": 1, "definitionId": "bakery", "tileX": 1, "tileY": 1, "rotation": 0}],
         "roads": [{"tileX": 2, "tileY": 2}]
     })";
-
     ch::MapDocument inline_doc(test_json);
     assert(inline_doc.terrain_tiles().size() == 1);
     assert(std::abs(inline_doc.terrain_height_at(0, 0) - 1.5F) < 0.001F);
@@ -130,21 +120,17 @@ int main(int argc, char** argv) {
     assert(std::abs(inline_doc.terrain_heightfield().sample(0.5F, 0.0F) - 0.5F) < 0.001F);
     assert(inline_doc.buildings().size() == 1);
     assert(inline_doc.roads().size() == 1);
-
     assert(inline_doc.get_terrain_at(0, 0).has_value());
     assert(inline_doc.get_terrain_at(0, 0)->texture == "grass");
     assert(inline_doc.get_building_at(1, 1).has_value());
     assert(inline_doc.get_building_at(1, 1)->definition_id == "bakery");
     assert(inline_doc.is_road_at(2, 2));
     assert(!inline_doc.is_road_at(0, 0));
-
     auto inline_report = ch::validate_map_document(inline_doc);
     assert(inline_report.valid);
 
-    // 5. CH_GAME_COMMAND_V1 preview and execution share one prepared plan.
     TestGameCommand preview_command;
-    const ch::GameCommandResult preview =
-        ch::GameCommandExecutor::run(preview_command, ch::GameCommandMode::preview);
+    const ch::GameCommandResult preview = ch::GameCommandExecutor::run(preview_command, ch::GameCommandMode::preview);
     assert(preview.success);
     assert(!preview.applied);
     assert(preview.cost_units == 750);
@@ -153,8 +139,7 @@ int main(int argc, char** argv) {
     assert(preview_command.apply_calls == 0);
 
     TestGameCommand execute_command;
-    const ch::GameCommandResult executed =
-        ch::GameCommandExecutor::run(execute_command, ch::GameCommandMode::execute);
+    const ch::GameCommandResult executed = ch::GameCommandExecutor::run(execute_command, ch::GameCommandMode::execute);
     assert(executed.success);
     assert(executed.applied);
     assert(execute_command.prepare_calls == 1);
@@ -162,23 +147,20 @@ int main(int argc, char** argv) {
     assert(execute_command.applied_cost == executed.cost_units);
 
     TestGameCommand blocked_command(false);
-    const ch::GameCommandResult blocked =
-        ch::GameCommandExecutor::run(blocked_command, ch::GameCommandMode::execute);
+    const ch::GameCommandResult blocked = ch::GameCommandExecutor::run(blocked_command, ch::GameCommandMode::execute);
     assert(!blocked.success);
     assert(!blocked.applied);
     assert(blocked.failure == ch::GameCommandFailure::blocked);
     assert(blocked_command.apply_calls == 0);
 
-    // 6. Budgeted resource cache: LRU eviction never destroys pinned entries.
     int evicted = 0;
-    ch::BudgetedResourceCache<std::string, int> resource_cache(
-        8, [&](int&) { ++evicted; });
+    ch::BudgetedResourceCache<std::string, int> resource_cache(8, [&](int&) { ++evicted; });
     auto load_value = [](const int value) {
         return [value]() -> std::optional<int> { return value; };
     };
     assert(resource_cache.get_or_load("a", 4, load_value(10)) != nullptr);
     assert(resource_cache.get_or_load("b", 4, load_value(20)) != nullptr);
-    assert(resource_cache.get("a") != nullptr); // make b least-recently used
+    assert(resource_cache.get("a") != nullptr);
     assert(resource_cache.get_or_load("c", 4, load_value(30)) != nullptr);
     assert(resource_cache.get("b") == nullptr);
     assert(resource_cache.resident_bytes() == 8);
@@ -194,7 +176,6 @@ int main(int argc, char** argv) {
     resource_cache.set_budget_bytes(2);
     assert(resource_cache.resident_bytes() == 0);
 
-    // 7. Ride state machine advances from simulation time, not render FPS.
     RideStateDurations ride_durations;
     ride_durations.boarding_ms = 1000;
     ride_durations.starting_ms = 200;
@@ -215,24 +196,30 @@ int main(int argc, char** argv) {
     assert(ride.snapshot().state == RideOperatingState::idle);
     assert(!ride.snapshot().dispatch_requested);
 
-    // 8. Developer console parses quoted read-only commands without game coupling.
     DeveloperConsoleRegistry console;
-    assert(console.register_command("echo", [](const DeveloperConsoleRegistry::Arguments& args) {
-        std::string joined;
-        for (const std::string& arg : args) {
-            if (!joined.empty()) joined += '|';
-            joined += arg;
-        }
-        return DeveloperConsoleResult{true, joined};
-    }));
+    assert(console.register_command({"echo", "echo <args...>", "Echo arguments for diagnostics", true},
+        [](const DeveloperConsoleRegistry::Arguments& args) {
+            std::string joined;
+            for (const std::string& arg : args) {
+                if (!joined.empty()) joined += '|';
+                joined += arg;
+            }
+            return DeveloperConsoleResult{true, joined};
+        }));
     const DeveloperConsoleResult console_result = console.execute("echo citizen \"Roda Gigante\"");
     assert(console_result.success);
     assert(console_result.output == "citizen|Roda Gigante");
+    const DeveloperConsoleResult help_result = console.help("echo");
+    assert(help_result.success);
+    assert(help_result.output.find("echo <args...>") != std::string::npos);
+    assert(help_result.output.find("[read-only]") != std::string::npos);
     assert(!console.execute("unknown").success);
+    assert(console.history().size() == 2);
+    console.clear_history();
+    assert(console.history().empty());
 
-    // 9. Scenario harness stops deterministically at the first failed step.
-    ScenarioTestHarness scenario;
     int scenario_state = 0;
+    ScenarioTestHarness scenario("happy-path");
     assert(scenario.add_step("prepare", [&]() {
         scenario_state = 1;
         return ScenarioStepResult{true, {}};
@@ -242,9 +229,10 @@ int main(int argc, char** argv) {
     }));
     const ScenarioRunResult scenario_result = scenario.run();
     assert(scenario_result.success);
+    assert(scenario_result.scenario_name == "happy-path");
     assert(scenario_result.completed_steps == 2);
 
-    ScenarioTestHarness failing_scenario;
+    ScenarioTestHarness failing_scenario("failure-path");
     assert(failing_scenario.add_step("fail-here", []() {
         return ScenarioStepResult{false, "expected failure"};
     }));
@@ -252,6 +240,16 @@ int main(int argc, char** argv) {
     assert(!failed_scenario.success);
     assert(failed_scenario.failed_step == "fail-here");
     assert(failed_scenario.completed_steps == 0);
+
+    ScenarioTestSuite suite;
+    assert(suite.add(std::move(scenario)));
+    ScenarioTestHarness second("second");
+    assert(second.add_step("ok", []() { return ScenarioStepResult{true, {}}; }));
+    assert(suite.add(std::move(second)));
+    const ScenarioSuiteRunResult suite_result = suite.run();
+    assert(suite_result.success);
+    assert(suite_result.completed_scenarios == 2);
+    assert(suite_result.results.size() == 2);
 
     std::cout << "ch_core_test passed successfully!\n";
     return 0;
