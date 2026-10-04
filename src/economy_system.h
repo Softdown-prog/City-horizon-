@@ -59,6 +59,10 @@ public:
     [[nodiscard]] const std::vector<EconomyTransaction>& ledger() const;
     [[nodiscard]] int consecutive_negative_months() const;
     [[nodiscard]] bool bankrupt() const;
+    // The desktop runtime owns one authoritative treasury. Compatibility
+    // bridges can query it without threading a second money model through the
+    // legacy unity entrypoint. Nested test instances restore the prior pointer.
+    [[nodiscard]] static CityEconomy* active_instance() noexcept { return active_instance_; }
 
     [[nodiscard]] bool can_afford(std::int64_t cost) const;
     [[nodiscard]] bool try_spend(std::int64_t cost);
@@ -113,11 +117,26 @@ public:
                                                                           const FarmingSystem* farming = nullptr);
 
 private:
+    struct ActiveInstanceRegistration {
+        CityEconomy* owner = nullptr;
+        CityEconomy* previous = nullptr;
+
+        explicit ActiveInstanceRegistration(CityEconomy* instance) noexcept
+            : owner(instance), previous(active_instance_) {
+            active_instance_ = owner;
+        }
+        ~ActiveInstanceRegistration() {
+            if (active_instance_ == owner) active_instance_ = previous;
+        }
+    };
+
     void record(EconomyTransactionType type, std::int64_t amount, const GameDate& date,
                 std::uint64_t building_instance_id = 0, std::uint32_t land_parcel_id = 0);
 
     static constexpr std::size_t kMaxLedgerEntries = 100;
     static constexpr int kBankruptcyMonths = 3;
+    inline static CityEconomy* active_instance_ = nullptr;
+    ActiveInstanceRegistration active_registration_{this};
     std::int64_t funds_ = 50'000;
     // The fiscal closure marker prevents a save/load from charging January's
     // property tax twice for the same game year.
