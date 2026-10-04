@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
     RoadPlacementCommand road_command(roads, buildings, economy, -2, -2);
     const auto preview = ch::GameCommandExecutor::run(road_command, ch::GameCommandMode::preview);
     if (!require(preview.success && !preview.applied, "road command preview succeeds without applying") ||
-        !require(preview.cost_cents == kRoadCostPerTile && economy.funds() == 1000,
+        !require(preview.cost_units == kRoadCostPerTile && economy.funds() == 1000,
                  "road preview reports cost without spending") ||
         !require(!roads.is_road(-2, -2), "road preview does not mutate road manager")) {
         return 1;
