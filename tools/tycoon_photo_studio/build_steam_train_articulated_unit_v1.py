@@ -1,7 +1,7 @@
 """Render one articulated steam-train unit from the approved City Horizon V3 recipe.
 
 This deliberately reuses the existing refined locomotive/coach builders instead of
-forking their geometry.  CH Blender remains authoring-only; runtime consumes 2D
+forking their geometry. CH Blender remains authoring-only; runtime consumes 2D
 RGBA sprites under CH_CAMERA_V1.
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ if str(HERE) not in sys.path:
 import build_steam_train_refined_v3 as refined_v3  # noqa: E402
 
 base = refined_v3.base
+_original_build_for_gate = base.build_for_gate
 
 
 def _take_unit_arg() -> str:
@@ -41,7 +42,16 @@ def _take_unit_arg() -> str:
 UNIT = _take_unit_arg()
 
 
+def _unit_asset_id() -> str:
+    return (
+        "vehicle.steam_train.locomotive.01"
+        if UNIT == "locomotive"
+        else "vehicle.steam_train.coach.01"
+    )
+
+
 def build_unit(root, mats, recipe):
+    base.ASSET_ID = _unit_asset_id()
     if UNIT == "locomotive":
         base.build_locomotive(root, mats, recipe)
         locomotive = bpy.data.objects.get("LocomotiveRoot")
@@ -50,7 +60,6 @@ def build_unit(root, mats, recipe):
         # The approved consist recipe authors the locomotive around x=-16.0.
         # Translate only its unit root so the independent sprite is centered.
         locomotive.location.x += 16.0
-        base.ASSET_ID = "vehicle.steam_train.locomotive.01"
         return
 
     base.build_coach(root, mats, 1, 0.0, recipe)
@@ -58,11 +67,24 @@ def build_unit(root, mats, recipe):
     gap = float(recipe["geometry"]["coachGap"])
     base.add_coupler(root, mats, "Coach_Articulated_FrontCoupler", -(length * 0.5 + gap * 0.5))
     base.add_coupler(root, mats, "Coach_Articulated_RearCoupler", +(length * 0.5 + gap * 0.5))
-    base.ASSET_ID = "vehicle.steam_train.coach.01"
+
+
+def build_for_gate_unit(args):
+    result = _original_build_for_gate(args)
+    recipe, studio, scene, root, ground, authored, out = result
+    root["assetId"] = _unit_asset_id()
+    root["assetType"] = "vehicle_train_unit"
+    root["articulatedUnit"] = UNIT
+    if UNIT == "locomotive":
+        root["footprint"] = "6x2"
+    else:
+        root["footprint"] = "4x2"
+    return recipe, studio, scene, root, ground, authored, out
 
 
 # Keep V3 materials/details, scene gate, proxy/final flow and CH_CAMERA_V1.
 base.build_train = build_unit
+base.build_for_gate = build_for_gate_unit
 
 
 if __name__ == "__main__":
