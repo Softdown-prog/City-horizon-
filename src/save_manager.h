@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "src/ch_core/terrain_heightfield.h"
@@ -41,6 +42,11 @@ class MissionManager;
 // file format, version checks and user-data paths remain centralized here.
 class SaveManager {
 public:
+    // CH_SAVE_V1 is the stable save family. saveVersion is the schema revision
+    // inside that family and can continue increasing without renaming the
+    // contract while backward-compatible migration remains possible.
+    static constexpr std::string_view kSaveContract = "CH_SAVE_V1";
+    static constexpr int kMinimumReadableSaveVersion = 1;
     static constexpr int kSaveVersion = 12;
 
     [[nodiscard]] static std::filesystem::path default_save_path();
