@@ -16,11 +16,11 @@
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "accessPoints": [
-    { "x": 3, "y": 5, "facing": "south" }
+    { "x": 2, "y": 2, "facing": "south" }
   ],
   "footprint": {
-    "width": 7,
-    "height": 6
+    "width": 4,
+    "height": 3
   },
   "amusementRide": {
     "contract": "CH_AMUSEMENT_RIDE_V1",
