@@ -31,9 +31,9 @@ struct RailPlacementNode {
     RailPlacementNodeId id = kInvalidRailPlacementNodeId;
     RailWorldPoint3 position{};
     float heading_radians = 0.0F;
-    // V3 keeps vector indices stable. Nodes become inactive when no live edge
-    // references them, preventing deleted geometry from leaving invisible snap
-    // magnets behind while preserving IDs for save/load and later pieces.
+    // V3 keeps vector indices stable. Committed nodes become inactive when no
+    // live edge references them, while an editor root may remain active during
+    // transactional preview. IDs never move after middle-piece demolition.
     bool active = true;
 };
 
@@ -251,9 +251,12 @@ public:
         if (checkpoint_value.node_count > nodes_.size() || checkpoint_value.edge_count > edges_.size()) {
             return false;
         }
+        // Rollback is only the append-only editor staging path. Existing node
+        // activity is part of the checkpoint state and must be preserved: a
+        // standalone root is a valid source for repeated previews. Tombstone
+        // operations call recompute_node_activity() explicitly instead.
         edges_.resize(checkpoint_value.edge_count);
         nodes_.resize(checkpoint_value.node_count);
-        recompute_node_activity();
         return true;
     }
 
