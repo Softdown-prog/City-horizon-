@@ -5,9 +5,17 @@
   "category": "city_park",
   "subtype": "amusement_ride",
   "format": "PNG_RGBA_HORIZONTAL_SPRITESHEET",
-  "frameSize": [1280, 1280],
+  "frameSize": [
+    1280,
+    1280
+  ],
   "transparentBackground": true,
-  "directionOrder": ["south", "west", "north", "east"],
+  "directionOrder": [
+    "south",
+    "west",
+    "north",
+    "east"
+  ],
   "footprint": {
     "widthTiles": 7,
     "depthTiles": 6
@@ -51,6 +59,24 @@
   "sourceWorkflowRun": 37167313390,
   "sourceArtifact": "CH-Blender-Agent-37167313390-1",
   "sourceCommit": "7cb2b1f7a876ae765745b2b929faa0367b1875f0",
-  "status": "runtime_promotion_queued",
-  "promotionRequestRevision": 1
+  "status": "runtime_promoted",
+  "promotionRequestRevision": 1,
+  "runtimeAssets": {
+    "south": {
+      "sprite": "pirate_ship_south_animation.png",
+      "colorMask": "pirate_ship_south_mask_animation.png"
+    },
+    "west": {
+      "sprite": "pirate_ship_west_animation.png",
+      "colorMask": "pirate_ship_west_mask_animation.png"
+    },
+    "north": {
+      "sprite": "pirate_ship_north_animation.png",
+      "colorMask": "pirate_ship_north_mask_animation.png"
+    },
+    "east": {
+      "sprite": "pirate_ship_east_animation.png",
+      "colorMask": "pirate_ship_east_mask_animation.png"
+    }
+  }
 }
