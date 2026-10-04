@@ -1,0 +1,12 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_pirate_ship.swing_passengers.north.runtime640.004",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_pirate_ship_swing_passengers_direction_guarded.py",
+  "qualityStage": "runtime",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
+  "assetRequirements": {"contract": "CH_ASSET_REQUIREMENTS_V1", "assetId": "attraction.park_pirate_ship.clean_reference", "footprint": {"widthTiles": 7, "depthTiles": 6}, "minDimensions": [19, 10, 19], "maxDimensions": [30, 20, 29]},
+  "args": ["--recipe", "tools/tycoon_photo_studio/assets/pirate_ship_clean_reference.json", "--studio-preset", "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_large_ride_runtime_640.json", "--direction", "north", "--output", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004"],
+  "outputDir": "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004",
+  "expectedOutputs": ["out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/preflight_report.json", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/proxy_north.png", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/proxy_report.json", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/studio_metadata.json", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/passenger_overlay_manifest.json", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/color_mask_manifest.json", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/mask_primary_north.png", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/mask_secondary_north_00.png", "out/ch_blender_agent/pirate_ship_swing_passengers_north_runtime640_004/swing_frames_north.json"]
+}
