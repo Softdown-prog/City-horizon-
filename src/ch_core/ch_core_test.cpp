@@ -1,13 +1,16 @@
+#include "src/ch_core/budgeted_resource_cache.h"
 #include "src/ch_core/contracts.h"
 #include "src/ch_core/game_command.h"
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
 #include "src/ch_core/validation.h"
+#include "src/ride_state_machine.h"
 
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <optional>
 #include <string>
 
 namespace {
@@ -54,6 +57,7 @@ int main(int argc, char** argv) {
     static_assert(ch::contracts::kMapMax == 79);
     assert(std::string(ch::contracts::kGridContract) == "CH_GRID_V1");
     assert(std::string(ch::kGameCommandContract) == "CH_GAME_COMMAND_V1");
+    assert(std::string(kRideStateMachineContract) == "CH_RIDE_STATE_MACHINE_V1");
 
     // 2. Verify Grid Math
     ch::GridCoord c1{5, -10};
@@ -160,6 +164,52 @@ int main(int argc, char** argv) {
     assert(!blocked.applied);
     assert(blocked.failure == ch::GameCommandFailure::blocked);
     assert(blocked_command.apply_calls == 0);
+
+    // 6. Budgeted resource cache: LRU eviction never destroys pinned entries.
+    int evicted = 0;
+    ch::BudgetedResourceCache<std::string, int> resource_cache(
+        8, [&](int&) { ++evicted; });
+    auto load_value = [](const int value) {
+        return [value]() -> std::optional<int> { return value; };
+    };
+    assert(resource_cache.get_or_load("a", 4, load_value(10)) != nullptr);
+    assert(resource_cache.get_or_load("b", 4, load_value(20)) != nullptr);
+    assert(resource_cache.get("a") != nullptr); // make b least-recently used
+    assert(resource_cache.get_or_load("c", 4, load_value(30)) != nullptr);
+    assert(resource_cache.get("b") == nullptr);
+    assert(resource_cache.resident_bytes() == 8);
+    assert(evicted == 1);
+    assert(resource_cache.pin("a"));
+    resource_cache.set_budget_bytes(4);
+    assert(resource_cache.get("a") != nullptr);
+    assert(resource_cache.get("c") == nullptr);
+    assert(resource_cache.resident_bytes() == 4);
+    resource_cache.set_budget_bytes(2);
+    assert(resource_cache.budget_stats().over_budget_events >= 1);
+    assert(resource_cache.unpin("a"));
+    resource_cache.set_budget_bytes(2);
+    assert(resource_cache.resident_bytes() == 0);
+
+    // 7. Ride state machine advances from simulation time, not render FPS.
+    RideStateDurations ride_durations;
+    ride_durations.boarding_ms = 1000;
+    ride_durations.starting_ms = 200;
+    ride_durations.running_ms = 2000;
+    ride_durations.stopping_ms = 200;
+    ride_durations.unloading_ms = 600;
+    RideStateMachine ride(ride_durations);
+    ride.request_dispatch();
+    assert(ride.snapshot().state == RideOperatingState::boarding);
+    ride.update(1100);
+    assert(ride.snapshot().state == RideOperatingState::starting);
+    assert(ride.snapshot().elapsed_in_state_ms == 100);
+    ride.update(1100);
+    assert(ride.snapshot().state == RideOperatingState::running);
+    assert(ride.snapshot().elapsed_in_state_ms == 1000);
+    assert(std::abs(ride.snapshot().normalized_running_phase(ride_durations) - 0.5F) < 0.001F);
+    ride.update(2800);
+    assert(ride.snapshot().state == RideOperatingState::idle);
+    assert(!ride.snapshot().dispatch_requested);
 
     std::cout << "ch_core_test passed successfully!\n";
     return 0;
