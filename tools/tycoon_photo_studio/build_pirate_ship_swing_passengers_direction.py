@@ -50,7 +50,7 @@ def main() -> None:
     root["assetId"] = core.base.ASSET
     root["cameraContract"] = "CH_CAMERA_V1"
     root["styleContract"] = c["styleContract"]
-    root["footprint"] = "7x6"
+    root["footprint"] = f"{c['footprint']['widthTiles']}x{c['footprint']['depthTiles']}"
     root["proceduralContract"] = core.base.CONTRACT
     root["animationContract"] = core.ANIMATION_CONTRACT
     root["passengerOverlayContract"] = core.PASSENGER_CONTRACT
@@ -60,12 +60,21 @@ def main() -> None:
     core.base.build(root, c, M)
     pivot = core._make_swing_pivot(root, c)
     slots = core._add_passengers(pivot, c)
+
+    # The original authored geometry was built for the former 7x6 footprint.
+    # Scale the whole authored hierarchy uniformly so the approved topology and
+    # animation remain intact while the attraction honestly fits the 4x3 tile contract.
+    model_scale = float(c.get("modelScale", 1.0))
+    root.scale = (model_scale, model_scale, model_scale)
+    root["modelScale"] = model_scale
+    bpy.context.view_layer.update()
+
     mask_counts = core._tag_color_masks()
     overlay_validation = core._assert_passenger_binding(c)
 
     recv = studio["shadowReceiver"]
     rm = core.base.bs.make_material(
-        "ShadowReceiver", recv["materialColor"], float(recv.get("roughness", 1))
+        "ShadowReceiver", recv["materialColor"], float(recv.get("roughness", 1.0))
     )
     ground = core.base.bs.add_box(
         "ShadowReceiverPlane",
@@ -86,6 +95,8 @@ def main() -> None:
         "assetId": core.base.ASSET,
         "cameraContract": "CH_CAMERA_V1",
         "direction": direction_id,
+        "footprint": c["footprint"],
+        "modelScale": model_scale,
         "frameCount": core.FRAME_COUNT,
         "fps": core.FPS,
         "amplitudeDegrees": core.AMPLITUDE_DEGREES,
@@ -95,7 +106,7 @@ def main() -> None:
         "swingApproval": {
             "commit": "a9f6e02b63a06462f10133b405ee85921f172e40",
             "reviewWorkflowRun": 36350851439,
-            "approvedProxySha256": "c92f1feac2c816599edfac0bf00aa1a645389b7cca86f3350b6b73bd9d33e89b",
+            "approvedProxySha256": "c92f1feac2c816599edfac0bf00aa1a645389b7cca86f3350b6b73bd9d33e89b"
         },
         "passengerOverlayContract": core.PASSENGER_CONTRACT,
         "passengerVisualRecipeSource": "CH_COASTER_PASSENGER_OVERLAY_V1 / approved Viking V15 CHActor recipe",
@@ -106,9 +117,9 @@ def main() -> None:
         "colorMasks": {
             "primary": "fixed A-frame supports / muletas",
             "secondary": "boat hull, seats and boat decoration",
-            "taggedObjectCounts": mask_counts,
+            "taggedObjectCounts": mask_counts
         },
-        "parallelBake": True,
+        "parallelBake": True
     }
     (out / "studio_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (out / "passenger_overlay_manifest.json").write_text(json.dumps({
@@ -122,7 +133,7 @@ def main() -> None:
         "motionParent": "SwingPivot",
         "compositionMode": "depth_correct_blender_composite_plus_transparent_overlay",
         "frameCount": core.FRAME_COUNT,
-        "validation": overlay_validation,
+        "validation": overlay_validation
     }, indent=2), encoding="utf-8")
     (out / "color_mask_manifest.json").write_text(json.dumps({
         "contract": core.COLOR_MASK_CONTRACT,
@@ -131,14 +142,14 @@ def main() -> None:
         "primaryColor": {
             "target": "A-frame supports / muletas",
             "file": f"mask_primary_{direction_id}.png",
-            "animated": False,
+            "animated": False
         },
         "secondaryColor": {
             "target": "boat",
             "filePattern": f"mask_secondary_{direction_id}_%02d.png",
-            "animated": True,
+            "animated": True
         },
-        "frameCount": core.FRAME_COUNT,
+        "frameCount": core.FRAME_COUNT
     }, indent=2), encoding="utf-8")
 
     profile = core.base.scene_gate.load_profile(a.preflight_profile)
@@ -149,7 +160,7 @@ def main() -> None:
         footprint=c["footprint"],
         profile=profile,
         asset_id=core.base.ASSET,
-        report_path=out / "preflight_report.json",
+        report_path=out / "preflight_report.json"
     )
     core.base.scene_gate.require_pass(pre)
 
@@ -157,7 +168,6 @@ def main() -> None:
     frames = []
     canonical_report = None
 
-    # Primary mask is stationary and is baked once per direction.
     pivot.rotation_euler[1] = 0.0
     bpy.context.view_layer.update()
     core.render_color_mask(scene, out / f"mask_primary_{direction_id}.png", "primary")
@@ -172,7 +182,7 @@ def main() -> None:
             output_path=out / occupied_name,
             profile=profile,
             asset_id=core.base.ASSET,
-            direction=direction_id,
+            direction=direction_id
         )
         if index == 0:
             canonical_report = dict(report)
@@ -186,7 +196,7 @@ def main() -> None:
             output_path=out / overlay_name,
             profile=profile,
             asset_id=core.base.ASSET,
-            direction=direction_id,
+            direction=direction_id
         )
         core._restore_visibility(states)
 
@@ -201,7 +211,7 @@ def main() -> None:
             "passengerOverlayFile": overlay_name,
             "primaryMaskFile": f"mask_primary_{direction_id}.png",
             "secondaryMaskFile": secondary_mask,
-            "sha256": report["sha256"],
+            "sha256": report["sha256"]
         })
 
     if canonical_report is None:
@@ -217,7 +227,7 @@ def main() -> None:
         "amplitudeDegrees": core.AMPLITUDE_DEGREES,
         "anglesDegrees": cycle,
         "swingApproval": "Viking V15 / human reviewed",
-        "frames": frames,
+        "frames": frames
     }, indent=2), encoding="utf-8")
 
     pivot.rotation_euler[1] = 0.0
