@@ -26,8 +26,6 @@ struct CoasterTrackSkin {
     CoasterTrackSkinId id = CoasterTrackSkinId::classic_steel_01;
     std::string_view name = "Classic Steel 01";
 
-    // Original City Horizon palette inspired by the readability of classic
-    // isometric tycoon steel coasters; no third-party art or texture is used.
     CoasterSkinColor rail_shadow{0.13F, 0.16F, 0.18F, 0.28F};
     CoasterSkinColor rail_side{0.25F, 0.30F, 0.33F, 1.0F};
     CoasterSkinColor rail_body{0.63F, 0.69F, 0.72F, 1.0F};
@@ -58,15 +56,15 @@ struct CoasterTrackSkin {
     float support_shadow_width_px = 3.00F;
     float support_body_width_px = 1.60F;
 
-    // Screen-space depth cues. These are presentation offsets only.
     float side_offset_x_px = 0.62F;
     float side_offset_y_px = 0.92F;
     float cap_offset_x_px = -0.14F;
     float cap_offset_y_px = -0.30F;
 
-    // Blender-baked detail atlas layered over the procedural vector skin.
-    // Runtime loaders gracefully fall back to the vector skin if the atlas is
-    // missing, so presentation can never invalidate route/physics geometry.
+    // Detail atlas retained for the approved joint/lift/brake modules, but it
+    // stays disabled until the complete Blender track-body skin is approved.
+    // This prevents the temporary vector body + baked details combination from
+    // being mistaken for the final hybrid visual.
     std::string_view overlay_atlas_path = "assets/coasters/skins/classic_steel_01/track_skin_atlas.png";
     int overlay_cell_width_px = 96;
     int overlay_cell_height_px = 72;
@@ -74,7 +72,7 @@ struct CoasterTrackSkin {
     double joint_plate_spacing_m = 6.0;
     double chain_lift_spacing_m = 1.35;
     double brake_fin_spacing_m = 1.55;
-    bool overlay_atlas_enabled = true;
+    bool overlay_atlas_enabled = false;
 };
 
 inline constexpr CoasterTrackSkin kClassicSteelTrackSkin{};
