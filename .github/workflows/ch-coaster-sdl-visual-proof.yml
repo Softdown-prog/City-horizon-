@@ -1,0 +1,51 @@
+name: CH Coaster SDL Visual Proof
+
+on:
+  push:
+    paths:
+      - 'src/coaster_sdl_renderer.h'
+      - 'src/coaster_render_adapter.h'
+      - 'src/coaster_track_geometry.h'
+      - 'src/coaster_centerline_route.h'
+      - 'src/ch_core/projection.h'
+      - 'src/ch_core/projection.cpp'
+      - 'tools/coaster_sdl_proof/**'
+      - '.github/workflows/ch-coaster-sdl-visual-proof.yml'
+  workflow_dispatch:
+
+jobs:
+  render-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SDL proof
+        run: >-
+          cmake -S tools/coaster_sdl_proof
+          -B build/ch-coaster-sdl-proof
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build SDL proof
+        run: cmake --build build/ch-coaster-sdl-proof --target coaster_sdl_visual_proof --parallel 2
+
+      - name: Render canonical Switchback proof
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_RENDER_DRIVER: software
+        run: |
+          mkdir -p out/coaster_sdl_visual_proof
+          build/ch-coaster-sdl-proof/coaster_sdl_visual_proof out/coaster_sdl_visual_proof
+          test -s out/coaster_sdl_visual_proof/coaster_flame_switchback_02_runtime_track.bmp
+          test -s out/coaster_sdl_visual_proof/proof_meta.json
+          cat out/coaster_sdl_visual_proof/proof_meta.json
+
+      - name: Upload SDL runtime proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Coaster-SDL-Visual-Proof-${{ github.run_id }}
+          path: out/coaster_sdl_visual_proof
+          if-no-files-found: error
+          retention-days: 14
