@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 import build_pirate_ship_swing_passengers_direction as directional
 
@@ -85,6 +86,30 @@ def _install_overlay_and_mask_fixes() -> None:
             raise RuntimeError(f"CH_PIRATE_OVERLAY_NOT_BOUND_TO_BOAT:{detached[:8]}")
         return slots
     core._add_passengers = add_passengers_bound_to_boat
+
+    def assert_passenger_binding_scaled(recipe):
+        scale = float(recipe.get("modelScale", 1.0))
+        cz = float(recipe["dimensions"]["shipCenterZ"]) * scale
+        passengers = [
+            obj for obj in bpy.context.scene.objects
+            if obj.type == "MESH" and obj.name.startswith("CHR_PiratePassenger_")
+        ]
+        if not passengers:
+            raise RuntimeError("CH_PIRATE_PASSENGER_OVERLAY_EMPTY")
+        world_z = [
+            (obj.matrix_world @ Vector(corner)).z
+            for obj in passengers for corner in obj.bound_box
+        ]
+        zmin, zmax = min(world_z), max(world_z)
+        lower = cz + 0.20 * scale
+        upper = cz + 2.40 * scale
+        if zmin < lower or zmax > upper:
+            raise RuntimeError(
+                f"CH_PIRATE_PASSENGER_BINDING_OUT_OF_BOAT:z={zmin:.3f}..{zmax:.3f}:shipCenterZ={cz:.3f}:scale={scale:.3f}"
+            )
+        return {"status": "ok", "worldZMin": round(zmin, 4), "worldZMax": round(zmax, 4), "modelScale": scale}
+    core._assert_passenger_binding = assert_passenger_binding_scaled
+
     def primary_mask_name(name: str) -> bool:
         return name.startswith(("NearSide_", "FarSide_", "TransversePivotAxle", "NearBearingHousing", "NearBearingHub", "FarBearingHousing", "FarBearingHub", "PivotColorCap_", "TopCenterSign", "PirateHat", "BoardingDeckFrontFascia", "BoardingDeckPanel_", "BoardingDeckTopAccent"))
     core._primary_mask_name = primary_mask_name
