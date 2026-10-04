@@ -1,5 +1,6 @@
 #include "mobile_animation.h"
 #include "ch_core/asset_registry.h"
+#include "ch_core/resource_cache.h"
 #include "ch_render/animated_prop_runtime.h"
 #include "ch_render/palette_bank.h"
 #include "ch_render/sprite_animation_runtime.h"
@@ -9,6 +10,8 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -75,6 +78,33 @@ int main(int argc, char** argv) {
                  "asset registry rejects duplicate ids") ||
         !require(registry.find("ride.pirate_ship.01") != nullptr && registry.ids(ch::AssetKind::Ride).size() == 1,
                  "asset registry resolves ids and filters by kind")) {
+        return 1;
+    }
+
+    ch::ResourceCache<std::string, int> resource_cache;
+    int load_calls = 0;
+    int* first_load = resource_cache.get_or_load("texture.tree.mango", [&]() -> std::optional<int> {
+        ++load_calls;
+        return 42;
+    });
+    int* cached_load = resource_cache.get_or_load("texture.tree.mango", [&]() -> std::optional<int> {
+        ++load_calls;
+        return 99;
+    });
+    int* failed_load = resource_cache.get_or_load("texture.missing", [&]() -> std::optional<int> {
+        ++load_calls;
+        return std::nullopt;
+    });
+    const auto cache_stats = resource_cache.stats();
+    if (!require(first_load != nullptr && *first_load == 42,
+                 "resource cache stores the first successful on-demand load") ||
+        !require(cached_load == first_load && *cached_load == 42 && load_calls == 2,
+                 "resource cache reuses a hit without invoking the loader again") ||
+        !require(failed_load == nullptr,
+                 "resource cache preserves a failed on-demand load as a miss") ||
+        !require(cache_stats.lookups == 3 && cache_stats.hits == 1 && cache_stats.misses == 2 &&
+                     cache_stats.load_attempts == 2 && cache_stats.load_failures == 1 && cache_stats.insertions == 1,
+                 "resource cache exposes deterministic hit miss and load telemetry")) {
         return 1;
     }
 
