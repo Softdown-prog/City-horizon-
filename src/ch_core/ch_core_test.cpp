@@ -1,4 +1,5 @@
 #include "src/ch_core/contracts.h"
+#include "src/ch_core/game_command.h"
 #include "src/ch_core/grid.h"
 #include "src/ch_core/projection.h"
 #include "src/ch_core/map_document.h"
@@ -9,6 +10,41 @@
 #include <iostream>
 #include <string>
 
+namespace {
+
+class TestGameCommand final : public ch::IGameCommand {
+public:
+    explicit TestGameCommand(bool valid = true) : valid_(valid) {}
+
+    [[nodiscard]] ch::GameCommandPlan prepare() const override {
+        ++prepare_calls;
+        ch::GameCommandPlan plan;
+        plan.valid = valid_;
+        plan.failure = valid_ ? ch::GameCommandFailure::none : ch::GameCommandFailure::blocked;
+        plan.message = valid_ ? "ok" : "blocked";
+        plan.cost_cents = 750;
+        plan.affected_tiles = {{3, 4}, {4, 4}};
+        plan.transaction.description = "test command";
+        plan.transaction.action_type = ch::TransactionActionType::set_road;
+        return plan;
+    }
+
+    [[nodiscard]] bool apply(const ch::GameCommandPlan& prepared, std::string&) override {
+        ++apply_calls;
+        applied_cost = prepared.cost_cents;
+        return true;
+    }
+
+    mutable int prepare_calls = 0;
+    int apply_calls = 0;
+    std::int64_t applied_cost = 0;
+
+private:
+    bool valid_ = true;
+};
+
+}  // namespace
+
 int main(int argc, char** argv) {
     // 1. Verify Contracts
     static_assert(ch::contracts::kTileWidth == 128);
@@ -17,6 +53,7 @@ int main(int argc, char** argv) {
     static_assert(ch::contracts::kMapMin == -80);
     static_assert(ch::contracts::kMapMax == 79);
     assert(std::string(ch::contracts::kGridContract) == "CH_GRID_V1");
+    assert(std::string(ch::kGameCommandContract) == "CH_GAME_COMMAND_V1");
 
     // 2. Verify Grid Math
     ch::GridCoord c1{5, -10};
@@ -95,6 +132,34 @@ int main(int argc, char** argv) {
 
     auto inline_report = ch::validate_map_document(inline_doc);
     assert(inline_report.valid);
+
+    // 5. CH_GAME_COMMAND_V1 preview and execution share one prepared plan.
+    TestGameCommand preview_command;
+    const ch::GameCommandResult preview =
+        ch::GameCommandExecutor::run(preview_command, ch::GameCommandMode::preview);
+    assert(preview.success);
+    assert(!preview.applied);
+    assert(preview.cost_cents == 750);
+    assert(preview.affected_tiles.size() == 2);
+    assert(preview_command.prepare_calls == 1);
+    assert(preview_command.apply_calls == 0);
+
+    TestGameCommand execute_command;
+    const ch::GameCommandResult executed =
+        ch::GameCommandExecutor::run(execute_command, ch::GameCommandMode::execute);
+    assert(executed.success);
+    assert(executed.applied);
+    assert(execute_command.prepare_calls == 1);
+    assert(execute_command.apply_calls == 1);
+    assert(execute_command.applied_cost == executed.cost_cents);
+
+    TestGameCommand blocked_command(false);
+    const ch::GameCommandResult blocked =
+        ch::GameCommandExecutor::run(blocked_command, ch::GameCommandMode::execute);
+    assert(!blocked.success);
+    assert(!blocked.applied);
+    assert(blocked.failure == ch::GameCommandFailure::blocked);
+    assert(blocked_command.apply_calls == 0);
 
     std::cout << "ch_core_test passed successfully!\n";
     return 0;
