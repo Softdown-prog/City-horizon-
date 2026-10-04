@@ -90,7 +90,7 @@ jobs:
           else
             echo "needs-character-forge=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -q 'coaster\.flame\.v3\.04\.video' "$jobs_file"; then
+          if grep -Eq 'coaster\.flame\.v3\.04\.video|steam_train\.articulated\.visual\.' "$jobs_file"; then
             echo "needs-coaster-video=true" >> "$GITHUB_OUTPUT"
           else
             echo "needs-coaster-video=false" >> "$GITHUB_OUTPUT"
@@ -119,7 +119,7 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pillow
 
-      - name: Install coaster video dependencies
+      - name: Install video dependencies
         if: steps.jobs.outputs.needs-coaster-video == 'true'
         shell: bash
         run: |
