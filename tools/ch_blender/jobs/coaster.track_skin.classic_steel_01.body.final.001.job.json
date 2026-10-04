@@ -1,13 +1,13 @@
 {
   "contract": "CH_BLENDER_AGENT_JOB_V1",
-  "jobId": "coaster.track_skin.classic_steel_01.body.final.002",
+  "jobId": "coaster.track_skin.classic_steel_01.body.final.003",
   "operation": "guarded_blender_script",
   "script": "tools/tycoon_photo_studio/build_coaster_track_skin_body_guarded.py",
   "qualityStage": "final",
   "approval": {
     "proxyReviewed": true,
-    "approvedProxySha256": "7001c0ce9510b4347c82209eafe3204d5fce6f63354b9ec3f809fbcf5c8dd80a",
-    "sourceFingerprint": "a7910055ee6ff6d92281f5ae278042a8ff3e1f2140887bbe40755ff9f0879a21"
+    "approvedProxySha256": "8deae705ed88e396c2b181b51668d219d6095d795e544e69decada919a05728a",
+    "sourceFingerprint": "de3e92e0cc2e0841b7f87c22fea75bdd4992836f0d0e7d04e1a6a515b878abca"
   },
   "assetRequirements": {
     "contract": "CH_ASSET_REQUIREMENTS_V1",
@@ -25,9 +25,7 @@
     "--studio-preset",
     "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
     "--output",
-    "out/ch_blender_agent/coaster.track_skin.classic_steel_01.body.final.v2",
-    "--save-blend",
-    "out/ch_blender_agent/coaster.track_skin.classic_steel_01.body.final.v2/coaster.track_skin.classic_steel_01.body.final.blend"
+    "out/ch_blender_agent/coaster.track_skin.classic_steel_01.body.final.v3"
   ],
-  "outputDir": "out/ch_blender_agent/coaster.track_skin.classic_steel_01.body.final.v2"
+  "outputDir": "out/ch_blender_agent/coaster.track_skin.classic_steel_01.body.final.v3"
 }
