@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   promote-pirate-ship-runtime:
-    if: ${{ github.event.workflow_run.id == 37176004189 && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'final pirate ship 4x3') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current main
@@ -30,21 +30,23 @@ jobs:
       - name: Install sprite tooling
         run: python -m pip install --upgrade pillow
 
-      - name: Download approved V16 pirate ship bake
+      - name: Download approved pirate ship final bake
         uses: actions/download-artifact@v4
         with:
-          name: CH-Blender-Agent-37176004189-1
+          name: CH-Blender-Agent-${{ github.event.workflow_run.id }}-1
           path: out/pirate-source
           repository: Softdown-prog/City-horizon-
-          run-id: 37176004189
+          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build V16 runtime spritesheets and color masks
+      - name: Build 4x3 runtime spritesheets and color masks at 640px
+        env:
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           python - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageChops
-          import json
+          import json, os
 
           source = Path("out/pirate-source")
           target = Path("assets/city_park/pirate_ship")
@@ -52,11 +54,13 @@ jobs:
           directions = ("south", "west", "north", "east")
           frame_count = 28
           frame_duration_ms = 125
+          runtime_size = (640, 640)
+          source_run = int(os.environ["SOURCE_RUN_ID"])
 
           for direction in directions:
-              folder = source / f"pirate_ship_swing_passengers_{direction}_003"
+              folder = source / f"pirate_ship_swing_passengers_{direction}_runtime640_004"
               if not folder.is_dir():
-                  raise SystemExit(f"missing V16 pirate source folder: {folder}")
+                  raise SystemExit(f"missing final pirate source folder: {folder}")
 
               frames = [Image.open(folder / f"swing_{direction}_{index:02d}.png").convert("RGBA")
                         for index in range(frame_count)]
@@ -64,23 +68,27 @@ jobs:
                            for index in range(frame_count)]
               primary = Image.open(folder / f"mask_primary_{direction}.png").convert("RGBA")
 
-              width, height = frames[0].size
-              if (width, height) != (1280, 1280):
-                  raise SystemExit(f"unexpected V16 pirate frame size for {direction}: {(width, height)}")
-              if any(frame.size != (width, height) for frame in frames + secondary):
-                  raise SystemExit(f"inconsistent V16 pirate frames for {direction}")
+              source_size = frames[0].size
+              if any(frame.size != source_size for frame in frames + secondary) or primary.size != source_size:
+                  raise SystemExit(f"inconsistent pirate frames for {direction}")
 
+              # Review proxies may be 1280px; runtime is intentionally normalized to 640px.
+              if source_size != runtime_size:
+                  frames = [frame.resize(runtime_size, Image.Resampling.LANCZOS) for frame in frames]
+                  secondary = [mask.resize(runtime_size, Image.Resampling.LANCZOS) for mask in secondary]
+                  primary = primary.resize(runtime_size, Image.Resampling.LANCZOS)
+
+              width, height = runtime_size
               sheet = Image.new("RGBA", (width * frame_count, height), (0, 0, 0, 0))
               mask_sheet = Image.new("RGBA", (width * frame_count, height), (0, 0, 0, 0))
               primary_alpha = primary.getchannel("A")
-              zero = Image.new("L", (width, height), 0)
+              zero = Image.new("L", runtime_size, 0)
 
               for index, frame in enumerate(frames):
                   sheet.paste(frame, (index * width, 0))
                   secondary_alpha = secondary[index].getchannel("A")
                   secondary_only = ImageChops.subtract(secondary_alpha, primary_alpha)
                   coverage = ImageChops.lighter(primary_alpha, secondary_only)
-                  # CH_COLOR_MASK_V1: R=Primary, G=Secondary, B=unused, A=coverage.
                   combined = Image.merge("RGBA", (primary_alpha, secondary_only, zero, coverage))
                   mask_sheet.paste(combined, (index * width, 0))
 
@@ -90,10 +98,11 @@ jobs:
               mask_sheet.save(mask_path, optimize=True)
               expected_size = (width * frame_count, height)
               if Image.open(sheet_path).size != expected_size or Image.open(mask_path).size != expected_size:
-                  raise SystemExit(f"invalid V16 runtime strip for {direction}")
+                  raise SystemExit(f"invalid pirate runtime strip for {direction}")
 
           definition_path = Path("assets/definitions/pirate_ship_01.json")
           definition = json.loads(definition_path.read_text(encoding="utf-8"))
+          definition["footprint"] = {"width": 4, "height": 3}
           definition["animation"] = {
               "layout": "horizontal",
               "frameCount": frame_count,
@@ -103,22 +112,24 @@ jobs:
           definition["amusementRide"]["capacity"] = 24
           definition["amusementRide"]["cycle"]["durationMs"] = frame_count * frame_duration_ms
           definition["amusementRide"]["passengers"]["seatCount"] = 24
-          definition["productionStatus"] = "runtime_animated_four_direction_v16"
-          definition["sourceWorkflowRun"] = 37176004189
+          definition["productionStatus"] = "runtime_animated_four_direction_v16_4x3_640"
+          definition["sourceWorkflowRun"] = source_run
           definition_path.write_text(json.dumps(definition, indent=2) + "\n", encoding="utf-8")
 
           manifest_path = target / "pirate_ship_runtime_manifest.json"
           manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
           manifest.update({
-              "status": "runtime_promoted_v16",
-              "sourceWorkflowRun": 37176004189,
-              "sourceArtifact": "CH-Blender-Agent-37176004189-1",
+              "status": "runtime_promoted_v16_4x3_640",
+              "sourceWorkflowRun": source_run,
+              "sourceArtifact": f"CH-Blender-Agent-{source_run}-1",
+              "frameSize": [640, 640],
+              "footprint": {"widthTiles": 4, "depthTiles": 3},
               "frameCount": frame_count,
               "fps": 8,
               "frameDurationMs": frame_duration_ms,
               "cycleDurationMs": frame_count * frame_duration_ms,
               "motionProfile": "slow_ascent_peak_dwell_fast_descent_v1",
-              "swingApproval": "Viking V16 / human-approved slower pendulum timing"
+              "swingApproval": "Pirate Ship 4x3 proxy human-approved; Viking V16 timing preserved"
           })
           manifest["runtimeAssets"] = {
               direction: {
@@ -130,7 +141,7 @@ jobs:
           manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           PY
 
-      - name: Validate V16 runtime contract
+      - name: Validate 4x3 640px runtime contract
         run: |
           python - <<'PY'
           import json
@@ -139,7 +150,7 @@ jobs:
 
           definition = json.loads(Path("assets/definitions/pirate_ship_01.json").read_text(encoding="utf-8"))
           assert definition["id"] == "pirate_ship_01"
-          assert definition["footprint"] == {"width": 7, "height": 6}
+          assert definition["footprint"] == {"width": 4, "height": 3}
           assert definition["amusementRide"]["capacity"] == 24
           assert definition["amusementRide"]["cycle"]["durationMs"] == 3500
           assert definition["animation"]["frameCount"] == 28
@@ -149,20 +160,20 @@ jobs:
               p = Path(path)
               if not p.is_file():
                   raise SystemExit(f"runtime asset missing: {p}")
-              if Image.open(p).size != (35840, 1280):
+              if Image.open(p).size != (17920, 640):
                   raise SystemExit(f"runtime strip has wrong dimensions: {p}")
-          print("Pirate ship V16 runtime promotion validated")
+          print("Pirate ship 4x3 / 640 runtime promotion validated")
           PY
 
-      - name: Commit promoted V16 runtime assets
+      - name: Commit promoted pirate ship runtime assets
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/city_park/pirate_ship assets/definitions/pirate_ship_01.json
           if git diff --cached --quiet; then
-            echo "Pirate V16 runtime assets already promoted."
+            echo "Pirate runtime assets already promoted."
             exit 0
           fi
-          git commit -m "assets: promote pirate ship V16 runtime sprites [skip ci]"
+          git commit -m "assets: promote pirate ship 4x3 640 runtime sprites [skip ci]"
           git pull --rebase origin main
           git push origin HEAD:main
