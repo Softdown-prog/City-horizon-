@@ -4,6 +4,7 @@
 #include "src/ch_core/shoreline_autotile.h"
 #include "src/ch_core/ground_surface.h"
 #include "src/ch_render/shoreline_catalog.h"
+#include "src/ch_render/water_surface_runtime.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -38,6 +39,37 @@ constexpr float kGrassOpaqueLeft = 53.0F;
 constexpr float kGrassOpaqueTop = 23.0F;
 constexpr float kGrassOpaqueWidth = 1175.0F;
 constexpr float kGrassOpaqueHeight = 587.0F;
+
+const WaterSurfaceRuntimeCatalog& water_surface_runtime_for_root(const std::filesystem::path& asset_root) {
+    thread_local std::unordered_map<std::string, WaterSurfaceRuntimeCatalog> catalogs;
+    const std::string key = asset_root.lexically_normal().generic_string();
+    auto [it, inserted] = catalogs.try_emplace(key);
+    if (inserted) {
+        (void)it->second.load_manifest(asset_root / "assets/terrain/water/water_surfaces.json");
+    }
+    return it->second;
+}
+
+const TextureAsset* water_runtime_texture(
+    const WaterSurfaceRuntimeCatalog& runtime,
+    const std::string& asset_id,
+    const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture) {
+    const AssetDescriptor* asset = runtime.find_asset(asset_id);
+    return asset == nullptr ? nullptr : find_texture(asset->logical_path);
+}
+
+SDL_FColor water_runtime_color(const WaterSurfaceRuntimeCatalog& runtime,
+                               const WaterSurfaceRuntimeDefinition* surface) {
+    if (surface == nullptr) return {0.0F, 0.0F, 0.0F, 1.0F};
+    const Rgba8* color = runtime.coverage_color(*surface);
+    if (color == nullptr) return {0.0F, 0.0F, 0.0F, 1.0F};
+    return {
+        static_cast<float>(color->r) / 255.0F,
+        static_cast<float>(color->g) / 255.0F,
+        static_cast<float>(color->b) / 255.0F,
+        static_cast<float>(color->a) / 255.0F,
+    };
+}
 
 
 constexpr TileCoordinate road_access_offset(const GridDirection direction) {
@@ -452,6 +484,9 @@ void MapRenderer::render_world_terrain_and_water(
 ) {
     if (renderer == nullptr) return;
 
+    const WaterSurfaceRuntimeCatalog& water_runtime = water_surface_runtime_for_root(asset_root);
+    const WaterSurfaceRuntimeDefinition* shallow_definition = water_runtime.find_surface("water_shallow");
+    const WaterSurfaceRuntimeDefinition* deep_definition = water_runtime.find_surface("water_deep");
     const TextureAsset* grass_base = find_texture("assets/terrain/grass_isometric_01.png");
 
     std::unordered_map<std::uint64_t, const TextureAsset*> scenario_terrain_textures;
@@ -529,14 +564,14 @@ void MapRenderer::render_world_terrain_and_water(
         }
     }
 
-    const TextureAsset* shallow_surface = water_tiles.empty() ? nullptr :
-        find_texture("assets/terrain/water/water_shallow_world.png");
-    const TextureAsset* deep_surface = water_tiles.empty() ? nullptr :
-        find_texture("assets/terrain/water/water_deep_world.png");
-    const TextureAsset* shallow_glint = water_tiles.empty() ? nullptr :
-        find_texture("assets/terrain/water/water_shallow_glint_cycle_atlas.png");
-    const TextureAsset* deep_glint = water_tiles.empty() ? nullptr :
-        find_texture("assets/terrain/water/water_deep_glint_cycle_atlas.png");
+    const TextureAsset* shallow_surface = (water_tiles.empty() || shallow_definition == nullptr) ? nullptr :
+        water_runtime_texture(water_runtime, shallow_definition->base_asset_id, find_texture);
+    const TextureAsset* deep_surface = (water_tiles.empty() || deep_definition == nullptr) ? nullptr :
+        water_runtime_texture(water_runtime, deep_definition->base_asset_id, find_texture);
+    const TextureAsset* shallow_glint = (water_tiles.empty() || shallow_definition == nullptr) ? nullptr :
+        water_runtime_texture(water_runtime, shallow_definition->rgba_atlas_asset_id, find_texture);
+    const TextureAsset* deep_glint = (water_tiles.empty() || deep_definition == nullptr) ? nullptr :
+        water_runtime_texture(water_runtime, deep_definition->rgba_atlas_asset_id, find_texture);
 
     // Canonical Layer Execution:
     // 1. Terrain Base
@@ -561,11 +596,11 @@ void MapRenderer::render_world_terrain_and_water(
 
     // Opaque coverage owns every shared raster edge; texture and glint follow
     // logical world coordinates through all four camera rotations.
-    constexpr SDL_FColor kDeepBase = {80.0F / 255.0F, 163.0F / 255.0F, 194.0F / 255.0F, 1.0F};
-    constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};
+    const SDL_FColor deep_coverage = water_runtime_color(water_runtime, deep_definition);
+    const SDL_FColor shallow_coverage = water_runtime_color(water_runtime, shallow_definition);
     for (const auto& tile : water_tiles) {
         render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,
-                         tile.shallow ? kShallowBase : kDeepBase);
+                         tile.shallow ? shallow_coverage : deep_coverage);
     }
 
     SDL_TextureAddressMode previous_u = SDL_TEXTURE_ADDRESS_AUTO;
@@ -583,7 +618,7 @@ void MapRenderer::render_world_terrain_and_water(
     // Every atlas frame already contains the approved moving overlay. Drawing
     // the separate original overlay here would double its brightness.
     (void)SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
-    const int frame = std::clamp(static_cast<int>(std::floor(std::fmod(std::max(0.0F, render_time), 2.0F) * 8.0F)), 0, 15);
+    const int frame = water_runtime.frame_at_seconds(render_time);
     for (const auto& tile : water_tiles) {
         const TextureAsset* glint = tile.shallow ? shallow_glint : deep_glint;
         if (glint != nullptr) {
@@ -1414,7 +1449,7 @@ void MapForgeNativeViewport::render_frame() {
                 camera_,
                 vw,
                 vh,
-                static_cast<float>(SDL_GetTicks() % 2000U) / 1000.0F
+                static_cast<float>(SDL_GetTicks()) / 1000.0F
             );
 
             for (const auto& r : current_document_->roads()) {
