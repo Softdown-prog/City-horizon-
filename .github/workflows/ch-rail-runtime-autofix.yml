@@ -1,0 +1,55 @@
+name: CH Rail Runtime Precise Autofix
+
+on:
+  push:
+    branches: [feature/rail-runtime-integration-v1]
+    paths:
+      - ".github/workflows/ch-rail-runtime-autofix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix-calibration-field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/rail-runtime-integration-v1
+          fetch-depth: 0
+
+      - name: Patch only the local calibration geometry field
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/main_runtime_impl.cpp")
+          text = path.read_text(encoding="utf-8")
+          marker = "void render_building_calibration_debug"
+          start = text.index(marker)
+          needle = "geometry.ground_world.x, geometry.ground_world.y"
+          idx = text.index(needle, start)
+
+          # The shared ch::BuildingSpriteGeometry before this helper must keep
+          # its canonical ground_world field. Only the local helper changes.
+          assert needle in text[:start]
+          assert "geometry.ground.x, geometry.ground.y" not in text[start:]
+
+          text = text[:idx] + "geometry.ground.x, geometry.ground.y" + text[idx + len(needle):]
+          assert needle in text[:start]
+          assert "geometry.ground.x, geometry.ground.y" in text[start:]
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit exact fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Softdown-prog"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/main_runtime_impl.cpp
+          git diff --cached --check
+          git commit -m "runtime: fix local calibration ground field precisely"
+          git push origin HEAD:feature/rail-runtime-integration-v1
