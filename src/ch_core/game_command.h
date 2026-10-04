@@ -40,7 +40,7 @@ struct GameCommandPlan {
     bool valid = false;
     GameCommandFailure failure = GameCommandFailure::invalid_request;
     std::string message;
-    std::int64_t cost_cents = 0;
+    std::int64_t cost_units = 0;
     std::vector<GameCommandTile> affected_tiles;
     CommandRecord transaction;
 };
@@ -50,7 +50,7 @@ struct GameCommandResult {
     bool applied = false;
     GameCommandFailure failure = GameCommandFailure::invalid_request;
     std::string message;
-    std::int64_t cost_cents = 0;
+    std::int64_t cost_units = 0;
     std::vector<GameCommandTile> affected_tiles;
     CommandRecord transaction;
 };
@@ -74,7 +74,7 @@ public:
         result.success = plan.valid;
         result.failure = plan.failure;
         result.message = plan.message;
-        result.cost_cents = plan.cost_cents;
+        result.cost_units = plan.cost_units;
         result.affected_tiles = plan.affected_tiles;
         result.transaction = plan.transaction;
 
