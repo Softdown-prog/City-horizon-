@@ -1,0 +1,17 @@
+{
+  "contract": "CH_RUNTIME_PROMOTION_REQUEST_V1",
+  "assetId": "attraction.park_carousel_city_horizon.01",
+  "sourceRepository": "Softdown-prog/Ch_blender",
+  "sourceRunId": 37226554691,
+  "sourceArtifactId": 11312657043,
+  "sourceArtifactName": "CH-Blender-Windows-37226554691-1",
+  "sourceHeadSha": "116de40da23a4d5d2fd77cbbd260311b8356e538",
+  "sourceAnimationContract": "CH_CAROUSEL_ANIMATION_FRAMES_V1",
+  "sourceMaskContract": "CH_COLOR_MASK_ANIMATION_FRAMES_V1",
+  "runtimeFrameSize": [256, 256],
+  "frameCount": 48,
+  "frameDurationMs": 100,
+  "directions": ["south", "east", "west", "north"],
+  "footprint": {"width": 4, "height": 4},
+  "promotePrimaryColorMask": true
+}
