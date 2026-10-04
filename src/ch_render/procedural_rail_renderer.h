@@ -26,7 +26,18 @@ public:
         const ch::CameraState& camera,
         float viewport_width,
         float viewport_height,
-        const Palette& palette = {});
+        const Palette& palette);
+
+    [[nodiscard]] static bool render_geometry(
+        SDL_Renderer* renderer,
+        const RailGeometry& geometry,
+        const RailProfile& profile,
+        const ch::CameraState& camera,
+        float viewport_width,
+        float viewport_height) {
+        return render_geometry(renderer, geometry, profile, camera,
+                               viewport_width, viewport_height, Palette{});
+    }
 
     // Convenience path for callers that own only a spline. Invalid rail input
     // never reaches SDL because RailMeshBuilder::build() returns zero geometry.
@@ -37,5 +48,16 @@ public:
         const ch::CameraState& camera,
         float viewport_width,
         float viewport_height,
-        const Palette& palette = {});
+        const Palette& palette);
+
+    [[nodiscard]] static bool render_segment(
+        SDL_Renderer* renderer,
+        const RailSplineSegment& segment,
+        const RailProfile& profile,
+        const ch::CameraState& camera,
+        float viewport_width,
+        float viewport_height) {
+        return render_segment(renderer, segment, profile, camera,
+                              viewport_width, viewport_height, Palette{});
+    }
 };
