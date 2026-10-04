@@ -4,6 +4,7 @@
   "assetType":"attraction",
   "styleContract":"CH_STYLIZED_PRERENDER_V1",
   "footprint":{"widthTiles":4,"depthTiles":3},
+  "modelScale":0.82,
   "referenceContract":{
     "source":"user_supplied_real_ride_photos_2026_10_03",
     "primaryRead":"full_scale_pirate_ship_amusement_ride",
