@@ -1,6 +1,6 @@
 from pathlib import Path
 
-# CH_MONEY_SPEND_FX_V1 integration worker. Kept idempotent so concurrent main updates can rebase safely.
+# CH_MONEY_SPEND_FX_V2 integration worker. Kept idempotent so concurrent main updates can rebase safely.
 path = Path('src/main_runtime_impl.cpp')
 text = path.read_text(encoding='utf-8')
 original = text
@@ -38,12 +38,17 @@ once(
 'road-spend')
 
 once(
+'''            if (farming.try_remove_resource(resource->id, quantity)) economy.earn_agricultural_sale(revenue, simulation_clock.date());\n            status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);\n''',
+'''            if (farming.try_remove_resource(resource->id, quantity)) {\n                economy.earn_agricultural_sale(revenue, simulation_clock.date());\n                money_spend_fx.spawn_income(revenue, static_cast<float>(viewport_width) - 180.0F, 92.0F);\n            }\n            status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);\n''',
+'agricultural-income')
+
+once(
 '''        render_weather(renderer, weather, viewport_width, viewport_height);\n        gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));\n''',
 '''        render_weather(renderer, weather, viewport_width, viewport_height);\n        money_spend_fx.render(renderer);\n        gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));\n''',
 'render')
 
 if text != original:
     path.write_text(text, encoding='utf-8')
-    print('CH_MONEY_SPEND_FX_V1 integrated')
+    print('CH_MONEY_SPEND_FX_V2 integrated')
 else:
-    print('CH_MONEY_SPEND_FX_V1 already integrated')
+    print('CH_MONEY_SPEND_FX_V2 already integrated')
