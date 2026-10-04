@@ -9,11 +9,11 @@
     "contract": "CH_ASSET_REQUIREMENTS_V1",
     "assetId": "attraction.park_pirate_ship.clean_reference",
     "footprint": {"widthTiles": 4, "depthTiles": 3},
-    "minDimensions": [19, 10, 19],
-    "maxDimensions": [30, 20, 29]
+    "minDimensions": [14, 8, 15],
+    "maxDimensions": [18.5, 13.5, 25]
   },
   "args": ["--recipe", "tools/tycoon_photo_studio/assets/pirate_ship_clean_reference.json", "--studio-preset", "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_large_ride_runtime_640.json", "--direction", "east", "--output", "out/ch_blender_agent/pirate_ship_swing_passengers_east_runtime640_004"],
   "outputDir": "out/ch_blender_agent/pirate_ship_swing_passengers_east_runtime640_004",
   "expectedOutputs": ["out/ch_blender_agent/pirate_ship_swing_passengers_east_runtime640_004/preflight_report.json", "out/ch_blender_agent/pirate_ship_swing_passengers_east_runtime640_004/proxy_east.png", "out/ch_blender_agent/pirate_ship_swing_passengers_east_runtime640_004/proxy_report.json"],
-  "retryReason": "runtime640_studio_contract_fixed"
+  "retryReason": "scaled_model_and_passenger_validation_aligned"
 }
