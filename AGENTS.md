@@ -2,25 +2,6 @@
 
 This file is the fast onboarding document for AI agents and human contributors. Read it before changing the project. Also read the root [`README.md`](README.md), which is now the main cross-chat project reset point.
 
-## 0. Parallel work and Git safety — mandatory
-
-City Horizon is commonly edited by multiple chats, agents, Actions jobs and worker-pool jobs at the same time. `main` is therefore an **integration branch**, not a shared mutable working branch.
-
-Before any repository change, also read [`docs/PARALLEL_GIT_WORKFLOW.md`](docs/PARALLEL_GIT_WORKFLOW.md).
-
-Hard rules:
-- do **not** make normal development commits directly to `main`;
-- create one isolated branch per chat/task from the latest `main`;
-- workers may run in parallel inside a task, but must not race to rewrite the same canonical path;
-- before integration, reconcile the task branch with the current `main` and preserve all already-landed changes;
-- integrate through a pull request;
-- never force-push, hard-reset, or move the `main` ref backwards;
-- never replace a whole file from a stale snapshot when a localized edit is sufficient;
-- if two tasks touch the same path, resolve the conflict on the task branch from current `main` plus the intended task delta;
-- generated assets can be parallel artifacts, but promotion into shared runtime/catalog paths must be coordinated/serialized.
-
-The previous direct-to-`main` solo rule is retired because it is unsafe when several chats and workers operate concurrently.
-
 ## 1. What City Horizon is
 
 City Horizon is a **modern 2D isometric city-builder**.
@@ -189,17 +170,7 @@ For a localized fix, do not silently refactor or "improve" unrelated areas. If t
 
 ### Git workflow
 
-Always use the parallel-safe workflow defined in [`docs/PARALLEL_GIT_WORKFLOW.md`](docs/PARALLEL_GIT_WORKFLOW.md).
-
-For every normal development task:
-1. fetch/read the current `main`;
-2. create a task-specific branch from that current `main`;
-3. make only the task's intended changes there;
-4. before integration, reconcile the branch with the newest `main`;
-5. open/update a PR and require the `Main Integration Guard` to pass;
-6. merge without rewriting `main` history.
-
-Do not commit directly to `main` from a chat/agent. Do not use `update_ref(..., force=true)` or equivalent on `main`. If a worker/action must write generated results back, it must first synchronize with `origin/main`; shared canonical promotions should be serialized using the repository's common main-writer coordination policy.
+For the current solo workflow, **do not create a new branch unless the user explicitly asks for one**. Make requested repository commits directly to `main` after reading the current target files. Do not silently open PR branches or duplicate worktrees.
 
 ### Vertical-slice priority
 
@@ -224,7 +195,6 @@ For game scope, this `AGENTS.md` and the root `README.md` are authoritative over
 ## 13. Where to learn more
 
 - project reset / quick onboarding: `README.md`
-- parallel Git integration: `docs/PARALLEL_GIT_WORKFLOW.md`
 - visual/runtime asset notes: `assets/README.md`
 - asset pipeline: `docs/ASSET_PIPELINE.md`
 - Tycoon Photo Studio: `tools/tycoon_photo_studio/README.md`
