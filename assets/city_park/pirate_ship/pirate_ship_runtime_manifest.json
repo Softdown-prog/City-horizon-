@@ -51,5 +51,6 @@
   "sourceWorkflowRun": 37167313390,
   "sourceArtifact": "CH-Blender-Agent-37167313390-1",
   "sourceCommit": "7cb2b1f7a876ae765745b2b929faa0367b1875f0",
-  "status": "runtime_promotion_queued"
+  "status": "runtime_promotion_queued",
+  "promotionRequestRevision": 1
 }
