@@ -36,7 +36,7 @@ jobs:
           mkdir -p out/carousel_city_horizon_promotion
           gh run download 37226554691 \
             --repo Softdown-prog/Ch_blender \
-            --name CH-Blender-Windows-37226554691-1 \
+            --name CH-Blender-Windows-37226554691-2 \
             --dir out/carousel_city_horizon_promotion
           test -n "$(find out/carousel_city_horizon_promotion -name animation_manifest.json -print -quit)"
           test -n "$(find out/carousel_city_horizon_promotion -name primary_mask_manifest.json -print -quit)"
