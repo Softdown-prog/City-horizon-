@@ -1,0 +1,53 @@
+name: Main Integration Guard
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-integration-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  branch-freshness:
+    name: branch contains current main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Fetch current main
+        shell: bash
+        run: git fetch --no-tags origin main
+
+      - name: Refuse stale integration branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PR head: $(git rev-parse HEAD)"
+          echo "main:    $(git rev-parse origin/main)"
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "::error::This branch does not contain the current main. Rebase/merge origin/main into the task branch before integration."
+            exit 1
+          fi
+          echo "Branch contains current main; integration ancestry is safe."
+
+      - name: Reject accidental main-rewrite instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git diff --name-only origin/main...HEAD)"
+          if printf '%s\n' "$files" | grep -Eq '(^|/)(AGENTS\.md|PARALLEL_GIT_WORKFLOW\.md)$'; then
+            echo "Coordination policy changed in this PR; review intentionally."
+          fi
+          if git log --format='%B' origin/main..HEAD | grep -Eqi 'force[- ]?push[[:space:]]+.*main|reset[[:space:]]+--hard[[:space:]]+.*main'; then
+            echo "::error::Commit message suggests rewriting main history. Main must only move forward."
+            exit 1
+          fi
