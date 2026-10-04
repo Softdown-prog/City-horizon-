@@ -65,6 +65,14 @@ public:
     [[nodiscard]] bool spend_for_upgrade(std::int64_t cost, const GameDate& date, std::uint64_t building_instance_id);
     [[nodiscard]] bool spend_for_land(std::int64_t cost, const GameDate& date, std::uint32_t land_parcel_id);
     void earn_agricultural_sale(std::int64_t amount, const GameDate& date);
+    // Infrastructure placement tools that spend through try_spend() can return
+    // a bounded demolition refund without abusing restore_funds(), which is a
+    // save/load boundary that intentionally resets fiscal state and the ledger.
+    void credit_infrastructure_refund(const std::int64_t amount) noexcept {
+        if (amount > 0 && funds_ <= std::numeric_limits<std::int64_t>::max() - amount) {
+            funds_ += amount;
+        }
+    }
     void restore_funds(std::int64_t funds);
     void restore_last_property_tax_year(int year);
     // Save/load boundary for the bankruptcy streak. Keep the counter bounded to
