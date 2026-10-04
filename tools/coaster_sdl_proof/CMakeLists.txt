@@ -11,6 +11,10 @@ set(SDL_STATIC ON CACHE BOOL "Build SDL static library" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "Disable SDL test library" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "Disable SDL tests" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "Disable SDL examples" FORCE)
+# This proof intentionally renders to an SDL software surface in CI. It never
+# creates a desktop window, so headless Unix runners must skip the X11/Wayland
+# requirement while retaining SDL's dummy/offscreen video and render paths.
+set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "Headless console-only SDL proof" FORCE)
 FetchContent_Declare(
     SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
