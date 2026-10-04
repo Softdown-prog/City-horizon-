@@ -1,0 +1,109 @@
+name: CH Carousel Runtime Video Proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "assets/city_park/carousel/**"
+      - "assets/definitions/carousel_city_horizon_01.json"
+      - ".github/workflows/ch-carousel-runtime-video-proof.yml"
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install proof dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pillow==11.3.0 imageio==2.37.0 imageio-ffmpeg==0.6.0
+
+      - name: Validate carousel runtime definition
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          definition = json.loads(Path('assets/definitions/carousel_city_horizon_01.json').read_text())
+          manifest = json.loads(Path(definition['runtimeManifest']).read_text())
+          assert definition['id'] == 'carousel_city_horizon_01'
+          assert definition['category'] == 'city_park'
+          assert definition['playerBuildable'] is True
+          assert definition['buildCost'] == 15000
+          assert definition['defaultServicePrice'] == 5
+          assert definition['footprint'] == {'width': 4, 'height': 4}
+          assert definition['animation']['frameCount'] == 48
+          assert definition['animation']['frameDurationMs'] == 100
+          assert manifest['frameCount'] == 48
+          assert manifest['frameResolution'] == [256, 256]
+          assert manifest['contract'] == 'CH_ANIMATED_SPRITE_BAKE_V1'
+          for key in ('0','1','2','3'):
+              assert Path(definition['sprites'][key]).is_file(), definition['sprites'][key]
+          print('carousel runtime contract ok')
+          PY
+
+      - name: Render carousel review video
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          import imageio.v2 as imageio
+
+          sheet_path = Path('assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_animation.png')
+          sheet = Image.open(sheet_path).convert('RGBA')
+          frame_w = 256
+          frame_h = 256
+          frame_count = 48
+          assert sheet.size == (frame_w * frame_count, frame_h), sheet.size
+
+          out = Path('out/carousel-runtime-proof')
+          out.mkdir(parents=True, exist_ok=True)
+          frames = []
+          for i in range(frame_count):
+              frame = sheet.crop((i * frame_w, 0, (i + 1) * frame_w, frame_h))
+              canvas = Image.new('RGBA', (768, 512), (236, 236, 230, 255))
+              draw = ImageDraw.Draw(canvas)
+              # 4x4 2:1 footprint guide centered under the promoted sprite.
+              cx, cy = 384, 348
+              tile_w, tile_h = 96, 48
+              for gx in range(4):
+                  for gy in range(4):
+                      x = cx + (gx - gy) * tile_w // 2
+                      y = cy + (gx + gy) * tile_h // 2
+                      diamond = [(x, y - tile_h//2), (x + tile_w//2, y), (x, y + tile_h//2), (x - tile_w//2, y)]
+                      draw.polygon(diamond, fill=(132, 186, 111, 255), outline=(88, 127, 76, 255))
+              scale = 1.25
+              sprite = frame.resize((int(frame_w*scale), int(frame_h*scale)), Image.Resampling.NEAREST)
+              anchor_x = 0.5
+              anchor_y = 0.68359375
+              px = int(cx - sprite.width * anchor_x)
+              py = int(cy - sprite.height * anchor_y)
+              canvas.alpha_composite(sprite, (px, py))
+              draw = ImageDraw.Draw(canvas)
+              draw.rectangle((18, 16, 348, 88), fill=(20, 23, 28, 220))
+              draw.text((32, 30), 'CARROSSEL - CITY HORIZON', fill='white')
+              draw.text((32, 52), f'Frame {i+1:02d}/48 | 10 FPS | 4x4 | $15.000', fill='white')
+              png = out / f'frame_{i:03d}.png'
+              canvas.convert('RGB').save(png)
+              frames.append(imageio.imread(png))
+
+          imageio.mimsave(out / 'carousel_city_horizon_runtime_proof.mp4', frames, fps=10, codec='libx264', quality=8)
+          imageio.mimsave(out / 'carousel_city_horizon_runtime_proof.gif', frames, fps=10, loop=0)
+          print(out / 'carousel_city_horizon_runtime_proof.mp4')
+          PY
+
+      - name: Upload carousel proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Carousel-Runtime-Video-Proof
+          path: out/carousel-runtime-proof/**
+          if-no-files-found: error
+          retention-days: 14
