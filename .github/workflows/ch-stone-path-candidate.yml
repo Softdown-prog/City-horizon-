@@ -1,4 +1,4 @@
-name: CH Stone Path Candidate
+name: CH Path Tile Workers
 
 on:
   push:
@@ -6,17 +6,25 @@ on:
       - "main"
     paths:
       - "Converter/file_000000002c5c820ea492fb76b85d5fb1.png"
+      - "Converter/file_00000000e7b4820ea8e8cdc823cfa927.png"
       - "tools/generate_stone_paths.py"
+      - "tools/generate_wood_paths.py"
+      - "tools/promote_wood_path_runtime.py"
       - "tools/ground_tile_worker.py"
       - "tools/normalize_atomic_path_tile.py"
       - "tools/tile_geometry.py"
       - "tools/validate_ground_tiles.py"
+      - "tools/validate_path_tiles.py"
       - "tools/tiles/validate_atomic_path_candidate.py"
       - ".github/workflows/ch-stone-path-candidate.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ch-path-tile-workers-main
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-stone-path-candidate:
@@ -58,3 +66,80 @@ jobs:
             out/stone_path_01/stone_path_01.json
           if-no-files-found: error
           retention-days: 14
+
+  generate-validate-promote-wood-path:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout triggering revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Generate wooden path through canonical tile worker
+        run: |
+          python tools/generate_wood_paths.py \
+            --source Converter/file_00000000e7b4820ea8e8cdc823cfa927.png \
+            --output-dir assets/terrain/paths/wood_01 \
+            --work-dir out/wood_path_01
+
+      - name: Validate atomic-path geometry
+        run: |
+          python tools/tiles/validate_atomic_path_candidate.py --debug \
+            assets/terrain/paths/wood_01/wood_path_00_isolated.png \
+            assets/terrain/paths/wood_01/wood_path_05_straight_ns.png \
+            assets/terrain/paths/wood_01/wood_path_10_straight_ew.png \
+            assets/terrain/paths/wood_01/wood_path_15_cross.png
+
+      - name: Validate complete 16-mask family
+        run: |
+          python tools/validate_path_tiles.py \
+            --directory assets/terrain/paths/wood_01 \
+            --prefix wood_path \
+            --report out/wood_path_01/wood_path_family_validation.json
+
+      - name: Register wooden path in runtime
+        run: python tools/promote_wood_path_runtime.py
+
+      - name: Sanity checks
+        run: |
+          python -m py_compile tools/generate_wood_paths.py tools/promote_wood_path_runtime.py tools/validate_path_tiles.py
+          git diff --check
+          test -f assets/terrain/paths/wood_01/wood_path_00_isolated.png
+          test -f assets/terrain/paths/wood_01/wood_path_15_cross.png
+          grep -q 'style_id == "wood_path"' src/runtime_map_renderer.h
+          grep -q 'action.payload == "wood_path"' src/main_runtime_impl.cpp
+          grep -q '"wood_path", "Caminho de Madeira"' src/ui_manager.cpp
+
+      - name: Publish visual validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wood-path-01-validation
+          path: |
+            out/wood_path_01/wood_path_base_128x64.png
+            out/wood_path_01/wood_path_repeat_preview.png
+            out/wood_path_01/wood_path_autotile_preview.png
+            out/wood_path_01/wood_path_worker_report.json
+            out/wood_path_01/wood_path_family_validation.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit runtime assets and registration safely
+        run: |
+          if git diff --quiet -- assets/terrain/paths/wood_01 src/runtime_map_renderer.h src/main_runtime_impl.cpp src/ui_manager.cpp; then
+            echo "Wood path is already promoted; nothing to commit."
+            exit 0
+          fi
+          git config user.name "city-horizon-worker"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/terrain/paths/wood_01 src/runtime_map_renderer.h src/main_runtime_impl.cpp src/ui_manager.cpp
+          git commit -m "Promote wooden path tile family to runtime"
+          git pull --rebase origin main
+          git push origin HEAD:main
