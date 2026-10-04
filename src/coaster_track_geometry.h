@@ -40,13 +40,23 @@ struct CoasterTrackStyle {
     double support_base_half_width_m = 1.05;
     double support_flare_per_height = 0.055;
     double support_max_base_half_width_m = 1.85;
+
+    // Medium supports keep the open A-frame silhouette but gain a short upper
+    // X-brace when height or lateral curve load warrants it. Curves also flare
+    // their feet slightly wider so outside turns do not read as thin stilts.
+    double support_medium_brace_threshold_m = 2.20;
+    double support_curve_brace_reference_per_m = 0.035;
+    double support_curve_extra_flare_m = 0.30;
+    double support_medium_brace_lower_t = 0.38;
+    double support_medium_brace_upper_t = 0.82;
+
     double support_tower_threshold_m = 4.80;
     double support_bay_height_m = 3.20;
     double inverted_support_up_z_threshold = -0.10;
     std::size_t max_frame_samples = 8192U;
     std::size_t max_ties = 4096U;
-    // Maximum structural members, not support stations. One A-frame station
-    // emits three members; tall tower stations additionally emit bracing bays.
+    // Maximum structural members, not support stations. One basic A-frame
+    // emits three members, a medium braced frame five, and tall towers more.
     std::size_t max_supports = 2048U;
 };
 
@@ -129,14 +139,24 @@ struct CoasterTrackGeometry {
            style.support_flare_per_height >= 0.0 &&
            finite_positive(style.support_max_base_half_width_m) &&
            style.support_max_base_half_width_m >= style.support_base_half_width_m &&
+           finite_positive(style.support_medium_brace_threshold_m) &&
+           finite_positive(style.support_curve_brace_reference_per_m) &&
+           std::isfinite(style.support_curve_extra_flare_m) &&
+           style.support_curve_extra_flare_m >= 0.0 &&
+           std::isfinite(style.support_medium_brace_lower_t) &&
+           std::isfinite(style.support_medium_brace_upper_t) &&
+           style.support_medium_brace_lower_t > 0.0 &&
+           style.support_medium_brace_upper_t < 1.0 &&
+           style.support_medium_brace_lower_t < style.support_medium_brace_upper_t &&
            finite_positive(style.support_tower_threshold_m) &&
+           style.support_medium_brace_threshold_m < style.support_tower_threshold_m &&
            finite_positive(style.support_bay_height_m) &&
            std::isfinite(style.inverted_support_up_z_threshold) &&
            style.inverted_support_up_z_threshold >= -1.0 &&
            style.inverted_support_up_z_threshold <= 1.0 &&
            style.max_frame_samples >= 2U &&
            style.max_ties >= 1U &&
-           style.max_supports >= 3U;
+           style.max_supports >= 5U;
 }
 
 [[nodiscard]] inline CoasterTrackPoint3 track_point(
@@ -259,10 +279,15 @@ struct CoasterTrackGeometry {
     axis_x /= axis_length;
     axis_y /= axis_length;
 
+    const double curve_load = std::clamp(
+        std::abs(sample.horizontal_curvature_per_m) /
+            style.support_curve_brace_reference_per_m,
+        0.0, 1.0);
     const double base_half_width = std::min(
         style.support_max_base_half_width_m,
         style.support_base_half_width_m +
-            height * style.support_flare_per_height);
+            height * style.support_flare_per_height +
+            curve_load * style.support_curve_extra_flare_m);
     const CoasterTrackPoint3 foot_left = {
         top_center.x + axis_x * base_half_width,
         top_center.y + axis_y * base_half_width,
@@ -281,7 +306,28 @@ struct CoasterTrackGeometry {
         return false;
     }
 
-    if (height < style.support_tower_threshold_m) return true;
+    if (height < style.support_tower_threshold_m) {
+        const bool needs_medium_brace =
+            height >= style.support_medium_brace_threshold_m || curve_load >= 0.55;
+        if (!needs_medium_brace) return true;
+
+        const CoasterTrackPoint3 lower_left = lerp_track_point(
+            foot_left, top_left, style.support_medium_brace_lower_t);
+        const CoasterTrackPoint3 lower_right = lerp_track_point(
+            foot_right, top_right, style.support_medium_brace_lower_t);
+        const CoasterTrackPoint3 upper_left = lerp_track_point(
+            foot_left, top_left, style.support_medium_brace_upper_t);
+        const CoasterTrackPoint3 upper_right = lerp_track_point(
+            foot_right, top_right, style.support_medium_brace_upper_t);
+
+        // A compact X only through the upper body preserves the readable open
+        // base while making medium/curved frames feel engineered rather than
+        // like two unsupported legs.
+        return append_support_member(
+                   geometry, style, distance_m, lower_left, upper_right) &&
+               append_support_member(
+                   geometry, style, distance_m, lower_right, upper_left);
+    }
 
     const auto bay_count = static_cast<std::size_t>(std::max(
         2.0, std::ceil(height / style.support_bay_height_m)));
