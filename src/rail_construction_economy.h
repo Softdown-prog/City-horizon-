@@ -9,7 +9,7 @@
 #include <limits>
 #include <unordered_map>
 
-inline constexpr const char* kChRailConstructionEconomyContract = "CH_RAIL_CONSTRUCTION_ECONOMY_V1";
+inline constexpr const char* kChRailConstructionEconomyContract = "CH_RAIL_CONSTRUCTION_ECONOMY_V2";
 
 // City Horizon-owned railway pricing. The quote is derived only from our
 // procedural geometry and logical piece grouping, so preview and execution can
@@ -54,6 +54,9 @@ public:
 
         for (std::size_t index = first_edge; index < edges.size(); ++index) {
             const RailPlacementEdge& edge = edges[index];
+            // A deleted historical slot must never contribute to a later quote.
+            // Preview edges are always appended active after the checkpoint.
+            if (!edge.active) continue;
             if (edge.piece_group == kInvalidRailPlacementPieceId) return {};
             const double length = sampled_length(edge.segment);
             if (!std::isfinite(length) || length <= 0.0) return {};
