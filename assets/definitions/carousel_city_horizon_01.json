@@ -10,10 +10,10 @@
     "3": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_east_animation.png"
   },
   "spriteAnchors": {
-    "0": { "x": 0.5, "y": 0.68359375 },
-    "1": { "x": 0.5, "y": 0.68359375 },
-    "2": { "x": 0.5, "y": 0.68359375 },
-    "3": { "x": 0.5, "y": 0.68359375 }
+    "0": { "x": 0.5, "y": 0.74 },
+    "1": { "x": 0.5, "y": 0.74 },
+    "2": { "x": 0.5, "y": 0.74 },
+    "3": { "x": 0.5, "y": 0.74 }
   },
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
@@ -61,7 +61,7 @@
   "needsEffect": {
     "fun": 55
   },
-  "artScale": 1.0,
+  "artScale": 1.35,
   "animation": {
     "layout": "horizontal",
     "frameCount": 48,
