@@ -16,6 +16,7 @@
 #include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
 #include "economy_system.h"
+#include "money_spend_fx.h"
 #include "farming_system.h"
 #include "land_system.h"
 #include "map_tile_occupancy.h"
@@ -2048,6 +2049,7 @@ int main() {
     bool running = true;
     Uint64 last_simulation_ticks = SDL_GetTicks();
     GameplayUi gameplay_ui;
+    MoneySpendFx money_spend_fx;
     show_loading(1.0F, "PRONTO");
     const auto vehicle_traversable = [&](const int x, const int y) {
         const MapTileOccupancy occupancy = inspect_map_tile(buildings, roads, sidewalks, farming, x, y);
@@ -3175,6 +3177,7 @@ int main() {
                             active_map_doc->paint_terrain_at(x, y, water_terrain_id, "");
                             record_terrain_paint(x, y, water_terrain_id);
                             status = definition->display_name + " PLACED: " + format_money(definition->build_cost);
+                            money_spend_fx.spawn(definition->build_cost, event.button.x, event.button.y);
                             (void)play_sound(SoundEvent::ui_confirm);
                         }
                         if (status != "WATER ALREADY PLACED" && status.find(" PLACED: ") == std::string::npos)
@@ -3276,6 +3279,7 @@ int main() {
                             power.rebuild(buildings, catalog);
                             selected_instance_id = *instance_id;
                             status = placement->name + " BUILT: " + format_money(placement->build_cost) + " SPENT";
+                            money_spend_fx.spawn(placement->build_cost, event.button.x, event.button.y);
                             if (power.power_available() < 0) {
                                 status += " | POWER DEFICIT " + std::to_string(-power.power_available());
                             }
@@ -3495,6 +3499,9 @@ int main() {
                     status = changed == 0 ? "NENHUM PISO ALTERADO" :
                         "PISO ALTERADO: " + std::to_string(changed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " BLOQUEADOS");
+                    if (changed > 0 && tile_cost > 0) {
+                        money_spend_fx.spawn(static_cast<std::int64_t>(changed) * tile_cost, event.button.x, event.button.y);
+                    }
                     (void)play_sound(changed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;
                     continue;
@@ -3518,6 +3525,9 @@ int main() {
                     const int placed = roads.place_segment(segment);
                     status = placed == 0 ? "ROAD ALREADY EXISTS" : "ROAD PLACED: " + std::to_string(placed) + " TILE(S), " +
                         format_money(static_cast<std::int64_t>(placed) * kRoadCostPerTile) + " SPENT";
+                    if (placed > 0) {
+                        money_spend_fx.spawn(static_cast<std::int64_t>(placed) * kRoadCostPerTile, event.button.x, event.button.y);
+                    }
                 }
                 road_dragging = false;
             } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
@@ -4169,6 +4179,7 @@ int main() {
 
         // Weather is a screen-space layer above the world and below all UI.
         render_weather(renderer, weather, viewport_width, viewport_height);
+        money_spend_fx.render(renderer);
         gameplay_ui.update_layout(viewport_width, viewport_height, make_ui_model(mouse_tile));
         gameplay_ui.render(renderer);
         SDL_RenderPresent(renderer);
