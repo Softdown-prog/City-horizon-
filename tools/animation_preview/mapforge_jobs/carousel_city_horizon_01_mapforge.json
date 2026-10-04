@@ -1,6 +1,6 @@
 {
   "contract": "CH_VIDEO_SCENARIO_V1",
-  "id": "mapforge.carousel_city_horizon_01.validation",
+  "id": "mapforge.carousel_city_horizon_01.validation.tuned",
   "reviewOnly": true,
   "fps": 10,
   "frameCount": 48,
