@@ -61,6 +61,7 @@ int main() {
     relaxed_sample.z = 1.5;
     relaxed_sample.up_z = 1.0;
     relaxed_sample.tangent_x = 1.0;
+    relaxed_sample.right_y = -1.0;
 
     CenterlineSample loaded_sample = relaxed_sample;
     loaded_sample.z = 9.0;
@@ -78,6 +79,39 @@ int main() {
     if (loaded_spacing < style.support_min_spacing_m - 1.0e-9 ||
         relaxed_spacing > style.support_spacing_m + 1.0e-9)
         return fail("adaptive support spacing escaped configured bounds");
+
+    // Medium curved supports should be visibly stronger than a basic three-piece
+    // A-frame without becoming a full multi-bay tower. The compact upper X adds
+    // exactly two structural members and curve load slightly widens the feet.
+    CoasterTrackGeometry straight_support_geometry;
+    straight_support_geometry.route_length_m = 1.0;
+    straight_support_geometry.frames.resize(2U);
+    CenterlineSample medium_straight = relaxed_sample;
+    medium_straight.z = 2.8;
+    if (!append_support_station(
+            straight_support_geometry, style, medium_straight, 0.0, 0.0))
+        return fail("medium straight support station must build");
+
+    CoasterTrackGeometry curved_support_geometry;
+    curved_support_geometry.route_length_m = 1.0;
+    curved_support_geometry.frames.resize(2U);
+    CenterlineSample medium_curve = medium_straight;
+    medium_curve.horizontal_curvature_per_m = 0.060;
+    if (!append_support_station(
+            curved_support_geometry, style, medium_curve, 0.0, 0.0))
+        return fail("medium curve support station must build");
+    if (straight_support_geometry.supports.size() != 5U ||
+        curved_support_geometry.supports.size() != 5U)
+        return fail("medium support must emit A-frame plus compact X brace");
+
+    const double straight_foot_span = distance(
+        straight_support_geometry.supports[0].top,
+        straight_support_geometry.supports[1].top);
+    const double curved_foot_span = distance(
+        curved_support_geometry.supports[0].top,
+        curved_support_geometry.supports[1].top);
+    if (!(curved_foot_span > straight_foot_span))
+        return fail("curved support feet must flare wider than straight support feet");
 
     // Verify that a vertical loop uses the transported local up/right frame.
     // At the apex local up points down; therefore the structural spine, offset
@@ -143,6 +177,8 @@ int main() {
               << " loop_frames=" << loop_geometry.frames.size()
               << " render_lines=" << render_plan.lines.size()
               << " relaxed_support_spacing=" << relaxed_spacing
-              << " loaded_support_spacing=" << loaded_spacing << '\n';
+              << " loaded_support_spacing=" << loaded_spacing
+              << " medium_support_members=" << curved_support_geometry.supports.size()
+              << '\n';
     return 0;
 }
