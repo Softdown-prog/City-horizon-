@@ -1,0 +1,58 @@
+name: CH Tool Cursors
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/tool_cursor.h"
+      - "tools/install_tool_cursors.py"
+      - ".github/workflows/ch-tool-cursors.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ch-tool-cursors-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  install-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Integrate cursor controller
+        run: python tools/install_tool_cursors.py
+
+      - name: Static contract checks
+        run: |
+          grep -q '#include "tool_cursor.h"' src/main_runtime_impl.cpp
+          grep -q 'ToolCursorManager tool_cursors' src/main_runtime_impl.cpp
+          grep -q 'ToolCursorKind::raise_terrain' src/main_runtime_impl.cpp
+          grep -q 'ToolCursorKind::lower_terrain' src/main_runtime_impl.cpp
+          grep -q 'ToolCursorKind::demolish' src/main_runtime_impl.cpp
+          grep -q 'ToolCursorKind::floor' src/main_runtime_impl.cpp
+          grep -q 'SDL_CreateColorCursor' src/tool_cursor.h
+          git diff --check
+
+      - name: Commit integration safely
+        run: |
+          if git diff --quiet -- src/main_runtime_impl.cpp; then
+            echo "Contextual cursor integration already present."
+            exit 0
+          fi
+          git config user.name "city-horizon-worker"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/main_runtime_impl.cpp
+          git commit -m "feat(ui): activate contextual editing cursors"
+          git pull --rebase origin main
+          git push origin HEAD:main
