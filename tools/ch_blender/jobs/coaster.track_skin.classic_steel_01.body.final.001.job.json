@@ -6,7 +6,8 @@
   "qualityStage": "final",
   "approval": {
     "proxyReviewed": true,
-    "approvedProxySha256": "ac28e6fbe9e413c6ad6aa8904bbc2320cfc89d9e175820dada4a63d0364a1846"
+    "approvedProxySha256": "ac28e6fbe9e413c6ad6aa8904bbc2320cfc89d9e175820dada4a63d0364a1846",
+    "sourceFingerprint": "71b01b3074e93ce8feea69a39e98d6de79dbad61405d3ff1068827ee3f361329"
   },
   "assetRequirements": {
     "contract": "CH_ASSET_REQUIREMENTS_V1",
