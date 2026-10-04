@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import math
-import os
 import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-# CH_MONEY_SPEND_VIDEO_PROOF_V1
+# CH_MONEY_SPEND_VIDEO_PROOF_V2
 OUT = Path("out/money-spend-fx-proof")
 FRAMES = OUT / "frames"
 W, H = 960, 540
 FPS = 30
-DURATION = 4.0
+DURATION = 4.4
 LIFETIME_MS = 950.0
 
 
@@ -41,17 +39,16 @@ def draw_diamond(draw: ImageDraw.ImageDraw, cx: int, cy: int, fill, outline=None
     draw.polygon(pts, fill=fill, outline=outline)
 
 
-def blend(base, overlay, alpha):
-    return tuple(int(base[i]*(1-alpha)+overlay[i]*alpha) for i in range(3))
-
-
 def main():
     FRAMES.mkdir(parents=True, exist_ok=True)
 
+    # No item names are rendered. Runtime feedback communicates only the money
+    # movement itself: yellow for spending, green for income.
     events = [
-        (0.70, 40, 480, 268, "PEDRA"),
-        (1.70, 25, 610, 300, "MADEIRA"),
-        (2.75, 1200, 355, 235, "CONSTRUCAO"),
+        (0.70, 40, 480, 268, False),
+        (1.55, 25, 610, 300, False),
+        (2.45, 1200, 355, 235, False),
+        (3.35, 320, 760, 105, True),
     ]
 
     total = int(DURATION*FPS)
@@ -61,8 +58,8 @@ def main():
         d = ImageDraw.Draw(img, "RGBA")
 
         d.rectangle((0,0,W,H), fill=(37,53,64,255))
-        d.text((28,22), "CH_MONEY_SPEND_FX_V1 — VIDEO DE TESTE", font=FONT_TITLE, fill=(245,245,240,255))
-        d.text((30,58), "Gasto real confirmado -> valor sobe e desaparece", font=FONT_SMALL, fill=(190,205,212,255))
+        d.text((28,22), "CH_MONEY_SPEND_FX_V2 — VIDEO DE TESTE", font=FONT_TITLE, fill=(245,245,240,255))
+        d.text((30,58), "Somente valor: gasto amarelo | receita verde", font=FONT_SMALL, fill=(190,205,212,255))
 
         for gy in range(5):
             for gx in range(6):
@@ -80,24 +77,22 @@ def main():
         d.polygon([(355,202),(397,223),(355,244),(313,223)], fill=(188,178,160,255))
         d.polygon([(313,223),(355,244),(355,309),(313,287)], fill=(147,137,123,255))
         d.polygon([(397,223),(355,244),(355,309),(397,287)], fill=(122,113,101,255))
-        d.text((308,315), "CASA", font=FONT_SMALL, fill=(230,230,225,220))
 
-        for started, amount, sx, sy, label in events:
+        for started, amount, sx, sy, income in events:
             dt = tsec-started
             if -0.12 <= dt < 0:
                 pulse = (dt+0.12)/0.12
                 r = 10+int(18*pulse)
                 d.ellipse((sx-r,sy-r,sx+r,sy+r), outline=(255,255,255,int(180*(1-pulse))), width=3)
             if 0 <= dt < LIFETIME_MS/1000.0:
-                ms = dt*1000.0
-                tt = max(0.0,min(1.0,ms/LIFETIME_MS))
+                tt = max(0.0,min(1.0,dt*1000.0/LIFETIME_MS))
                 eased = 1.0-(1.0-tt)*(1.0-tt)
                 yy = sy-18.0-34.0*eased
                 alpha = int(255.0*(1.0-tt))
-                text = f"-${amount}"
+                text = f"+${amount}" if income else f"-${amount}"
                 d.text((sx+2,yy+2), text, font=FONT_MONEY, anchor="mm", fill=(22,18,14,int(alpha*0.70)))
-                d.text((sx,yy), text, font=FONT_MONEY, anchor="mm", fill=(255,214,92,alpha))
-                d.text((sx,sy+40), label, font=FONT_SMALL, anchor="mm", fill=(235,235,230,190))
+                foreground = (106,220,128,alpha) if income else (255,214,92,alpha)
+                d.text((sx,yy), text, font=FONT_MONEY, anchor="mm", fill=foreground)
 
         x0, x1 = 80, 880
         y = 500
