@@ -1,0 +1,64 @@
+name: CH Coaster Classic Steel Body Promote
+
+on:
+  push:
+    paths:
+      - 'tools/runtime_promotion_requests/classic_steel_body_v1.request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download approved CH Blender final body artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf out/classic_steel_body_promotion
+          mkdir -p out/classic_steel_body_promotion
+          gh run download 37206595181 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name CH-Blender-Agent-37206595181-1 \
+            --dir out/classic_steel_body_promotion
+          test -n "$(find out/classic_steel_body_promotion -name final_bake_report.json -print -quit)"
+
+      - name: Validate and promote Classic Steel body
+        run: python tools/runtime_promotion_requests/promote_classic_steel_body_v1.py
+
+      - name: Validate promoted runtime files
+        run: |
+          test -s assets/coasters/skins/classic_steel_01/body/track_body_south.png
+          test -s assets/coasters/skins/classic_steel_01/body/track_body_east.png
+          test -s assets/coasters/skins/classic_steel_01/body/track_body_west.png
+          test -s assets/coasters/skins/classic_steel_01/body/track_body_north.png
+          test -s assets/coasters/skins/classic_steel_01/body/track_body_runtime.json
+          grep -q 'body_sprite_enabled = true' src/coaster_track_skin.h
+          grep -q 'render_coaster_track_body_skin' src/coaster_sdl_renderer.h
+
+      - name: Commit promoted runtime body
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            assets/coasters/skins/classic_steel_01/body \
+            src/coaster_sdl_renderer.h
+          git diff --cached --check
+          git commit -m 'coaster: promote Classic Steel full body runtime skin'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

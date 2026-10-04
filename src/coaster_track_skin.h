@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string_view>
 
 namespace ch::coaster {
@@ -8,7 +9,7 @@ namespace ch::coaster {
 // Visual-only skin contract layered on top of CH_COASTER_TRACK_GEOMETRY_V1.
 // The centerline, physics, gauge, ties and support placement remain procedural
 // and authoritative. A skin may change material language without changing the
-// ride layout. This also leaves a stable seam for future Blender-baked modules.
+// ride layout. This also leaves a stable seam for Blender-baked modules.
 inline constexpr std::string_view kCoasterTrackSkinContract = "CH_COASTER_TRACK_SKIN_V1";
 
 enum class CoasterTrackSkinId {
@@ -61,10 +62,30 @@ struct CoasterTrackSkin {
     float cap_offset_x_px = -0.14F;
     float cap_offset_y_px = -0.30F;
 
-    // Detail atlas retained for the approved joint/lift/brake modules, but it
-    // stays disabled until the complete Blender track-body skin is approved.
-    // This prevents the temporary vector body + baked details combination from
-    // being mistaken for the final hybrid visual.
+    // Approved CH Blender full-body skin. Direction order is the canonical
+    // studio order SOUTH, EAST, WEST, NORTH. The procedural renderer remains
+    // underneath as a fail-safe if any sprite cannot be loaded.
+    std::array<std::string_view, 4> body_sprite_paths{
+        "assets/coasters/skins/classic_steel_01/body/track_body_south.png",
+        "assets/coasters/skins/classic_steel_01/body/track_body_east.png",
+        "assets/coasters/skins/classic_steel_01/body/track_body_west.png",
+        "assets/coasters/skins/classic_steel_01/body/track_body_north.png",
+    };
+    int body_sprite_width_px = 256;
+    int body_sprite_height_px = 256;
+    float body_sprite_anchor_x = 0.50000024F;
+    float body_sprite_anchor_y = 0.79645400F;
+    // 128px canonical tile / 297.43548584px projected source tile.
+    float body_sprite_scale_at_zoom1 = 0.43034542F;
+    // One authored body module is exactly one gameplay tile (3 metres).
+    double body_sprite_spacing_m = 3.0;
+    // The authored rail centre is z=0.57m while procedural rails sit 0.10m
+    // above the centerline, so the sprite ground anchor sits 0.47m below it.
+    double body_ground_below_center_m = 0.47;
+    bool body_sprite_enabled = true;
+
+    // Detail atlas remains optional. It can be layered later over the full body
+    // for lift chains/brake fins after the full-body runtime proof is accepted.
     std::string_view overlay_atlas_path = "assets/coasters/skins/classic_steel_01/track_skin_atlas.png";
     int overlay_cell_width_px = 96;
     int overlay_cell_height_px = 72;
@@ -84,5 +105,7 @@ inline constexpr CoasterTrackSkin kClassicSteelTrackSkin{};
 static_assert(kCoasterTrackSkinContract == std::string_view{"CH_COASTER_TRACK_SKIN_V1"});
 static_assert(kClassicSteelTrackSkin.rail_body_width_px > kClassicSteelTrackSkin.rail_head_width_px);
 static_assert(kClassicSteelTrackSkin.spine_body_width_px > kClassicSteelTrackSkin.rail_body_width_px);
+static_assert(kClassicSteelTrackSkin.body_sprite_paths.size() == 4U);
+static_assert(kClassicSteelTrackSkin.body_sprite_spacing_m == 3.0);
 
 }  // namespace ch::coaster
