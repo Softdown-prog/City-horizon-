@@ -1,0 +1,18 @@
+{
+  "id": "steam_train_locomotive_01",
+  "name": "Trem a Vapor - Locomotiva",
+  "category": "transport",
+  "texture": "assets/vehicles/steam_train_locomotive_01/steam_train_locomotive_south.png",
+  "sprites": {
+    "0": "assets/vehicles/steam_train_locomotive_01/steam_train_locomotive_south.png",
+    "1": "assets/vehicles/steam_train_locomotive_01/steam_train_locomotive_west.png",
+    "2": "assets/vehicles/steam_train_locomotive_01/steam_train_locomotive_north.png",
+    "3": "assets/vehicles/steam_train_locomotive_01/steam_train_locomotive_east.png"
+  },
+  "rotatable": true,
+  "playerBuildable": false,
+  "productionStatus": "runtime_vehicle_train_unit_approved",
+  "runtimeRole": "vehicle_train_locomotive",
+  "runtimeManifest": "assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json",
+  "sourceApprovedProxySha256": "c750f3874c943cd0443a54d8c186e0bb7b58b8cec58ad43d9b9d095e98fe906f"
+}

@@ -1,0 +1,64 @@
+{
+  "contract": "CH_RUNTIME_VEHICLE_TRAIN_UNIT_V1",
+  "assetId": "vehicle.steam_train.locomotive.01",
+  "assetType": "vehicle_train_unit",
+  "unitRole": "locomotive",
+  "visualContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "runtimeRepresentation": "2D_RGBA_pre_rendered_sprite",
+  "format": "PNG_RGBA",
+  "frameSize": [
+    1024,
+    1024
+  ],
+  "transparentBackground": true,
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "logicalDimensionsM": {
+    "length": 5.2,
+    "width": 1.9
+  },
+  "views": {
+    "south": {
+      "file": "steam_train_locomotive_south.png",
+      "pivot": {
+        "x": 512,
+        "y": 678
+      },
+      "sha256": "cd14c55f4a67e717aaafcd94f7d8c4faa766534baeeb4f79c8f0dfb05bcb0b99"
+    },
+    "east": {
+      "file": "steam_train_locomotive_east.png",
+      "pivot": {
+        "x": 512,
+        "y": 678
+      },
+      "sha256": "1c42b4d19f11d73efe5a6f4b7ac5bc928b61995d644c6b00089099960c76f852"
+    },
+    "west": {
+      "file": "steam_train_locomotive_west.png",
+      "pivot": {
+        "x": 512,
+        "y": 678
+      },
+      "sha256": "3890ab0e4bd8987e6134c04ac97ac29d3790699d007c086b4bd528cfed7b90d0"
+    },
+    "north": {
+      "file": "steam_train_locomotive_north.png",
+      "pivot": {
+        "x": 512,
+        "y": 678
+      },
+      "sha256": "44d331190e2aa864d400316c5d08afa87f0a9600b0f2580d904560dce7c27b43"
+    }
+  },
+  "sourceCommit": "992df6f34fea4bafd3eb3e1414ab00523b70c0c0",
+  "sourceWorkflowRun": 37194593044,
+  "sourceArtifactId": 11300772601,
+  "approvedProxySha256": "c750f3874c943cd0443a54d8c186e0bb7b58b8cec58ad43d9b9d095e98fe906f",
+  "approvedForRuntime": true
+}

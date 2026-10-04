@@ -1,0 +1,18 @@
+{
+  "id": "steam_train_coach_01",
+  "name": "Trem a Vapor - Vagao de Passageiros",
+  "category": "transport",
+  "texture": "assets/vehicles/steam_train_coach_01/steam_train_coach_south.png",
+  "sprites": {
+    "0": "assets/vehicles/steam_train_coach_01/steam_train_coach_south.png",
+    "1": "assets/vehicles/steam_train_coach_01/steam_train_coach_west.png",
+    "2": "assets/vehicles/steam_train_coach_01/steam_train_coach_north.png",
+    "3": "assets/vehicles/steam_train_coach_01/steam_train_coach_east.png"
+  },
+  "rotatable": true,
+  "playerBuildable": false,
+  "productionStatus": "runtime_vehicle_train_unit_approved",
+  "runtimeRole": "vehicle_train_coach",
+  "runtimeManifest": "assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json",
+  "sourceApprovedProxySha256": "25708eb0efbd2486cc93bb016c3e0182d35cf0f39003f6102f847b18cfab1de1"
+}
