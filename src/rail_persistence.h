@@ -2,6 +2,7 @@
 
 #include "rail_placement_graph.h"
 
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -14,7 +15,8 @@
 #include <utility>
 #include <vector>
 
-inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V1";
+inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V2";
+inline constexpr const char* kChRailPersistenceLegacyContract = "CH_RAIL_PERSISTENCE_V1";
 
 struct RailPersistentAction {
     RailPlacementPieceId piece_group = kInvalidRailPlacementPieceId;
@@ -23,14 +25,22 @@ struct RailPersistentAction {
     bool active = true;
 };
 
+struct RailPersistentStation {
+    RailPlacementPieceId piece_group = kInvalidRailPlacementPieceId;
+    double dwell_seconds = 3.0;
+};
+
 struct RailPersistentState {
     std::vector<RailPlacementNode> nodes;
     std::vector<RailPlacementEdge> edges;
     std::vector<RailPersistentAction> actions;
+    std::vector<RailPersistentStation> stations;
 };
 
 namespace ch::rail_persistence {
 
+// Keep the original JSON extension key so existing city saves remain discoverable.
+// The payload header below carries the V1/V2 schema distinction.
 inline constexpr std::string_view kCityJsonKey = "railRuntimeV1";
 
 struct ReadResult {
@@ -45,6 +55,7 @@ using RestoreRuntimeFn = bool (*)(const RailPersistentState&);
 
 inline CaptureRuntimeFn g_capture_runtime = nullptr;
 inline RestoreRuntimeFn g_restore_runtime = nullptr;
+inline std::vector<RailPersistentStation> g_runtime_stations;
 
 inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntimeFn restore) noexcept {
     g_capture_runtime = capture;
@@ -55,14 +66,36 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
     return g_capture_runtime != nullptr && g_restore_runtime != nullptr;
 }
 
+inline void set_runtime_stations(std::vector<RailPersistentStation> stations) {
+    g_runtime_stations = std::move(stations);
+}
+
+[[nodiscard]] inline const std::vector<RailPersistentStation>& runtime_stations() noexcept {
+    return g_runtime_stations;
+}
+
+inline void clear_runtime_stations() noexcept {
+    g_runtime_stations.clear();
+}
+
 [[nodiscard]] inline std::optional<RailPersistentState> capture_runtime_state() {
     if (g_capture_runtime == nullptr) return std::nullopt;
-    return g_capture_runtime();
+    RailPersistentState state = g_capture_runtime();
+    state.stations = g_runtime_stations;
+    return state;
 }
 
 [[nodiscard]] inline bool restore_runtime_state(const RailPersistentState& state) {
-    return g_restore_runtime == nullptr ? state.nodes.empty() && state.edges.empty() && state.actions.empty()
-                                        : g_restore_runtime(state);
+    if (g_restore_runtime == nullptr) {
+        if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty()) {
+            return false;
+        }
+        clear_runtime_stations();
+        return true;
+    }
+    if (!g_restore_runtime(state)) return false;
+    g_runtime_stations = state.stations;
+    return true;
 }
 
 [[nodiscard]] inline bool validate(const RailPersistentState& state, std::string* error = nullptr) {
@@ -106,6 +139,19 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
             return false;
         }
     }
+
+    std::unordered_map<RailPlacementPieceId, bool> station_groups;
+    for (const RailPersistentStation& station : state.stations) {
+        const auto piece = group_activity.find(station.piece_group);
+        if (station.piece_group == kInvalidRailPlacementPieceId ||
+            !std::isfinite(station.dwell_seconds) || station.dwell_seconds < 0.0 ||
+            station_groups.contains(station.piece_group) ||
+            piece == group_activity.end() || !piece->second) {
+            if (error) *error = "rail station references an invalid or tombstoned logical piece";
+            return false;
+        }
+        station_groups.emplace(station.piece_group, true);
+    }
     return true;
 }
 
@@ -114,7 +160,7 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
     if (!validate(state, &validation_error)) return {};
 
     std::ostringstream output;
-    output << kChRailPersistenceContract << '\n' << std::setprecision(9);
+    output << kChRailPersistenceContract << '\n' << std::setprecision(17);
     for (const RailPlacementNode& node : state.nodes) {
         output << "N " << node.id << ' '
                << node.position.x << ' ' << node.position.y << ' ' << node.position.z << ' '
@@ -134,6 +180,9 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
         output << "A " << action.piece_group << ' ' << action.build_cost << ' '
                << action.refund_value << ' ' << (action.active ? 1 : 0) << '\n';
     }
+    for (const RailPersistentStation& station : state.stations) {
+        output << "S " << station.piece_group << ' ' << station.dwell_seconds << '\n';
+    }
     return output.str();
 }
 
@@ -142,10 +191,12 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
                                               std::string* error = nullptr) {
     std::istringstream input(payload);
     std::string header;
-    if (!std::getline(input, header) || header != kChRailPersistenceContract) {
+    if (!std::getline(input, header) ||
+        (header != kChRailPersistenceContract && header != kChRailPersistenceLegacyContract)) {
         if (error) *error = "unsupported rail persistence payload";
         return false;
     }
+    const bool legacy_v1 = header == kChRailPersistenceLegacyContract;
 
     RailPersistentState parsed;
     std::string line;
@@ -191,6 +242,13 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
             }
             action.active = active != 0;
             parsed.actions.push_back(action);
+        } else if (kind == 'S' && !legacy_v1) {
+            RailPersistentStation station;
+            if (!(row >> station.piece_group >> station.dwell_seconds)) {
+                if (error) *error = "invalid rail station row";
+                return false;
+            }
+            parsed.stations.push_back(station);
         } else {
             if (error) *error = "unknown rail persistence row";
             return false;
@@ -283,7 +341,8 @@ inline void register_runtime(const CaptureRuntimeFn capture, const RestoreRuntim
                                                 const RailPersistentState& state,
                                                 std::string* error = nullptr) {
     const std::string payload = serialize_payload(state);
-    if (payload.empty() && (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty())) {
+    if (payload.empty() && (!state.nodes.empty() || !state.edges.empty() ||
+                            !state.actions.empty() || !state.stations.empty())) {
         if (error) *error = "rail state failed validation before save";
         return false;
     }
