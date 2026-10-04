@@ -112,8 +112,9 @@ int main(int argc, char** argv) {
     // CH_GAME_COMMAND_V1 vertical slice: preview does not spend or mutate;
     // execute consumes the exact previewed cost and produces the road tile.
     RoadManager roads(-16, 16);
+    LandManager lands(-16, 16);
     CityEconomy economy(1000);
-    RoadPlacementCommand road_command(roads, buildings, economy, -2, -2);
+    RoadPlacementCommand road_command(roads, buildings, lands, economy, -2, -2);
     const auto preview = ch::GameCommandExecutor::run(road_command, ch::GameCommandMode::preview);
     if (!require(preview.success && !preview.applied, "road command preview succeeds without applying") ||
         !require(preview.cost_units == kRoadCostPerTile && economy.funds() == 1000,
@@ -129,7 +130,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    RoadPlacementCommand occupied_command(roads, buildings, economy, -2, -2);
+    RoadPlacementCommand occupied_command(roads, buildings, lands, economy, -2, -2);
     const auto occupied = ch::GameCommandExecutor::run(occupied_command, ch::GameCommandMode::execute);
     if (!require(!occupied.success && !occupied.applied &&
                      occupied.failure == ch::GameCommandFailure::conflicting_state,
