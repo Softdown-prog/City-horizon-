@@ -1,0 +1,16 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "steam_train.articulated.visual.001",
+  "operation": "blender_script",
+  "script": "tools/ch_blender/steam_train_articulated_visual_proof.py",
+  "args": [
+    "--output",
+    "out/ch_blender_agent/steam_train_articulated_visual_001"
+  ],
+  "outputDir": "out/ch_blender_agent/steam_train_articulated_visual_001",
+  "expectedOutputs": [
+    "out/ch_blender_agent/steam_train_articulated_visual_001/steam_train_articulated.mp4",
+    "out/ch_blender_agent/steam_train_articulated_visual_001/steam_train_articulated.gif",
+    "out/ch_blender_agent/steam_train_articulated_visual_001/visual_proof_report.json"
+  ]
+}
