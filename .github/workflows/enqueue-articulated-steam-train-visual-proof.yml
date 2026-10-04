@@ -1,0 +1,82 @@
+name: Enqueue Articulated Steam Train Visual Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json"
+      - "assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ch-articulated-steam-train-visual-proof-enqueue
+  cancel-in-progress: false
+
+jobs:
+  enqueue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout promoted runtime assets
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify both runtime units are approved
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected = {
+              Path('assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json'):
+                  ('vehicle.steam_train.locomotive.01', 'locomotive'),
+              Path('assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json'):
+                  ('vehicle.steam_train.coach.01', 'coach'),
+          }
+          for path, (asset_id, role) in expected.items():
+              data = json.loads(path.read_text(encoding='utf-8'))
+              assert data['contract'] == 'CH_RUNTIME_VEHICLE_TRAIN_UNIT_V1'
+              assert data['assetId'] == asset_id
+              assert data['unitRole'] == role
+              assert data['approvedForRuntime'] is True
+              assert set(data['views']) == {'south', 'east', 'west', 'north'}
+          PY
+
+      - name: Enqueue deterministic Worker Pool proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          job="tools/ch_blender/jobs/steam_train.articulated.visual.001.job.json"
+          if [[ -f "$job" ]]; then
+            echo "Visual proof job already queued; nothing to do."
+            exit 0
+          fi
+          cat > "$job" <<'JSON'
+          {
+            "contract": "CH_BLENDER_AGENT_JOB_V1",
+            "jobId": "steam_train.articulated.visual.001",
+            "operation": "blender_script",
+            "script": "tools/ch_blender/steam_train_articulated_visual_proof.py",
+            "args": [
+              "--output",
+              "out/ch_blender_agent/steam_train_articulated_visual_001"
+            ],
+            "outputDir": "out/ch_blender_agent/steam_train_articulated_visual_001",
+            "expectedOutputs": [
+              "out/ch_blender_agent/steam_train_articulated_visual_001/steam_train_articulated.mp4",
+              "out/ch_blender_agent/steam_train_articulated_visual_001/steam_train_articulated.gif",
+              "out/ch_blender_agent/steam_train_articulated_visual_001/visual_proof_report.json"
+            ]
+          }
+          JSON
+
+          python tools/ch_blender/ch_blender_cli.py validate-job --job "$job"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$job"
+          git commit -m "worker: queue articulated steam train visual proof"
+          git push origin HEAD:main
