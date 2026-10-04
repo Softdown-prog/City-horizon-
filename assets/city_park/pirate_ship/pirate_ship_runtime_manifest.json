@@ -1,0 +1,55 @@
+{
+  "contract": "CH_CITY_PARK_ANIMATED_ASSET_V1",
+  "assetId": "attraction.park_pirate_ship.01",
+  "displayName": "Barco Pirata",
+  "category": "city_park",
+  "subtype": "amusement_ride",
+  "format": "PNG_RGBA_HORIZONTAL_SPRITESHEET",
+  "frameSize": [1280, 1280],
+  "transparentBackground": true,
+  "directionOrder": ["south", "west", "north", "east"],
+  "footprint": {
+    "widthTiles": 7,
+    "depthTiles": 6
+  },
+  "animation": {
+    "contract": "CH_PIRATE_SHIP_SWING_RUNTIME_V1",
+    "sourcePoseCount": 12,
+    "runtimeFrameDurationMs": 292,
+    "runtimeCycleDurationMs": 3504,
+    "playback": "activity_loop",
+    "amplitudeDegrees": 35.0,
+    "timingReference": "Viking V16 human-approved slower pendulum timing",
+    "timingReferenceWorkflowRun": 36361381756,
+    "timingReferenceFrameCount": 28,
+    "timingReferenceFps": 8,
+    "timingReferenceCycleDurationMs": 3500,
+    "timingReferenceMotionProfile": "slow_ascent_peak_dwell_fast_descent_v1",
+    "note": "Current pirate render has 12 approved spatial poses. Runtime cadence is stretched to the V16 3.5 s cycle so the attraction does not use the rejected fast swing."
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "redChannel": "primary",
+    "greenChannel": "secondary",
+    "primaryMeaning": "A-frame supports and fixed decorative structure",
+    "secondaryMeaning": "moving pirate ship hull, benches and ship decoration"
+  },
+  "passengers": {
+    "contract": "CH_RIDE_PASSENGER_OVERLAY_V1",
+    "bindingContract": "CH_RIDE_PASSENGER_SEAT_BINDING_V1",
+    "seatLayoutContract": "CH_RIDE_PASSENGER_SEAT_LAYOUT_V1",
+    "seatLayoutManifest": "assets/city_park/pirate_ship/pirate_ship_passenger_seats_v2.json",
+    "seatCount": 24,
+    "seatAssignment": "queue_order_next_free_slot",
+    "paletteMode": "stable_per_visitor",
+    "motionParent": "SwingPivot",
+    "geometryParent": "DominantPassengerShip"
+  },
+  "gameplaySourceOfTruth": "assets/definitions/pirate_ship_01.json",
+  "rideContract": "CH_AMUSEMENT_RIDE_V1",
+  "rideCapacity": 24,
+  "sourceWorkflowRun": 37167313390,
+  "sourceArtifact": "CH-Blender-Agent-37167313390-1",
+  "sourceCommit": "7cb2b1f7a876ae765745b2b929faa0367b1875f0",
+  "status": "runtime_promotion_queued"
+}
