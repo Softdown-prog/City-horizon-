@@ -2,6 +2,7 @@
 #include "ch_core/asset_registry.h"
 #include "ch_render/palette_bank.h"
 #include "ch_render/sprite_animation_runtime.h"
+#include "ch_render/water_surface_runtime.h"
 
 #include <array>
 #include <cmath>
@@ -25,8 +26,10 @@ bool require(const bool condition, const char* message) {
 int main(int argc, char** argv) {
     if (!require(argc == 2, "animation definitions directory argument")) return 1;
 
+    const std::filesystem::path animation_definitions = argv[1];
+
     MobileAnimationCatalog catalog;
-    if (!require(catalog.load_from_directory(std::filesystem::path(argv[1])), "catalog loads")) return 1;
+    if (!require(catalog.load_from_directory(animation_definitions), "catalog loads")) return 1;
 
     const std::array directions = {MobileEntityDirection::south, MobileEntityDirection::east,
                                    MobileEntityDirection::north, MobileEntityDirection::west};
@@ -91,6 +94,64 @@ int main(int argc, char** argv) {
                  "palette replaces a semantic color ramp") ||
         !require(palette.color(4) != nullptr && palette.color(4)->b == 170,
                  "primary color remap updates the expected entries")) {
+        return 1;
+    }
+
+    ch::WaterSurfaceRuntimeCatalog water_runtime;
+    const std::filesystem::path water_manifest =
+        animation_definitions.parent_path().parent_path() / "terrain" / "water" / "water_surfaces.json";
+    if (!require(water_runtime.load_manifest(water_manifest),
+                 "water runtime loads the canonical CH_WATER_SURFACE_V1 manifest") ||
+        !require(water_runtime.manifest_loaded(), "water runtime records manifest-backed state") ||
+        !require(water_runtime.animation().frame_count == 16 &&
+                     water_runtime.animation().frame_duration_ms == 125 &&
+                     water_runtime.animation().world_period_tiles == 4,
+                 "water runtime uses the approved sixteen-frame two-second cycle")) {
+        return 1;
+    }
+
+    const ch::WaterSurfaceRuntimeDefinition* shallow_water = water_runtime.find_surface("water_shallow");
+    const ch::WaterSurfaceRuntimeDefinition* deep_water = water_runtime.find_surface("water_deep");
+    if (!require(shallow_water != nullptr && shallow_water->build_cost == 50,
+                 "shallow water keeps its runtime id and build cost") ||
+        !require(deep_water != nullptr && deep_water->build_cost == 100,
+                 "deep water keeps its runtime id and build cost")) {
+        return 1;
+    }
+
+    const ch::AssetDescriptor* shallow_base = shallow_water == nullptr
+        ? nullptr
+        : water_runtime.find_asset(shallow_water->base_asset_id);
+    const ch::AssetDescriptor* deep_atlas = deep_water == nullptr
+        ? nullptr
+        : water_runtime.find_asset(deep_water->rgba_atlas_asset_id);
+    const ch::Rgba8* shallow_coverage = shallow_water == nullptr
+        ? nullptr
+        : water_runtime.coverage_color(*shallow_water);
+    const ch::Rgba8* deep_coverage = deep_water == nullptr
+        ? nullptr
+        : water_runtime.coverage_color(*deep_water);
+    if (!require(shallow_base != nullptr &&
+                     shallow_base->logical_path == "assets/terrain/water/water_shallow_world.png",
+                 "water runtime registers the shallow base by stable asset id") ||
+        !require(deep_atlas != nullptr &&
+                     deep_atlas->logical_path == "assets/terrain/water/water_deep_glint_cycle_atlas.png",
+                 "water runtime registers the deep animation atlas by stable asset id") ||
+        !require(shallow_coverage != nullptr && shallow_coverage->r == 115 && shallow_coverage->g == 200,
+                 "water runtime exposes shallow opaque coverage through the semantic palette") ||
+        !require(deep_coverage != nullptr && deep_coverage->r == 80 && deep_coverage->b == 194,
+                 "water runtime exposes deep opaque coverage through the semantic palette")) {
+        return 1;
+    }
+
+    if (!require(water_runtime.frame_at_seconds(0.124F) == 0,
+                 "water cycle holds frame zero before 125 milliseconds") ||
+        !require(water_runtime.frame_at_seconds(0.125F) == 1,
+                 "water cycle advances on the manifest frame duration") ||
+        !require(water_runtime.frame_at_seconds(1.999F) == 15,
+                 "water cycle reaches the last frame before two seconds") ||
+        !require(water_runtime.frame_at_seconds(2.0F) == 0,
+                 "water cycle loops deterministically at two seconds")) {
         return 1;
     }
 
