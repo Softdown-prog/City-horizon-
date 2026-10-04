@@ -1,0 +1,24 @@
+{
+  "contract": "CH_RAIL_ASSET_STATE_V1",
+  "policy": {
+    "approvedAssetsDoNotRerenderForSiblingChanges": true,
+    "finalBakeRunsOncePerApprovedGeometry": true,
+    "workerPoolUsesOnlyChangedAssets": true
+  },
+  "assets": {
+    "transport.rail_track.classic.switch_left.01": {
+      "visualRevision": 7,
+      "status": "approved_frozen_final_bake_queued",
+      "proxySha256": "285912fc837c71271db5c26fdc461638a46e8a197ce35fc6c3371a5f5a42633b"
+    },
+    "transport.rail_track.classic.switch_right.01": {
+      "visualRevision": 7,
+      "status": "approved_frozen_final_bake_queued",
+      "proxySha256": "6b9026b970d9ce3a25d76357f203a247ea517fba00dfa99a80630545621799eb"
+    },
+    "transport.rail_track.classic.crossing.01": {
+      "visualRevision": 9,
+      "status": "iterating_proxy_review"
+    }
+  }
+}
