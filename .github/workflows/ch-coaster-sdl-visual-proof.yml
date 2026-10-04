@@ -6,9 +6,11 @@ on:
       - 'src/coaster_sdl_renderer.h'
       - 'src/coaster_render_adapter.h'
       - 'src/coaster_track_geometry.h'
+      - 'src/coaster_track_skin.h'
       - 'src/coaster_centerline_route.h'
       - 'src/ch_core/projection.h'
       - 'src/ch_core/projection.cpp'
+      - 'assets/coasters/skins/classic_steel_01/**'
       - 'tools/coaster_sdl_proof/**'
       - '.github/workflows/ch-coaster-sdl-visual-proof.yml'
   workflow_dispatch:
