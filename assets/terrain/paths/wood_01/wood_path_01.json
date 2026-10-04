@@ -39,7 +39,7 @@
   "workerReport": {
     "schema": "CITY_HORIZON_GROUND_TILE_WORKER_V1",
     "ok": true,
-    "source": "/tmp/tmpckc7849b/wood_rectified_128x64.png",
+    "source": "/tmp/tmpccdru249/wood_rectified_128x64.png",
     "output": "out/wood_path_01/wood_path_base_128x64.png",
     "preview": "out/wood_path_01/wood_path_repeat_preview.png",
     "width": 128,
