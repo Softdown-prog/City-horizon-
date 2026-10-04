@@ -2,18 +2,21 @@
 
 #include "building_system.h"
 #include "economy_system.h"
-#include "land_system.h"
 #include "road_system.h"
 #include "src/ch_core/game_command.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 class RoadPlacementCommand final : public ch::IGameCommand {
 public:
-    RoadPlacementCommand(RoadManager& roads, const BuildingManager& buildings, const LandManager& lands,
-                         CityEconomy& economy, const int tile_x, const int tile_y)
-        : roads_(roads), buildings_(buildings), lands_(lands), economy_(economy),
+    using TileOwnershipQuery = std::function<bool(int, int)>;
+
+    RoadPlacementCommand(RoadManager& roads, const BuildingManager& buildings,
+                         TileOwnershipQuery tile_owned, CityEconomy& economy,
+                         const int tile_x, const int tile_y)
+        : roads_(roads), buildings_(buildings), tile_owned_(std::move(tile_owned)), economy_(economy),
           tile_x_(tile_x), tile_y_(tile_y) {}
 
     [[nodiscard]] ch::GameCommandPlan prepare() const override {
@@ -48,7 +51,7 @@ public:
             return plan;
         }
 
-        if (!lands_.is_tile_owned(tile_x_, tile_y_)) {
+        if (!tile_owned_ || !tile_owned_(tile_x_, tile_y_)) {
             plan.valid = false;
             plan.failure = ch::GameCommandFailure::blocked;
             plan.message = "road tile is not owned";
@@ -74,7 +77,7 @@ public:
             return false;
         }
         if (roads_.validate_placement(tile_x_, tile_y_, buildings_) != RoadPlacementFailure::none ||
-            !lands_.is_tile_owned(tile_x_, tile_y_)) {
+            !tile_owned_ || !tile_owned_(tile_x_, tile_y_)) {
             error = "road placement changed after preview";
             return false;
         }
@@ -93,7 +96,7 @@ public:
 private:
     RoadManager& roads_;
     const BuildingManager& buildings_;
-    const LandManager& lands_;
+    TileOwnershipQuery tile_owned_;
     CityEconomy& economy_;
     int tile_x_ = 0;
     int tile_y_ = 0;
