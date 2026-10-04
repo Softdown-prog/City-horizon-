@@ -1,0 +1,54 @@
+{
+  "contract": "CH_COASTER_TRACK_BODY_RUNTIME_V1",
+  "assetId": "coaster.track_skin.classic_steel_01.body",
+  "skinId": "classic_steel_01",
+  "geometryAuthority": "CH_COASTER_TRACK_GEOMETRY_V1",
+  "skinContract": "CH_COASTER_TRACK_SKIN_V1",
+  "runtimeRepresentation": "2D_RGBA_track_body_skin",
+  "bakeRun": 37206595181,
+  "artifact": "CH-Blender-Agent-37206595181-1",
+  "approvedProxySha256": "8deae705ed88e396c2b181b51668d219d6095d795e544e69decada919a05728a",
+  "sourceFingerprint": "de3e92e0cc2e0841b7f87c22fea75bdd4992836f0d0e7d04e1a6a515b878abca",
+  "resolutionPx": [
+    256,
+    256
+  ],
+  "groundOriginPx": [
+    128.00006103515625,
+    203.8922233581543
+  ],
+  "groundAnchorNormalized": [
+    0.5000002384185791,
+    0.7964539974927902
+  ],
+  "projectedTileWidthPx": 297.43548583984375,
+  "canonicalTileWidthPx": 128,
+  "spriteScaleAtZoom1": 0.43034542310436524,
+  "moduleLengthMeters": 3.0,
+  "directions": [
+    {
+      "direction": "south",
+      "path": "assets/coasters/skins/classic_steel_01/body/track_body_south.png",
+      "sha256": "4cb71b85652b4d3872874c9b2812cc48cb394efd2146710c24a5fe9b9474e169",
+      "bytes": 53474
+    },
+    {
+      "direction": "east",
+      "path": "assets/coasters/skins/classic_steel_01/body/track_body_east.png",
+      "sha256": "bc04a8e60485ff8a2743e7b4723fe9a220a944d0912f6ed3e5d53276b733716b",
+      "bytes": 52965
+    },
+    {
+      "direction": "west",
+      "path": "assets/coasters/skins/classic_steel_01/body/track_body_west.png",
+      "sha256": "2c6eb339e708964a8b8bb1a7d51db06551f97ce5cdcf41d008c05c27e0e1947a",
+      "bytes": 53002
+    },
+    {
+      "direction": "north",
+      "path": "assets/coasters/skins/classic_steel_01/body/track_body_north.png",
+      "sha256": "0ab21442c253d3a2480350f8e7f8f65c9dddd6f914973094c13038e025e16b95",
+      "bytes": 53456
+    }
+  ]
+}

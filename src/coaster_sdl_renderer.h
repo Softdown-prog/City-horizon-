@@ -383,6 +383,129 @@ struct CoasterSkinOverlayDraw {
     }
 }
 
+struct CoasterTrackBodyDraw {
+    SDL_Texture* texture = nullptr;
+    SDL_FRect destination{};
+    float depth_key = 0.0F;
+};
+
+[[nodiscard]] inline SDL_Texture* coaster_track_body_texture(
+    SDL_Renderer* renderer,
+    const CoasterTrackSkin& skin,
+    const int direction_index) {
+    if (renderer == nullptr || !skin.body_sprite_enabled ||
+        direction_index < 0 || direction_index >= static_cast<int>(skin.body_sprite_paths.size())) {
+        return nullptr;
+    }
+    const std::string path{skin.body_sprite_paths[static_cast<std::size_t>(direction_index)]};
+    if (path.empty()) return nullptr;
+
+    static std::unordered_map<SDL_Renderer*, std::unordered_map<std::string, SDL_Texture*>> cache;
+    auto& renderer_cache = cache[renderer];
+    if (const auto found = renderer_cache.find(path); found != renderer_cache.end()) {
+        return found->second;
+    }
+
+    SDL_Surface* surface = SDL_LoadPNG(path.c_str());
+    if (surface == nullptr) {
+        renderer_cache.emplace(path, nullptr);
+        return nullptr;  // Procedural track remains visible as the fallback.
+    }
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
+    if (texture != nullptr) {
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+    }
+    renderer_cache.emplace(path, texture);
+    return texture;
+}
+
+inline void append_coaster_track_body_draw(
+    std::vector<CoasterTrackBodyDraw>& draws,
+    SDL_Renderer* renderer,
+    const CoasterTrackGeometry& geometry,
+    const std::size_t frame_index,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const CoasterTrackSkin& skin) {
+    if (frame_index >= geometry.frames.size()) return;
+    const int direction_index = coaster_overlay_direction_column(geometry, frame_index, camera);
+    SDL_Texture* texture = coaster_track_body_texture(renderer, skin, direction_index);
+    if (texture == nullptr) return;
+
+    const auto& frame = geometry.frames[frame_index];
+    const WorldPoint3 anchor_world = coaster_meters_to_world(
+        frame.center.x,
+        frame.center.y,
+        frame.center.z - skin.body_ground_below_center_m);
+    const ScreenPoint anchor = world_to_screen_point(
+        anchor_world, camera, viewport_width, viewport_height);
+    const float sprite_scale = std::max(
+        0.0F, skin.body_sprite_scale_at_zoom1 * std::max(0.0F, camera.zoom));
+    const float width = static_cast<float>(skin.body_sprite_width_px) * sprite_scale;
+    const float height = static_cast<float>(skin.body_sprite_height_px) * sprite_scale;
+    if (!(width > 0.0F) || !(height > 0.0F)) return;
+
+    CoasterTrackBodyDraw draw;
+    draw.texture = texture;
+    draw.destination = {
+        anchor.x - width * skin.body_sprite_anchor_x,
+        anchor.y - height * skin.body_sprite_anchor_y,
+        width,
+        height,
+    };
+    draw.depth_key = camera_depth_key(anchor_world.x, anchor_world.y, camera);
+    draws.push_back(draw);
+}
+
+inline void render_coaster_track_body_skin(
+    SDL_Renderer* renderer,
+    const CoasterTrackGeometry& geometry,
+    const CameraState& camera,
+    const float viewport_width,
+    const float viewport_height,
+    const CoasterTrackSkin& skin) {
+    if (renderer == nullptr || !skin.body_sprite_enabled || geometry.frames.empty() ||
+        !(skin.body_sprite_spacing_m > 0.0) || !(geometry.route_length_m > 0.0)) {
+        return;
+    }
+
+    std::vector<CoasterTrackBodyDraw> draws;
+    const std::size_t estimated = static_cast<std::size_t>(
+        std::ceil(geometry.route_length_m / skin.body_sprite_spacing_m)) + 1U;
+    draws.reserve(estimated);
+
+    std::size_t cursor = 0U;
+    std::size_t last_index = geometry.frames.size();
+    const double end_distance = geometry.closed
+        ? std::max(0.0, geometry.route_length_m - skin.body_sprite_spacing_m * 0.25)
+        : geometry.route_length_m;
+    for (double target = 0.0; target <= end_distance + 1.0e-6;
+         target += skin.body_sprite_spacing_m) {
+        while (cursor + 1U < geometry.frames.size() &&
+               std::abs(geometry.frames[cursor + 1U].distance_m - target) <=
+               std::abs(geometry.frames[cursor].distance_m - target)) {
+            ++cursor;
+        }
+        if (cursor == last_index) continue;
+        append_coaster_track_body_draw(
+            draws, renderer, geometry, cursor, camera,
+            viewport_width, viewport_height, skin);
+        last_index = cursor;
+    }
+
+    std::stable_sort(draws.begin(), draws.end(), [](const auto& left, const auto& right) {
+        return left.depth_key < right.depth_key;
+    });
+    for (const auto& draw : draws) {
+        SDL_SetTextureColorMod(draw.texture, 255, 255, 255);
+        SDL_SetTextureAlphaMod(draw.texture, SDL_ALPHA_OPAQUE);
+        SDL_RenderTexture(renderer, draw.texture, nullptr, &draw.destination);
+    }
+}
+
 [[nodiscard]] inline int coaster_overlay_module_row(const CoasterSkinOverlayModule module) noexcept {
     return static_cast<int>(module);
 }
@@ -514,6 +637,10 @@ inline void render_coaster_track(
         static_cast<int>(vertices.size()),
         indices.data(),
         static_cast<int>(indices.size()));
+    // Full Blender body is presentation-only. The procedural geometry above
+    // remains authoritative and doubles as the safe fallback when a PNG is absent.
+    render_coaster_track_body_skin(
+        renderer, geometry, camera, viewport_width, viewport_height, skin);
     render_coaster_track_overlay_modules(
         renderer, geometry, camera, viewport_width, viewport_height, skin);
 }
