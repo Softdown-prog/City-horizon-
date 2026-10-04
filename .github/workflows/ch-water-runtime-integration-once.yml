@@ -1,0 +1,91 @@
+name: CH Water Runtime Integration Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ch-water-runtime-integration-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase on latest main
+        run: |
+          git fetch origin main
+          git checkout -B ch-water-runtime-integration origin/main
+
+      - name: Apply exact localized water renderer edits
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/ch_render/map_renderer.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '#include "src/ch_render/shoreline_catalog.h"\n',
+              '#include "src/ch_render/shoreline_catalog.h"\n#include "src/ch_render/water_surface_runtime.h"\n'
+          )
+
+          anchor = '''constexpr float kGrassOpaqueHeight = 587.0F;\n\n\n'''
+          helpers = '''constexpr float kGrassOpaqueHeight = 587.0F;\n\nconst WaterSurfaceRuntimeCatalog& water_surface_runtime_for_root(const std::filesystem::path& asset_root) {\n    thread_local std::unordered_map<std::string, WaterSurfaceRuntimeCatalog> catalogs;\n    const std::string key = asset_root.lexically_normal().generic_string();\n    auto [it, inserted] = catalogs.try_emplace(key);\n    if (inserted) {\n        (void)it->second.load_manifest(asset_root / "assets/terrain/water/water_surfaces.json");\n    }\n    return it->second;\n}\n\nconst TextureAsset* water_runtime_texture(\n    const WaterSurfaceRuntimeCatalog& runtime,\n    const std::string& asset_id,\n    const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture) {\n    const AssetDescriptor* asset = runtime.find_asset(asset_id);\n    return asset == nullptr ? nullptr : find_texture(asset->logical_path);\n}\n\nSDL_FColor water_runtime_color(const WaterSurfaceRuntimeCatalog& runtime,\n                               const WaterSurfaceRuntimeDefinition* surface) {\n    if (surface == nullptr) return {0.0F, 0.0F, 0.0F, 1.0F};\n    const Rgba8* color = runtime.coverage_color(*surface);\n    if (color == nullptr) return {0.0F, 0.0F, 0.0F, 1.0F};\n    return {\n        static_cast<float>(color->r) / 255.0F,\n        static_cast<float>(color->g) / 255.0F,\n        static_cast<float>(color->b) / 255.0F,\n        static_cast<float>(color->a) / 255.0F,\n    };\n}\n\n\n'''
+          replace_once(anchor, helpers)
+
+          replace_once(
+              '''    if (renderer == nullptr) return;\n\n    const TextureAsset* grass_base = find_texture("assets/terrain/grass_isometric_01.png");\n''',
+              '''    if (renderer == nullptr) return;\n\n    const WaterSurfaceRuntimeCatalog& water_runtime = water_surface_runtime_for_root(asset_root);\n    const WaterSurfaceRuntimeDefinition* shallow_definition = water_runtime.find_surface("water_shallow");\n    const WaterSurfaceRuntimeDefinition* deep_definition = water_runtime.find_surface("water_deep");\n    const TextureAsset* grass_base = find_texture("assets/terrain/grass_isometric_01.png");\n'''
+          )
+
+          replace_once(
+              '''    const TextureAsset* shallow_surface = water_tiles.empty() ? nullptr :\n        find_texture("assets/terrain/water/water_shallow_world.png");\n    const TextureAsset* deep_surface = water_tiles.empty() ? nullptr :\n        find_texture("assets/terrain/water/water_deep_world.png");\n    const TextureAsset* shallow_glint = water_tiles.empty() ? nullptr :\n        find_texture("assets/terrain/water/water_shallow_glint_cycle_atlas.png");\n    const TextureAsset* deep_glint = water_tiles.empty() ? nullptr :\n        find_texture("assets/terrain/water/water_deep_glint_cycle_atlas.png");\n''',
+              '''    const TextureAsset* shallow_surface = (water_tiles.empty() || shallow_definition == nullptr) ? nullptr :\n        water_runtime_texture(water_runtime, shallow_definition->base_asset_id, find_texture);\n    const TextureAsset* deep_surface = (water_tiles.empty() || deep_definition == nullptr) ? nullptr :\n        water_runtime_texture(water_runtime, deep_definition->base_asset_id, find_texture);\n    const TextureAsset* shallow_glint = (water_tiles.empty() || shallow_definition == nullptr) ? nullptr :\n        water_runtime_texture(water_runtime, shallow_definition->rgba_atlas_asset_id, find_texture);\n    const TextureAsset* deep_glint = (water_tiles.empty() || deep_definition == nullptr) ? nullptr :\n        water_runtime_texture(water_runtime, deep_definition->rgba_atlas_asset_id, find_texture);\n'''
+          )
+
+          replace_once(
+              '''    constexpr SDL_FColor kDeepBase = {80.0F / 255.0F, 163.0F / 255.0F, 194.0F / 255.0F, 1.0F};\n    constexpr SDL_FColor kShallowBase = {115.0F / 255.0F, 200.0F / 255.0F, 210.0F / 255.0F, 1.0F};\n    for (const auto& tile : water_tiles) {\n        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,\n                         tile.shallow ? kShallowBase : kDeepBase);\n    }\n''',
+              '''    const SDL_FColor deep_coverage = water_runtime_color(water_runtime, deep_definition);\n    const SDL_FColor shallow_coverage = water_runtime_color(water_runtime, shallow_definition);\n    for (const auto& tile : water_tiles) {\n        render_tile_fill(renderer, tile.tile_x, tile.tile_y, camera, viewport_width, viewport_height,\n                         tile.shallow ? shallow_coverage : deep_coverage);\n    }\n'''
+          )
+
+          replace_once(
+              '    const int frame = std::clamp(static_cast<int>(std::floor(std::fmod(std::max(0.0F, render_time), 2.0F) * 8.0F)), 0, 15);\n',
+              '    const int frame = water_runtime.frame_at_seconds(render_time);\n'
+          )
+
+          replace_once(
+              '                static_cast<float>(SDL_GetTicks() % 2000U) / 1000.0F\n',
+              '                static_cast<float>(SDL_GetTicks()) / 1000.0F\n'
+          )
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Verify localized diff
+        run: |
+          git diff --check
+          test "$(git diff --name-only)" = "src/ch_render/map_renderer.cpp"
+          git diff --stat
+          grep -q 'water_runtime.frame_at_seconds(render_time)' src/ch_render/map_renderer.cpp
+          grep -q 'find_or_create_overlay_texture' src/ch_render/map_renderer.cpp
+          grep -q 'CH_BUILDING_ACTIVITY_OVERLAY_V1' src/ch_render/map_renderer.cpp
+          grep -q 'VisualPresentation::AtlasPhase' src/ch_render/map_renderer.cpp
+
+      - name: Commit localized integration
+        run: |
+          git config user.name "City Horizon Worker"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/ch_render/map_renderer.cpp
+          git commit -m "refactor(water): consume runtime water contract in renderer"
+          git push origin HEAD:main
