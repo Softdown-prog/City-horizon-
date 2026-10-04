@@ -2,6 +2,7 @@
 
 #include "economy_system.h"
 #include "park_fence_runtime.h"
+#include "rail_persistence.h"
 #include "runtime_game_state.h"
 #include "save_manager.h"
 
@@ -13,9 +14,11 @@
 #include <sstream>
 #include <string>
 
-// Runtime-only persistence is layered over the existing city save contract so
-// old saveVersion 1..12 files remain readable without rewriting SaveManager's
-// JSON parser. Each city save owns one small deterministic sidecar next to it.
+// Runtime persistence is layered over the existing city save contract so old
+// saveVersion 1..12 files remain readable without rewriting SaveManager's JSON
+// parser. Park fences keep their digest-bound sidecar; railway V1 is embedded
+// into that same canonical city JSON before the digest is computed, so both
+// runtime layers participate in one transactional replacement.
 class ParkFenceSaveManager : public SaveManager {
 public:
     [[nodiscard]] SaveOperationResult save(const std::filesystem::path& path,
@@ -44,6 +47,22 @@ public:
         if (!result.success) {
             cleanup_file(staged_city);
             return result;
+        }
+
+        // The rail extension is written into the staged canonical city JSON,
+        // before the fence sidecar digest is calculated. A failed rail write
+        // therefore aborts the whole transaction instead of producing a city/
+        // runtime mismatch.
+        if (const std::optional<RailPersistentState> rail_state =
+                ch::rail_persistence::capture_runtime_state(); rail_state.has_value()) {
+            std::string rail_error;
+            if (!ch::rail_persistence::inject_city_extension(staged_city, *rail_state, &rail_error)) {
+                cleanup_file(staged_city);
+                cleanup_file(staged_fence);
+                result.success = false;
+                result.message = "city and runtime state were not committed: " + rail_error;
+                return result;
+            }
         }
 
         const std::optional<std::uint64_t> city_digest = file_digest(staged_city);
@@ -102,6 +121,9 @@ public:
         cleanup_file(backup_city);
         cleanup_file(backup_fence);
         result.message += " + Park fences/bankruptcy (transactional V4)";
+        if (ch::rail_persistence::runtime_registered()) {
+            result.message += " + railway persistence V1";
+        }
         return result;
     }
 
@@ -115,15 +137,32 @@ public:
                                            MissionManager* missions = nullptr,
                                            std::vector<TerrainPaintTile>* terrain_paint = nullptr,
                                            std::vector<ch::TerrainHeightSample>* terrain_heights = nullptr) const {
+        // Validate the railway extension before SaveManager mutates any live
+        // city systems. Missing data is a valid legacy save and maps to an empty
+        // railway; malformed data fails closed.
+        const ch::rail_persistence::ReadResult pending_rail =
+            ch::rail_persistence::read_city_extension(path);
+        if (!pending_rail.valid) {
+            return {false, "save load failed: " + pending_rail.error};
+        }
+
         SaveOperationResult result = SaveManager::load(path, catalog, economy, clock, buildings, roads,
                                                        sidewalks, farming, lands, population,
                                                        vehicle_catalog, vehicles, missions, terrain_paint,
                                                        terrain_heights);
         if (!result.success) return result;
 
-        // Canonical/legacy saves have no bankruptcy streak. SaveManager restores
-        // funds through the runtime economy wrapper, which resets Game Over.
-        // A V4 sidecar below may restore and re-publish the bankruptcy state.
+        if (ch::rail_persistence::runtime_registered()) {
+            if (!ch::rail_persistence::restore_runtime_state(pending_rail.state)) {
+                result.success = false;
+                result.message = "save load failed: validated railway state could not be restored";
+                return result;
+            }
+            result.message += pending_rail.present ? " | railway restored" : " | railway cleared (legacy save)";
+        }
+
+        // Canonical/legacy saves have no bankruptcy streak. A V4 sidecar below
+        // may restore and re-publish the bankruptcy state.
         park_fence_runtime::clear();
         const std::filesystem::path fence_path = sidecar_path(path);
         std::ifstream input(fence_path, std::ios::binary);

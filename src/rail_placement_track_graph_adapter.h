@@ -14,7 +14,7 @@
 namespace ch::rail {
 
 inline constexpr const char* kRailPlacementTrackGraphAdapterContract =
-    "CH_RAIL_PLACEMENT_TRACK_GRAPH_ADAPTER_V1";
+    "CH_RAIL_PLACEMENT_TRACK_GRAPH_ADAPTER_V2";
 
 struct RailPlacementTopologyBuildResult {
     ch::track::TrackGraph graph{};
@@ -146,10 +146,9 @@ namespace detail {
 
 }  // namespace detail
 
-// Converts the editor staging graph into the shared modular topology. The
-// adapter does not mutate placement data. Node identity becomes external port
-// connectivity; turnout/crossing route edges sharing piece_group become one
-// multi-route PieceDescriptor.
+// Converts only live placement edges into shared modular topology. Tombstoned
+// edge slots remain intentionally unmapped so selected-piece demolition can
+// preserve stable IDs without leaking deleted routes back into simulation.
 [[nodiscard]] inline RailPlacementTopologyBuildResult build_track_graph(
     const RailPlacementGraph& placement) {
     RailPlacementTopologyBuildResult output;
@@ -158,6 +157,9 @@ namespace detail {
 
     std::vector<std::vector<ch::track::PortRef>> ports_by_node(placement.nodes().size());
     std::vector<bool> consumed(placement.edges().size(), false);
+    for (std::size_t index = 0U; index < placement.edges().size(); ++index) {
+        if (!placement.edges()[index].active) consumed[index] = true;
+    }
 
     const auto register_piece = [&](ch::track::PieceDescriptor descriptor,
                                     const std::vector<RailPlacementNodeId>& port_nodes,
@@ -167,7 +169,7 @@ namespace detail {
         const auto piece_id = output.graph.add_piece(std::move(descriptor));
         if (!piece_id) return false;
         for (std::size_t port = 0U; port < port_nodes.size(); ++port) {
-            if (port_nodes[port] >= ports_by_node.size()) return false;
+            if (port_nodes[port] >= ports_by_node.size() || !placement.nodes()[port_nodes[port]].active) return false;
             ports_by_node[port_nodes[port]].push_back({*piece_id, port});
         }
         for (const auto& mapping : edge_routes) {
@@ -181,13 +183,14 @@ namespace detail {
     for (std::size_t edge_index = 0U; edge_index < placement.edges().size(); ++edge_index) {
         if (consumed[edge_index]) continue;
         const RailPlacementEdge& seed = placement.edges()[edge_index];
+        if (!seed.active) continue;
         const RailPlacementPieceId group = detail::effective_piece_group(seed);
 
         std::vector<const RailPlacementEdge*> grouped;
         for (std::size_t candidate = edge_index; candidate < placement.edges().size(); ++candidate) {
             if (consumed[candidate]) continue;
             const RailPlacementEdge& edge = placement.edges()[candidate];
-            if (detail::effective_piece_group(edge) == group) {
+            if (edge.active && detail::effective_piece_group(edge) == group) {
                 consumed[candidate] = true;
                 grouped.push_back(&edge);
             }
@@ -260,8 +263,9 @@ namespace detail {
     }
 
     for (const RailPlacementEdge& edge : placement.edges()) {
+        if (!edge.active) continue;
         if (edge.id >= output.edge_piece.size() || output.edge_piece[edge.id] == ch::track::kInvalidPieceInstanceId) {
-            output.error = "rail placement edge was not mapped to topology";
+            output.error = "active rail placement edge was not mapped to topology";
             return output;
         }
     }
