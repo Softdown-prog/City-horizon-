@@ -94,11 +94,24 @@ jobs:
 
           $cli = (Resolve-Path "build/ch-mapforge-video/Release/MapForge2CLI.exe").Path
           $candidateRaw = (Resolve-Path $candidate).Path
-          $normalizedCandidate = Join-Path (Resolve-Path "out/ch-mapforge-video").Path "candidate_normalized.png"
+          $outputRoot = (Resolve-Path "out/ch-mapforge-video").Path
+          $normalizedCandidate = Join-Path $outputRoot "candidate_normalized.png"
           $env:CH_VIDEO_RAW_CANDIDATE = $candidateRaw
           $env:CH_VIDEO_NORMALIZED_CANDIDATE = $normalizedCandidate
+          $candidateForRenderer = $normalizedCandidate
 
-          if ($null -ne $job.mapforgeFrameIndex) {
+          if ($null -ne $job.mapforgeAnimateSheet -and [bool]$job.mapforgeAnimateSheet) {
+            $frameWidth = if ($null -ne $job.mapforgeFrameWidth) { [int]$job.mapforgeFrameWidth } else { 256 }
+            $frameHeight = if ($null -ne $job.mapforgeFrameHeight) { [int]$job.mapforgeFrameHeight } else { 256 }
+            $frameCount = if ($null -ne $job.mapforgeFrameCount) { [int]$job.mapforgeFrameCount } else { 0 }
+            if ($frameWidth -le 0 -or $frameHeight -le 0 -or $frameCount -le 0) { throw "Invalid animated MapForge sheet contract" }
+            $env:CH_VIDEO_FRAME_WIDTH = "$frameWidth"
+            $env:CH_VIDEO_FRAME_HEIGHT = "$frameHeight"
+            $env:CH_VIDEO_FRAME_COUNT = "$frameCount"
+            $env:CH_VIDEO_FRAME_DIR = $outputRoot
+            python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; fw=int(os.environ['CH_VIDEO_FRAME_WIDTH']); fh=int(os.environ['CH_VIDEO_FRAME_HEIGHT']); count=int(os.environ['CH_VIDEO_FRAME_COUNT']); out=os.environ['CH_VIDEO_FRAME_DIR']; im=Image.open(src).convert('RGBA'); assert fw*count <= im.width and fh <= im.height, f'{count} frames of {fw}x{fh} outside sheet {im.size}'; [im.crop((i*fw,0,(i+1)*fw,fh)).save(os.path.join(out,f'candidate_frame_{i:03d}.png'), format='PNG', optimize=False) for i in range(count)]"
+            $candidateForRenderer = Join-Path $outputRoot "candidate_frame_{index03}.png"
+          } elseif ($null -ne $job.mapforgeFrameIndex) {
             $frameIndex = [int]$job.mapforgeFrameIndex
             $frameWidth = if ($null -ne $job.mapforgeFrameWidth) { [int]$job.mapforgeFrameWidth } else { 256 }
             $frameHeight = if ($null -ne $job.mapforgeFrameHeight) { [int]$job.mapforgeFrameHeight } else { 256 }
@@ -111,17 +124,16 @@ jobs:
             python -c "import os; from PIL import Image; src=os.environ['CH_VIDEO_RAW_CANDIDATE']; dst=os.environ['CH_VIDEO_NORMALIZED_CANDIDATE']; im=Image.open(src).convert('RGBA'); im.save(dst, format='PNG', optimize=False)"
           }
 
-          if (-not (Test-Path $normalizedCandidate)) { throw "Normalized candidate PNG missing" }
-          $candidate = (Resolve-Path $normalizedCandidate).Path
+          if (-not [bool]$job.mapforgeAnimateSheet -and -not (Test-Path $normalizedCandidate)) { throw "Normalized candidate PNG missing" }
           $baseRequest = (Resolve-Path $baseRequest).Path
           $repoRoot = (Resolve-Path ".").Path
-          $output = (Resolve-Path "out/ch-mapforge-video").Path
+          $output = $outputRoot
 
           $job | Add-Member -NotePropertyName baseRequestFile -NotePropertyValue $baseRequest -Force
           $job | Add-Member -NotePropertyName outputDir -NotePropertyValue $output -Force
           $job | Add-Member -NotePropertyName renderer -NotePropertyValue ([pscustomobject]@{
             cwd = $repoRoot
-            command = @($cli, "capture", "{output}", $candidate, "{request}")
+            command = @($cli, "capture", "{output}", $candidateForRenderer, "{request}")
           }) -Force
 
           $resolved = "out/ch-mapforge-video-job-resolved.json"
