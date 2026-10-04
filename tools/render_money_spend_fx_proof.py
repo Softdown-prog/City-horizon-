@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+# CH_MONEY_SPEND_VIDEO_PROOF_V1
 OUT = Path("out/money-spend-fx-proof")
 FRAMES = OUT / "frames"
 W, H = 960, 540
@@ -59,19 +60,16 @@ def main():
         img = Image.new("RGBA", (W,H), (35,49,60,255))
         d = ImageDraw.Draw(img, "RGBA")
 
-        # soft game-like background
         d.rectangle((0,0,W,H), fill=(37,53,64,255))
         d.text((28,22), "CH_MONEY_SPEND_FX_V1 — VIDEO DE TESTE", font=FONT_TITLE, fill=(245,245,240,255))
         d.text((30,58), "Gasto real confirmado -> valor sobe e desaparece", font=FONT_SMALL, fill=(190,205,212,255))
 
-        # isometric ground grid
         for gy in range(5):
             for gx in range(6):
                 cx, cy = iso_to_screen(gx, gy)
                 grass = (101,145,76,255) if (gx+gy)%2==0 else (96,138,72,255)
                 draw_diamond(d, cx, cy, grass, (75,110,58,255))
 
-        # stone tile / wood tile areas
         draw_diamond(d, 480, 300, (138,132,122,255), (82,78,72,255))
         for off in (-36,-12,12,36):
             d.line((480+off,268,480+off+28,300), fill=(100,96,91,170), width=2)
@@ -79,13 +77,11 @@ def main():
         for off in (-42,-18,6,30):
             d.line((608+off,300,608+off+26,332), fill=(82,50,29,210), width=3)
 
-        # tiny building marker
         d.polygon([(355,202),(397,223),(355,244),(313,223)], fill=(188,178,160,255))
         d.polygon([(313,223),(355,244),(355,309),(313,287)], fill=(147,137,123,255))
         d.polygon([(397,223),(355,244),(355,309),(397,287)], fill=(122,113,101,255))
         d.text((308,315), "CASA", font=FONT_SMALL, fill=(230,230,225,220))
 
-        # click pulses + exact MoneySpendFx motion contract
         for started, amount, sx, sy, label in events:
             dt = tsec-started
             if -0.12 <= dt < 0:
@@ -99,12 +95,10 @@ def main():
                 yy = sy-18.0-34.0*eased
                 alpha = int(255.0*(1.0-tt))
                 text = f"-${amount}"
-                # shadow then yellow, same visual hierarchy as runtime
                 d.text((sx+2,yy+2), text, font=FONT_MONEY, anchor="mm", fill=(22,18,14,int(alpha*0.70)))
                 d.text((sx,yy), text, font=FONT_MONEY, anchor="mm", fill=(255,214,92,alpha))
                 d.text((sx,sy+40), label, font=FONT_SMALL, anchor="mm", fill=(235,235,230,190))
 
-        # timeline strip
         x0, x1 = 80, 880
         y = 500
         d.line((x0,y,x1,y), fill=(130,145,150,180), width=2)
