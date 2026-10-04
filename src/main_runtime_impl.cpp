@@ -2344,7 +2344,10 @@ int main() {
             const int quantity = farming.inventory_count(resource->id);
             if (quantity <= 0) { status = resource->display_name + ": NO STOCK TO SELL"; (void)play_sound(SoundEvent::ui_error); return; }
             const std::int64_t revenue = static_cast<std::int64_t>(quantity) * resource->base_sell_price;
-            if (farming.try_remove_resource(resource->id, quantity)) economy.earn_agricultural_sale(revenue, simulation_clock.date());
+            if (farming.try_remove_resource(resource->id, quantity)) {
+                economy.earn_agricultural_sale(revenue, simulation_clock.date());
+                money_spend_fx.spawn_income(revenue, static_cast<float>(viewport_width) - 180.0F, 92.0F);
+            }
             status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);
             (void)play_sound(SoundEvent::ui_confirm); return;
         }
