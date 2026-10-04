@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# CH_MONEY_SPEND_FX_V1 integration worker. Kept idempotent so concurrent main updates can rebase safely.
 path = Path('src/main_runtime_impl.cpp')
 text = path.read_text(encoding='utf-8')
 original = text
