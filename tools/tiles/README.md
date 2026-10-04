@@ -2,6 +2,20 @@
 
 Esta pasta é a entrada canônica para agentes que trabalham com **tiles de chão/caminhos**. Não é necessário vasculhar todas as ferramentas do repositório antes de produzir um tile.
 
+## Princípio: receita por tipo de tile, não regra global
+
+Não existe uma obrigação de gerar rampas, escadas, 16 máscaras ou transições para todo material. O agente deve primeiro classificar o pedido e aplicar somente a receita necessária.
+
+Exemplos:
+
+- **caminho plano conectado** → contrato `atomic-path` + família N/E/S/W de 16 máscaras;
+- **material de terreno** (areia, lama, cascalho) → pode usar transição/blend suave contra a superfície de baixo, sem exigir 16 máscaras;
+- **rampa/escada/subida/descida** → só gerar quando o asset solicitado realmente precisar dessas variantes;
+- **água** → usar pipeline contínuo próprio; não tratar como caminho;
+- **overlay/decal** → usar receita de overlay; não forçar contrato de caminho.
+
+A ausência de uma variante não é erro se aquela variante não fizer parte da receita escolhida para o material.
+
 ## Contrato do jogo
 
 Para caminhos atômicos atuais:
@@ -12,20 +26,46 @@ Para caminhos atômicos atuais:
 - alpha fora do losango
 - sem halo, borda decorativa, bevel, pixels pretos/coloridos ou resíduos da imagem-fonte
 - interior da textura deve permanecer visualmente estável
-- conexões N/E/S/W usam família de 16 máscaras
+- conexões N/E/S/W usam família de 16 máscaras **somente quando o asset for um caminho conectado**
 
 A autoridade geométrica é `assets/terrain/ground_tile_contract.json`, perfil `atomic-path`.
 
-## Pipeline oficial
+## Pipeline oficial — caminho conectado
 
 1. **Fonte artística** — começar por uma textura/imagem visualmente boa. Não usar procedural para inventar a arte do material por padrão.
 2. **Normalização** — produzir o losango 128x64 RGBA.
 3. **Limpeza de borda** — preencher RGB transparente antes de copiar amostras para a borda, remover bevel/rim e contaminação somente no perímetro. Nunca espalhar correção para o centro.
 4. **Seam** — igualar apenas amostras que realmente se encontram nas bordas opostas. Não difundir cores da borda para o interior.
-5. **Autotile** — gerar as 16 máscaras N/E/S/W a partir do tile-base limpo.
-6. **Gates** — validar contrato geométrico, pixels escuros indevidos e as 16 máscaras, inclusive pares de bordas com conectores compatíveis.
+5. **Autotile** — quando necessário, gerar as 16 máscaras N/E/S/W a partir do tile-base limpo.
+6. **Gates** — validar contrato geométrico, pixels escuros indevidos e, quando houver família conectada, validar as 16 máscaras e pares de bordas compatíveis.
 7. **Preview visual** — verificar reta, curva, cruzamento, repetição e tile isolado. Gate técnico aprovado NÃO equivale a aprovação artística.
-8. **Runtime** — publicar PNGs apenas após aprovação do preview visual. Os workflows de geração armazenam candidatos como artefatos e nunca fazem commit dos tiles.
+8. **Runtime** — publicar PNGs apenas após aprovação do preview visual. Os workflows de geração armazenam candidatos como artefatos e nunca fazem commit dos tiles automaticamente.
+
+## Pipeline opcional — transição de material
+
+Para materiais como areia, lama ou cascalho que devem se misturar visualmente com a superfície inferior, usar `tools/tiles/material_transition_worker.py`.
+
+Esse worker:
+
+- não é obrigatório;
+- não cria escadas/rampas;
+- não cria automaticamente 16 máscaras;
+- preserva o material no centro;
+- reduz alpha somente numa faixa curta da borda;
+- usa pequena irregularidade determinística para evitar um contorno geométrico perfeito;
+- permite preview sobre uma textura de fundo.
+
+Exemplo:
+
+```bash
+python tools/tiles/material_transition_worker.py \
+  --source assets/terrain/sand_isometric_01.png \
+  --output out/sand_transition_overlay.png \
+  --underlay out/grass_atomic_preview.png \
+  --preview out/sand_to_grass_preview.png
+```
+
+A intenção visual é uma transição discreta tipo "tingimento" areia→grama, sem borda dura e sem transformar areia em caminho rígido.
 
 ## Problemas já aprendidos
 
@@ -52,7 +92,9 @@ As implementações históricas ainda podem estar em `tools/` por compatibilidad
 - `tools/ground_tile_worker.py` — preparação, limpeza, seam e preview repetido.
 - `tools/tile_geometry.py` — máscara de losango compartilhada por normalização, worker, geradores e gate.
 - `tools/normalize_atomic_path_tile.py` — normalização do caminho atômico.
-- `tools/generate_sand_paths.py` — gerador da família de areia; serve como referência para materiais futuros.
+- `tools/generate_sand_paths.py` — gerador da família de areia conectada quando areia for usada como caminho.
+- `tools/tiles/material_transition_worker.py` — blend opcional para materiais de terreno sobre a superfície inferior.
+- `tools/tiles/validate_atomic_path_candidate.py` — worker seguro para chamar o gate `atomic-path` com os argumentos corretos.
 - `tools/validate_ground_tiles.py` — gate do contrato geométrico.
 - `tools/validate_path_tiles.py` — gate das 16 máscaras, pixels escuros e emendas compatíveis.
 - `tools/extract_ground_tile_sheet.py` — extração de sheets de terreno.
@@ -60,7 +102,9 @@ As implementações históricas ainda podem estar em `tools/` por compatibilidad
 
 ## Regra para agentes
 
-Ao receber tarefa de tile, **ler este README primeiro**. Não criar outro normalizador, seam fixer ou gerador específico antes de verificar se o worker existente cobre o caso. Se surgir um defeito recorrente, corrigir a ferramenta reutilizável e documentar a causa aqui.
+Ao receber tarefa de tile, **ler este README primeiro** e escolher a receita mínima necessária para aquele asset. Não criar outro normalizador, seam fixer ou gerador específico antes de verificar se o worker existente cobre o caso. Se surgir um defeito recorrente, corrigir a ferramenta reutilizável e documentar a causa aqui.
+
+Não presumir que todo tile precisa de 16 máscaras, rampas, escadas ou transições. Esses recursos são opt-in conforme o tipo de asset e o pedido atual.
 
 Não alterar Blender/building pipeline para corrigir tiles. Tiles e buildings são domínios separados.
 
