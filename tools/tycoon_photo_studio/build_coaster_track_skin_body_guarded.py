@@ -220,6 +220,17 @@ def main():
     if not re.fullmatch(r"[0-9a-f]{64}", approval):
         raise RuntimeError("CH_FINAL_REQUIRES_APPROVED_PROXY")
     render_final_directions(scene, root, authored, profile, out, approval)
+    studio_metadata = {
+        "contract": "CH_COASTER_TRACK_BODY_STUDIO_METADATA_V1",
+        "assetId": ASSET_ID,
+        "cameraContract": "CH_CAMERA_V1",
+        "skinContract": "CH_COASTER_TRACK_SKIN_V1",
+        "geometryAuthority": "CH_COASTER_TRACK_GEOMETRY_V1",
+        "runtimeRepresentation": "2D_RGBA_track_body_skin",
+        "studioFingerprint": report.get("studioFingerprint"),
+        "directionOrder": [d["id"] for d in bs.DIRECTIONS],
+    }
+    (out / "studio_metadata.json").write_text(json.dumps(studio_metadata, indent=2), encoding="utf-8")
     save_blend(args.save_blend)
     print("[CH_GATE] Classic Steel track-body final 4-direction runtime bake complete")
 
