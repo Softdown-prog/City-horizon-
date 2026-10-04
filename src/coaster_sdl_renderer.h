@@ -9,23 +9,24 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <vector>
 
 namespace ch::coaster {
 
-// CH_COASTER_SDL_RENDERER_V2
+// CH_COASTER_SDL_RENDERER_V3
 // Final presentation bridge for the pre-rendered Flame atlas and the dedicated
 // world-space coaster track. Simulation remains independent from SDL.
 //
-// CH_COASTER_TRACK_PRESENTATION_V1 promotes the approved V5.08 visual language
-// into the live renderer. Geometry is still owned exclusively by
-// CH_COASTER_TRACK_GEOMETRY_V1; this layer only gives those world-space members
-// a stable 2.5D material treatment instead of reducing them to one-pixel debug
-// lines.
+// CH_COASTER_TRACK_PRESENTATION_V2 keeps CH_COASTER_TRACK_GEOMETRY_V1 fully
+// authoritative and improves only the screen-space material treatment. V2
+// softens the high-contrast white rail look, adds a subtle outer fringe,
+// strengthens the red spine's volume, reduces tie noise, and overlaps adjacent
+// rail/spine segments enough to hide tiny wedge gaps on projected curves.
 inline constexpr const char* kCoasterTrackPresentationContract =
-    "CH_COASTER_TRACK_PRESENTATION_V1";
+    "CH_COASTER_TRACK_PRESENTATION_V2";
 
 struct CarSpriteGeometry {
     ScreenPoint screen_anchor{};
@@ -92,6 +93,7 @@ struct CarSpriteGeometry {
 }
 
 enum class TrackPresentationPass : std::uint8_t {
+    fringe,
     silhouette,
     body,
     highlight,
@@ -112,9 +114,24 @@ enum class TrackPresentationPass : std::uint8_t {
         case TrackLineKind::spine:
         case TrackLineKind::left_rail:
         case TrackLineKind::right_rail:
-            return 3;
+            return 4;
     }
     return 2;
+}
+
+[[nodiscard]] inline TrackPresentationPass presentation_pass_for_index(
+    const TrackLineKind kind,
+    const int pass_index) noexcept {
+    if (kind == TrackLineKind::support || kind == TrackLineKind::tie) {
+        return pass_index == 0 ? TrackPresentationPass::silhouette
+                               : TrackPresentationPass::body;
+    }
+    switch (pass_index) {
+        case 0: return TrackPresentationPass::fringe;
+        case 1: return TrackPresentationPass::silhouette;
+        case 2: return TrackPresentationPass::body;
+        default: return TrackPresentationPass::highlight;
+    }
 }
 
 [[nodiscard]] inline float presentation_line_width_px(
@@ -123,18 +140,20 @@ enum class TrackPresentationPass : std::uint8_t {
     const float scale) noexcept {
     switch (kind) {
         case TrackLineKind::support:
-            return (pass == TrackPresentationPass::silhouette ? 3.4F : 1.9F) * scale;
+            return (pass == TrackPresentationPass::silhouette ? 3.15F : 1.70F) * scale;
         case TrackLineKind::spine:
-            if (pass == TrackPresentationPass::silhouette) return 8.0F * scale;
-            if (pass == TrackPresentationPass::body) return 5.2F * scale;
-            return std::max(1.0F, 1.25F * scale);
+            if (pass == TrackPresentationPass::fringe) return 9.20F * scale;
+            if (pass == TrackPresentationPass::silhouette) return 7.90F * scale;
+            if (pass == TrackPresentationPass::body) return 5.35F * scale;
+            return std::max(0.70F, 0.88F * scale);
         case TrackLineKind::tie:
-            return (pass == TrackPresentationPass::silhouette ? 4.2F : 2.35F) * scale;
+            return (pass == TrackPresentationPass::silhouette ? 3.25F : 1.70F) * scale;
         case TrackLineKind::left_rail:
         case TrackLineKind::right_rail:
-            if (pass == TrackPresentationPass::silhouette) return 5.0F * scale;
-            if (pass == TrackPresentationPass::body) return 3.0F * scale;
-            return std::max(1.0F, 1.0F * scale);
+            if (pass == TrackPresentationPass::fringe) return 5.35F * scale;
+            if (pass == TrackPresentationPass::silhouette) return 4.35F * scale;
+            if (pass == TrackPresentationPass::body) return 2.55F * scale;
+            return std::max(0.52F, 0.64F * scale);
     }
     return 1.0F;
 }
@@ -148,20 +167,22 @@ enum class TrackPresentationPass : std::uint8_t {
 
     switch (kind) {
         case TrackLineKind::support:
-            if (pass == TrackPresentationPass::silhouette) return rgba(47.0F, 56.0F, 61.0F);
-            return rgba(121.0F, 132.0F, 138.0F);
+            if (pass == TrackPresentationPass::silhouette) return rgba(43.0F, 50.0F, 55.0F);
+            return rgba(111.0F, 122.0F, 128.0F);
         case TrackLineKind::spine:
-            if (pass == TrackPresentationPass::silhouette) return rgba(70.0F, 24.0F, 22.0F);
-            if (pass == TrackPresentationPass::body) return rgba(177.0F, 53.0F, 42.0F);
-            return rgba(221.0F, 91.0F, 65.0F, 0.90F);
+            if (pass == TrackPresentationPass::fringe) return rgba(38.0F, 16.0F, 17.0F, 0.22F);
+            if (pass == TrackPresentationPass::silhouette) return rgba(65.0F, 22.0F, 21.0F);
+            if (pass == TrackPresentationPass::body) return rgba(166.0F, 48.0F, 39.0F);
+            return rgba(221.0F, 86.0F, 63.0F, 0.58F);
         case TrackLineKind::tie:
-            if (pass == TrackPresentationPass::silhouette) return rgba(38.0F, 42.0F, 45.0F);
-            return rgba(104.0F, 111.0F, 116.0F);
+            if (pass == TrackPresentationPass::silhouette) return rgba(36.0F, 40.0F, 43.0F);
+            return rgba(88.0F, 96.0F, 101.0F);
         case TrackLineKind::left_rail:
         case TrackLineKind::right_rail:
-            if (pass == TrackPresentationPass::silhouette) return rgba(68.0F, 76.0F, 81.0F);
-            if (pass == TrackPresentationPass::body) return rgba(214.0F, 221.0F, 225.0F);
-            return rgba(250.0F, 251.0F, 252.0F, 0.92F);
+            if (pass == TrackPresentationPass::fringe) return rgba(31.0F, 37.0F, 41.0F, 0.18F);
+            if (pass == TrackPresentationPass::silhouette) return rgba(57.0F, 65.0F, 70.0F);
+            if (pass == TrackPresentationPass::body) return rgba(174.0F, 185.0F, 191.0F);
+            return rgba(228.0F, 235.0F, 238.0F, 0.54F);
     }
     return rgba(255.0F, 255.0F, 255.0F);
 }
@@ -170,19 +191,40 @@ enum class TrackPresentationPass : std::uint8_t {
     const TrackLineKind kind,
     const TrackPresentationPass pass,
     const float scale) noexcept {
-    // A tiny downward silhouette plus upper highlight is enough to turn the
-    // projected members into readable 2.5D material without changing their
-    // authoritative world-space position.
+    // The lower/right silhouette gives the member body depth. The restrained
+    // upper highlight reads as steel specular response without becoming a
+    // continuous white stripe at normal gameplay zoom.
     if (pass == TrackPresentationPass::silhouette &&
         (kind == TrackLineKind::spine ||
          kind == TrackLineKind::left_rail ||
          kind == TrackLineKind::right_rail)) {
-        return {0.65F * scale, 0.85F * scale};
+        return {0.60F * scale, 0.88F * scale};
     }
     if (pass == TrackPresentationPass::highlight) {
-        return {-0.20F * scale, -0.45F * scale};
+        return {-0.16F * scale, -0.34F * scale};
     }
     return {0.0F, 0.0F};
+}
+
+[[nodiscard]] inline float presentation_cap_extension_px(
+    const TrackLineKind kind,
+    const TrackPresentationPass pass,
+    const float width_px) noexcept {
+    // Rails/spine are emitted as many adjacent geometry members. Slightly
+    // extending the opaque body/silhouette hides wedge cracks at direction
+    // changes while keeping the translucent highlight from forming bright beads.
+    if (kind != TrackLineKind::spine &&
+        kind != TrackLineKind::left_rail &&
+        kind != TrackLineKind::right_rail) {
+        return 0.0F;
+    }
+    if (pass == TrackPresentationPass::silhouette || pass == TrackPresentationPass::body) {
+        return std::min(1.65F, width_px * 0.38F);
+    }
+    if (pass == TrackPresentationPass::fringe) {
+        return std::min(0.90F, width_px * 0.16F);
+    }
+    return 0.0F;
 }
 
 inline void append_track_presentation_quad(
@@ -191,19 +233,28 @@ inline void append_track_presentation_quad(
     const TrackScreenLine& line,
     const float width_px,
     const SDL_FColor color,
-    const SDL_FPoint offset) {
-    const float ax = line.a.x + offset.x;
-    const float ay = line.a.y + offset.y;
-    const float bx = line.b.x + offset.x;
-    const float by = line.b.y + offset.y;
+    const SDL_FPoint offset,
+    const float cap_extension_px) {
+    float ax = line.a.x + offset.x;
+    float ay = line.a.y + offset.y;
+    float bx = line.b.x + offset.x;
+    float by = line.b.y + offset.y;
     const float dx = bx - ax;
     const float dy = by - ay;
     const float length = std::hypot(dx, dy);
     if (!(length > 1.0e-4F) || !(width_px > 0.0F)) return;
 
+    const float ux = dx / length;
+    const float uy = dy / length;
+    const float extension = std::max(0.0F, cap_extension_px);
+    ax -= ux * extension;
+    ay -= uy * extension;
+    bx += ux * extension;
+    by += uy * extension;
+
     const float half_width = width_px * 0.5F;
-    const float nx = -dy / length * half_width;
-    const float ny = dx / length * half_width;
+    const float nx = -uy * half_width;
+    const float ny = ux * half_width;
     const int base = static_cast<int>(vertices.size());
 
     SDL_Vertex v0{};
@@ -236,9 +287,9 @@ inline void append_track_presentation_quad(
 }
 
 // Draws the exact CH_COASTER_TRACK_GEOMETRY_V1 representation using the live
-// CH_COASTER_TRACK_PRESENTATION_V1 material pass. The geometry remains shared
-// with simulation/proof code; only final screen-space thickness, steel shading
-// and the red structural spine live here.
+// CH_COASTER_TRACK_PRESENTATION_V2 material pass. The geometry remains shared
+// with simulation/proof code; only final screen-space thickness, steel shading,
+// red structural spine, and projected join cleanup live here.
 inline void render_coaster_track(
     SDL_Renderer* renderer,
     const CoasterTrackGeometry& geometry,
@@ -257,22 +308,24 @@ inline void render_coaster_track(
     const float scale = coaster_track_presentation_scale(camera);
     std::vector<SDL_Vertex> vertices;
     std::vector<int> indices;
-    vertices.reserve(plan.lines.size() * 10U);
-    indices.reserve(plan.lines.size() * 15U);
+    vertices.reserve(plan.lines.size() * 14U);
+    indices.reserve(plan.lines.size() * 21U);
 
     for (const TrackLineRenderCommand& command : plan.lines) {
         const TrackScreenLine line = project_track_line(
             command, camera, viewport_width, viewport_height);
         const int pass_count = presentation_pass_count(line.kind);
         for (int pass_index = 0; pass_index < pass_count; ++pass_index) {
-            const auto pass = static_cast<TrackPresentationPass>(pass_index);
+            const TrackPresentationPass pass = presentation_pass_for_index(line.kind, pass_index);
+            const float width_px = presentation_line_width_px(line.kind, pass, scale);
             append_track_presentation_quad(
                 vertices,
                 indices,
                 line,
-                presentation_line_width_px(line.kind, pass, scale),
+                width_px,
                 presentation_line_color(line.kind, pass),
-                presentation_pass_offset(line.kind, pass, scale));
+                presentation_pass_offset(line.kind, pass, scale),
+                presentation_cap_extension_px(line.kind, pass, width_px));
         }
     }
 
