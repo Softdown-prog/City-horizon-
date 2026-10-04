@@ -1,0 +1,8 @@
+{
+  "contract": "CH_COASTER_CLASSIC_STEEL_OVERLAY_PROMOTION_REQUEST_V1",
+  "assetId": "coaster.track_skin.classic_steel_01.modules",
+  "sourceRun": 37177174997,
+  "sourceArtifact": "CH-Blender-Agent-37177174997-1",
+  "targetSkin": "classic_steel_01",
+  "enableRuntimeOverlay": true
+}
