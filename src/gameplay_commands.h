@@ -16,7 +16,7 @@ public:
 
     [[nodiscard]] ch::GameCommandPlan prepare() const override {
         ch::GameCommandPlan plan;
-        plan.cost_cents = kRoadCostPerTile;
+        plan.cost_units = kRoadCostPerTile;
         plan.affected_tiles = {{tile_x_, tile_y_}};
         plan.transaction.description = "place road";
         plan.transaction.action_type = ch::TransactionActionType::set_road;
@@ -46,7 +46,7 @@ public:
             return plan;
         }
 
-        if (!economy_.can_afford(plan.cost_cents)) {
+        if (!economy_.can_afford(plan.cost_units)) {
             plan.valid = false;
             plan.failure = ch::GameCommandFailure::insufficient_funds;
             plan.message = "insufficient funds for road";
@@ -60,7 +60,7 @@ public:
     }
 
     [[nodiscard]] bool apply(const ch::GameCommandPlan& prepared, std::string& error) override {
-        if (!prepared.valid || prepared.cost_cents < 0) {
+        if (!prepared.valid || prepared.cost_units < 0) {
             error = "invalid prepared road command";
             return false;
         }
@@ -68,12 +68,12 @@ public:
             error = "road placement changed after preview";
             return false;
         }
-        if (!economy_.try_spend(prepared.cost_cents)) {
+        if (!economy_.try_spend(prepared.cost_units)) {
             error = "funds changed after preview";
             return false;
         }
         if (!roads_.place_tile(tile_x_, tile_y_)) {
-            economy_.credit_infrastructure_refund(prepared.cost_cents);
+            economy_.credit_infrastructure_refund(prepared.cost_units);
             error = "road manager rejected prepared placement";
             return false;
         }
