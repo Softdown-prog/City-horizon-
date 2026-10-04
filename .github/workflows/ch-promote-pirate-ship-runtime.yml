@@ -139,3 +139,5 @@ jobs:
           git add assets/city_park/pirate_ship
           git commit -m "assets: promote pirate ship runtime sprites [skip ci]"
           git push origin HEAD:main
+
+# bootstrap trigger: workflow now exists on main
