@@ -16,6 +16,10 @@ on:
       - ".github/workflows/ch-wood-path-promote.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ch-wood-path-promote-main
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
