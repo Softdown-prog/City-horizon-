@@ -1,0 +1,22 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "vehicle.steam_train.locomotive_01.final.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_steam_train_articulated_unit_v1.py",
+  "qualityStage": "final",
+  "approval": {
+    "proxyReviewed": true,
+    "approvedProxySha256": "c750f3874c943cd0443a54d8c186e0bb7b58b8cec58ad43d9b9d095e98fe906f"
+  },
+  "args": [
+    "--unit",
+    "locomotive",
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/steam_train_cab_7coaches_v1.train.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json",
+    "--output",
+    "out/ch_blender_agent/vehicle.steam_train.locomotive_01.final.v1"
+  ],
+  "outputDir": "out/ch_blender_agent/vehicle.steam_train.locomotive_01.final.v1"
+}
