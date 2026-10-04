@@ -1,4 +1,5 @@
 #include "procedural_rail_renderer.h"
+#include "../rail_live_operation_overlay.h"
 
 #include <cmath>
 #include <cstdint>
@@ -92,5 +93,11 @@ bool ProceduralRailRenderer::render_segment(
     if (renderer == nullptr || !finite_positive(viewport_width) || !finite_positive(viewport_height)) return false;
     const RailBuildResult build = RailMeshBuilder::build(segment, profile);
     if (!build.ok()) return false;
-    return render_geometry(renderer, build.geometry, profile, camera, viewport_width, viewport_height, palette);
+    const bool rendered = render_geometry(
+        renderer, build.geometry, profile, camera, viewport_width, viewport_height, palette);
+    if (rendered) {
+        ch::rail_live_operation::render_after_segment(
+            renderer, segment, camera, viewport_width, viewport_height);
+    }
+    return rendered;
 }

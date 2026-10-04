@@ -5,6 +5,10 @@ on:
     paths:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_live_operation_controller.h"
+      - "src/rail_live_operation_controller_test.cpp"
+      - "src/rail_live_operation_overlay.h"
+      - "src/ch_render/procedural_rail_renderer.cpp"
       - "src/rail_placement_graph.h"
       - "src/rail_placement_track_graph_adapter.h"
       - "src/track_graph.h"
@@ -17,6 +21,10 @@ on:
     paths:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_live_operation_controller.h"
+      - "src/rail_live_operation_controller_test.cpp"
+      - "src/rail_live_operation_overlay.h"
+      - "src/ch_render/procedural_rail_renderer.cpp"
       - "src/rail_placement_graph.h"
       - "src/rail_placement_track_graph_adapter.h"
       - "src/track_graph.h"
@@ -55,12 +63,27 @@ jobs:
         shell: bash
         run: build/rail-operation/rail_operation_runtime_test
 
+      - name: Compile live station controller regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_live_operation_controller_test.cpp \
+            -o build/rail-operation/rail_live_operation_controller_test
+
+      - name: Run live station controller regression
+        shell: bash
+        run: build/rail-operation/rail_live_operation_controller_test
+
       - name: Guard clean-room boundary
         shell: bash
         run: |
           set -euo pipefail
           if grep -R -n -E 'OpenRCT2|TrackCircuitIterator|TrackElementDescriptor' \
-            src/rail_operation_runtime.h src/rail_operation_runtime_test.cpp; then
+            src/rail_operation_runtime.h src/rail_operation_runtime_test.cpp \
+            src/rail_live_operation_controller.h src/rail_live_operation_controller_test.cpp \
+            src/rail_live_operation_overlay.h; then
             echo "Clean-room guard rejected reference-project identifiers in City Horizon implementation."
             exit 1
           fi
