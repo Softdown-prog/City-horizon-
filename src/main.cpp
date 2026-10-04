@@ -23,7 +23,7 @@
 // 16. The runtime UI receives a compact citizen inspection snapshot for needs/budget bars.
 // 17. Normal world clicks can select the nearest visible pedestrian for that panel.
 // 18. Citizen status remains hidden until the player explicitly selects a pedestrian.
-// 19. Viking-ship rope creaks start only while the ride moves, with a small
+// 19. Pirate-ship rope creaks start only while the ride moves, with a small
 //     presentation-only speed-of-sound propagation delay.
 // 20. Aggregate residential population materializes bounded, persistent citizen
 //     actors whose autonomous decisions are sharded across simulation ticks.
@@ -222,7 +222,7 @@ private:
     return false;
 }
 
-[[nodiscard]] inline std::optional<std::uint32_t> ch_viking_ship_sound_delay_ms(
+[[nodiscard]] inline std::optional<std::uint32_t> ch_pirate_ship_sound_delay_ms(
     const BuildingManager& buildings, const BuildingCatalog& catalog) {
     const ch::runtime_view::ViewSnapshot view = ch::runtime_view::snapshot();
     if (!view.valid) return std::nullopt;
@@ -233,7 +233,7 @@ private:
     float nearest_distance_tiles = -1.0F;
 
     for (const BuildingInstance& instance : buildings.instances()) {
-        if (instance.definition_id != "viking_ship_01" || !instance.activity_active()) continue;
+        if (instance.definition_id != "pirate_ship_01" || !instance.activity_active()) continue;
         const BuildingDefinition* definition = catalog.find(instance.definition_id);
         if (definition == nullptr || !ch_attraction_visible_in_current_view(instance, *definition)) continue;
 
@@ -261,7 +261,7 @@ private:
                     static_cast<std::uint32_t>(std::max(0L, std::lround(delay_ms))));
 }
 
-struct ChVikingShipAudioDelayState {
+struct ChPirateShipAudioDelayState {
     bool waiting_or_playing = false;
     std::uint64_t ready_at_ms = 0;
 };
@@ -269,23 +269,23 @@ struct ChVikingShipAudioDelayState {
 inline void ch_sync_park_ride_audio_visibility(
     AudioManager& audio, const BuildingManager& buildings, const BuildingCatalog& catalog,
     const bool simulation_running) {
-    static ChVikingShipAudioDelayState viking_audio;
-    const std::optional<std::uint32_t> viking_delay = simulation_running
-        ? ch_viking_ship_sound_delay_ms(buildings, catalog)
+    static ChPirateShipAudioDelayState pirate_audio;
+    const std::optional<std::uint32_t> pirate_delay = simulation_running
+        ? ch_pirate_ship_sound_delay_ms(buildings, catalog)
         : std::nullopt;
     const std::uint64_t now_ms = SDL_GetTicks();
 
-    if (viking_delay) {
-        if (!viking_audio.waiting_or_playing) {
-            viking_audio.waiting_or_playing = true;
-            viking_audio.ready_at_ms = now_ms + *viking_delay;
+    if (pirate_delay) {
+        if (!pirate_audio.waiting_or_playing) {
+            pirate_audio.waiting_or_playing = true;
+            pirate_audio.ready_at_ms = now_ms + *pirate_delay;
         }
-        if (now_ms >= viking_audio.ready_at_ms) {
-            (void)audio.set_looping(SoundEvent::viking_ship_running, true);
+        if (now_ms >= pirate_audio.ready_at_ms) {
+            (void)audio.set_looping(SoundEvent::pirate_ship_running, true);
             return;
         }
     } else {
-        viking_audio = {};
+        pirate_audio = {};
     }
 
     const bool ferris_audible = simulation_running &&
