@@ -151,6 +151,31 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Water uses the same semantic terrain command. The approved shallow-water
+    // build price is 50 game units; preview must not charge or mutate.
+    ch::MapDocument terrain = ch::MapDocument::create_empty("command-test", 32, 32);
+    TerrainPaintCommand shallow_water(terrain, tile_owned, economy, -3, -3, "water_shallow",
+                                      "assets/terrain/water/water_shallow_world.png", 50);
+    const auto water_preview = ch::GameCommandExecutor::run(shallow_water, ch::GameCommandMode::preview);
+    if (!require(water_preview.success && !water_preview.applied && water_preview.cost_units == 50,
+                 "shallow-water preview exposes approved cost without applying") ||
+        !require(economy.funds() == 1000 - kRoadCostPerTile,
+                 "shallow-water preview does not spend funds") ||
+        !require(!terrain.get_terrain_at(-3, -3).has_value(),
+                 "shallow-water preview does not mutate terrain")) {
+        return 1;
+    }
+    const auto water_executed = ch::GameCommandExecutor::run(shallow_water, ch::GameCommandMode::execute);
+    const auto painted_water = terrain.get_terrain_at(-3, -3);
+    if (!require(water_executed.success && water_executed.applied,
+                 "shallow-water command executes") ||
+        !require(painted_water.has_value() && painted_water->terrain_definition == "water_shallow",
+                 "water command writes semantic terrain definition") ||
+        !require(economy.funds() == 1000 - kRoadCostPerTile - 50,
+                 "water execution charges the exact previewed cost")) {
+        return 1;
+    }
+
     std::cout << "building system tests passed\n";
     return 0;
 }
