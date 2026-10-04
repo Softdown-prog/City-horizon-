@@ -1,0 +1,58 @@
+{
+  "contract": "CH_ATOMIC_PATH_FAMILY_V1",
+  "id": "wood_path_01",
+  "styleId": "wood_path",
+  "displayName": "Caminho de Madeira",
+  "tileCanvas": {
+    "width": 128,
+    "height": 64,
+    "projection": "isometric_2_to_1"
+  },
+  "connectivity": {
+    "bits": {
+      "N": 1,
+      "E": 2,
+      "S": 4,
+      "W": 8
+    },
+    "variantCount": 16
+  },
+  "source": "Converter/file_00000000e7b4820ea8e8cdc823cfa927.png",
+  "variants": [
+    "wood_path_00_isolated.png",
+    "wood_path_01_end_n.png",
+    "wood_path_02_end_e.png",
+    "wood_path_03_curve_ne.png",
+    "wood_path_04_end_s.png",
+    "wood_path_05_straight_ns.png",
+    "wood_path_06_curve_es.png",
+    "wood_path_07_tee_no_w.png",
+    "wood_path_08_end_w.png",
+    "wood_path_09_curve_nw.png",
+    "wood_path_10_straight_ew.png",
+    "wood_path_11_tee_no_s.png",
+    "wood_path_12_curve_sw.png",
+    "wood_path_13_tee_no_e.png",
+    "wood_path_14_tee_no_n.png",
+    "wood_path_15_cross.png"
+  ],
+  "workerReport": {
+    "schema": "CITY_HORIZON_GROUND_TILE_WORKER_V1",
+    "ok": true,
+    "source": "/tmp/tmpckc7849b/wood_rectified_128x64.png",
+    "output": "out/wood_path_01/wood_path_base_128x64.png",
+    "preview": "out/wood_path_01/wood_path_repeat_preview.png",
+    "width": 128,
+    "height": 64,
+    "mode": "RGBA",
+    "stripEdgePixels": 1,
+    "decontaminateEdgePixels": 0,
+    "decontaminatedPixels": 0,
+    "edgeHarmonization": "exact-border-only",
+    "edgeError": 0.3232,
+    "maxEdgeError": 6.0,
+    "nearBlackPixels": 4,
+    "maxNearBlackPixels": null
+  },
+  "promotionState": "runtime"
+}

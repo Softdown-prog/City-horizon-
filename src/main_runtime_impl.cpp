@@ -2420,8 +2420,8 @@ int main() {
             case UiAction::activate_roads: begin_road_mode(); break;
             case UiAction::activate_sidewalks: begin_sidewalk_mode(); break;
             case UiAction::select_sidewalk_style:
-                if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "grass" ||
-                    action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {
+                if (action.payload == "dirt_path" || action.payload == "sand_path" || action.payload == "wood_path" ||
+                    action.payload == "grass" || action.payload == "crosswalk_ns" || action.payload == "crosswalk_ew") {
                     sidewalk_style = action.payload;
                     begin_sidewalk_mode();
                 }
