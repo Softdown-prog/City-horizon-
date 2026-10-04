@@ -1,0 +1,480 @@
+name: Promote Approved Rail Turnouts
+
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-approved-rail-turnouts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image tooling
+        run: python -m pip install --upgrade pillow
+
+      - name: Download approved CH Blender bake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rail-turnouts
+          curl --fail --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/11288884463/zip" \
+            --output /tmp/rail-turnouts.zip
+          unzip -q /tmp/rail-turnouts.zip -d /tmp/rail-turnouts
+
+      - name: Promote sprites and wire runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import json
+
+          repo = Path('.')
+          artifact = Path('/tmp/rail-turnouts')
+          runtime_dir = repo / 'assets/rail/classic/turnouts'
+          runtime_dir.mkdir(parents=True, exist_ok=True)
+
+          jobs = {
+              'switch_left': artifact / 'rail.classic.v7.01.switch_left.final',
+              'switch_right': artifact / 'rail.classic.v7.02.switch_right.final',
+          }
+          directions = ('south', 'east', 'north', 'west')
+          promoted = {}
+          for kind, folder in jobs.items():
+              files = {}
+              for direction in directions:
+                  source = folder / f'transport.rail_track.classic.{kind}.01_{direction}_source.png'
+                  if not source.is_file():
+                      raise SystemExit(f'missing approved bake: {source}')
+                  target_name = f'transport.rail_track.classic.{kind}.01_{direction}.png'
+                  target = runtime_dir / target_name
+                  image = Image.open(source).convert('RGBA').resize((512, 512), Image.Resampling.LANCZOS)
+                  image.save(target, optimize=True)
+                  files[direction] = target_name
+              promoted[kind] = files
+
+          manifest = {
+              'contract': 'CH_RAIL_RUNTIME_SPRITES_V1',
+              'sourceArtifact': {
+                  'workflowRun': 37166371198,
+                  'artifactId': 11288884463,
+                  'sha256': '0d476f867fcf2b438f521981ed2deda11c5b8414d6f8dda5630db8e44029db18',
+              },
+              'cameraContract': 'CH_CAMERA_V1',
+              'projection': 'orthographic_dimetric_2_to_1',
+              'runtimeResolution': [512, 512],
+              'spriteAnchorPixels': [256.0, 380.0],
+              'projectedFootprintWidthPixels': 435.36,
+              'footprintTiles': [1, 1],
+              'geometry': {
+                  'throughSpanTiles': 1.0,
+                  'divergingRadiusTiles': 0.5,
+                  'divergingAngleDegrees': 90.0,
+                  'ports': ['entry', 'through_exit', 'side_exit'],
+              },
+              'assets': {
+                  'switch_left': {
+                      'assetId': 'transport.rail_track.classic.switch_left.01',
+                      'state': 'approved_frozen_promoted_runtime',
+                      'files': promoted['switch_left'],
+                  },
+                  'switch_right': {
+                      'assetId': 'transport.rail_track.classic.switch_right.01',
+                      'state': 'approved_frozen_promoted_runtime',
+                      'files': promoted['switch_right'],
+                  },
+              },
+              'fallback': 'procedural_renderer_when_sprite_unavailable',
+          }
+          (runtime_dir / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          def patch(path, old, new, count=1):
+              text = path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'patch anchor missing in {path}: {old[:100]!r}')
+              path.write_text(text.replace(old, new, count), encoding='utf-8')
+
+          # 1) Canonical modular 1x1 turnout primitive.  It is deliberately separate
+          # from the generic shallow turnout so existing procedural/editor tests retain
+          # their original behaviour.
+          path_builder = repo / 'src/rail_path_builder.h'
+          marker = '    // Canonical turnout/points primitive. The through route remains straight,\n'
+          modular_primitive = r'''    // Approved City Horizon 1x1 modular turnout primitive. The piece enters at
+    // one tile boundary, crosses the tile on the through route, and exposes a
+    // perpendicular side port through a 90-degree half-tile-radius branch. This
+    // mirrors CITY_HORIZON_RAIL_TRACK_V1 instead of stretching the art to a
+    // shallow procedural turnout.
+    [[nodiscard]] static RailTurnoutBuildResult modular_turnout(
+        const RailWorldPoint3& start,
+        const float start_heading_radians,
+        const RailTurnDirection direction,
+        const float tile_span = 1.0F,
+        const int subdivisions = 48,
+        const RailProfile& profile = {}) {
+        if (!std::isfinite(tile_span) || tile_span <= 0.0F) {
+            return {{RailValidationError::invalid_profile, "rail modular turnout has invalid tile span"}, {}, {}, 0.0F};
+        }
+
+        RailProfile modular_profile = profile;
+        const float radius = tile_span * 0.5F;
+        // The approved tycoon module intentionally uses a tighter branch than
+        // free-form curves. Relax only this authored primitive's validation.
+        modular_profile.min_turn_radius = std::min(modular_profile.min_turn_radius, radius * 0.90F);
+
+        const RailPathBuildResult branch = quarter_curve(
+            start, start_heading_radians, radius, direction,
+            subdivisions, modular_profile);
+        if (!branch) return {branch.validation, {}, {}, 0.0F};
+
+        const RailPathBuildResult through = straight(
+            start, start_heading_radians, tile_span,
+            std::max(modular_profile.min_subdivisions, subdivisions), modular_profile);
+        if (!through) return {through.validation, {}, {}, 0.0F};
+
+        const RailBuildResult through_mesh = RailMeshBuilder::build(through.segment, modular_profile);
+        const RailBuildResult branch_mesh = RailMeshBuilder::build(branch.segment, modular_profile);
+        if (!through_mesh.ok()) return {through_mesh.validation, {}, {}, 0.0F};
+        if (!branch_mesh.ok()) return {branch_mesh.validation, {}, {}, 0.0F};
+
+        constexpr float kHalfPi = 1.57079632679489661923F;
+        RailTurnoutBuildResult result;
+        result.through = through.segment;
+        result.diverging = branch.segment;
+        result.diverging_exit_heading_radians = start_heading_radians +
+            (direction == RailTurnDirection::left ? kHalfPi : -kHalfPi);
+        result.validation = {};
+        return result;
+    }
+
+'''
+          patch(path_builder, marker, modular_primitive + marker)
+
+          # 2) Placement graph gets an explicit modular append operation and a
+          # kind-aware restore gate so save/load accepts the approved tight turnout
+          # without relaxing free-form curve safety.
+          graph = repo / 'src/rail_placement_graph.h'
+          graph_marker = '    // At-grade diamond crossing. The primary route continues from `from`; the\n'
+          modular_graph = r'''    [[nodiscard]] std::optional<RailPlacementTurnoutResult> append_modular_turnout(
+        const RailPlacementNodeId from,
+        const RailTurnDirection direction,
+        const float tile_span = 1.0F,
+        const int subdivisions = 48) {
+        const RailPlacementNode* source = node(from);
+        if (source == nullptr) return std::nullopt;
+
+        const RailTurnoutBuildResult authored = RailPathBuilder::modular_turnout(
+            source->position, source->heading_radians, direction,
+            tile_span, subdivisions, profile_);
+        if (!authored.ok() ||
+            !mesh_safe_for_kind(authored.through, RailPlacementEdgeKind::turnout_through) ||
+            !mesh_safe_for_kind(authored.diverging, RailPlacementEdgeKind::turnout_diverging)) {
+            return std::nullopt;
+        }
+        if (nodes_.size() > static_cast<std::size_t>(std::numeric_limits<RailPlacementNodeId>::max()) - 2U ||
+            edges_.size() > static_cast<std::size_t>(std::numeric_limits<RailPlacementEdgeId>::max()) - 2U) {
+            return std::nullopt;
+        }
+
+        const RailPlacementCheckpoint before = checkpoint();
+        const auto through_node = add_root(authored.through.end, source->heading_radians);
+        const auto diverging_node = add_root(authored.diverging.end, authored.diverging_exit_heading_radians);
+        if (!through_node || !diverging_node) {
+            const bool rolled_back = rollback(before);
+            (void)rolled_back;
+            return std::nullopt;
+        }
+
+        const RailPlacementEdgeId through_edge = static_cast<RailPlacementEdgeId>(edges_.size());
+        const RailPlacementPieceId piece_group = static_cast<RailPlacementPieceId>(through_edge);
+        edges_.push_back({through_edge, from, *through_node, RailPlacementEdgeKind::turnout_through, authored.through, piece_group, true});
+        const RailPlacementEdgeId diverging_edge = static_cast<RailPlacementEdgeId>(edges_.size());
+        edges_.push_back({diverging_edge, from, *diverging_node, RailPlacementEdgeKind::turnout_diverging, authored.diverging, piece_group, true});
+        return RailPlacementTurnoutResult{*through_node, *diverging_node, through_edge, diverging_edge};
+    }
+
+'''
+          patch(graph, graph_marker, modular_graph + graph_marker)
+          patch(graph, '!mesh_safe(edge_value.segment)) {', '!mesh_safe_for_kind(edge_value.segment, edge_value.kind)) {')
+          old_mesh_safe = r'''    [[nodiscard]] bool mesh_safe(const RailSplineSegment& segment) const {
+        const RailBuildResult built = RailMeshBuilder::build(segment, profile_);
+        if (!built.ok()) return false;
+        return RailMeshBuilder::validate_mesh(built.geometry.ballast, profile_).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.sleepers, profile_).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.left_rail, profile_).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.right_rail, profile_).ok();
+    }
+'''
+          new_mesh_safe = r'''    [[nodiscard]] static bool mesh_safe_with_profile(const RailSplineSegment& segment,
+                                                     const RailProfile& validation_profile) {
+        const RailBuildResult built = RailMeshBuilder::build(segment, validation_profile);
+        if (!built.ok()) return false;
+        return RailMeshBuilder::validate_mesh(built.geometry.ballast, validation_profile).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.sleepers, validation_profile).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.left_rail, validation_profile).ok() &&
+               RailMeshBuilder::validate_mesh(built.geometry.right_rail, validation_profile).ok();
+    }
+
+    [[nodiscard]] bool mesh_safe_for_kind(const RailSplineSegment& segment,
+                                          const RailPlacementEdgeKind kind) const {
+        if (kind == RailPlacementEdgeKind::turnout_diverging) {
+            RailProfile modular_profile = profile_;
+            modular_profile.min_turn_radius = std::min(modular_profile.min_turn_radius, 0.45F);
+            return mesh_safe_with_profile(segment, modular_profile);
+        }
+        return mesh_safe_with_profile(segment, profile_);
+    }
+
+    [[nodiscard]] bool mesh_safe(const RailSplineSegment& segment) const {
+        return mesh_safe_with_profile(segment, profile_);
+    }
+'''
+          patch(graph, old_mesh_safe, new_mesh_safe)
+
+          # 3) Only the live runtime opts into fixed modular turnouts; the generic
+          # controller defaults to the old variable-radius behaviour for tests/tools.
+          controller = repo / 'src/rail_placement_controller.h'
+          patch(controller,
+                '    explicit RailPlacementController(RailPlacementGraph& graph) : graph_(graph) {}\n',
+                '    explicit RailPlacementController(RailPlacementGraph& graph, const bool modular_turnouts = false)\n'
+                '        : graph_(graph), modular_turnouts_(modular_turnouts) {}\n')
+          patch(controller,
+                '            const auto result = graph_.append_quarter_curve(source_, metric_world, direction);\n',
+                '            if (modular_turnouts_ && metric_world < 1.35F) break;\n'
+                '            const auto result = graph_.append_quarter_curve(source_, metric_world, direction);\n')
+          old_turnout_call = r'''            constexpr float kTurnoutAngleRadians = 0.2617993877991494F; // 15 degrees
+            const RailTurnDirection direction = mode_ == RailPlacementMode::turnout_left
+                ? RailTurnDirection::left : RailTurnDirection::right;
+            const auto result = graph_.append_turnout(
+                source_, metric_world, kTurnoutAngleRadians, direction);
+'''
+          new_turnout_call = r'''            constexpr float kTurnoutAngleRadians = 0.2617993877991494F; // generic 15-degree turnout
+            const RailTurnDirection direction = mode_ == RailPlacementMode::turnout_left
+                ? RailTurnDirection::left : RailTurnDirection::right;
+            const auto result = modular_turnouts_
+                ? graph_.append_modular_turnout(source_, direction)
+                : graph_.append_turnout(source_, metric_world, kTurnoutAngleRadians, direction);
+'''
+          patch(controller, old_turnout_call, new_turnout_call)
+          patch(controller,
+                '    bool active_ = false;\n',
+                '    bool modular_turnouts_ = false;\n    bool active_ = false;\n')
+
+          # 4) Runtime rendering: fixed turnouts use the approved pre-rendered
+          # sprite in all four canonical camera-relative orientations. Preview,
+          # invalid preview and hover are tinted at texture level; all other rail
+          # modules remain on the procedural renderer.
+          bridge = repo / 'src/rail_runtime_bridge.h'
+          patch(bridge,
+                '    RuntimeState()\n        : graph_(profile_), controller_(graph_), drag_(controller_), input_(drag_) {\n',
+                '    RuntimeState()\n        : graph_(profile_), controller_(graph_, true), drag_(controller_), input_(drag_) {\n')
+          bridge_text = bridge.read_text(encoding='utf-8')
+          render_start = bridge_text.index('    void render(SDL_Renderer* renderer,\n')
+          render_end = bridge_text.index('\nprivate:\n', render_start)
+          new_render = r'''    void render(SDL_Renderer* renderer,
+                const CameraState& camera,
+                const float viewport_width,
+                const float viewport_height,
+                const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture) const {
+        if (renderer == nullptr || graph_.edges().empty()) return;
+
+        ProceduralRailRenderer::Palette committed_palette{};
+        ProceduralRailRenderer::Palette hover_palette{};
+        hover_palette.ballast = SDL_Color{111, 121, 129, 235};
+        hover_palette.sleepers = SDL_Color{144, 111, 72, 255};
+        hover_palette.rails = SDL_Color{237, 218, 128, 255};
+        ProceduralRailRenderer::Palette valid_preview_palette{};
+        valid_preview_palette.ballast = SDL_Color{124, 111, 74, 220};
+        valid_preview_palette.sleepers = SDL_Color{125, 83, 42, 235};
+        valid_preview_palette.rails = SDL_Color{219, 193, 95, 255};
+        ProceduralRailRenderer::Palette invalid_preview_palette{};
+        invalid_preview_palette.ballast = SDL_Color{129, 58, 54, 210};
+        invalid_preview_palette.sleepers = SDL_Color{142, 58, 45, 235};
+        invalid_preview_palette.rails = SDL_Color{232, 91, 76, 255};
+
+        constexpr float kHalfPi = 1.57079632679489661923F;
+        constexpr float kTwoPi = 6.28318530717958647692F;
+        constexpr float kSpriteCanvasPixels = 512.0F;
+        constexpr float kSpriteAnchorX = 256.0F;
+        constexpr float kSpriteAnchorY = 380.0F;
+        constexpr float kProjectedFootprintWidth = 435.36F;
+
+        const auto diverging_edge_for = [&](const RailPlacementPieceId group) -> const RailPlacementEdge* {
+            for (const RailPlacementEdge& candidate : graph_.edges()) {
+                if (candidate.active && candidate.piece_group == group &&
+                    candidate.kind == RailPlacementEdgeKind::turnout_diverging) {
+                    return &candidate;
+                }
+            }
+            return nullptr;
+        };
+
+        const auto render_turnout_sprite = [&](const RailPlacementEdge& through,
+                                               const bool staged,
+                                               const bool hovered) -> bool {
+            const RailPlacementEdge* branch = diverging_edge_for(through.piece_group);
+            if (branch == nullptr || !find_texture) return false;
+
+            const float tx = through.segment.end.x - through.segment.start.x;
+            const float ty = through.segment.end.y - through.segment.start.y;
+            const float branch_x = branch->segment.end.x - branch->segment.start.x;
+            const float branch_y = branch->segment.end.y - branch->segment.start.y;
+            const float heading = std::atan2(ty, tx);
+            int logical_turn = static_cast<int>(std::lround(heading / kHalfPi));
+            const float snapped_heading = static_cast<float>(logical_turn) * kHalfPi;
+            if (std::abs(std::remainder(heading - snapped_heading, kTwoPi)) > 0.03F) return false;
+            logical_turn = ((logical_turn % 4) + 4) % 4;
+
+            const float cross = tx * branch_y - ty * branch_x;
+            const bool left = cross > 0.0F;
+            const int visual_turn = (logical_turn - static_cast<int>(camera.rotation) + 4) % 4;
+            const char* direction = visual_turn == 0 ? "south" :
+                                    visual_turn == 1 ? "east" :
+                                    visual_turn == 2 ? "north" : "west";
+            const std::string kind = left ? "switch_left" : "switch_right";
+            const std::filesystem::path sprite_path =
+                std::filesystem::path("assets/rail/classic/turnouts") /
+                ("transport.rail_track.classic." + kind + ".01_" + direction + ".png");
+            const TextureAsset* sprite = find_texture(sprite_path);
+            if (sprite == nullptr || sprite->texture == nullptr) return false;
+
+            const RailWorldPoint3 center{
+                (through.segment.start.x + through.segment.end.x) * 0.5F,
+                (through.segment.start.y + through.segment.end.y) * 0.5F,
+                (through.segment.start.z + through.segment.end.z) * 0.5F,
+            };
+            const ScreenPoint screen = world_to_screen_point(
+                center.x, center.y, center.z, camera, viewport_width, viewport_height);
+            const float scale = (static_cast<float>(contracts::kTileWidth) * camera.zoom) /
+                                kProjectedFootprintWidth;
+            const SDL_FRect destination{
+                screen.x - kSpriteAnchorX * scale,
+                screen.y - kSpriteAnchorY * scale,
+                kSpriteCanvasPixels * scale,
+                kSpriteCanvasPixels * scale,
+            };
+
+            Uint8 red = 255, green = 255, blue = 255, alpha = 255;
+            if (staged) {
+                if (preview_valid_) {
+                    red = 244; green = 220; blue = 145; alpha = 224;
+                } else {
+                    red = 255; green = 112; blue = 102; alpha = 216;
+                }
+            } else if (hovered) {
+                red = 255; green = 226; blue = 126;
+            }
+            (void)SDL_SetTextureColorMod(sprite->texture, red, green, blue);
+            (void)SDL_SetTextureAlphaMod(sprite->texture, alpha);
+            const bool rendered = SDL_RenderTexture(renderer, sprite->texture, nullptr, &destination);
+            (void)SDL_SetTextureColorMod(sprite->texture, 255, 255, 255);
+            (void)SDL_SetTextureAlphaMod(sprite->texture, 255);
+            return rendered;
+        };
+
+        std::unordered_set<RailPlacementPieceId> sprite_backed_turnouts;
+        for (const RailPlacementEdge& edge : graph_.edges()) {
+            if (!edge.active) continue;
+            const bool staged = gesture_active_ &&
+                static_cast<std::size_t>(edge.id) >= gesture_checkpoint_.edge_count;
+            const bool hovered = !staged && hovered_piece_.has_value() &&
+                edge.piece_group == *hovered_piece_;
+
+            if (edge.kind == RailPlacementEdgeKind::turnout_through) {
+                if (render_turnout_sprite(edge, staged, hovered)) {
+                    sprite_backed_turnouts.insert(edge.piece_group);
+                    continue;
+                }
+            }
+            if (sprite_backed_turnouts.contains(edge.piece_group)) continue;
+
+            const ProceduralRailRenderer::Palette& palette = staged
+                ? (preview_valid_ ? valid_preview_palette : invalid_preview_palette)
+                : (hovered ? hover_palette : committed_palette);
+            RailProfile render_profile = profile_;
+            if (edge.kind == RailPlacementEdgeKind::turnout_through ||
+                edge.kind == RailPlacementEdgeKind::turnout_diverging) {
+                render_profile.min_turn_radius = std::min(render_profile.min_turn_radius, 0.45F);
+            }
+            (void)ProceduralRailRenderer::render_segment(
+                renderer, edge.segment, render_profile, camera,
+                viewport_width, viewport_height, palette);
+        }
+    }
+'''
+          bridge.write_text(bridge_text[:render_start] + new_render + bridge_text[render_end:], encoding='utf-8')
+
+          # Reject diagonal modular points because the approved source bake has
+          # four canonical rotations, not screen-space rotated approximations.
+          bridge_text = bridge.read_text(encoding='utf-8')
+          validation_anchor = '''            const RailPlacementEdge& edge = graph_.edges()[edge_index];\n            if (!edge.active) continue;\n            const RailSplineSegment& segment = edge.segment;\n'''
+          validation_replacement = '''            const RailPlacementEdge& edge = graph_.edges()[edge_index];\n            if (!edge.active) continue;\n            if (edge.kind == RailPlacementEdgeKind::turnout_through) {\n                const float dx = edge.segment.end.x - edge.segment.start.x;\n                const float dy = edge.segment.end.y - edge.segment.start.y;\n                constexpr float kTurnoutQuarterTurn = 1.57079632679489661923F;\n                constexpr float kTurnoutFullTurn = 6.28318530717958647692F;\n                const float heading = std::atan2(dy, dx);\n                const float snapped = std::round(heading / kTurnoutQuarterTurn) * kTurnoutQuarterTurn;\n                if (std::abs(std::remainder(heading - snapped, kTurnoutFullTurn)) > 0.03F) {\n                    if (error) *error = "RAIL TURNOUT REQUIRES CARDINAL 90 DEG HEADING";\n                    return false;\n                }\n            }\n            const RailSplineSegment& segment = edge.segment;\n'''
+          if validation_anchor not in bridge_text:
+              raise SystemExit('runtime staged validation anchor missing')
+          bridge_text = bridge_text.replace(validation_anchor, validation_replacement, 1)
+
+          old_wrapper = '''inline void render(SDL_Renderer* renderer,\n                   const CameraState& camera,\n                   const float viewport_width,\n                   const float viewport_height) {\n    (void)kRailPersistenceRuntimeRegistered;\n    state().render(renderer, camera, viewport_width, viewport_height);\n}\n'''
+          new_wrapper = '''inline void render(SDL_Renderer* renderer,\n                   const CameraState& camera,\n                   const float viewport_width,\n                   const float viewport_height,\n                   const std::function<const TextureAsset*(const std::filesystem::path&)>& find_texture) {\n    (void)kRailPersistenceRuntimeRegistered;\n    state().render(renderer, camera, viewport_width, viewport_height, find_texture);\n}\n'''
+          if old_wrapper not in bridge_text:
+              raise SystemExit('rail runtime render wrapper anchor missing')
+          bridge_text = bridge_text.replace(old_wrapper, new_wrapper, 1)
+          bridge_text = bridge_text.replace(
+              '        rail_runtime::render(renderer, camera, viewport_width, viewport_height);\n',
+              '        rail_runtime::render(renderer, camera, viewport_width, viewport_height, find_texture);\n', 1)
+          bridge_text = bridge_text.replace(
+              '// append the procedural railway immediately above roads and below sidewalks.\n',
+              '// append the hybrid railway immediately above roads and below sidewalks.\n// Approved turnout modules use CH Blender sprites; unfinished modules stay procedural.\n', 1)
+          bridge.write_text(bridge_text, encoding='utf-8')
+
+          print('Promoted runtime files:')
+          for p in sorted(runtime_dir.iterdir()):
+              print(' -', p)
+          PY
+
+      - name: Validate promoted sprite manifest
+        run: |
+          set -euo pipefail
+          test -f assets/rail/classic/turnouts/manifest.json
+          test "$(find assets/rail/classic/turnouts -maxdepth 1 -name '*.png' | wc -l)" -eq 8
+          python -m json.tool assets/rail/classic/turnouts/manifest.json >/dev/null
+
+      - name: Compile City Horizon runtime
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/rail-turnout-promote -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/rail-turnout-promote --target city_builder --parallel 2
+
+      - name: Publish promoted runtime assets
+        run: |
+          set -euo pipefail
+          git config user.name "city-horizon-rail-promoter"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/promote-approved-rail-turnouts.yml
+          git add assets/rail/classic/turnouts \
+                  src/rail_path_builder.h \
+                  src/rail_placement_graph.h \
+                  src/rail_placement_controller.h \
+                  src/rail_runtime_bridge.h
+          git commit -m "rail: promote approved turnout sprites to runtime"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
