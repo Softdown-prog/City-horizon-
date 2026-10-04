@@ -5,7 +5,10 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/economy_system.h"
       - "src/rail_runtime_bridge.h"
+      - "src/rail_construction_economy.h"
+      - "src/rail_construction_economy_test.cpp"
       - "src/rail_system.cpp"
       - "src/rail_system.h"
       - "src/rail_mapforge_input_adapter.h"
@@ -22,7 +25,10 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/economy_system.h"
       - "src/rail_runtime_bridge.h"
+      - "src/rail_construction_economy.h"
+      - "src/rail_construction_economy_test.cpp"
       - "src/rail_system.cpp"
       - "src/rail_system.h"
       - "src/rail_mapforge_input_adapter.h"
@@ -76,3 +82,13 @@ jobs:
             src/rail_system.cpp src/rail_placement_track_graph_adapter_test.cpp \
             -o build/rail-runtime/rail_placement_track_graph_adapter_test
           build/rail-runtime/rail_placement_track_graph_adapter_test
+
+      - name: Compile rail construction economy regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_construction_economy_test.cpp \
+            -o build/rail-runtime/rail_construction_economy_test
+          build/rail-runtime/rail_construction_economy_test
