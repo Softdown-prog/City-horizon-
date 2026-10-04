@@ -1,0 +1,1384 @@
+{
+  "contract": "CH_COLOR_MASK_ANIMATION_FRAMES_V1",
+  "status": "ok",
+  "assetId": "park_carousel_city_horizon_01",
+  "channel": "primary",
+  "semantic": "canopy_yellow_stripes",
+  "encoding": "white_on_black",
+  "targetPanels": [
+    "CanopyPanel_01",
+    "CanopyPanel_03",
+    "CanopyPanel_05",
+    "CanopyPanel_07",
+    "CanopyPanel_09",
+    "CanopyPanel_11",
+    "CanopyPanel_13",
+    "CanopyPanel_15",
+    "CanopyPanel_17",
+    "CanopyPanel_19",
+    "CanopyPanel_21",
+    "CanopyPanel_23"
+  ],
+  "frameCount": 48,
+  "frameDurationMs": 100,
+  "directions": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "frames": {
+    "south": [
+      {
+        "file": "frame_000.png",
+        "sha256": "e7b505425618b79c98ae52b0872b0b51ec6744e88c3b34e88c8f8f59596db53a",
+        "bytes": 69849,
+        "frame": 0,
+        "rotationDegrees": 0.0
+      },
+      {
+        "file": "frame_001.png",
+        "sha256": "35346ebb067dc97a447ba08ca0a1bf90dd2c886179490c61a1c710de89e6470a",
+        "bytes": 62233,
+        "frame": 1,
+        "rotationDegrees": 7.5
+      },
+      {
+        "file": "frame_002.png",
+        "sha256": "2f231a671aef4d3180fa29da5f05fe3aadfc829a936c4c62f3fc53df6ae3c1ad",
+        "bytes": 62258,
+        "frame": 2,
+        "rotationDegrees": 15.0
+      },
+      {
+        "file": "frame_003.png",
+        "sha256": "64e2696d4069f6b9906e84b2820afe370c5349054078af6f07c85e5e00715e9b",
+        "bytes": 62246,
+        "frame": 3,
+        "rotationDegrees": 22.5
+      },
+      {
+        "file": "frame_004.png",
+        "sha256": "527f342ec2c69d58494c8d34248bd066cb098a6a0127d856388a0e34c3cf24cd",
+        "bytes": 62154,
+        "frame": 4,
+        "rotationDegrees": 30.0
+      },
+      {
+        "file": "frame_005.png",
+        "sha256": "bbe1619f9dc436ddf04a4ad5853060f4b56a094f158d2c5a802c876cdf6fdd50",
+        "bytes": 62208,
+        "frame": 5,
+        "rotationDegrees": 37.5
+      },
+      {
+        "file": "frame_006.png",
+        "sha256": "6e8a477d045e704b049cfc2f061d2dcc2d8e8b8d823d32a776857ad1253b0b7a",
+        "bytes": 62256,
+        "frame": 6,
+        "rotationDegrees": 45.0
+      },
+      {
+        "file": "frame_007.png",
+        "sha256": "777a333ccca444495c5163913b14f7408f11f01207f1dc666a23d4788b36448c",
+        "bytes": 62247,
+        "frame": 7,
+        "rotationDegrees": 52.5
+      },
+      {
+        "file": "frame_008.png",
+        "sha256": "14ee4574e79def3315bca7b2340693fb00c4b9c52883862cdc30a1f1815a8464",
+        "bytes": 62152,
+        "frame": 8,
+        "rotationDegrees": 60.0
+      },
+      {
+        "file": "frame_009.png",
+        "sha256": "a942c463a0a114a6510e45f8989052110ff6506e4639f9c39617de728bfe2bc0",
+        "bytes": 62242,
+        "frame": 9,
+        "rotationDegrees": 67.5
+      },
+      {
+        "file": "frame_010.png",
+        "sha256": "773b1b8b0ae0f43b7c2d6db26e0c1c534bb784a96d586db111b21b11e3ccbc84",
+        "bytes": 62261,
+        "frame": 10,
+        "rotationDegrees": 75.0
+      },
+      {
+        "file": "frame_011.png",
+        "sha256": "9b37a79a7d42f647cd1eff0ed08c1af04af149ceb14421686fb776e845d46bdd",
+        "bytes": 62247,
+        "frame": 11,
+        "rotationDegrees": 82.5
+      },
+      {
+        "file": "frame_012.png",
+        "sha256": "175d648aed6af55e628ac7da3090bfd12acd6fe76773d2c500da73bf73a82c96",
+        "bytes": 62162,
+        "frame": 12,
+        "rotationDegrees": 90.0
+      },
+      {
+        "file": "frame_013.png",
+        "sha256": "0e9b927237b37d3a3904053e7fa0b1952f0c1f678985685f7b1a9bee3afb50ed",
+        "bytes": 62233,
+        "frame": 13,
+        "rotationDegrees": 97.5
+      },
+      {
+        "file": "frame_014.png",
+        "sha256": "7105ff71994307dbd2795323e863b5de9d2a5f7f98d1961f6d257cdf42cb964b",
+        "bytes": 62258,
+        "frame": 14,
+        "rotationDegrees": 105.0
+      },
+      {
+        "file": "frame_015.png",
+        "sha256": "e7f2fe8cd417cbee447c0b2cae3b6d22014489c51aabeedc824c397c0a836e18",
+        "bytes": 62246,
+        "frame": 15,
+        "rotationDegrees": 112.5
+      },
+      {
+        "file": "frame_016.png",
+        "sha256": "3a34e0b60875e2e2b0e2aeb3ddcc02203bd88546852f344cd261da11c5433d17",
+        "bytes": 62154,
+        "frame": 16,
+        "rotationDegrees": 120.0
+      },
+      {
+        "file": "frame_017.png",
+        "sha256": "1ce4c0d71808738328746e9877d751d973ae91f6e153b234a0d3567a80e21767",
+        "bytes": 62208,
+        "frame": 17,
+        "rotationDegrees": 127.5
+      },
+      {
+        "file": "frame_018.png",
+        "sha256": "7e714bb33b780472bec30506256d084fbe38079e7a0acf3b029a75ab665030c4",
+        "bytes": 62256,
+        "frame": 18,
+        "rotationDegrees": 135.0
+      },
+      {
+        "file": "frame_019.png",
+        "sha256": "c77e35bc906ec5d1ba5b4874ab9ffe8d16b014bcbdf18eda691f4f1e857eba95",
+        "bytes": 62247,
+        "frame": 19,
+        "rotationDegrees": 142.5
+      },
+      {
+        "file": "frame_020.png",
+        "sha256": "b67ed94250f3e64d049c2fea2b73ec45c910b312e8092881b4dea98f1c6c2818",
+        "bytes": 62152,
+        "frame": 20,
+        "rotationDegrees": 150.0
+      },
+      {
+        "file": "frame_021.png",
+        "sha256": "d164944b73864a0b4408ab7fcaa3547136dfe40449a2d860823bf09dc8bad4ea",
+        "bytes": 62242,
+        "frame": 21,
+        "rotationDegrees": 157.5
+      },
+      {
+        "file": "frame_022.png",
+        "sha256": "b37ff60c32d139e0d730a21831b6b81a11e1b08f1d9a933ca34a797541b6c928",
+        "bytes": 62261,
+        "frame": 22,
+        "rotationDegrees": 165.0
+      },
+      {
+        "file": "frame_023.png",
+        "sha256": "49d1967e9262f9ae660a0162052239c49c1cbfdf711730db18247c46d3cf4fa9",
+        "bytes": 62247,
+        "frame": 23,
+        "rotationDegrees": 172.5
+      },
+      {
+        "file": "frame_024.png",
+        "sha256": "34dbb25acece1e59f4acc31c68469b0e4e49c18ca40ea39d737762e5261a2c66",
+        "bytes": 62162,
+        "frame": 24,
+        "rotationDegrees": 180.0
+      },
+      {
+        "file": "frame_025.png",
+        "sha256": "dfe77c7cbe33b4406d2ddff3eb1f771794af93280eb4a88954d023d85096ea63",
+        "bytes": 62233,
+        "frame": 25,
+        "rotationDegrees": 187.5
+      },
+      {
+        "file": "frame_026.png",
+        "sha256": "6bd0fdf457929695302bf2dac03da1946d6eb2a88bb7d7c2b6c41f7c872b0a5b",
+        "bytes": 62258,
+        "frame": 26,
+        "rotationDegrees": 195.0
+      },
+      {
+        "file": "frame_027.png",
+        "sha256": "5a7b35dfc75ee22b60a319d6a8b89e746ce788ffb8a0649e707521fa6dd66284",
+        "bytes": 62246,
+        "frame": 27,
+        "rotationDegrees": 202.5
+      },
+      {
+        "file": "frame_028.png",
+        "sha256": "d7c8d653e455c6e48eb99416dc25df449cb08005ab9f58fc089bc1ac06f3d93a",
+        "bytes": 62154,
+        "frame": 28,
+        "rotationDegrees": 210.0
+      },
+      {
+        "file": "frame_029.png",
+        "sha256": "9c8a32708cafcfdfe7612d828834ccef9d33a50d1e5ed0281ed714c262c77c31",
+        "bytes": 62208,
+        "frame": 29,
+        "rotationDegrees": 217.5
+      },
+      {
+        "file": "frame_030.png",
+        "sha256": "13b2efaa95d35b4d63250b533c457b07a3be2633e769dcc59801419f6cc8761d",
+        "bytes": 62256,
+        "frame": 30,
+        "rotationDegrees": 225.0
+      },
+      {
+        "file": "frame_031.png",
+        "sha256": "f2766ea65f35a3ff7e58636e87f68f4f0ca15e2417e8624d636cf65d2026569e",
+        "bytes": 62247,
+        "frame": 31,
+        "rotationDegrees": 232.5
+      },
+      {
+        "file": "frame_032.png",
+        "sha256": "a1a2cda282698f3d2ee11da79b7b10ed8fe9bdd3edb2704d1290e7c9120e513e",
+        "bytes": 62152,
+        "frame": 32,
+        "rotationDegrees": 240.0
+      },
+      {
+        "file": "frame_033.png",
+        "sha256": "75dfab5115f484b3a4e562d7357b8d7ee66dfcd99f04b3c9f77a7c246327b4e2",
+        "bytes": 62242,
+        "frame": 33,
+        "rotationDegrees": 247.5
+      },
+      {
+        "file": "frame_034.png",
+        "sha256": "166bca2f750e11fe5252f3f5b0a4768d1507eb691590d56a77c7a1c31b50ec85",
+        "bytes": 62261,
+        "frame": 34,
+        "rotationDegrees": 255.0
+      },
+      {
+        "file": "frame_035.png",
+        "sha256": "840e545a3a43fec3659eea2e2c559e99f81da17dde84b659f14b438bc7597308",
+        "bytes": 62247,
+        "frame": 35,
+        "rotationDegrees": 262.5
+      },
+      {
+        "file": "frame_036.png",
+        "sha256": "cb20f544a86c17c89cfc394d9784a7e2da81d05103bcb13a3156a90340c93983",
+        "bytes": 62162,
+        "frame": 36,
+        "rotationDegrees": 270.0
+      },
+      {
+        "file": "frame_037.png",
+        "sha256": "0276596716d3eec1f16fc5b9d70a39effd6c5e30f765248e4ee06053f5ee9990",
+        "bytes": 62233,
+        "frame": 37,
+        "rotationDegrees": 277.5
+      },
+      {
+        "file": "frame_038.png",
+        "sha256": "b1818142c5f890c624363fcae85dc09d050acadb2fb6065a6cdd93504e09732c",
+        "bytes": 62258,
+        "frame": 38,
+        "rotationDegrees": 285.0
+      },
+      {
+        "file": "frame_039.png",
+        "sha256": "482b860d6eaace0f554864891a9c97f8509b9741c30c246bd391e0c404b3079b",
+        "bytes": 62246,
+        "frame": 39,
+        "rotationDegrees": 292.5
+      },
+      {
+        "file": "frame_040.png",
+        "sha256": "8de122dce32746a69fa09c0e69c059f0f19fa12dad3f882a4b24726eb7b0314a",
+        "bytes": 62154,
+        "frame": 40,
+        "rotationDegrees": 300.0
+      },
+      {
+        "file": "frame_041.png",
+        "sha256": "404ce67ebd3d74db4c9564e00d6fe3c39905631d4bbd4b1bac98106ad7b13bdd",
+        "bytes": 62208,
+        "frame": 41,
+        "rotationDegrees": 307.5
+      },
+      {
+        "file": "frame_042.png",
+        "sha256": "46502de0b446917a48032bee4626e19b295e9db8b1de75c820b7f7f902b12863",
+        "bytes": 62256,
+        "frame": 42,
+        "rotationDegrees": 315.0
+      },
+      {
+        "file": "frame_043.png",
+        "sha256": "5db59d7447dc7ec47d327de96751e1232ab1d8dba3eb0d75e99aa09ecf4a4336",
+        "bytes": 62247,
+        "frame": 43,
+        "rotationDegrees": 322.5
+      },
+      {
+        "file": "frame_044.png",
+        "sha256": "f001026dd63c3360de6e06129cbce4ffc5398f68ca8576af3e76442d6083a79a",
+        "bytes": 62152,
+        "frame": 44,
+        "rotationDegrees": 330.0
+      },
+      {
+        "file": "frame_045.png",
+        "sha256": "fe4677b03ae0880950070bcfb382197a76b25156072bd990b5968a4194fe089a",
+        "bytes": 62242,
+        "frame": 45,
+        "rotationDegrees": 337.5
+      },
+      {
+        "file": "frame_046.png",
+        "sha256": "6cd3a2ed69b271191a7c400e064ca28d4044f4edc568666783902675163fdf1e",
+        "bytes": 62261,
+        "frame": 46,
+        "rotationDegrees": 345.0
+      },
+      {
+        "file": "frame_047.png",
+        "sha256": "8fded60daba3deaa24338b0092ccc62d97a24f1bc7a72574aeeb3767c3aea925",
+        "bytes": 62247,
+        "frame": 47,
+        "rotationDegrees": 352.5
+      }
+    ],
+    "east": [
+      {
+        "file": "frame_000.png",
+        "sha256": "bceae21e933d9ab50b8fce3b5459e92d2db407cd65e7b27fb0f9b413ed90590d",
+        "bytes": 62162,
+        "frame": 0,
+        "rotationDegrees": 0.0
+      },
+      {
+        "file": "frame_001.png",
+        "sha256": "8048121ca6c2f3e3ccea4923971138fd789182505221a9b113b1be286fd2d244",
+        "bytes": 62233,
+        "frame": 1,
+        "rotationDegrees": 7.5
+      },
+      {
+        "file": "frame_002.png",
+        "sha256": "4ed47d2a380cfd4a11b293c0f4e2f11336470ecc03caaffb9f5f1131d844e2b7",
+        "bytes": 62258,
+        "frame": 2,
+        "rotationDegrees": 15.0
+      },
+      {
+        "file": "frame_003.png",
+        "sha256": "122cd4b5a24632c00c9697dde5175b3c04b76c8c3e01fa9e4ecd146d609f3cee",
+        "bytes": 62246,
+        "frame": 3,
+        "rotationDegrees": 22.5
+      },
+      {
+        "file": "frame_004.png",
+        "sha256": "8d81577f3ed1c86806be0ad69fbe3cfb6c72a6c04d9f15eca6c9691c4a6ad560",
+        "bytes": 62154,
+        "frame": 4,
+        "rotationDegrees": 30.0
+      },
+      {
+        "file": "frame_005.png",
+        "sha256": "def23dc2de1d00fff8c701e90453786407df0bf5650ecd45102f7f9c582d7c0f",
+        "bytes": 62208,
+        "frame": 5,
+        "rotationDegrees": 37.5
+      },
+      {
+        "file": "frame_006.png",
+        "sha256": "360766afc7722f440f52b3d6dfbb64ad677240cfc9e0574fba2a134c56a692a5",
+        "bytes": 62256,
+        "frame": 6,
+        "rotationDegrees": 45.0
+      },
+      {
+        "file": "frame_007.png",
+        "sha256": "e224ca30f0b81f5807493c11b904f1dc8cb22841fc59b62ffb4c9cc060338f5d",
+        "bytes": 62247,
+        "frame": 7,
+        "rotationDegrees": 52.5
+      },
+      {
+        "file": "frame_008.png",
+        "sha256": "a84400de3757096fb1c61c495823f532d9dbf377e2a10b4e25fc30895acb7b17",
+        "bytes": 62152,
+        "frame": 8,
+        "rotationDegrees": 60.0
+      },
+      {
+        "file": "frame_009.png",
+        "sha256": "1cd19d1c0778bf9a59f3b540f0e4c29acb32477587d0f90b9e3b227f4255195c",
+        "bytes": 62242,
+        "frame": 9,
+        "rotationDegrees": 67.5
+      },
+      {
+        "file": "frame_010.png",
+        "sha256": "1138564d8902d782900a57a9b62c7c14b4c185a3d806327d7baacc908ffa9fd1",
+        "bytes": 62261,
+        "frame": 10,
+        "rotationDegrees": 75.0
+      },
+      {
+        "file": "frame_011.png",
+        "sha256": "b820e93456ad4fad50791adf1433568f8009f576b5b5dd630dc30e11cf1925a6",
+        "bytes": 62247,
+        "frame": 11,
+        "rotationDegrees": 82.5
+      },
+      {
+        "file": "frame_012.png",
+        "sha256": "ac4c386e3ebc5c42ed921a8e5da9010d2f0117c0942c3339e1b521b3f6e143a2",
+        "bytes": 62162,
+        "frame": 12,
+        "rotationDegrees": 90.0
+      },
+      {
+        "file": "frame_013.png",
+        "sha256": "0ab00ad5c0ac1ee850fe00bb662721b79ab8cf38a2d7b2438d2e50ad0142275f",
+        "bytes": 62233,
+        "frame": 13,
+        "rotationDegrees": 97.5
+      },
+      {
+        "file": "frame_014.png",
+        "sha256": "59707a1d55ad7c74eb71a70ad8cb8ca880b37c9e45b61f15cb4b4e3dca2207db",
+        "bytes": 62258,
+        "frame": 14,
+        "rotationDegrees": 105.0
+      },
+      {
+        "file": "frame_015.png",
+        "sha256": "3c9868c969ffc71f490225e6d9ff9967f347cf04ecf6d37b4741aed950735361",
+        "bytes": 62246,
+        "frame": 15,
+        "rotationDegrees": 112.5
+      },
+      {
+        "file": "frame_016.png",
+        "sha256": "c5ae854c114f3eae61ccc4842ffbe9f99b3a6c58181d794fcd4907e4afe19611",
+        "bytes": 62154,
+        "frame": 16,
+        "rotationDegrees": 120.0
+      },
+      {
+        "file": "frame_017.png",
+        "sha256": "db713ac59979a5f89819f28c30918fdb0fa48c27bf4d9ec634979dc90343b83e",
+        "bytes": 62208,
+        "frame": 17,
+        "rotationDegrees": 127.5
+      },
+      {
+        "file": "frame_018.png",
+        "sha256": "ae1e1a88f4fc2ac04985f5cfd7d7cdfdb0f72883005deee3d22c7ff0cf506c1c",
+        "bytes": 62256,
+        "frame": 18,
+        "rotationDegrees": 135.0
+      },
+      {
+        "file": "frame_019.png",
+        "sha256": "e662808d3d436d0ee71cfc397d7676dfd2535db4a2b8fd73552cd1aabbeda8b8",
+        "bytes": 62247,
+        "frame": 19,
+        "rotationDegrees": 142.5
+      },
+      {
+        "file": "frame_020.png",
+        "sha256": "ec305a4d07ad06be172842c5bf3c508d7d553b7a399a06f1ebfe8ca5450718f3",
+        "bytes": 62152,
+        "frame": 20,
+        "rotationDegrees": 150.0
+      },
+      {
+        "file": "frame_021.png",
+        "sha256": "9790eeb5c468d504df6ed0cd4545507225541831445fa6127b81a2bea8d4fbcd",
+        "bytes": 62242,
+        "frame": 21,
+        "rotationDegrees": 157.5
+      },
+      {
+        "file": "frame_022.png",
+        "sha256": "a8b24d26f0bfa85096a654719d8f0092340ed5ea90e01093807d4e13664ee795",
+        "bytes": 62261,
+        "frame": 22,
+        "rotationDegrees": 165.0
+      },
+      {
+        "file": "frame_023.png",
+        "sha256": "0ae660b1af67d8025c548946759a4ba95da8fa1199e6daccdf0948da0edee056",
+        "bytes": 62247,
+        "frame": 23,
+        "rotationDegrees": 172.5
+      },
+      {
+        "file": "frame_024.png",
+        "sha256": "0cac69208ff30d9e9e703afc6dc4f3672b4ddeea335241c2a394e086dad2dd5e",
+        "bytes": 62162,
+        "frame": 24,
+        "rotationDegrees": 180.0
+      },
+      {
+        "file": "frame_025.png",
+        "sha256": "172c05d5cf105adaae9a7fb7a24dc13e7050d753a31c0b7f1a3b0030599aca0b",
+        "bytes": 62233,
+        "frame": 25,
+        "rotationDegrees": 187.5
+      },
+      {
+        "file": "frame_026.png",
+        "sha256": "49ad4df61461190a70ef05afd74706b2239016cc4ce0887669901a0e6633a518",
+        "bytes": 62258,
+        "frame": 26,
+        "rotationDegrees": 195.0
+      },
+      {
+        "file": "frame_027.png",
+        "sha256": "eab4f14113aa314cd3c6b6050ef2b7f8d02020967a215cbb0b9b6bf46556be4a",
+        "bytes": 62246,
+        "frame": 27,
+        "rotationDegrees": 202.5
+      },
+      {
+        "file": "frame_028.png",
+        "sha256": "9eec695c0ccaf91b16ff2d62605fbedb470b0ae9970bd8cd64452220a675b15b",
+        "bytes": 62154,
+        "frame": 28,
+        "rotationDegrees": 210.0
+      },
+      {
+        "file": "frame_029.png",
+        "sha256": "2cb4f33f0a81ff461198ae25f8c31e93638a82945b204d18be8baccdbed74a9f",
+        "bytes": 62208,
+        "frame": 29,
+        "rotationDegrees": 217.5
+      },
+      {
+        "file": "frame_030.png",
+        "sha256": "7d38e65112cb1500c60d2f088e75c28d7e220afedf6bd6f235691b1bb570b304",
+        "bytes": 62256,
+        "frame": 30,
+        "rotationDegrees": 225.0
+      },
+      {
+        "file": "frame_031.png",
+        "sha256": "b497b501c439afd7afe619cb5433d66e88840bb6923c7926783a1649bcb4168e",
+        "bytes": 62247,
+        "frame": 31,
+        "rotationDegrees": 232.5
+      },
+      {
+        "file": "frame_032.png",
+        "sha256": "9363ad92d262a22db42a7b82e87fd43ab8a123dbe736bbc9088f7788e5dada50",
+        "bytes": 62152,
+        "frame": 32,
+        "rotationDegrees": 240.0
+      },
+      {
+        "file": "frame_033.png",
+        "sha256": "4679b79f5732e198dce2e8506a63a36005d378309f819a2f8ac7c671662caa6b",
+        "bytes": 62242,
+        "frame": 33,
+        "rotationDegrees": 247.5
+      },
+      {
+        "file": "frame_034.png",
+        "sha256": "f090e6516bc27ec659f8bafb459b8b69c94f2a7784e2b9347d500e0794d0bbc4",
+        "bytes": 62261,
+        "frame": 34,
+        "rotationDegrees": 255.0
+      },
+      {
+        "file": "frame_035.png",
+        "sha256": "6fd49406a1fd98018581a7550f6878acb3720bd290926cff1e71f59a9a25688e",
+        "bytes": 62247,
+        "frame": 35,
+        "rotationDegrees": 262.5
+      },
+      {
+        "file": "frame_036.png",
+        "sha256": "2f507defaa3c796134058e4188908f94d9c33c997a644e0e818991eb95e7d219",
+        "bytes": 62162,
+        "frame": 36,
+        "rotationDegrees": 270.0
+      },
+      {
+        "file": "frame_037.png",
+        "sha256": "027b983549a343e89ea244107f1b07598bec461c2fc0a74f4a767df6e8130329",
+        "bytes": 62233,
+        "frame": 37,
+        "rotationDegrees": 277.5
+      },
+      {
+        "file": "frame_038.png",
+        "sha256": "7fdd19d7517b8f9113ce449b7183c0854ff4655ef38b45901ef12046e59276f4",
+        "bytes": 62258,
+        "frame": 38,
+        "rotationDegrees": 285.0
+      },
+      {
+        "file": "frame_039.png",
+        "sha256": "48a231c7313abaf5d3d4a8c268f58fb9276609bb7cd241e61139b7fab3b4c5c0",
+        "bytes": 62246,
+        "frame": 39,
+        "rotationDegrees": 292.5
+      },
+      {
+        "file": "frame_040.png",
+        "sha256": "26993e294d62e9b4e298e82df118a04e61ff9a8ae75bafdf5328d3f2976b8fcc",
+        "bytes": 62154,
+        "frame": 40,
+        "rotationDegrees": 300.0
+      },
+      {
+        "file": "frame_041.png",
+        "sha256": "a9477d7d98ab394202ca919b1ab88ce619079c3e05b20327520165178d459ca1",
+        "bytes": 62208,
+        "frame": 41,
+        "rotationDegrees": 307.5
+      },
+      {
+        "file": "frame_042.png",
+        "sha256": "9cde9a296282d2f1ccff280b9a871c8a988ea88a147ad4a6694d651a338e1955",
+        "bytes": 62256,
+        "frame": 42,
+        "rotationDegrees": 315.0
+      },
+      {
+        "file": "frame_043.png",
+        "sha256": "5863994ca113b9f488a95dc60c22feee4060213637642546642cf9c16bfaeb04",
+        "bytes": 62247,
+        "frame": 43,
+        "rotationDegrees": 322.5
+      },
+      {
+        "file": "frame_044.png",
+        "sha256": "828f5a042fce0d0f2b9d9bf461db990c5cb1bd4a78195f2c0302b223584a3eba",
+        "bytes": 62152,
+        "frame": 44,
+        "rotationDegrees": 330.0
+      },
+      {
+        "file": "frame_045.png",
+        "sha256": "e71d6ecfb4643894d2d7418e4d69bd87ef6a08bd0566d4707fa0a7a8b5c295db",
+        "bytes": 62242,
+        "frame": 45,
+        "rotationDegrees": 337.5
+      },
+      {
+        "file": "frame_046.png",
+        "sha256": "c9f8cd28fbf07bf65370e45bbf96821573a004ea3d5b27ae17d0d20bd0017090",
+        "bytes": 62261,
+        "frame": 46,
+        "rotationDegrees": 345.0
+      },
+      {
+        "file": "frame_047.png",
+        "sha256": "391c889ff4885633ec30a2e0b4fce97786dd8770123b45c054abbe2ce84359b6",
+        "bytes": 62247,
+        "frame": 47,
+        "rotationDegrees": 352.5
+      }
+    ],
+    "west": [
+      {
+        "file": "frame_000.png",
+        "sha256": "4a2f6b098c403c2dcd945b0c243cb6f564a829d31cdd1a7d867c83216ac3f5ca",
+        "bytes": 62162,
+        "frame": 0,
+        "rotationDegrees": 0.0
+      },
+      {
+        "file": "frame_001.png",
+        "sha256": "686227897d813739cfc32eb0190bb5d99d98a604be544cb366a526d1bd614beb",
+        "bytes": 62233,
+        "frame": 1,
+        "rotationDegrees": 7.5
+      },
+      {
+        "file": "frame_002.png",
+        "sha256": "f1741318edc5aa8d536766ab4be942df80b5f218fe3fb777c59f7ae20342d662",
+        "bytes": 62258,
+        "frame": 2,
+        "rotationDegrees": 15.0
+      },
+      {
+        "file": "frame_003.png",
+        "sha256": "9b4602f593edde8b4f02915289dcc77cf141d77ce50fa0585bde4f02ee6fbc30",
+        "bytes": 62246,
+        "frame": 3,
+        "rotationDegrees": 22.5
+      },
+      {
+        "file": "frame_004.png",
+        "sha256": "0d522cd22caea858d55d7371d2f8ba30035665ec0047af589668d89c13c51d6f",
+        "bytes": 62154,
+        "frame": 4,
+        "rotationDegrees": 30.0
+      },
+      {
+        "file": "frame_005.png",
+        "sha256": "283112462d6f3d066f2a2a4a803ec0341db0defed0e4b75950e09d7aad3182e3",
+        "bytes": 62208,
+        "frame": 5,
+        "rotationDegrees": 37.5
+      },
+      {
+        "file": "frame_006.png",
+        "sha256": "fcc2c1658c0955444ce79597508532372a42459685a4884f3e93ce2bcad71b84",
+        "bytes": 62256,
+        "frame": 6,
+        "rotationDegrees": 45.0
+      },
+      {
+        "file": "frame_007.png",
+        "sha256": "3fab6d19608529705ed2c288bcf538f336ac69b3aa8f93877f3618e1ff287174",
+        "bytes": 62247,
+        "frame": 7,
+        "rotationDegrees": 52.5
+      },
+      {
+        "file": "frame_008.png",
+        "sha256": "5289120aaadaac7c8335fdd201255d0f23a13f043725b5580765f2284dfc526f",
+        "bytes": 62152,
+        "frame": 8,
+        "rotationDegrees": 60.0
+      },
+      {
+        "file": "frame_009.png",
+        "sha256": "f3189941f3841dd9014c996b142d982abc74c8956d9f724bb73871046e6cb7a6",
+        "bytes": 62242,
+        "frame": 9,
+        "rotationDegrees": 67.5
+      },
+      {
+        "file": "frame_010.png",
+        "sha256": "26785222289e051d95a85504fb567b5ae89e940197f17839b609c6f92dc4c155",
+        "bytes": 62261,
+        "frame": 10,
+        "rotationDegrees": 75.0
+      },
+      {
+        "file": "frame_011.png",
+        "sha256": "e2836bc17e0dc3922be75fa32c0ec48d78659ba3cae809e984ed41e2f9120fc1",
+        "bytes": 62247,
+        "frame": 11,
+        "rotationDegrees": 82.5
+      },
+      {
+        "file": "frame_012.png",
+        "sha256": "81d19fd2b080fd655340061ce6b1c737ed3c14e55f98592333c93a2f208a7b24",
+        "bytes": 62162,
+        "frame": 12,
+        "rotationDegrees": 90.0
+      },
+      {
+        "file": "frame_013.png",
+        "sha256": "8ff84dc910bf9831b0545377402997b689554797b51accd900ea0a2184e3bd2c",
+        "bytes": 62233,
+        "frame": 13,
+        "rotationDegrees": 97.5
+      },
+      {
+        "file": "frame_014.png",
+        "sha256": "31cad40ea4a43a2f92f8a41de4293f01779c14919870b833ad744a355296ad01",
+        "bytes": 62258,
+        "frame": 14,
+        "rotationDegrees": 105.0
+      },
+      {
+        "file": "frame_015.png",
+        "sha256": "81b9c67adaab31dee91348d46736471da462798355e53e5bd2d46d255536be27",
+        "bytes": 62246,
+        "frame": 15,
+        "rotationDegrees": 112.5
+      },
+      {
+        "file": "frame_016.png",
+        "sha256": "7e60d9c2ed4bd553e38fb21f162d8e27a85383e600a7bb62aac94bddee0c5563",
+        "bytes": 62154,
+        "frame": 16,
+        "rotationDegrees": 120.0
+      },
+      {
+        "file": "frame_017.png",
+        "sha256": "01674ad45b47e6a693f6c54a136b722ec62f8e71aaa60b5424a3e9b7bc3d08c5",
+        "bytes": 62208,
+        "frame": 17,
+        "rotationDegrees": 127.5
+      },
+      {
+        "file": "frame_018.png",
+        "sha256": "9da92bf7d5d99c4de7823fc1fd35f50e192ed75698c4f3e5fcbe04bd020f640f",
+        "bytes": 62256,
+        "frame": 18,
+        "rotationDegrees": 135.0
+      },
+      {
+        "file": "frame_019.png",
+        "sha256": "84af7fa23b8f53bf45cc6778d289e83b5afcf32818e7ad13a8c0302c5773a614",
+        "bytes": 62247,
+        "frame": 19,
+        "rotationDegrees": 142.5
+      },
+      {
+        "file": "frame_020.png",
+        "sha256": "c718a979e9260581934c3120af1303ab5daa35da2b6e5041eb3736a245c4f9ad",
+        "bytes": 62152,
+        "frame": 20,
+        "rotationDegrees": 150.0
+      },
+      {
+        "file": "frame_021.png",
+        "sha256": "bcfe9e28e1564f746d0eda2f8816a07692ef6ee82fa76f98da92de71c6433faf",
+        "bytes": 62242,
+        "frame": 21,
+        "rotationDegrees": 157.5
+      },
+      {
+        "file": "frame_022.png",
+        "sha256": "339756bb93022fe24c5b6c1d5a59b522b814a8c86040674b0a68b3bb27a26f94",
+        "bytes": 62261,
+        "frame": 22,
+        "rotationDegrees": 165.0
+      },
+      {
+        "file": "frame_023.png",
+        "sha256": "794661ec7c08cc762304e64d65709fdcb3badb7786c52213ea61688d28fb6fe8",
+        "bytes": 62247,
+        "frame": 23,
+        "rotationDegrees": 172.5
+      },
+      {
+        "file": "frame_024.png",
+        "sha256": "1860564403472335be9405b56072ea0fea03a9238a24cc50cfe82a9d2e717d53",
+        "bytes": 62162,
+        "frame": 24,
+        "rotationDegrees": 180.0
+      },
+      {
+        "file": "frame_025.png",
+        "sha256": "c023c8be3e0c7e5f6ab659542a0c81adac2442dc1d4a97a7baef287b95bae7d6",
+        "bytes": 62233,
+        "frame": 25,
+        "rotationDegrees": 187.5
+      },
+      {
+        "file": "frame_026.png",
+        "sha256": "3b8a1fd2df2c3d66afbfeb9ea224d663c767729cc9a274dc2aefe55d1601447c",
+        "bytes": 62258,
+        "frame": 26,
+        "rotationDegrees": 195.0
+      },
+      {
+        "file": "frame_027.png",
+        "sha256": "3a153aa127108d18fdc5d8f92eafa9492aa23913dcf2694bf30e6ad7680c2880",
+        "bytes": 62246,
+        "frame": 27,
+        "rotationDegrees": 202.5
+      },
+      {
+        "file": "frame_028.png",
+        "sha256": "4887682a2b49ce11257e05706415cafc6e7ac3840fbc105055d92b9d89ef1640",
+        "bytes": 62154,
+        "frame": 28,
+        "rotationDegrees": 210.0
+      },
+      {
+        "file": "frame_029.png",
+        "sha256": "16583455f2a16bdfff01c109933e4e2e699570017ef65cf9e98b35e137ef0c8f",
+        "bytes": 62208,
+        "frame": 29,
+        "rotationDegrees": 217.5
+      },
+      {
+        "file": "frame_030.png",
+        "sha256": "5ef449ac6fc25905d6dafb1f1d3c42d89d4df8e0ac987658334d18fa4b744695",
+        "bytes": 62256,
+        "frame": 30,
+        "rotationDegrees": 225.0
+      },
+      {
+        "file": "frame_031.png",
+        "sha256": "739d74a079a8b7ae941e08ed10b51b95d6c695d7d203a46f4227150a64bb31e1",
+        "bytes": 62247,
+        "frame": 31,
+        "rotationDegrees": 232.5
+      },
+      {
+        "file": "frame_032.png",
+        "sha256": "6a1415b6a393271a2945066e967e0af8dbc3bae99fc5ad2140c8bffba531cf74",
+        "bytes": 62152,
+        "frame": 32,
+        "rotationDegrees": 240.0
+      },
+      {
+        "file": "frame_033.png",
+        "sha256": "317d0e51b63220c7c44f919815f50a0c431febd463813e5dfd120002f1a1604c",
+        "bytes": 62242,
+        "frame": 33,
+        "rotationDegrees": 247.5
+      },
+      {
+        "file": "frame_034.png",
+        "sha256": "c82006ad4a8b11c4e5ef77b5cf2ed8cf48382bd4b2f7cec612b5c26d95886df0",
+        "bytes": 62261,
+        "frame": 34,
+        "rotationDegrees": 255.0
+      },
+      {
+        "file": "frame_035.png",
+        "sha256": "d288a0db6cd3af15690c5eb9670dcb80c8a31f4b4389b6bc33959a4a9bc986ce",
+        "bytes": 62247,
+        "frame": 35,
+        "rotationDegrees": 262.5
+      },
+      {
+        "file": "frame_036.png",
+        "sha256": "1187d03c2e69f7576909d7ebcfb0d415a0dc56458a50fa5064d5c721ad25ffcd",
+        "bytes": 62162,
+        "frame": 36,
+        "rotationDegrees": 270.0
+      },
+      {
+        "file": "frame_037.png",
+        "sha256": "185c8f486102a27fe9169264f2ba2947796581cb91ad499f9a4ef98eae7baff5",
+        "bytes": 62233,
+        "frame": 37,
+        "rotationDegrees": 277.5
+      },
+      {
+        "file": "frame_038.png",
+        "sha256": "ccb90a88c336a5f041953fb78504feb0a2c4f9165322233c723acad8e4ca3562",
+        "bytes": 62258,
+        "frame": 38,
+        "rotationDegrees": 285.0
+      },
+      {
+        "file": "frame_039.png",
+        "sha256": "d887d2b8ac68078ff4fee2fb5f77b619c1b477eff96a538ee5a3d57f8198c500",
+        "bytes": 62246,
+        "frame": 39,
+        "rotationDegrees": 292.5
+      },
+      {
+        "file": "frame_040.png",
+        "sha256": "5fec65ba77c6ca2b9b8332a82913597b251b8ca36ed7b0c2b028d0ad8b5df78b",
+        "bytes": 62154,
+        "frame": 40,
+        "rotationDegrees": 300.0
+      },
+      {
+        "file": "frame_041.png",
+        "sha256": "c1418c71d892508c34d5e5125c151a1924a899e8e952ad0ea72951ce339b8571",
+        "bytes": 62208,
+        "frame": 41,
+        "rotationDegrees": 307.5
+      },
+      {
+        "file": "frame_042.png",
+        "sha256": "f848c23260b37ac1fddb4f2f33afa23bc478e22e929b357a0c6f4efdc74ee964",
+        "bytes": 62256,
+        "frame": 42,
+        "rotationDegrees": 315.0
+      },
+      {
+        "file": "frame_043.png",
+        "sha256": "8df3ae93f79da89ccf5e582a55c9dc4c7ccbaf4a49c1052db30905ad3ce699a9",
+        "bytes": 62247,
+        "frame": 43,
+        "rotationDegrees": 322.5
+      },
+      {
+        "file": "frame_044.png",
+        "sha256": "7f56e045770f1946b1de739dbb1977364f79bb12a0e9976d133ee2ce42b31ff9",
+        "bytes": 62152,
+        "frame": 44,
+        "rotationDegrees": 330.0
+      },
+      {
+        "file": "frame_045.png",
+        "sha256": "c354a4f389f888c3751a6a9e0a6c533313fe871e031d0b1ab6cc0bf72bc7f59d",
+        "bytes": 62242,
+        "frame": 45,
+        "rotationDegrees": 337.5
+      },
+      {
+        "file": "frame_046.png",
+        "sha256": "690427eafc0a80fbd44ff35810e02d8c63c29a41105820a730a9de7d4a6afe8d",
+        "bytes": 62261,
+        "frame": 46,
+        "rotationDegrees": 345.0
+      },
+      {
+        "file": "frame_047.png",
+        "sha256": "c24682efa40039bf4860c6a51ed8a30c4b4c76554a3f0b41abc87c6079188817",
+        "bytes": 62247,
+        "frame": 47,
+        "rotationDegrees": 352.5
+      }
+    ],
+    "north": [
+      {
+        "file": "frame_000.png",
+        "sha256": "88172217a8256b9ab1226d366d59df6c4f75346fce52e8fe602c55dceb2947f3",
+        "bytes": 62162,
+        "frame": 0,
+        "rotationDegrees": 0.0
+      },
+      {
+        "file": "frame_001.png",
+        "sha256": "1669fb53e9156ae72fadfed62750e97c4aa5c320aa85748c2a7644d6785b940d",
+        "bytes": 62233,
+        "frame": 1,
+        "rotationDegrees": 7.5
+      },
+      {
+        "file": "frame_002.png",
+        "sha256": "d582af50427b752c320789b813c122de1feb37e1423149510fe3a36dbe422377",
+        "bytes": 62258,
+        "frame": 2,
+        "rotationDegrees": 15.0
+      },
+      {
+        "file": "frame_003.png",
+        "sha256": "1682eacd40443dc9b2d9d52d2ec2e6b4359d2b64f3e9d50be957462321f5a296",
+        "bytes": 62246,
+        "frame": 3,
+        "rotationDegrees": 22.5
+      },
+      {
+        "file": "frame_004.png",
+        "sha256": "80f5e72f2ee9c13e56a82263cadb420b592a88edacf132ba2999b6fb840d9d9d",
+        "bytes": 62154,
+        "frame": 4,
+        "rotationDegrees": 30.0
+      },
+      {
+        "file": "frame_005.png",
+        "sha256": "d14fd9c732b529c483ce8b4640a537ff66be4e2c86549c9753260289b58a96a2",
+        "bytes": 62208,
+        "frame": 5,
+        "rotationDegrees": 37.5
+      },
+      {
+        "file": "frame_006.png",
+        "sha256": "ea0c25b286d867697392889e505e9053d0855b3f8298c83712b5a85cffd295ee",
+        "bytes": 62256,
+        "frame": 6,
+        "rotationDegrees": 45.0
+      },
+      {
+        "file": "frame_007.png",
+        "sha256": "9051009725b2eebabebe7c5ead407b2c765c89e9e11acdcc9114585f29838210",
+        "bytes": 62247,
+        "frame": 7,
+        "rotationDegrees": 52.5
+      },
+      {
+        "file": "frame_008.png",
+        "sha256": "9f0b830d279e71f72161761fc355c478a22f67744e5655b69d97f52aa4cc7058",
+        "bytes": 62152,
+        "frame": 8,
+        "rotationDegrees": 60.0
+      },
+      {
+        "file": "frame_009.png",
+        "sha256": "f2ef0cae450e6b7d2a5b57b0ca76c3a7393fb46f6adabae90428c2e8712defa3",
+        "bytes": 62242,
+        "frame": 9,
+        "rotationDegrees": 67.5
+      },
+      {
+        "file": "frame_010.png",
+        "sha256": "f76b7b21b2f5d4c7281595d7810ea8d16cb56b0d6ac17806d7febaaff3f52f45",
+        "bytes": 62261,
+        "frame": 10,
+        "rotationDegrees": 75.0
+      },
+      {
+        "file": "frame_011.png",
+        "sha256": "5b6f3e0887efc2c06112ebb4d50b2ea6bd4cb7f2b5e0a1b2782650556a7c0ae5",
+        "bytes": 62247,
+        "frame": 11,
+        "rotationDegrees": 82.5
+      },
+      {
+        "file": "frame_012.png",
+        "sha256": "a1c2a186b2795bd9ac791cf3e99b9ace45d8ef4a168efe81ecfcf781586c0da9",
+        "bytes": 62162,
+        "frame": 12,
+        "rotationDegrees": 90.0
+      },
+      {
+        "file": "frame_013.png",
+        "sha256": "94f5736fac3753a19628c9fd7847cfeccfb2f03feb5839c7d51a7b774c37ff5a",
+        "bytes": 62233,
+        "frame": 13,
+        "rotationDegrees": 97.5
+      },
+      {
+        "file": "frame_014.png",
+        "sha256": "9e07ba514719f8f863bdd83dd2c8a1a9b20b78699fe42d727f665fd30eeff552",
+        "bytes": 62258,
+        "frame": 14,
+        "rotationDegrees": 105.0
+      },
+      {
+        "file": "frame_015.png",
+        "sha256": "5239e792128fabe8b079b208a8131f8e274bd7ac0f7ac90a08e9b7f378b57898",
+        "bytes": 62246,
+        "frame": 15,
+        "rotationDegrees": 112.5
+      },
+      {
+        "file": "frame_016.png",
+        "sha256": "801db7a3cc05bfee30969021bd30d22ab4bdb6d54c22bed7399f48bc82cd6302",
+        "bytes": 62154,
+        "frame": 16,
+        "rotationDegrees": 120.0
+      },
+      {
+        "file": "frame_017.png",
+        "sha256": "dd8a1bcf691da31160d689f5cbf24fc60d0f4d28af6ed3b903856b7b0216ae20",
+        "bytes": 62208,
+        "frame": 17,
+        "rotationDegrees": 127.5
+      },
+      {
+        "file": "frame_018.png",
+        "sha256": "336bb0c5f8273cdf50c1b13ef4e427f4358b6f6977f6105e1af5bce6e810bd49",
+        "bytes": 62256,
+        "frame": 18,
+        "rotationDegrees": 135.0
+      },
+      {
+        "file": "frame_019.png",
+        "sha256": "5cf8baf103dddaf4dc7c37d9e2d8620fe59df915b65d6d50005a3b9c746a3bcc",
+        "bytes": 62247,
+        "frame": 19,
+        "rotationDegrees": 142.5
+      },
+      {
+        "file": "frame_020.png",
+        "sha256": "5545cc46570a5af2456fe0a105ef64a34d3dcf3e9aa6e47b7fbaeb7418eba452",
+        "bytes": 62152,
+        "frame": 20,
+        "rotationDegrees": 150.0
+      },
+      {
+        "file": "frame_021.png",
+        "sha256": "dd6b09c77495b065283c5aaec3189a27c10a084d4f55c137d5051ec613d777d4",
+        "bytes": 62242,
+        "frame": 21,
+        "rotationDegrees": 157.5
+      },
+      {
+        "file": "frame_022.png",
+        "sha256": "c6f4da73196099db865f4f1d09a3a833335b3eb68e6db462c465b34bb5273934",
+        "bytes": 62261,
+        "frame": 22,
+        "rotationDegrees": 165.0
+      },
+      {
+        "file": "frame_023.png",
+        "sha256": "164c20181190937c6645605468cbdb7fde46be7ed0f34adff13c1a424614031d",
+        "bytes": 62247,
+        "frame": 23,
+        "rotationDegrees": 172.5
+      },
+      {
+        "file": "frame_024.png",
+        "sha256": "ca2a8197dc47efbbbb66f08d3fc43d219b2de935d5919c32940af06d77e34dba",
+        "bytes": 62162,
+        "frame": 24,
+        "rotationDegrees": 180.0
+      },
+      {
+        "file": "frame_025.png",
+        "sha256": "55df926a328d5418cf9b5e7bbb065bf2bd322ca058f53c6ea26206325dba1aed",
+        "bytes": 62233,
+        "frame": 25,
+        "rotationDegrees": 187.5
+      },
+      {
+        "file": "frame_026.png",
+        "sha256": "5a5824142a3c24d195544f19d5534fdcd00b8ffe0fb19c4ee907d36ebc593b00",
+        "bytes": 62258,
+        "frame": 26,
+        "rotationDegrees": 195.0
+      },
+      {
+        "file": "frame_027.png",
+        "sha256": "c1d28bb5949b9dd4e3c9a7247401530cdd95065ec2af30d564402ce5fbebbc72",
+        "bytes": 62246,
+        "frame": 27,
+        "rotationDegrees": 202.5
+      },
+      {
+        "file": "frame_028.png",
+        "sha256": "bb814d8d510fbe6ed6e627e3dbd6654d1b5869ed16ad3a833545e75f08a09b28",
+        "bytes": 62154,
+        "frame": 28,
+        "rotationDegrees": 210.0
+      },
+      {
+        "file": "frame_029.png",
+        "sha256": "f28f85d523cd079982c73ea33abc5318c6a4deae5585d02b0adbe0a83e9f46ab",
+        "bytes": 62208,
+        "frame": 29,
+        "rotationDegrees": 217.5
+      },
+      {
+        "file": "frame_030.png",
+        "sha256": "bec701bc9e41026b89c04aec6c395b221f97d291bf3810dec5c9ac0b330e32e0",
+        "bytes": 62256,
+        "frame": 30,
+        "rotationDegrees": 225.0
+      },
+      {
+        "file": "frame_031.png",
+        "sha256": "3ed8766f8761b1df9d79a15d7145a9186c90793317923715db1fa41036b1d34b",
+        "bytes": 62247,
+        "frame": 31,
+        "rotationDegrees": 232.5
+      },
+      {
+        "file": "frame_032.png",
+        "sha256": "4640f431344f98a311807bd35e9173ee24ae1c0abdb27a75b38d1495c12290eb",
+        "bytes": 62152,
+        "frame": 32,
+        "rotationDegrees": 240.0
+      },
+      {
+        "file": "frame_033.png",
+        "sha256": "1c978462baa6d85698f43baaf1671329e3d71929f5b602d4fd4969cd8dc587f2",
+        "bytes": 62242,
+        "frame": 33,
+        "rotationDegrees": 247.5
+      },
+      {
+        "file": "frame_034.png",
+        "sha256": "342bba098829a189d32480ff22967eebc6e2c529e50a3d804151964675077fc1",
+        "bytes": 62261,
+        "frame": 34,
+        "rotationDegrees": 255.0
+      },
+      {
+        "file": "frame_035.png",
+        "sha256": "791b000696f8a148807f56388bfbef8071a971b30e03d16c60d5a138b2b2aa71",
+        "bytes": 62247,
+        "frame": 35,
+        "rotationDegrees": 262.5
+      },
+      {
+        "file": "frame_036.png",
+        "sha256": "876439a12531dc868b499f63877abb057c2847c0a8bf3c30d726424b2390c048",
+        "bytes": 62162,
+        "frame": 36,
+        "rotationDegrees": 270.0
+      },
+      {
+        "file": "frame_037.png",
+        "sha256": "1a6732e500a985456da590f03dc077a67ce8290a535f7979b98c3a89980518ff",
+        "bytes": 62233,
+        "frame": 37,
+        "rotationDegrees": 277.5
+      },
+      {
+        "file": "frame_038.png",
+        "sha256": "93d9754ee67fb6b702460df34c80d09941faa085d4790d6bed0edf7959419355",
+        "bytes": 62258,
+        "frame": 38,
+        "rotationDegrees": 285.0
+      },
+      {
+        "file": "frame_039.png",
+        "sha256": "0cdd6cfef52eedffc6fc63295e66d95dd7c72e648915a151aa8f0b0d5d2f0199",
+        "bytes": 62246,
+        "frame": 39,
+        "rotationDegrees": 292.5
+      },
+      {
+        "file": "frame_040.png",
+        "sha256": "bb6333fcc8e91046f07a972aefdaf8bb080a60b0c879cb6d3dd0f1ccdae150c9",
+        "bytes": 62154,
+        "frame": 40,
+        "rotationDegrees": 300.0
+      },
+      {
+        "file": "frame_041.png",
+        "sha256": "dfebf48b66717ac2fbd64aa12587b46b6365a030d057dbea492ab03af5a969a9",
+        "bytes": 62208,
+        "frame": 41,
+        "rotationDegrees": 307.5
+      },
+      {
+        "file": "frame_042.png",
+        "sha256": "28f4982ab2c5953cdd6cc67f919731fd33655cd343a3037ae087e39e22761943",
+        "bytes": 62256,
+        "frame": 42,
+        "rotationDegrees": 315.0
+      },
+      {
+        "file": "frame_043.png",
+        "sha256": "a06b29db3dc13c16dbd7e56d9a57364f24c7ad4b21919fe68f0640172951c44a",
+        "bytes": 62247,
+        "frame": 43,
+        "rotationDegrees": 322.5
+      },
+      {
+        "file": "frame_044.png",
+        "sha256": "6fdb3133252c8a454af8985fd800b7b6eec00d864928107f22be53692e627abd",
+        "bytes": 62152,
+        "frame": 44,
+        "rotationDegrees": 330.0
+      },
+      {
+        "file": "frame_045.png",
+        "sha256": "db34a98ef1814499e8159ad3fd7b1d29661ee846b895ba05111b25279b904664",
+        "bytes": 62242,
+        "frame": 45,
+        "rotationDegrees": 337.5
+      },
+      {
+        "file": "frame_046.png",
+        "sha256": "0d2be51d94c55c558dbc86ee4b8b766b72406d1bf0be36dffcf66f32a9c163df",
+        "bytes": 62261,
+        "frame": 46,
+        "rotationDegrees": 345.0
+      },
+      {
+        "file": "frame_047.png",
+        "sha256": "7bcfc5f336cafdee8ce5d942a7907eb4d8f74f70cb2d5e07a2d8d892c7c582df",
+        "bytes": 62247,
+        "frame": 47,
+        "rotationDegrees": 352.5
+      }
+    ]
+  }
+}

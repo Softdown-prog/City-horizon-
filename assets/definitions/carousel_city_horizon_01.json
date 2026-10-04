@@ -1,0 +1,92 @@
+{
+  "id": "carousel_city_horizon_01",
+  "name": "Carrossel",
+  "category": "city_park",
+  "texture": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_animation.png",
+  "sprites": {
+    "0": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_animation.png",
+    "1": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_west_animation.png",
+    "2": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_north_animation.png",
+    "3": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_east_animation.png"
+  },
+  "spriteAnchors": {
+    "0": {
+      "x": 0.5,
+      "y": 0.68359375
+    },
+    "1": {
+      "x": 0.5,
+      "y": 0.68359375
+    },
+    "2": {
+      "x": 0.5,
+      "y": 0.68359375
+    },
+    "3": {
+      "x": 0.5,
+      "y": 0.68359375
+    }
+  },
+  "colorMasks": {
+    "primary": {
+      "semantic": "canopy_yellow_stripes",
+      "encoding": "white_on_black",
+      "sprites": {
+        "0": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_primary_mask.png",
+        "1": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_west_primary_mask.png",
+        "2": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_north_primary_mask.png",
+        "3": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_east_primary_mask.png"
+      }
+    }
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "requiresTicketBooth": true,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    {
+      "x": 2,
+      "y": 4,
+      "facing": "south"
+    }
+  ],
+  "footprint": {
+    "width": 4,
+    "height": 4
+  },
+  "occupancyFootprint": {
+    "width": 4,
+    "height": 4,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "buildCost": 15000,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "serviceName": "Ingresso do carrossel",
+  "defaultServicePrice": 5,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 30,
+  "baseServiceCustomersPerMonth": 75,
+  "servicePopulationForFullDemand": 50,
+  "needsEffect": {
+    "fun": 55
+  },
+  "artScale": 1.0,
+  "animation": {
+    "layout": "horizontal",
+    "frameCount": 48,
+    "frameDurationMs": 100,
+    "playback": "activity_loop"
+  },
+  "playerBuildable": true,
+  "balanceStatus": "provisional",
+  "productionStatus": "runtime_256_promoted",
+  "renderClass": "attraction_256",
+  "runtimeManifest": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_runtime_manifest.json",
+  "sourceChBlenderRunId": 37226554691,
+  "sourceChBlenderHeadSha": "116de40da23a4d5d2fd77cbbd260311b8356e538"
+}
