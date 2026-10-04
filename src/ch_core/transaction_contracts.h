@@ -23,6 +23,11 @@ struct TerrainStateSnapshot {
     int tile_y = 0;
     std::string previous_texture;
     std::string new_texture;
+    // Added compatibly after the original texture-only snapshot. Older aggregate
+    // initializers keep these empty; semantic terrain/water commands populate
+    // them so undo/redo can restore gameplay meaning rather than only artwork.
+    std::string previous_definition;
+    std::string new_definition;
 };
 
 struct BuildingStateSnapshot {
