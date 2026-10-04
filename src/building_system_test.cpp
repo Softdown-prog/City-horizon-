@@ -1,4 +1,7 @@
 #include "building_system.h"
+#include "economy_system.h"
+#include "gameplay_commands.h"
+#include "road_system.h"
 
 #include <iostream>
 #include <string>
@@ -103,6 +106,36 @@ int main(int argc, char** argv) {
         !require(buildings.find_by_id(*house_id) != nullptr &&
                      buildings.find_by_id(*house_id)->rotation == BuildingRotation::r270,
                  "logical rotation persists on the instance")) {
+        return 1;
+    }
+
+    // CH_GAME_COMMAND_V1 vertical slice: preview does not spend or mutate;
+    // execute consumes the exact previewed cost and produces the road tile.
+    RoadManager roads(-16, 16);
+    CityEconomy economy(1000);
+    RoadPlacementCommand road_command(roads, buildings, economy, -2, -2);
+    const auto preview = ch::GameCommandExecutor::run(road_command, ch::GameCommandMode::preview);
+    if (!require(preview.success && !preview.applied, "road command preview succeeds without applying") ||
+        !require(preview.cost_cents == kRoadCostPerTile && economy.funds() == 1000,
+                 "road preview reports cost without spending") ||
+        !require(!roads.is_road(-2, -2), "road preview does not mutate road manager")) {
+        return 1;
+    }
+    const auto executed = ch::GameCommandExecutor::run(road_command, ch::GameCommandMode::execute);
+    if (!require(executed.success && executed.applied, "road command executes") ||
+        !require(roads.is_road(-2, -2), "road command places the requested tile") ||
+        !require(economy.funds() == 1000 - kRoadCostPerTile,
+                 "road command charges the same cost exposed by preview")) {
+        return 1;
+    }
+
+    RoadPlacementCommand occupied_command(roads, buildings, economy, -2, -2);
+    const auto occupied = ch::GameCommandExecutor::run(occupied_command, ch::GameCommandMode::execute);
+    if (!require(!occupied.success && !occupied.applied &&
+                     occupied.failure == ch::GameCommandFailure::conflicting_state,
+                 "road command rejects an occupied tile before spending") ||
+        !require(economy.funds() == 1000 - kRoadCostPerTile,
+                 "rejected road command leaves funds unchanged")) {
         return 1;
     }
 
