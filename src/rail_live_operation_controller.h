@@ -24,14 +24,20 @@ public:
         std::vector<rail_operation::StationDefinition> restored_stations;
         restored_stations.reserve(state.stations.size());
         for (const RailPersistentStation& station : state.stations) {
-            if (!graph_.piece_active(station.piece_group) ||
-                !std::isfinite(station.dwell_seconds) || station.dwell_seconds < 0.0) {
-                return false;
-            }
+            if (!std::isfinite(station.dwell_seconds) || station.dwell_seconds < 0.0) return false;
+            if (!graph_.piece_active(station.piece_group)) continue;
+            const auto duplicate = std::find_if(
+                restored_stations.begin(), restored_stations.end(),
+                [&](const rail_operation::StationDefinition& existing) {
+                    return existing.piece_group == station.piece_group;
+                });
+            if (duplicate != restored_stations.end()) return false;
             restored_stations.push_back({station.piece_group, station.dwell_seconds});
         }
         stations_ = std::move(restored_stations);
-        return rebuild();
+        if (!rebuild()) return false;
+        publish_stations();
+        return true;
     }
 
     [[nodiscard]] bool toggle_station(const RailPlacementPieceId piece_group,
