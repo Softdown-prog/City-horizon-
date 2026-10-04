@@ -27,7 +27,7 @@ public:
         plan.valid = valid_;
         plan.failure = valid_ ? ch::GameCommandFailure::none : ch::GameCommandFailure::blocked;
         plan.message = valid_ ? "ok" : "blocked";
-        plan.cost_cents = 750;
+        plan.cost_units = 750;
         plan.affected_tiles = {{3, 4}, {4, 4}};
         plan.transaction.description = "test command";
         plan.transaction.action_type = ch::TransactionActionType::set_road;
@@ -36,7 +36,7 @@ public:
 
     [[nodiscard]] bool apply(const ch::GameCommandPlan& prepared, std::string&) override {
         ++apply_calls;
-        applied_cost = prepared.cost_cents;
+        applied_cost = prepared.cost_units;
         return true;
     }
 
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
         ch::GameCommandExecutor::run(preview_command, ch::GameCommandMode::preview);
     assert(preview.success);
     assert(!preview.applied);
-    assert(preview.cost_cents == 750);
+    assert(preview.cost_units == 750);
     assert(preview.affected_tiles.size() == 2);
     assert(preview_command.prepare_calls == 1);
     assert(preview_command.apply_calls == 0);
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
     assert(executed.applied);
     assert(execute_command.prepare_calls == 1);
     assert(execute_command.apply_calls == 1);
-    assert(execute_command.applied_cost == executed.cost_cents);
+    assert(execute_command.applied_cost == executed.cost_units);
 
     TestGameCommand blocked_command(false);
     const ch::GameCommandResult blocked =
