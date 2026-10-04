@@ -15,16 +15,18 @@
     "2": { "x": 0.5, "y": 0.68359375 },
     "3": { "x": 0.5, "y": 0.68359375 }
   },
-  "colorMasks": {
-    "primary": {
-      "semantic": "canopy_yellow_stripes",
-      "encoding": "white_on_black",
-      "sprites": {
-        "0": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_primary_mask.png",
-        "1": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_west_primary_mask.png",
-        "2": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_north_primary_mask.png",
-        "3": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_east_primary_mask.png"
-      }
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "primary"
+    },
+    "alpha": "coverage",
+    "sprites": {
+      "0": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_south_primary_mask.png",
+      "1": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_west_primary_mask.png",
+      "2": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_north_primary_mask.png",
+      "3": "assets/city_park/carousel/attraction.park_carousel_city_horizon.01_east_primary_mask.png"
     }
   },
   "rotatable": true,
