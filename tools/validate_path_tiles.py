@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the actual 16-mask path family, including compatible neighbors."""
+"""Validate an actual 16-mask path family, including compatible neighbors."""
 
 from __future__ import annotations
 
@@ -83,7 +83,10 @@ def inspect_family(directory: Path, prefix: str, *, max_pair_error: float = 6.0,
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
-    parser.add_argument("--prefix", choices=("dirt_path", "sand_path"), required=True)
+    parser.add_argument(
+        "--prefix", required=True,
+        help="family filename prefix, e.g. dirt_path, sand_path, wood_path",
+    )
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--max-pair-error", type=float, default=6.0)
     parser.add_argument("--max-pixel-error", type=float, default=48.0)
