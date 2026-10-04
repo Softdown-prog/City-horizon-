@@ -1,8 +1,10 @@
 #pragma once
 
 #include "building_system.h"
+#include "economy_system.h"
 #include "farming_system.h"
 #include "land_system.h"
+#include "rail_construction_economy.h"
 #include "rail_mapforge_input_adapter.h"
 #include "rail_placement_track_graph_adapter.h"
 #include "road_system.h"
@@ -18,13 +20,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
-inline constexpr const char* kChRailRuntimeBridgeContract = "CH_RAIL_RUNTIME_BRIDGE_V1";
+inline constexpr const char* kChRailRuntimeBridgeContract = "CH_RAIL_RUNTIME_BRIDGE_V2";
 
 namespace ch::rail_runtime {
 
@@ -51,11 +55,13 @@ public:
     void reset() {
         cancel_gesture(false);
         graph_.clear();
+        committed_actions_.clear();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
         new_root_heading_radians_ = 0.0F;
         committed_edge_count_ = 0U;
         preview_valid_ = false;
+        preview_cost_ = 0;
         refresh_status();
     }
 
@@ -97,6 +103,15 @@ public:
                     return true;
                 case SDL_SCANCODE_E:
                     if (!gesture_active_) rotate_new_root_heading(1.0F);
+                    return true;
+                case SDL_SCANCODE_DELETE:
+                case SDL_SCANCODE_BACKSPACE:
+                    if (gesture_active_) {
+                        cancel_gesture(false);
+                        status_ = "RAIL PREVIEW CANCELLED";
+                    } else {
+                        demolish_last_committed_action();
+                    }
                     return true;
                 case SDL_SCANCODE_ESCAPE:
                     if (gesture_active_) {
@@ -174,6 +189,11 @@ public:
     }
 
 private:
+    struct CommittedRailAction {
+        RailPlacementCheckpoint checkpoint{};
+        std::int64_t build_cost = 0;
+    };
+
     static constexpr float kPi = 3.14159265358979323846F;
     static constexpr float kHeadingStepRadians = kPi * 0.25F;
     static constexpr float kNodeSnapRadiusWorld = 0.36F;
@@ -189,6 +209,10 @@ private:
             case RailPlacementMode::crossing: return "CROSSING";
         }
         return "STRAIGHT";
+    }
+
+    [[nodiscard]] static std::string money_label(const std::int64_t amount) {
+        return "$" + std::to_string(amount);
     }
 
     void select_mode(const RailPlacementMode mode) {
@@ -223,7 +247,7 @@ private:
         }
         status_ = std::string("RAIL ") + mode_label(selected_mode_) +
             " | LMB DRAG | 1-6 PIECE | Q/E HEADING " + std::to_string(heading_degrees()) +
-            " | T EXIT | PIECES " + std::to_string(piece_count());
+            " | DEL UNDO | T EXIT | PIECES " + std::to_string(piece_count());
     }
 
     [[nodiscard]] std::optional<RailPlacementNodeId> nearest_node(const RailDragWorldPoint& point) const {
@@ -341,6 +365,7 @@ private:
 
         gesture_active_ = true;
         preview_valid_ = false;
+        preview_cost_ = 0;
         status_ = std::string("RAIL ") + mode_label(selected_mode_) + " | DRAG TO SIZE";
     }
 
@@ -353,15 +378,45 @@ private:
             screen_x, screen_y, view.camera, view.viewport_width, view.viewport_height);
         if (!preview || !preview->ok()) {
             preview_valid_ = false;
+            preview_cost_ = 0;
             status_ = "RAIL PREVIEW INVALID: DRAG FARTHER";
             return;
         }
 
         std::string validation_error;
-        preview_valid_ = validate_staged(context, &validation_error);
-        status_ = preview_valid_
-            ? std::string("RAIL ") + mode_label(selected_mode_) + " PREVIEW OK | RELEASE TO BUILD"
-            : validation_error;
+        if (!validate_staged(context, &validation_error)) {
+            preview_valid_ = false;
+            preview_cost_ = 0;
+            status_ = validation_error;
+            return;
+        }
+
+        const RailConstructionQuote quote =
+            RailConstructionEconomy::quote(graph_, gesture_checkpoint_.edge_count);
+        if (!quote.valid || quote.build_cost <= 0) {
+            preview_valid_ = false;
+            preview_cost_ = 0;
+            status_ = "RAIL QUOTE INVALID";
+            return;
+        }
+
+        CityEconomy* economy = CityEconomy::active_instance();
+        preview_cost_ = quote.build_cost;
+        if (economy == nullptr) {
+            preview_valid_ = false;
+            status_ = "RAIL ECONOMY UNAVAILABLE";
+            return;
+        }
+        if (!economy->can_afford(preview_cost_)) {
+            preview_valid_ = false;
+            status_ = "RAIL NEEDS " + money_label(preview_cost_) +
+                " | FUNDS " + money_label(economy->funds());
+            return;
+        }
+
+        preview_valid_ = true;
+        status_ = std::string("RAIL ") + mode_label(selected_mode_) +
+            " PREVIEW OK | COST " + money_label(preview_cost_) + " | RELEASE TO BUILD";
     }
 
     void finish_gesture(const float screen_x,
@@ -383,16 +438,67 @@ private:
             return;
         }
 
+        CityEconomy* economy = CityEconomy::active_instance();
+        const std::int64_t committed_cost = preview_cost_;
+        if (economy == nullptr || committed_cost <= 0 || !economy->can_afford(committed_cost)) {
+            cancel_gesture(false);
+            status_ = "RAIL COMMIT BLOCKED: FUNDS CHANGED";
+            return;
+        }
+
         if (!input_.confirm()) {
             cancel_gesture(false);
             status_ = "RAIL COMMIT FAILED";
             return;
         }
 
+        // The geometry becomes authoritative only after the controller commits.
+        // Money is charged afterwards; if that final charge unexpectedly fails,
+        // the same pre-gesture checkpoint restores the graph atomically.
+        if (!economy->try_spend(committed_cost)) {
+            (void)graph_.rollback(gesture_checkpoint_);
+            gesture_active_ = false;
+            preview_valid_ = false;
+            preview_cost_ = 0;
+            committed_edge_count_ = graph_.edges().size();
+            status_ = "RAIL COMMIT ROLLED BACK: PAYMENT FAILED";
+            return;
+        }
+
+        committed_actions_.push_back({gesture_checkpoint_, committed_cost});
         committed_edge_count_ = graph_.edges().size();
         gesture_active_ = false;
         preview_valid_ = false;
-        refresh_status();
+        preview_cost_ = 0;
+        status_ = "RAIL BUILT: " + money_label(committed_cost) +
+            " SPENT | DEL UNDO | PIECES " + std::to_string(piece_count());
+    }
+
+    void demolish_last_committed_action() {
+        if (committed_actions_.empty()) {
+            status_ = "RAIL DEMOLISH: NO COMMITTED PIECE";
+            return;
+        }
+        CityEconomy* economy = CityEconomy::active_instance();
+        if (economy == nullptr) {
+            status_ = "RAIL DEMOLISH: ECONOMY UNAVAILABLE";
+            return;
+        }
+
+        const CommittedRailAction action = committed_actions_.back();
+        if (!graph_.rollback(action.checkpoint)) {
+            status_ = "RAIL DEMOLISH FAILED: CHECKPOINT REJECTED";
+            return;
+        }
+
+        const std::int64_t refund = RailConstructionEconomy::demolition_refund(action.build_cost);
+        economy->credit_infrastructure_refund(refund);
+        committed_actions_.pop_back();
+        committed_edge_count_ = graph_.edges().size();
+        preview_valid_ = false;
+        preview_cost_ = 0;
+        status_ = "RAIL DEMOLISHED | REFUND " + money_label(refund) +
+            " | PIECES " + std::to_string(piece_count());
     }
 
     void cancel_gesture(const bool refresh) {
@@ -400,6 +506,7 @@ private:
         if (gesture_active_) (void)graph_.rollback(gesture_checkpoint_);
         gesture_active_ = false;
         preview_valid_ = false;
+        preview_cost_ = 0;
         committed_edge_count_ = graph_.edges().size();
         if (refresh) refresh_status();
     }
@@ -411,7 +518,9 @@ private:
     RailMapForgeInputAdapter input_;
     RailPlacementMode selected_mode_ = RailPlacementMode::straight;
     RailPlacementCheckpoint gesture_checkpoint_{};
+    std::vector<CommittedRailAction> committed_actions_;
     std::size_t committed_edge_count_ = 0U;
+    std::int64_t preview_cost_ = 0;
     float new_root_heading_radians_ = 0.0F;
     bool tool_active_ = false;
     bool gesture_active_ = false;
