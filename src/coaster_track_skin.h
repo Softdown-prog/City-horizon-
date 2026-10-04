@@ -68,7 +68,7 @@ struct CoasterTrackSkin {
     // procedural vector skin above; this path is reserved for Blender-baked
     // joint plates, chain-lift caps, brake fins and other ornamental modules.
     std::string_view overlay_atlas_path = "assets/coasters/skins/classic_steel_01/track_skin_atlas.png";
-    bool overlay_atlas_enabled = false;
+    // Enabled only after the atlas asset is promoted alongside its manifest.\n    // Runtime loaders must gracefully fall back to the vector skin if missing.\n    bool overlay_atlas_enabled = false;
 };
 
 inline constexpr CoasterTrackSkin kClassicSteelTrackSkin{};

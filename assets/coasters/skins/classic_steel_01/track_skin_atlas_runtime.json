@@ -1,0 +1,52 @@
+{
+  "contract": "CH_COASTER_TRACK_SKIN_ATLAS_V1",
+  "skinId": "classic_steel_01",
+  "atlas": "track_skin_atlas.png",
+  "sizePx": [
+    384,
+    216
+  ],
+  "cellPx": [
+    96,
+    72
+  ],
+  "layout": {
+    "columns": [
+      "south",
+      "east",
+      "north",
+      "west"
+    ],
+    "rows": [
+      "joint_plate",
+      "chain_lift",
+      "brake_fin"
+    ]
+  },
+  "placement": {
+    "joint_plate": {
+      "spacingMeters": 6,
+      "driveModes": [
+        "Free",
+        "Lift",
+        "Brake",
+        "Station"
+      ]
+    },
+    "chain_lift": {
+      "driveModes": [
+        "Lift"
+      ]
+    },
+    "brake_fin": {
+      "driveModes": [
+        "Brake"
+      ]
+    }
+  },
+  "source": {
+    "pipeline": "CH Blender",
+    "bakeRun": 37177174997
+  },
+  "notes": "Visual-only overlay. CH_COASTER_TRACK_GEOMETRY_V1 remains authoritative for centerline, gauge, physics, ties and supports."
+}
