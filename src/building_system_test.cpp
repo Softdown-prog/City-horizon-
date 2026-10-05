@@ -192,6 +192,60 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Building placement and demolition now use the same transactional command
+    // boundary. Surround the candidate footprint with roads so this fixture is
+    // independent of the definition's particular road-access edge.
+    for (int x = 8; x <= 10; ++x) {
+        (void)roads.place_tile(x, -9);
+        (void)roads.place_tile(x, -5);
+    }
+    for (int y = -8; y <= -6; ++y) {
+        (void)roads.place_tile(7, y);
+        (void)roads.place_tile(11, y);
+    }
+    CityEconomy construction_economy(100'000);
+    const std::int64_t construction_funds = construction_economy.funds();
+    BuildingPlacementCommand place_house(buildings, roads, tile_owned, construction_economy,
+                                         *house, 8, -8, BuildingRotation::r0, GameDate{1, 1, 1});
+    const auto building_preview = ch::GameCommandExecutor::run(place_house, ch::GameCommandMode::preview);
+    if (!require(building_preview.success && !building_preview.applied,
+                 "building command preview succeeds without applying") ||
+        !require(building_preview.cost_units == house->build_cost &&
+                     construction_economy.funds() == construction_funds,
+                 "building preview exposes exact cost without spending") ||
+        !require(buildings.instance_at(8, -8) == nullptr,
+                 "building preview does not mutate occupancy")) {
+        return 1;
+    }
+
+    const auto building_executed = ch::GameCommandExecutor::run(place_house, ch::GameCommandMode::execute);
+    const BuildingInstance* commanded_house = buildings.instance_at(8, -8);
+    if (!require(building_executed.success && building_executed.applied,
+                 "building placement command executes") ||
+        !require(commanded_house != nullptr && commanded_house->definition_id == house->id,
+                 "building command creates the requested definition") ||
+        !require(construction_economy.funds() == construction_funds - house->build_cost,
+                 "building command charges the exact previewed cost")) {
+        return 1;
+    }
+
+    const std::uint64_t commanded_house_id = commanded_house->instance_id;
+    BuildingDemolitionCommand demolish_house(buildings, *house, commanded_house_id);
+    const auto demolition_preview = ch::GameCommandExecutor::run(demolish_house, ch::GameCommandMode::preview);
+    if (!require(demolition_preview.success && !demolition_preview.applied,
+                 "demolition preview succeeds without mutating") ||
+        !require(buildings.find_by_id(commanded_house_id) != nullptr,
+                 "demolition preview leaves building present")) {
+        return 1;
+    }
+    const auto demolition_executed = ch::GameCommandExecutor::run(demolish_house, ch::GameCommandMode::execute);
+    if (!require(demolition_executed.success && demolition_executed.applied,
+                 "demolition command executes") ||
+        !require(buildings.find_by_id(commanded_house_id) == nullptr && !buildings.is_occupied(8, -8),
+                 "demolition command releases building occupancy")) {
+        return 1;
+    }
+
     std::cout << "building system tests passed\n";
     return 0;
 }
