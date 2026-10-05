@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -197,4 +198,183 @@ private:
     std::string terrain_definition_;
     std::string texture_path_;
     std::int64_t cost_units_ = 0;
+};
+
+class BuildingPlacementCommand final : public ch::IGameCommand {
+public:
+    using TileOwnershipQuery = std::function<bool(int, int)>;
+
+    BuildingPlacementCommand(BuildingManager& buildings, const RoadManager& roads,
+                             TileOwnershipQuery tile_owned, CityEconomy& economy,
+                             const BuildingDefinition& definition, const int tile_x,
+                             const int tile_y, const BuildingRotation rotation,
+                             const GameDate date)
+        : buildings_(buildings), roads_(roads), tile_owned_(std::move(tile_owned)), economy_(economy),
+          definition_(definition), tile_x_(tile_x), tile_y_(tile_y), rotation_(rotation), date_(date) {}
+
+    [[nodiscard]] ch::GameCommandPlan prepare() const override {
+        ch::GameCommandPlan plan;
+        plan.cost_units = definition_.build_cost;
+        plan.transaction.description = "place building";
+        plan.transaction.action_type = ch::TransactionActionType::place_building;
+
+        if (!definition_.player_buildable || definition_.build_cost < 0) {
+            plan.failure = ch::GameCommandFailure::invalid_request;
+            plan.message = "building is not player-buildable";
+            return plan;
+        }
+
+        const BuildingFootprint footprint = rotated_footprint(definition_, rotation_);
+        for (int y = 0; y < footprint.height; ++y) {
+            for (int x = 0; x < footprint.width; ++x) {
+                plan.affected_tiles.push_back({tile_x_ + x, tile_y_ + y});
+                if (!tile_owned_ || !tile_owned_(tile_x_ + x, tile_y_ + y)) {
+                    plan.failure = ch::GameCommandFailure::blocked;
+                    plan.message = "building footprint crosses unowned land";
+                    return plan;
+                }
+            }
+        }
+
+        const PlacementFailure placement = buildings_.validate(definition_, tile_x_, tile_y_, rotation_);
+        if (placement != PlacementFailure::none) {
+            plan.failure = placement == PlacementFailure::outside_map
+                ? ch::GameCommandFailure::out_of_bounds
+                : placement == PlacementFailure::unavailable_rotation
+                    ? ch::GameCommandFailure::invalid_request
+                    : ch::GameCommandFailure::conflicting_state;
+            plan.message = "building placement is invalid";
+            return plan;
+        }
+        if (!roads_.has_required_road_access(definition_, tile_x_, tile_y_, rotation_)) {
+            plan.failure = ch::GameCommandFailure::blocked;
+            plan.message = "building has no required road access";
+            return plan;
+        }
+        if (!economy_.can_afford(plan.cost_units)) {
+            plan.failure = ch::GameCommandFailure::insufficient_funds;
+            plan.message = "insufficient funds for building";
+            return plan;
+        }
+
+        plan.transaction.payloads.push_back(ch::BuildingStateSnapshot{
+            .instance_id = 0,
+            .definition_id = definition_.id,
+            .tile_x = tile_x_,
+            .tile_y = tile_y_,
+            .previous_rotation = static_cast<int>(rotation_),
+            .new_rotation = static_cast<int>(rotation_),
+            .was_present = false,
+            .is_present = true,
+        });
+        plan.valid = true;
+        plan.failure = ch::GameCommandFailure::none;
+        plan.message = "building placement ready";
+        return plan;
+    }
+
+    [[nodiscard]] bool apply(const ch::GameCommandPlan& prepared, std::string& error) override {
+        if (!prepared.valid || prepared.cost_units != definition_.build_cost ||
+            buildings_.validate(definition_, tile_x_, tile_y_, rotation_) != PlacementFailure::none ||
+            !roads_.has_required_road_access(definition_, tile_x_, tile_y_, rotation_)) {
+            error = "building placement changed after preview";
+            return false;
+        }
+        const BuildingFootprint footprint = rotated_footprint(definition_, rotation_);
+        for (int y = 0; y < footprint.height; ++y) {
+            for (int x = 0; x < footprint.width; ++x) {
+                if (!tile_owned_ || !tile_owned_(tile_x_ + x, tile_y_ + y)) {
+                    error = "building ownership changed after preview";
+                    return false;
+                }
+            }
+        }
+
+        const std::optional<std::uint64_t> instance_id = buildings_.place(definition_, tile_x_, tile_y_, rotation_);
+        if (!instance_id) {
+            error = "building manager rejected prepared placement";
+            return false;
+        }
+        if (!economy_.spend_for_building(prepared.cost_units, date_, *instance_id)) {
+            (void)buildings_.remove_instance(definition_, *instance_id);
+            error = "funds changed after preview";
+            return false;
+        }
+        return true;
+    }
+
+private:
+    BuildingManager& buildings_;
+    const RoadManager& roads_;
+    TileOwnershipQuery tile_owned_;
+    CityEconomy& economy_;
+    const BuildingDefinition& definition_;
+    int tile_x_ = 0;
+    int tile_y_ = 0;
+    BuildingRotation rotation_ = BuildingRotation::r0;
+    GameDate date_{};
+};
+
+class BuildingDemolitionCommand final : public ch::IGameCommand {
+public:
+    BuildingDemolitionCommand(BuildingManager& buildings, const BuildingDefinition& definition,
+                              const std::uint64_t instance_id)
+        : buildings_(buildings), definition_(definition), instance_id_(instance_id) {}
+
+    [[nodiscard]] ch::GameCommandPlan prepare() const override {
+        ch::GameCommandPlan plan;
+        plan.cost_units = 0;
+        plan.transaction.description = "demolish building";
+        plan.transaction.action_type = ch::TransactionActionType::demolish_building;
+
+        const BuildingInstance* instance = buildings_.find_by_id(instance_id_);
+        if (instance == nullptr || instance->definition_id != definition_.id) {
+            plan.failure = ch::GameCommandFailure::conflicting_state;
+            plan.message = "building instance no longer exists";
+            return plan;
+        }
+
+        const BuildingFootprint footprint = rotated_footprint(definition_, instance->rotation);
+        for (int y = 0; y < footprint.height; ++y) {
+            for (int x = 0; x < footprint.width; ++x) {
+                plan.affected_tiles.push_back({instance->tile_x + x, instance->tile_y + y});
+            }
+        }
+        plan.transaction.payloads.push_back(ch::BuildingStateSnapshot{
+            .instance_id = static_cast<std::size_t>(instance_id_),
+            .definition_id = definition_.id,
+            .tile_x = instance->tile_x,
+            .tile_y = instance->tile_y,
+            .previous_rotation = static_cast<int>(instance->rotation),
+            .new_rotation = static_cast<int>(instance->rotation),
+            .was_present = true,
+            .is_present = false,
+        });
+        plan.valid = true;
+        plan.failure = ch::GameCommandFailure::none;
+        plan.message = "building demolition ready";
+        return plan;
+    }
+
+    [[nodiscard]] bool apply(const ch::GameCommandPlan& prepared, std::string& error) override {
+        if (!prepared.valid) {
+            error = "invalid prepared demolition command";
+            return false;
+        }
+        const BuildingInstance* current = buildings_.find_by_id(instance_id_);
+        if (current == nullptr || current->definition_id != definition_.id) {
+            error = "building changed after preview";
+            return false;
+        }
+        if (!buildings_.remove_instance(definition_, instance_id_)) {
+            error = "building manager rejected prepared demolition";
+            return false;
+        }
+        return true;
+    }
+
+private:
+    BuildingManager& buildings_;
+    const BuildingDefinition& definition_;
+    std::uint64_t instance_id_ = 0;
 };
