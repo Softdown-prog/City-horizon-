@@ -67,19 +67,40 @@ def main():
     scene.render.film_transparent=True
     scene.render.image_settings.file_format="PNG"
     scene.render.image_settings.color_mode="RGBA"
-    scene.view_settings.look="None"
-    scene.view_settings.view_transform="Standard"
-    scene.view_settings.exposure=0
-    scene.view_settings.gamma=1
+
+    # set_direction() guards the fixed CH studio, including color management.
+    # Keep the studio untouched while rotating. Switch to linear mask output
+    # only for the render itself, then restore before the next direction.
+    original_view={
+        "look": scene.view_settings.look,
+        "view_transform": scene.view_settings.view_transform,
+        "exposure": scene.view_settings.exposure,
+        "gamma": scene.view_settings.gamma,
+    }
+
+    def set_mask_view():
+        scene.view_settings.look="None"
+        scene.view_settings.view_transform="Standard"
+        scene.view_settings.exposure=0
+        scene.view_settings.gamma=1
+
+    def restore_studio_view():
+        scene.view_settings.view_transform=original_view["view_transform"]
+        scene.view_settings.look=original_view["look"]
+        scene.view_settings.exposure=original_view["exposure"]
+        scene.view_settings.gamma=original_view["gamma"]
 
     reports={}
     for direction in base.bs.DIRECTIONS:
+        restore_studio_view()
         base.bs.set_direction(root,direction)
         bpy.context.view_layer.update()
         did=direction["id"]
         path=out/f"mask_{did}.png"
+        set_mask_view()
         scene.render.filepath=str(path)
         bpy.ops.render.render(write_still=True)
+        restore_studio_view()
         reports[did]={"file":path.name,"primary":"R","secondary":"G"}
 
     # Satisfy the generic proxy worker contract without changing mask semantics.
