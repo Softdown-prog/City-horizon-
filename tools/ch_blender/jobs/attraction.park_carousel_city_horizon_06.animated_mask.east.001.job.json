@@ -1,0 +1,45 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_carousel_city_horizon_06.animated_mask.east.001",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_carousel_city_horizon_06_animated_mask.py",
+  "qualityStage": "proxy",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
+  "assetRequirements": {
+    "contract": "CH_ASSET_REQUIREMENTS_V1",
+    "assetId": "attraction.park_carousel_city_horizon_06",
+    "footprint": {
+      "widthTiles": 7,
+      "depthTiles": 7
+    },
+    "minDimensions": [
+      5,
+      5,
+      2.5
+    ],
+    "maxDimensions": [
+      9,
+      9,
+      5
+    ]
+  },
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/park_carousel_city_horizon_06.carousel.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east",
+    "--direction",
+    "east"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east",
+  "expectedOutputs": [
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/preflight_report.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/proxy_south.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/proxy_report.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/mask_east_manifest.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/mask_east_f01.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_06.animated_mask_east/mask_east_f48.png"
+  ]
+}

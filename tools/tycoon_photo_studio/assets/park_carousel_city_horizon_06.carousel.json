@@ -176,6 +176,7 @@
     "approvalBasis": "explicit_user_approval_after_24_frame_per_direction_review",
     "approvalScope": "48_frame_four_direction_beauty_candidate_only",
     "runtimePromotionApproved": false,
-    "animatedColorMaskApproved": false
+    "animatedColorMaskApproved": true,
+    "maskApprovalBasis": "user_approved_final_48_frame_beauty_and_requested_continuation"
   }
 }
