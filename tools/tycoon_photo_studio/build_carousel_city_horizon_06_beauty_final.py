@@ -26,6 +26,7 @@ def args():
     p.add_argument("--recipe",required=True)
     p.add_argument("--studio-preset",required=True)
     p.add_argument("--output",required=True)
+    p.add_argument("--stage",choices=("preflight","proxy","final"),default="proxy")
     p.add_argument("--preflight-profile")
     return p.parse_args(av)
 
