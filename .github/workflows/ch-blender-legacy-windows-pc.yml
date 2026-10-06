@@ -1,0 +1,65 @@
+name: CH Blender Legacy - Windows PC
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: city-horizon-legacy-pc
+  cancel-in-progress: false
+jobs:
+  smoke:
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Validate Blender 4.2.3 Legacy and render Cycles CPU
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'C:\Users\User\.ch-blender\blender-4.2.3-legacy\blender.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Legacy executable missing' }
+          $marker = Get-Content (Join-Path (Split-Path $exe) 'ch-legacy-build.json') -Raw | ConvertFrom-Json
+          if ($marker.backend -ne 'legacy_cpu_4_2_3' -or $marker.upstreamTag -ne 'v4.2.3') { throw 'Invalid Legacy marker' }
+          $version = & $exe --version
+          if ($LASTEXITCODE -ne 0 -or $version[0].Trim() -notmatch '^Blender 4\.2\.3(?: LTS)?$') { throw 'Expected Blender 4.2.3' }
+          Write-Host $version[0]
+          "CH_BLENDER_EXE=$exe" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "BLENDER_EXE=$exe" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "CH_BLENDER_BACKEND=legacy_cpu_4_2_3" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $output = Join-Path $env:RUNNER_TEMP ("legacy-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT")
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+          $env:CH_LEGACY_SMOKE_OUTPUT = $output
+          @'
+          import bpy, os, json
+          from pathlib import Path
+          assert bpy.app.version == (4,2,3)
+          bpy.ops.wm.read_factory_settings(use_empty=False)
+          s = bpy.context.scene
+          s.render.engine = 'CYCLES'
+          s.cycles.device = 'CPU'
+          s.cycles.samples = 4
+          s.cycles.use_denoising = False
+          s.render.resolution_x = s.render.resolution_y = 64
+          s.render.resolution_percentage = 100
+          s.render.film_transparent = True
+          s.render.image_settings.file_format = 'PNG'
+          s.render.image_settings.color_mode = 'RGBA'
+          out = Path(os.environ['CH_LEGACY_SMOKE_OUTPUT'])
+          s.render.filepath = str(out / 'cycles_cpu.png')
+          bpy.ops.render.render(write_still=True)
+          image = bpy.data.images.load(s.render.filepath)
+          assert tuple(image.size) == (64,64) and image.channels == 4
+          (out / 'report.json').write_text(json.dumps({'version': bpy.app.version_string, 'backend': 'legacy_cpu_4_2_3', 'bpy': True, 'cyclesCPU': True, 'pngRGBA': True, 'artisticApproval': False}))
+          print('CH_LEGACY_SMOKE_OK')
+          '@ | Set-Content (Join-Path $output 'smoke.py') -Encoding utf8
+          & $exe --background --python-exit-code 1 --python (Join-Path $output 'smoke.py')
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $output 'report.json'))) { throw 'Legacy smoke failed' }
+          "CH_LEGACY_SMOKE_OUTPUT=$output" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Upload technical proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Legacy-PC-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CH_LEGACY_SMOKE_OUTPUT }}
+          if-no-files-found: error
+          retention-days: 14
