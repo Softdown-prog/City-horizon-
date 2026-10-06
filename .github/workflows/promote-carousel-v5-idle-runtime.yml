@@ -1,0 +1,215 @@
+name: Promote Carousel V5 Idle Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/runtime_promotions/park_carousel_01.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-carousel-idle-runtime-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install image dependency
+        run: python -m pip install --upgrade pillow
+
+      - name: Read promotion request
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path("tools/ch_blender/runtime_promotions/park_carousel_01.json")
+          d=json.loads(p.read_text(encoding="utf-8"))
+          assert d["contract"]=="CH_RUNTIME_ASSET_PROMOTION_V1"
+          assert d["assetId"]=="park_carousel_01"
+          assert d["approved"] is True
+          assert d["approvalScope"]=="idle_static_four_direction_runtime"
+          assert d["frameSize"]==[1280,1280]
+          assert d["format"]=="PNG_RGBA"
+          assert d["transparentBackground"] is True
+          assert d["directionOrder"]==["south","east","west","north"]
+          with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as f:
+              f.write(f'run_id={d["sourceWorkflowRun"]}\n')
+              f.write(f'artifact_id={d["sourceArtifactId"]}\n')
+              f.write(f'artifact_name={d["sourceArtifactName"]}\n')
+              f.write(f'source_dir={d["sourceDir"]}\n')
+          PY
+
+      - name: Download approved idle artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: out/runtime_promotion/source
+
+      - name: Validate and promote four idle directions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json, shutil
+
+          req=json.loads(Path("tools/ch_blender/runtime_promotions/park_carousel_01.json").read_text(encoding="utf-8"))
+          root=Path("out/runtime_promotion/source")
+          candidates=list(root.rglob(req["sourceDir"]))
+          if len(candidates)!=1:
+              raise SystemExit(f"Expected one source dir {req['sourceDir']}, found {len(candidates)}")
+          src=candidates[0]
+          dst=Path(req["destination"])
+          dst.mkdir(parents=True,exist_ok=True)
+
+          directions=("south","east","west","north")
+          views={}
+          alpha_bounds={}
+          for direction in directions:
+              source=src/f"idle_{direction}.png"
+              target=dst/f"park_carousel_01_{direction}.png"
+              if not source.is_file():
+                  raise SystemExit(f"Missing source {source}")
+              data=source.read_bytes()
+              digest=hashlib.sha256(data).hexdigest()
+              if digest!=req["sha256"][direction]:
+                  raise SystemExit(f"{direction}: SHA mismatch {digest}")
+              im=Image.open(source).convert("RGBA")
+              if im.size!=(1280,1280):
+                  raise SystemExit(f"{direction}: expected 1280x1280, got {im.size}")
+              a=im.getchannel("A")
+              bbox=a.getbbox()
+              if not bbox:
+                  raise SystemExit(f"{direction}: empty alpha")
+              for xy in ((0,0),(1279,0),(0,1279),(1279,1279)):
+                  if a.getpixel(xy)!=0:
+                      raise SystemExit(f"{direction}: background corner not transparent")
+              shutil.copy2(source,target)
+              views[direction]={"file":target.name,"sha256":digest,"alphaBounds":list(bbox)}
+              alpha_bounds[direction]=bbox
+
+          max_opaque_width=max(b[2]-b[0] for b in alpha_bounds.values())
+          target_width=(7+7)*64
+          art_scale=round((target_width*0.975)/max_opaque_width,4)
+          if not 0.75 <= art_scale <= 1.25:
+              raise SystemExit(f"Unexpected carousel artScale {art_scale}")
+
+          manifest={
+            "contract":"CH_CITY_PARK_STATIC_ASSET_V1",
+            "assetId":"park_carousel_01",
+            "displayName":"Carrossel",
+            "category":"city_park",
+            "subtype":"amusement_ride_idle",
+            "format":"PNG_RGBA",
+            "frameSize":[1280,1280],
+            "transparentBackground":True,
+            "directionOrder":list(directions),
+            "footprint":{"widthTiles":7,"depthTiles":7},
+            "runtimeRepresentation":"2D_RGBA_static_four_direction_sprite",
+            "views":views,
+            "sourceAuthoringAssetId":req["sourceAuthoringAssetId"],
+            "sourceWorkflowRun":req["sourceWorkflowRun"],
+            "sourceArtifactId":req["sourceArtifactId"],
+            "sourceCommit":req["sourceCommit"],
+            "approvedForRuntime":True,
+            "approvalScope":req["approvalScope"],
+            "status":"runtime_idle_four_direction",
+            "note":"Static idle runtime promotion only. Procedural recipe remains draft/not-approved-exemplar."
+          }
+          (dst/"park_carousel_01_runtime_manifest.json").write_text(json.dumps(manifest,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+
+          definition={
+            "id":"park_carousel_01",
+            "name":"Carrossel",
+            "category":"city_park",
+            "texture":"assets/city_park/carousel/park_carousel_01_south.png",
+            "sprites":{
+              "0":"assets/city_park/carousel/park_carousel_01_south.png",
+              "1":"assets/city_park/carousel/park_carousel_01_west.png",
+              "2":"assets/city_park/carousel/park_carousel_01_north.png",
+              "3":"assets/city_park/carousel/park_carousel_01_east.png"
+            },
+            "rotatable":True,
+            "requiresRoadAccess":False,
+            "requiresRoadOrPathAccess":False,
+            "requiresTicketBooth":False,
+            "grassOnly":True,
+            "roadAccessMode":"any_perimeter",
+            "accessPoints":[{"x":3,"y":6,"facing":"south"}],
+            "footprint":{"width":7,"height":7},
+            "occupancyFootprint":{"width":7,"height":7,"offsetX":0,"offsetY":0},
+            "buildCost":18000,
+            "maintenancePerMonth":0,
+            "taxRevenuePerMonth":0,
+            "powerConsumption":0,
+            "needsEffect":{"fun":60},
+            "artScale":art_scale,
+            "playerBuildable":True,
+            "productionStatus":"runtime_idle_four_direction_approved",
+            "renderClass":"large_asset_1280",
+            "runtimeManifest":"assets/city_park/carousel/park_carousel_01_runtime_manifest.json",
+            "sourceWorkflowRun":req["sourceWorkflowRun"],
+            "sourceAuthoringAssetId":req["sourceAuthoringAssetId"]
+          }
+          Path("assets/definitions/park_carousel_01.json").write_text(json.dumps(definition,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+          print(f"Carousel runtime staged: artScale={art_scale} maxOpaqueWidth={max_opaque_width}px")
+          PY
+
+      - name: Validate runtime references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("assets/definitions/park_carousel_01.json").read_text(encoding="utf-8"))
+          files=[d["texture"],*d["sprites"].values(),d["runtimeManifest"]]
+          missing=[p for p in files if not Path(p).is_file()]
+          if missing:
+              raise SystemExit(f"Missing runtime references: {missing}")
+          assert d["sprites"]["0"].endswith("_south.png")
+          assert d["sprites"]["1"].endswith("_west.png")
+          assert d["sprites"]["2"].endswith("_north.png")
+          assert d["sprites"]["3"].endswith("_east.png")
+          assert d["playerBuildable"] is True
+          print("Carousel runtime references validated.")
+          PY
+
+      - name: Commit carousel runtime to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/city_park/carousel assets/definitions/park_carousel_01.json
+          if git diff --cached --quiet; then
+            echo "Carousel idle runtime already promoted."
+            exit 0
+          fi
+          git commit -m "assets: promote carousel V5 idle four-direction runtime"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
