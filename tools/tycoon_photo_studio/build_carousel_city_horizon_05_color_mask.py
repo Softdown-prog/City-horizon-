@@ -77,6 +77,8 @@ def main():
         "exposure": scene.view_settings.exposure,
         "gamma": scene.view_settings.gamma,
     }
+    original_resolution=(scene.render.resolution_x, scene.render.resolution_y, scene.render.resolution_percentage)
+    runtime_resolution=(1280,1280)
 
     def set_mask_view():
         scene.view_settings.look="None"
@@ -98,8 +100,14 @@ def main():
         did=direction["id"]
         path=out/f"mask_{did}.png"
         set_mask_view()
+        scene.render.resolution_x=runtime_resolution[0]
+        scene.render.resolution_y=runtime_resolution[1]
+        scene.render.resolution_percentage=100
         scene.render.filepath=str(path)
         bpy.ops.render.render(write_still=True)
+        scene.render.resolution_x=original_resolution[0]
+        scene.render.resolution_y=original_resolution[1]
+        scene.render.resolution_percentage=original_resolution[2]
         restore_studio_view()
         reports[did]={"file":path.name,"primary":"R","secondary":"G"}
 
