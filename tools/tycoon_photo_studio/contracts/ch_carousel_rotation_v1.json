@@ -27,20 +27,34 @@
     "productionContractUnchanged": true,
     "sampledFrames": [
       1,
+      3,
       5,
+      7,
       9,
+      11,
       13,
+      15,
       17,
+      19,
       21,
+      23,
       25,
+      27,
       29,
+      31,
       33,
+      35,
       37,
+      39,
       41,
-      45
+      43,
+      45,
+      47
     ],
-    "framesPerDirection": 12,
-    "totalFourDirectionFrames": 48
+    "framesPerDirection": 24,
+    "totalFourDirectionFrames": 96,
+    "angularStepDegrees": 15,
+    "reason": "Avoid 30-degree stripe-period aliasing that makes the canopy appear stationary in review."
   },
   "playback": {
     "fps": 8,
@@ -62,6 +76,7 @@
     "primary plus secondary stripe counts must equal 24",
     "production frame count must equal 48",
     "angular step must equal 360/frameCount = 7.5 degrees",
+    "review proxy must sample 24 frames at 15 degree visual steps to avoid 30 degree stripe aliasing",
     "exported frame 48 must represent 352.5 degrees, not 360 degrees",
     "frame 49 exists only as the non-exported loop closure key",
     "beauty and color-mask frame ordering must match"

@@ -2,12 +2,11 @@
 from __future__ import annotations
 import math
 
-REVIEW_FRAMES=(1,5,9,13,17,21,25,29,33,37,41,45)
-
 def validate_recipe(recipe):
     geo=recipe.get("geometry",{})
     animation=recipe.get("animation",{})
     mask=recipe.get("colorMask",{})
+    review=recipe.get("reviewProxy",{})
 
     stripe_count=int(geo.get("canopySegments",0))
     primary_count=int(geo.get("canopyPrimaryStripeCount",0))
@@ -49,10 +48,19 @@ def validate_recipe(recipe):
     if channels.get("B")!="unused":
         raise RuntimeError("Carousel B mask channel must remain unused")
 
+    review_frames=[int(v) for v in review.get("frames",[])]
+    expected_review=list(range(1,49,2))
+    if review_frames!=expected_review:
+        raise RuntimeError("Carousel review proxy must sample frames 1,3,5,...,47 (24 samples at 15 degrees)")
+    if int(review.get("framesPerDirection",0))!=24 or int(review.get("totalFrames",0))!=96:
+        raise RuntimeError("Carousel review proxy must contain 24 frames/direction and 96 total frames")
+    if not math.isclose(float(review.get("angularStepDegrees",0.0)),15.0,abs_tol=1e-8):
+        raise RuntimeError("Carousel review proxy angular step must be 15 degrees")
+
     return {
       "frameStart":frame_start,"frameEnd":frame_end,"frameCount":frame_count,
       "loopClosureFrame":closure_frame,"angularStepDegrees":expected_step,
-      "fps":int(animation.get("fps",8)),"reviewFrames":list(REVIEW_FRAMES)
+      "fps":int(animation.get("fps",8)),"reviewFrames":review_frames
     }
 
 def frame_angle_degrees(recipe,frame):
