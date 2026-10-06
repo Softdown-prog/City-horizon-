@@ -41,9 +41,29 @@
   },
   "artScale": 1.0111,
   "playerBuildable": true,
-  "productionStatus": "runtime_idle_four_direction_approved",
+  "productionStatus": "runtime_idle_four_direction_color_mask_enabled",
   "renderClass": "large_asset_1280",
   "runtimeManifest": "assets/city_park/carousel/park_carousel_01_runtime_manifest.json",
   "sourceWorkflowRun": 37454113454,
-  "sourceAuthoringAssetId": "attraction.park_carousel_city_horizon_05"
+  "sourceAuthoringAssetId": "attraction.park_carousel_city_horizon_05",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "channels": {
+      "R": "canopy_primary_stripes",
+      "G": "canopy_secondary_stripes"
+    },
+    "alpha": "coverage",
+    "uiSemantics": {
+      "R": "Listra A do chapeu",
+      "G": "Listra B do chapeu"
+    },
+    "sprites": {
+      "0": "assets/city_park/carousel/park_carousel_01_south_mask.png",
+      "1": "assets/city_park/carousel/park_carousel_01_west_mask.png",
+      "2": "assets/city_park/carousel/park_carousel_01_north_mask.png",
+      "3": "assets/city_park/carousel/park_carousel_01_east_mask.png"
+    }
+  },
+  "colorCustomizationStatus": "runtime_enabled_ch_color_mask_v1"
 }

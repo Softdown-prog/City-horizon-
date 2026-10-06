@@ -69,6 +69,59 @@
   "sourceCommit": "63ab44a8123c6332783215b3c9110b17b0f51f44",
   "approvedForRuntime": true,
   "approvalScope": "idle_static_four_direction_runtime",
-  "status": "runtime_idle_four_direction",
-  "note": "Static idle runtime promotion only; procedural V5 recipe remains draft/not-approved-exemplar."
+  "status": "runtime_idle_four_direction_color_mask_enabled",
+  "note": "Static idle runtime promotion only; procedural V5 recipe remains draft/not-approved-exemplar.",
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "format": "PNG_RGBA",
+    "frameSize": [
+      1280,
+      1280
+    ],
+    "alpha": "coverage",
+    "channels": {
+      "R": "canopy_primary_stripes",
+      "G": "canopy_secondary_stripes"
+    },
+    "primaryMeaning": "red/authored canopy stripe family; player tint slot A",
+    "secondaryMeaning": "cream/authored canopy stripe family; player tint slot B",
+    "runtimeAssets": {
+      "south": {
+        "file": "park_carousel_01_south_mask.png",
+        "sha256": "896353c494c9438fea3a55b2445395abc1761c676ed897a6ec0e22d9083fc7e9",
+        "channels": {
+          "R": "canopy_primary_stripes",
+          "G": "canopy_secondary_stripes"
+        }
+      },
+      "east": {
+        "file": "park_carousel_01_east_mask.png",
+        "sha256": "7a14b0d43da352fb3613dce372d5b82c815c4547c76864e61f5b52ff9d786127",
+        "channels": {
+          "R": "canopy_primary_stripes",
+          "G": "canopy_secondary_stripes"
+        }
+      },
+      "west": {
+        "file": "park_carousel_01_west_mask.png",
+        "sha256": "3dbe2b42ee636e76ed465d38dd09bdc53813372b1448a152d848fdd0b7a68492",
+        "channels": {
+          "R": "canopy_primary_stripes",
+          "G": "canopy_secondary_stripes"
+        }
+      },
+      "north": {
+        "file": "park_carousel_01_north_mask.png",
+        "sha256": "72f6959012c67d68ed7b5f14e77a5370c351b02fa7cb0e16ae50593288509e5d",
+        "channels": {
+          "R": "canopy_primary_stripes",
+          "G": "canopy_secondary_stripes"
+        }
+      }
+    },
+    "sourceWorkflowRun": 37474833757,
+    "sourceArtifactId": 11418327770,
+    "sourceCommit": "5cd539935ff26b09c660fa774e94dc761bdac502",
+    "approvedForRuntime": true
+  }
 }
