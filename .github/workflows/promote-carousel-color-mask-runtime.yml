@@ -1,0 +1,182 @@
+name: Promote Carousel Color Mask Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ch_blender/runtime_promotions/park_carousel_01_color_mask.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ch-carousel-color-mask-runtime
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pillow
+
+      - name: Read promotion request
+        id: promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          d=json.loads(Path("tools/ch_blender/runtime_promotions/park_carousel_01_color_mask.json").read_text(encoding="utf-8"))
+          assert d["contract"]=="CH_RUNTIME_COLOR_MASK_PROMOTION_V1"
+          assert d["assetId"]=="park_carousel_01"
+          assert d["maskContract"]=="CH_COLOR_MASK_V1"
+          assert d["approved"] is True
+          assert d["finalSize"]==[1280,1280]
+          assert d["directionOrder"]==["south","east","west","north"]
+          assert d["channels"]=={"R":"canopy_primary_stripes","G":"canopy_secondary_stripes"}
+          with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as f:
+              f.write(f'run_id={d["sourceWorkflowRun"]}\n')
+              f.write(f'artifact_id={d["sourceArtifactId"]}\n')
+              f.write(f'source_dir={d["sourceDir"]}\n')
+          PY
+
+      - name: Download approved runtime-scale mask artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.promotion.outputs.run_id }}
+          artifact-ids: ${{ steps.promotion.outputs.artifact_id }}
+          path: ${{ runner.temp }}/carousel_mask_runtime
+
+      - name: Validate promote and activate masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json, os, shutil
+
+          req=json.loads(Path("tools/ch_blender/runtime_promotions/park_carousel_01_color_mask.json").read_text(encoding="utf-8"))
+          root=Path(os.environ["RUNNER_TEMP"])/"carousel_mask_runtime"
+          matches=list(root.rglob(req["sourceDir"]))
+          if len(matches)!=1:
+              raise SystemExit(f"Expected one source dir {req['sourceDir']}, found {len(matches)}")
+          src=matches[0]
+          dst=Path("assets/city_park/carousel")
+          definition_path=Path("assets/definitions/park_carousel_01.json")
+          manifest_path=dst/"park_carousel_01_runtime_manifest.json"
+          definition=json.loads(definition_path.read_text(encoding="utf-8"))
+          manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          runtime_names={}
+          views={}
+          for direction in ("south","east","west","north"):
+              source=src/f"mask_{direction}.png"
+              expected=req["sha256"][direction]
+              actual=hashlib.sha256(source.read_bytes()).hexdigest()
+              if actual!=expected:
+                  raise SystemExit(f"{direction}: SHA mismatch {actual}")
+              im=Image.open(source).convert("RGBA")
+              if im.size!=(1280,1280):
+                  raise SystemExit(f"{direction}: expected 1280x1280, got {im.size}")
+              alpha=im.getchannel("A")
+              if not alpha.getbbox():
+                  raise SystemExit(f"{direction}: empty mask")
+              # Both recolor channels must exist in every direction.
+              rmax=im.getchannel("R").getextrema()[1]
+              gmax=im.getchannel("G").getextrema()[1]
+              if rmax==0 or gmax==0:
+                  raise SystemExit(f"{direction}: missing R/G mask coverage")
+              target=dst/f"park_carousel_01_{direction}_mask.png"
+              shutil.copy2(source,target)
+              runtime_names[direction]=str(target)
+              views[direction]={
+                  "file":target.name,
+                  "sha256":actual,
+                  "channels":{"R":"canopy_primary_stripes","G":"canopy_secondary_stripes"}
+              }
+
+          # BuildingRotation runtime order: 0=S, 1=W, 2=N, 3=E.
+          definition["colorMask"]={
+              "contract":"CH_COLOR_MASK_V1",
+              "enabled":True,
+              "channels":{
+                  "R":"canopy_primary_stripes",
+                  "G":"canopy_secondary_stripes"
+              },
+              "alpha":"coverage",
+              "uiSemantics":{
+                  "R":"Listra A do chapeu",
+                  "G":"Listra B do chapeu"
+              },
+              "sprites":{
+                  "0":runtime_names["south"],
+                  "1":runtime_names["west"],
+                  "2":runtime_names["north"],
+                  "3":runtime_names["east"]
+              }
+          }
+          definition["productionStatus"]="runtime_idle_four_direction_color_mask_enabled"
+          definition["colorCustomizationStatus"]="runtime_enabled_ch_color_mask_v1"
+          definition_path.write_text(json.dumps(definition,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+
+          manifest["colorMask"]={
+              "contract":"CH_COLOR_MASK_V1",
+              "format":"PNG_RGBA",
+              "frameSize":[1280,1280],
+              "alpha":"coverage",
+              "channels":{
+                  "R":"canopy_primary_stripes",
+                  "G":"canopy_secondary_stripes"
+              },
+              "primaryMeaning":"red/authored canopy stripe family; player tint slot A",
+              "secondaryMeaning":"cream/authored canopy stripe family; player tint slot B",
+              "runtimeAssets":views,
+              "sourceWorkflowRun":req["sourceWorkflowRun"],
+              "sourceArtifactId":req["sourceArtifactId"],
+              "sourceCommit":req["sourceCommit"],
+              "approvedForRuntime":True
+          }
+          manifest["status"]="runtime_idle_four_direction_color_mask_enabled"
+          manifest_path.write_text(json.dumps(manifest,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+
+          # Verify every reference exists before commit.
+          refs=list(definition["colorMask"]["sprites"].values())
+          missing=[p for p in refs if not Path(p).is_file()]
+          if missing:
+              raise SystemExit(f"Missing mask runtime references: {missing}")
+          print("Carousel CH_COLOR_MASK_V1 runtime activated:", refs)
+          PY
+
+      - name: Commit activated carousel color customization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/city_park/carousel assets/definitions/park_carousel_01.json
+          if git diff --cached --quiet; then
+            echo "Carousel color mask runtime already active."
+            exit 0
+          fi
+          git commit -m "assets: activate carousel canopy color customization"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

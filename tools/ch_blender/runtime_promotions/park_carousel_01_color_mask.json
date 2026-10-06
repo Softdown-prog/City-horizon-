@@ -1,0 +1,28 @@
+{
+  "contract": "CH_RUNTIME_COLOR_MASK_PROMOTION_V1",
+  "assetId": "park_carousel_01",
+  "sourceAssetId": "attraction.park_carousel_city_horizon_05",
+  "maskContract": "CH_COLOR_MASK_V1",
+  "approved": true,
+  "approvalScope": "canopy_stripes_four_direction_runtime",
+  "sourceCommit": "5cd539935ff26b09c660fa774e94dc761bdac502",
+  "sourceWorkflowRun": 37474833757,
+  "sourceArtifactId": 11418327770,
+  "sourceArtifactName": "CH-Blender-Agent-37474833757-1",
+  "sourceDir": "attraction.park_carousel_city_horizon_05.color_mask_v5",
+  "destination": "assets/city_park/carousel",
+  "directionOrder": ["south","east","west","north"],
+  "finalSize": [1280,1280],
+  "format": "PNG_RGBA",
+  "channels": {
+    "R": "canopy_primary_stripes",
+    "G": "canopy_secondary_stripes"
+  },
+  "alpha": "coverage",
+  "sha256": {
+    "south": "896353c494c9438fea3a55b2445395abc1761c676ed897a6ec0e22d9083fc7e9",
+    "east": "7a14b0d43da352fb3613dce372d5b82c815c4547c76864e61f5b52ff9d786127",
+    "west": "3dbe2b42ee636e76ed465d38dd09bdc53813372b1448a152d848fdd0b7a68492",
+    "north": "72f6959012c67d68ed7b5f14e77a5370c351b02fa7cb0e16ae50593288509e5d"
+  }
+}
