@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   promote:
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'tools/ch_blender/runtime_promotions/viking_ship_01.json') || contains(join(github.event.commits.*.added, ','), 'tools/ch_blender/runtime_promotions/viking_ship_01.json')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,7 +64,6 @@ jobs:
 
 
   promote-carousel-idle:
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'tools/ch_blender/runtime_promotions/park_carousel_01.json') || contains(join(github.event.commits.*.added, ','), 'tools/ch_blender/runtime_promotions/park_carousel_01.json')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
