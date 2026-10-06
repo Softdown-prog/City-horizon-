@@ -947,10 +947,12 @@ void draw_text(SDL_Renderer* renderer, float x, float y, const std::string& text
     const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
     const SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
     const float scale = definition.art_scale * camera.zoom;
-    const float frame_w = definition.animation.has_value() && definition.animation->frame_count > 1
-        ? static_cast<float>(texture.source_width) / static_cast<float>(definition.animation->frame_count)
-        : static_cast<float>(texture.source_width);
-    const float frame_h = static_cast<float>(texture.source_height);
+    const int atlas_columns = definition.animation.has_value() && definition.animation->frame_count > 1
+        ? definition.animation->resolved_columns() : 1;
+    const int atlas_rows = definition.animation.has_value() && definition.animation->frame_count > 1
+        ? definition.animation->resolved_rows() : 1;
+    const float frame_w = static_cast<float>(texture.source_width) / static_cast<float>(std::max(1, atlas_columns));
+    const float frame_h = static_cast<float>(texture.source_height) / static_cast<float>(std::max(1, atlas_rows));
     const SDL_FRect bounds = {
         anchor.x - frame_w * scale * definition.anchor_x_for(visual_rotation, instance.current_level),
         anchor.y - frame_h * scale * definition.anchor_y_for(visual_rotation, instance.current_level),
@@ -987,8 +989,19 @@ void render_building(SDL_Renderer* renderer, const BuildingDefinition& definitio
         } else {
             frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
         }
-        const float frame_width = texture.source_width / static_cast<float>(frame_count);
-        const SDL_FRect source = {frame_width * frame_index, 0.0F, frame_width, texture.source_height};
+        const BuildingAnimationDefinition& animation = *definition.animation;
+        const int columns = std::max(1, animation.resolved_columns());
+        const int rows = std::max(1, animation.resolved_rows());
+        const float frame_width = texture.source_width / static_cast<float>(columns);
+        const float frame_height = texture.source_height / static_cast<float>(rows);
+        const int column = frame_index % columns;
+        const int row = frame_index / columns;
+        const SDL_FRect source = {
+            static_cast<float>(column) * frame_width,
+            static_cast<float>(row) * frame_height,
+            frame_width,
+            frame_height
+        };
         SDL_RenderTexture(renderer, texture.texture, &source, &geometry.sprite_bounds);
     } else {
         SDL_RenderTexture(renderer, texture.texture, nullptr, &geometry.sprite_bounds);
@@ -1025,9 +1038,18 @@ void render_building_activity_overlay(SDL_Renderer* renderer, const BuildingDefi
         }
     }
 
-    const float frame_width = texture->source_width / static_cast<float>(frame_count);
-    const float frame_height = texture->source_height;
-    const SDL_FRect source = {frame_width * static_cast<float>(frame_index), 0.0F, frame_width, frame_height};
+    const int columns = animation == nullptr ? 1 : std::max(1, animation->resolved_columns());
+    const int rows = animation == nullptr ? 1 : std::max(1, animation->resolved_rows());
+    const float frame_width = texture->source_width / static_cast<float>(columns);
+    const float frame_height = texture->source_height / static_cast<float>(rows);
+    const int column = frame_index % columns;
+    const int row = frame_index / columns;
+    const SDL_FRect source = {
+        frame_width * static_cast<float>(column),
+        frame_height * static_cast<float>(row),
+        frame_width,
+        frame_height
+    };
     const BuildingFootprint footprint = rotated_footprint(definition, instance.rotation);
     const CameraWorldPoint ground = building_visual_ground_world(instance, footprint, camera.rotation);
     SDL_FPoint anchor = world_to_screen(ground.x, ground.y, camera, viewport_width, viewport_height);
@@ -1207,7 +1229,12 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
             const BuildingDefinition* definition = building_catalog.find(draw.building->definition_id);
             if (definition == nullptr) continue;
             const BuildingRotation visual_rotation = camera_visual_rotation(*definition, draw.building->rotation, camera.rotation);
-            const TextureAsset* texture = textures.find(root / definition->texture_path_for(visual_rotation));
+            const auto building_texture_path = root / definition->texture_path_for(visual_rotation);
+            const TextureAsset* texture = textures.find(building_texture_path);
+            if (texture == nullptr && definition->animation.has_value() &&
+                definition->animation->layout == "grid") {
+                texture = textures.load(renderer, building_texture_path);
+            }
             if (texture != nullptr) {
                 const bool is_owned = lands.is_tile_owned(draw.building->tile_x, draw.building->tile_y);
                 const Uint8 r = is_owned ? 255 : 140;
@@ -1222,14 +1249,14 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                     constexpr Uint8 kTintOverlayAlpha = 184;
                     const auto mask_path = root / definition->color_mask_path_for(visual_rotation);
                     if (draw.building->wall_color_customized) {
-                        if (const TextureAsset* wall = textures.find_mask_channel(mask_path, 'R')) {
+                        if (const TextureAsset* wall = textures.load_mask_channel(renderer, mask_path, 'R')) {
                             render_building(renderer, *definition, *draw.building, visual_rotation, *wall, camera,
                                             viewport_width, viewport_height, document, kTintOverlayAlpha,
                                             draw.building->wall_tint.r, draw.building->wall_tint.g, draw.building->wall_tint.b);
                         }
                     }
                     if (draw.building->roof_color_customized) {
-                        if (const TextureAsset* roof = textures.find_mask_channel(mask_path, 'G')) {
+                        if (const TextureAsset* roof = textures.load_mask_channel(renderer, mask_path, 'G')) {
                             render_building(renderer, *definition, *draw.building, visual_rotation, *roof, camera,
                                             viewport_width, viewport_height, document, kTintOverlayAlpha,
                                             draw.building->roof_tint.r, draw.building->roof_tint.g, draw.building->roof_tint.b);
@@ -1774,8 +1801,12 @@ int main() {
             for (std::uint8_t rotation = 0; rotation < 4; ++rotation) {
                 const BuildingRotation logical_rotation = static_cast<BuildingRotation>(rotation);
                 if (definition.supports_rotation(logical_rotation)) {
-                    (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
-                    if (lvl.level == 1 && definition.supports_color_mask(logical_rotation)) {
+                    const bool deferred_grid_animation = definition.animation.has_value() &&
+                        definition.animation->layout == "grid";
+                    if (!deferred_grid_animation) {
+                        (void)textures.load(renderer, asset_root / definition.texture_path_for(logical_rotation, lvl.level));
+                    }
+                    if (lvl.level == 1 && definition.supports_color_mask(logical_rotation) && !deferred_grid_animation) {
                         const auto mask_path = asset_root / definition.color_mask_path_for(logical_rotation);
                         (void)textures.load_mask_channel(renderer, mask_path, 'R');
                         (void)textures.load_mask_channel(renderer, mask_path, 'G');
@@ -4143,7 +4174,13 @@ int main() {
 
         if (placement_definition != nullptr) {
             const BuildingRotation visual_rotation = camera_visual_rotation(*placement_definition, placement_rotation, camera.rotation);
-            if (const TextureAsset* preview_texture = textures.find(asset_root / placement_definition->texture_path_for(visual_rotation))) {
+            const auto preview_path = asset_root / placement_definition->texture_path_for(visual_rotation);
+            const TextureAsset* preview_texture = textures.find(preview_path);
+            if (preview_texture == nullptr && placement_definition->animation.has_value() &&
+                placement_definition->animation->layout == "grid") {
+                preview_texture = textures.load(renderer, preview_path);
+            }
+            if (preview_texture != nullptr) {
                 BuildingInstance preview;
                 preview.definition_id = placement_definition->id;
                 preview.tile_x = mouse_tile.first;

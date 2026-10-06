@@ -154,6 +154,10 @@ struct BuildingAnimationDefinition {
     int frame_count = 1;
     int frame_duration_ms = 120;
     std::string layout = "horizontal";
+    // Grid atlases keep long animations within practical GPU texture limits.
+    // Legacy horizontal strips remain the default and need no data changes.
+    int columns = 0;
+    int rows = 0;
     // "loop" preserves the legacy continuous animation contract.
     // "ambient_once" holds an idle frame, plays one action sequence, then
     // returns to idle before the next deterministic ambient cycle.
@@ -163,6 +167,15 @@ struct BuildingAnimationDefinition {
     int action_start_frame = 1;
     int action_frame_count = 0;
     int idle_hold_ms = 0;
+
+    [[nodiscard]] int resolved_columns() const noexcept {
+        if (layout == "grid" && columns > 0) return columns;
+        return frame_count > 0 ? frame_count : 1;
+    }
+    [[nodiscard]] int resolved_rows() const noexcept {
+        if (layout == "grid" && rows > 0) return rows;
+        return 1;
+    }
 };
 
 // CH_BUILDING_ACTIVITY_OVERLAY_V1. Transparent temporary visual activity,

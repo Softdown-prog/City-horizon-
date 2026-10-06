@@ -712,10 +712,12 @@ BuildingSpriteGeometry MapRenderer::building_sprite_geometry(const BuildingDefin
     const ScreenPoint anchor_sp = world_to_screen_point(ground.x, ground.y, camera, viewport_width, viewport_height);
     const SDL_FPoint anchor = {anchor_sp.x, anchor_sp.y};
 
-    const float frame_w = (definition.animation.has_value() && definition.animation->frame_count > 1)
-        ? source_width / static_cast<float>(definition.animation->frame_count)
-        : source_width;
-    const float frame_h = source_height;
+    const int atlas_columns = definition.animation.has_value() && definition.animation->frame_count > 1
+        ? definition.animation->resolved_columns() : 1;
+    const int atlas_rows = definition.animation.has_value() && definition.animation->frame_count > 1
+        ? definition.animation->resolved_rows() : 1;
+    const float frame_w = source_width / static_cast<float>(std::max(1, atlas_columns));
+    const float frame_h = source_height / static_cast<float>(std::max(1, atlas_rows));
 
     const float scale = definition.art_scale * camera.zoom;
     const SDL_FRect bounds = {
@@ -779,9 +781,18 @@ void MapRenderer::render_building(SDL_Renderer* renderer, const BuildingDefiniti
             frame_index = static_cast<int>((SDL_GetTicks() / duration_ms) % frame_count);
         }
 
-        const float frame_w = source_width / static_cast<float>(frame_count);
-        const float frame_h = source_height;
-        const SDL_FRect src_rect = { frame_index * frame_w, 0.0F, frame_w, frame_h };
+        const int columns = std::max(1, animation.resolved_columns());
+        const int rows = std::max(1, animation.resolved_rows());
+        const float frame_w = source_width / static_cast<float>(columns);
+        const float frame_h = source_height / static_cast<float>(rows);
+        const int column = frame_index % columns;
+        const int row = frame_index / columns;
+        const SDL_FRect src_rect = {
+            static_cast<float>(column) * frame_w,
+            static_cast<float>(row) * frame_h,
+            frame_w,
+            frame_h
+        };
         SDL_RenderTexture(renderer, texture, &src_rect, &geometry.sprite_bounds);
     } else {
         SDL_RenderTexture(renderer, texture, nullptr, &geometry.sprite_bounds);

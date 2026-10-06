@@ -259,6 +259,12 @@ template <typename Number>
             parsed_animation.frame_count = frame_count;
             parsed_animation.frame_duration_ms = std::max(1, json_number<int>(*anim, "frameDurationMs").value_or(120));
             parsed_animation.layout = json_string(*anim, "layout").value_or("horizontal");
+            if (parsed_animation.layout != "horizontal" && parsed_animation.layout != "grid") return std::nullopt;
+            parsed_animation.columns = std::max(1, json_number<int>(*anim, "columns").value_or(
+                parsed_animation.layout == "grid" ? frame_count : frame_count));
+            parsed_animation.rows = std::max(1, json_number<int>(*anim, "rows").value_or(1));
+            if (parsed_animation.layout == "grid" &&
+                parsed_animation.columns * parsed_animation.rows < frame_count) return std::nullopt;
             parsed_animation.playback = json_string(*anim, "playback").value_or("loop");
             if (parsed_animation.playback != "loop" && parsed_animation.playback != "ambient_once" && parsed_animation.playback != "activity_loop") return std::nullopt;
             parsed_animation.idle_frame = std::clamp(json_number<int>(*anim, "idleFrame").value_or(0), 0, frame_count - 1);
@@ -343,6 +349,10 @@ template <typename Number>
             a.frame_count = std::max(1, json_number<int>(*anim, "frameCount").value_or(1));
             a.frame_duration_ms = std::max(1, json_number<int>(*anim, "frameDurationMs").value_or(120));
             a.layout = json_string(*anim, "layout").value_or("horizontal");
+            if (a.layout != "horizontal" && a.layout != "grid") return std::nullopt;
+            a.columns = std::max(1, json_number<int>(*anim, "columns").value_or(a.frame_count));
+            a.rows = std::max(1, json_number<int>(*anim, "rows").value_or(1));
+            if (a.layout == "grid" && a.columns * a.rows < a.frame_count) return std::nullopt;
             a.playback = json_string(*anim, "playback").value_or("loop");
             a.idle_frame = std::max(0, json_number<int>(*anim, "idleFrame").value_or(0));
             a.action_start_frame = std::max(0, json_number<int>(*anim, "actionStartFrame").value_or(0));
