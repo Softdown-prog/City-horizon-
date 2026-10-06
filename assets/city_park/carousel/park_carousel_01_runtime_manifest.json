@@ -70,5 +70,5 @@
   "approvedForRuntime": true,
   "approvalScope": "idle_static_four_direction_runtime",
   "status": "runtime_idle_four_direction",
-  "note": "Static idle runtime promotion only. Procedural recipe remains draft/not-approved-exemplar."
+  "note": "Static idle runtime promotion only; procedural V5 recipe remains draft/not-approved-exemplar."
 }
