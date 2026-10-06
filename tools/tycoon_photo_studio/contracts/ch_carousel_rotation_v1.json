@@ -2,49 +2,68 @@
   "id": "CH_CAROUSEL_ROTATION_V1",
   "status": "active",
   "assetFamily": "amusement_carousel",
-  "purpose": "Define deterministic pre-rendered carousel rotation sampling so alternating canopy stripes remain visually coherent in 2D runtime animation.",
+  "purpose": "Define deterministic pre-rendered carousel rotation sampling so alternating canopy stripes remain coherent in the 2D runtime animation.",
   "canopy": {
     "stripeCount": 24,
-    "recolorStripeCount": 12,
-    "fixedStripeCount": 12,
-    "alternation": "recolor_fixed_recolor_fixed",
-    "stripeAngleDegrees": 15.0
+    "primaryStripeCount": 12,
+    "secondaryStripeCount": 12,
+    "alternation": "primary_secondary_primary_secondary",
+    "stripeAngleDegrees": 15
   },
   "sampling": {
     "frameCount": 48,
     "frameStart": 1,
     "frameEnd": 48,
     "angularStepDegrees": 7.5,
-    "fullRotationDegrees": 360.0,
+    "fullRotationDegrees": 360,
     "sampleAngles": "frame n uses (n-1)*7.5 degrees for n=1..48",
     "loopClosureFrame": 49,
-    "loopClosureAngleDegrees": 360.0,
+    "loopClosureAngleDegrees": 360,
     "exportLoopClosureFrame": false,
     "duplicate360FrameForbidden": true
   },
+  "reviewProxy": {
+    "enabled": true,
+    "productionContractUnchanged": true,
+    "sampledFrames": [
+      1,
+      5,
+      9,
+      13,
+      17,
+      21,
+      25,
+      29,
+      33,
+      37,
+      41,
+      45
+    ],
+    "framesPerDirection": 12,
+    "totalFourDirectionFrames": 48
+  },
   "playback": {
     "fps": 8,
-    "rotationPeriodSeconds": 6.0,
+    "rotationPeriodSeconds": 6,
     "looping": true,
     "runtimeFrameOrder": "1_to_48_then_wrap_to_1"
   },
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
     "animated": true,
-    "scope": "canopy_recolor_stripes_only",
-    "channelR": "canopy_recolor_stripes",
-    "channelG": "unused",
+    "scope": "canopy_stripe_families_only",
+    "channelR": "canopy_primary_stripes",
+    "channelG": "canopy_secondary_stripes",
     "channelB": "unused",
-    "fixedStripeRule": "cream stripes are never recolored",
-    "synchronization": "mask frame and beauty frame must use the same direction, frame index, pivot and canvas"
+    "synchronization": "mask frame and beauty frame must use the same direction, frame index, pivot, canvas and rotor angle"
   },
   "validation": [
     "canopy stripe count must equal 24",
-    "recolor plus fixed stripe counts must equal 24",
-    "frame count must equal 48",
+    "primary plus secondary stripe counts must equal 24",
+    "production frame count must equal 48",
     "angular step must equal 360/frameCount = 7.5 degrees",
     "exported frame 48 must represent 352.5 degrees, not 360 degrees",
     "frame 49 exists only as the non-exported loop closure key",
-    "beauty and color-mask spritesheets must have identical frame ordering"
+    "beauty and color-mask frame ordering must match"
   ]
 }

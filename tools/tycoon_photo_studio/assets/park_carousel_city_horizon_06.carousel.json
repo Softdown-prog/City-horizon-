@@ -1,0 +1,160 @@
+{
+  "contract": "CITY_HORIZON_CAROUSEL_V6",
+  "assetId": "park_carousel_city_horizon_06",
+  "family": "amusement_carousel",
+  "lifecycle": {
+    "status": "draft",
+    "exemplarStatus": "not_approved_exemplar",
+    "promotionAllowed": false,
+    "approvalRequired": "explicit_human_visual_approval_after_animation_review"
+  },
+  "reference": {
+    "sourceKind": "derived_from_approved_v5_runtime_art",
+    "sourceAssetId": "park_carousel_01",
+    "notes": [
+      "Preserve V5 silhouette, proportions, materials, single centered stair and wide low canopy.",
+      "Animation-prep change: canopy subdivision is corrected from 16 to the canonical 24 alternating stripe families.",
+      "No runtime replacement is implied by this draft."
+    ]
+  },
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "designIntent": {
+    "silhouette": "same_clean_wide_low_round_carousel_as_v5",
+    "detailBudget": "low",
+    "proportionPolicy": "preserve_v5",
+    "animationPolicy": "rotate_CarouselRotor_only_keep_foundation_and_stair_static"
+  },
+  "footprint": {
+    "widthTiles": 7,
+    "depthTiles": 7
+  },
+  "geometry": {
+    "baseRadius": 3.25,
+    "platformTopZ": 0.54,
+    "baseHeight": 0.38,
+    "canopyRadius": 3.52,
+    "canopyInnerRadius": 0.46,
+    "canopyOuterZ": 2.66,
+    "canopyInnerZ": 2.91,
+    "canopyThickness": 0.055,
+    "canopySegments": 24,
+    "canopyPrimaryStripeCount": 12,
+    "canopySecondaryStripeCount": 12,
+    "valanceHeight": 0.28,
+    "valanceSegments": 24,
+    "supportCount": 8,
+    "supportRadius": 2.94,
+    "horseCount": 6,
+    "horseRadius": 2,
+    "horseBodyZ": 1.22,
+    "horseScale": 1.2,
+    "stairWidth": 0.92,
+    "stairDepth": 0.72,
+    "stairHeight": 0.32,
+    "stairLateralOffset": 0,
+    "centerColumnRadius": 0.56
+  },
+  "materials": {
+    "red": {
+      "rgba": [
+        0.84,
+        0.075,
+        0.055,
+        1
+      ],
+      "roughness": 0.6
+    },
+    "cream": {
+      "rgba": [
+        0.95,
+        0.92,
+        0.84,
+        1
+      ],
+      "roughness": 0.74
+    },
+    "gold": {
+      "rgba": [
+        0.86,
+        0.56,
+        0.12,
+        1
+      ],
+      "roughness": 0.46,
+      "metallic": 0.14
+    },
+    "dark_red": {
+      "rgba": [
+        0.42,
+        0.025,
+        0.02,
+        1
+      ],
+      "roughness": 0.7
+    },
+    "horse": {
+      "rgba": [
+        0.94,
+        0.93,
+        0.87,
+        1
+      ],
+      "roughness": 0.68
+    },
+    "brown": {
+      "rgba": [
+        0.3,
+        0.12,
+        0.045,
+        1
+      ],
+      "roughness": 0.74
+    }
+  },
+  "animation": {
+    "contract": "CH_CAROUSEL_ROTATION_V1",
+    "frameStart": 1,
+    "frameEnd": 48,
+    "frameCount": 48,
+    "fps": 8,
+    "looping": true,
+    "angularStepDegrees": 7.5,
+    "fullRotationDegrees": 360,
+    "loopClosureFrame": 49,
+    "exportLoopClosureFrame": false,
+    "motion": "one_full_rotation_CarouselRotor_only",
+    "status": "draft_animation_review"
+  },
+  "colorMask": {
+    "contract": "CH_COLOR_MASK_V1",
+    "enabled": true,
+    "animated": true,
+    "scope": "canopy_stripe_families_only",
+    "channels": {
+      "R": "canopy_primary_stripes",
+      "G": "canopy_secondary_stripes",
+      "B": "unused"
+    },
+    "synchronization": "same direction frame pivot canvas and rotor angle as beauty"
+  },
+  "reviewProxy": {
+    "frames": [
+      1,
+      5,
+      9,
+      13,
+      17,
+      21,
+      25,
+      29,
+      33,
+      37,
+      41,
+      45
+    ],
+    "framesPerDirection": 12,
+    "totalFrames": 48
+  }
+}

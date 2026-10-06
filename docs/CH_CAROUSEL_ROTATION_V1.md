@@ -2,67 +2,49 @@
 
 This contract defines the canonical pre-rendered rotation sampling for the City Horizon carousel.
 
-## Why 48 frames
+## Canonical sampling
 
-The carousel canopy has 24 radial stripes: 12 recolorable stripes alternating with 12 fixed cream stripes. A full stripe spans 15 degrees. Rendering only one sample per full stripe would give 24 frames and a visibly coarse rotational step.
-
-City Horizon therefore samples at half-stripe increments:
+The canopy has 24 alternating radial stripes: 12 primary stripes and 12 secondary stripes. A full stripe spans 15 degrees. To avoid visible jumps, City Horizon samples at half-stripe increments:
 
 - canopy stripes: 24 total;
+- primary stripes: 12;
+- secondary stripes: 12;
 - full stripe angle: 15 degrees;
-- samples per full stripe: 2;
 - exported frames per full turn: 48;
-- angular step per exported frame: 7.5 degrees.
+- angular step: 7.5 degrees.
 
-This keeps the alternating canopy pattern moving coherently instead of appearing to jump between distant white/yellow stripe positions.
-
-## Exact frame rule
-
-Export frames `1..48` only.
-
-Frame `n` represents:
+Export frames `1..48` only. Frame `n` represents:
 
 `angleDegrees = (n - 1) * 7.5`
 
-Therefore:
-
-- frame 1 = 0.0 degrees;
-- frame 2 = 7.5 degrees;
-- frame 3 = 15.0 degrees;
-- ...;
-- frame 48 = 352.5 degrees.
-
-A non-exported loop-closure key may exist at frame 49 = 360.0 degrees. Do not export frame 49. Exporting both 0 and 360 degrees would duplicate the same visual pose and would turn the intended 7.5-degree sampling into the wrong interval across the exported set.
+Frame 48 is 352.5 degrees. Frame 49 may exist only as a non-exported 360-degree loop closure key.
 
 ## Playback
 
-The current authored playback is 8 fps. With 48 exported frames, one revolution lasts 6.0 seconds.
+Canonical playback is 8 fps. Forty-eight frames therefore produce one revolution every 6 seconds. Runtime timing may change later without changing the 48 unique angular samples unless a new visual review explicitly approves a different sampling contract.
 
-Frame count and playback speed are separate concerns. If the carousel is later made slower or faster, prefer changing runtime fps/timing while preserving the 48 unique angular samples unless a new visual review explicitly approves another sampling contract.
+## Four directions
+
+Beauty animation is authored for SOUTH, EAST, WEST and NORTH using the fixed CH camera/studio. The camera and lights never rotate. The asset root selects the canonical direction and the internal `CarouselRotor` supplies the per-frame spin.
+
+Production count is 48 frames per direction = 192 beauty frames.
+
+For economical visual review, a proxy may render the canonical subset `1,5,9,...,45` (12 samples per direction, 48 review PNGs total). Those proxy samples are review-only and do not replace the 48-frame production contract.
 
 ## Color mask
 
-Use `CH_COLOR_MASK_V1` and generate one animated recolor region only: the 12 authored recolor stripes on the canopy.
+Use `CH_COLOR_MASK_V1` for the same animated frame set:
 
-- R channel: recolorable canopy stripes;
-- G channel: unused;
+- R channel: primary canopy stripe family (Listra A);
+- G channel: secondary canopy stripe family (Listra B);
 - B channel: unused;
-- cream canopy stripes: fixed color;
 - all other carousel parts: fixed color.
 
-The mask must be rendered for the same 48 frames as the beauty animation. For every frame and direction, beauty and mask must share exactly the same camera, object rotation, canvas size, pivot and frame index.
+For every frame and direction, beauty and mask must share exactly the same camera, canvas, pivot, asset direction, rotor angle and frame index. The runtime must select the beauty and mask frame using the same animation cursor.
 
-The runtime must apply the color mask using the same animation frame currently used by the beauty sprite. A mask frame may never lag or advance relative to the beauty frame.
+## Packaging
 
-## Spritesheet packaging
-
-Per direction:
-
-- 1 row;
-- 48 columns;
-- frame order `1..48`.
-
-If a combined four-direction sheet is generated, each direction remains one row and every row contains the same 48-frame order.
+Per direction, production contains 48 ordered frames. A spritesheet may use one row with 48 columns, or a runtime frame sequence may keep the frames separate if the renderer contract requires it.
 
 Recommended names:
 
@@ -71,14 +53,13 @@ Recommended names:
 
 ## Validation gates
 
-Reject the bake if any of the following is true:
+Reject production if:
 
 - canopy stripe count is not 24;
-- recolor/fixed canopy stripes are not 12 + 12;
-- exported frame count is not 48;
+- stripe families are not 12 + 12;
+- production frame count is not 48 per direction;
 - angular step is not 7.5 degrees;
-- frame 48 is a duplicated 360-degree pose;
+- frame 48 duplicates 360 degrees;
 - frame 49 is exported;
-- mask and beauty frame counts differ;
-- mask and beauty pivots/canvas differ;
-- anything outside the intended canopy recolor stripes is included in the recolor channel.
+- beauty and mask frame counts/order/canvas/pivot differ;
+- anything outside the canopy stripe families is included in the color mask.
