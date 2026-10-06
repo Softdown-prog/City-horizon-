@@ -1,0 +1,32 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "attraction.park_carousel_city_horizon_05.color_mask.003",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_carousel_city_horizon_05_color_mask.py",
+  "qualityStage": "proxy",
+  "qualityProfile": "tools/ch_blender/preflight_profiles/ch_asset_hq_1k_review_v1.json",
+  "assetRequirements": {
+    "contract": "CH_ASSET_REQUIREMENTS_V1",
+    "assetId": "attraction.park_carousel_city_horizon_05",
+    "footprint": {"widthTiles": 7, "depthTiles": 7},
+    "minDimensions": [5.0, 5.0, 2.5],
+    "maxDimensions": [9.0, 9.0, 5.0]
+  },
+  "args": [
+    "--recipe", "tools/tycoon_photo_studio/assets/park_carousel_city_horizon_05.carousel.json",
+    "--studio-preset", "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output", "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3"
+  ],
+  "outputDir": "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3",
+  "expectedOutputs": [
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/preflight_report.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/mask_south.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/mask_east.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/mask_west.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/mask_north.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/color_mask_manifest.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/mask_render_report.json",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/proxy_south.png",
+    "out/ch_blender_agent/attraction.park_carousel_city_horizon_05.color_mask_v3/proxy_report.json"
+  ]
+}
