@@ -142,19 +142,33 @@
   "reviewProxy": {
     "frames": [
       1,
+      3,
       5,
+      7,
       9,
+      11,
       13,
+      15,
       17,
+      19,
       21,
+      23,
       25,
+      27,
       29,
+      31,
       33,
+      35,
       37,
+      39,
       41,
-      45
+      43,
+      45,
+      47
     ],
-    "framesPerDirection": 12,
-    "totalFrames": 48
+    "framesPerDirection": 24,
+    "totalFrames": 96,
+    "angularStepDegrees": 15,
+    "purpose": "anti_alias_review_of_canopy_rotation"
   }
 }
