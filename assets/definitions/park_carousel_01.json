@@ -1,0 +1,49 @@
+{
+  "id": "park_carousel_01",
+  "name": "Carrossel",
+  "category": "city_park",
+  "texture": "assets/city_park/carousel/park_carousel_01_south.png",
+  "sprites": {
+    "0": "assets/city_park/carousel/park_carousel_01_south.png",
+    "1": "assets/city_park/carousel/park_carousel_01_west.png",
+    "2": "assets/city_park/carousel/park_carousel_01_north.png",
+    "3": "assets/city_park/carousel/park_carousel_01_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "requiresTicketBooth": false,
+  "grassOnly": true,
+  "roadAccessMode": "any_perimeter",
+  "accessPoints": [
+    {
+      "x": 3,
+      "y": 6,
+      "facing": "south"
+    }
+  ],
+  "footprint": {
+    "width": 7,
+    "height": 7
+  },
+  "occupancyFootprint": {
+    "width": 7,
+    "height": 7,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "buildCost": 18000,
+  "maintenancePerMonth": 0,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "needsEffect": {
+    "fun": 60
+  },
+  "artScale": 1.0111,
+  "playerBuildable": true,
+  "productionStatus": "runtime_idle_four_direction_approved",
+  "renderClass": "large_asset_1280",
+  "runtimeManifest": "assets/city_park/carousel/park_carousel_01_runtime_manifest.json",
+  "sourceWorkflowRun": 37454113454,
+  "sourceAuthoringAssetId": "attraction.park_carousel_city_horizon_05"
+}
