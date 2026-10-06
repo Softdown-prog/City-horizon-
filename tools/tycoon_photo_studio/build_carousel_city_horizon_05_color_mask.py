@@ -115,7 +115,7 @@ def main():
         authored=authored,
         output_path=out/"proxy_south.png",
         profile=profile,
-        asset_id="park_carousel_01",
+        asset_id=base.ASSET_ID,
         direction="south",
     )
     restore_studio_view()
