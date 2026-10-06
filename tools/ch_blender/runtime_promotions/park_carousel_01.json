@@ -12,14 +12,24 @@
   "sourceDir": "attraction.park_carousel_city_horizon_05.idle_4dir",
   "destination": "assets/city_park/carousel",
   "format": "PNG_RGBA",
-  "frameSize": [1280, 1280],
+  "frameSize": [
+    1280,
+    1280
+  ],
   "transparentBackground": true,
-  "directionOrder": ["south", "east", "west", "north"],
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
   "sha256": {
     "south": "515402ea20cb39d2f03c47dabd4ceb1c762f43e4af8b08c1040d09548a863146",
     "east": "71bbb506d018b402db29707873e20bb3e44321c8d147dcc18c264b7afa87c5d9",
     "west": "2eab46b7fe0db14a7e05f7865185c9403440d2214beeab243d1fe701f337cc6c",
     "north": "e20e4c71ab4adc2cb5d4fac8d67e882a5b441508dfcdb6ba36391a9f25f74a47"
   },
-  "note": "Promotes only the explicitly approved four-direction idle sprite set. The procedural V5 recipe remains draft/not-approved-exemplar."
+  "note": "Promotes only the explicitly approved four-direction idle sprite set. The procedural V5 recipe remains draft/not-approved-exemplar.",
+  "promotionRevision": 2,
+  "retriggerReason": "workflow_registered_after_initial_creation"
 }
