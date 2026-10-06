@@ -11,8 +11,16 @@
   "sourceArtifactName": "CH-Blender-Agent-37474833757-1",
   "sourceDir": "attraction.park_carousel_city_horizon_05.color_mask_v5",
   "destination": "assets/city_park/carousel",
-  "directionOrder": ["south","east","west","north"],
-  "finalSize": [1280,1280],
+  "directionOrder": [
+    "south",
+    "east",
+    "west",
+    "north"
+  ],
+  "finalSize": [
+    1280,
+    1280
+  ],
   "format": "PNG_RGBA",
   "channels": {
     "R": "canopy_primary_stripes",
@@ -24,5 +32,7 @@
     "east": "7a14b0d43da352fb3613dce372d5b82c815c4547c76864e61f5b52ff9d786127",
     "west": "3dbe2b42ee636e76ed465d38dd09bdc53813372b1448a152d848fdd0b7a68492",
     "north": "72f6959012c67d68ed7b5f14e77a5370c351b02fa7cb0e16ae50593288509e5d"
-  }
+  },
+  "promotionRevision": 2,
+  "retriggerReason": "workflow_registered_after_initial_creation"
 }
