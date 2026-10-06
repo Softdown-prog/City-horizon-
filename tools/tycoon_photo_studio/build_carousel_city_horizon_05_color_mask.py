@@ -103,11 +103,24 @@ def main():
         restore_studio_view()
         reports[did]={"file":path.name,"primary":"R","secondary":"G"}
 
-    # Satisfy the generic proxy worker contract without changing mask semantics.
-    south=out/"mask_south.png"
-    proxy=out/"proxy_south.png"
-    proxy.write_bytes(south.read_bytes())
-    (out/"proxy_report.json").write_text(json.dumps({
+    # Generate the worker-owned canonical proxy report through scene_gate.
+    # This keeps the generic CH Blender guard satisfied while the mask PNGs
+    # remain the real runtime-review outputs.
+    restore_studio_view()
+    base.bs.set_direction(root,base.bs.DIRECTIONS[0])
+    bpy.context.view_layer.update()
+    set_mask_view()
+    proxy_report=base.scene_gate.render_proxy(
+        scene=scene,
+        authored=authored,
+        output_path=out/"proxy_south.png",
+        profile=profile,
+        asset_id="park_carousel_01",
+        direction="south",
+    )
+    restore_studio_view()
+    (out/"proxy_report.json").write_text(json.dumps(proxy_report,indent=2),encoding="utf-8")
+    (out/"mask_render_report.json").write_text(json.dumps({
         "contract":"CH_COLOR_MASK_RENDER_REPORT_V1",
         "assetId":"park_carousel_01",
         "primaryMeaning":"red canopy stripes",
