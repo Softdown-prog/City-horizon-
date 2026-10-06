@@ -1,127 +1,114 @@
 {
-  "contract": "CH_CITY_PARK_STATIC_ASSET_V1",
+  "contract": "CH_CITY_PARK_ANIMATED_ASSET_V1",
   "assetId": "park_carousel_01",
   "displayName": "Carrossel",
   "category": "city_park",
-  "subtype": "amusement_ride_idle",
+  "subtype": "amusement_ride_rotating",
   "format": "PNG_RGBA",
-  "frameSize": [
+  "masterFrameSize": [
     1280,
     1280
   ],
-  "transparentBackground": true,
+  "runtimeFrameSize": [
+    512,
+    512
+  ],
+  "atlasLayout": {
+    "columns": 8,
+    "rows": 6,
+    "width": 4096,
+    "height": 3072
+  },
+  "animation": {
+    "rotationContract": "CH_CAROUSEL_ROTATION_V1",
+    "frameCount": 48,
+    "frameDurationMs": 125,
+    "fps": 8,
+    "rotationPeriodSeconds": 6,
+    "angularStepDegrees": 7.5,
+    "loopClosureFrame": 49,
+    "loopClosureExported": false
+  },
   "directionOrder": [
     "south",
     "east",
     "west",
     "north"
   ],
+  "runtimeRepresentation": "2D_RGBA_grid_atlas_four_direction_lazy_loaded",
   "footprint": {
     "widthTiles": 7,
     "depthTiles": 7
   },
-  "runtimeRepresentation": "2D_RGBA_static_four_direction_sprite",
-  "views": {
+  "beautyAtlases": {
     "south": {
-      "file": "park_carousel_01_south.png",
-      "sha256": "515402ea20cb39d2f03c47dabd4ceb1c762f43e4af8b08c1040d09548a863146",
-      "alphaBounds": [
-        208,
-        276,
-        1072,
-        969
-      ]
+      "file": "assets/city_park/carousel/runtime512/park_carousel_01_south_animation_512_atlas.png",
+      "sha256": "25e20544e9df53943752c951aef0bbee8c793de273bd6e3f95cece7d72b6df5d",
+      "bytes": 3424805
     },
     "east": {
-      "file": "park_carousel_01_east.png",
-      "sha256": "71bbb506d018b402db29707873e20bb3e44321c8d147dcc18c264b7afa87c5d9",
-      "alphaBounds": [
-        208,
-        276,
-        1072,
-        969
-      ]
+      "file": "assets/city_park/carousel/runtime512/park_carousel_01_east_animation_512_atlas.png",
+      "sha256": "be89101f11c0f012b062316a0dd0b3549ca67c42d772cc62ddcd976162e98583",
+      "bytes": 3424455
     },
     "west": {
-      "file": "park_carousel_01_west.png",
-      "sha256": "2eab46b7fe0db14a7e05f7865185c9403440d2214beeab243d1fe701f337cc6c",
-      "alphaBounds": [
-        208,
-        276,
-        1072,
-        969
-      ]
+      "file": "assets/city_park/carousel/runtime512/park_carousel_01_west_animation_512_atlas.png",
+      "sha256": "1d1569fa3d7f8eed09639e039f0f188a247d9b83e409ed39b6a95acab8e8c73a",
+      "bytes": 3409568
     },
     "north": {
-      "file": "park_carousel_01_north.png",
-      "sha256": "e20e4c71ab4adc2cb5d4fac8d67e882a5b441508dfcdb6ba36391a9f25f74a47",
-      "alphaBounds": [
-        208,
-        276,
-        1072,
-        969
-      ]
+      "file": "assets/city_park/carousel/runtime512/park_carousel_01_north_animation_512_atlas.png",
+      "sha256": "ec2ea774e6969e404637d787a75cca57e033212d491f0f88b5e33662fc5981ac",
+      "bytes": 3406951
     }
   },
-  "sourceAuthoringAssetId": "attraction.park_carousel_city_horizon_05",
-  "sourceWorkflowRun": 37454113454,
-  "sourceArtifactId": 11409495052,
-  "sourceCommit": "63ab44a8123c6332783215b3c9110b17b0f51f44",
-  "approvedForRuntime": true,
-  "approvalScope": "idle_static_four_direction_runtime",
-  "status": "runtime_idle_four_direction_color_mask_enabled",
-  "note": "Static idle runtime promotion only; procedural V5 recipe remains draft/not-approved-exemplar.",
   "colorMask": {
     "contract": "CH_COLOR_MASK_V1",
-    "format": "PNG_RGBA",
+    "animated": true,
     "frameSize": [
-      1280,
-      1280
+      512,
+      512
     ],
-    "alpha": "coverage",
     "channels": {
       "R": "canopy_primary_stripes",
-      "G": "canopy_secondary_stripes"
+      "G": "canopy_secondary_stripes",
+      "B": "unused"
     },
-    "primaryMeaning": "red/authored canopy stripe family; player tint slot A",
-    "secondaryMeaning": "cream/authored canopy stripe family; player tint slot B",
-    "runtimeAssets": {
+    "alpha": "coverage",
+    "atlases": {
       "south": {
-        "file": "park_carousel_01_south_mask.png",
-        "sha256": "896353c494c9438fea3a55b2445395abc1761c676ed897a6ec0e22d9083fc7e9",
-        "channels": {
-          "R": "canopy_primary_stripes",
-          "G": "canopy_secondary_stripes"
-        }
+        "file": "assets/city_park/carousel/runtime512/park_carousel_01_south_mask_animation_512_atlas.png",
+        "sha256": "63b5c4f1b0791915db11e4030c1d62774b4a460e10df1b87e6242d79564d098c",
+        "bytes": 297771
       },
       "east": {
-        "file": "park_carousel_01_east_mask.png",
-        "sha256": "7a14b0d43da352fb3613dce372d5b82c815c4547c76864e61f5b52ff9d786127",
-        "channels": {
-          "R": "canopy_primary_stripes",
-          "G": "canopy_secondary_stripes"
-        }
+        "file": "assets/city_park/carousel/runtime512/park_carousel_01_east_mask_animation_512_atlas.png",
+        "sha256": "580daf05ccd5696d3397020bcc8fb24e56b56d12d54529f438e109ef2a0b1da6",
+        "bytes": 297799
       },
       "west": {
-        "file": "park_carousel_01_west_mask.png",
-        "sha256": "3dbe2b42ee636e76ed465d38dd09bdc53813372b1448a152d848fdd0b7a68492",
-        "channels": {
-          "R": "canopy_primary_stripes",
-          "G": "canopy_secondary_stripes"
-        }
+        "file": "assets/city_park/carousel/runtime512/park_carousel_01_west_mask_animation_512_atlas.png",
+        "sha256": "e4c699109ef01ee50ade852c2465a61e01d714b0245caf70e16c3ed8e0a35ed6",
+        "bytes": 297749
       },
       "north": {
-        "file": "park_carousel_01_north_mask.png",
-        "sha256": "72f6959012c67d68ed7b5f14e77a5370c351b02fa7cb0e16ae50593288509e5d",
-        "channels": {
-          "R": "canopy_primary_stripes",
-          "G": "canopy_secondary_stripes"
-        }
+        "file": "assets/city_park/carousel/runtime512/park_carousel_01_north_mask_animation_512_atlas.png",
+        "sha256": "4a19113003371725059f89aba08e03e11dbdfc3675240d2f3b5e238552e506bd",
+        "bytes": 297915
       }
-    },
-    "sourceWorkflowRun": 37474833757,
-    "sourceArtifactId": 11418327770,
-    "sourceCommit": "5cd539935ff26b09c660fa774e94dc761bdac502",
-    "approvedForRuntime": true
-  }
+    }
+  },
+  "sourceAuthoringAssetId": "attraction.park_carousel_city_horizon_06",
+  "beautySource": {
+    "workflowRun": 37495772742,
+    "artifactId": 11434668419
+  },
+  "maskSource": {
+    "workflowRun": 37517771764,
+    "artifactId": 11443920850,
+    "note": "All 192 mask frames were present; workflow failure was limited to non-SOUTH proxy-report validation."
+  },
+  "approvedForRuntime": true,
+  "approvalScope": "48_frame_rotation_and_512_runtime_packaging",
+  "status": "runtime_animated_512_four_direction_color_mask_enabled"
 }
