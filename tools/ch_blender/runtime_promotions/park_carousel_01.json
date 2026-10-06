@@ -30,6 +30,6 @@
     "north": "e20e4c71ab4adc2cb5d4fac8d67e882a5b441508dfcdb6ba36391a9f25f74a47"
   },
   "note": "Promotes only the explicitly approved four-direction idle sprite set. The procedural V5 recipe remains draft/not-approved-exemplar.",
-  "promotionRevision": 2,
-  "retriggerReason": "workflow_registered_after_initial_creation"
+  "promotionRevision": 3,
+  "retriggerReason": "registered_runtime_promotion_workflow_extended_for_carousel"
 }
