@@ -1,0 +1,87 @@
+{
+  "contract": "CITY_HORIZON_CAROUSEL_V3",
+  "assetId": "park_carousel_city_horizon_03",
+  "family": "amusement_carousel",
+  "lifecycle": {
+    "status": "draft",
+    "exemplarStatus": "not_approved_exemplar",
+    "promotionAllowed": false,
+    "approvalRequired": "explicit_human_visual_approval_after_final"
+  },
+  "reference": {
+    "sourceKind": "user_owned_concept_art",
+    "rightsStatement": "User states they own the supplied concept image and authorized its use as the design reference for this asset.",
+    "usage": "direct_design_reference_with_simplification_for_city_horizon",
+    "notes": [
+      "Keep the broad, low, flat circular canopy and simple red/cream/gold language.",
+      "V3 improves horse readability, canopy valance continuity, platform finish and entrance placement.",
+      "Do not reuse any previously rejected carousel implementation."
+    ]
+  },
+  "styleContract": "CH_STYLIZED_PRERENDER_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "studioPreset": "CH_TYCOON_STUDIO_V1",
+  "designIntent": {
+    "silhouette": "wide_low_round_carousel_with_flat_canopy_and_open_sides",
+    "detailBudget": "low_to_medium",
+    "proportionPolicy": "believable_tycoon_scale_not_miniature",
+    "keyReads": [
+      "broad shallow roof",
+      "alternating red and cream roof wedges",
+      "continuous red valance with sparse gold separators",
+      "open sides with slim gold support poles",
+      "larger readable white horses with brown manes and red saddles",
+      "raised red platform with cream and gold trim",
+      "two short front stair entries",
+      "simple center drum and small red flag"
+    ]
+  },
+  "footprint": {
+    "widthTiles": 7,
+    "depthTiles": 7
+  },
+  "geometry": {
+    "baseRadius": 3.25,
+    "platformTopZ": 0.54,
+    "baseHeight": 0.40,
+    "canopyRadius": 3.28,
+    "canopyInnerRadius": 0.46,
+    "canopyOuterZ": 2.62,
+    "canopyInnerZ": 2.90,
+    "canopyThickness": 0.06,
+    "canopySegments": 16,
+    "valanceHeight": 0.38,
+    "valanceSegments": 24,
+    "supportCount": 10,
+    "supportRadius": 2.78,
+    "horseCount": 8,
+    "horseInnerRadius": 1.42,
+    "horseOuterRadius": 2.16,
+    "horseBodyZ": 1.18,
+    "horseScale": 1.16,
+    "stairCount": 2,
+    "stairWidth": 1.02,
+    "stairDepth": 0.82,
+    "stairHeight": 0.36,
+    "stairLateralOffset": 1.72,
+    "centerColumnRadius": 0.62,
+    "flagHeight": 0.56
+  },
+  "materials": {
+    "red": {"rgba": [0.84, 0.075, 0.055, 1.0], "roughness": 0.60},
+    "cream": {"rgba": [0.95, 0.92, 0.84, 1.0], "roughness": 0.74},
+    "gold": {"rgba": [0.86, 0.56, 0.12, 1.0], "roughness": 0.46, "metallic": 0.14},
+    "dark_red": {"rgba": [0.42, 0.025, 0.02, 1.0], "roughness": 0.70},
+    "horse": {"rgba": [0.94, 0.93, 0.87, 1.0], "roughness": 0.68},
+    "brown": {"rgba": [0.30, 0.12, 0.045, 1.0], "roughness": 0.74},
+    "black": {"rgba": [0.06, 0.05, 0.045, 1.0], "roughness": 0.80}
+  },
+  "animation": {
+    "frameStart": 1,
+    "frameEnd": 32,
+    "fps": 12,
+    "looping": true,
+    "motion": "one_full_rotation_with_gentle_horse_bob",
+    "status": "draft_not_for_final_bake_yet"
+  }
+}
