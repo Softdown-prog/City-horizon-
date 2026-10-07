@@ -124,6 +124,18 @@ jobs:
           if bool(job.get("target", {}).get("register", False)) != bool(asset.get("registered", False)):
               raise SystemExit("registration state mismatch")
 
+          cleanup_requested = bool(job.get("cleanup", {}).get("enabled", False) or job.get("cleanup", {}).get("profile"))
+          if cleanup_requested:
+              cleanup = asset.get("cleanup", {})
+              if not cleanup.get("enabled") or cleanup.get("profile") != "recorded_sfx_cleanup":
+                  raise SystemExit(f"cleanup report missing or invalid: {cleanup}")
+              clean_master = Path(asset.get("cleanMaster", ""))
+              if not clean_master.is_file() or clean_master.stat().st_size == 0:
+                  raise SystemExit(f"clean master missing or empty: {clean_master}")
+              clean_probe = asset.get("cleanMasterProbe", {})
+              if clean_probe.get("sampleRate") != 48000 or float(clean_probe.get("durationSeconds", 0)) <= 0:
+                  raise SystemExit(f"invalid clean master probe: {clean_probe}")
+
           print(json.dumps({
               "status": "ok",
               "job": job["id"],

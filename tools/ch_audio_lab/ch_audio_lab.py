@@ -175,6 +175,29 @@ def synthetic_thunder(duration: float, channels: int, rng: random.Random) -> lis
     return result
 
 
+def synthetic_recorded_pop_noisy(duration: float, channels: int, rng: random.Random) -> list[tuple[float, ...]]:
+    """Small mouth/cork-like pop buried in steady room noise for cleanup CI."""
+    total = max(1, int(duration * SAMPLE_RATE))
+    result: list[tuple[float, ...]] = []
+    event_time = min(0.28, max(0.08, duration * 0.25))
+    for i in range(total):
+        t = i / SAMPLE_RATE
+        # Deliberately include mains-like hum and broadband room hiss.
+        room = 0.018 * math.sin(2 * math.pi * 60.0 * t) + 0.012 * (rng.random() * 2.0 - 1.0)
+        dt = t - event_time
+        pop = 0.0
+        if 0.0 <= dt <= 0.30:
+            env = math.exp(-dt * 22.0)
+            pop = env * (
+                0.60 * math.sin(2 * math.pi * 145.0 * dt)
+                + 0.20 * math.sin(2 * math.pi * 420.0 * dt)
+                + 0.10 * (rng.random() * 2.0 - 1.0)
+            )
+        value = clamp(room + pop)
+        result.append(tuple(value for _ in range(channels)))
+    return result
+
+
 def synthetic_ambient_pad(duration: float, channels: int, rng: random.Random) -> list[tuple[float, ...]]:
     del rng
     total = max(1, int(duration * SAMPLE_RATE))
@@ -201,6 +224,7 @@ SYNTHETIC_PROFILES = {
     "rain": synthetic_rain,
     "thunder": synthetic_thunder,
     "ambient_pad": synthetic_ambient_pad,
+    "recorded_pop_noisy": synthetic_recorded_pop_noisy,
 }
 
 
@@ -317,6 +341,8 @@ def run_lab(job_path: Path) -> dict[str, Any]:
         "register": register,
         "report": str(asset_report),
         "mastering": dict(job.get("mastering") or {}),
+        "cleanup": dict(job.get("cleanup") or {}),
+        "durationSeconds": duration,
     }
     if register:
         worker_job["catalog"] = str(repo_path(target.get("catalog", "assets/audio/audio_catalog.json")))
@@ -327,6 +353,7 @@ def run_lab(job_path: Path) -> dict[str, Any]:
 
     worker_job_path.write_text(json.dumps(worker_job, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     subprocess.run([sys.executable, str(REPO_ROOT / "tools/audio_asset_worker.py"), str(worker_job_path)], cwd=str(REPO_ROOT), check=True)
+    asset_payload = json.loads(asset_report.read_text(encoding="utf-8"))
 
     report = {
         "contract": REPORT_CONTRACT,
@@ -343,6 +370,9 @@ def run_lab(job_path: Path) -> dict[str, Any]:
         "registered": register,
         "generationRequest": str(prompt_file),
         "assetReport": str(asset_report),
+        "cleanup": asset_payload.get("cleanup"),
+        "cleanMaster": asset_payload.get("cleanMaster"),
+        "cleanMasterSha256": asset_payload.get("cleanMasterSha256"),
     }
     (output_dir / "audio_lab_report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False))

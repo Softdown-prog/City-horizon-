@@ -127,6 +127,7 @@ Profiles currently available:
 - `rain`
 - `thunder`
 - `ambient_pad`
+- `recorded_pop_noisy` — deterministic noisy pop used to validate recorded-SFX cleanup
 
 ### `source`
 
@@ -154,6 +155,69 @@ Supported placeholders:
 - `{repo}`
 
 Do not make AudioCraft/MusicGen/AudioGen the default production provider without separately resolving their model-weight licensing for the intended game use. Provider licensing must be recorded and reviewed before generated assets are promoted.
+
+
+## Recorded SFX cleanup
+
+CH Audio Lab can clean user-recorded sound effects before mastering. The
+`recorded_sfx_cleanup` profile is deliberately conservative: it is meant for
+short Foley/SFX such as coins, cork pops, liquid pours, clicks and impacts.
+
+It performs, in order:
+
+1. low-rumble high-pass filtering;
+2. FFmpeg spectral denoise (`afftdn`) with noise tracking;
+3. a gentle high-frequency low-pass to reduce ultrasonic/phone hiss;
+4. optional leading/trailing silence trim with retained padding;
+5. normal mastering (optional LUFS normalization/fades) after cleanup.
+
+This is **noise reduction, not source separation**. It works best on steady
+room tone, fan/air-conditioner noise, electrical hum and microphone hiss. It
+will not reliably remove another voice, music, television or a changing sound
+that overlaps the wanted effect.
+
+Example:
+
+```json
+{
+  "cleanup": {
+    "enabled": true,
+    "profile": "recorded_sfx_cleanup",
+    "noiseReductionDb": 10,
+    "noiseFloorDb": -50,
+    "trackNoise": true,
+    "highpassHz": 55,
+    "lowpassHz": 19000,
+    "trimSilence": true,
+    "trimThresholdDb": -50,
+    "startSilenceSeconds": 0.02,
+    "stopSilenceSeconds": 0.08
+  },
+  "mastering": {
+    "channels": 1,
+    "quality": 6,
+    "normalize": true,
+    "targetLufs": -18,
+    "truePeakDb": -1.5
+  }
+}
+```
+
+When cleanup is enabled the review package preserves the copied source and
+also emits `clean_master.wav` as lossless 24-bit PCM / 48 kHz. The OGG review
+is encoded from that clean master. This makes the WAV suitable as the
+high-quality source for a future SFX store while the original raw recording is
+still retained for provenance.
+
+Drop future raw recordings under:
+
+```text
+tools/ch_audio_lab/inbox/
+```
+
+Then create a review job using `provider.type = "source"` and
+`target.register = false`. Nothing is promoted to the game until explicitly
+approved.
 
 ## Review first, promote second
 

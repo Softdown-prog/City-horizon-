@@ -1,0 +1,34 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "my_recorded_sfx",
+  "kind": "effect",
+  "prompt": "clean and master my own recorded sound effect without changing its character",
+  "durationSeconds": 3,
+  "provider": {
+    "type": "source",
+    "source": "tools/ch_audio_lab/inbox/my_recording.wav"
+  },
+  "cleanup": {
+    "enabled": true,
+    "profile": "recorded_sfx_cleanup",
+    "noiseReductionDb": 10,
+    "noiseFloorDb": -50,
+    "trackNoise": true,
+    "highpassHz": 55,
+    "lowpassHz": 19000,
+    "trimSilence": true,
+    "trimThresholdDb": -50,
+    "startSilenceSeconds": 0.02,
+    "stopSilenceSeconds": 0.08
+  },
+  "mastering": {
+    "channels": 1,
+    "quality": 6,
+    "normalize": true,
+    "targetLufs": -18,
+    "truePeakDb": -1.5
+  },
+  "target": {
+    "register": false
+  }
+}

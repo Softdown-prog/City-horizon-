@@ -1,0 +1,38 @@
+{
+  "contract": "CH_AUDIO_GENERATION_V1",
+  "id": "recorded_sfx_cleanup_smoke",
+  "kind": "effect",
+  "prompt": "deterministic noisy short pop used to validate recorded SFX cleanup",
+  "durationSeconds": 1.2,
+  "provider": {
+    "type": "synthetic_smoke",
+    "profile": "recorded_pop_noisy",
+    "channels": 1,
+    "seed": 20261007
+  },
+  "cleanup": {
+    "enabled": true,
+    "profile": "recorded_sfx_cleanup",
+    "noiseReductionDb": 10,
+    "noiseFloorDb": -50,
+    "trackNoise": true,
+    "highpassHz": 55,
+    "lowpassHz": 19000,
+    "trimSilence": true,
+    "trimThresholdDb": -50,
+    "startSilenceSeconds": 0.02,
+    "stopSilenceSeconds": 0.08
+  },
+  "mastering": {
+    "channels": 1,
+    "quality": 6,
+    "normalize": true,
+    "targetLufs": -18,
+    "truePeakDb": -1.5,
+    "fadeInSeconds": 0.002,
+    "fadeOutSeconds": 0.01
+  },
+  "target": {
+    "register": false
+  }
+}

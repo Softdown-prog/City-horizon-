@@ -3,6 +3,7 @@
 
 Legacy jobs remain supported. CH Audio Lab V1 adds:
 - effect / ambient / music mastering presets;
+- optional recorded-SFX cleanup (rumble cut, spectral denoise, air-band cut and silence trim);
 - optional loudness normalization and fades;
 - deterministic ffprobe validation;
 - SHA-256 proof and JSON report;
@@ -73,6 +74,81 @@ def default_mastering(kind: str) -> dict[str, Any]:
     if kind == "ambient":
         return {"channels": 2, "quality": 5, "targetLufs": -20.0, "truePeakDb": -2.0}
     return {"channels": 1, "quality": 4, "targetLufs": -18.0, "truePeakDb": -1.5}
+
+
+def build_cleanup_filter(job: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    """Build a conservative cleanup chain for user-recorded SFX.
+
+    This is intentionally spectral cleanup, not source separation. It targets
+    steady room/fan/hiss noise and low-frequency handling rumble while keeping
+    short transients such as coins, pops, corks and liquid attacks intact.
+    """
+    cleanup = dict(job.get("cleanup") or {})
+    profile_value = str(cleanup.get("profile", "")).strip()
+    enabled = bool(cleanup.get("enabled", bool(profile_value)))
+    if not enabled:
+        return None, {"enabled": False}
+
+    profile = profile_value or "recorded_sfx_cleanup"
+    if profile != "recorded_sfx_cleanup":
+        raise SystemExit(f"unsupported cleanup profile: {profile}")
+
+    highpass_hz = float(cleanup.get("highpassHz", 55.0))
+    lowpass_hz = float(cleanup.get("lowpassHz", 19000.0))
+    noise_reduction_db = float(cleanup.get("noiseReductionDb", 10.0))
+    noise_floor_db = float(cleanup.get("noiseFloorDb", -50.0))
+    track_noise = bool(cleanup.get("trackNoise", True))
+    trim_silence = bool(cleanup.get("trimSilence", True))
+    trim_threshold_db = float(cleanup.get("trimThresholdDb", -50.0))
+    start_silence = float(cleanup.get("startSilenceSeconds", 0.02))
+    stop_silence = float(cleanup.get("stopSilenceSeconds", 0.08))
+
+    if not 20.0 <= highpass_hz <= 400.0:
+        raise SystemExit("cleanup highpassHz must be between 20 and 400 Hz")
+    if not 4000.0 <= lowpass_hz <= 24000.0:
+        raise SystemExit("cleanup lowpassHz must be between 4000 and 24000 Hz")
+    if highpass_hz >= lowpass_hz:
+        raise SystemExit("cleanup highpassHz must be lower than lowpassHz")
+    if not 0.0 <= noise_reduction_db <= 30.0:
+        raise SystemExit("cleanup noiseReductionDb must be between 0 and 30 dB")
+    if not -80.0 <= noise_floor_db <= -20.0:
+        raise SystemExit("cleanup noiseFloorDb must be between -80 and -20 dB")
+    if not -80.0 <= trim_threshold_db <= -20.0:
+        raise SystemExit("cleanup trimThresholdDb must be between -80 and -20 dB")
+    if not 0.0 <= start_silence <= 2.0 or not 0.0 <= stop_silence <= 2.0:
+        raise SystemExit("cleanup silence padding must be between 0 and 2 seconds")
+
+    filters: list[str] = [f"highpass=f={highpass_hz:g}"]
+    if noise_reduction_db > 0.0:
+        filters.append(
+            f"afftdn=nr={noise_reduction_db:g}:nf={noise_floor_db:g}:tn={1 if track_noise else 0}"
+        )
+    filters.append(f"lowpass=f={lowpass_hz:g}")
+
+    if trim_silence:
+        filters.append(
+            "silenceremove="
+            f"start_periods=1:start_duration=0.01:start_threshold={trim_threshold_db:g}dB:"
+            f"start_silence={start_silence:g}:"
+            f"stop_periods=1:stop_duration=0.04:stop_threshold={trim_threshold_db:g}dB:"
+            f"stop_silence={stop_silence:g}"
+        )
+
+    report = {
+        "enabled": True,
+        "profile": profile,
+        "highpassHz": highpass_hz,
+        "lowpassHz": lowpass_hz,
+        "noiseReductionDb": noise_reduction_db,
+        "noiseFloorDb": noise_floor_db,
+        "trackNoise": track_noise,
+        "trimSilence": trim_silence,
+        "trimThresholdDb": trim_threshold_db,
+        "startSilenceSeconds": start_silence,
+        "stopSilenceSeconds": stop_silence,
+        "filter": ",".join(filters),
+    }
+    return ",".join(filters), report
 
 
 def build_audio_filter(job: dict[str, Any], kind: str) -> str | None:
@@ -170,12 +246,45 @@ def main() -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
+    requested_duration = float(job.get("durationSeconds", 0.0) or 0.0)
+    cleanup_filter, cleanup_report = build_cleanup_filter(job)
+    encoding_source = source
+    clean_master_path: Path | None = None
+    clean_master_probe: dict[str, Any] | None = None
+
+    if cleanup_filter:
+        cleanup = dict(job.get("cleanup") or {})
+        clean_master_path = Path(
+            cleanup.get("output") or (report_path.parent / "clean_master.wav")
+        )
+        clean_master_path.parent.mkdir(parents=True, exist_ok=True)
+        cleanup_command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(source), "-vn",
+        ]
+        if requested_duration > 0:
+            cleanup_command += ["-t", f"{requested_duration:.6f}"]
+        cleanup_command += [
+            "-af", cleanup_filter,
+            "-ac", str(channels), "-ar", "48000",
+            "-c:a", "pcm_s24le",
+            str(clean_master_path),
+        ]
+        run_checked(cleanup_command)
+        clean_master_probe = probe_audio(clean_master_path)
+        if clean_master_probe["sampleRate"] != 48000:
+            raise SystemExit(f"unexpected clean master sample rate: {clean_master_probe['sampleRate']}")
+        if clean_master_probe["channels"] != channels:
+            raise SystemExit(f"unexpected clean master channel count: {clean_master_probe['channels']}")
+        if clean_master_probe["durationSeconds"] <= 0:
+            raise SystemExit("clean master has zero duration")
+        encoding_source = clean_master_path
+
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(source), "-vn",
+        "-i", str(encoding_source), "-vn",
     ]
-    requested_duration = float(job.get("durationSeconds", 0.0) or 0.0)
-    if requested_duration > 0:
+    if requested_duration > 0 and not cleanup_filter:
         command += ["-t", f"{requested_duration:.6f}"]
 
     audio_filter = build_audio_filter(job, kind)
@@ -213,6 +322,10 @@ def main() -> None:
         "output": str(output),
         "sourceSha256": sha256_file(source),
         "outputSha256": sha256_file(output),
+        "cleanMaster": str(clean_master_path) if clean_master_path else None,
+        "cleanMasterSha256": sha256_file(clean_master_path) if clean_master_path else None,
+        "cleanMasterProbe": clean_master_probe,
+        "cleanup": cleanup_report,
         "probe": probe,
         "mastering": {
             "channels": channels,
