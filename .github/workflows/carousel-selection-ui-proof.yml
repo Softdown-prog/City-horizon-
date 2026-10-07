@@ -1,0 +1,146 @@
+name: Carousel Selection UI Proof
+
+on:
+  push:
+    paths:
+      - '.github/workflows/carousel-selection-ui-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Render carousel selection proof
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont
+
+          W,H=1280,800
+          out=Path('out/carousel_selection_ui')
+          out.mkdir(parents=True,exist_ok=True)
+
+          bg=Image.new('RGBA',(W,H),(37,54,48,255))
+          d=ImageDraw.Draw(bg,'RGBA')
+
+          # Isometric 2:1 map grid, aligned to the game's visual language.
+          tile_w,tile_h=96,48
+          ox,oy=560,155
+          for gy in range(-4,12):
+              for gx in range(-4,12):
+                  cx=ox+(gx-gy)*tile_w/2
+                  cy=oy+(gx+gy)*tile_h/2
+                  pts=[(cx,cy-tile_h/2),(cx+tile_w/2,cy),(cx,cy+tile_h/2),(cx-tile_w/2,cy)]
+                  fill=(67,91,70,255) if (gx+gy)%2==0 else (63,86,67,255)
+                  d.polygon(pts,fill=fill)
+                  d.line(pts+[pts[0]],fill=(88,112,87,150),width=1)
+
+          # Selected 7x7 footprint emphasis.
+          for gy in range(1,8):
+              for gx in range(1,8):
+                  cx=ox+(gx-gy)*tile_w/2
+                  cy=oy+(gx+gy)*tile_h/2
+                  pts=[(cx,cy-tile_h/2),(cx+tile_w/2,cy),(cx,cy+tile_h/2),(cx-tile_w/2,cy)]
+                  d.line(pts+[pts[0]],fill=(255,208,92,180),width=2)
+
+          # Exact first frame from the approved 512 runtime atlas.
+          atlas=Image.open('assets/city_park/carousel/runtime512/park_carousel_01_south_animation_512_atlas.png').convert('RGBA')
+          assert atlas.size==(4096,3072),atlas.size
+          frame=atlas.crop((0,0,512,512))
+          # Keep original 512 pixels; only composite at native size.
+          bg.alpha_composite(frame,(306,170))
+
+          # HUD top bar.
+          d.rectangle((12,12,944,70),fill=(16,39,56,245),outline=(55,91,111,255),width=2)
+          d.text((28,24),'FUNDOS',fill=(151,178,192,255))
+          d.text((28,43),'$50.000',fill=(238,246,249,255))
+          d.text((270,24),'DATA',fill=(151,178,192,255))
+          d.text((270,43),'DIA 01 - MES 01 - ANO 1',fill=(238,246,249,255))
+          d.text((600,24),'POPULACAO',fill=(151,178,192,255))
+          d.text((600,43),'128 / 160',fill=(238,246,249,255))
+
+          # Real selected-building panel structure.
+          px,py,pw,ph=938,84,330,684
+          d.rounded_rectangle((px,py,px+pw,py+ph),radius=6,fill=(14,33,45,247),outline=(55,91,111,255),width=2)
+          d.text((px+12,py+12),'CARROSSEL',fill=(236,244,248,255))
+          d.text((px+12,py+31),'PARQUE',fill=(164,193,205,255))
+          d.text((px+12,py+51),'CUSTO: $18.000',fill=(214,230,236,255))
+          d.text((px+12,py+69),'ROTACAO: SUL',fill=(164,193,205,255))
+          d.text((px+303,py+10),'X',fill=(236,244,248,255))
+
+          # Small preview from same exact frame.
+          preview=frame.resize((68,68),Image.Resampling.LANCZOS)
+          bg.alpha_composite(preview,(px+12,py+92))
+
+          # Service price card.
+          sy=py+108
+          d.rounded_rectangle((px+88,sy,px+316,sy+195),radius=4,fill=(12,35,48,244),outline=(55,91,111,255),width=1)
+          d.text((px+98,sy+10),'VENDE: Ingresso do carrossel',fill=(236,223,184,255))
+          d.text((px+98,sy+38),'PRECO AO CLIENTE',fill=(164,193,205,255))
+          d.rounded_rectangle((px+236,sy+31,px+282,sy+61),radius=3,fill=(20,49,65,255),outline=(77,145,169,255))
+          d.text((px+249,sy+39),'$8',fill=(238,246,249,255))
+          d.rounded_rectangle((px+194,sy+31,px+228,sy+61),radius=3,fill=(22,72,91,255),outline=(100,197,219,255))
+          d.text((px+207,sy+39),'-',fill=(238,246,249,255))
+          d.rounded_rectangle((px+282,sy+31,px+316,sy+61),radius=3,fill=(22,72,91,255),outline=(100,197,219,255))
+          d.text((px+294,sy+39),'+',fill=(238,246,249,255))
+          d.text((px+98,sy+68),'MIN $1  |  MAX $40',fill=(118,151,166,255))
+          metrics=[
+              ('DEMANDA','100%'),
+              ('CLIENTES / MES','90'),
+              ('RECEITA VENDAS','$720/MES'),
+              ('RESULTADO','$720/MES'),
+              ('MANUTENCAO','$0/MES'),
+          ]
+          yy=sy+93
+          for label,value in metrics:
+              d.text((px+100,yy),f'{label}: {value}',fill=(202,219,227,255))
+              yy+=21
+
+          # General info.
+          info_y=sy+210
+          d.text((px+12,info_y),'ACESSO A RUA: NAO OBRIGATORIO',fill=(202,219,227,255))
+          d.text((px+12,info_y+20),'BILHETERIA: OBRIGATORIA',fill=(202,219,227,255))
+          d.text((px+12,info_y+40),'LOTE: 7x7',fill=(202,219,227,255))
+
+          # Color mask controls, semantic labels from colorMask.uiSemantics.
+          cy=py+ph-128
+          d.line((px+12,cy,px+316,cy),fill=(55,91,111,255),width=1)
+          palette=[(220,38,38),(245,158,11),(250,204,21),(34,197,94),(14,165,233),(99,102,241),(168,85,247)]
+          labels=['LISTRA A','LISTRA B']
+          for row,label in enumerate(labels):
+              y=cy+18+row*34
+              d.text((px+12,y+5),label,fill=(164,193,205,255))
+              for i,c in enumerate(palette):
+                  x=px+96+i*31
+                  d.rounded_rectangle((x,y,x+26,y+26),radius=3,fill=(*c,255),outline=(100,120,130,255),width=1)
+          d.text((px+12,cy+91),'CORES ORIGINAIS',fill=(118,151,166,255))
+          d.rounded_rectangle((px+216,cy+84,px+316,cy+108),radius=3,fill=(22,72,91,255),outline=(100,197,219,255))
+          d.text((px+232,cy+90),'ORIGINAL',fill=(238,246,249,255))
+
+          # Click/selection cue.
+          d.rounded_rectangle((378,660,760,700),radius=5,fill=(14,33,45,230),outline=(255,208,92,255),width=2)
+          d.text((396,674),'CARROSSEL SELECIONADO - PAINEL DE CONTROLE ABERTO',fill=(255,228,145,255))
+
+          path=out/'carousel_mapforge_selection_panel.png'
+          bg.convert('RGB').save(path,'PNG',optimize=True)
+          print(path)
+          PY
+
+      - name: Upload proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: carousel-mapforge-selection-ui-proof
+          path: out/carousel_selection_ui/carousel_mapforge_selection_panel.png
+          retention-days: 14
