@@ -332,6 +332,10 @@ template <typename Number>
     if (const auto color_mask = json_object(json, "colorMask")) {
         BuildingColorMaskDefinition parsed;
         parsed.enabled = json_bool(*color_mask, "enabled").value_or(false);
+        if (const auto semantics = json_object(*color_mask, "uiSemantics")) {
+            parsed.primary_label = json_string(*semantics, "R").value_or(parsed.primary_label);
+            parsed.secondary_label = json_string(*semantics, "G").value_or(parsed.secondary_label);
+        }
         if (const auto mask_sprites = json_object(*color_mask, "sprites")) {
             for (std::size_t index = 0; index < parsed.sprite_paths.size(); ++index) parsed.sprite_paths[index] = json_string(*mask_sprites, std::to_string(index)).value_or("");
         }

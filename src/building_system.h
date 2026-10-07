@@ -197,6 +197,8 @@ struct BuildingColorTint {
 struct BuildingColorMaskDefinition {
     bool enabled = false;
     std::array<std::string, 4> sprite_paths;
+    std::string primary_label = "PAREDE";
+    std::string secondary_label = "TELHADO";
 };
 
 struct BuildingDefinition {

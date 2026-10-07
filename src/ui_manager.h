@@ -121,6 +121,8 @@ struct UiBuildItem {
     std::string footprint;
     std::string requirements;
     int thumbnail_frame_count = 1;
+    int thumbnail_columns = 1;
+    int thumbnail_rows = 1;
 };
 
 struct UiSelectedBuilding {
@@ -167,6 +169,10 @@ struct UiSelectedBuilding {
     int roof_tint_g = 255;
     int roof_tint_b = 255;
     int thumbnail_frame_count = 1;
+    int thumbnail_columns = 1;
+    int thumbnail_rows = 1;
+    std::string primary_color_label = "PAREDE";
+    std::string secondary_color_label = "TELHADO";
 };
 
 struct UiLandDetails {
@@ -222,6 +228,8 @@ struct GameplayUiModel {
     std::string placement_preview_path;
     std::string placement_rotation_label;
     int placement_preview_frame_count = 1;
+    int placement_preview_columns = 1;
+    int placement_preview_rows = 1;
     std::string selected_building_id;
     bool paused = false;
     std::vector<UiBuildItem> build_items;
@@ -248,6 +256,8 @@ struct UiButton {
     std::string thumbnail_path;
     bool build_card = false;
     int thumbnail_frame_count = 1;
+    int thumbnail_columns = 1;
+    int thumbnail_rows = 1;
     bool color_swatch = false;
     Uint8 swatch_r = 255;
     Uint8 swatch_g = 255;

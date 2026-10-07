@@ -1093,13 +1093,16 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
                 SDL_SetRenderDrawColor(renderer, 62, 105, 125, SDL_ALPHA_OPAQUE);
                 SDL_RenderRect(renderer, &stage);
                 if (const UiThumbnail* sprite = thumbnail_for(renderer, model_.placement_preview_path)) {
-                    const float frame_width = sprite->width / static_cast<float>(std::max(1, model_.placement_preview_frame_count));
+                    const int columns = std::max(1, model_.placement_preview_columns);
+                    const int rows = std::max(1, model_.placement_preview_rows);
+                    const float frame_width = sprite->width / static_cast<float>(columns);
+                    const float frame_height = sprite->height / static_cast<float>(rows);
                     const float available_width = std::min(bounds.width - 24.0F, 230.0F);
-                    const float scale = std::min(available_width / frame_width, (bounds.height - 22.0F) / sprite->height);
-                    const SDL_FRect source = {0.0F, 0.0F, frame_width, sprite->height};
+                    const float scale = std::min(available_width / frame_width, (bounds.height - 22.0F) / frame_height);
+                    const SDL_FRect source = {0.0F, 0.0F, frame_width, frame_height};
                     const SDL_FRect destination = {bounds.x + (bounds.width - frame_width * scale) * 0.5F,
-                                                   bounds.y + (bounds.height - sprite->height * scale) * 0.5F,
-                                                   frame_width * scale, sprite->height * scale};
+                                                   bounds.y + (bounds.height - frame_height * scale) * 0.5F,
+                                                   frame_width * scale, frame_height * scale};
                     SDL_RenderTexture(renderer, sprite->texture, &source, &destination);
                 } else if (model_.selected_building_id.empty()) {
                     draw_text_centered(renderer, bounds, bounds.y + bounds.height * 0.5F - 6.0F,
@@ -1160,10 +1163,13 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
         const SDL_FRect preview = {panel_x + 12.0F, 116.0F, 78.0F, 68.0F};
         SDL_SetRenderDrawColor(renderer, 13, 34, 47, SDL_ALPHA_OPAQUE); SDL_RenderFillRect(renderer, &preview);
         if (const UiThumbnail* thumbnail = thumbnail_for(renderer, item.thumbnail_path)) {
-            const float frame_width = thumbnail->width / static_cast<float>(std::max(1, item.thumbnail_frame_count));
-            const float scale = std::min(preview.w / frame_width, preview.h / thumbnail->height);
-            const SDL_FRect destination = {preview.x + (preview.w - frame_width * scale) * 0.5F, preview.y + (preview.h - thumbnail->height * scale) * 0.5F, frame_width * scale, thumbnail->height * scale};
-            const SDL_FRect source = {0.0F, 0.0F, frame_width, thumbnail->height};
+            const int columns = std::max(1, item.thumbnail_columns);
+            const int rows = std::max(1, item.thumbnail_rows);
+            const float frame_width = thumbnail->width / static_cast<float>(columns);
+            const float frame_height = thumbnail->height / static_cast<float>(rows);
+            const float scale = std::min(preview.w / frame_width, preview.h / frame_height);
+            const SDL_FRect destination = {preview.x + (preview.w - frame_width * scale) * 0.5F, preview.y + (preview.h - frame_height * scale) * 0.5F, frame_width * scale, frame_height * scale};
+            const SDL_FRect source = {0.0F, 0.0F, frame_width, frame_height};
             SDL_RenderTexture(renderer, thumbnail->texture, &source, &destination);
         } else { SDL_SetRenderDrawColor(renderer, 74, 112, 127, SDL_ALPHA_OPAQUE); SDL_RenderRect(renderer, &preview); }
         draw_text_fit(renderer, panel_x + 102.0F, 96.0F, 212.0F, item.name, 236, 244, 248);
@@ -1217,8 +1223,8 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             const float color_top = 84.0F + panel_height - 116.0F;
             SDL_SetRenderDrawColor(renderer, 55, 91, 111, SDL_ALPHA_OPAQUE);
             SDL_RenderLine(renderer, panel_x + 12.0F, color_top + 5.0F, panel_x + 316.0F, color_top + 5.0F);
-            draw_text(renderer, panel_x + 12.0F, color_top + 28.0F, "PAREDE", 164, 193, 205);
-            draw_text(renderer, panel_x + 12.0F, color_top + 60.0F, "TELHADO", 164, 193, 205);
+            draw_text_fit(renderer, panel_x + 12.0F, color_top + 28.0F, 80.0F, item.primary_color_label, 164, 193, 205);
+            draw_text_fit(renderer, panel_x + 12.0F, color_top + 60.0F, 80.0F, item.secondary_color_label, 164, 193, 205);
             draw_text(renderer, panel_x + 12.0F, color_top + 91.0F,
                       item.wall_color_customized || item.roof_color_customized ? "CORES PERSONALIZADAS" : "CORES ORIGINAIS",
                       118, 151, 166);
@@ -1542,7 +1548,10 @@ void GameplayUi::add_build_card(UiRect bounds, const UiBuildItem& item, bool act
     UiButton card; card.bounds = bounds; card.label = item.name; card.action = action; card.payload = item.definition_id;
     card.enabled = item.enabled; card.active = active; card.detail = item.category + "  |  " + item.build_cost + "  |  " + item.footprint;
     card.requirements = item.requirements; card.thumbnail_path = item.thumbnail_path; card.build_card = true;
-    card.thumbnail_frame_count = item.thumbnail_frame_count; buttons_.push_back(std::move(card));
+    card.thumbnail_frame_count = item.thumbnail_frame_count;
+    card.thumbnail_columns = item.thumbnail_columns;
+    card.thumbnail_rows = item.thumbnail_rows;
+    buttons_.push_back(std::move(card));
 }
 
 void GameplayUi::add_panel(UiRect bounds) { panels_.push_back(bounds); }
@@ -1623,12 +1632,15 @@ void GameplayUi::render_build_card(SDL_Renderer* renderer, const UiButton& butto
     SDL_SetRenderDrawColor(renderer, 48, 86, 105, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &preview);
     if (const UiThumbnail* thumbnail = thumbnail_for(renderer, button.thumbnail_path)) {
-        const float frame_width = thumbnail->width / static_cast<float>(std::max(1, button.thumbnail_frame_count));
-        const float scale = std::min(preview.w / frame_width, preview.h / thumbnail->height);
+        const int columns = std::max(1, button.thumbnail_columns);
+        const int rows = std::max(1, button.thumbnail_rows);
+        const float frame_width = thumbnail->width / static_cast<float>(columns);
+        const float frame_height = thumbnail->height / static_cast<float>(rows);
+        const float scale = std::min(preview.w / frame_width, preview.h / frame_height);
         const SDL_FRect destination = {preview.x + (preview.w - frame_width * scale) * 0.5F,
-                                       preview.y + (preview.h - thumbnail->height * scale) * 0.5F,
-                                       frame_width * scale, thumbnail->height * scale};
-        const SDL_FRect source = {0.0F, 0.0F, frame_width, thumbnail->height};
+                                       preview.y + (preview.h - frame_height * scale) * 0.5F,
+                                       frame_width * scale, frame_height * scale};
+        const SDL_FRect source = {0.0F, 0.0F, frame_width, frame_height};
         SDL_RenderTexture(renderer, thumbnail->texture, &source, &destination);
     } else if (button.thumbnail_path.empty()) {
         draw_text(renderer, preview.x + preview.w * 0.5F - 4.0F, preview.y + preview.h * 0.5F - 4.0F,

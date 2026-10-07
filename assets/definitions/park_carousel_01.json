@@ -12,7 +12,7 @@
   "rotatable": true,
   "requiresRoadAccess": false,
   "requiresRoadOrPathAccess": false,
-  "requiresTicketBooth": false,
+  "requiresTicketBooth": true,
   "grassOnly": true,
   "roadAccessMode": "any_perimeter",
   "accessPoints": [
@@ -73,5 +73,11 @@
     "frameCount": 48,
     "frameDurationMs": 125,
     "playback": "loop"
-  }
+  },
+  "serviceName": "Ingresso do carrossel",
+  "defaultServicePrice": 8,
+  "minimumServicePrice": 1,
+  "maximumServicePrice": 40,
+  "baseServiceCustomersPerMonth": 90,
+  "servicePopulationForFullDemand": 60
 }

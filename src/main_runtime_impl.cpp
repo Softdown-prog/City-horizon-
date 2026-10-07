@@ -2801,6 +2801,8 @@ int main() {
             const BuildingRotation visual_rotation = camera_visual_rotation(*placement, placement_rotation, camera.rotation);
             model.placement_preview_path = (asset_root / placement->texture_path_for(visual_rotation)).string();
             model.placement_preview_frame_count = placement->animation ? std::max(1, placement->animation->frame_count) : 1;
+            model.placement_preview_columns = placement->animation ? std::max(1, placement->animation->resolved_columns()) : 1;
+            model.placement_preview_rows = placement->animation ? std::max(1, placement->animation->resolved_rows()) : 1;
             model.placement_rotation_label = rotation_label(placement_rotation);
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
@@ -2814,6 +2816,10 @@ int main() {
                                          catalog_requirements_label(definition)});
             model.build_items.back().thumbnail_frame_count =
                 definition.animation ? std::max(1, definition.animation->frame_count) : 1;
+            model.build_items.back().thumbnail_columns =
+                definition.animation ? std::max(1, definition.animation->resolved_columns()) : 1;
+            model.build_items.back().thumbnail_rows =
+                definition.animation ? std::max(1, definition.animation->resolved_rows()) : 1;
         }
         for (const BuildingDefinition& definition : catalog.definitions()) {
             if (!definition.player_buildable) continue;
@@ -2937,6 +2943,14 @@ int main() {
                     };
                     model.selected_building->thumbnail_frame_count =
                         definition->animation ? std::max(1, definition->animation->frame_count) : 1;
+                    model.selected_building->thumbnail_columns =
+                        definition->animation ? std::max(1, definition->animation->resolved_columns()) : 1;
+                    model.selected_building->thumbnail_rows =
+                        definition->animation ? std::max(1, definition->animation->resolved_rows()) : 1;
+                    if (definition->color_mask) {
+                        model.selected_building->primary_color_label = definition->color_mask->primary_label;
+                        model.selected_building->secondary_color_label = definition->color_mask->secondary_label;
+                    }
                 }
             }
         }
