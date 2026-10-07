@@ -1,0 +1,87 @@
+name: Carousel Runtime 512 Preview
+
+on:
+  push:
+    paths:
+      - '.github/workflows/carousel-runtime512-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install preview dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Extract exact runtime frames
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          src=Path('assets/city_park/carousel/runtime512')
+          out=Path('out/carousel_runtime512_preview')
+          out.mkdir(parents=True, exist_ok=True)
+
+          directions=('south','east','west','north')
+          frame_size=512
+          cols=8
+          rows=6
+          index=1
+
+          # Neutral checkerboard makes the original transparent edge quality visible
+          # without rescaling the 512x512 runtime frames.
+          def checker():
+              bg=Image.new('RGBA',(frame_size,frame_size),(210,210,210,255))
+              px=bg.load()
+              step=32
+              for y in range(frame_size):
+                  for x in range(frame_size):
+                      if ((x//step)+(y//step))%2:
+                          px[x,y]=(230,230,230,255)
+              return bg
+
+          for direction in directions:
+              atlas_path=src/f'park_carousel_01_{direction}_animation_512_atlas.png'
+              atlas=Image.open(atlas_path).convert('RGBA')
+              assert atlas.size==(4096,3072), (atlas_path, atlas.size)
+              for frame in range(48):
+                  col=frame%cols
+                  row=frame//cols
+                  img=atlas.crop((col*frame_size,row*frame_size,(col+1)*frame_size,(row+1)*frame_size))
+                  bg=checker()
+                  bg.alpha_composite(img)
+                  bg.convert('RGB').save(out/f'frame_{index:04d}.png', compress_level=6)
+                  index+=1
+
+          assert index==193
+          print('Extracted 192 exact 512x512 runtime frames')
+          PY
+
+      - name: Encode 4-direction MP4
+        run: |
+          ffmpeg -y -framerate 8             -i out/carousel_runtime512_preview/frame_%04d.png             -c:v libx264 -preset medium -crf 15             -pix_fmt yuv420p -movflags +faststart             out/carousel_runtime512_final_4direcoes.mp4
+
+      - name: Verify preview
+        run: |
+          test -s out/carousel_runtime512_final_4direcoes.mp4
+          ffprobe -v error -show_entries stream=width,height,r_frame_rate,nb_frames             -show_entries format=duration,size             -of json out/carousel_runtime512_final_4direcoes.mp4
+
+      - name: Upload final runtime preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: carousel-runtime512-final-preview
+          path: out/carousel_runtime512_final_4direcoes.mp4
+          retention-days: 14
