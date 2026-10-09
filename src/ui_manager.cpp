@@ -969,7 +969,7 @@ void GameplayUi::handle_mouse_button_up(const float mouse_x, const float mouse_y
         const int placed = g_park_fence_placement.commit_drag();
         for (std::size_t index = 1; index < route.size(); ++index) {
             if (!existing_segments[index - 1] && g_park_fences.has_segment(route[index - 1], route[index])) {
-                park_fence_runtime::set_segment_style(route[index - 1], route[index], g_park_fence_style);
+                (void)park_fence_runtime::set_segment_style(route[index - 1], route[index], g_park_fence_style);
             }
         }
         g_park_fence_status = placed > 0
