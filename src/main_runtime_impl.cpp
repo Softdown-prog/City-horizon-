@@ -4122,6 +4122,14 @@ int main() {
             !ch::runtime_game_state::game_over);
         ch::rail_runtime::render(renderer, rail_camera,
                                  static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        float rail_hotkey_mouse_x = 0.0F;
+        float rail_hotkey_mouse_y = 0.0F;
+        SDL_GetMouseState(&rail_hotkey_mouse_x, &rail_hotkey_mouse_y);
+        ch::rail_live_operation::overlay().render_production_frame(
+            renderer, rail_camera,
+            static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+            active_overlay == UiOverlay::none &&
+            !gameplay_ui.consumes_point(rail_hotkey_mouse_x, rail_hotkey_mouse_y));
         // Train sprites are drawn later in the depth-sorted world-entity pass.
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height),

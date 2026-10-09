@@ -122,11 +122,35 @@ public:
     void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
     void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
     [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
+
+    // Single authoritative production frame. Never copy the whole rail graph
+    // once per segment: hundreds of tracks would otherwise become quadratic.
+    void render_production_frame(SDL_Renderer* renderer, const ch::CameraState& camera,
+                                 const float viewport_width, const float viewport_height,
+                                 const bool hotkeys_allowed) {
+        if (renderer == nullptr || viewport_width <= 0.0F || viewport_height <= 0.0F) return;
+        const std::optional<RailPersistentState> captured = rail_persistence::capture_runtime_state();
+        if (!captured) return;
+        const std::uint64_t signature = detail::state_signature(*captured);
+        if (!state_ready_ || signature != state_signature_) {
+            if (!controller_.sync_from_persistent_state(*captured)) return;
+            const auto refreshed = rail_persistence::capture_runtime_state();
+            state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
+            state_ready_ = true;
+            last_tick_ns_ = SDL_GetTicksNS();
+        }
+        if (hotkeys_allowed) handle_hotkeys(*captured, camera, viewport_width, viewport_height);
+        else update_key_latches();
+        update_clock();
+        render_stations(renderer, *captured, camera, viewport_width, viewport_height);
+    }
+
     void render_after_segment(SDL_Renderer* renderer,
                               const RailSplineSegment& rendered_segment,
                               const ch::CameraState& camera,
                               const float viewport_width,
                               const float viewport_height) {
+        if (production_sprites_) return; // Main runtime owns once-per-frame update.
         if (renderer == nullptr || viewport_width <= 0.0F || viewport_height <= 0.0F) return;
         const std::optional<RailPersistentState> captured = rail_persistence::capture_runtime_state();
         if (!captured) return;
@@ -148,6 +172,13 @@ public:
     }
 
 private:
+    void update_key_latches() noexcept {
+        int key_count = 0;
+        const bool* keys = SDL_GetKeyboardState(&key_count);
+        station_key_was_down_ = keys != nullptr && SDL_SCANCODE_7 < key_count && keys[SDL_SCANCODE_7];
+        restart_key_was_down_ = keys != nullptr && SDL_SCANCODE_8 < key_count && keys[SDL_SCANCODE_8];
+    }
+
     void handle_hotkeys(const RailPersistentState& state,
                         const ch::CameraState& camera,
                         const float viewport_width,
