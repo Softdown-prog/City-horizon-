@@ -4079,6 +4079,10 @@ int main() {
         const ch::CameraState rail_camera{
             camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
         ch::rail_live_operation::overlay().use_production_sprites(true);
+        ch::rail_live_operation::overlay().set_simulation_running(
+            active_overlay == UiOverlay::none &&
+            simulation_clock.speed() != SimulationSpeed::paused &&
+            !ch::runtime_game_state::game_over);
         ch::rail_runtime::render(renderer, rail_camera,
                                  static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         ch::rail_train_visual::render_articulated_train(

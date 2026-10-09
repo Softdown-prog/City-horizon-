@@ -120,6 +120,7 @@ public:
     // Production sprites are drawn by the game's shared texture cache, never
     // by the low-level procedural track renderer. Keep debug fallback opt-in.
     void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
+    void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
     [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
     void render_after_segment(SDL_Renderer* renderer,
                               const RailSplineSegment& rendered_segment,
@@ -189,7 +190,7 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        controller_.update(elapsed);
+        if (simulation_running_) controller_.update(elapsed);
     }
 
     void render_stations(SDL_Renderer* renderer,
@@ -255,6 +256,7 @@ private:
     bool station_key_was_down_ = false;
     bool restart_key_was_down_ = false;
     bool production_sprites_ = false;
+    bool simulation_running_ = true;
 };
 
 [[nodiscard]] inline LiveOperationOverlay& overlay() {
