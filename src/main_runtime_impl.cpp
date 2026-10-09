@@ -13,6 +13,7 @@
 #include "audio_manager.h"
 #include "building_system.h"
 #include "coaster_runtime.h"
+#include "rail_train_sprite_render_adapter.h"
 #include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
 #include "economy_system.h"
@@ -3084,9 +3085,31 @@ int main() {
         }
         tool_cursors.set(desired_cursor);
 
+        // CH_RAIL_FIRST_RUN_V1: construction events share the actual SDL loop.
+        // Capture the latest camera before input (the renderer also captures it).
+        ch::runtime_view::capture(
+            {camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)},
+            static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             mouse_click_event = false;
+            const bool rail_pointer_event = event.type == SDL_EVENT_MOUSE_MOTION ||
+                event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP;
+            const float rail_mouse_x = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x;
+            const float rail_mouse_y = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y : event.button.y;
+            const bool rail_over_ui = rail_pointer_event && gameplay_ui.consumes_point(rail_mouse_x, rail_mouse_y);
+            const bool rail_can_edit = active_overlay == UiOverlay::none &&
+                placement_definition_id.empty() && !build_panel_open && !road_mode && !land_mode &&
+                !sidewalk_mode && !terrain_relief_mode && water_terrain_id.empty() &&
+                !agriculture_mode && !decoration_mode;
+            const ch::rail_runtime::InteractionContext rail_context{
+                &lands, &buildings, &roads, &sidewalks, &farming,
+                active_map_doc ? &active_map_doc->terrain_heightfield() : nullptr};
+            if ((!rail_over_ui || !rail_pointer_event) &&
+                ch::rail_runtime::state().consume_event(event, rail_can_edit, rail_context)) {
+                status = ch::rail_runtime::status_text();
+                continue;
+            }
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
@@ -4049,6 +4072,20 @@ int main() {
         render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
                      static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                      active_map_doc ? &*active_map_doc : nullptr);
+        // Rail meshes use the same camera and world grid as the city roads.
+        // The last segment ticks the live station controller exactly once.
+        const ch::CameraState rail_camera{
+            camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+        ch::rail_live_operation::overlay().use_production_sprites(true);
+        ch::rail_runtime::render(renderer, rail_camera,
+                                 static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        ch::rail_train_visual::render_articulated_train(
+            renderer, ch::rail_live_operation::overlay().controller(), rail_camera,
+            static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+            [&](const std::filesystem::path& relative_path) -> SDL_Texture* {
+                const TextureAsset* asset = textures.load(renderer, asset_root / relative_path);
+                return asset == nullptr ? nullptr : asset->texture;
+            });
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                           active_map_doc ? &*active_map_doc : nullptr);

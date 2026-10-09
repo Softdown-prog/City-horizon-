@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
 
 #include <SDL3/SDL.h>
@@ -116,6 +117,10 @@ namespace detail {
 
 class LiveOperationOverlay final {
 public:
+    // Production sprites are drawn by the game's shared texture cache, never
+    // by the low-level procedural track renderer. Keep debug fallback opt-in.
+    void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
+    [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
     void render_after_segment(SDL_Renderer* renderer,
                               const RailSplineSegment& rendered_segment,
                               const ch::CameraState& camera,
@@ -138,7 +143,7 @@ public:
         handle_hotkeys(*captured, camera, viewport_width, viewport_height);
         update_clock();
         render_stations(renderer, *captured, camera, viewport_width, viewport_height);
-        render_train(renderer, camera, viewport_width, viewport_height);
+        if (!production_sprites_) render_train(renderer, camera, viewport_width, viewport_height);
     }
 
 private:
@@ -249,6 +254,7 @@ private:
     bool state_ready_ = false;
     bool station_key_was_down_ = false;
     bool restart_key_was_down_ = false;
+    bool production_sprites_ = false;
 };
 
 [[nodiscard]] inline LiveOperationOverlay& overlay() {
