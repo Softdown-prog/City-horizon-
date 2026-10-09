@@ -348,7 +348,7 @@ inline void ch_fill_citizen_status(GameplayUiModel& model, const PedestrianSyste
     for (const PedestrianInstance& pedestrian : pedestrians.instances()) {
         if (pedestrian.state == PedestrianState::resting || pedestrian.state == PedestrianState::visiting) continue;
         const ch::ScreenPoint screen = ch::world_to_screen_point(
-            pedestrian.map_x, pedestrian.map_y, camera, viewport_width, viewport_height);
+            pedestrian.spatial.visual_world_x, pedestrian.spatial.visual_world_y, camera, viewport_width, viewport_height);
         const float dx = screen.x - mouse_x;
         const float dy = screen.y - mouse_y;
         const float distance_squared = dx * dx + dy * dy;

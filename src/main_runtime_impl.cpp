@@ -13,6 +13,7 @@
 #include "audio_manager.h"
 #include "building_system.h"
 #include "coaster_runtime.h"
+#include "rail_train_sprite_render_adapter.h"
 #include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
 #include "economy_system.h"
@@ -698,7 +699,7 @@ void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands, cons
                           const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height,
                           const ch::MapDocument* document = nullptr) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height, document);
+    ch::RuntimeMapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height, document);
 }
 
 void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
@@ -711,7 +712,7 @@ void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVi
                   const TextureCache& textures, const std::filesystem::path& asset_root, const Camera& camera,
                   float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_roads(renderer, roads, visuals,
+    ch::RuntimeMapRenderer::render_roads(renderer, roads, visuals,
                                   [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                   asset_root, cs, viewport_width, viewport_height, document);
 }
@@ -720,7 +721,7 @@ void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, 
                       const std::filesystem::path& root, const Camera& camera, float vw, float vh,
                       const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_sidewalks(renderer, sidewalks,
+    ch::RuntimeMapRenderer::render_sidewalks(renderer, sidewalks,
                                      [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                      root, cs, vw, vh, document);
 }
@@ -729,7 +730,7 @@ void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const 
                     const TextureCache& textures, const std::filesystem::path& root, const Camera& camera,
                     float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_farming(renderer, farming, crops,
+    ch::RuntimeMapRenderer::render_farming(renderer, farming, crops,
                                     [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                     root, cs, viewport_width, viewport_height, document);
 }
@@ -1167,18 +1168,21 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                            const BuildingCatalog& building_catalog, const LandManager& lands,
                            const std::vector<MobileEntityRenderData>& mobile_entities,
                            const ch::coaster::TrainStepResult* coaster_train,
+                           const ch::rail_live_operation::LiveOperationController* rail_controller,
                            const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
                            float viewport_width, float viewport_height, const ch::MapDocument* document) {
     struct EntityDraw {
-        enum class Kind { building, mobile_entity, coaster_car } kind = Kind::building;
+        enum class Kind { building, mobile_entity, coaster_car, rail_unit } kind = Kind::building;
         float depth = 0.0F;
         const BuildingInstance* building = nullptr;
         const MobileEntityRenderData* mobile_entity = nullptr;
         const ch::coaster::CarRenderCommand* coaster_car = nullptr;
+        const ch::rail_operation::ArticulatedUnitPose* rail_unit = nullptr;
     };
     std::vector<EntityDraw> draws;
-    draws.reserve(buildings.instances().size() + mobile_entities.size() + ch::coaster::kCoasterTrainCarCount);
+    draws.reserve(buildings.instances().size() + mobile_entities.size() +
+                  ch::coaster::kCoasterTrainCarCount + 8U);
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = building_catalog.find(instance.definition_id);
         if (definition == nullptr) continue;
@@ -1208,6 +1212,23 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
         }
     }
 
+    // Railway consists join the same authoritative isometric ground-depth pass.
+    // This prevents a rear building/citizen from always covering the locomotive.
+    std::vector<ch::rail_operation::ArticulatedUnitPose> rail_units;
+    if (rail_controller != nullptr) {
+        const auto* route = rail_controller->operational_route();
+        const auto pose = rail_controller->train_pose();
+        if (route != nullptr && pose.has_value()) {
+            rail_units = ch::rail_operation::build_articulated_consist_poses(*route, *pose);
+            for (const auto& unit : rail_units) {
+                draws.push_back({EntityDraw::Kind::rail_unit,
+                    camera_depth_key(static_cast<float>(unit.pose.x),
+                                     static_cast<float>(unit.pose.y), camera),
+                    nullptr, nullptr, nullptr, &unit});
+            }
+        }
+    }
+
     std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {
         return left.depth < right.depth;
     });
@@ -1223,6 +1244,18 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
             if (geometry.destination.w > 0.0F && geometry.destination.h > 0.0F) {
                 SDL_RenderTexture(renderer, atlas->texture, &geometry.source, &geometry.destination);
             }
+            continue;
+        }
+        if (draw.kind == EntityDraw::Kind::rail_unit) {
+            const ch::CameraState rail_view{
+                camera.pan_x, camera.pan_y, camera.zoom,
+                static_cast<ch::CameraRotation>(camera.rotation)};
+            ch::rail_train_visual::render_unit(renderer, *draw.rail_unit, rail_view,
+                viewport_width, viewport_height,
+                [&](const std::filesystem::path& path) -> SDL_Texture* {
+                    const TextureAsset* asset = textures.load(renderer, root / path);
+                    return asset == nullptr ? nullptr : asset->texture;
+                });
             continue;
         }
         if (draw.kind == EntityDraw::Kind::building) {
@@ -2377,7 +2410,10 @@ int main() {
             const std::int64_t revenue = static_cast<std::int64_t>(quantity) * resource->base_sell_price;
             if (farming.try_remove_resource(resource->id, quantity)) {
                 economy.earn_agricultural_sale(revenue, simulation_clock.date());
-                money_spend_fx.spawn_income(revenue, static_cast<float>(viewport_width) - 180.0F, 92.0F);
+                int income_viewport_width = 0;
+                int income_viewport_height = 0;
+                (void)SDL_GetCurrentRenderOutputSize(renderer, &income_viewport_width, &income_viewport_height);
+                money_spend_fx.spawn_income(revenue, static_cast<float>(income_viewport_width) - 180.0F, 92.0F);
             }
             status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);
             (void)play_sound(SoundEvent::ui_confirm); return;
@@ -3084,9 +3120,33 @@ int main() {
         }
         tool_cursors.set(desired_cursor);
 
+        // CH_RAIL_FIRST_RUN_V1: construction events share the actual SDL loop.
+        // Capture the latest camera before input (the renderer also captures it).
+        ch::runtime_view::capture(
+            {camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)},
+            static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             mouse_click_event = false;
+            const bool rail_pointer_event = event.type == SDL_EVENT_MOUSE_MOTION ||
+                event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP;
+            const float rail_mouse_x = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x :
+                (rail_pointer_event ? event.button.x : 0.0F);
+            const float rail_mouse_y = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y :
+                (rail_pointer_event ? event.button.y : 0.0F);
+            const bool rail_over_ui = rail_pointer_event && gameplay_ui.consumes_point(rail_mouse_x, rail_mouse_y);
+            const bool rail_can_edit = active_overlay == UiOverlay::none &&
+                placement_definition_id.empty() && !build_panel_open && !road_mode && !land_mode &&
+                !sidewalk_mode && !terrain_relief_mode && water_terrain_id.empty() &&
+                !agriculture_mode && !decoration_mode;
+            const ch::rail_runtime::InteractionContext rail_context{
+                &lands, &buildings, &roads, &sidewalks, &farming,
+                active_map_doc ? &active_map_doc->terrain_heightfield() : nullptr};
+            if ((!rail_over_ui || !rail_pointer_event) &&
+                ch::rail_runtime::state().consume_event(event, rail_can_edit, rail_context)) {
+                status = ch::rail_runtime::status_text();
+                continue;
+            }
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
@@ -3547,8 +3607,10 @@ int main() {
                     status = changed == 0 ? "NENHUM PISO ALTERADO" :
                         "PISO ALTERADO: " + std::to_string(changed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " BLOQUEADOS");
-                    if (changed > 0 && tile_cost > 0) {
-                        money_spend_fx.spawn(static_cast<std::int64_t>(changed) * tile_cost, event.button.x, event.button.y);
+                    const std::int64_t total_floor_cost =
+                        static_cast<std::int64_t>(changed) * floor_style_cost(sidewalk_style);
+                    if (total_floor_cost > 0) {
+                        money_spend_fx.spawn(total_floor_cost, event.button.x, event.button.y);
                     }
                     (void)play_sound(changed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;
@@ -4049,6 +4111,26 @@ int main() {
         render_roads(renderer, roads, road_visuals, textures, asset_root, camera,
                      static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                      active_map_doc ? &*active_map_doc : nullptr);
+        // Rail meshes use the same camera and world grid as the city roads.
+        // The last segment ticks the live station controller exactly once.
+        const ch::CameraState rail_camera{
+            camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
+        ch::rail_live_operation::overlay().use_production_sprites(true);
+        ch::rail_live_operation::overlay().set_simulation_running(
+            active_overlay == UiOverlay::none &&
+            simulation_clock.speed() != SimulationSpeed::paused &&
+            !ch::runtime_game_state::game_over);
+        ch::rail_runtime::render(renderer, rail_camera,
+                                 static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+        float rail_hotkey_mouse_x = 0.0F;
+        float rail_hotkey_mouse_y = 0.0F;
+        SDL_GetMouseState(&rail_hotkey_mouse_x, &rail_hotkey_mouse_y);
+        ch::rail_live_operation::overlay().render_production_frame(
+            renderer, rail_camera,
+            static_cast<float>(viewport_width), static_cast<float>(viewport_height),
+            active_overlay == UiOverlay::none &&
+            !gameplay_ui.consumes_point(rail_hotkey_mouse_x, rail_hotkey_mouse_y));
+        // Train sprites are drawn later in the depth-sorted world-entity pass.
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                           active_map_doc ? &*active_map_doc : nullptr);
@@ -4160,7 +4242,8 @@ int main() {
                 static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         }
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
-                              coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,
+                              coaster_train.valid ? &coaster_train : nullptr,
+                              &ch::rail_live_operation::overlay().controller(), mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                               active_map_doc ? &*active_map_doc : nullptr);
         if (seagull_pass_active) {

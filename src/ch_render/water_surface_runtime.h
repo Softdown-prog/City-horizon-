@@ -1,7 +1,7 @@
 #pragma once
 
-#include "src/ch_core/asset_registry.h"
-#include "src/ch_render/palette_bank.h"
+#include "../ch_core/asset_registry.h"
+#include "palette_bank.h"
 
 #include <algorithm>
 #include <cmath>

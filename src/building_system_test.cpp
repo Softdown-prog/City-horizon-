@@ -27,8 +27,7 @@ int main(int argc, char** argv) {
     const BuildingDefinition* carousel = catalog.find("carousel_city_horizon_01");
     if (!require(coffee != nullptr, "coffee shop definition exists") ||
         !require(bakery != nullptr, "bakery definition exists") ||
-        !require(house != nullptr, "popular house definition exists") ||
-        !require(carousel != nullptr, "carousel definition exists")) {
+        !require(house != nullptr, "popular house definition exists")) {
         return 1;
     }
 
@@ -55,7 +54,14 @@ int main(int argc, char** argv) {
                  "bakery retains its current service economy") ||
         !require(house->category == "residential" && house->footprint_width == 3 && house->footprint_height == 3 &&
                      house->residential_capacity == 5 && house->rotatable,
-                 "popular house uses the current 3x3 residential contract") ||
+                 "popular house uses the current 3x3 residential contract")) {
+        return 1;
+    }
+
+    // The previous carousel asset was deliberately removed from the catalog.
+    // Validate the optional attraction's contract when present, but never
+    // require deleted prototype assets to ship with every game build.
+    if (carousel != nullptr && (
         !require(carousel->category == "city_park" && carousel->player_buildable && carousel->rotatable,
                  "carousel is exposed as a buildable city-park attraction") ||
         !require(carousel->footprint_width == 4 && carousel->footprint_height == 4 && carousel->build_cost == 15000,
@@ -69,7 +75,7 @@ int main(int argc, char** argv) {
                      carousel->animation->playback == "activity_loop",
                  "carousel exposes the promoted 48-frame activity animation") ||
         !require(carousel->color_mask.has_value() && carousel->color_mask->enabled,
-                 "carousel primary color mask is available to runtime")) {
+                 "carousel primary color mask is available to runtime"))) {
         return 1;
     }
 

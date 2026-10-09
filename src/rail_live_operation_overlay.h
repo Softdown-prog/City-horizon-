@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
 
 #include <SDL3/SDL.h>
@@ -116,11 +117,40 @@ namespace detail {
 
 class LiveOperationOverlay final {
 public:
+    // Production sprites are drawn by the game's shared texture cache, never
+    // by the low-level procedural track renderer. Keep debug fallback opt-in.
+    void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
+    void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
+    [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
+
+    // Single authoritative production frame. Never copy the whole rail graph
+    // once per segment: hundreds of tracks would otherwise become quadratic.
+    void render_production_frame(SDL_Renderer* renderer, const ch::CameraState& camera,
+                                 const float viewport_width, const float viewport_height,
+                                 const bool hotkeys_allowed) {
+        if (renderer == nullptr || viewport_width <= 0.0F || viewport_height <= 0.0F) return;
+        const std::optional<RailPersistentState> captured = rail_persistence::capture_runtime_state();
+        if (!captured) return;
+        const std::uint64_t signature = detail::state_signature(*captured);
+        if (!state_ready_ || signature != state_signature_) {
+            if (!controller_.sync_from_persistent_state(*captured)) return;
+            const auto refreshed = rail_persistence::capture_runtime_state();
+            state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
+            state_ready_ = true;
+            last_tick_ns_ = SDL_GetTicksNS();
+        }
+        if (hotkeys_allowed) handle_hotkeys(*captured, camera, viewport_width, viewport_height);
+        else update_key_latches();
+        update_clock();
+        render_stations(renderer, *captured, camera, viewport_width, viewport_height);
+    }
+
     void render_after_segment(SDL_Renderer* renderer,
                               const RailSplineSegment& rendered_segment,
                               const ch::CameraState& camera,
                               const float viewport_width,
                               const float viewport_height) {
+        if (production_sprites_) return; // Main runtime owns once-per-frame update.
         if (renderer == nullptr || viewport_width <= 0.0F || viewport_height <= 0.0F) return;
         const std::optional<RailPersistentState> captured = rail_persistence::capture_runtime_state();
         if (!captured) return;
@@ -138,10 +168,17 @@ public:
         handle_hotkeys(*captured, camera, viewport_width, viewport_height);
         update_clock();
         render_stations(renderer, *captured, camera, viewport_width, viewport_height);
-        render_train(renderer, camera, viewport_width, viewport_height);
+        if (!production_sprites_) render_train(renderer, camera, viewport_width, viewport_height);
     }
 
 private:
+    void update_key_latches() noexcept {
+        int key_count = 0;
+        const bool* keys = SDL_GetKeyboardState(&key_count);
+        station_key_was_down_ = keys != nullptr && SDL_SCANCODE_7 < key_count && keys[SDL_SCANCODE_7];
+        restart_key_was_down_ = keys != nullptr && SDL_SCANCODE_8 < key_count && keys[SDL_SCANCODE_8];
+    }
+
     void handle_hotkeys(const RailPersistentState& state,
                         const ch::CameraState& camera,
                         const float viewport_width,
@@ -149,7 +186,7 @@ private:
         int key_count = 0;
         const bool* keys = SDL_GetKeyboardState(&key_count);
         const bool station_down = keys != nullptr && SDL_SCANCODE_7 < key_count && keys[SDL_SCANCODE_7];
-        const bool restart_down = keys != nullptr && SDL_SCANCODE_R < key_count && keys[SDL_SCANCODE_R];
+        const bool restart_down = keys != nullptr && SDL_SCANCODE_8 < key_count && keys[SDL_SCANCODE_8];
 
         if (station_down && !station_key_was_down_) {
             float mouse_x = 0.0F;
@@ -184,7 +221,7 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        controller_.update(elapsed);
+        if (simulation_running_) controller_.update(elapsed);
     }
 
     void render_stations(SDL_Renderer* renderer,
@@ -249,6 +286,8 @@ private:
     bool state_ready_ = false;
     bool station_key_was_down_ = false;
     bool restart_key_was_down_ = false;
+    bool production_sprites_ = false;
+    bool simulation_running_ = true;
 };
 
 [[nodiscard]] inline LiveOperationOverlay& overlay() {

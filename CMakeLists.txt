@@ -105,6 +105,8 @@ target_link_libraries(ch_render PRIVATE ch_core SDL3::SDL3)
 
 add_executable(city_builder
     src/main.cpp
+    src/rail_system.cpp
+    src/ch_render/procedural_rail_renderer.cpp
     src/audio_manager.cpp
     src/building_system.cpp
     src/crosswalk_system.cpp
