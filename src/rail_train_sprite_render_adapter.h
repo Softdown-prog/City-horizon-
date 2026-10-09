@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rail_live_operation_controller.h"
+#include "rail_live_operation_overlay.h"
 #include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
 

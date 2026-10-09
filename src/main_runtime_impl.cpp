@@ -3095,8 +3095,10 @@ int main() {
             mouse_click_event = false;
             const bool rail_pointer_event = event.type == SDL_EVENT_MOUSE_MOTION ||
                 event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP;
-            const float rail_mouse_x = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x;
-            const float rail_mouse_y = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y : event.button.y;
+            const float rail_mouse_x = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x :
+                (rail_pointer_event ? event.button.x : 0.0F);
+            const float rail_mouse_y = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y :
+                (rail_pointer_event ? event.button.y : 0.0F);
             const bool rail_over_ui = rail_pointer_event && gameplay_ui.consumes_point(rail_mouse_x, rail_mouse_y);
             const bool rail_can_edit = active_overlay == UiOverlay::none &&
                 placement_definition_id.empty() && !build_panel_open && !road_mode && !land_mode &&
