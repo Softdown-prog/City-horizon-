@@ -1168,18 +1168,21 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                            const BuildingCatalog& building_catalog, const LandManager& lands,
                            const std::vector<MobileEntityRenderData>& mobile_entities,
                            const ch::coaster::TrainStepResult* coaster_train,
+                           const ch::rail_live_operation::LiveOperationController* rail_controller,
                            const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
                            float viewport_width, float viewport_height, const ch::MapDocument* document) {
     struct EntityDraw {
-        enum class Kind { building, mobile_entity, coaster_car } kind = Kind::building;
+        enum class Kind { building, mobile_entity, coaster_car, rail_unit } kind = Kind::building;
         float depth = 0.0F;
         const BuildingInstance* building = nullptr;
         const MobileEntityRenderData* mobile_entity = nullptr;
         const ch::coaster::CarRenderCommand* coaster_car = nullptr;
+        const ch::rail_operation::ArticulatedUnitPose* rail_unit = nullptr;
     };
     std::vector<EntityDraw> draws;
-    draws.reserve(buildings.instances().size() + mobile_entities.size() + ch::coaster::kCoasterTrainCarCount);
+    draws.reserve(buildings.instances().size() + mobile_entities.size() +
+                  ch::coaster::kCoasterTrainCarCount + 8U);
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = building_catalog.find(instance.definition_id);
         if (definition == nullptr) continue;
@@ -1209,6 +1212,23 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
         }
     }
 
+    // Railway consists join the same authoritative isometric ground-depth pass.
+    // This prevents a rear building/citizen from always covering the locomotive.
+    std::vector<ch::rail_operation::ArticulatedUnitPose> rail_units;
+    if (rail_controller != nullptr) {
+        const auto* route = rail_controller->operational_route();
+        const auto pose = rail_controller->train_pose();
+        if (route != nullptr && pose.has_value()) {
+            rail_units = ch::rail_operation::build_articulated_consist_poses(*route, *pose);
+            for (const auto& unit : rail_units) {
+                draws.push_back({EntityDraw::Kind::rail_unit,
+                    camera_depth_key(static_cast<float>(unit.pose.x),
+                                     static_cast<float>(unit.pose.y), camera),
+                    nullptr, nullptr, nullptr, &unit});
+            }
+        }
+    }
+
     std::stable_sort(draws.begin(), draws.end(), [](const EntityDraw& left, const EntityDraw& right) {
         return left.depth < right.depth;
     });
@@ -1224,6 +1244,18 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
             if (geometry.destination.w > 0.0F && geometry.destination.h > 0.0F) {
                 SDL_RenderTexture(renderer, atlas->texture, &geometry.source, &geometry.destination);
             }
+            continue;
+        }
+        if (draw.kind == EntityDraw::Kind::rail_unit) {
+            const ch::CameraState rail_view{
+                camera.pan_x, camera.pan_y, camera.zoom,
+                static_cast<ch::CameraRotation>(camera.rotation)};
+            ch::rail_train_visual::render_unit(renderer, *draw.rail_unit, rail_view,
+                viewport_width, viewport_height,
+                [&](const std::filesystem::path& path) -> SDL_Texture* {
+                    const TextureAsset* asset = textures.load(renderer, root / path);
+                    return asset == nullptr ? nullptr : asset->texture;
+                });
             continue;
         }
         if (draw.kind == EntityDraw::Kind::building) {
@@ -4090,13 +4122,7 @@ int main() {
             !ch::runtime_game_state::game_over);
         ch::rail_runtime::render(renderer, rail_camera,
                                  static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-        ch::rail_train_visual::render_articulated_train(
-            renderer, ch::rail_live_operation::overlay().controller(), rail_camera,
-            static_cast<float>(viewport_width), static_cast<float>(viewport_height),
-            [&](const std::filesystem::path& relative_path) -> SDL_Texture* {
-                const TextureAsset* asset = textures.load(renderer, asset_root / relative_path);
-                return asset == nullptr ? nullptr : asset->texture;
-            });
+        // Train sprites are drawn later in the depth-sorted world-entity pass.
         render_crosswalks(renderer, crosswalk_runtime::crosswalks(), textures, asset_root, camera,
                           static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                           active_map_doc ? &*active_map_doc : nullptr);
@@ -4208,7 +4234,8 @@ int main() {
                 static_cast<float>(viewport_width), static_cast<float>(viewport_height));
         }
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
-                              coaster_train.valid ? &coaster_train : nullptr, mobile_animations, textures,
+                              coaster_train.valid ? &coaster_train : nullptr,
+                              &ch::rail_live_operation::overlay().controller(), mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                               active_map_doc ? &*active_map_doc : nullptr);
         if (seagull_pass_active) {

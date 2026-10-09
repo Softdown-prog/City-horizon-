@@ -42,6 +42,27 @@ enum class View : std::size_t { south = 0, west = 1, north = 2, east = 3 };
         (std::string("steam_train_coach_") + view + ".png");
 }
 
+// Each unit can join the canonical world-depth queue alongside buildings,
+// citizens and coaster cars. The renderer owns no images or GPU resources.
+template <typename TextureProvider>
+inline void render_unit(SDL_Renderer* renderer, const rail_operation::ArticulatedUnitPose& unit,
+                        const CameraState& camera, const float viewport_width,
+                        const float viewport_height, TextureProvider&& get_texture) {
+    if (renderer == nullptr) return;
+    const bool is_engine = unit.kind == rail_operation::ConsistUnitKind::locomotive;
+    SDL_Texture* texture = get_texture(sprite_path(unit.kind, select_view(unit.pose, camera)));
+    if (texture == nullptr) return;
+    const float scale = std::max(0.35F, camera.zoom) * (is_engine ? 260.0F : 215.0F);
+    const float pivot_y = is_engine ? 678.0F : 732.0F;
+    const ScreenPoint origin = world_to_screen_point(
+        static_cast<float>(unit.pose.x), static_cast<float>(unit.pose.y),
+        static_cast<float>(unit.pose.z), camera, viewport_width, viewport_height);
+    const SDL_FRect dst{origin.x - scale * 0.5F, origin.y - scale * pivot_y / 1024.0F, scale, scale};
+    if (dst.x + dst.w < -64.0F || dst.y + dst.h < -64.0F ||
+        dst.x > viewport_width + 64.0F || dst.y > viewport_height + 64.0F) return;
+    (void)SDL_RenderTexture(renderer, texture, nullptr, &dst);
+}
+
 // Texture provider uses the engine's existing cache; this adapter never owns,
 // reallocates or destroys textures. Caller passes the asset-root-aware loader.
 template <typename TextureProvider>
@@ -62,21 +83,7 @@ inline void render_articulated_train(
                camera_depth_key(static_cast<float>(b.pose.x), static_cast<float>(b.pose.y), camera);
     });
     for (const auto& unit : units) {
-        const bool is_engine = unit.kind == rail_operation::ConsistUnitKind::locomotive;
-        SDL_Texture* texture = get_texture(sprite_path(unit.kind, select_view(unit.pose, camera)));
-        if (texture == nullptr) continue;
-        // Authored 1024x1024 PNGs have a CH_CAMERA_V1 contact pivot. Preserve
-        // distinct locomotive/coach pivots from their promoted runtime manifests.
-        const float scale = std::max(0.35F, camera.zoom) * (is_engine ? 260.0F : 215.0F);
-        const float pivot_y = is_engine ? 678.0F : 732.0F;
-        const ScreenPoint origin = world_to_screen_point(
-            static_cast<float>(unit.pose.x), static_cast<float>(unit.pose.y),
-            static_cast<float>(unit.pose.z), camera, viewport_width, viewport_height);
-        const SDL_FRect dst{origin.x - scale * 0.5F, origin.y - scale * pivot_y / 1024.0F,
-                            scale, scale};
-        if (dst.x + dst.w < -64.0F || dst.y + dst.h < -64.0F ||
-            dst.x > viewport_width + 64.0F || dst.y > viewport_height + 64.0F) continue;
-        (void)SDL_RenderTexture(renderer, texture, nullptr, &dst);
+        render_unit(renderer, unit, camera, viewport_width, viewport_height, get_texture);
     }
 }
 } // namespace ch::rail_train_visual
