@@ -840,14 +840,14 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
             }),
             buttons_.end());
 
-        const float desired_height = 52.0F + 3.0F * 90.0F + 2.0F * 6.0F + 9.0F;
+        const float desired_height = 52.0F + 5.0F * 90.0F + 4.0F * 6.0F + 9.0F;
         const UiRect panel = {drawer_x, drawer_y, drawer_width, std::min(drawer_height, desired_height)};
         add_panel(panel);
         g_floor_catalog_bounds = panel;
         add_button({panel.x + panel.width - 29.0F, panel.y + 9.0F, 19.0F, 19.0F},
                    "X", UiAction::close_tool_panel);
 
-        const std::array<UiBuildItem, 3> items = floor_catalog_items();
+        const std::array<UiBuildItem, 5> items = floor_catalog_items();
         float card_y = panel.y + 52.0F;
         for (const UiBuildItem& item : items) {
             const UiRect card = {panel.x + 8.0F, card_y, panel.width - 16.0F, 90.0F};

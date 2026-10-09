@@ -699,7 +699,7 @@ void render_land_overlays(SDL_Renderer* renderer, const LandManager& lands, cons
                           const bool land_mode, const Camera& camera, const float viewport_width, const float viewport_height,
                           const ch::MapDocument* document = nullptr) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height, document);
+    ch::RuntimeMapRenderer::render_land_overlays(renderer, lands, hovered_parcel, land_mode, cs, viewport_width, viewport_height, document);
 }
 
 void render_road_sprite(SDL_Renderer* renderer, const TextureAsset& texture, int tile_x, int tile_y,
@@ -712,7 +712,7 @@ void render_roads(SDL_Renderer* renderer, const RoadManager& roads, const RoadVi
                   const TextureCache& textures, const std::filesystem::path& asset_root, const Camera& camera,
                   float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_roads(renderer, roads, visuals,
+    ch::RuntimeMapRenderer::render_roads(renderer, roads, visuals,
                                   [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                   asset_root, cs, viewport_width, viewport_height, document);
 }
@@ -721,7 +721,7 @@ void render_sidewalks(SDL_Renderer* renderer, const SidewalkManager& sidewalks, 
                       const std::filesystem::path& root, const Camera& camera, float vw, float vh,
                       const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_sidewalks(renderer, sidewalks,
+    ch::RuntimeMapRenderer::render_sidewalks(renderer, sidewalks,
                                      [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                      root, cs, vw, vh, document);
 }
@@ -730,7 +730,7 @@ void render_farming(SDL_Renderer* renderer, const FarmingSystem& farming, const 
                     const TextureCache& textures, const std::filesystem::path& root, const Camera& camera,
                     float viewport_width, float viewport_height, const ch::MapDocument* document) {
     const ch::CameraState cs{camera.pan_x, camera.pan_y, camera.zoom, static_cast<ch::CameraRotation>(camera.rotation)};
-    ch::MapRenderer::render_farming(renderer, farming, crops,
+    ch::RuntimeMapRenderer::render_farming(renderer, farming, crops,
                                     [&textures](const std::filesystem::path& p) { return textures.find(p); },
                                     root, cs, viewport_width, viewport_height, document);
 }
@@ -2378,7 +2378,10 @@ int main() {
             const std::int64_t revenue = static_cast<std::int64_t>(quantity) * resource->base_sell_price;
             if (farming.try_remove_resource(resource->id, quantity)) {
                 economy.earn_agricultural_sale(revenue, simulation_clock.date());
-                money_spend_fx.spawn_income(revenue, static_cast<float>(viewport_width) - 180.0F, 92.0F);
+                int income_viewport_width = 0;
+                int income_viewport_height = 0;
+                (void)SDL_GetCurrentRenderOutputSize(renderer, &income_viewport_width, &income_viewport_height);
+                money_spend_fx.spawn_income(revenue, static_cast<float>(income_viewport_width) - 180.0F, 92.0F);
             }
             status = resource->display_name + " SOLD: " + std::to_string(quantity) + " | " + format_money(revenue);
             (void)play_sound(SoundEvent::ui_confirm); return;
@@ -3572,8 +3575,10 @@ int main() {
                     status = changed == 0 ? "NENHUM PISO ALTERADO" :
                         "PISO ALTERADO: " + std::to_string(changed) + " TILE(S)" +
                         (blocked == 0 ? "" : " | " + std::to_string(blocked) + " BLOQUEADOS");
-                    if (changed > 0 && tile_cost > 0) {
-                        money_spend_fx.spawn(static_cast<std::int64_t>(changed) * tile_cost, event.button.x, event.button.y);
+                    const std::int64_t total_floor_cost =
+                        static_cast<std::int64_t>(changed) * floor_style_cost(sidewalk_style);
+                    if (total_floor_cost > 0) {
+                        money_spend_fx.spawn(total_floor_cost, event.button.x, event.button.y);
                     }
                     (void)play_sound(changed == 0 ? SoundEvent::ui_error : SoundEvent::ui_confirm);
                     sidewalk_dragging = false;

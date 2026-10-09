@@ -1,6 +1,6 @@
 #pragma once
 
-#include "src/ch_render/animated_prop_catalog.h"
+#include "animated_prop_catalog.h"
 
 #include <algorithm>
 #include <cmath>
