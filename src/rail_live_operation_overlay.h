@@ -155,7 +155,7 @@ private:
         int key_count = 0;
         const bool* keys = SDL_GetKeyboardState(&key_count);
         const bool station_down = keys != nullptr && SDL_SCANCODE_7 < key_count && keys[SDL_SCANCODE_7];
-        const bool restart_down = keys != nullptr && SDL_SCANCODE_R < key_count && keys[SDL_SCANCODE_R];
+        const bool restart_down = keys != nullptr && SDL_SCANCODE_8 < key_count && keys[SDL_SCANCODE_8];
 
         if (station_down && !station_key_was_down_) {
             float mouse_x = 0.0F;

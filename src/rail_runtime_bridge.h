@@ -297,7 +297,7 @@ private:
         }
         status_ = std::string("RAIL ") + mode_label(selected_mode_) +
             " | LMB DRAG | 1-6 PIECE | Q/E HEADING " + std::to_string(heading_degrees()) +
-            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | R TRAIN RESTART | T EXIT | PIECES " + std::to_string(piece_count());
+            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | 8 TRAIN RESTART | T EXIT | PIECES " + std::to_string(piece_count());
         if (hovered_piece_) status_ += " | HOVER " + std::to_string(*hovered_piece_);
     }
 
