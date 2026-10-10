@@ -18,6 +18,7 @@
 #include <cmath>
 #include <filesystem>
 #include <optional>
+#include <vector>
 
 namespace ch::studio {
 namespace {
@@ -277,6 +278,65 @@ MapCaptureResult runMapCapture(const QString& output_path,
                 }
             }
         }
+    }
+
+    // Approved pre-rendered rail sprites share the game's CH_CAMERA_V1 world
+    // projection. Never substitute procedural geometry for missing artwork.
+    // capture.railSprites: [{path, world:[x,y], anchorPixels:[px,py],
+    //                        scale:1.0, elevationWorld:0.0}]
+    // Paths are relative to the request file directory unless absolute.
+    const QJsonArray railSprites = capture.value("railSprites").toArray();
+    struct RailCaptureSprite {
+        QPointF point;
+        QImage image;
+        QPointF anchor;
+        double scale;
+        double depth;
+    };
+    std::vector<RailCaptureSprite> railLayer;
+    railLayer.reserve(static_cast<std::size_t>(railSprites.size()));
+    const std::filesystem::path requestDirectory =
+        std::filesystem::absolute(std::filesystem::path(request_path.toStdString())).parent_path();
+    for (const QJsonValue& value : railSprites) {
+        if (!value.isObject()) return fail(20, QStringLiteral("railSprites entries must be objects"));
+        const QJsonObject item = value.toObject();
+        const QString relativePath = item.value("path").toString();
+        if (relativePath.isEmpty()) return fail(21, QStringLiteral("rail sprite path missing"));
+        const std::filesystem::path filePath(relativePath.toStdString());
+        const std::filesystem::path resolved = filePath.is_absolute() ? filePath : requestDirectory / filePath;
+        const QImage sprite(QString::fromStdString(resolved.string()));
+        if (sprite.isNull()) {
+            return fail(22, QStringLiteral("missing or invalid approved rail PNG: %1")
+                                 .arg(QString::fromStdString(resolved.string())));
+        }
+        const QJsonArray world = item.value("world").toArray();
+        const QJsonArray anchorPixels = item.value("anchorPixels").toArray();
+        if (world.size() != 2 || anchorPixels.size() != 2)
+            return fail(23, QStringLiteral("rail sprite requires world and anchorPixels pairs"));
+        const QPointF worldPoint(world.at(0).toDouble(), world.at(1).toDouble());
+        const QPointF anchorPoint(anchorPixels.at(0).toDouble(), anchorPixels.at(1).toDouble());
+        const double spriteScale = item.value("scale").toDouble(1.0);
+        const double elevation = item.value("elevationWorld").toDouble(0.0);
+        if (!std::isfinite(spriteScale) || spriteScale <= 0.0 || !std::isfinite(elevation) ||
+            !std::isfinite(worldPoint.x()) || !std::isfinite(worldPoint.y()) ||
+            !std::isfinite(anchorPoint.x()) || !std::isfinite(anchorPoint.y())) {
+            return fail(24, QStringLiteral("invalid rail sprite transform"));
+        }
+        const auto screen = ch::world_to_screen_point(
+            static_cast<float>(worldPoint.x()), static_cast<float>(worldPoint.y()),
+            static_cast<float>(elevation), camera, width, height);
+        const double finalScale = spriteScale * static_cast<double>(camera.zoom);
+        railLayer.push_back({QPointF(screen.x, screen.y), sprite, anchorPoint,
+                             finalScale, worldPoint.x() + worldPoint.y()});
+    }
+    std::stable_sort(railLayer.begin(), railLayer.end(), [](const auto& left, const auto& right) {
+        return left.depth < right.depth;
+    });
+    for (const auto& rail : railLayer) {
+        const QRectF target(rail.point.x() - rail.anchor.x() * rail.scale,
+                            rail.point.y() - rail.anchor.y() * rail.scale,
+                            rail.image.width() * rail.scale, rail.image.height() * rail.scale);
+        painter.drawImage(target, rail.image);
     }
 
     const QPointF candidateTile = pairOr(candidateSpec, "tile", QPointF(0.0, 0.0));
