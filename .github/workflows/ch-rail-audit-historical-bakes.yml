@@ -2,6 +2,10 @@ name: CH Rail Audit Historical Blender Bakes
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-rail-audit-historical-bakes.yml'
 
 permissions:
   contents: read
@@ -13,6 +17,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Install Pillow for reviewed image previews
+        run: python3 -m pip install pillow
       - name: Audit existing left-curve bake artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,8 +41,33 @@ jobs:
           dest=Path('out/rail-bake-audit/left_curve_inventory.json')
           dest.write_text(json.dumps(report,indent=2)+'\n')
           print(json.dumps(report,indent=2))
+          if not report['has_all_four_directions']:
+              raise SystemExit('BLOCKED: incomplete four-direction historical curve bake')
+          from PIL import Image, ImageDraw
+          import hashlib
+          dest=Path('out/rail-bake-audit/curve_left_90')
+          dest.mkdir(parents=True,exist_ok=True)
+          thumbs=[]
+          for direction in ('south','east','north','west'):
+              matches=[p for p in pngs if 'rail.prerendered.curve_left_90' in str(p) and '_'+direction+'_source.png' in p.name]
+              if len(matches)!=1: raise SystemExit(f'Expected one {direction} source, got {len(matches)}')
+              source=matches[0]
+              with Image.open(source) as original:
+                  if original.width < 512 or original.height < 512: raise SystemExit(f'Undersized {source}')
+                  image=original.convert('RGBA')
+                  thumb=image.copy(); thumb.thumbnail((420,420))
+                  tile=Image.new('RGBA',(440,460),'#dbe4dd')
+                  tile.alpha_composite(thumb,((440-thumb.width)//2,(420-thumb.height)//2))
+                  ImageDraw.Draw(tile).text((12,433),direction,fill='#15251c')
+                  thumbs.append(tile)
+                  image.save(dest/f'curve_left_90_{direction}_review.png',optimize=True)
+              print(direction,'source SHA256',hashlib.sha256(source.read_bytes()).hexdigest())
+          sheet=Image.new('RGBA',(880,920),'#dbe4dd')
+          for i,tile in enumerate(thumbs): sheet.alpha_composite(tile,((i%2)*440,(i//2)*460))
+          sheet.convert('RGB').save(Path('out/rail-bake-audit/curve_left_90_contact_sheet.png'),optimize=True)
+          print('Four original-size previews + 4-up contact sheet exported for review; NOT runtime-promoted.')
           PY
-      - name: Publish truthful asset inventory
+      - name: Publish truthful asset inventory and four-view review images
         uses: actions/upload-artifact@v4
         with:
           name: CH-Rail-Historical-Bake-Audit-${{ github.run_id }}
