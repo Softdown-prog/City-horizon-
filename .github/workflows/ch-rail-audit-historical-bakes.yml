@@ -1,0 +1,48 @@
+name: CH Rail Audit Historical Blender Bakes
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ch-rail-audit-historical-bakes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit-historical-bakes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit existing left-curve bake artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rail-left-bake out/rail-bake-audit
+          gh run download 36933056636 --repo "${{ github.repository }}" --name CH-Blender-Agent-36933056636-1 --dir /tmp/rail-left-bake
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('/tmp/rail-left-bake')
+          pngs=sorted(root.rglob('*.png'))
+          records=[{'path':str(p.relative_to(root)),'bytes':p.stat().st_size} for p in pngs]
+          selected=[p for p in records if 'rail.prerendered.curve_left_90' in p['path']]
+          report={'source_run':36933056636,'source_artifact':11196458208,
+                  'png_count':len(pngs),'left_curve_candidates':selected,
+                  'has_all_four_directions':all(any('_'+d in p['path'] for p in selected)
+                      for d in ('south','east','north','west')),
+                  'approved_for_runtime':False}
+          dest=Path('out/rail-bake-audit/left_curve_inventory.json')
+          dest.write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Publish truthful asset inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Historical-Bake-Audit-${{ github.run_id }}
+          path: out/rail-bake-audit/
+          if-no-files-found: error
+          retention-days: 30
