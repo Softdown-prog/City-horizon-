@@ -51,15 +51,16 @@ def sprite_view(unit, available_views=None):
 
 def layout_for(role, view):
     # CH_RAIL_VISUAL_ALIGNMENT_V2: the same immutable 1024px source sprite.
+    diagonal = view in ("north_east","east_south","south_west","west_north")
     if role == "locomotive":
+        if diagonal:
+            return 385 * 1.28, 512, 641
         return 385, *{
             "south": (475,755), "east": (475,851),
-            "west": (549,811), "north": (549,844),
-            "north_east": (512,848), "east_south": (475,803),
-            "south_west": (512,783), "west_north": (549,828)
+            "west": (549,811), "north": (549,844)
         }[view]
-    if view in ("north_east","east_south","south_west","west_north"):
-        return 300, 512, 877
+    if diagonal:
+        return 300 * 1.28, 512, 684
     return 300, 512, (882 if view in ("east","west") else 872)
 
 def images_for(role):
