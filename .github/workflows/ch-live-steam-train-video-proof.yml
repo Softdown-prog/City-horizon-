@@ -38,6 +38,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg
           command -v ffmpeg && command -v ffprobe
 
+      - name: Inspect approved directional sprite geometry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          for role in ('steam_train_locomotive_01', 'steam_train_coach_01'):
+              for view in ('north', 'south', 'east', 'west'):
+                  path = next((Path('assets/vehicles')/role).glob('*_'+view+'.png'))
+                  im = Image.open(path).convert('RGBA')
+                  alpha = im.getchannel('A')
+                  print(role, view, 'canvas=', im.size,
+                        'alpha_bbox=', alpha.getbbox(),
+                        'opaque_bbox=', alpha.point(lambda a:255 if a>=128 else 0).getbbox(),
+                        flush=True)
+          PY
+
       - name: Compile production C++ train movement exporter
         run: |
           set -euo pipefail
