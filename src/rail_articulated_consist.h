@@ -96,6 +96,28 @@ struct ArticulatedUnitPose {
     return pose;
 }
 
+// CH_RAIL_BOGIE_CHORD_V2: wheel contacts follow the rail centreline;
+// the rigid body is oriented along the chord between its two bogies.
+inline constexpr double kRailBogieHalfWheelbaseRatio = 0.38;
+[[nodiscard]] inline TrainPose orient_train_unit_from_bogies(
+    const OperationalRoute& route, TrainPose center, double length_m) noexcept {
+    if (!(length_m > 0.0) || !std::isfinite(length_m)) return center;
+    const double half = length_m * kRailBogieHalfWheelbaseRatio;
+    const auto front = sample_operational_route_pose(route,center.distance_m+half);
+    const auto rear = sample_operational_route_pose(route,center.distance_m-half);
+    if (!front || !rear) return center;
+    const double dx=front->x-rear->x, dy=front->y-rear->y, dz=front->z-rear->z;
+    const double magnitude=std::sqrt(dx*dx+dy*dy+dz*dz);
+    if (!(magnitude > 1e-8)) return center;
+    center.x=(front->x+rear->x)*0.5;
+    center.y=(front->y+rear->y)*0.5;
+    center.z=(front->z+rear->z)*0.5;
+    center.tangent_x=dx/magnitude;
+    center.tangent_y=dy/magnitude;
+    center.tangent_z=dz/magnitude;
+    return center;
+}
+
 [[nodiscard]] inline std::vector<ArticulatedUnitPose> build_articulated_consist_poses(
     const OperationalRoute& route,
     const TrainPose& lead,
@@ -110,7 +132,8 @@ struct ArticulatedUnitPose {
     result.reserve(spec.coach_count + 1U);
     if (const auto pose = sample_operational_route_pose(
             route, lead.distance_m, lead.speed_mps, lead.dwelling, lead.station_piece)) {
-        result.push_back({ConsistUnitKind::locomotive, 0U, lead.distance_m, *pose});
+        result.push_back({ConsistUnitKind::locomotive, 0U, lead.distance_m,
+                          orient_train_unit_from_bogies(route, *pose, spec.locomotive_length_m)});
     }
 
     double cursor = lead.distance_m -
@@ -120,7 +143,8 @@ struct ArticulatedUnitPose {
         const auto pose = sample_operational_route_pose(
             route, cursor, lead.speed_mps, lead.dwelling, lead.station_piece);
         if (!pose) continue; // Open routes reveal trailing cars only after they enter the route.
-        result.push_back({ConsistUnitKind::passenger_coach, index + 1U, cursor, *pose});
+        result.push_back({ConsistUnitKind::passenger_coach, index + 1U, cursor,
+                          orient_train_unit_from_bogies(route, *pose, spec.coach_length_m)});
     }
     return result;
 }
