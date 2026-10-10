@@ -1,0 +1,31 @@
+name: CH Rail Diagonal Asset Gate
+
+on:
+  pull_request:
+    paths:
+      - "assets/vehicles/steam_train_locomotive_01/**"
+      - "assets/vehicles/steam_train_coach_01/**"
+      - "src/rail_train_sprite_render_adapter.h"
+      - "tools/ch_blender/validate_train_diagonal_runtime.py"
+      - ".github/workflows/ch-rail-diagonal-asset-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "assets/vehicles/steam_train_locomotive_01/**"
+      - "assets/vehicles/steam_train_coach_01/**"
+      - "src/rail_train_sprite_render_adapter.h"
+      - "tools/ch_blender/validate_train_diagonal_runtime.py"
+      - ".github/workflows/ch-rail-diagonal-asset-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-approved-diagonals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate promoted train sprites and fallbacks
+        run: python3 tools/ch_blender/validate_train_diagonal_runtime.py

@@ -1,6 +1,15 @@
 name: CH Live Steam Train Video Proof
 
 on:
+  pull_request:
+    paths:
+      - 'src/rail_live_video_proof_export.cpp'
+      - 'tools/rail_visual_proof/render_live_train_video.py'
+      - '.github/workflows/ch-live-steam-train-video-proof.yml'
+      - 'src/rail_train_sprite_render_adapter.h'
+      - 'assets/vehicles/steam_train_locomotive_01/**'
+      - 'assets/vehicles/steam_train_coach_01/**'
+      - 'tools/ch_blender/validate_train_diagonal_runtime.py'
   push:
     branches: [main]
     paths:
@@ -55,6 +64,9 @@ jobs:
                         flush=True)
           PY
 
+      - name: Validate promoted diagonal sprites against approved manifests
+        run: python3 tools/ch_blender/validate_train_diagonal_runtime.py
+
       - name: Compile production C++ train movement exporter
         run: |
           set -euo pipefail
@@ -87,6 +99,16 @@ jobs:
             out/rail-live-video/locomotiva_trilhos_runtime.mp4
           test -s out/rail-live-video/locomotiva_trilhos_runtime_preview.png
           test -s out/rail-live-video/rail_video_proof_report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('out/rail-live-video/rail_video_proof_report.json').read_text())
+          assert report['camera_directions'] == 8, 'Proof must use approved 8-direction assets'
+          assert report['frame_count'] == 216 and report['fps'] == 16
+          assert report['coupler_gap_test_pass'] is True
+          assert report['full_gameplay_capture'] is False
+          print('PASS: 8-direction compositor proof, 216 frames, articulated couplers')
+          PY
 
       - name: Publish locomotive MP4 and exact native proof trace
         uses: actions/upload-artifact@v4
@@ -101,5 +123,7 @@ jobs:
             assets/vehicles/steam_train_coach_01/*.png
             assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json
             assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json
+            assets/vehicles/steam_train_locomotive_01/steam_train_diagonal_runtime.json
+            assets/vehicles/steam_train_coach_01/steam_train_diagonal_runtime.json
           if-no-files-found: error
           retention-days: 30
