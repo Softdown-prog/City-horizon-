@@ -96,5 +96,9 @@ jobs:
             out/rail-live-video/locomotiva_trilhos_runtime_preview.png
             out/rail-live-video/rail_native_poses.json
             out/rail-live-video/rail_video_proof_report.json
+            assets/vehicles/steam_train_locomotive_01/*.png
+            assets/vehicles/steam_train_coach_01/*.png
+            assets/vehicles/steam_train_locomotive_01/steam_train_unit_runtime.json
+            assets/vehicles/steam_train_coach_01/steam_train_unit_runtime.json
           if-no-files-found: error
           retention-days: 30
