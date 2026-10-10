@@ -2,6 +2,7 @@
 
 #include "rail_live_operation_overlay.h"
 #include "rail_articulated_consist.h"
+#include "rail_train_direction_math.h"
 #include "src/ch_core/projection.h"
 
 #include <SDL3/SDL.h>
@@ -71,6 +72,50 @@ struct SpriteLayout {
     return {300.0F, 512.0F, 872.0F};
 }
 
+// Only explicitly promoted diagonal sets can activate the eight-view mode.
+// Existing original 4-view assets are the permanent safe fallback.
+[[nodiscard]] inline bool diagonal_set_ready(rail_operation::ConsistUnitKind kind) {
+    const auto valid = [](const char* role) {
+        const auto dir = std::filesystem::path("assets/vehicles") /
+            (std::string("steam_train_") + role + "_01");
+        if (!std::filesystem::is_regular_file(dir / "steam_train_diagonal_runtime.json"))
+            return false;
+        for (const char* name : {"north_east","east_south","south_west","west_north"})
+            if (!std::filesystem::is_regular_file(
+                dir / (std::string("steam_train_") + role + "_" + name + ".png")))
+                return false;
+        return true;
+    };
+    static const bool locomotive = valid("locomotive");
+    static const bool coach = valid("coach");
+    return kind == rail_operation::ConsistUnitKind::locomotive ? locomotive : coach;
+}
+
+[[nodiscard]] inline SpriteLayout diagonal_layout(
+    rail_operation::ConsistUnitKind kind, int direction_index) noexcept {
+    if (kind == rail_operation::ConsistUnitKind::locomotive) {
+        switch (direction_index) {
+            case 1: return {385.0F,512.0F,848.0F};
+            case 3: return {385.0F,475.0F,803.0F};
+            case 5: return {385.0F,512.0F,783.0F};
+            case 7: return {385.0F,549.0F,828.0F};
+            default: break;
+        }
+    } else {
+        return {300.0F,512.0F,877.0F};
+    }
+    return layout_for(kind, View::north);
+}
+
+[[nodiscard]] inline std::filesystem::path diagonal_sprite_path(
+    rail_operation::ConsistUnitKind kind, int direction_index) {
+    const char* role = kind == rail_operation::ConsistUnitKind::locomotive ? "locomotive" : "coach";
+    return std::filesystem::path("assets/vehicles") /
+        (std::string("steam_train_") + role + "_01") /
+        (std::string("steam_train_") + role + "_" +
+         rail_train_heading::label(direction_index) + ".png");
+}
+
 // Each unit can join the canonical world-depth queue alongside buildings,
 // citizens and coaster cars. The renderer owns no images or GPU resources.
 template <typename TextureProvider>
@@ -78,10 +123,20 @@ inline void render_unit(SDL_Renderer* renderer, const rail_operation::Articulate
                         const CameraState& camera, const float viewport_width,
                         const float viewport_height, TextureProvider&& get_texture) {
     if (renderer == nullptr) return;
-    const View view = select_view(unit.pose, camera);
-    SDL_Texture* texture = get_texture(sprite_path(unit.kind, view));
+    const View fallback_view = select_view(unit.pose, camera);
+    const int direction_index = rail_train_heading::octant(
+        static_cast<float>(unit.pose.tangent_x),
+        static_cast<float>(unit.pose.tangent_y), camera.rotation);
+    SDL_Texture* texture = nullptr;
+    SpriteLayout layout = layout_for(unit.kind, fallback_view);
+    if (rail_train_heading::is_diagonal(direction_index) &&
+        diagonal_set_ready(unit.kind)) {
+        texture = get_texture(diagonal_sprite_path(unit.kind, direction_index));
+        if (texture != nullptr) layout = diagonal_layout(unit.kind, direction_index);
+    }
+    if (texture == nullptr)
+        texture = get_texture(sprite_path(unit.kind, fallback_view));
     if (texture == nullptr) return;
-    const SpriteLayout layout = layout_for(unit.kind, view);
     const float scale = std::max(0.35F, camera.zoom) * layout.canvas_size_px;
     const ScreenPoint origin = world_to_screen_point(
         static_cast<float>(unit.pose.x), static_cast<float>(unit.pose.y),

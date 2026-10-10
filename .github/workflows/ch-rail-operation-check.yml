@@ -6,6 +6,8 @@ on:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
       - "src/rail_articulated_consist.h"
+      - "src/rail_train_direction_math.h"
+      - "src/rail_train_direction_math_test.cpp"
       - "src/rail_articulated_consist_test.cpp"
       - "src/rail_live_operation_controller.h"
       - "src/rail_live_operation_controller_test.cpp"
@@ -24,6 +26,8 @@ on:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
       - "src/rail_articulated_consist.h"
+      - "src/rail_train_direction_math.h"
+      - "src/rail_train_direction_math_test.cpp"
       - "src/rail_articulated_consist_test.cpp"
       - "src/rail_live_operation_controller.h"
       - "src/rail_live_operation_controller_test.cpp"
@@ -92,6 +96,15 @@ jobs:
       - name: Run live station controller regression
         shell: bash
         run: build/rail-operation/rail_live_operation_controller_test
+
+      - name: Validate the CH_CAMERA_V1 eight-direction yaw map
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I. -Isrc src/rail_train_direction_math_test.cpp \
+            -o build/rail-operation/rail_train_direction_math_test
+          build/rail-operation/rail_train_direction_math_test
 
       - name: Guard clean-room boundary
         shell: bash
