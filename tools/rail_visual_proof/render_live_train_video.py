@@ -34,9 +34,17 @@ def project(x, y, ox, oy):
     # Official CH_CAMERA_V1 r0, kTileWidth 128 / kTileHeight 64.
     return ((W/2 + (x-y)*64*ZOOM-ox), (H*0.41 + (x+y)*32*ZOOM-oy))
 
-def sprite_view(unit):
-    # CH_CAMERA_V1: exactly the same orientation as the production C++ adapter.
+def sprite_view(unit, available_views=None):
+    # Match CH_RAIL_HEADING_8_V1. The four original cardinal sprites remain
+    # authoritative until a separately reviewed diagonal pack is promoted.
     tx,ty=unit["tx"],unit["ty"]
+    if available_views is not None and len(available_views)==8:
+        angle=math.atan2(ty,tx)*4/math.pi
+        index=(math.floor(angle+0.5) if angle>=0 else math.ceil(angle-0.5))%8
+        eight=("north","north_east","east","east_south",
+               "south","south_west","west","west_north")
+        if eight[index] in available_views:
+            return eight[index]
     if abs(tx)>=abs(ty):
         return "north" if tx>=0 else "south"
     return "east" if ty>=0 else "west"
@@ -46,8 +54,12 @@ def layout_for(role, view):
     if role == "locomotive":
         return 385, *{
             "south": (475,755), "east": (475,851),
-            "west": (549,811), "north": (549,844)
+            "west": (549,811), "north": (549,844),
+            "north_east": (512,848), "east_south": (475,803),
+            "south_west": (512,783), "west_north": (549,828)
         }[view]
+    if view in ("north_east","east_south","south_west","west_north"):
+        return 300, 512, 877
     return 300, 512, (882 if view in ("east","west") else 872)
 
 def images_for(role):
@@ -62,6 +74,20 @@ def images_for(role):
         if actual!=info["sha256"]:
             raise ValueError("Manifest hash mismatch: "+str(src))
         images[direction]=Image.open(src).convert("RGBA")
+    diagonal_manifest=folder/"steam_train_diagonal_runtime.json"
+    if diagonal_manifest.exists():
+        diagonal=json.loads(diagonal_manifest.read_text())
+        required={"north_east","east_south","south_west","west_north"}
+        if (diagonal.get("contract")!="CH_RAIL_DIAGONAL_RUNTIME_V1" or
+            diagonal.get("approvedForRuntime") is not True or
+            diagonal.get("unitRole")!=role or
+            set(diagonal.get("views",{}))!=required):
+            raise RuntimeError("Invalid promoted diagonal manifest "+str(diagonal_manifest))
+        for direction, item in diagonal["views"].items():
+            path=folder/item["file"]
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=item["sha256"]:
+                raise RuntimeError("Bad approved diagonal sprite "+str(path))
+            images[direction]=Image.open(path).convert("RGBA")
     return images, m
 
 def render(trace, out):
@@ -151,7 +177,7 @@ def render(trace, out):
         # Frame-accurate depth sorting via world ground contact plane.
         for unit in sorted(units,key=lambda u:u["x"]+u["y"]):
             role=unit["kind"]
-            view=sprite_view(unit)
+            view=sprite_view(unit, loco if role=="locomotive" else coach)
             dst=sprites[(role,view)]
             px,py=project(unit["x"],unit["y"],ox,oy)
             _,pivot_x,pivot_y=layout_for(role,view)
@@ -187,6 +213,7 @@ def render(trace, out):
         "capture_type":trace["capture_type"],
         "origin":"Native C++ TrainRuntime + real approved CH Blender sprites",
         "visual_alignment_contract":"CH_RAIL_VISUAL_ALIGNMENT_V2",
+        "camera_directions": 8 if len(coach)==8 and len(loco)==8 else 4,
         "full_gameplay_capture":False,
         "frame_count":len(frames),"fps":FPS,
         "route_length_m":trace["route_length_m"],
