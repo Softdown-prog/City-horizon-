@@ -1,0 +1,66 @@
+name: CH Rail Recover Approved Turnout Artwork
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  recover-approved-turnouts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pillow
+        run: python3 -m pip install pillow
+      - name: Download previously approved CH Blender artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ch-approved-rail
+          gh run download 37166371198 --repo "${{ github.repository }}" --name CH-Blender-Agent-37166371198-1 --dir /tmp/ch-approved-rail
+      - name: Extract eight reviewed turnout sprites, without changing runtime
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib, json
+          root=Path('/tmp/ch-approved-rail')
+          dest=Path('out/rail-reviewed-turnouts')
+          dest.mkdir(parents=True, exist_ok=True)
+          results={}
+          for part,job in (
+              ('switch_left','rail.classic.v7.01.switch_left.final'),
+              ('switch_right','rail.classic.v7.02.switch_right.final')):
+              results[part]={}
+              for direction in ('south','east','north','west'):
+                  name=f'transport.rail_track.classic.{part}.01_{direction}'
+                  source=root/job/(name+'_source.png')
+                  if not source.is_file(): raise SystemExit(f'Missing approved source: {source}')
+                  with Image.open(source) as image:
+                      if image.width < 512 or image.height < 512: raise SystemExit(f'Invalid source dimensions: {source}')
+                      rgba=image.convert('RGBA').resize((512,512), Image.Resampling.LANCZOS)
+                      target=dest/(name+'.png')
+                      rgba.save(target,optimize=True)
+                  results[part][direction]={'file':target.name,'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'runtime_sha256':hashlib.sha256(target.read_bytes()).hexdigest()}
+          (dest/'reviewed_sources.json').write_text(json.dumps({
+              'contract':'CH_RAIL_REVIEWED_TURNOUT_RECOVERY_V1',
+              'source_run':37166371198,
+              'source_artifact':11288884463,
+              'approved_for_runtime_promotion':False,
+              'requires_visual_alignment_review':True,
+              'sprites':results
+          },indent=2)+'\n')
+          print('Recovered 8 reviewed turnout PNGs; no changes to game/runtime.')
+          PY
+      - name: Publish recovery proof for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Reviewed-Turnouts-${{ github.run_id }}
+          path: out/rail-reviewed-turnouts/
+          if-no-files-found: error
+          retention-days: 30
