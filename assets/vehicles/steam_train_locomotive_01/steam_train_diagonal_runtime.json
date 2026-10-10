@@ -1,0 +1,44 @@
+{
+  "contract": "CH_RAIL_DIAGONAL_RUNTIME_V1",
+  "unitRole": "locomotive",
+  "approvedForRuntime": true,
+  "cameraContract": "CH_CAMERA_V1",
+  "sourceWorkflowRun": 38054190025,
+  "sourceArtifactId": 11670614740,
+  "runtimePixelScaleCompensation": 1.28,
+  "originalCardinalViewsPreserved": true,
+  "views": {
+    "north_east": {
+      "file": "steam_train_locomotive_north_east.png",
+      "sha256": "4445f0abe8bd6a5ac9da8503f3bc6a4603d1043b3779153fe567bcffaeaf4569",
+      "pivot": {
+        "x": 512,
+        "y": 641
+      }
+    },
+    "east_south": {
+      "file": "steam_train_locomotive_east_south.png",
+      "sha256": "5a3b8e9ad2c35e2dc985ca9d3f11543eb4a710066db133ac49c2862497c6a71c",
+      "pivot": {
+        "x": 512,
+        "y": 641
+      }
+    },
+    "south_west": {
+      "file": "steam_train_locomotive_south_west.png",
+      "sha256": "570592197241aea9873681fdfc21a1a798eaaf2ca6f5929cfa83f9169e50cca8",
+      "pivot": {
+        "x": 512,
+        "y": 641
+      }
+    },
+    "west_north": {
+      "file": "steam_train_locomotive_west_north.png",
+      "sha256": "1b44c786a8b45cc0af90f993a06f13b583a1f57d60fb1353e2259d1eab192308",
+      "pivot": {
+        "x": 512,
+        "y": 641
+      }
+    }
+  }
+}

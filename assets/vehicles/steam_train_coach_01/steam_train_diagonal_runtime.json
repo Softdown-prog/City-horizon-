@@ -1,0 +1,44 @@
+{
+  "contract": "CH_RAIL_DIAGONAL_RUNTIME_V1",
+  "unitRole": "coach",
+  "approvedForRuntime": true,
+  "cameraContract": "CH_CAMERA_V1",
+  "sourceWorkflowRun": 38054190025,
+  "sourceArtifactId": 11670614740,
+  "runtimePixelScaleCompensation": 1.28,
+  "originalCardinalViewsPreserved": true,
+  "views": {
+    "north_east": {
+      "file": "steam_train_coach_north_east.png",
+      "sha256": "efa0f04f54dd97c86bfa7bb55110e3166675e4c8f1591996727845d48a2d2d73",
+      "pivot": {
+        "x": 512,
+        "y": 684
+      }
+    },
+    "east_south": {
+      "file": "steam_train_coach_east_south.png",
+      "sha256": "bb90197f8183bd59dd8f61f2d106882c505d1599ebac7557503d2ce239b39061",
+      "pivot": {
+        "x": 512,
+        "y": 684
+      }
+    },
+    "south_west": {
+      "file": "steam_train_coach_south_west.png",
+      "sha256": "f9b285b2dc87e5829e6b41a42e7c4bcffa92e7f0af96ed04727ff0c1951a048f",
+      "pivot": {
+        "x": 512,
+        "y": 684
+      }
+    },
+    "west_north": {
+      "file": "steam_train_coach_west_north.png",
+      "sha256": "fbed3fe9cccebaae06c970a43d53a589661a6427517483006f1784092bd232cc",
+      "pivot": {
+        "x": 512,
+        "y": 684
+      }
+    }
+  }
+}
