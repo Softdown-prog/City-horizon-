@@ -1,0 +1,29 @@
+name: CH Rail Prerendered Assets Check
+
+on:
+  pull_request:
+    paths:
+      - "assets/rail/prerendered_v1/**"
+      - "src/rail_2d_visual_catalog.cpp"
+      - "tools/rail_visual_proof/check_prerendered_track_assets.py"
+      - ".github/workflows/ch-rail-prerendered-assets-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "assets/rail/prerendered_v1/**"
+      - "src/rail_2d_visual_catalog.cpp"
+      - "tools/rail_visual_proof/check_prerendered_track_assets.py"
+      - ".github/workflows/ch-rail-prerendered-assets-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prerendered-asset-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm real approved rail sprites exist
+        run: python3 tools/rail_visual_proof/check_prerendered_track_assets.py
