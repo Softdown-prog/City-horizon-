@@ -9,6 +9,7 @@ on:
       - '.github/workflows/ch-live-steam-train-video-proof.yml'
       - 'src/rail_operation_runtime.h'
       - 'src/rail_articulated_consist.h'
+      - 'src/rail_train_sprite_render_adapter.h'
       - 'src/rail_placement_graph.h'
       - 'src/rail_system.cpp'
       - 'assets/vehicles/steam_train_locomotive_01/**'

@@ -26,9 +26,11 @@ enum class View : std::size_t { south = 0, west = 1, north = 2, east = 3 };
     const WorldPoint view = camera_view_point(static_cast<float>(pose.tangent_x),
                                               static_cast<float>(pose.tangent_y),
                                               camera.rotation);
-    if (std::abs(view.y) >= std::abs(view.x))
-        return view.y >= 0.0F ? View::south : View::north;
-    return view.x >= 0.0F ? View::east : View::west;
+    // Approved CH_CAMERA_V1 PNGs encode Blender views, not world-axis names.
+    // +X moves screen-right/down (NORTH sprite), +Y screen-left/down (EAST).
+    if (std::abs(view.x) >= std::abs(view.y))
+        return view.x >= 0.0F ? View::north : View::south;
+    return view.y >= 0.0F ? View::east : View::west;
 }
 
 [[nodiscard]] inline std::filesystem::path sprite_path(
@@ -42,6 +44,33 @@ enum class View : std::size_t { south = 0, west = 1, north = 2, east = 3 };
         (std::string("steam_train_coach_") + view + ".png");
 }
 
+// CH_RAIL_VISUAL_ALIGNMENT_V2: calibrated from the opaque (alpha >= 128)
+ // extents of the eight approved 1024x1024 PNGs. Asset pixels are untouched.
+ // Sizes correspond to actual 5.2m locomotive / 3.9m coach on the CH grid.
+struct SpriteLayout {
+    float canvas_size_px;
+    float pivot_x_px;
+    float pivot_y_px;
+};
+[[nodiscard]] inline constexpr SpriteLayout layout_for(
+    const rail_operation::ConsistUnitKind kind, const View view) noexcept {
+    if (kind == rail_operation::ConsistUnitKind::locomotive) {
+        switch (view) {
+            case View::south: return {385.0F, 475.0F, 755.0F};
+            case View::east:  return {385.0F, 475.0F, 851.0F};
+            case View::west:  return {385.0F, 549.0F, 811.0F};
+            case View::north: return {385.0F, 549.0F, 844.0F};
+        }
+    }
+    switch (view) {
+        case View::south: return {300.0F, 512.0F, 872.0F};
+        case View::north: return {300.0F, 512.0F, 872.0F};
+        case View::east:  return {300.0F, 512.0F, 882.0F};
+        case View::west:  return {300.0F, 512.0F, 882.0F};
+    }
+    return {300.0F, 512.0F, 872.0F};
+}
+
 // Each unit can join the canonical world-depth queue alongside buildings,
 // citizens and coaster cars. The renderer owns no images or GPU resources.
 template <typename TextureProvider>
@@ -49,15 +78,18 @@ inline void render_unit(SDL_Renderer* renderer, const rail_operation::Articulate
                         const CameraState& camera, const float viewport_width,
                         const float viewport_height, TextureProvider&& get_texture) {
     if (renderer == nullptr) return;
-    const bool is_engine = unit.kind == rail_operation::ConsistUnitKind::locomotive;
-    SDL_Texture* texture = get_texture(sprite_path(unit.kind, select_view(unit.pose, camera)));
+    const View view = select_view(unit.pose, camera);
+    SDL_Texture* texture = get_texture(sprite_path(unit.kind, view));
     if (texture == nullptr) return;
-    const float scale = std::max(0.35F, camera.zoom) * (is_engine ? 260.0F : 215.0F);
-    const float pivot_y = is_engine ? 678.0F : 732.0F;
+    const SpriteLayout layout = layout_for(unit.kind, view);
+    const float scale = std::max(0.35F, camera.zoom) * layout.canvas_size_px;
     const ScreenPoint origin = world_to_screen_point(
         static_cast<float>(unit.pose.x), static_cast<float>(unit.pose.y),
         static_cast<float>(unit.pose.z), camera, viewport_width, viewport_height);
-    const SDL_FRect dst{origin.x - scale * 0.5F, origin.y - scale * pivot_y / 1024.0F, scale, scale};
+    const SDL_FRect dst{
+        origin.x - scale * layout.pivot_x_px / 1024.0F,
+        origin.y - scale * layout.pivot_y_px / 1024.0F,
+        scale, scale};
     if (dst.x + dst.w < -64.0F || dst.y + dst.h < -64.0F ||
         dst.x > viewport_width + 64.0F || dst.y > viewport_height + 64.0F) return;
     (void)SDL_RenderTexture(renderer, texture, nullptr, &dst);

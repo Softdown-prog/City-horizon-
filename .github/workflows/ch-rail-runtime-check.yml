@@ -5,6 +5,7 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/rail_train_sprite_render_adapter.h"
       - "src/economy_system.h"
       - "src/park_fence_save_manager.h"
       - "src/rail_runtime_bridge.h"
@@ -28,6 +29,7 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/rail_train_sprite_render_adapter.h"
       - "src/economy_system.h"
       - "src/park_fence_save_manager.h"
       - "src/rail_runtime_bridge.h"

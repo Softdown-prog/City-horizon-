@@ -32,15 +32,23 @@ F28=font(29, True)
 
 def project(x, y, ox, oy):
     # Official CH_CAMERA_V1 r0, kTileWidth 128 / kTileHeight 64.
-    return ((W/2 + (x-y)*64*ZOOM-ox), (H/2 + (x+y)*32*ZOOM-oy))
+    return ((W/2 + (x-y)*64*ZOOM-ox), (H*0.41 + (x+y)*32*ZOOM-oy))
 
 def sprite_view(unit):
-    # Same four-direction camera-relative tangent decision as
-    # src/rail_train_sprite_render_adapter.h at rotation r0.
+    # CH_CAMERA_V1: exactly the same orientation as the production C++ adapter.
     tx,ty=unit["tx"],unit["ty"]
-    if abs(ty)>=abs(tx):
-        return "south" if ty>=0 else "north"
-    return "east" if tx>=0 else "west"
+    if abs(tx)>=abs(ty):
+        return "north" if tx>=0 else "south"
+    return "east" if ty>=0 else "west"
+
+def layout_for(role, view):
+    # CH_RAIL_VISUAL_ALIGNMENT_V2: the same immutable 1024px source sprite.
+    if role == "locomotive":
+        return 385, *{
+            "south": (475,755), "east": (475,851),
+            "west": (549,811), "north": (549,844)
+        }[view]
+    return 300, 512, (882 if view in ("east","west") else 872)
 
 def images_for(role):
     folder=ROOT/"assets"/"vehicles"/("steam_train_locomotive_01" if role=="locomotive" else "steam_train_coach_01")
@@ -66,11 +74,11 @@ def render(trace, out):
     assert len(frames)==trace["frame_count"] and trace["fps"]==FPS
     loco,loco_manifest=images_for("locomotive")
     coach,coach_manifest=images_for("coach")
-    # Sprite scales and pivot values copied from production render_unit.
+    # Sprite scales and pivots are an exact copy of production render_unit.
     sprites={}
     for role, variants in (("locomotive",loco),("coach",coach)):
-        size=round(max(0.35, ZOOM)*(260 if role=="locomotive" else 215))
         for direction, im in variants.items():
+            size=round(max(0.35, ZOOM)*layout_for(role,direction)[0])
             sprites[(role,direction)]=im.resize((size,size),Image.Resampling.LANCZOS)
     track=trace["track"]
     if len(track)<12:
@@ -143,13 +151,12 @@ def render(trace, out):
         # Frame-accurate depth sorting via world ground contact plane.
         for unit in sorted(units,key=lambda u:u["x"]+u["y"]):
             role=unit["kind"]
-            dst=sprites[(role,sprite_view(unit))]
+            view=sprite_view(unit)
+            dst=sprites[(role,view)]
             px,py=project(unit["x"],unit["y"],ox,oy)
-            # The sprite footprint and pivot are identical to C++ render_unit:
-            # destination = world_ground - scaled (0.5, pivot_y / 1024).
-            pivot=678 if role=="locomotive" else 732
-            dx=round(px-dst.width*0.5)
-            dy=round(py-dst.height*pivot/1024)
+            _,pivot_x,pivot_y=layout_for(role,view)
+            dx=round(px-dst.width*pivot_x/1024)
+            dy=round(py-dst.height*pivot_y/1024)
             # subtle contact shadow. Depth placement from actual runtime pose.
             sh=ImageDraw.Draw(im)
             sh.ellipse((px-16,py-4,px+16,py+7),fill=(40,65,47))
@@ -179,6 +186,7 @@ def render(trace, out):
         "contract":"CH_RAIL_LIVE_VIDEO_PROOF_V1",
         "capture_type":trace["capture_type"],
         "origin":"Native C++ TrainRuntime + real approved CH Blender sprites",
+        "visual_alignment_contract":"CH_RAIL_VISUAL_ALIGNMENT_V2",
         "full_gameplay_capture":False,
         "frame_count":len(frames),"fps":FPS,
         "route_length_m":trace["route_length_m"],
