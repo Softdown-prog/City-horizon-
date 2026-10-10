@@ -116,6 +116,35 @@ struct SpriteLayout {
          rail_train_heading::label(direction_index) + ".png");
 }
 
+// Couplers follow the actual front/rear chassis ends rather than connecting
+// centre anchors. Paint first, beneath coach sprites, with a bright metal edge.
+inline void render_coupler_between(
+    SDL_Renderer* renderer, const rail_operation::ArticulatedUnitPose& leading,
+    const rail_operation::ArticulatedUnitPose& following,
+    const CameraState& camera, float viewport_width, float viewport_height) {
+    const float front_length=leading.kind==rail_operation::ConsistUnitKind::locomotive
+        ? 5.2F : 3.9F;
+    constexpr float kHalfCoachLength=1.95F;
+    constexpr float kCouplerElevation=0.22F;
+    const ScreenPoint a=world_to_screen_point(
+        static_cast<float>(leading.pose.x-leading.pose.tangent_x*front_length*0.5),
+        static_cast<float>(leading.pose.y-leading.pose.tangent_y*front_length*0.5),
+        static_cast<float>(leading.pose.z)+kCouplerElevation,
+        camera,viewport_width,viewport_height);
+    const ScreenPoint b=world_to_screen_point(
+        static_cast<float>(following.pose.x+following.pose.tangent_x*kHalfCoachLength),
+        static_cast<float>(following.pose.y+following.pose.tangent_y*kHalfCoachLength),
+        static_cast<float>(following.pose.z)+kCouplerElevation,
+        camera,viewport_width,viewport_height);
+    Uint8 old_r=255,old_g=255,old_b=255,old_a=255;
+    (void)SDL_GetRenderDrawColor(renderer,&old_r,&old_g,&old_b,&old_a);
+    (void)SDL_SetRenderDrawColor(renderer,48,43,36,255);
+    (void)SDL_RenderLine(renderer,a.x,a.y+1.0F,b.x,b.y+1.0F);
+    (void)SDL_SetRenderDrawColor(renderer,170,154,125,255);
+    (void)SDL_RenderLine(renderer,a.x,a.y,b.x,b.y);
+    (void)SDL_SetRenderDrawColor(renderer,old_r,old_g,old_b,old_a);
+}
+
 // Each unit can join the canonical world-depth queue alongside buildings,
 // citizens and coaster cars. The renderer owns no images or GPU resources.
 template <typename TextureProvider>
@@ -163,6 +192,12 @@ inline void render_articulated_train(
     const auto lead = operation.train_pose();
     if (route == nullptr || !lead) return;
     auto units = rail_operation::build_articulated_consist_poses(*route, *lead);
+    // Connect adjacent cars before sorting, so links appear beneath chassis.
+    for (std::size_t i=1U;i<units.size();++i) {
+        if (units[i].unit_index==units[i-1U].unit_index+1U)
+            render_coupler_between(renderer,units[i-1U],units[i],camera,
+                                   viewport_width,viewport_height);
+    }
     // Draw from the rear of the isometric contact plane forward. This preserves
     // train-car occlusion within the consist without changing the world queue.
     std::stable_sort(units.begin(), units.end(), [&](const auto& a, const auto& b) {
