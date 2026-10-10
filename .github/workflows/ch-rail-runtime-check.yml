@@ -7,6 +7,7 @@ on:
       - "src/main_runtime_impl.cpp"
       - "src/rail_train_sprite_render_adapter.h"
       - "src/rail_train_direction_math.h"
+      - "src/rail_train_direction_math_test.cpp"
       - "src/economy_system.h"
       - "src/park_fence_save_manager.h"
       - "src/rail_runtime_bridge.h"
@@ -32,6 +33,7 @@ on:
       - "src/main_runtime_impl.cpp"
       - "src/rail_train_sprite_render_adapter.h"
       - "src/rail_train_direction_math.h"
+      - "src/rail_train_direction_math_test.cpp"
       - "src/economy_system.h"
       - "src/park_fence_save_manager.h"
       - "src/rail_runtime_bridge.h"
@@ -82,6 +84,15 @@ jobs:
       - name: Build live City Builder
         shell: bash
         run: cmake --build build/rail-runtime --target city_builder --parallel 2
+
+      - name: Compile eight-view train direction regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \\
+            -Isrc -I. src/rail_train_direction_math_test.cpp \\
+            -o build/rail-runtime/rail_train_direction_math_test
+          build/rail-runtime/rail_train_direction_math_test
 
       - name: Compile shared rail topology regression
         shell: bash
