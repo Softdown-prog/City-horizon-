@@ -93,14 +93,14 @@ struct SpriteLayout {
 
 // V2 diagonal source was framed at 1.28x the cardinal orthographic scale.
 // The extra canvas margin must be compensated when rendering, otherwise cars
-// suddenly shrink when turning. Pivots are from CH Blender's ground-origin
-// camera projection (512,678 for locomotive and 512,732 for coach).
+// suddenly shrink when turning. Pivots are measured directly from CH Blender V2's review metadata
+// (512,641 locomotive / 512,684 coach), not guessed from older assets.
 inline constexpr float kRailDiagonalV2FramingRatio = 1.28F;
 [[nodiscard]] inline constexpr SpriteLayout diagonal_layout(
     rail_operation::ConsistUnitKind kind, int /*direction_index*/) noexcept {
     if (kind == rail_operation::ConsistUnitKind::locomotive)
-        return {385.0F * kRailDiagonalV2FramingRatio,512.0F,678.0F};
-    return {300.0F * kRailDiagonalV2FramingRatio,512.0F,732.0F};
+        return {385.0F * kRailDiagonalV2FramingRatio,512.0F,641.0F};
+    return {300.0F * kRailDiagonalV2FramingRatio,512.0F,684.0F};
 }
 
 [[nodiscard]] inline std::filesystem::path diagonal_sprite_path(
