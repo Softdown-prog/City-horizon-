@@ -179,7 +179,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -Eq 'steam_train\\.diagonal\\.(locomotive|coach)\\.' "${{ steps.jobs.outputs.jobs-file }}"; then
+          if grep -Fq 'steam_train.diagonal.' "${{ steps.jobs.outputs.jobs-file }}"; then
             python tools/ch_blender/prepare_steam_train_diagonal_views.py
           fi
 

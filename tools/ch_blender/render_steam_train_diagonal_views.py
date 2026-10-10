@@ -56,8 +56,15 @@ def main():
     scene.render.film_transparent = True
     scene.render.image_settings.color_mode = "RGBA"
     scene.cycles.samples = 20
-    # Retain 2048px source/1024px target, the approved camera/framing/lighting,
-    # and downsample once in the existing photo studio postprocessor.
+    # The 4-view V3 framing did not include side-on projections at +45 degree
+    # angles. The old renders touched and visibly clipped the image borders.
+    # Give the new eight-view shots a verified clear margin. Retain this ratio
+    # in the QA metadata for runtime world-scale compensation at promotion time.
+    source_ortho_scale = float(scene.camera.data.ortho_scale)
+    pixel_scale_compensation = 1.28
+    scene.camera.data.ortho_scale = source_ortho_scale * pixel_scale_compensation
+    # Preserve the approved camera yaw/pitch and scene materials/light rig.
+    # Only orthographic framing expands; all approved 4 cardinal PNGs stay put.
     bpy.context.view_layer.update()
     directions = []
     for direction, degrees in DIR_ANGLES.items():
@@ -88,6 +95,9 @@ def main():
         "sourceResolution": list(studio["render"]["sourceResolution"]),
         "finalResolution": list(studio["render"]["finalResolution"]),
         "approvedCardinalSpritesIntact": True,
+        "originalOrthoScale": source_ortho_scale,
+        "bakeOrthoScale": float(scene.camera.data.ortho_scale),
+        "runtimePixelScaleCompensation": pixel_scale_compensation,
         "quality": {"cyclesSamples": 20, "denoising": True},
         "views": directions,
     }

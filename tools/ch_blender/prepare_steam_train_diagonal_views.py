@@ -19,7 +19,9 @@ DIRECTIONS = ("north_east", "east_south", "south_west", "west_north")
 PRESET = ROOT/"tools/tycoon_photo_studio/render_pipelines/large_asset/studio_1024.json"
 
 def prepare(role):
-    source = ROOT/"out"/"ch_blender_agent"/("steam_train_diagonal_"+role+"_v1")
+    # V2 fixes the clipped side-on shots; historical V1 outputs are retained
+    # as QA evidence but must not silently reenter the promotion pipeline.
+    source = ROOT/"out"/"ch_blender_agent"/("steam_train_diagonal_"+role+"_v2")
     metadata_path=source/"diagonal_bake_metadata.json"
     if not metadata_path.exists():
         raise RuntimeError("missing render metadata: "+str(metadata_path))
@@ -49,16 +51,31 @@ def prepare(role):
         origin=spec["groundOriginSourcePx"]
         pivot={"x": round(origin["x"] / color.width * 1024),
                "y": round(origin["y"] / color.height * 1024)}
+        # QA runs on the high-resolution source and checks opaque object alpha,
+        # not peripheral almost-transparent shadow fog.
+        visible = color.getchannel("A").point(lambda a: 255 if a >= 128 else 0).getbbox()
+        if visible is None:
+            raise RuntimeError(f"Empty CH Blender view {role}/{direction}")
+        margin = min(visible[0], visible[1], color.width-visible[2],
+                     color.height-visible[3])
         entries.append({"direction":direction,"file":"review/"+name,
                         "pivot":pivot,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),
+                        "opaqueSourceMarginPx":margin,
                         "alphaBounds":list(image.getchannel("A").getbbox())})
+        if margin < 40:
+            raise RuntimeError(
+                f"CH_RAIL_DIAGONAL_CLIPPED: {role}/{direction}: source 2048px margin {margin}px; "
+                "keep runtime approval blocked")
         panel=Image.new("RGBA",(1024,1024),(216,222,212,255))
         panel.alpha_composite(image)
         ImageDraw.Draw(panel).text((20,20),role.upper()+"  "+direction.upper(),fill=(23,29,34,255))
         board.alpha_composite(panel,((index%2)*1024,(index//2)*1024))
     board.convert("RGB").save(output/("steam_train_"+role+"_diagonal_contact.jpg"),quality=90)
-    report={"contract":"CH_RAIL_DIAGONAL_REVIEW_V1","role":role,
-            "approvedForRuntime":False,"cardinalSpritesUntouched":True,"views":entries}
+    report={"contract":"CH_RAIL_DIAGONAL_REVIEW_V2","role":role,
+            "approvedForRuntime":False,"cardinalSpritesUntouched":True,
+            "runtimePixelScaleCompensation":meta.get("runtimePixelScaleCompensation"),
+            "allViewsHaveMargin":all(item["opaqueSourceMarginPx"] >= 40 for item in entries),
+            "views":entries}
     (output/"diagonal_review_report.json").write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps(report,indent=2))
 
