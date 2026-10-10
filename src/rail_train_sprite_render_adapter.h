@@ -91,20 +91,16 @@ struct SpriteLayout {
     return kind == rail_operation::ConsistUnitKind::locomotive ? locomotive : coach;
 }
 
-[[nodiscard]] inline SpriteLayout diagonal_layout(
-    rail_operation::ConsistUnitKind kind, int direction_index) noexcept {
-    if (kind == rail_operation::ConsistUnitKind::locomotive) {
-        switch (direction_index) {
-            case 1: return {385.0F,512.0F,848.0F};
-            case 3: return {385.0F,475.0F,803.0F};
-            case 5: return {385.0F,512.0F,783.0F};
-            case 7: return {385.0F,549.0F,828.0F};
-            default: break;
-        }
-    } else {
-        return {300.0F,512.0F,877.0F};
-    }
-    return layout_for(kind, View::north);
+// V2 diagonal source was framed at 1.28x the cardinal orthographic scale.
+// The extra canvas margin must be compensated when rendering, otherwise cars
+// suddenly shrink when turning. Pivots are from CH Blender's ground-origin
+// camera projection (512,678 for locomotive and 512,732 for coach).
+inline constexpr float kRailDiagonalV2FramingRatio = 1.28F;
+[[nodiscard]] inline constexpr SpriteLayout diagonal_layout(
+    rail_operation::ConsistUnitKind kind, int /*direction_index*/) noexcept {
+    if (kind == rail_operation::ConsistUnitKind::locomotive)
+        return {385.0F * kRailDiagonalV2FramingRatio,512.0F,678.0F};
+    return {300.0F * kRailDiagonalV2FramingRatio,512.0F,732.0F};
 }
 
 [[nodiscard]] inline std::filesystem::path diagonal_sprite_path(
