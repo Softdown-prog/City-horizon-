@@ -1,0 +1,82 @@
+name: CH Live Steam Train Video Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/rail_live_video_proof_export.cpp'
+      - 'tools/rail_visual_proof/render_live_train_video.py'
+      - '.github/workflows/ch-live-steam-train-video-proof.yml'
+      - 'src/rail_operation_runtime.h'
+      - 'src/rail_articulated_consist.h'
+      - 'src/rail_placement_graph.h'
+      - 'src/rail_system.cpp'
+      - 'assets/vehicles/steam_train_locomotive_01/**'
+      - 'assets/vehicles/steam_train_coach_01/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-live-steam-train-video-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout approved runtime and sprites
+        uses: actions/checkout@v4
+
+      - name: Install PNG compositor and MP4 encoder
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pillow
+          ffmpeg -version | head -n 1
+
+      - name: Compile production C++ train movement exporter
+        run: |
+          set -euo pipefail
+          mkdir -p out/rail-live-video
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I. -Isrc \
+            src/rail_system.cpp src/rail_live_video_proof_export.cpp \
+            -o out/rail-live-video/rail_native_proof_export
+
+      - name: Assert native rails, wagon spacing, turns and station stop
+        run: |
+          set -euo pipefail
+          out/rail-live-video/rail_native_proof_export out/rail-live-video/rail_native_poses.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path('out/rail-live-video/rail_native_poses.json').read_text())
+          assert all(d['checks'][k] for k in ('moved', 'station_dwell', 'curve_heading_change', 'eight_units'))
+          assert d['checks']['max_units'] == 8
+          print('Verified native C++ train motion, articulation and station dwell:', d['checks'])
+          PY
+
+      - name: Encode 1280x720 MP4 with approved production train sprites
+        run: |
+          set -euo pipefail
+          python tools/rail_visual_proof/render_live_train_video.py \
+            --trace out/rail-live-video/rail_native_poses.json \
+            --outdir out/rail-live-video
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 \
+            out/rail-live-video/locomotiva_trilhos_runtime.mp4
+          test -s out/rail-live-video/locomotiva_trilhos_runtime_preview.png
+          test -s out/rail-live-video/rail_video_proof_report.json
+
+      - name: Publish locomotive MP4 and exact native proof trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Live-Locomotiva-MP4-${{ github.run_id }}
+          path: |
+            out/rail-live-video/locomotiva_trilhos_runtime.mp4
+            out/rail-live-video/locomotiva_trilhos_runtime_preview.png
+            out/rail-live-video/rail_native_poses.json
+            out/rail-live-video/rail_video_proof_report.json
+          if-no-files-found: error
+          retention-days: 30
