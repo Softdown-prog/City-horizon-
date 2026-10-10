@@ -67,6 +67,33 @@ jobs:
           sheet.convert('RGB').save(Path('out/rail-bake-audit/curve_left_90_contact_sheet.png'),optimize=True)
           print('Four original-size previews + 4-up contact sheet exported for review; NOT runtime-promoted.')
           PY
+      - name: Inspect remaining historical rail jobs without rerendering
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,subprocess
+          jobs=[
+              ('straight','36912425069','CH-Blender-Agent-36912425069-1'),
+              ('curve_right_90','36925606297','CH-Blender-Agent-36925606297-1'),
+          ]
+          results=[]
+          for kind,run_id,name in jobs:
+              directory=Path('/tmp/rail-history')/kind
+              directory.mkdir(parents=True,exist_ok=True)
+              cmd=['gh','run','download',run_id,'--repo','${{ github.repository }}',
+                   '--name',name,'--dir',str(directory)]
+              result=subprocess.run(cmd,capture_output=True,text=True,check=False)
+              pngs=sorted(directory.rglob('*.png'))
+              results.append({'kind':kind,'run_id':int(run_id),'download_ok':result.returncode==0,
+                              'source_pngs':[str(p.relative_to(directory)) for p in pngs],
+                              'note':'Historic workflow artifacts may only contain failure reports. No assets are promoted.'})
+          target=Path('out/rail-bake-audit/remaining_tracks_inventory.json')
+          target.write_text(json.dumps(results,indent=2)+'\n')
+          print(json.dumps(results,indent=2))
+          PY
       - name: Publish truthful asset inventory and four-view review images
         uses: actions/upload-artifact@v4
         with:
