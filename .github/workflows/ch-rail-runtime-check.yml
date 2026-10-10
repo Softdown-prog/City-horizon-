@@ -89,8 +89,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \\
-            -Isrc -I. src/rail_train_direction_math_test.cpp \\
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. src/rail_train_direction_math_test.cpp \
             -o build/rail-runtime/rail_train_direction_math_test
           build/rail-runtime/rail_train_direction_math_test
 
