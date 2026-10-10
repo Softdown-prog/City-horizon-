@@ -77,7 +77,7 @@ jobs:
           import json,subprocess
           jobs=[
               ('straight','36912425069','CH-Blender-Agent-36912425069-1'),
-              ('curve_right_90','36925606297','CH-Blender-Agent-36925606297-1'),
+              ('curve_right_90','37022943595','CH-Blender-Agent-37022943595-1'),
           ]
           results=[]
           for kind,run_id,name in jobs:
