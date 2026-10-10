@@ -77,6 +77,8 @@ int main(int argc, char** argv) {
     double prev_distance = -1.0;
     bool moved=false, dwelled=false, turned=false, full_consist=false;
     std::size_t max_units=0;
+    double max_coupler_gap_m=0.0;
+    double max_chassis_offset_m=0.0;
     for (int frame=0; frame<kFrames; ++frame) {
         if (frame > 0) train.update(kStepSeconds);
         const auto lead = train.pose();
@@ -99,8 +101,33 @@ int main(int argc, char** argv) {
             const auto& u=units[i];
             if (i) out << ',';
             const auto sampled=ch::rail_operation::sample_operational_route_pose(route,u.route_distance_m);
-            if (!sampled || std::hypot(sampled->x-u.pose.x,sampled->y-u.pose.y)>1.0e-5)
-                return fail("a vehicle has drifted off the canonical track centerline");
+            if (!sampled) return fail("a vehicle could not sample the rail");
+            const double body=u.kind==ch::rail_operation::ConsistUnitKind::locomotive?5.2:3.9;
+            const double half_bogie=body*ch::rail_operation::kRailBogieHalfWheelbaseRatio;
+            const auto front=ch::rail_operation::sample_operational_route_pose(
+                route,u.route_distance_m+half_bogie);
+            const auto rear=ch::rail_operation::sample_operational_route_pose(
+                route,u.route_distance_m-half_bogie);
+            if (front && rear) {
+                if (std::hypot(u.pose.x-(front->x+rear->x)*0.5,
+                               u.pose.y-(front->y+rear->y)*0.5)>1.0e-5)
+                    return fail("a body has detached from its on-rail bogies");
+            } else if (std::hypot(u.pose.x-sampled->x,u.pose.y-sampled->y)>1.0e-5) {
+                return fail("train entering route must track the centreline");
+            }
+            max_chassis_offset_m=std::max(max_chassis_offset_m,
+                std::hypot(u.pose.x-sampled->x,u.pose.y-sampled->y));
+            if (i>0) {
+                const auto& prev=units[i-1U];
+                const double prev_len=prev.kind==ch::rail_operation::ConsistUnitKind::locomotive?5.2:3.9;
+                const double gap=std::hypot(
+                    (prev.pose.x-prev.pose.tangent_x*prev_len*0.5)-
+                    (u.pose.x+u.pose.tangent_x*body*0.5),
+                    (prev.pose.y-prev.pose.tangent_y*prev_len*0.5)-
+                    (u.pose.y+u.pose.tangent_y*body*0.5));
+                max_coupler_gap_m=std::max(max_coupler_gap_m,gap);
+                if (gap>0.75) return fail("coupler gap larger than curve safety limit");
+            }
             if (i>0 && (u.kind!=ch::rail_operation::ConsistUnitKind::passenger_coach ||
                         u.route_distance_m>=units[i-1].route_distance_m))
                 return fail("coach order or spacing invalid");
@@ -115,7 +142,9 @@ int main(int argc, char** argv) {
         << ",\"station_dwell\":" << (dwelled?"true":"false")
         << ",\"curve_heading_change\":" << (turned?"true":"false")
         << ",\"eight_units\":" << (full_consist?"true":"false")
-        << ",\"max_units\":" << max_units << "}}\n";
+        << ",\"max_units\":" << max_units
+        << ",\"max_coupler_gap_m\":" << max_coupler_gap_m
+        << ",\"max_chassis_offset_m\":" << max_chassis_offset_m << "}}\n";
     out.close();
     if (!moved || !dwelled || !turned || !full_consist)
         return fail("incomplete proof: motion, curve, stop, or full consist missing");
