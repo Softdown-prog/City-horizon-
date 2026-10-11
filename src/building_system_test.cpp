@@ -176,14 +176,24 @@ int main(int argc, char** argv) {
     // Water uses the same semantic terrain command. The approved shallow-water
     // build price is 50 game units; preview must not charge or mutate.
     ch::MapDocument terrain = ch::MapDocument::create_empty("command-test", 32, 32);
+    // create_empty initializes every tile to grass. Compare against that
+    // initial value instead of mistakenly expecting an absent terrain tile.
+    const auto original_terrain = terrain.get_terrain_at(-3, -3);
+    if (!require(original_terrain.has_value() && original_terrain->terrain_definition == "grass",
+                 "shallow-water fixture starts with a grass tile")) return 1;
     TerrainPaintCommand shallow_water(terrain, tile_owned, economy, -3, -3, "water_shallow",
                                       "assets/terrain/water/water_shallow_world.png", 50);
     const auto water_preview = ch::GameCommandExecutor::run(shallow_water, ch::GameCommandMode::preview);
+    const auto terrain_after_preview = terrain.get_terrain_at(-3, -3);
     if (!require(water_preview.success && !water_preview.applied && water_preview.cost_units == 50,
                  "shallow-water preview exposes approved cost without applying") ||
         !require(economy.funds() == 1000 - kRoadCostPerTile,
                  "shallow-water preview does not spend funds") ||
-        !require(!terrain.get_terrain_at(-3, -3).has_value(),
+        !require(terrain_after_preview.has_value() &&
+                     terrain_after_preview->tile_x == original_terrain->tile_x &&
+                     terrain_after_preview->tile_y == original_terrain->tile_y &&
+                     terrain_after_preview->terrain_definition == original_terrain->terrain_definition &&
+                     terrain_after_preview->texture == original_terrain->texture,
                  "shallow-water preview does not mutate terrain")) {
         return 1;
     }
