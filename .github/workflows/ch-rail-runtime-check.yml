@@ -25,6 +25,9 @@ on:
       - "src/track_graph.h"
       - "src/ch_render/procedural_rail_renderer.cpp"
       - "src/ch_render/procedural_rail_renderer.h"
+      - "src/rail_2d_visual_catalog.cpp"
+      - "src/rail_2d_visual_catalog.h"
+      - "CMakeLists.txt"
       - ".github/workflows/ch-rail-runtime-check.yml"
   push:
     branches: [main]
@@ -51,6 +54,9 @@ on:
       - "src/track_graph.h"
       - "src/ch_render/procedural_rail_renderer.cpp"
       - "src/ch_render/procedural_rail_renderer.h"
+      - "src/rail_2d_visual_catalog.cpp"
+      - "src/rail_2d_visual_catalog.h"
+      - "CMakeLists.txt"
       - ".github/workflows/ch-rail-runtime-check.yml"
   workflow_dispatch:
 
@@ -80,6 +86,13 @@ jobs:
       - name: Configure City Builder
         shell: bash
         run: cmake -S . -B build/rail-runtime -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCH_VISITOR_FORGE_PREVIEW=OFF
+
+      - name: Verify Blender rail catalog and runtime build linkage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/rail_visual_proof/check_prerendered_track_assets.py
+          grep -q "src/rail_2d_visual_catalog.cpp" CMakeLists.txt
 
       - name: Build live City Builder
         shell: bash
