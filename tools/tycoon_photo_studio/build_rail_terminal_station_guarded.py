@@ -46,30 +46,95 @@ def box(name, position, dimensions, mat, root, role, ground=False):
     scene_gate.tag(obj, role, ground_contact=ground)
     return obj
 
+def roof_slope(name, corners, thickness, mat, root):
+    """Thin real sloped roof surface, not a flat slab painted as tiles."""
+    import math
+    a, b, c, d = corners
+    vertices = [a, b, c, d] + [(p[0], p[1], p[2] - thickness) for p in corners]
+    faces = [(0, 1, 2, 3), (4, 7, 6, 5),
+             (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
+    mesh = bpy.data.meshes.new(name + "Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.parent = root
+    obj.data.materials.append(mat)
+    scene_gate.tag(obj, "station.roof")
+    return obj
+
 def make_station(root, recipe):
-    walls = material("Warm station terracotta", (0.63, 0.31, 0.19))
-    stone = material("Cream limestone trim", (0.89, 0.77, 0.52))
-    roof = material("Deep blue slate roof", (0.12, 0.28, 0.40))
+    walls = material("Brick wall brown", (0.37, 0.205, 0.125))
+    stone = material("Warm limestone trim", (0.73, 0.65, 0.52))
+    roof = material("Dark weathered brown clay roof", (0.255, 0.155, 0.105))
     timber = material("Railway aged timber", (0.30, 0.19, 0.11))
-    platform = material("Warm concrete paving", (0.69, 0.63, 0.53))
+    platform = material("Light gray concrete paving", (0.56, 0.56, 0.53))
     window = material("Blue green railway glass", (0.065, 0.30, 0.37), 0.25)
     steel = material("Iron framework", (0.21, 0.23, 0.22), 0.45, 0.45)
     clock = material("Clock face", (0.87, 0.84, 0.68))
-    gold = material("Golden platform safety marking", (0.92, 0.66, 0.11))
-    dark = material("Dark blue signboard", (0.07, 0.18, 0.29))
+    gold = material("Muted ochre platform safety marking", (0.73, 0.60, 0.24))
+    dark = material("Black brown station signboard", (0.12, 0.085, 0.065))
     red = material("Railway burgundy accent", (0.54, 0.15, 0.12))
+    bricks = [
+        material("Brick ochre brown", (0.46, 0.27, 0.15)),
+        material("Brick rust brown", (0.40, 0.21, 0.125)),
+        material("Brick deep brown", (0.30, 0.16, 0.095)),
+    ]
+    mortar = material("Brick mortar", (0.55, 0.47, 0.38))
+    concrete_joint = material("Concrete sidewalk seams", (0.39, 0.40, 0.39))
+    roof_ridge = material("Clay roof cap tiles", (0.35, 0.205, 0.13))
     # Entire authored geometry stays inside 5x3 tiles (15x9 world units).
     # x = rail direction, open connection at -7.5, end buffer at +6.9.
     box("Long main platform", (0.0, -0.65, 0.17), (14.1, 1.75, 0.34), platform, root, "station.platform", True)
     box("Platform safety edge", (0.0, -1.51, 0.36), (14.1, 0.14, 0.09), stone, root, "station.platform_edge")
     box("Platform yellow warning strip", (0.0, -1.40, 0.363), (13.7, 0.115, 0.025), gold, root, "station.platform_marking")
     box("Paved station forecourt", (-0.5, 2.85, 0.10), (12.9, 2.0, 0.20), platform, root, "station.forecourt", True)
+    # Concrete sidewalk slab joints: broad enough to read at actual game size.
+    for i in range(1, 6):
+        x = -6.95 + i * 2.05
+        box(f"Concrete forecourt expansion joint {i}", (x, 2.83, 0.204),
+            (0.026, 1.95, 0.008), concrete_joint, root, "station.sidewalk_joint")
+    for i in range(1, 7):
+        x = -6.95 + i * 2.12
+        box(f"Platform expansion joint {i}", (x, -0.62, 0.343),
+            (0.025, 1.65, 0.008), concrete_joint, root, "station.platform_joint")
     # Main building on the far side of platform; rail lane remains uncovered.
     box("Station ticket hall", (-0.9, 2.05, 1.28), (7.2, 2.65, 2.56), walls, root, "station.building", True)
     box("Ticket hall sill", (-0.9, 2.05, 0.32), (7.5, 2.85, 0.22), stone, root, "station.foundation", True)
-    box("Roof upper volume", (-0.9, 2.05, 2.83), (7.85, 3.07, 0.60), roof, root, "station.roof")
-    box("Roof ridge", (-0.9, 2.05, 3.20), (7.85, 0.30, 0.20), stone, root, "station.roof")
-    box("Entrance canopy", (-1.0, 3.65, 1.95), (5.6, 0.90, 0.22), roof, root, "station.canopy")
+    # True two-sided gable roof, visible pitch and overhanging eaves.
+    roof_slope("Clay roof toward platform",
+               [(-4.88, 0.30, 2.60), (3.08, 0.30, 2.60),
+                (3.08, 2.04, 3.49), (-4.88, 2.04, 3.49)], 0.12, roof, root)
+    roof_slope("Clay roof toward street",
+               [(-4.88, 2.04, 3.49), (3.08, 2.04, 3.49),
+                (3.08, 3.78, 2.60), (-4.88, 3.78, 2.60)], 0.12, roof, root)
+    box("Gable roof ridge", (-0.9, 2.04, 3.51), (8.04, 0.20, 0.15),
+        roof_ridge, root, "station.roof_ridge")
+    for row in range(1, 5):
+        t = row / 5.0
+        for sign in (-1, 1):
+            y = 2.04 + sign * (1.74 * t)
+            z = 3.49 - 0.89 * t + 0.025
+            box(f"Clay roof horizontal tile seam {row} {sign}", (-0.9, y, z),
+                (7.88, 0.045, 0.04), roof_ridge, root, "station.roof_tiles")
+    # Real brick courses, with staggered joints and slight material variations.
+    # Each raised brick is shallow: reads as masonry without noisy microtexture.
+    for row in range(12):
+        z = 0.48 + 0.162 * row
+        offset = 0.24 if row % 2 else 0.0
+        for i in range(14):
+            x = -4.45 + 0.48 * i + offset
+            if x > 2.56:
+                continue
+            box(f"Facade brick {row:02d}-{i:02d}", (x, 3.387, z),
+                (0.437, 0.026, 0.128), bricks[(i + 2 * row) % 3], root, "station.brick")
+        for i in range(6):
+            y = 0.85 + i * 0.42 + (0.20 if row % 2 else 0)
+            if y > 3.2:
+                continue
+            box(f"End wall brick {row:02d}-{i:02d}", (2.71, y, z),
+                (0.026, 0.38, 0.128), bricks[(2 * i + row) % 3], root, "station.brick")
+    box("Entrance canopy", (-1.0, 3.65, 1.95), (5.6, 0.90, 0.16), roof, root, "station.canopy")
     box("Entrance canopy golden edge", (-1.0, 4.06, 1.92), (5.55, 0.09, 0.09), gold, root, "station.canopy_trim")
     box("Facade horizontal cream band", (-0.9, 3.39, 2.43), (7.21, 0.12, 0.13), stone, root, "station.trim")
     for x in (-4.18, 2.38):
@@ -85,9 +150,11 @@ def make_station(root, recipe):
     box("Station clock case", (-0.9, 3.52, 2.91), (0.68, 0.13, 0.68), clock, root, "station.clock")
     box("Station clock center", (-0.90, 3.60, 2.91), (0.13, 0.05, 0.13), dark, root, "station.clock_detail")
     box("Station clock hand", (-0.84, 3.62, 2.95), (0.25, 0.04, 0.06), dark, root, "station.clock_detail")
-    for x in (-3.65, -2.55, -1.45, -0.35, 0.75, 1.85):
-        box("Slate roof tile rib", (x, 2.05, 3.17), (0.065, 2.80, 0.035), stone, root, "station.roof_trim")
-    box("Long platform shelter roof", (4.1, 0.30, 2.80), (5.55, 2.40, 0.25), roof, root, "station.platform_shelter")
+    # Roof end fascia emphasizes the gable rather than a rectangular flat cap.
+    for x in (-4.85, 3.05):
+        box("Gable roof end fascia", (x, 2.04, 3.40), (0.075, 0.17, 0.16),
+            roof_ridge, root, "station.roof_trim")
+    box("Long platform shelter roof", (4.1, 0.30, 2.80), (5.55, 2.40, 0.22), roof, root, "station.platform_shelter")
     box("Shelter roof gold fascia", (4.1, -0.91, 2.78), (5.40, 0.085, 0.10), gold, root, "station.platform_shelter_trim")
     for i, x in enumerate((1.75, 4.1, 6.40)):
         box(f"Shelter post {i}", (x, 0.89, 1.40), (0.17, 0.17, 2.80), steel, root, "station.shelter_post")
