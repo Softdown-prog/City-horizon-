@@ -1,0 +1,26 @@
+{
+  "contract": "CH_RAIL_STATION_SOURCE_V1",
+  "assetId": "transport.rail_station.terminal_b.01",
+  "assetType": "rail_terminal_station",
+  "footprint": "5x3",
+  "tileWorldSize": 3,
+  "footprintTiles": [
+    5,
+    3
+  ],
+  "entryPortLocalWorld": [
+    -7.5,
+    -2.4,
+    0
+  ],
+  "terminalStopLocalWorld": [
+    5.25,
+    -2.4,
+    0
+  ],
+  "stationClickRole": "station.building",
+  "visualStyle": "historical_masonry_station_rail_industrial",
+  "runtimeRepresentation": "2D_RGBA_station_four_rotations",
+  "directionPolicy": "rotate_asset_root_keep_camera_lights_fixed",
+  "notes": "Terminal end at positive local X, open rail connection negative X. External track snapping and click interaction are runtime work, not Blender output."
+}
