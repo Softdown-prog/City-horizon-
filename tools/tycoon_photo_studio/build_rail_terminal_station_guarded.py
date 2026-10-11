@@ -342,6 +342,33 @@ def main():
     elif args.stage == "final":
         if not re.fullmatch(r"[a-f0-9]{64}", args.approval_proxy_sha or ""):
             raise RuntimeError("CH_FINAL_REQUIRES_REVIEWED_PROXY")
+        (out / "proxy_approval.json").write_text(json.dumps({
+            "contract": "CH_PROXY_APPROVAL_V1",
+            "assetId": recipe["assetId"],
+            "proxySha256": args.approval_proxy_sha.lower(),
+            "reviewed": True,
+            "runtimeTarget": recipe.get("runtimeRepresentation", "2D_RGBA_station_four_rotations"),
+        }, indent=2), encoding="utf-8")
+        (out / "studio_metadata.json").write_text(json.dumps({
+            "sourceObject": recipe["assetId"],
+            "assetType": "rail_terminal_station",
+            "sourceContract": "DIRECT_CH_BLENDER_GUARDED_V1",
+            "assetConfig": "tools/tycoon_photo_studio/build_rail_terminal_station_guarded.py",
+            "recipe": args.recipe,
+            "studioPreset": "CH_TYCOON_STUDIO_V1",
+            "cameraContract": "CH_CAMERA_V1",
+            "styleContract": "CH_STYLIZED_PRERENDER_V1",
+            "gridContract": "CH_GRID_V1",
+            "projection": "orthographic_dimetric_2_to_1",
+            "yawDegrees": 45.0,
+            "elevationDegrees": 30.0,
+            "footprint": recipe["footprint"],
+            "renderResolution": [int(scene.render.resolution_x), int(scene.render.resolution_y)],
+            "transparentBackground": True,
+            "runtimeRepresentation": recipe.get("runtimeRepresentation", "2D_RGBA_station_four_rotations"),
+            "entryPortLocalWorld": recipe["entryPortLocalWorld"],
+            "terminalStopLocalWorld": recipe["terminalStopLocalWorld"],
+        }, indent=2), encoding="utf-8")
         ground.hide_render = True
         directions = []
         for direction in bs.DIRECTIONS:
