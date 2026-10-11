@@ -238,7 +238,30 @@ def make_station(root, recipe):
     for x in (-4.85, 3.05):
         box("Gable roof end fascia", (x, 2.04, 3.40), (0.075, 0.17, 0.16),
             roof_ridge, root, "station.roof_trim")
-    box("Long platform shelter roof", (4.1, 0.30, 2.80), (5.55, 2.40, 0.22), roof, root, "station.platform_shelter")
+    # Shelter roof has a visible shallow pitched profile with a muted timber
+    # fascia. The canopy stays clear of the terminal train lane at y=-2.4.
+    roof_slope("Platform shelter near roof face",
+               [(1.32, -0.92, 2.65), (6.87, -0.92, 2.65),
+                (6.87, 0.26, 3.01), (1.32, 0.26, 3.01)], 0.09, roof, root)
+    roof_slope("Platform shelter far roof face",
+               [(1.32, 0.26, 3.01), (6.87, 0.26, 3.01),
+                (6.87, 1.44, 2.65), (1.32, 1.44, 2.65)], 0.09, roof, root)
+    box("Platform shelter roof ridge", (4.1, 0.26, 3.04),
+        (5.62, 0.17, 0.10), roof_ridge, root, "station.platform_shelter")
+    for y in (-0.90, 1.42):
+        box("Platform shelter gutter", (4.1, y, 2.62),
+            (5.55, 0.10, 0.12), timber, root, "station.platform_shelter_trim")
+    # Distinctive timber braces and a sheltered waiting bench.
+    for x in (1.75, 4.1, 6.40):
+        box("Shelter post footing", (x, 0.89, 0.44),
+            (0.32, 0.32, 0.23), stone, root, "station.shelter_footing")
+    box("Platform notice frame", (4.35, 1.12, 1.61),
+        (1.15, 0.13, 0.72), timber, root, "station.notice")
+    box("Platform notice face", (4.35, 1.035, 1.61),
+        (0.95, 0.06, 0.53), clock, root, "station.notice")
+    # A modest parapet and concrete curb emphasize scale without mini-detail.
+    box("Station forecourt concrete curb", (-0.5, 3.88, 0.19),
+        (12.7, 0.14, 0.19), stone, root, "station.sidewalk_curb")
     box("Shelter roof gold fascia", (4.1, -0.91, 2.78), (5.40, 0.085, 0.10), gold, root, "station.platform_shelter_trim")
     for i, x in enumerate((1.75, 4.1, 6.40)):
         box(f"Shelter post {i}", (x, 0.89, 1.40), (0.17, 0.17, 2.80), steel, root, "station.shelter_post")
