@@ -7,6 +7,7 @@ on:
       - "src/rail_system.h"
       - "src/ch_render/procedural_rail_renderer.h"
       - "src/ch_render/procedural_rail_renderer.cpp"
+      - "src/rail_2d_visual_catalog.cpp"
       - ".github/workflows/ch-procedural-rail-renderer-check.yml"
   workflow_dispatch:
 
@@ -27,7 +28,7 @@ jobs:
 
       - name: Configure only to materialize pinned SDL3 headers
         shell: bash
-        run: cmake -S . -B build-rail-renderer -DBUILD_TESTING=OFF
+        run: cmake -S . -B build-rail-renderer -DBUILD_TESTING=OFF -DSDL_UNIX_CONSOLE_BUILD=ON
 
       - name: Syntax-check rail renderer against project SDL3
         shell: bash
