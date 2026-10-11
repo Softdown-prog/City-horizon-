@@ -1,0 +1,29 @@
+{
+  "contract": "CH_BLENDER_AGENT_JOB_V1",
+  "jobId": "rail.terminal_station_b.proxy.008",
+  "operation": "guarded_blender_script",
+  "script": "tools/tycoon_photo_studio/build_rail_terminal_station_guarded.py",
+  "qualityStage": "proxy",
+  "assetRequirements": {
+    "contract": "CH_ASSET_REQUIREMENTS_V1",
+    "assetId": "transport.rail_station.terminal_b.01",
+    "footprint": {
+      "widthTiles": 5,
+      "depthTiles": 3
+    },
+    "requiredRoles": [
+      "station.building",
+      "station.platform",
+      "station.roof"
+    ]
+  },
+  "args": [
+    "--recipe",
+    "tools/tycoon_photo_studio/assets/rail_terminal_station_b_v1.station.json",
+    "--studio-preset",
+    "tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json",
+    "--output",
+    "out/ch_blender_agent/rail.terminal_station_b.008"
+  ],
+  "outputDir": "out/ch_blender_agent/rail.terminal_station_b.008"
+}
