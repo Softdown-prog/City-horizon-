@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'C\+\+/MapForge2/src/map_capture_service.cpp'
-      - 'C\+\+/MapForge2/src/map_capture_main.cpp'
+      - '*/MapForge2/src/map_capture_service.cpp'
+      - '*/MapForge2/src/map_capture_main.cpp'
       - '.github/workflows/ch-mapforge-rail-sprite-smoke.yml'
 
 permissions:
