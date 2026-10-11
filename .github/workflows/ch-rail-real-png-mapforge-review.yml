@@ -1,0 +1,88 @@
+name: CH Rail Real PNG MapForge Review
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-rail-real-png-mapforge-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-art-and-mapforge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install capture dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config
+          python3 -m pip install pillow
+      - name: Verify complete existing catalog and build review sheet
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from PIL import Image, ImageOps, ImageDraw
+          from pathlib import Path
+          import hashlib,json
+          root=Path('assets/rail/prerendered_v1')
+          kinds={'straight':['south','west'],'curve_left_90':['south','west','north','east'],'curve_right_90':['south','west','north','east'],'turnout_left':['south','west','north','east'],'turnout_right':['south','west','north','east']}
+          dest=Path('out/rail-real-png-review');dest.mkdir(parents=True,exist_ok=True)
+          sheet=Image.new('RGB',(5*290,4*320),(44,51,56));d=ImageDraw.Draw(sheet)
+          records={}
+          for col,(kind,dirs) in enumerate(kinds.items()):
+              for row,direction in enumerate(dirs):
+                  name=f'{kind}_{direction}.png';p=root/name
+                  if not p.is_file(): raise SystemExit('Missing catalog PNG: '+name)
+                  with Image.open(p) as original:
+                      im=original.convert('RGBA')
+                      if im.size!=(512,512) or im.getbbox() is None or im.getchannel('A').getextrema()[0]==255: raise SystemExit('Invalid sprite: '+name)
+                      preview=Image.new('RGBA',im.size,(96,105,109,255));preview.alpha_composite(im)
+                      preview.thumbnail((265,265))
+                      sheet.paste(preview.convert('RGB'),(col*290+10,row*320+40))
+                  records[name]=hashlib.sha256(p.read_bytes()).hexdigest()
+                  d.text((col*290+10,row*320+13),name,fill='white')
+          sheet.save(dest/'real_rail_18_contact_sheet.png')
+          (dest/'validation.json').write_text(json.dumps({'contract':'CH_RAIL_18_SPRITE_REVIEW_V1','status':'art_inventory_pass','visualApproval':False,'pngSha256':records},indent=2)+'\n')
+          print('PASS: 18 real Blender rail PNGs verified; gameplay seam review still pending')
+          PY
+      - name: Compile existing canonical MapForge capture
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O1 -fPIC -I. -I'C++/MapForge2/src'             'C++/MapForge2/src/map_capture_main.cpp'             'C++/MapForge2/src/map_capture_service.cpp'             'src/ch_core/projection.cpp'             -o out/rail-real-png-review/MapForge2MapCapture             $(pkg-config --cflags --libs Qt6Gui Qt6Core)
+      - name: Make real-PNG capture request and render
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          out=Path('out/rail-real-png-review')
+          rail=Path('assets/rail/prerendered_v1')
+          sprites=[]
+          for i,(name,x,y) in enumerate([('straight_south',0.5,0.5),('curve_left_90_south',2.5,0.5),('curve_right_90_south',4.5,0.5),('turnout_left_south',0.5,2.5),('turnout_right_south',2.5,2.5)]):
+              path=os.path.relpath(rail/(name+'.png'),out)
+              sprites.append({'path':path,'world':[x,y],'anchorPixels':[256,380],'scale':0.45})
+          request={'contract':'MAPFORGE_CAPTURE_REQUEST_V1','capture':{'canvas':{'width':1280,'height':720},'camera':{'contract':'CH_CAMERA_V1','rotationQuarterTurns':0,'zoom':1.0,'focusTile':[2,1],'focusScreen':[0.5,0.55]},'stage':{'minTile':-6,'maxTile':7,'drawGrid':True},'candidate':{'tile':[0,0],'showFootprint':False,'showAnchor':False},'railSprites':sprites}}
+          (out/'capture_request.json').write_text(json.dumps(request,indent=2)+'\n')
+          PY
+          QT_QPA_PLATFORM=offscreen out/rail-real-png-review/MapForge2MapCapture out/rail-real-png-review/real_rail_mapforge_capture.png assets/rail/prerendered_v1/straight_south.png out/rail-real-png-review/capture_request.json
+          python3 - <<'PY'
+          from PIL import Image
+          p='out/rail-real-png-review/real_rail_mapforge_capture.png'
+          with Image.open(p) as im:
+              assert im.size == (1280,720), im.size
+              assert len(im.getcolors(1280*720) or [])>20, 'Capture looks empty'
+          print('PASS: compiled MapForge consumed real Blender artwork')
+          PY
+      - name: Upload real-asset visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Real-PNG-MapForge-Review-${{ github.run_id }}
+          path: |
+            out/rail-real-png-review/real_rail_18_contact_sheet.png
+            out/rail-real-png-review/real_rail_mapforge_capture.png
+            out/rail-real-png-review/capture_request.json
+            out/rail-real-png-review/validation.json
+          if-no-files-found: warn
+          retention-days: 30
