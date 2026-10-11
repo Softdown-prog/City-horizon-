@@ -82,7 +82,7 @@ def render(trace_path,outdir,capture_exe):
     # rail images along the radius-7 native C++ route. A 90-degree Blender
     # module has radius 1.5, so stamping that module on radius 7 cannot work.
     # Every rotated rail image is derived from real Blender PNG pixels.
-    samples=sample_route(trace['track'], step=2.8)
+    samples=sample_route(trace['track'], step=1.5)
     inventory={}
     rail_specs=[]
     prepared=outdir/'aligned_rail_sprite_cache'
@@ -116,7 +116,7 @@ def render(trace_path,outdir,capture_exe):
                                  32*math.cos(theta)+32*math.sin(theta))
         source_box=source.getchannel('A').getbbox()
         source_diag=math.hypot(source_box[2]-source_box[0],source_box[3]-source_box[1])
-        target_scale=span_px/max(1,source_diag)
+        target_scale=1.8*span_px/max(1,source_diag)
         target_file=prepared/f'aligned_{i:03d}.png'
         rotated.save(target_file)
         rail_specs.append({'path':str(target_file.resolve()),'world':[x,y],
