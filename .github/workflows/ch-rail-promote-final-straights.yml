@@ -1,0 +1,78 @@
+name: CH Rail Stage Final Straight PNGs
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-rail-promote-final-straights.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: ch-rail-straight-stage-main
+  cancel-in-progress: false
+jobs:
+  stage-straights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Download actual final Blender bake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ch-final-straight
+          gh run download 38126499484 --repo "${{ github.repository }}" --name CH-Blender-Agent-38126499484-1 --dir /tmp/ch-final-straight
+      - name: Validate and stage two catalog-ready directions
+        run: |
+          python3 -m pip install pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib,json
+          root=Path('/tmp/ch-final-straight/rail.prerendered.straight.quality')
+          dest=Path('assets/rail/prerendered_v1')
+          dest.mkdir(parents=True,exist_ok=True)
+          report={}
+          for direction in ('south','west'):
+              source=root/f'rail.prerendered.straight.v1_{direction}_source.png'
+              if not source.exists(): raise SystemExit(f'Missing final {direction} source: {source}')
+              with Image.open(source) as im:
+                  if min(im.size)<512: raise SystemExit(f'Source undersized: {im.size}')
+                  image=im.convert('RGBA')
+                  if image.getchannel('A').getextrema()[0]==255: raise SystemExit('Missing alpha transparency')
+                  if image.getbbox() is None: raise SystemExit('Empty source')
+                  image=image.resize((512,512),Image.Resampling.LANCZOS)
+                  target=dest/f'straight_{direction}.png'
+                  image.save(target,optimize=True)
+              report[direction]={'path':target.as_posix(),'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'sourceRun':38126499484,'sourceFile':source.name}
+          (dest/'straight_final_review.json').write_text(json.dumps({'contract':'CH_RAIL_STRAIGHT_STAGED_V1','approvedForRuntime':False,'requiresGameplayScaleAlignmentReview':True,'sources':report},indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+          test -s assets/rail/prerendered_v1/straight_south.png
+          test -s assets/rail/prerendered_v1/straight_west.png
+      - name: Commit only verified PNGs and provenance into main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/rail/prerendered_v1/straight_south.png assets/rail/prerendered_v1/straight_west.png assets/rail/prerendered_v1/straight_final_review.json
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(rail): stage approved-bake straight PNGs for alignment review"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Publish staged art reference
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Final-Straights-${{ github.run_id }}
+          path: |
+            assets/rail/prerendered_v1/straight_south.png
+            assets/rail/prerendered_v1/straight_west.png
+            assets/rail/prerendered_v1/straight_final_review.json
+          if-no-files-found: warn
+          retention-days: 30
