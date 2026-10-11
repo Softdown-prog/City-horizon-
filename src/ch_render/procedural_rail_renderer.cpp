@@ -143,7 +143,22 @@ bool ProceduralRailRenderer::render_segment(
     if (!build.ok()) return false;
     // Conservative visual promotion: only perfectly axis-aligned 3-unit
     // straight modules use Blender PNGs; spline curves retain safe geometry.
-    if (render_approved_straight_sprite(renderer, segment, camera, viewport_width, viewport_height)) {
+    // Keep staged/invalid/hovered previews colored by the procedural palette.
+    // A committed sprite must never mask the red invalid-placement indication.
+    const Palette approved_palette{};
+    const bool is_committed_visual =
+        palette.ballast.r == approved_palette.ballast.r &&
+        palette.ballast.g == approved_palette.ballast.g &&
+        palette.ballast.b == approved_palette.ballast.b &&
+        palette.ballast.a == approved_palette.ballast.a &&
+        palette.sleepers.r == approved_palette.sleepers.r &&
+        palette.sleepers.g == approved_palette.sleepers.g &&
+        palette.sleepers.b == approved_palette.sleepers.b &&
+        palette.rails.r == approved_palette.rails.r &&
+        palette.rails.g == approved_palette.rails.g &&
+        palette.rails.b == approved_palette.rails.b;
+    if (is_committed_visual && render_approved_straight_sprite(
+            renderer, segment, camera, viewport_width, viewport_height)) {
         ch::rail_live_operation::render_after_segment(renderer, segment, camera, viewport_width, viewport_height);
         return true;
     }
