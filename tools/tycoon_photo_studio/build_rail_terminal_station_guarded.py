@@ -119,7 +119,7 @@ def main():
     bpy.context.view_layer.update()
     profile = scene_gate.load_profile(args.preflight_profile)
     report = scene_gate.run_preflight(
-        scene=scene, authored=authored, footprint=recipe["footprint"],
+        scene=scene, authored=authored, footprint={"widthTiles": 5, "depthTiles": 3},
         profile=profile, asset_id=recipe["assetId"], report_path=out / "preflight_report.json")
     scene_gate.require_pass(report)
     if args.stage == "proxy":
