@@ -36,13 +36,31 @@ namespace {
     const Rail2dDirection direction = std::abs(dx) > std::abs(dy) ? Rail2dDirection::south : Rail2dDirection::west;
     const auto spec = Rail2dVisualCatalog::resolve(Rail2dPieceKind::straight, direction);
     if (!spec) return false;
-    const std::filesystem::path path(spec->png_path);
-    SDL_Surface* surface = SDL_LoadPNG(path.string().c_str());
-    if (!surface) return false;
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_DestroySurface(surface);
-    if (!texture) return false;
-    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    // Renderer-owned cache: SDL destroys the texture with its property cleanup
+    // when the renderer goes away. No global SDL_Texture* can outlive a renderer.
+    const SDL_PropertiesID properties = SDL_GetRendererProperties(renderer);
+    if (!properties) return false;
+    const char* property_key = direction == Rail2dDirection::south
+        ? "city_horizon.rail.prerender.straight.south"
+        : "city_horizon.rail.prerender.straight.west";
+    auto* texture = static_cast<SDL_Texture*>(
+        SDL_GetPointerProperty(properties, property_key, nullptr));
+    if (!texture) {
+        const std::filesystem::path path(spec->png_path);
+        SDL_Surface* surface = SDL_LoadPNG(path.string().c_str());
+        if (!surface) return false;
+        SDL_Texture* loaded = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_DestroySurface(surface);
+        if (!loaded) return false;
+        SDL_SetTextureBlendMode(loaded, SDL_BLENDMODE_BLEND);
+        // Ownership transfers even if this call fails: SDL invokes the
+        // cleanup callback on failed insertion, preventing texture leaks.
+        if (!SDL_SetPointerPropertyWithCleanup(
+                properties, property_key, loaded,
+                [](void*, void* value) { SDL_DestroyTexture(static_cast<SDL_Texture*>(value)); },
+                nullptr)) return false;
+        texture = loaded;
+    }
     const float mx = (segment.start.x + segment.end.x) * 0.5F;
     const float my = (segment.start.y + segment.end.y) * 0.5F;
     const auto position = ch::world_to_screen_point(mx, my, segment.start.z, camera, width, height);
@@ -55,9 +73,7 @@ namespace {
     const SDL_FRect rect{position.x - 256.0F * scale,
                          position.y - 380.0F * scale,
                          kSourceSize * scale, kSourceSize * scale};
-    const bool ok = SDL_RenderTexture(renderer, texture, nullptr, &rect);
-    SDL_DestroyTexture(texture);
-    return ok;
+    return SDL_RenderTexture(renderer, texture, nullptr, &rect);
 }
 
 [[nodiscard]] bool render_mesh(
