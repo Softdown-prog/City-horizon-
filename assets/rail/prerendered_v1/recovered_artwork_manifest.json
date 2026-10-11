@@ -1,0 +1,92 @@
+{
+  "contract": "CH_RAIL_RECOVERED_ARTWORK_V1",
+  "cameraContract": "CH_CAMERA_V1",
+  "sourceRuns": {
+    "turnouts": 37166371198,
+    "curve_left_90": 36933056636
+  },
+  "promotionState": "staged_for_gameplay_scale_alignment_review",
+  "approvedForRuntime": false,
+  "missingPieces": [
+    "straight_south",
+    "straight_west",
+    "curve_right_90_south",
+    "curve_right_90_west",
+    "curve_right_90_north",
+    "curve_right_90_east"
+  ],
+  "assets": {
+    "turnout_left_south.png": {
+      "source": "ch-turnouts/rail.classic.v7.01.switch_left.final/transport.rail_track.classic.switch_left.01_south_source.png",
+      "sha256": "86e86aeb800936ccc1d24dcf23492bc1ecc8f1cdd1f765c955f25701626f4de4",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_left_west.png": {
+      "source": "ch-turnouts/rail.classic.v7.01.switch_left.final/transport.rail_track.classic.switch_left.01_west_source.png",
+      "sha256": "1eb9e0f19e248d0107354aa2fd55957897b5d96ca7eb994bd37c98c82ca43f17",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_left_north.png": {
+      "source": "ch-turnouts/rail.classic.v7.01.switch_left.final/transport.rail_track.classic.switch_left.01_north_source.png",
+      "sha256": "9985f3879477e368f012b7ae4d5736db21b58b3aee5cd87483df8058205d2340",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_left_east.png": {
+      "source": "ch-turnouts/rail.classic.v7.01.switch_left.final/transport.rail_track.classic.switch_left.01_east_source.png",
+      "sha256": "42a7163a3cfa85ab80bbd882b0eb98d84ead2edb66a244b37802c228b907839c",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_right_south.png": {
+      "source": "ch-turnouts/rail.classic.v7.02.switch_right.final/transport.rail_track.classic.switch_right.01_south_source.png",
+      "sha256": "b18c6fabe89f3d5368efcc75173c6a059f0b97fbc9a848d18d8fb6d9d3096158",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_right_west.png": {
+      "source": "ch-turnouts/rail.classic.v7.02.switch_right.final/transport.rail_track.classic.switch_right.01_west_source.png",
+      "sha256": "3ae707026777e5e6aa9e3a2df545cbda0dd8684d6e983f9fd1338be16766334e",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_right_north.png": {
+      "source": "ch-turnouts/rail.classic.v7.02.switch_right.final/transport.rail_track.classic.switch_right.01_north_source.png",
+      "sha256": "67be0c8a276758d910718ce0fdd9928d8f8fdeb9631f0c412de268516f9e8109",
+      "width": 512,
+      "height": 512
+    },
+    "turnout_right_east.png": {
+      "source": "ch-turnouts/rail.classic.v7.02.switch_right.final/transport.rail_track.classic.switch_right.01_east_source.png",
+      "sha256": "6bdccdeac8a4f75f390704e9aea6d37ce37aa47556c2d991e78965fec8af07ea",
+      "width": 512,
+      "height": 512
+    },
+    "curve_left_90_south.png": {
+      "source": "ch-curve-left/rail.prerendered.curve_left_90.quality/rail.prerendered.curve_left_90.v1_south_source.png",
+      "sha256": "6e88c15e46cf2bad5d3834851ee3ab9db36af309c8572c4a5ec57e0ca963587d",
+      "width": 512,
+      "height": 512
+    },
+    "curve_left_90_west.png": {
+      "source": "ch-curve-left/rail.prerendered.curve_left_90.quality/rail.prerendered.curve_left_90.v1_west_source.png",
+      "sha256": "2ac437bd5d2d8b048376b8868e7862a4832eab822887c24a4f0713f8a38fdbe2",
+      "width": 512,
+      "height": 512
+    },
+    "curve_left_90_north.png": {
+      "source": "ch-curve-left/rail.prerendered.curve_left_90.quality/rail.prerendered.curve_left_90.v1_north_source.png",
+      "sha256": "5052b35414b1d0e6af53d757c2b36474f85adca49a7cd357aac899ee58978da6",
+      "width": 512,
+      "height": 512
+    },
+    "curve_left_90_east.png": {
+      "source": "ch-curve-left/rail.prerendered.curve_left_90.quality/rail.prerendered.curve_left_90.v1_east_source.png",
+      "sha256": "296e81f19b96804b0480ca19b388f4cd0b075c2283b952d9212646e72d2e679f",
+      "width": 512,
+      "height": 512
+    }
+  }
+}
