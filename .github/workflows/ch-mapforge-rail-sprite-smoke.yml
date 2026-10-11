@@ -1,0 +1,104 @@
+name: CH MapForge Rail Sprite Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'C++/MapForge2/src/map_capture_service.cpp'
+      - 'C++/MapForge2/src/map_capture_main.cpp'
+      - '.github/workflows/ch-mapforge-rail-sprite-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt6 and PNG fixture dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config
+          python3 -m pip install pillow
+      - name: Compile actual MapForge capture implementation
+        run: |
+          set -euo pipefail
+          mkdir -p out/mapforge-rail-smoke
+          c++ -std=c++20 -O1 -Wall -Wextra -Wpedantic -fPIC \
+            -I. -I'C++/MapForge2/src' \
+            'C++/MapForge2/src/map_capture_main.cpp' \
+            'C++/MapForge2/src/map_capture_service.cpp' \
+            -o out/mapforge-rail-smoke/MapForge2MapCapture \
+            $(pkg-config --cflags --libs Qt6Gui Qt6Core)
+      - name: Generate unmistakable TEST sprite and capture specification
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageDraw
+          from pathlib import Path
+          import json
+          out=Path('out/mapforge-rail-smoke')
+          im=Image.new('RGBA',(256,256),(0,0,0,0))
+          d=ImageDraw.Draw(im)
+          d.polygon([(8,128),(128,68),(248,128),(128,188)],fill=(111,89,74,255))
+          d.line([(22,111),(128,59),(233,111)],fill=(211,219,213,255),width=9)
+          d.line([(22,147),(128,95),(233,147)],fill=(211,219,213,255),width=9)
+          d.text((73,118),'TEST',fill=(248,234,88,255))
+          im.save(out/'test_rail_fixture.png')
+          request={
+            'contract':'MAPFORGE_CAPTURE_REQUEST_V1',
+            'capture':{
+              'canvas':{'width':900,'height':600},
+              'camera':{'contract':'CH_CAMERA_V1','rotationQuarterTurns':1,'zoom':0.85,
+                        'focusTile':[0,0],'focusScreen':[0.5,0.55]},
+              'stage':{'minTile':-5,'maxTile':5,'drawGrid':True},
+              'candidate':{'tile':[0,0],'showFootprint':False,'showAnchor':False},
+              'railSprites':[{'path':'test_rail_fixture.png','world':[0.5,0.5],
+                              'anchorPixels':[128,128],'scale':0.9}]
+            }}
+          (out/'request.json').write_text(json.dumps(request,indent=2)+'\n')
+          PY
+      - name: Render PNG through compiled MapForge
+        run: |
+          set -euo pipefail
+          QT_QPA_PLATFORM=offscreen out/mapforge-rail-smoke/MapForge2MapCapture \
+            out/mapforge-rail-smoke/rail_sprite_smoke.png \
+            out/mapforge-rail-smoke/test_rail_fixture.png \
+            out/mapforge-rail-smoke/request.json
+          python3 - <<'PY'
+          from PIL import Image
+          im=Image.open('out/mapforge-rail-smoke/rail_sprite_smoke.png').convert('RGB')
+          assert im.size==(900,600), im.size
+          assert any(r>190 and g>190 and b>185 for r,g,b in im.getdata()), 'Test rail sprite not present'
+          print('PASS: actual MapForge captured prerendered PNG layer')
+          PY
+      - name: Confirm missing real sprite fails closed
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('out/mapforge-rail-smoke/request.json')
+          data=json.loads(p.read_text())
+          data['capture']['railSprites'][0]['path']='not_promoted_real_track.png'
+          (p.parent/'missing.json').write_text(json.dumps(data))
+          PY
+          if QT_QPA_PLATFORM=offscreen out/mapforge-rail-smoke/MapForge2MapCapture \
+              out/mapforge-rail-smoke/should_not_exist.png \
+              out/mapforge-rail-smoke/test_rail_fixture.png \
+              out/mapforge-rail-smoke/missing.json; then
+            echo "ERROR: silently accepted missing rail asset"; exit 1
+          fi
+          test ! -e out/mapforge-rail-smoke/should_not_exist.png
+      - name: Publish smoke preview (not an approved game asset)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Rail-Sprite-Smoke-${{ github.run_id }}
+          path: |
+            out/mapforge-rail-smoke/rail_sprite_smoke.png
+            out/mapforge-rail-smoke/request.json
+          if-no-files-found: warn
+          retention-days: 14
