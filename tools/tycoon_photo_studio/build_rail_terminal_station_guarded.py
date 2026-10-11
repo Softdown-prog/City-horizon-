@@ -134,7 +134,27 @@ def make_station(root, recipe):
                 continue
             box(f"End wall brick {row:02d}-{i:02d}", (2.71, y, z),
                 (0.026, 0.38, 0.128), bricks[(2 * i + row) % 3], root, "station.brick")
-    # Railway-facing facade: visible from the canonical SOUTH game camera.
+    # V7: readable staggered brick courses on the RAIL-facing wall, not only
+    # the rear facade. Keep a clear reveal around the doorway and windows.
+    # At 256px proxy resolution individual mortar lines vanish, so use
+    # shallow relief and deliberate color rhythm rather than tiny seams.
+    for course in range(11):
+        z = 0.47 + course * 0.174
+        stagger = 0.27 if course % 2 else 0.0
+        for index in range(13):
+            x = -4.30 + index * 0.53 + stagger
+            if x > 2.43:
+                continue
+            # Avoid the real door and glass geometry, including their surrounds.
+            if (abs(x + 1.90) < 0.82 and z < 2.29) or any(
+                abs(x - window_x) < 0.70 and 0.75 < z < 2.24
+                for window_x in (-3.45, 0.65, 2.02)
+            ):
+                continue
+            box(f"Rail facade brick course {course:02d} {index:02d}",
+                (x, 0.699, z), (0.49, 0.045, 0.136),
+                bricks[(course + 2 * index) % len(bricks)], root, "station.brick")
+        # Railway-facing facade: visible from the canonical SOUTH game camera.
     # The previous facade details were mostly on the far street side.
     for i, x in enumerate((-3.45, -1.92, 0.65, 2.02)):
         if x == -1.92:
