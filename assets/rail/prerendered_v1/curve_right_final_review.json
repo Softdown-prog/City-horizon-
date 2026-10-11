@@ -1,0 +1,32 @@
+{
+  "contract": "CH_RAIL_RIGHT_CURVE_STAGED_V1",
+  "proxySha256": "caa5845da4e3975533a2416713540dc56413796f5f3f9e9476216f6cb4f5157f",
+  "approvedForRuntime": false,
+  "requiresGameplayScaleAlignmentReview": true,
+  "directions": {
+    "south": {
+      "path": "assets/rail/prerendered_v1/curve_right_90_south.png",
+      "sha256": "e78042d6c21b96f16b4db7e4c41dd1dba8799618376f63019a5c8b5b2dcdc39f",
+      "sourceRun": 38146308411,
+      "sourceFile": "rail.prerendered.curve_right_90.v1_south_source.png"
+    },
+    "west": {
+      "path": "assets/rail/prerendered_v1/curve_right_90_west.png",
+      "sha256": "75063310621b937f95884226b38d3b948cd3d70b56bbde1ed8e073fd0c5462c7",
+      "sourceRun": 38146308411,
+      "sourceFile": "rail.prerendered.curve_right_90.v1_west_source.png"
+    },
+    "north": {
+      "path": "assets/rail/prerendered_v1/curve_right_90_north.png",
+      "sha256": "5cc5202fefd5b726d21e920fbf41708626868b27240590f66592983612aa04e6",
+      "sourceRun": 38146308411,
+      "sourceFile": "rail.prerendered.curve_right_90.v1_north_source.png"
+    },
+    "east": {
+      "path": "assets/rail/prerendered_v1/curve_right_90_east.png",
+      "sha256": "fa98cecd7dc66ec68b5046f214f5c5fd8f79d1838f7a4a6e820ab53cc052b08b",
+      "sourceRun": 38146308411,
+      "sourceFile": "rail.prerendered.curve_right_90.v1_east_source.png"
+    }
+  }
+}
