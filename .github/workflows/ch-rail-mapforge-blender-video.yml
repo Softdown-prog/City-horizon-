@@ -1,0 +1,61 @@
+name: CH Rail MapForge Blender Train MP4
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-rail-mapforge-blender-video.yml'
+      - 'tools/rail_visual_proof/render_mapforge_train_video.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render-mapforge-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg Qt6 and Pillow
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg qt6-base-dev pkg-config
+          python3 -m pip install pillow
+      - name: Compile native train physics and real MapForge renderer
+        run: |
+          set -euo pipefail
+          mkdir -p out/rail-mapforge-video
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -Isrc src/rail_system.cpp src/rail_live_video_proof_export.cpp -o out/rail-mapforge-video/rail_native_proof_export
+          c++ -std=c++20 -O1 -fPIC -I. -I'C++/MapForge2/src' 'C++/MapForge2/src/map_capture_main.cpp' 'C++/MapForge2/src/map_capture_service.cpp' src/ch_core/projection.cpp -o out/rail-mapforge-video/MapForge2MapCapture $(pkg-config --cflags --libs Qt6Gui Qt6Core)
+      - name: Export genuine eight-unit train native pose trace
+        run: |
+          out/rail-mapforge-video/rail_native_proof_export out/rail-mapforge-video/native_train_poses.json
+          python3 tools/ch_blender/validate_train_diagonal_runtime.py
+      - name: Capture 216 MapForge frames with real Blender rails and train PNGs then encode MP4
+        run: |
+          set -euo pipefail
+          python3 tools/rail_visual_proof/render_mapforge_train_video.py --trace out/rail-mapforge-video/native_train_poses.json --outdir out/rail-mapforge-video --capture-exe out/rail-mapforge-video/MapForge2MapCapture
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 out/rail-mapforge-video/city_horizon_trem_mapforge_trilhos_blender.mp4
+          test -s out/rail-mapforge-video/trem_mapforge_preview.png
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('out/rail-mapforge-video/mapforge_video_report.json')
+          report=json.loads(p.read_text())
+          assert report['frames']==216 and report['fps']==16
+          assert report['renderSource'].startswith('MapForge2MapCapture')
+          assert report['trainUnitsMax']==8
+          assert report['seamApproval'] is False
+          print('PASS: 216 native train pose frames over authentic MapForge render with Blender track assets')
+          PY
+      - name: Publish newly rendered true-asset MP4 and preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-MapForge-Blender-Train-MP4-${{ github.run_id }}
+          path: |
+            out/rail-mapforge-video/city_horizon_trem_mapforge_trilhos_blender.mp4
+            out/rail-mapforge-video/trem_mapforge_preview.png
+            out/rail-mapforge-video/mapforge_video_report.json
+            out/rail-mapforge-video/native_train_poses.json
+          if-no-files-found: warn
+          retention-days: 30
