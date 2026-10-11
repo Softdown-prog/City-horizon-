@@ -1,0 +1,19 @@
+{
+  "contract": "CH_RAIL_STRAIGHT_STAGED_V1",
+  "approvedForRuntime": false,
+  "requiresGameplayScaleAlignmentReview": true,
+  "sources": {
+    "south": {
+      "path": "assets/rail/prerendered_v1/straight_south.png",
+      "sha256": "2b02ce16d76419136fdf6a1e767f27ec25ef995accdc2ba3ab2039ce08fea9d1",
+      "sourceRun": 38126499484,
+      "sourceFile": "rail.prerendered.straight.v1_south_source.png"
+    },
+    "west": {
+      "path": "assets/rail/prerendered_v1/straight_west.png",
+      "sha256": "1407956ff5583b716689a9423a60b93c648545394cb06c970bc46c806bccbd27",
+      "sourceRun": 38126499484,
+      "sourceFile": "rail.prerendered.straight.v1_west_source.png"
+    }
+  }
+}
