@@ -78,35 +78,51 @@ def render(trace_path,outdir,capture_exe):
     assert len(frames)==216
     outdir.mkdir(parents=True,exist_ok=True)
     rails=ROOT/'assets/rail/prerendered_v1'
-    samples=sample_route(trace['track'], step=1.5)
-    # The legacy proof used a 3-world-unit interval with a fixed 0.38 scale,
-    # although the sprite alpha footprint differs across Blender bakes.
-    # The new interval is half a module, deliberately overlapping image
-    # coverage pending actual rail-port anchor calibration.
+    # Use the real straight Blender rail artwork as a source for tangent-aligned
+    # rail images along the radius-7 native C++ route. A 90-degree Blender
+    # module has radius 1.5, so stamping that module on radius 7 cannot work.
+    # Every rotated rail image is derived from real Blender PNG pixels.
+    samples=sample_route(trace['track'], step=2.8)
     inventory={}
     rail_specs=[]
+    prepared=outdir/'aligned_rail_sprite_cache'
+    prepared.mkdir(parents=True,exist_ok=True)
+    straight_images={}
+    for direction in ('south','west'):
+        png=rails/f'straight_{direction}.png'
+        inventory[png.name]=hashlib.sha256(png.read_bytes()).hexdigest()
+        straight_images[direction]=Image.open(png).convert('RGBA')
     for i,(x,y,theta) in enumerate(samples):
-        kind,direction=kind_direction(samples,i)
-        name=f'{kind}_{direction}.png'
-        png=rails/name
-        if not png.is_file():
-            raise RuntimeError('Missing Blender track image: '+str(png))
-        inventory[name]=hashlib.sha256(png.read_bytes()).hexdigest()
-        with Image.open(png) as source_image:
-            bbox=source_image.convert('RGBA').getchannel('A').getbbox()
-            if bbox is None: raise RuntimeError('Empty rail PNG '+name)
-            visible_width=bbox[2]-bbox[0]
-            if visible_width < 20: raise RuntimeError('Unexpected narrow rail PNG '+name)
-            # Scale sprite alpha width to the *3 world unit* rail module
-            # projected at 64px/world in CH_CAMERA_V1. MapForge multiplies
-            # this factor by camera zoom itself. This is a diagnostic visual
-            # calibration, not geometric validation of the actual ports.
-            scale=(MODULE_SPAN_WORLD*64.0)/visible_width
-            # Alpha bottom-centre is a measurable local landmark, unlike the
-            # old [256,380] pivot imported from a different turnout recipe.
-            anchor=[(bbox[0]+bbox[2])*0.5,bbox[3]]
-        rail_specs.append({'path':str(png.resolve()),'world':[x,y],
-                           'anchorPixels':anchor,'scale':round(scale,6)})
+        # World x projects down-right; world y down-left (camera r0).
+        screen_angle=math.degrees(math.atan2(math.sin(theta)*32+math.cos(theta)*32,
+                                              math.cos(theta)*64-math.sin(theta)*64))
+        # Select the closest Blender cardinal source before rotating it.
+        canonical={'south':math.degrees(math.atan2(32,64)),
+                   'west':math.degrees(math.atan2(32,-64))}
+        direction=min(canonical,key=lambda d:abs((screen_angle-canonical[d]+180)%360-180))
+        angle=(screen_angle-canonical[direction]+180)%360-180
+        source=straight_images[direction]
+        # Rotation around transparent canvas midpoint, preserving all real
+        # sleeper/rail pixel data rather than drawing fake replacement rails.
+        rotated=source.rotate(-angle,resample=Image.Resampling.BICUBIC,expand=True)
+        bbox=rotated.getchannel('A').getbbox()
+        if bbox is None: raise RuntimeError('empty transformed real Blender rail')
+        # Use transparent-alpha centre as path anchor; bottom-of-bbox (legacy)
+        # made tracks hover off the actual runtime centreline.
+        anchor=[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2]
+        # The footprint is tuned to the local centreline sample span, not
+        # an entire 90-degree radius-incompatible curve module.
+        span_px=2.95*math.hypot(64*math.cos(theta)-64*math.sin(theta),
+                                 32*math.cos(theta)+32*math.sin(theta))
+        source_box=source.getchannel('A').getbbox()
+        source_diag=math.hypot(source_box[2]-source_box[0],source_box[3]-source_box[1])
+        target_scale=span_px/max(1,source_diag)
+        target_file=prepared/f'aligned_{i:03d}.png'
+        rotated.save(target_file)
+        rail_specs.append({'path':str(target_file.resolve()),'world':[x,y],
+                           'anchorPixels':anchor,'scale':round(target_scale,6)})
+    # These are tangent-conformed render images for visual proof only. This
+    # DOES NOT promote the incompatible Blender curve modules to runtime.
     locos,loco_manifest=images_for('locomotive')
     coaches,coach_manifest=images_for('coach')
     resized={}
@@ -186,10 +202,11 @@ def render(trace_path,outdir,capture_exe):
        'frames':216,'fps':FPS,'resolution':[W,H],'camera':'CH_CAMERA_V1 r0',
        'realBlenderTrackImages':inventory,'trackInstances':len(rail_specs),
        'seamApproval':False,'fullInteractiveGameCapture':False,
-       'spritePlacement':'alpha-derived anchor and 3-world-unit visible-width calibration',
+       'spritePlacement':'real Blender straight PNG pixels rotated to follow native C++ route tangent, alpha-centre anchor',
        'nativeCurveRadiusWorld':NATIVE_ROUTE_CURVE_RADIUS_WORLD,
        'blenderCurveModuleRadiusWorld':CURVE_ART_RADIUS_WORLD,
        'curveGeometryCompatible':False,
+       'curveVisualMode':'tangent-conformed authentic Blender straight texture sprites; not approved 90-degree modules',
        'warning':'Native radius-7 curves and baked radius-1.5 modules cannot be claimed port-aligned without a matched route or re-bake.',
        'video':outfile.name}
     (outdir/'mapforge_video_report.json').write_text(json.dumps(report,indent=2)+'\n')
