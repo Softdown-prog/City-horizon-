@@ -107,6 +107,7 @@ add_executable(city_builder
     src/main.cpp
     src/rail_system.cpp
     src/ch_render/procedural_rail_renderer.cpp
+    src/rail_2d_visual_catalog.cpp
     src/audio_manager.cpp
     src/building_system.cpp
     src/crosswalk_system.cpp
