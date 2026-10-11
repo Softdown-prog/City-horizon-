@@ -31,6 +31,7 @@ jobs:
             -I. -I'C++/MapForge2/src' \
             'C++/MapForge2/src/map_capture_main.cpp' \
             'C++/MapForge2/src/map_capture_service.cpp' \
+            'src/ch_core/projection.cpp' \
             -o out/mapforge-rail-smoke/MapForge2MapCapture \
             $(pkg-config --cflags --libs Qt6Gui Qt6Core)
       - name: Generate unmistakable TEST sprite and capture specification
