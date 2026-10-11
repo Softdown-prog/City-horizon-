@@ -1,0 +1,98 @@
+name: CH Rail Promote Recovered PNGs
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ch-rail-promote-recovered-pngs.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ch-rail-promote-recovered-pngs-main
+  cancel-in-progress: false
+jobs:
+  promote-existing-bakes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Install image validation dependency
+        run: python3 -m pip install pillow
+      - name: Download existing reviewed Blender bake artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ch-turnouts /tmp/ch-curve-left
+          gh run download 37166371198 --repo "${{ github.repository }}" --name CH-Blender-Agent-37166371198-1 --dir /tmp/ch-turnouts
+          gh run download 36933056636 --repo "${{ github.repository }}" --name CH-Blender-Agent-36933056636-1 --dir /tmp/ch-curve-left
+      - name: Stage exactly twelve original reviewed PNGs and provenance
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib,json
+          dest=Path('assets/rail/prerendered_v1')
+          dest.mkdir(parents=True,exist_ok=True)
+          inputs={}
+          for part,job in [('turnout_left','rail.classic.v7.01.switch_left.final'),('turnout_right','rail.classic.v7.02.switch_right.final')]:
+              kind='switch_left' if part=='turnout_left' else 'switch_right'
+              for direction in ('south','west','north','east'):
+                  name=f'transport.rail_track.classic.{kind}.01_{direction}_source.png'
+                  inputs[f'{part}_{direction}.png']=Path('/tmp/ch-turnouts')/job/name
+          for direction in ('south','west','north','east'):
+              inputs[f'curve_left_90_{direction}.png']=Path('/tmp/ch-curve-left')/'rail.prerendered.curve_left_90.quality'/f'rail.prerendered.curve_left_90.v1_{direction}_source.png'
+          result={}
+          for target_name,source in inputs.items():
+              if not source.is_file():
+                  raise SystemExit('Source bake is absent: '+str(source))
+              with Image.open(source) as im:
+                  if im.size[0]<512 or im.size[1]<512 or im.mode not in ('RGBA','RGB','P','LA'):
+                      raise SystemExit(f'Unexpected image format: {source}: {im.mode} {im.size}')
+                  if im.getbbox() is None:
+                      raise SystemExit('Empty PNG: '+str(source))
+                  image=im.convert('RGBA')
+                  if image.getchannel('A').getextrema()[0]==255:
+                      raise SystemExit('Nontransparent Blender sprite: '+str(source))
+                  if image.size != (512,512):
+                      image=image.resize((512,512),Image.Resampling.LANCZOS)
+                  output=dest/target_name
+                  image.save(output,optimize=True)
+              result[target_name]=dict(source=str(source.relative_to(Path('/tmp'))),sha256=hashlib.sha256(output.read_bytes()).hexdigest(),width=512,height=512)
+          manifest={'contract':'CH_RAIL_RECOVERED_ARTWORK_V1','cameraContract':'CH_CAMERA_V1',
+            'sourceRuns':{'turnouts':37166371198,'curve_left_90':36933056636},
+            'promotionState':'staged_for_gameplay_scale_alignment_review',
+            'approvedForRuntime':False,
+            'missingPieces':['straight_south','straight_west','curve_right_90_south','curve_right_90_west','curve_right_90_north','curve_right_90_east'],
+            'assets':result}
+          (dest/'recovered_artwork_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          print('Staged',len(result),'historical Blender sprites; six unresolved files remain; runtime activation is NOT approved.')
+          PY
+      - name: Ensure only recovered assets are promoted
+        run: |
+          set -euo pipefail
+          test "$(find assets/rail/prerendered_v1 -maxdepth 1 -name '*.png' | wc -l)" -eq 12
+          git status --short -- assets/rail/prerendered_v1
+      - name: Commit validated artwork directly to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/rail/prerendered_v1/
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(rail): stage twelve recovered Blender sprites for visual review"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Publish source promotion ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Promotion-Ledger-${{ github.run_id }}
+          path: assets/rail/prerendered_v1/recovered_artwork_manifest.json
+          if-no-files-found: warn
+          retention-days: 30
