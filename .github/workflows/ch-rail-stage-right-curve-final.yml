@@ -1,0 +1,80 @@
+name: CH Rail Stage Final Right Curve
+on:
+  workflow_run:
+    workflows: ["CH Blender Agent Worker"]
+    types: [completed]
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: ch-rail-stage-right-curve-main
+  cancel-in-progress: false
+jobs:
+  stage:
+    if: ${{ github.event.workflow_run.id == 38146308411 && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Fetch exact successful final bake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ch-final-curve
+          gh run download 38146308411 --repo "${{ github.repository }}" --name CH-Blender-Agent-38146308411-1 --dir /tmp/ch-final-curve
+      - name: Validate original Blender PNG files
+        run: |
+          set -euo pipefail
+          python3 -m pip install pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import json, hashlib
+          root=Path('/tmp/ch-final-curve/rail.prerendered.curve_right_90.quality')
+          dest=Path('assets/rail/prerendered_v1')
+          dest.mkdir(parents=True,exist_ok=True)
+          reviewed={}
+          for direction in ('south','west','north','east'):
+              source=root/f'rail.prerendered.curve_right_90.v1_{direction}_source.png'
+              if not source.is_file(): raise SystemExit(f'Missing final bake: {source}')
+              with Image.open(source) as im:
+                  if min(im.size)<512: raise SystemExit(f'Undersized bake: {source} {im.size}')
+                  sprite=im.convert('RGBA')
+                  if sprite.getchannel('A').getextrema()[0]==255 or sprite.getbbox() is None: raise SystemExit(f'Empty/nontransparent: {source}')
+                  if sprite.size != (512,512):
+                      sprite=sprite.resize((512,512),Image.Resampling.LANCZOS)
+                  destfile=dest/f'curve_right_90_{direction}.png'
+                  sprite.save(destfile,optimize=True)
+              reviewed[direction]={'path':str(destfile),'sha256':hashlib.sha256(destfile.read_bytes()).hexdigest(),'sourceRun':38146308411,'sourceFile':source.name}
+          (dest/'curve_right_final_review.json').write_text(json.dumps({
+             'contract':'CH_RAIL_RIGHT_CURVE_STAGED_V1',
+             'proxySha256':'caa5845da4e3975533a2416713540dc56413796f5f3f9e9476216f6cb4f5157f',
+             'approvedForRuntime':False,'requiresGameplayScaleAlignmentReview':True,
+             'directions':reviewed},indent=2)+'\n')
+          print(json.dumps(reviewed,indent=2))
+          PY
+          test "$(find assets/rail/prerendered_v1 -maxdepth 1 -name '*.png' | wc -l)" -eq 18
+      - name: Commit only four validated PNGs and ledger to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/rail/prerendered_v1/curve_right_90_*.png assets/rail/prerendered_v1/curve_right_final_review.json
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(rail): stage final right curve PNGs for gameplay alignment review"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Publish curve visual validation files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Right-Curve-Final-${{ github.run_id }}
+          path: |
+            assets/rail/prerendered_v1/curve_right_90_*.png
+            assets/rail/prerendered_v1/curve_right_final_review.json
+          if-no-files-found: warn
+          retention-days: 30
