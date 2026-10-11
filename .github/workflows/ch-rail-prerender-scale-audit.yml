@@ -1,0 +1,28 @@
+name: CH Rail Prerender Scale Audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/rail_visual_proof/audit_prerendered_scale.py'
+      - '.github/workflows/ch-rail-prerender-scale-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pillow
+        run: python3 -m pip install pillow
+      - name: Measure all real rail PNG alpha bounds at MapForge preview scale
+        run: python3 tools/rail_visual_proof/audit_prerendered_scale.py --preview-scale 0.45 --output out/rail-scale-audit.json
+      - name: Publish scale and anchor audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Scale-Audit-${{ github.run_id }}
+          path: out/rail-scale-audit.json
+          if-no-files-found: error
+          retention-days: 30
