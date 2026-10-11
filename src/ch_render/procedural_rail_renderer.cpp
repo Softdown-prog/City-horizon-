@@ -1,5 +1,8 @@
 #include "procedural_rail_renderer.h"
 #include "../rail_live_operation_overlay.h"
+#include "../rail_2d_visual_catalog.h"
+#include <SDL3/SDL.h>
+#include <filesystem>
 
 #include <cmath>
 #include <cstdint>
@@ -10,6 +13,51 @@ namespace {
 
 [[nodiscard]] bool finite_positive(const float value) {
     return std::isfinite(value) && value > 0.0F;
+}
+
+// Render-path bridge for one canonical Blender straight segment. The native
+// spline remains authoritative; curves and mismatched spans use mesh fallback.
+// This is a conservative gameplay pilot, not blanket certification of 18 art ports.
+[[nodiscard]] bool render_approved_straight_sprite(
+    SDL_Renderer* renderer, const RailSplineSegment& segment,
+    const ch::CameraState& camera, float width, float height) {
+    constexpr float kExpectedWorldLength = 3.0F;
+    constexpr float kTolerance = 0.025F;
+    const float dx = segment.end.x - segment.start.x;
+    const float dy = segment.end.y - segment.start.y;
+    const float dz = segment.end.z - segment.start.z;
+    const float length = std::hypot(dx, dy);
+    if (std::abs(length - kExpectedWorldLength) > kTolerance || std::abs(dz) > kTolerance) return false;
+    if (std::abs(dx) > kTolerance && std::abs(dy) > kTolerance) return false;
+    if (std::hypot(segment.control_a.x - (segment.start.x + dx / 3.0F),
+                   segment.control_a.y - (segment.start.y + dy / 3.0F)) > kTolerance ||
+        std::hypot(segment.control_b.x - (segment.start.x + dx * 2.0F / 3.0F),
+                   segment.control_b.y - (segment.start.y + dy * 2.0F / 3.0F)) > kTolerance) return false;
+    const Rail2dDirection direction = std::abs(dx) > std::abs(dy) ? Rail2dDirection::south : Rail2dDirection::west;
+    const auto spec = Rail2dVisualCatalog::resolve(Rail2dPieceKind::straight, direction);
+    if (!spec) return false;
+    const std::filesystem::path path(spec->png_path);
+    SDL_Surface* surface = SDL_LoadPNG(path.string().c_str());
+    if (!surface) return false;
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
+    if (!texture) return false;
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    const float mx = (segment.start.x + segment.end.x) * 0.5F;
+    const float my = (segment.start.y + segment.end.y) * 0.5F;
+    const auto position = ch::world_to_screen_point(mx, my, segment.start.z, camera, width, height);
+    // Historical bake uses a 512px canvas, 256/380 world-origin pivot.
+    // Its nominal 3-world-unit module spans 192 projected horizontal pixels
+    // before camera.zoom. Per-direction art-port review remains mandatory.
+    constexpr float kSourceSize = 512.0F;
+    constexpr float kModuleScale = 0.375F;
+    const float scale = kModuleScale * camera.zoom;
+    const SDL_FRect rect{position.x - 256.0F * scale,
+                         position.y - 380.0F * scale,
+                         kSourceSize * scale, kSourceSize * scale};
+    const bool ok = SDL_RenderTexture(renderer, texture, nullptr, &rect);
+    SDL_DestroyTexture(texture);
+    return ok;
 }
 
 [[nodiscard]] bool render_mesh(
@@ -93,6 +141,12 @@ bool ProceduralRailRenderer::render_segment(
     if (renderer == nullptr || !finite_positive(viewport_width) || !finite_positive(viewport_height)) return false;
     const RailBuildResult build = RailMeshBuilder::build(segment, profile);
     if (!build.ok()) return false;
+    // Conservative visual promotion: only perfectly axis-aligned 3-unit
+    // straight modules use Blender PNGs; spline curves retain safe geometry.
+    if (render_approved_straight_sprite(renderer, segment, camera, viewport_width, viewport_height)) {
+        ch::rail_live_operation::render_after_segment(renderer, segment, camera, viewport_width, viewport_height);
+        return true;
+    }
     const bool rendered = render_geometry(
         renderer, build.geometry, profile, camera, viewport_width, viewport_height, palette);
     if (rendered) {
