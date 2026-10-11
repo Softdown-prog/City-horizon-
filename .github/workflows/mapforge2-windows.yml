@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "C++/MapForge2/**"
+      - "C\+\+/MapForge2/**"
       - "tools/map_forge/**"
       - "tools/visual_reference_gate.py"
       - "tools/carousel_production_gate.py"
