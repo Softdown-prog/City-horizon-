@@ -20,8 +20,11 @@ from render_live_train_video import images_for, layout_for, sprite_view, W, H, F
 ROOT = Path(__file__).resolve().parents[2]
 SCALE = 0.42
 # Trains use the existing approved CH_RAIL_VISUAL_ALIGNMENT_V2 pivot.
-SPRITE_SCALE = 0.38
+SPRITE_SCALE = 0.38  # legacy; calibrated per real PNG below
 ANCHOR = [256, 380]
+MODULE_SPAN_WORLD = 3.0
+CURVE_ART_RADIUS_WORLD = 1.5
+NATIVE_ROUTE_CURVE_RADIUS_WORLD = 7.0
 
 
 def sample_route(track, step=3.0):
@@ -75,7 +78,11 @@ def render(trace_path,outdir,capture_exe):
     assert len(frames)==216
     outdir.mkdir(parents=True,exist_ok=True)
     rails=ROOT/'assets/rail/prerendered_v1'
-    samples=sample_route(trace['track'])
+    samples=sample_route(trace['track'], step=1.5)
+    # The legacy proof used a 3-world-unit interval with a fixed 0.38 scale,
+    # although the sprite alpha footprint differs across Blender bakes.
+    # The new interval is half a module, deliberately overlapping image
+    # coverage pending actual rail-port anchor calibration.
     inventory={}
     rail_specs=[]
     for i,(x,y,theta) in enumerate(samples):
@@ -85,8 +92,21 @@ def render(trace_path,outdir,capture_exe):
         if not png.is_file():
             raise RuntimeError('Missing Blender track image: '+str(png))
         inventory[name]=hashlib.sha256(png.read_bytes()).hexdigest()
+        with Image.open(png) as source_image:
+            bbox=source_image.convert('RGBA').getchannel('A').getbbox()
+            if bbox is None: raise RuntimeError('Empty rail PNG '+name)
+            visible_width=bbox[2]-bbox[0]
+            if visible_width < 20: raise RuntimeError('Unexpected narrow rail PNG '+name)
+            # Scale sprite alpha width to the *3 world unit* rail module
+            # projected at 64px/world in CH_CAMERA_V1. MapForge multiplies
+            # this factor by camera zoom itself. This is a diagnostic visual
+            # calibration, not geometric validation of the actual ports.
+            scale=(MODULE_SPAN_WORLD*64.0)/visible_width
+            # Alpha bottom-centre is a measurable local landmark, unlike the
+            # old [256,380] pivot imported from a different turnout recipe.
+            anchor=[(bbox[0]+bbox[2])*0.5,bbox[3]]
         rail_specs.append({'path':str(png.resolve()),'world':[x,y],
-                           'anchorPixels':ANCHOR,'scale':SPRITE_SCALE})
+                           'anchorPixels':anchor,'scale':round(scale,6)})
     locos,loco_manifest=images_for('locomotive')
     coaches,coach_manifest=images_for('coach')
     resized={}
@@ -166,6 +186,11 @@ def render(trace_path,outdir,capture_exe):
        'frames':216,'fps':FPS,'resolution':[W,H],'camera':'CH_CAMERA_V1 r0',
        'realBlenderTrackImages':inventory,'trackInstances':len(rail_specs),
        'seamApproval':False,'fullInteractiveGameCapture':False,
+       'spritePlacement':'alpha-derived anchor and 3-world-unit visible-width calibration',
+       'nativeCurveRadiusWorld':NATIVE_ROUTE_CURVE_RADIUS_WORLD,
+       'blenderCurveModuleRadiusWorld':CURVE_ART_RADIUS_WORLD,
+       'curveGeometryCompatible':False,
+       'warning':'Native radius-7 curves and baked radius-1.5 modules cannot be claimed port-aligned without a matched route or re-bake.',
        'video':outfile.name}
     (outdir/'mapforge_video_report.json').write_text(json.dumps(report,indent=2)+'\n')
     print('PASS: real MapForge scene frames and native C++ train composed to',outfile)
