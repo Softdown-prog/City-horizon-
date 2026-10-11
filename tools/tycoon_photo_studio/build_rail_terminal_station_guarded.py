@@ -173,6 +173,36 @@ def make_station(root, recipe):
             (0.18, 0.17, 2.20), stone, root, "station.trim")
     box("Rail-facing stone stringcourse", (-0.9, 0.70, 2.37),
         (7.22, 0.10, 0.10), stone, root, "station.trim")
+    # Strong architectural rhythm on the railway side: prominent brick piers
+    # and a projecting ticket-door canopy distinguish this from a warehouse.
+    for i, x in enumerate((-4.31, -2.73, -0.98, 1.30, 2.53)):
+        box(f"Rail facade masonry pier {i}", (x, 0.672, 1.38),
+            (0.18, 0.24, 2.28), bricks[i % len(bricks)], root, "station.brick_pier")
+        box(f"Rail facade pier limestone cap {i}", (x, 0.62, 2.49),
+            (0.31, 0.31, 0.12), stone, root, "station.pier_cap")
+    box("Platform ticket doorway overhead canopy", (-1.92, 0.05, 2.29),
+        (1.79, 0.94, 0.14), roof, root, "station.canopy")
+    box("Ticket entrance canopy fascia", (-1.92, -0.37, 2.26),
+        (1.81, 0.10, 0.13), roof_ridge, root, "station.canopy_trim")
+    for x in (-2.69, -1.15):
+        box("Door canopy cast iron brackets", (x, 0.25, 1.96),
+            (0.10, 0.10, 0.53), steel, root, "station.canopy_support")
+    for i, x in enumerate((-3.63, 2.03)):
+        box(f"Platform wall lantern mount {i}", (x, 0.54, 2.42),
+            (0.14, 0.24, 0.28), steel, root, "station.lantern")
+        box(f"Platform wall lantern glass {i}", (x, 0.37, 2.35),
+            (0.19, 0.20, 0.29), clock, root, "station.lantern_glass")
+        box(f"Platform wall lantern crown {i}", (x, 0.37, 2.53),
+            (0.24, 0.25, 0.09), dark, root, "station.lantern")
+    # Inset brickwork relief around doors and windows.
+    for z in (0.43, 2.26):
+        box(f"Rail facade continuous masonry band {z}", (-0.9, 0.691, z),
+            (7.12, 0.065, 0.095), mortar, root, "station.mortar_band")
+    # Platform furniture remains on concrete rather than in the train corridor.
+    box("Platform information panel", (5.55, 0.65, 1.25),
+        (0.10, 0.72, 1.20), dark, root, "station.information_board")
+    box("Platform information panel footer", (5.55, 0.65, 0.60),
+        (0.16, 0.81, 0.10), stone, root, "station.information_board")
     # Gable-side end windows and brick trim, visible in other rotations.
     box("Gable end central glass", (2.735, 1.9, 1.48),
         (0.07, 0.98, 1.16), window, root, "station.window")
