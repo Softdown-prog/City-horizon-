@@ -69,6 +69,8 @@ jobs:
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           test -s out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           cp out/rail-sdl-capture/frame_0050.png out/rail-sdl-capture/rail_sdl_review_preview.png
+          cp out/rail-sdl-capture/frame_0012.png out/rail-sdl-capture/rail_sdl_matte_source_frame_12.png
+          cp out/rail-sdl-capture/frame_0036.png out/rail-sdl-capture/rail_sdl_matte_source_frame_36.png
       - name: Upload MP4, SDL screenshot and production review evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,5 +80,8 @@ jobs:
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
             out/rail-sdl-capture/rail_sdl_review_preview.png
             out/rail-sdl-capture/sprite_alpha_audit.json
+            out/rail-sdl-capture/rail_sdl_matte_source_frame_12.png
+            out/rail-sdl-capture/rail_sdl_matte_source_frame_36.png
+            assets/vehicles/steam_train_coach_01/steam_train_coach_north.png
           if-no-files-found: warn
           retention-days: 30
