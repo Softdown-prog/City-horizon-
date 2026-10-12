@@ -1,0 +1,72 @@
+name: CH Rail A-B Stations Video Proof
+on:
+  pull_request:
+    paths:
+      - 'src/rail_ab_video_proof_export.cpp'
+      - 'tools/rail_visual_proof/render_station_ab_video.py'
+      - '.github/workflows/ch-rail-ab-stations-video-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/rail_ab_video_proof_export.cpp'
+      - 'tools/rail_visual_proof/render_station_ab_video.py'
+      - '.github/workflows/ch-rail-ab-stations-video-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: ch-rail-ab-stations-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  station-ab-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compositor dependencies
+        run: |
+          python -m pip install pillow
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Compile production C++ station-to-station motion trace
+        run: |
+          mkdir -p out/station-ab
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -Isrc \
+            src/rail_system.cpp src/rail_ab_video_proof_export.cpp \
+            -o out/station-ab/station_ab_export
+      - name: Validate A-B-A real movements and coupling
+        run: |
+          out/station-ab/station_ab_export out/station-ab/native_station_ab_trace.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('out/station-ab/native_station_ab_trace.json').read_text())
+          assert d['frame_count']==640 and d['fps']==16
+          assert [s['name'] for s in d['stations']]==['A','B']
+          assert d['checks']['visits_a']>=2 and d['checks']['visits_b']>=1
+          assert d['checks']['reversals']>=2
+          assert d['checks']['full_consist_frames']==640
+          assert d['checks']['max_coupler_gap_m']<.75
+          print('Station A ↔ B native motion verified:',d['checks'])
+          PY
+      - name: Render 640 frames and encode station-to-station MP4
+        run: |
+          python tools/rail_visual_proof/render_station_ab_video.py \
+            --trace out/station-ab/native_station_ab_trace.json \
+            --outdir out/station-ab
+          ffprobe -v error -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 out/station-ab/estacoes_A_B_viagem_completa.mp4
+          test -s out/station-ab/estacoes_A_B_preview.png
+          test -s out/station-ab/estacoes_A_B_relatorio.json
+      - name: Publish MP4, preview and verifiable C++ trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Estacoes-A-B-Video-${{ github.run_id }}
+          path: |
+            out/station-ab/estacoes_A_B_viagem_completa.mp4
+            out/station-ab/estacoes_A_B_preview.png
+            out/station-ab/estacoes_A_B_relatorio.json
+            out/station-ab/native_station_ab_trace.json
+          if-no-files-found: error
+          retention-days: 30
