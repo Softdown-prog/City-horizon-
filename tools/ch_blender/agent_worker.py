@@ -583,6 +583,20 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
             }
             (output_root / "studio_metadata.json").write_text(
                 json.dumps(meta,indent=2,sort_keys=True) + "\n", encoding="utf-8")
+            # Preserve the same audited SHA from the *approved proxy*.
+            # The layered builder emits scene outputs only; the guarded
+            # orchestrator owns the final human-approval record.
+            approval_record = {
+                "contract":"CH_PROXY_APPROVAL_V1",
+                "assetId":contract["assetId"],
+                "proxySha256":approval_sha,
+                "reviewed":True,
+                "runtimeTarget":"2D_RGBA_base_plus_rotating_bridge",
+                "sourceFingerprint":source_fingerprint,
+            }
+            (output_root / "proxy_approval.json").write_text(
+                json.dumps(approval_record,indent=2,sort_keys=True) + "\n",
+                encoding="utf-8")
 
     rel_root = output_root.relative_to(REPO_ROOT).as_posix()
     defaults = [f"{rel_root}/preflight_report.json"]
