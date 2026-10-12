@@ -1,0 +1,189 @@
+name: CH Rail Turntable Approved Final Bake and Runtime Promotion
+
+on:
+  push:
+    branches:
+      - feature/rail-turntable-runtime-20261012
+    paths:
+      - 'tools/ch_blender/jobs/rail.turntable.7m2.final.001.job.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: ch-rail-turntable-final-promotion
+  cancel-in-progress: false
+
+jobs:
+  final-bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      OUT: out/ch_blender_agent/rail.turntable.7m2.final.001
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/rail-turntable-runtime-20261012
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow for independent PNG validation
+        run: python3 -m pip install pillow
+
+      - name: Validate approved exact-proxy final job
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ch_blender/ch_blender_cli.py validate-job \
+            --job tools/ch_blender/jobs/rail.turntable.7m2.final.001.job.json
+          python3 -m py_compile tools/tycoon_photo_studio/bake_rail_turntable_rotation_frames.py
+          python3 -m py_compile tools/rail_visual_proof/check_turntable_runtime_assets.py
+
+      - name: Setup pinned CH Blender
+        uses: ./.github/actions/setup-ch-blender
+
+      - name: CH Blender final 4-view base and bridge — approved proxy binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ch_blender/ch_blender_cli.py doctor
+          python3 tools/ch_blender/ch_blender_cli.py run-job \
+            --job tools/ch_blender/jobs/rail.turntable.7m2.final.001.job.json \
+            --report "$OUT/worker_report.json"
+
+      - name: Bake 100 physical bridge angle frames (25 x 4)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CH_BLENDER_EXE" --background --factory-startup \
+            --python-use-system-env --python-exit-code 1 \
+            --python tools/tycoon_photo_studio/bake_rail_turntable_rotation_frames.py -- \
+            --recipe tools/tycoon_photo_studio/assets/rail_turntable_7m2_01.turntable.json \
+            --studio-preset tools/tycoon_photo_studio/studio_presets/ch_tycoon_studio_v1.json \
+            --output "$OUT"
+
+      - name: Validate every approved layer, store assets and generate visual review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          source=Path("out/ch_blender_agent/rail.turntable.7m2.final.001")
+          root=Path("assets/rail/turntable_7m2_01")
+          root.mkdir(parents=True,exist_ok=True)
+          worker=json.loads((source/"worker_report.json").read_text())
+          q=worker.get("qualityGate",{})
+          assert worker["status"]=="ok"
+          assert q["stage"]=="final" and q["preflightStatus"]=="pass"
+          assert q["proxyReviewed"] is True
+          assert q["approvedProxySha256"]=="89cbd2228b688ecbde7cdc5f10126854f0c39d1c524c4fe2b545f522ba8a6046"
+          assert q["sourceFingerprint"]=="b10495a5389ec3276f0dcd61f41ddbf0cbe2d481d9194bd4dec7f5e71fcf58f5"
+          original=json.loads((source/"rail_turntable_layer_manifest.json").read_text())
+          angles=json.loads((source/"rotation_manifest.json").read_text())
+          assert original["qualityStage"]=="final"
+          assert original["approvedForRuntime"] is False
+          assert angles["frameCount"]==25
+          assert angles["cameraContract"]=="CH_CAMERA_V1"
+          pivot=angles["pivotPx"]
+          # All phase frames must share the same Blender origin.
+          assert abs(pivot["x"]-256.0)<1.0,pivot
+          assert abs(pivot["y"]-305.147)<1.5,pivot
+          index={}
+          thumbs=[]
+          for direction in ("south","east","west","north"):
+              base=f"rail_turntable_base_{direction}.png"
+              for n in [base,*[f"rail_turntable_bridge_{direction}_phase_{i:02d}.png" for i in range(25)]]:
+                  src=source/n
+                  assert src.is_file(),n
+                  with Image.open(src) as im:
+                      expected=1024 if n==base else 512
+                      assert im.mode=="RGBA" and im.size==(expected,expected),(n,im.mode,im.size)
+                      alpha=im.getchannel("A")
+                      assert alpha.getextrema()[0]==0 and alpha.getextrema()[1]==255,n
+                      assert alpha.getbbox() is not None,n
+                  target=root/n
+                  shutil.copyfile(src,target)
+                  index[n]=hashlib.sha256(target.read_bytes()).hexdigest()
+              assert len({index[f"rail_turntable_bridge_{direction}_phase_{i:02d}.png"] for i in range(25)})>=18,direction
+              # Review frames (beginning / 45 / 90 / 135 / 180) show actual perspective.
+              for frame in (0,6,12,18,24):
+                  with Image.open(root/f"rail_turntable_bridge_{direction}_phase_{frame:02d}.png") as im:
+                      preview=im.copy()
+                      preview.thumbnail((235,235))
+                      thumbs.append((direction,frame,preview))
+          assert len(index)==104,len(index)
+          for name,sha in angles["files"].items():
+              assert index.get(name)==sha,name
+          (root/"runtime_manifest.json").write_text(json.dumps({
+              "contract":"CH_RAIL_TURNTABLE_RUNTIME_V1",
+              "assetId":"rail_turntable_7m2_01",
+              "cameraContract":"CH_CAMERA_V1",
+              "pivotWorldMetres":[0,0,0],
+              "diameterMetres":7.2,
+              "frameCount":25,
+              "baseResolution":1024,
+              "bridgeResolution":512,
+              "approvedProxySha256":q["approvedProxySha256"],
+              "approvedSourceFingerprint":q["sourceFingerprint"],
+              "finalBakeQualityGate":"pass",
+              "userApprovedForRuntime":True,
+              "modelLayering":"fixed_base_and_rotating_bridge_separate",
+              "rotationDegrees":[0,180],
+              "frameIndexSelection":"round(angle/pi*24)",
+              "notes":"Real CH Blender per-angle orthographic views. Procedural fallback for unsupported diagonal track.",
+              "files":index,
+          },indent=2,sort_keys=True)+"\n")
+          sheet=Image.new("RGB",(5*260,4*270),(47,50,56))
+          draw=ImageDraw.Draw(sheet)
+          for k,(direction,frame,img) in enumerate(thumbs):
+              x=(k%5)*260
+              y=(k//5)*270
+              backdrop=Image.new("RGBA",img.size,(98,103,110,255))
+              backdrop.alpha_composite(img)
+              sheet.paste(backdrop.convert("RGB"),(x+12,y+28))
+              draw.text((x+12,y+8),f"{direction} / {frame*7.5:.1f} degrees",fill="white")
+          sheet.save(source/"rail_turntable_20_frame_rotation_review.png")
+          print("PASS: 4 Blender fixed bases and 4 x 25 3D bridge frames, no missing assets")
+          PY
+          python3 tools/rail_visual_proof/check_turntable_runtime_assets.py
+
+      - name: Promote only validated PNGs to the isolated integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/rail/turntable_7m2_01/
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(rail): install approved Blender turntable 104-frame catalog"
+            git fetch origin feature/rail-turntable-runtime-20261012
+            git rebase origin/feature/rail-turntable-runtime-20261012
+            git push origin HEAD:feature/rail-turntable-runtime-20261012
+          fi
+
+      - name: Trigger SDL runtime CI on promoted commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run ch-rail-runtime-check.yml --ref feature/rail-turntable-runtime-20261012
+
+      - name: Archive source evidence and 20-frame contact sheet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Turntable-Final-${{ github.run_id }}
+          path: out/ch_blender_agent/rail.turntable.7m2.final.001
+          if-no-files-found: warn
+          retention-days: 30
