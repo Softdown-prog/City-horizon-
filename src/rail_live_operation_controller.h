@@ -95,6 +95,15 @@ public:
         return operation_active_ ? train_.pose() : std::nullopt;
     }
 
+    // Exposed to the UI: a terminal train must never quietly reverse with a
+    // backwards locomotive or leave station B before a track-based maneuver.
+    [[nodiscard]] bool awaiting_terminal_maneuver() const noexcept {
+        return operation_active_ && train_.awaiting_terminal_maneuver();
+    }
+    [[nodiscard]] bool two_station_service_active() const noexcept {
+        return operation_active_ && train_.terminal_pair_enabled();
+    }
+
 private:
     void publish_stations() const {
         std::vector<RailPersistentStation> persistent;
@@ -118,6 +127,14 @@ private:
             if (!route.valid) continue;
             rail_operation::OperationalRoute runtime_route = route;
             if (!train_.set_route(std::move(runtime_route))) continue;
+            // Use the ordinary multi-stop runtime for loops and legacy single
+            // station saves. For exactly two stations on an OPEN line, require
+            // the full 1+7 consist to fit and begin service at station A.
+            // No imaginary siding is assumed or synthesized here.
+            if (!route.closed && stations_.size() == 2U &&
+                !train_.configure_terminal_pair()) {
+                continue;
+            }
             operational_route_ = std::move(route);
             train_.set_cruise_speed_mps(3.25);
             train_.set_acceleration_mps2(1.25);
