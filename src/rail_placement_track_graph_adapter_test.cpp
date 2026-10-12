@@ -141,6 +141,59 @@ void test_crossing_preview_is_transactional() {
     assert(placement.edges().size() == before.edge_count + 2U);
 }
 
+void test_siding_connector_between_two_real_turnouts() {
+    constexpr float kPi = 3.14159265358979323846F;
+    const float radius=12.0F;
+    RailPlacementGraph graph;
+    const auto west_root=graph.add_root({0.0F,0.0F,0.0F},0.0F);
+    const auto east_root=graph.add_root({100.0F,0.0F,0.0F},kPi);
+    assert(west_root && east_root);
+    const auto west=graph.append_turnout(
+        *west_root,radius,kPiOverTwelve,RailTurnDirection::left);
+    const auto east=graph.append_turnout(
+        *east_root,radius,kPiOverTwelve,RailTurnDirection::right);
+    assert(west && east);
+    RailPlacementController editor(graph);
+    assert(editor.begin(west->through_node,RailPlacementMode::straight));
+    const float x_start=graph.nodes()[west->through_node].position.x;
+    const float x_end=graph.nodes()[east->through_node].position.x;
+    const auto main_preview=editor.preview(x_end-x_start);
+    assert(main_preview && main_preview->primary_node==east->through_node);
+    assert(editor.commit());
+
+    const auto before=graph.checkpoint();
+    const auto siding=graph.append_smooth_connector(west->diverging_node,east->diverging_node);
+    assert(siding && siding->ok());
+    assert(graph.nodes().size()==before.node_count);
+    assert(graph.edges().size()==before.edge_count+1);
+    assert(graph.edges().back().from==west->diverging_node);
+    assert(graph.edges().back().to==east->diverging_node);
+    assert(!graph.append_smooth_connector(west->diverging_node,east->diverging_node));
+    const auto built=ch::rail::build_track_graph(graph);
+    assert(built.valid);
+    assert(built.graph.connections().size()==4U); // both main & sidetrack joins
+    const auto west_piece=built.edge_piece[west->through_edge];
+    const auto east_piece=built.edge_piece[east->through_edge];
+    const auto center_piece=built.edge_piece[main_preview->primary_edge];
+    assert(built.graph.build_route({west_piece,0U}).ok());
+    auto alternate=built.graph;
+    assert(alternate.set_active_route(west_piece,1U));
+    // Selected switch route must put the locomotive onto the REAL siding
+    // and reach the opposite turnout via the shared topology graph.
+    const auto bypass=alternate.build_route({west_piece,0U});
+    assert(bypass.ok());
+    assert(bypass.steps.size()==3U);
+    assert(bypass.steps[0].route==1U);
+    assert(bypass.steps[1].piece==built.edge_piece[siding->edge]);
+    assert(bypass.steps[2].piece==east_piece);
+    (void)center_piece;
+    const auto snapshot_nodes=graph.nodes();
+    const auto snapshot_edges=graph.edges();
+    RailPlacementGraph restored;
+    assert(restored.restore_snapshot(snapshot_nodes,snapshot_edges));
+    assert(ch::rail::build_track_graph(restored).valid);
+}
+
 void test_endpoint_join_is_real_connected_track() {
     RailPlacementGraph placement;
     const auto main_root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
@@ -259,6 +312,7 @@ int main() {
     test_endpoint_join_is_real_connected_track();
     test_endpoint_join_rejects_wrong_tangents_and_branching();
     test_endpoint_join_into_original_start();
+    test_siding_connector_between_two_real_turnouts();
     std::cout << "CH_RAIL_PLACEMENT_TRACK_GRAPH_ADAPTER_V1: OK\n";
     return 0;
 }
