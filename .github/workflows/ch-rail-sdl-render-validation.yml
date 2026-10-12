@@ -5,6 +5,7 @@ on:
     paths:
       - "src/rail_sdl_render_capture.cpp"
       - "src/rail_train_sprite_render_adapter.h"
+      - "src/rail_turntable_sprite_runtime.h"
       - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
@@ -13,6 +14,7 @@ on:
     paths:
       - "src/rail_sdl_render_capture.cpp"
       - "src/rail_train_sprite_render_adapter.h"
+      - "src/rail_turntable_sprite_runtime.h"
       - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
