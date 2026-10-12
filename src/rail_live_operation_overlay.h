@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 
 inline constexpr const char* kChRailLiveOperationOverlayContract = "CH_RAIL_LIVE_OPERATION_OVERLAY_V2";
 
@@ -237,6 +238,60 @@ private:
             const ch::ScreenPoint screen = ch::world_to_screen_point(
                 middle.x, middle.y, middle.z + 0.05F,
                 camera, viewport_width, viewport_height);
+            // The existing 7-key station marker uses a rail piece group.
+            // Render the authored four-direction building instead of a flat
+            // rectangle, while retaining a fallback when the PNG is absent.
+            // Separate 5x3 placement/collision rules are still required before
+            // this prototype becomes a purchasable construction.
+            const float dx = edge->segment.end.x - edge->segment.start.x;
+            const float dy = edge->segment.end.y - edge->segment.start.y;
+            const bool horizontal = std::abs(dx) >= std::abs(dy);
+            const char* direction = horizontal
+                ? (dx >= 0.0F ? "south" : "north")
+                : (dy >= 0.0F ? "east" : "west");
+            const std::string property_key = std::string("ch.station.terminal_b.") + direction;
+            const std::string path = std::string(
+                "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_")
+                + direction + ".png";
+            const SDL_PropertiesID props = SDL_GetRendererProperties(renderer);
+            SDL_Texture* station_texture = props ? static_cast<SDL_Texture*>(
+                SDL_GetPointerProperty(props, property_key.c_str(), nullptr)) : nullptr;
+            if (!station_texture && props) {
+                SDL_Surface* surface = SDL_LoadPNG(path.c_str());
+                if (surface) {
+                    SDL_Texture* created = SDL_CreateTextureFromSurface(renderer, surface);
+                    SDL_DestroySurface(surface);
+                    if (created) {
+                        SDL_SetTextureBlendMode(created, SDL_BLENDMODE_BLEND);
+                        if (SDL_SetPointerPropertyWithCleanup(
+                                props, property_key.c_str(), created,
+                                [](void*, void* value) {
+                                    SDL_DestroyTexture(static_cast<SDL_Texture*>(value));
+                                }, nullptr)) {
+                            station_texture = created;
+                        }
+                    }
+                }
+            }
+            if (station_texture) {
+                // The Blender model origin is centered on the 5x3 footprint.
+                // Its railway lane sits at local Y=-2.4 world units; translate
+                // the sprite origin from the selected rail center to the building.
+                const float length = std::hypot(dx, dy);
+                const float nx = length > 0.0001F ? -dy / length : 0.0F;
+                const float ny = length > 0.0001F ? dx / length : 1.0F;
+                const ch::ScreenPoint asset_center = ch::world_to_screen_point(
+                    middle.x + 2.4F * nx, middle.y + 2.4F * ny, middle.z,
+                    camera, viewport_width, viewport_height);
+                const float image_scale = zoom * 0.50F;
+                SDL_FRect dst{
+                    asset_center.x - 512.0F * image_scale,
+                    asset_center.y - 556.0F * image_scale,
+                    1024.0F * image_scale,
+                    1024.0F * image_scale
+                };
+                if (SDL_RenderTexture(renderer, station_texture, nullptr, &dst)) continue;
+            }
             SDL_FRect platform{
                 screen.x - 14.0F * zoom,
                 screen.y - 4.0F * zoom,
