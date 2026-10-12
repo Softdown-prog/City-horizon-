@@ -2,6 +2,7 @@
 
 #include "rail_operation_runtime.h"
 #include "rail_siding_topology.h"
+#include "rail_detached_locomotive_shunt.h"
 #include "rail_persistence.h"
 
 #include <algorithm>
@@ -81,7 +82,17 @@ public:
     }
 
     void update(const double seconds) noexcept {
-        if (operation_active_) train_.update(seconds);
+        if (!operation_active_) return;
+        if (shunt_.active()) {
+            shunt_.update(seconds);
+            return;
+        }
+        train_.update(seconds);
+        // B stop plus a fully validated, physically separated siding are
+        // mandatory. Without both, preserve the existing safe parked state.
+        if (train_.awaiting_terminal_maneuver() && shunt_path_) {
+            (void)shunt_.start(*shunt_path_);
+        }
     }
 
     [[nodiscard]] bool operation_active() const noexcept { return operation_active_; }
@@ -93,13 +104,40 @@ public:
         return operation_active_ && operational_route_.valid ? &operational_route_ : nullptr;
     }
     [[nodiscard]] std::optional<rail_operation::TrainPose> train_pose() const noexcept {
-        return operation_active_ ? train_.pose() : std::nullopt;
+        if (!operation_active_) return std::nullopt;
+        if (shunt_.active()) return shunt_.locomotive_pose();
+        return train_.pose();
+    }
+
+    [[nodiscard]] bool shunting_locomotive() const noexcept {
+        return operation_active_ && shunt_.active();
+    }
+    [[nodiscard]] bool locomotive_awaiting_turning() const noexcept {
+        return operation_active_ && shunt_.awaiting_turning();
+    }
+    [[nodiscard]] std::optional<rail_operation::DetachedShuntPhase> locomotive_shunt_phase() const noexcept {
+        if(!shunting_locomotive())return std::nullopt;
+        return shunt_.phase();
+    }
+    [[nodiscard]] std::vector<rail_operation::ArticulatedUnitPose> articulated_poses() const {
+        if(!operation_active_ || !operational_route_.valid)return {};
+        const auto lead=train_.pose();
+        if(!lead)return {};
+        auto units=rail_operation::build_articulated_consist_poses(operational_route_,*lead);
+        if(shunt_.active() && units.size()==8U) {
+            const auto locomotive=shunt_.locomotive_pose();
+            if(!locomotive)return {};
+            // Only the locomotive moves on the bypass. Each coach retains
+            // its stable identity and world position on the B platform.
+            units.front().pose=*locomotive;
+        }
+        return units;
     }
 
     // Exposed to the UI: a terminal train must never quietly reverse with a
     // backwards locomotive or leave station B before a track-based maneuver.
     [[nodiscard]] bool awaiting_terminal_maneuver() const noexcept {
-        return operation_active_ && train_.awaiting_terminal_maneuver();
+        return operation_active_ && train_.awaiting_terminal_maneuver() && !shunt_.active();
     }
     [[nodiscard]] bool two_station_service_active() const noexcept {
         return operation_active_ && train_.terminal_pair_enabled();
@@ -109,6 +147,9 @@ public:
     // The turntable and dispatch/coupling state machine remain separate.
     [[nodiscard]] bool connected_siding_available() const noexcept {
         return two_station_service_active() && connected_siding_.has_value();
+    }
+    [[nodiscard]] bool locomotive_shunt_route_safe() const noexcept {
+        return two_station_service_active() && shunt_path_.has_value();
     }
     [[nodiscard]] const std::optional<rail_operation::ConnectedSiding>& connected_siding() const noexcept {
         return connected_siding_;
@@ -128,6 +169,8 @@ private:
         operation_active_ = false;
         operational_route_ = {};
         connected_siding_.reset();
+        shunt_path_.reset();
+        shunt_=rail_operation::DetachedLocomotiveShunt{};
         train_ = rail_operation::TrainRuntime{};
         if (stations_.empty()) return true;
 
@@ -148,6 +191,10 @@ private:
             }
             if (train_.terminal_pair_enabled()) {
                 connected_siding_ = rail_operation::find_connected_siding(graph_, route);
+                if (connected_siding_) {
+                    shunt_path_ = rail_operation::compile_detached_locomotive_shunt(
+                        graph_, route, *connected_siding_);
+                }
             }
             operational_route_ = std::move(route);
             train_.set_cruise_speed_mps(3.25);
@@ -162,6 +209,8 @@ private:
     std::vector<rail_operation::StationDefinition> stations_;
     rail_operation::OperationalRoute operational_route_{};
     std::optional<rail_operation::ConnectedSiding> connected_siding_{};
+    std::optional<rail_operation::ShuntPath> shunt_path_{};
+    rail_operation::DetachedLocomotiveShunt shunt_{};
     rail_operation::TrainRuntime train_{};
     bool operation_active_ = false;
 };
