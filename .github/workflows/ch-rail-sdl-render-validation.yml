@@ -60,6 +60,20 @@ jobs:
           mkdir -p out/rail-sdl-capture
           build/rail-sdl-review/rail_sdl_render_capture out/rail-sdl-capture
           test "$(find out/rail-sdl-capture -name 'frame_*.png' | wc -l)" -eq 96
+      - name: Reject black turntable-alpha matte in approach shot
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          frame=Image.open(Path("out/rail-sdl-capture/frame_0036.png")).convert("RGB")
+          # Above the railroad, outside the actual turntable silhouette.
+          # An opaque black RGBA backing used to cover this rectangle.
+          sample=frame.getpixel((265,175))
+          assert max(sample) > 45, f"CH_RAIL_ALPHA_MATTE_REGRESSION: opaque black at {sample}"
+          print("CH_RAIL_ALPHA_MATTE_V1: PASS no solid black rectangle at approach")
+          PY
+
       - name: Encode short MP4 from SDL pixels
         run: |
           ffmpeg -hide_banner -loglevel error -y -framerate 12 \
