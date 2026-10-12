@@ -1,0 +1,44 @@
+{
+  "contract": "CH_RAIL_TERMINAL_STATION_ASSET_V1",
+  "assetId": "transport.rail_station.terminal_b.01",
+  "sourceWorkflowRun": 38186312498,
+  "sourceArtifactId": 11719801754,
+  "footprint": {
+    "widthTiles": 5,
+    "depthTiles": 3
+  },
+  "entryPortLocalWorld": [
+    -7.5,
+    -2.4,
+    0
+  ],
+  "terminalStopLocalWorld": [
+    5.25,
+    -2.4,
+    0
+  ],
+  "directionPolicy": "rotate_asset_root_keep_camera_lights_fixed",
+  "frameSize": [
+    1024,
+    1024
+  ],
+  "sprites": {
+    "south": {
+      "path": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_south.png",
+      "sha256": "2584d37f977b4e254cdacae822e2680f7bdb59af962c14d34864c295ac4d411f"
+    },
+    "west": {
+      "path": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_west.png",
+      "sha256": "1f48baaee8f21274f9e04e09b2ca4d100dfe8f1facc09ce633e92112c251470e"
+    },
+    "north": {
+      "path": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_north.png",
+      "sha256": "d584a62b3515ae0a89fabf3a348ad9a72b748be7ee4ddb630cfc7ff79fd767f9"
+    },
+    "east": {
+      "path": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_east.png",
+      "sha256": "4d555d8f119de5eb38e3bcbfb4d92c9dcd0a7912aec6b364c2dd535ecac29c5e"
+    }
+  },
+  "runtimeStatus": "art_staged_pending_station_placement_alignment"
+}
