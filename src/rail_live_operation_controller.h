@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_operation_runtime.h"
+#include "rail_siding_topology.h"
 #include "rail_persistence.h"
 
 #include <algorithm>
@@ -103,6 +104,15 @@ public:
     [[nodiscard]] bool two_station_service_active() const noexcept {
         return operation_active_ && train_.terminal_pair_enabled();
     }
+    // Presence of a built, topologically connected passing siding DOES NOT
+    // authorize reversing the locomotive or moving the seven coaches.
+    // The turntable and dispatch/coupling state machine remain separate.
+    [[nodiscard]] bool connected_siding_available() const noexcept {
+        return two_station_service_active() && connected_siding_.has_value();
+    }
+    [[nodiscard]] const std::optional<rail_operation::ConnectedSiding>& connected_siding() const noexcept {
+        return connected_siding_;
+    }
 
 private:
     void publish_stations() const {
@@ -117,6 +127,7 @@ private:
     [[nodiscard]] bool rebuild() {
         operation_active_ = false;
         operational_route_ = {};
+        connected_siding_.reset();
         train_ = rail_operation::TrainRuntime{};
         if (stations_.empty()) return true;
 
@@ -135,6 +146,9 @@ private:
                 !train_.configure_terminal_pair()) {
                 continue;
             }
+            if (train_.terminal_pair_enabled()) {
+                connected_siding_ = rail_operation::find_connected_siding(graph_, route);
+            }
             operational_route_ = std::move(route);
             train_.set_cruise_speed_mps(3.25);
             train_.set_acceleration_mps2(1.25);
@@ -147,6 +161,7 @@ private:
     RailPlacementGraph graph_{};
     std::vector<rail_operation::StationDefinition> stations_;
     rail_operation::OperationalRoute operational_route_{};
+    std::optional<rail_operation::ConnectedSiding> connected_siding_{};
     rail_operation::TrainRuntime train_{};
     bool operation_active_ = false;
 };

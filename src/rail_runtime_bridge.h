@@ -78,6 +78,8 @@ public:
         if (!graph_.restore_snapshot(state.nodes, state.edges)) return false;
         committed_actions_ = state.actions;
         selected_mode_ = RailPlacementMode::straight;
+        connector_mode_ = false;
+        connector_from_.reset();
         hovered_piece_.reset();
         new_root_heading_radians_ = 0.0F;
         tool_active_ = false;
@@ -94,6 +96,8 @@ public:
         hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
+        connector_mode_ = false;
+        connector_from_.reset();
         new_root_heading_radians_ = 0.0F;
         preview_valid_ = false;
         preview_cost_ = 0;
@@ -118,6 +122,8 @@ public:
                 if (tool_active_) {
                     cancel_gesture(false);
                     hovered_piece_.reset();
+                    connector_mode_ = false;
+                    connector_from_.reset();
                     tool_active_ = false;
                     status_ = "RAIL MODE CLOSED";
                 } else {
@@ -135,6 +141,12 @@ public:
                 case SDL_SCANCODE_4: select_mode(RailPlacementMode::turnout_left); return true;
                 case SDL_SCANCODE_5: select_mode(RailPlacementMode::turnout_right); return true;
                 case SDL_SCANCODE_6: select_mode(RailPlacementMode::crossing); return true;
+                case SDL_SCANCODE_9:
+                    if (gesture_active_) cancel_gesture(false);
+                    connector_mode_ = !connector_mode_;
+                    connector_from_.reset();
+                    refresh_status();
+                    return true;
                 case SDL_SCANCODE_Q:
                     if (!gesture_active_) rotate_new_root_heading(-1.0F);
                     return true;
@@ -162,6 +174,8 @@ public:
                         cancel_gesture(true);
                     } else {
                         hovered_piece_.reset();
+                        connector_mode_ = false;
+                        connector_from_.reset();
                         tool_active_ = false;
                         status_ = "RAIL MODE CLOSED";
                     }
@@ -180,7 +194,11 @@ public:
 
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
             if (gesture_active_) cancel_gesture(true);
-            else {
+            else if (connector_mode_) {
+                connector_mode_ = false;
+                connector_from_.reset();
+                refresh_status();
+            } else {
                 hovered_piece_.reset();
                 tool_active_ = false;
                 status_ = "RAIL MODE CLOSED";
@@ -189,7 +207,8 @@ public:
         }
 
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
-            begin_gesture(event.button.x, event.button.y, view, context);
+            if (connector_mode_) click_siding_port(event.button.x, event.button.y, view, context);
+            else begin_gesture(event.button.x, event.button.y, view, context);
             return true;
         }
 
@@ -267,6 +286,8 @@ private:
 
     void select_mode(const RailPlacementMode mode) {
         if (gesture_active_) cancel_gesture(false);
+        connector_mode_ = false;
+        connector_from_.reset();
         selected_mode_ = mode;
         refresh_status();
     }
@@ -295,9 +316,15 @@ private:
             status_ = "RAIL MODE READY | T TOGGLE";
             return;
         }
+        if (connector_mode_) {
+            status_ = connector_from_
+                ? "RAIL CONNECT | SELECT SECOND OPEN ENDPOINT | RMB CANCEL"
+                : "RAIL CONNECT | SELECT FIRST OPEN ENDPOINT | RMB CANCEL";
+            return;
+        }
         status_ = std::string("RAIL ") + mode_label(selected_mode_) +
             " | LMB DRAG | 1-6 PIECE | Q/E HEADING " + std::to_string(heading_degrees()) +
-            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | 8 TRAIN RESTART | T EXIT | PIECES " + std::to_string(piece_count());
+            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | 8 TRAIN RESTART | 9 CONNECT | T EXIT | PIECES " + std::to_string(piece_count());
         if (hovered_piece_) status_ += " | HOVER " + std::to_string(*hovered_piece_);
     }
 
@@ -423,6 +450,90 @@ private:
             }
         }
         return true;
+    }
+
+    // Click-to-connect 2 authored, open rail nodes. This is a persistent,
+    // fully priced construction rather than a test-only line drawn over ground.
+    void click_siding_port(const float screen_x, const float screen_y,
+                           const runtime_view::ViewSnapshot& view,
+                           const InteractionContext& context) {
+        const auto world = RailMapForgeInputAdapter::screen_to_world(
+            screen_x, screen_y, view.camera, view.viewport_width, view.viewport_height);
+        if (!world) {
+            status_ = "RAIL CONNECT: INVALID WORLD POINT";
+            return;
+        }
+        const auto target = nearest_node(*world);
+        if (!target) {
+            status_ = "RAIL CONNECT: CLICK AN EXISTING TRACK ENDPOINT";
+            return;
+        }
+        // Reject shared turnouts/junctions and disconnected blank editor roots.
+        const auto open_port = [&](RailPlacementNodeId node) {
+            std::size_t count = 0U;
+            for (const auto& edge : graph_.edges()) {
+                if (edge.active && (edge.from == node || edge.to == node)) ++count;
+            }
+            return count == 1U;
+        };
+        if (!open_port(*target)) {
+            status_ = "RAIL CONNECT: ENDPOINT MUST HAVE ONE TRACK";
+            return;
+        }
+        if (!connector_from_) {
+            connector_from_ = *target;
+            refresh_status();
+            return;
+        }
+        const auto from = *connector_from_;
+        connector_from_.reset();
+        if (from == *target || !open_port(from)) {
+            status_ = "RAIL CONNECT: SELECT TWO DIFFERENT OPEN ENDPOINTS";
+            return;
+        }
+        const auto checkpoint = graph_.checkpoint();
+        const auto segment = graph_.append_smooth_connector(from, *target);
+        if (!segment) {
+            status_ = "RAIL CONNECT: CANNOT FIT A SAFE CONNECTING CURVE";
+            return;
+        }
+        // Existing shared collision/level rules need gesture_active_ set
+        // only while validating the newly appended edge. No pointer drag is
+        // started and no staged section is persisted before payment.
+        gesture_checkpoint_ = checkpoint;
+        gesture_active_ = true;
+        std::string validation_error;
+        const bool terrain_safe = validate_staged(context, &validation_error);
+        gesture_active_ = false;
+        if (!terrain_safe) {
+            (void)graph_.rollback(checkpoint);
+            status_ = validation_error.empty() ? "RAIL CONNECT: GROUND BLOCKED" : validation_error;
+            return;
+        }
+        const auto topology = rail::build_track_graph(graph_);
+        if (!topology.valid) {
+            (void)graph_.rollback(checkpoint);
+            status_ = "RAIL CONNECT: TOPOLOGY REJECTED";
+            return;
+        }
+        const auto quote = RailConstructionEconomy::quote(graph_, checkpoint.edge_count);
+        CityEconomy* economy = CityEconomy::active_instance();
+        if (!quote.valid || quote.build_cost <= 0 || economy == nullptr ||
+            !economy->can_afford(quote.build_cost)) {
+            (void)graph_.rollback(checkpoint);
+            status_ = "RAIL CONNECT: INSUFFICIENT FUNDS OR INVALID PRICE";
+            return;
+        }
+        if (!economy->try_spend(quote.build_cost)) {
+            (void)graph_.rollback(checkpoint);
+            status_ = "RAIL CONNECT: PAYMENT FAILED; ROLLED BACK";
+            return;
+        }
+        const auto piece_group = graph_.edges()[segment->edge].piece_group;
+        const auto refund = RailConstructionEconomy::demolition_refund(quote.build_cost);
+        committed_actions_.push_back({piece_group, quote.build_cost, refund, true});
+        status_ = "RAIL CONNECTED: " + money_label(quote.build_cost) +
+            " SPENT | BOTH PORTS VALIDATED";
     }
 
     void begin_gesture(const float screen_x,
@@ -662,6 +773,8 @@ private:
     RailDragAdapter drag_;
     RailMapForgeInputAdapter input_;
     RailPlacementMode selected_mode_ = RailPlacementMode::straight;
+    bool connector_mode_ = false;
+    std::optional<RailPlacementNodeId> connector_from_{};
     RailPlacementCheckpoint gesture_checkpoint_{};
     std::vector<RailPersistentAction> committed_actions_;
     std::optional<RailPlacementPieceId> hovered_piece_;

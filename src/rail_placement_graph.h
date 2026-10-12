@@ -243,6 +243,182 @@ public:
         };
     }
 
+    // CH_RAIL_SIDING_CONNECTOR_V1. Join TWO authored and open rail ports
+    // without creating phantom nodes or arbitrary crossing junctions.
+    // Tangent-matched cubic is generated from actual existing rail geometry;
+    // full mesh curvature/budget rules remain authoritative.
+    [[nodiscard]] std::optional<RailPlacementAppendResult> append_smooth_connector(
+        const RailPlacementNodeId from, const RailPlacementNodeId to,
+        const int subdivisions = 64) {
+        if (from == to || from >= nodes_.size() || to >= nodes_.size() ||
+            !nodes_[from].active || !nodes_[to].active || subdivisions < profile_.min_subdivisions)
+            return std::nullopt;
+
+        auto port_outward = [&](RailPlacementNodeId id)->std::optional<RailWorldPoint3> {
+            const RailPlacementEdge* incident = nullptr;
+            for (const RailPlacementEdge& edge_value : edges_) {
+                if (!edge_value.active || (edge_value.from != id && edge_value.to != id))
+                    continue;
+                if (incident) return std::nullopt; // never infer a junction
+                incident = &edge_value;
+            }
+            if (!incident) return std::nullopt;
+            // The open port points away from the EXISTING section.
+            RailWorldPoint3 v{};
+            if (incident->to == id) {
+                v.x = incident->segment.end.x - incident->segment.control_b.x;
+                v.y = incident->segment.end.y - incident->segment.control_b.y;
+                v.z = incident->segment.end.z - incident->segment.control_b.z;
+            } else {
+                v.x = incident->segment.start.x - incident->segment.control_a.x;
+                v.y = incident->segment.start.y - incident->segment.control_a.y;
+                v.z = incident->segment.start.z - incident->segment.control_a.z;
+            }
+            const float magnitude = std::sqrt(v.x*v.x+v.y*v.y+v.z*v.z);
+            if (!(magnitude > 1.0e-6F))return std::nullopt;
+            v.x /= magnitude;v.y /= magnitude;v.z /= magnitude;
+            return v;
+        };
+        const auto outward_from=port_outward(from);
+        const auto outward_to=port_outward(to);
+        if (!outward_from || !outward_to) return std::nullopt;
+        const RailWorldPoint3& a=nodes_[from].position;
+        const RailWorldPoint3& b=nodes_[to].position;
+        const float dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+        const float span=std::sqrt(dx*dx+dy*dy+dz*dz);
+        if (!std::isfinite(span) || span < profile_.min_turn_radius*2.0F)
+            return std::nullopt;
+        // A valid connector must leave each free port, not double backwards
+        // through existing rails. Large same-position U-turns are not built here.
+        const float start_forward=(dx*outward_from->x+dy*outward_from->y+dz*outward_from->z)/span;
+        const float end_forward=(dx*outward_to->x+dy*outward_to->y+dz*outward_to->z)/span;
+        if (start_forward < 0.70F || end_forward > -0.70F) return std::nullopt;
+        const float handle=std::clamp(span*0.28F,2.5F,24.0F);
+        RailSplineSegment segment{};
+        segment.start=a;
+        segment.end=b;
+        segment.control_a={
+            a.x+outward_from->x*handle,
+            a.y+outward_from->y*handle,
+            a.z+outward_from->z*handle};
+        segment.control_b={
+            b.x+outward_to->x*handle,
+            b.y+outward_to->y*handle,
+            b.z+outward_to->z*handle};
+        segment.subdivisions=subdivisions;
+        if (!mesh_safe(segment))return std::nullopt;
+        if (edges_.size() >= static_cast<std::size_t>(std::numeric_limits<RailPlacementEdgeId>::max()))
+            return std::nullopt;
+        const auto id=static_cast<RailPlacementEdgeId>(edges_.size());
+        edges_.push_back({id,from,to,RailPlacementEdgeKind::curve,segment,
+                          static_cast<RailPlacementPieceId>(id),true});
+        return RailPlacementAppendResult{to,id};
+    }
+
+    // CH_RAIL_ENDPOINT_JOIN_V1: bind the endpoint of an uncommitted
+    // straight/curve to ONE existing, open rail port. A nearby pixel overlap
+    // alone is never a valid railway connection.
+    enum class EndpointJoinResult { no_target, joined, rejected };
+
+    [[nodiscard]] EndpointJoinResult join_preview_endpoint(
+        const RailPlacementEdgeId fresh_edge_id,
+        const std::size_t existing_node_count,
+        const float snap_radius_m = 0.35F) {
+        if (!std::isfinite(snap_radius_m) || snap_radius_m <= 0.0F ||
+            fresh_edge_id >= edges_.size() || nodes_.size() <= existing_node_count) {
+            return EndpointJoinResult::rejected;
+        }
+        RailPlacementEdge& edge_value = edges_[fresh_edge_id];
+        if (!edge_value.active ||
+            (edge_value.kind != RailPlacementEdgeKind::straight &&
+             edge_value.kind != RailPlacementEdgeKind::curve) ||
+            edge_value.to != nodes_.size() - 1U ||
+            edge_value.to < existing_node_count ||
+            edge_value.from >= existing_node_count ||
+            !nodes_.back().active) {
+            return EndpointJoinResult::rejected;
+        }
+
+        const RailWorldPoint3 end = edge_value.segment.end;
+        const float radius_sq = snap_radius_m * snap_radius_m;
+        std::optional<RailPlacementNodeId> match;
+        for (std::size_t index = 0; index < existing_node_count; ++index) {
+            const RailPlacementNode& candidate = nodes_[index];
+            if (!candidate.active) continue;
+            const float dx = candidate.position.x - end.x;
+            const float dy = candidate.position.y - end.y;
+            const float dz = candidate.position.z - end.z;
+            if (dx * dx + dy * dy + dz * dz > radius_sq) continue;
+            if (match) return EndpointJoinResult::rejected; // ambiguous port
+            match = candidate.id;
+        }
+        if (!match) return EndpointJoinResult::no_target;
+        if (*match == edge_value.from) return EndpointJoinResult::rejected;
+
+        // Terminal-to-terminal ONLY. An existing junction requires a turnout
+        // descriptor, not a third edge silently welded into a generic node.
+        const RailPlacementEdge* target_edge = nullptr;
+        std::size_t degree = 0U;
+        for (const RailPlacementEdge& candidate : edges_) {
+            if (!candidate.active || candidate.id == fresh_edge_id) continue;
+            if (candidate.from != *match && candidate.to != *match) continue;
+            ++degree;
+            target_edge = &candidate;
+            if (degree > 1U) return EndpointJoinResult::rejected;
+        }
+        if (degree != 1U || target_edge == nullptr) return EndpointJoinResult::rejected;
+
+        // Inward travel vectors at the shared endpoint must oppose each other
+        // (outward port normals must face opposite directions). This excludes
+        // 180-degree kinks, opposite-port overlaps and near-miss geometry.
+        const RailWorldPoint3 incoming = edge_value.segment.end;
+        const RailWorldPoint3 incoming_control = edge_value.segment.control_b;
+        const float ax = incoming.x - incoming_control.x;
+        const float ay = incoming.y - incoming_control.y;
+        const float az = incoming.z - incoming_control.z;
+        const bool target_is_end = target_edge->to == *match;
+        const RailWorldPoint3 target = target_is_end
+            ? target_edge->segment.end : target_edge->segment.start;
+        const RailWorldPoint3 target_handle = target_is_end
+            ? target_edge->segment.control_b : target_edge->segment.control_a;
+        const float bx = target_is_end ? target.x - target_handle.x : target_handle.x - target.x;
+        const float by = target_is_end ? target.y - target_handle.y : target_handle.y - target.y;
+        const float bz = target_is_end ? target.z - target_handle.z : target_handle.z - target.z;
+        const float an = std::sqrt(ax * ax + ay * ay + az * az);
+        const float bn = std::sqrt(bx * bx + by * by + bz * bz);
+        const float dot = (ax * bx + ay * by + az * bz) / (an * bn);
+        // At an old edge's END: its travel direction opposes the new
+        // edge's arrival (two ends meet). At the old START: their travel
+        // tangents agree (the new end meets an old start).
+        constexpr float kAlignmentThreshold = 0.9990F;
+        if (!(an > 1.0e-6F && bn > 1.0e-6F) ||
+            (target_is_end ? dot > -kAlignmentThreshold
+                           : dot < kAlignmentThreshold)) {
+            return EndpointJoinResult::rejected;
+        }
+
+        const RailSplineSegment original_segment = edge_value.segment;
+        const RailPlacementNodeId original_to = edge_value.to;
+        const RailWorldPoint3& position = nodes_[*match].position;
+        const float dx = position.x - edge_value.segment.end.x;
+        const float dy = position.y - edge_value.segment.end.y;
+        const float dz = position.z - edge_value.segment.end.z;
+        edge_value.segment.end = position;
+        edge_value.segment.control_b.x += dx;
+        edge_value.segment.control_b.y += dy;
+        edge_value.segment.control_b.z += dz;
+        edge_value.to = *match;
+        if (!mesh_safe(edge_value.segment)) {
+            edge_value.segment = original_segment;
+            edge_value.to = original_to;
+            return EndpointJoinResult::rejected;
+        }
+        // The preview terminal is the last allocation. No committed ID is
+        // changed; this keeps rollback, saved stable IDs and switch groups safe.
+        nodes_.pop_back();
+        return EndpointJoinResult::joined;
+    }
+
     [[nodiscard]] RailPlacementCheckpoint checkpoint() const {
         return {nodes_.size(), edges_.size()};
     }

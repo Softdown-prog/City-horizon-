@@ -5,6 +5,8 @@ on:
     paths:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_siding_topology.h"
+      - "src/rail_siding_topology_test.cpp"
       - "src/rail_articulated_consist.h"
       - "src/rail_train_direction_math.h"
       - "src/rail_train_direction_math_test.cpp"
@@ -25,6 +27,8 @@ on:
     paths:
       - "src/rail_operation_runtime.h"
       - "src/rail_operation_runtime_test.cpp"
+      - "src/rail_siding_topology.h"
+      - "src/rail_siding_topology_test.cpp"
       - "src/rail_articulated_consist.h"
       - "src/rail_train_direction_math.h"
       - "src/rail_train_direction_math_test.cpp"
@@ -96,6 +100,16 @@ jobs:
       - name: Run live station controller regression
         shell: bash
         run: build/rail-operation/rail_live_operation_controller_test
+
+      - name: Compile and run connected siding / safe B parking regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_siding_topology_test.cpp \
+            -o build/rail-operation/rail_siding_topology_test
+          build/rail-operation/rail_siding_topology_test
 
       - name: Validate the CH_CAMERA_V1 eight-direction yaw map
         shell: bash

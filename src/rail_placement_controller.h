@@ -119,6 +119,20 @@ public:
         }
         }
 
+        // Only preview straight/curve endpoints may weld to an existing
+        // open port. Turnouts own TWO exits; crossings own independent lanes.
+        if (candidate && (mode_ == RailPlacementMode::straight ||
+                          mode_ == RailPlacementMode::curve_left ||
+                          mode_ == RailPlacementMode::curve_right)) {
+            const auto outcome = graph_.join_preview_endpoint(
+                candidate->primary_edge, checkpoint_.node_count);
+            if (outcome == RailPlacementGraph::EndpointJoinResult::rejected) {
+                candidate.reset(); // The nearby track is NOT safely joinable.
+            } else if (outcome == RailPlacementGraph::EndpointJoinResult::joined) {
+                candidate->primary_node = graph_.edges()[candidate->primary_edge].to;
+            }
+        }
+
         if (!candidate) {
             const bool rolled_back = graph_.rollback(checkpoint_);
             (void)rolled_back;
