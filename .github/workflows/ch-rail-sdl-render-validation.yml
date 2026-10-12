@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "src/rail_sdl_render_capture.cpp"
+      - "src/rail_train_sprite_render_adapter.h"
       - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
@@ -11,6 +12,7 @@ on:
     branches: [main]
     paths:
       - "src/rail_sdl_render_capture.cpp"
+      - "src/rail_train_sprite_render_adapter.h"
       - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
