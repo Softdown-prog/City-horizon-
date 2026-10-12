@@ -137,6 +137,15 @@ add_executable(city_builder
 )
 target_link_libraries(city_builder PRIVATE ch_core ch_render SDL3::SDL3 SDL3_mixer::SDL3_mixer)
 
+# Deterministic SDL raster capture of live rail operation using the same
+# production locomotive, wagon and CH Blender turntable renderer adapters.
+# Separate executable: does not introduce test controls into city_builder.
+add_executable(rail_sdl_render_capture
+    src/rail_sdl_render_capture.cpp
+    src/rail_system.cpp
+)
+target_link_libraries(rail_sdl_render_capture PRIVATE ch_core SDL3::SDL3)
+
 # Narrow visual-contract pilot.  It uses the production MapDocument and
 # MapRenderer path and exists solely to capture the approved 6x6 water proof.
 add_executable(water_surface_pilot_runtime
