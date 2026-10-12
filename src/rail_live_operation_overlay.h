@@ -7,6 +7,8 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <array>
+#include <vector>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -59,6 +61,11 @@ namespace detail {
         hash = mix(hash, station.piece_group);
         hash = mix(hash, static_cast<std::uint64_t>(
             static_cast<std::int64_t>(std::llround(station.dwell_seconds * 1000.0))));
+    }
+    hash = mix(hash,state.turntables.size());
+    for(const RailPersistentTurntable& table:state.turntables){
+        hash=mix(hash,table.piece_group);
+        hash=mix(hash,static_cast<std::uint64_t>(table.build_cost));
     }
     return hash;
 }
@@ -188,6 +195,7 @@ public:
         else update_key_latches();
         update_clock();
         render_stations(renderer, *captured, camera, viewport_width, viewport_height);
+        render_turntables(renderer,*captured,camera,viewport_width,viewport_height);
     }
 
     void render_after_segment(SDL_Renderer* renderer,
@@ -213,6 +221,7 @@ public:
         handle_hotkeys(*captured, camera, viewport_width, viewport_height);
         update_clock();
         render_stations(renderer, *captured, camera, viewport_width, viewport_height);
+        render_turntables(renderer,*captured,camera,viewport_width,viewport_height);
         if (!production_sprites_) render_train(renderer, camera, viewport_width, viewport_height);
     }
 
@@ -359,6 +368,66 @@ private:
             (void)SDL_RenderFillRect(renderer, &platform);
             SDL_SetRenderDrawColor(renderer, 235, 222, 175, 255);
             (void)SDL_RenderRect(renderer, &platform);
+        }
+    }
+
+    void render_turntables(SDL_Renderer* renderer,
+                           const RailPersistentState& state,
+                           const ch::CameraState& camera,
+                           const float width, const float height) const {
+        constexpr float pi=3.14159265358979323846F;
+        constexpr float radius=3.6F;
+        for(const auto& table:state.turntables) {
+            const RailPlacementEdge* edge=detail::edge_for_group(state,table.piece_group);
+            if(!edge || !edge->active || edge->kind!=RailPlacementEdgeKind::straight)continue;
+            const auto c=RailMeshBuilder::sample_cubic(edge->segment,0.5F);
+            const ch::ScreenPoint middle=ch::world_to_screen_point(
+                c.x,c.y,c.z+0.02F,camera,width,height);
+            std::vector<SDL_Vertex> vertices;
+            vertices.reserve(34);
+            vertices.push_back({{middle.x,middle.y},{0.18F,0.19F,0.18F,1.0F},{0,0}});
+            std::vector<int> indices;
+            indices.reserve(96);
+            std::vector<SDL_FPoint> border;
+            border.reserve(34);
+            for(int n=0;n<=32;++n){
+                const float angle=(2.0F*pi*n)/32.0F;
+                const auto p=ch::world_to_screen_point(
+                    c.x+radius*std::cos(angle),c.y+radius*std::sin(angle),
+                    c.z+0.04F,camera,width,height);
+                border.push_back({p.x,p.y});
+                vertices.push_back({{p.x,p.y},{0.28F,0.30F,0.28F,1.0F},{0,0}});
+                if(n<32){
+                    indices.push_back(0);indices.push_back(n+1);indices.push_back(n+2);
+                }
+            }
+            (void)SDL_RenderGeometry(renderer,nullptr,vertices.data(),
+                                     static_cast<int>(vertices.size()),indices.data(),
+                                     static_cast<int>(indices.size()));
+            SDL_SetRenderDrawColor(renderer,186,155,97,255);
+            (void)SDL_RenderLines(renderer,border.data(),static_cast<int>(border.size()));
+            // The rotating steel bridge shares the locomotive's true
+            // rotational phase. The PNG vehicle pivots at this very center.
+            float turn=0.0F;
+            if(controller_.return_service_active()){
+                turn=static_cast<float>(controller_.turntable_rotation_radians());
+            }
+            const float dx=edge->segment.end.x-edge->segment.start.x;
+            const float dy=edge->segment.end.y-edge->segment.start.y;
+            const float base=std::atan2(dy,dx)+turn;
+            const float ax=std::cos(base),ay=std::sin(base);
+            const float nx=-ay,ny=ax;
+            for(int side=-1;side<=1;side+=2){
+                const float offset=side*0.37F;
+                const auto p1=ch::world_to_screen_point(
+                    c.x-3.0F*ax+offset*nx,c.y-3.0F*ay+offset*ny,c.z+0.07F,
+                    camera,width,height);
+                const auto p2=ch::world_to_screen_point(
+                    c.x+3.0F*ax+offset*nx,c.y+3.0F*ay+offset*ny,c.z+0.07F,
+                    camera,width,height);
+                SDL_SetRenderDrawColor(renderer,212,216,210,255);
+                (void)SDL_RenderLine(renderer,p1.x,p1.y,p2.x,p2.y);
+            }
         }
     }
 

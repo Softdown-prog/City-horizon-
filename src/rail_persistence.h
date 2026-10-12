@@ -15,7 +15,8 @@
 #include <utility>
 #include <vector>
 
-inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V2";
+inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V3";
+inline constexpr const char* kChRailPersistenceV2Contract = "CH_RAIL_PERSISTENCE_V2";
 inline constexpr const char* kChRailPersistenceLegacyContract = "CH_RAIL_PERSISTENCE_V1";
 
 struct RailPersistentAction {
@@ -30,11 +31,20 @@ struct RailPersistentStation {
     double dwell_seconds = 3.0;
 };
 
+// A real paid turntable mounted over one authored straight rail section.
+// The platform is centred at t=0.5 of the section, not an arbitrary marker.
+struct RailPersistentTurntable {
+    RailPlacementPieceId piece_group = kInvalidRailPlacementPieceId;
+    std::int64_t build_cost = 0;
+    std::int64_t refund_value = 0;
+};
+
 struct RailPersistentState {
     std::vector<RailPlacementNode> nodes;
     std::vector<RailPlacementEdge> edges;
     std::vector<RailPersistentAction> actions;
     std::vector<RailPersistentStation> stations;
+    std::vector<RailPersistentTurntable> turntables;
 };
 
 namespace ch::rail_persistence {
@@ -87,7 +97,7 @@ inline void clear_runtime_stations() noexcept {
 
 [[nodiscard]] inline bool restore_runtime_state(const RailPersistentState& state) {
     if (g_restore_runtime == nullptr) {
-        if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty()) {
+        if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty() || !state.turntables.empty()) {
             return false;
         }
         clear_runtime_stations();
@@ -96,6 +106,15 @@ inline void clear_runtime_stations() noexcept {
     if (!g_restore_runtime(state)) return false;
     g_runtime_stations = state.stations;
     return true;
+}
+
+[[nodiscard]] inline double detail_unused_turntable_length(const RailSplineSegment& segment) {
+    // The endpoint chord is a conservative lower bound for valid straight
+    // sections and stable across all persisted snapshots.
+    const double dx=static_cast<double>(segment.end.x)-segment.start.x;
+    const double dy=static_cast<double>(segment.end.y)-segment.start.y;
+    const double dz=static_cast<double>(segment.end.z)-segment.start.z;
+    return std::sqrt(dx*dx+dy*dy+dz*dz);
 }
 
 [[nodiscard]] inline bool validate(const RailPersistentState& state, std::string* error = nullptr) {
@@ -152,6 +171,35 @@ inline void clear_runtime_stations() noexcept {
         }
         station_groups.emplace(station.piece_group, true);
     }
+    // Turntable platforms use their own paid ledger; old rail pieces retain
+    // their existing action row unchanged. Only straight, long sections may
+    // anchor a rotating deck. Fail closed on orphaned or duplicate platforms.
+    std::unordered_map<RailPlacementPieceId, bool> turntable_groups;
+    for (const RailPersistentTurntable& table : state.turntables) {
+        if(table.piece_group == kInvalidRailPlacementPieceId ||
+           table.build_cost <= 0 || table.refund_value < 0 ||
+           table.refund_value > table.build_cost ||
+           turntable_groups.contains(table.piece_group) ||
+           station_groups.contains(table.piece_group)) {
+            if(error)*error="rail turntable cost, duplication or station overlap invalid";
+            return false;
+        }
+        bool valid_rail=false;
+        for(const RailPlacementEdge& edge:state.edges) {
+            if(!edge.active || edge.piece_group!=table.piece_group)continue;
+            if(valid_rail || edge.kind!=RailPlacementEdgeKind::straight ||
+               detail_unused_turntable_length(edge.segment) < 8.0) {
+                if(error)*error="rail turntable must anchor exactly one straight >=8m";
+                return false;
+            }
+            valid_rail=true;
+        }
+        if(!valid_rail) {
+            if(error)*error="rail turntable references removed or non-straight rail";
+            return false;
+        }
+        turntable_groups.emplace(table.piece_group,true);
+    }
     return true;
 }
 
@@ -183,6 +231,10 @@ inline void clear_runtime_stations() noexcept {
     for (const RailPersistentStation& station : state.stations) {
         output << "S " << station.piece_group << ' ' << station.dwell_seconds << '\n';
     }
+    for (const RailPersistentTurntable& table : state.turntables) {
+        output << "T " << table.piece_group << ' ' << table.build_cost << ' '
+               << table.refund_value << '\n';
+    }
     return output.str();
 }
 
@@ -192,11 +244,13 @@ inline void clear_runtime_stations() noexcept {
     std::istringstream input(payload);
     std::string header;
     if (!std::getline(input, header) ||
-        (header != kChRailPersistenceContract && header != kChRailPersistenceLegacyContract)) {
+        (header != kChRailPersistenceContract &&
+         header != kChRailPersistenceV2Contract && header != kChRailPersistenceLegacyContract)) {
         if (error) *error = "unsupported rail persistence payload";
         return false;
     }
     const bool legacy_v1 = header == kChRailPersistenceLegacyContract;
+    const bool v3 = header == kChRailPersistenceContract;
 
     RailPersistentState parsed;
     std::string line;
@@ -249,6 +303,13 @@ inline void clear_runtime_stations() noexcept {
                 return false;
             }
             parsed.stations.push_back(station);
+        } else if (kind == 'T' && v3) {
+            RailPersistentTurntable table;
+            if(!(row >> table.piece_group >> table.build_cost >> table.refund_value)) {
+                if(error)*error="invalid turntable row";
+                return false;
+            }
+            parsed.turntables.push_back(table);
         } else {
             if (error) *error = "unknown rail persistence row";
             return false;
@@ -342,7 +403,7 @@ inline void clear_runtime_stations() noexcept {
                                                 std::string* error = nullptr) {
     const std::string payload = serialize_payload(state);
     if (payload.empty() && (!state.nodes.empty() || !state.edges.empty() ||
-                            !state.actions.empty() || !state.stations.empty())) {
+                            !state.actions.empty() || !state.stations.empty() || !state.turntables.empty())) {
         if (error) *error = "rail state failed validation before save";
         return false;
     }

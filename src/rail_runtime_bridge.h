@@ -58,6 +58,7 @@ public:
         state.nodes = graph_.nodes();
         state.edges = graph_.edges();
         state.actions = committed_actions_;
+        state.turntables = turntables_;
         // A save captures only authoritative construction. A live ghost is
         // append-only after gesture_checkpoint_ and is never persisted.
         if (gesture_active_) {
@@ -77,6 +78,7 @@ public:
         cancel_gesture(false);
         if (!graph_.restore_snapshot(state.nodes, state.edges)) return false;
         committed_actions_ = state.actions;
+        turntables_ = state.turntables;
         selected_mode_ = RailPlacementMode::straight;
         connector_mode_ = false;
         connector_from_.reset();
@@ -93,6 +95,7 @@ public:
         cancel_gesture(false);
         graph_.clear();
         committed_actions_.clear();
+        turntables_.clear();
         hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
@@ -141,6 +144,10 @@ public:
                 case SDL_SCANCODE_4: select_mode(RailPlacementMode::turnout_left); return true;
                 case SDL_SCANCODE_5: select_mode(RailPlacementMode::turnout_right); return true;
                 case SDL_SCANCODE_6: select_mode(RailPlacementMode::crossing); return true;
+                case SDL_SCANCODE_0:
+                    if(gesture_active_)cancel_gesture(false);
+                    toggle_turntable(context);
+                    return true;
                 case SDL_SCANCODE_9:
                     if (gesture_active_) cancel_gesture(false);
                     connector_mode_ = !connector_mode_;
@@ -324,7 +331,7 @@ private:
         }
         status_ = std::string("RAIL ") + mode_label(selected_mode_) +
             " | LMB DRAG | 1-6 PIECE | Q/E HEADING " + std::to_string(heading_degrees()) +
-            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | 8 TRAIN RESTART | 9 CONNECT | T EXIT | PIECES " + std::to_string(piece_count());
+            " | DEL REMOVE | BACKSPACE LAST | 7 STATION | 8 RESTART | 9 CONNECT | 0 TURNTABLE | T EXIT | PIECES " + std::to_string(piece_count());
         if (hovered_piece_) status_ += " | HOVER " + std::to_string(*hovered_piece_);
     }
 
@@ -450,6 +457,90 @@ private:
             }
         }
         return true;
+    }
+
+    // Build a paid 7.2m rotating bridge centred over an existing straight.
+    // The rail itself remains a normal graph edge; the persisted device alone
+    // authorizes in-game locomotive rotation. No free hidden animation.
+    void toggle_turntable(const InteractionContext& context) {
+        if(!hovered_piece_) {
+            status_="TURNTABLE: HOVER A LONG STRAIGHT TRACK FIRST";
+            return;
+        }
+        const RailPlacementPieceId group=*hovered_piece_;
+        const auto found=std::find_if(turntables_.begin(),turntables_.end(),
+            [&](const RailPersistentTurntable& t){return t.piece_group==group;});
+        CityEconomy* economy=CityEconomy::active_instance();
+        if(economy==nullptr){status_="TURNTABLE: ECONOMY UNAVAILABLE";return;}
+        if(found!=turntables_.end()){
+            economy->credit_infrastructure_refund(found->refund_value);
+            turntables_.erase(found);
+            status_="TURNTABLE DISMANTLED: ENGINE RETURN NOW REQUIRES RESTART";
+            return;
+        }
+        const RailPlacementEdge* target=nullptr;
+        for(const auto& edge:graph_.edges()) {
+            if(edge.active && edge.piece_group==group) {
+                if(target!=nullptr || edge.kind!=RailPlacementEdgeKind::straight){
+                    status_="TURNTABLE: MUST USE ONE STRAIGHT SECTION";
+                    return;
+                }
+                target=&edge;
+            }
+        }
+        if(target==nullptr ||
+           rail_persistence::detail_unused_turntable_length(target->segment)<8.0) {
+            status_="TURNTABLE: STRAIGHT MUST BE AT LEAST 8M LONG";
+            return;
+        }
+        const auto& seg=target->segment;
+        const auto center=RailMeshBuilder::sample_cubic(seg,0.5F);
+        // A 7.2m diameter foundation is a construction footprint, not a
+        // floating decorative disc. Validate 9x9 tiles and level ground.
+        constexpr float kRadius=3.6F;
+        for(int x=static_cast<int>(std::floor(center.x-kRadius));
+                x<=static_cast<int>(std::floor(center.x+kRadius));++x) {
+            for(int y=static_cast<int>(std::floor(center.y-kRadius));
+                    y<=static_cast<int>(std::floor(center.y+kRadius));++y) {
+                const float dx=(static_cast<float>(x)+0.5F)-center.x;
+                const float dy=(static_cast<float>(y)+0.5F)-center.y;
+                if(dx*dx+dy*dy>kRadius*kRadius)continue;
+                std::string error;
+                if(!tile_available(x,y,context,&error)){
+                    status_="TURNTABLE: "+error;
+                    return;
+                }
+                if(context.terrain!=nullptr) {
+                    const float z=context.terrain->sample(
+                        static_cast<float>(x)+0.5F,static_cast<float>(y)+0.5F);
+                    if(!std::isfinite(z) || std::abs(z-center.z)>kTerrainLevelTolerance){
+                        status_="TURNTABLE: REQUIRES LEVEL TERRAIN";
+                        return;
+                    }
+                }
+            }
+        }
+        // No different rail segment may enter the spinning deck.
+        for(const auto& edge:graph_.edges()) {
+            if(!edge.active || edge.piece_group==group)continue;
+            const int samples=std::clamp(edge.segment.subdivisions,16,100);
+            for(int i=0;i<=samples;++i){
+                const auto point=RailMeshBuilder::sample_cubic(
+                    edge.segment,static_cast<float>(i)/static_cast<float>(samples));
+                const float dx=point.x-center.x,dy=point.y-center.y;
+                if(dx*dx+dy*dy<kRadius*kRadius){
+                    status_="TURNTABLE: OTHER RAIL INTERSECTS ROTATING DECK";
+                    return;
+                }
+            }
+        }
+        constexpr std::int64_t kPrice=3500;
+        if(!economy->can_afford(kPrice)||!economy->try_spend(kPrice)){
+            status_="TURNTABLE: INSUFFICIENT FUNDS";
+            return;
+        }
+        turntables_.push_back({group,kPrice,RailConstructionEconomy::demolition_refund(kPrice)});
+        status_="TURNTABLE BUILT: $3500 | SAVED WITH CITY";
     }
 
     // Click-to-connect 2 authored, open rail nodes. This is a persistent,
@@ -733,6 +824,14 @@ private:
         }
 
         economy->credit_infrastructure_refund(action->refund_value);
+        // The rotating device is a separately paid attachment to this rail.
+        // Demolishing its host must also decommission and refund the device.
+        const auto device=std::find_if(turntables_.begin(),turntables_.end(),
+            [&](const RailPersistentTurntable& t){return t.piece_group==piece_group;});
+        if(device!=turntables_.end()){
+            economy->credit_infrastructure_refund(device->refund_value);
+            turntables_.erase(device);
+        }
         action->active = false;
         hovered_piece_.reset();
         preview_valid_ = false;
@@ -777,6 +876,7 @@ private:
     std::optional<RailPlacementNodeId> connector_from_{};
     RailPlacementCheckpoint gesture_checkpoint_{};
     std::vector<RailPersistentAction> committed_actions_;
+    std::vector<RailPersistentTurntable> turntables_;
     std::optional<RailPlacementPieceId> hovered_piece_;
     std::int64_t preview_cost_ = 0;
     float new_root_heading_radians_ = 0.0F;

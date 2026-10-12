@@ -135,6 +135,69 @@ int main() {
         return fail("V1 payload compatibility");
     }
 
+    // V3: turntable is a paid rail attachment, bound to a single long
+    // straight section. Saves/load/legacy V2 compatibility remain deterministic.
+    RailPlacementGraph table_graph;
+    const auto table_root=table_graph.add_root({0,10,0},0);
+    if(!table_root)return fail("table root");
+    const auto host=table_graph.append_straight(*table_root,40.0F);
+    if(!host)return fail("table host straight");
+    RailPersistentState table_state;
+    table_state.nodes=table_graph.nodes();
+    table_state.edges=table_graph.edges();
+    const auto group=table_graph.edges()[host->edge].piece_group;
+    table_state.actions={{group,5000,3250,true}};
+    table_state.turntables={{group,3500,2275}};
+    if(!ch::rail_persistence::validate(table_state))
+        return fail("V3 valid physical turntable state");
+    const auto v3=ch::rail_persistence::serialize_payload(table_state);
+    RailPersistentState v3_loaded;
+    if(v3.find("CH_RAIL_PERSISTENCE_V3")!=0 ||
+       !ch::rail_persistence::deserialize_payload(v3,v3_loaded) ||
+       v3_loaded.turntables.size()!=1U ||
+       v3_loaded.turntables[0].build_cost!=3500 ||
+       v3_loaded.turntables[0].refund_value!=2275)
+        return fail("paid turntable V3 roundtrip");
+    RailPersistentState invalid_table=table_state;
+    invalid_table.turntables[0].piece_group=9999;
+    if(ch::rail_persistence::validate(invalid_table))
+        return fail("orphaned turntable accepted");
+    invalid_table=table_state;
+    invalid_table.turntables[0].refund_value=99999;
+    if(ch::rail_persistence::validate(invalid_table))
+        return fail("turntable unbounded refund accepted");
+    invalid_table=table_state;
+    invalid_table.turntables.push_back(table_state.turntables.front());
+    if(ch::rail_persistence::validate(invalid_table))
+        return fail("duplicate turntable accepted");
+    invalid_table=table_state;
+    invalid_table.stations={{group,1.0}};
+    if(ch::rail_persistence::validate(invalid_table))
+        return fail("turntable overlapping station accepted");
+    invalid_table=table_state;
+    invalid_table.edges[0].active=false;
+    invalid_table.actions[0].active=false;
+    if(ch::rail_persistence::validate(invalid_table))
+        return fail("turntable surviving demolished straight accepted");
+    RailPersistentState too_short=table_state;
+    too_short.nodes=state.nodes;
+    too_short.edges=state.edges;
+    too_short.actions=state.actions;
+    too_short.turntables={{first_group,3500,2275}};
+    if(ch::rail_persistence::validate(too_short))
+        return fail("4 metre deck below engine length accepted");
+
+    // V2 contains neither turntables nor their T rows; V3 serializer must
+    // not break decades of city snapshots by requiring a new field.
+    std::string version2=std::string(kChRailPersistenceV2Contract)+v3.substr(v3.find('\n'));
+    const std::size_t table_row=version2.find("\nT ");
+    if(table_row==std::string::npos)return fail("missing V3 T row");
+    version2.erase(table_row,version2.find('\n',table_row+1)-table_row);
+    RailPersistentState old_v2;
+    if(!ch::rail_persistence::deserialize_payload(version2,old_v2) ||
+       !old_v2.turntables.empty() || old_v2.edges.size()!=table_state.edges.size())
+        return fail("V2 old save backward compatibility");
+
     const ch::rail_persistence::ReadResult legacy = [&]() {
         const std::filesystem::path legacy_file = root_dir / "legacy.json";
         std::ofstream file(legacy_file, std::ios::binary | std::ios::trunc);

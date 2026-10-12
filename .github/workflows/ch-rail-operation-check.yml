@@ -9,6 +9,10 @@ on:
       - "src/rail_siding_topology_test.cpp"
       - "src/rail_detached_locomotive_shunt.h"
       - "src/rail_detached_locomotive_shunt_test.cpp"
+      - "src/rail_turntable_return.h"
+      - "src/rail_turntable_return_test.cpp"
+      - "src/rail_persistence.h"
+      - "src/rail_persistence_test.cpp"
       - "src/rail_train_sprite_render_adapter.h"
       - "src/rail_articulated_consist.h"
       - "src/rail_train_direction_math.h"
@@ -126,6 +130,26 @@ jobs:
             src/rail_system.cpp src/rail_detached_locomotive_shunt_test.cpp \
             -o build/rail-operation/rail_detached_locomotive_shunt_test
           build/rail-operation/rail_detached_locomotive_shunt_test
+
+      - name: Compile and run paid turntable A to B to A end-to-end regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_turntable_return_test.cpp \
+            -o build/rail-operation/rail_turntable_return_test
+          build/rail-operation/rail_turntable_return_test
+
+      - name: Compile and run V1/V2/V3 railway save compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_persistence_test.cpp \
+            -o build/rail-operation/rail_persistence_test
+          build/rail-operation/rail_persistence_test
 
       - name: Validate the CH_CAMERA_V1 eight-direction yaw map
         shell: bash
