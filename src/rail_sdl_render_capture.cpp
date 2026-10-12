@@ -272,7 +272,7 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
     double previous_loco_y=std::numeric_limits<double>::quiet_NaN();
     double previous_angle=0.0;
     std::ofstream chronology(out/"chronology.csv");
-    chronology<<"frame,simulation_seconds,phase,coupled,locomotive_x,locomotive_y,turn_radians\n";
+    chronology<<"frame,simulation_seconds,phase,coupled,locomotive_x,locomotive_y,turn_radians,locomotive_screen_x,locomotive_screen_y,table_screen_x,table_screen_y,camera_zoom\n";
     for(const Frame& frame:frames){
         const auto& locomotive=frame.units.front().pose;
         if(std::isfinite(previous_loco_x)){
@@ -290,9 +290,7 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
         previous_angle=frame.radians;
         previous_loco_x=locomotive.x;
         previous_loco_y=locomotive.y;
-        chronology<<index<<","<<frame.time_s<<","<<frame.sequence<<","
-                  <<frame.coupled<<","<<locomotive.x<<","
-                  <<locomotive.y<<","<<frame.radians<<"\n";
+
         const auto target=follow(frame,*table_center,camera);
         if(index==0)camera=target;
         else {
@@ -302,6 +300,24 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
             camera.zoom+=(target.zoom-camera.zoom)*kFollow;
             camera.pan_x+=(target.pan_x-camera.pan_x)*kFollow;
             camera.pan_y+=(target.pan_y-camera.pan_y)*kFollow;
+        }
+        const auto on_screen=ch::world_to_screen_point(
+            static_cast<float>(locomotive.x),static_cast<float>(locomotive.y),
+            static_cast<float>(locomotive.z),camera,
+            static_cast<float>(W),static_cast<float>(H));
+        const auto table_screen=ch::world_to_screen_point(
+            *table_center,camera,static_cast<float>(W),static_cast<float>(H));
+        chronology<<index<<","<<frame.time_s<<","<<frame.sequence<<","
+                  <<frame.coupled<<","<<locomotive.x<<","<<locomotive.y
+                  <<","<<frame.radians<<","<<on_screen.x<<","<<on_screen.y
+                  <<","<<table_screen.x<<","<<table_screen.y
+                  <<","<<camera.zoom<<"\n";
+        // A failed camera means the frame must NOT be accepted as proof.
+        if(frame.sequence==3 && (on_screen.x<120 || on_screen.x>W-120 ||
+                                 on_screen.y<85 || on_screen.y>H-85 ||
+                                 table_screen.x<75 || table_screen.x>W-75 ||
+                                 table_screen.y<70 || table_screen.y>H-70)){
+            std::cerr<<"Turntable maneuver outside video framing\n";return 13;
         }
         SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer,72,105,90,255);
