@@ -5,6 +5,8 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/renderer_backend_diagnostics.h"
+      - "src/renderer_backend_diagnostics_test.cpp"
       - "src/rail_train_sprite_render_adapter.h"
       - "src/rail_turntable_sprite_runtime.h"
       - "src/rail_turntable_return.h"
@@ -41,6 +43,8 @@ on:
     paths:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
+      - "src/renderer_backend_diagnostics.h"
+      - "src/renderer_backend_diagnostics_test.cpp"
       - "src/rail_train_sprite_render_adapter.h"
       - "src/rail_turntable_sprite_runtime.h"
       - "src/rail_turntable_return.h"
@@ -123,6 +127,15 @@ jobs:
       - name: Build live City Builder
         shell: bash
         run: cmake --build build/rail-runtime --target city_builder --parallel 2
+
+      - name: Verify real SDL renderer diagnostic under software fallback
+        shell: bash
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          cmake --build build/rail-runtime --target renderer_backend_diagnostics_test --parallel 2
+          build/rail-runtime/renderer_backend_diagnostics_test
 
       - name: Compile eight-view train direction regression
         shell: bash
