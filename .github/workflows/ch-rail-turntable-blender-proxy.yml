@@ -1,0 +1,109 @@
+name: CH Rail Turntable Blender Proxy
+
+on:
+  pull_request:
+    paths:
+      - 'tools/tycoon_photo_studio/build_rail_turntable_guarded.py'
+      - 'tools/tycoon_photo_studio/assets/rail_turntable_7m2_01.turntable.json'
+      - 'tools/ch_blender/jobs/rail.turntable.7m2.proxy.001.job.json'
+      - '.github/workflows/ch-rail-turntable-blender-proxy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ch-rail-turntable-proxy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reviewed-proxy-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate CH Blender authoring contract and source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/tycoon_photo_studio/build_rail_turntable_guarded.py
+          python3 -m json.tool tools/tycoon_photo_studio/assets/rail_turntable_7m2_01.turntable.json > /dev/null
+          python3 tools/ch_blender/ch_blender_cli.py validate-job \
+            --job tools/ch_blender/jobs/rail.turntable.7m2.proxy.001.job.json
+
+      - name: Install image check requirements
+        run: python3 -m pip install pillow
+
+      - name: Setup shared cached CH Blender
+        uses: ./.github/actions/setup-ch-blender
+
+      - name: Run guarded 4-view, 2-layer proxy
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          PYTHONPATH: ${{ github.workspace }}/tools/tycoon_photo_studio
+        run: |
+          set -euo pipefail
+          python3 tools/ch_blender/ch_blender_cli.py doctor
+          python3 tools/ch_blender/ch_blender_cli.py run-job \
+            --job tools/ch_blender/jobs/rail.turntable.7m2.proxy.001.job.json \
+            --report out/ch_blender_agent/rail.turntable.7m2.proxy.001/worker_report.json
+
+      - name: Verify transparency, layer separation, camera and create review sheet
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          out=Path('out/ch_blender_agent/rail.turntable.7m2.proxy.001')
+          manifest=json.loads((out/'rail_turntable_layer_manifest.json').read_text())
+          assert manifest['contract']=='CH_RAIL_TURNTABLE_LAYERED_BAKE_V1'
+          assert manifest['cameraContract']=='CH_CAMERA_V1'
+          assert manifest['footprintTiles']==[3,3]
+          assert manifest['qualityStage']=='proxy'
+          assert manifest['approvedForRuntime'] is False
+          assert manifest['diameterMetres']==7.2
+          assert set(manifest['layers'])=={'south','east','west','north'}
+          directions=['south','east','west','north']
+          modes=['assembly','base']
+          sheet=Image.new('RGB',(4*300,2*320),(42,48,54))
+          d=ImageDraw.Draw(sheet)
+          review={}
+          for col,direction in enumerate(directions):
+              for row,kind in enumerate(modes):
+                  path=out/f'rail_turntable_{kind}_{direction}.png'
+                  with Image.open(path) as img:
+                      assert img.size[0]>=240 and img.size[1]>=240, (path,img.size)
+                      assert img.mode=='RGBA', (path,img.mode)
+                      alpha=img.getchannel('A')
+                      assert alpha.getextrema()[0]==0 and alpha.getextrema()[1]==255, path
+                      assert alpha.getbbox() is not None, path
+                      rgba=img.convert('RGBA')
+                      rgba.thumbnail((276,276))
+                      background=Image.new('RGBA',rgba.size,(103,111,113,255))
+                      background.alpha_composite(rgba)
+                      sheet.paste(background.convert('RGB'),(300*col+12,320*row+31))
+                  d.text((300*col+12,320*row+9),f'{kind} / {direction}',fill='white')
+                  review[f'{kind}_{direction}']={'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+              assert review[f'assembly_{direction}']['sha256']!=review[f'base_{direction}']['sha256']
+          sheet.save(out/'rail_turntable_8_view_review.png')
+          (out/'validation.json').write_text(json.dumps({
+              'contract':'CH_RAIL_TURNTABLE_PROXY_REVIEW_V1',
+              'status':'proxy_geometry_pass',
+              'visualApproval':False,
+              'promotionAllowed':False,
+              'views':review},indent=2)+'\n')
+          print('CH RAIL TURNTABLE FOUR VIEW BASE/ASSEMBLY PROXY PASS')
+          PY
+
+      - name: Upload validation PNGs and CH Blender reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CH-Rail-Turntable-Proxy-${{ github.run_id }}
+          path: out/ch_blender_agent/rail.turntable.7m2.proxy.001
+          if-no-files-found: warn
+          retention-days: 30
