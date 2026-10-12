@@ -10,6 +10,7 @@
 #include <limits>
 #include <optional>
 #include <queue>
+#include <utility>
 #include <vector>
 
 namespace ch::rail_operation {
@@ -58,7 +59,7 @@ struct ConnectedSiding {
         on_main[edge.id]=true;
         const double at_from=cursor+(step.reversed?edge_length:0.0);
         const double at_to=cursor+(step.reversed?0.0:edge_length);
-        for(const auto [node,d]:{std::pair{edge.from,at_from},std::pair{edge.to,at_to}}) {
+        for(const auto& [node,d]:{std::pair{edge.from,at_from},std::pair{edge.to,at_to}}) {
             if(node>=node_distance.size())return std::nullopt;
             if(std::isfinite(node_distance[node]) &&
                std::abs(node_distance[node]-d)>0.05)return std::nullopt;
