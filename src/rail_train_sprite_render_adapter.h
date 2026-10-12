@@ -179,7 +179,10 @@ inline void render_unit(SDL_Renderer* renderer, const rail_operation::Articulate
     if (texture == nullptr)
         texture = get_texture(sprite_path(unit.kind, fallback_view));
     if (texture == nullptr) return;
-    const float scale = std::max(0.35F, camera.zoom) * layout.canvas_size_px;
+    // Preserve CH_CAMERA_V1's zoom across track and sprite projection.
+    // Do not impose a second 0.35 minimum on the locomotive and coaches.
+    if (!std::isfinite(camera.zoom) || camera.zoom <= 0.0F) return;
+    const float scale = camera.zoom * layout.canvas_size_px;
     const ScreenPoint origin = world_to_screen_point(
         static_cast<float>(unit.pose.x), static_cast<float>(unit.pose.y),
         static_cast<float>(unit.pose.z), camera, viewport_width, viewport_height);
