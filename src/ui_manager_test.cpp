@@ -68,6 +68,26 @@ int main() {
     const UiInputResult build_click = ui.handle_mouse_button_down(40, 765, true);
     require(build_click.consumed && build_click.action && build_click.action->action == UiAction::open_build_panel,
             "build toolbar click dispatches action");
+
+    // Railways have their own toolbar entry and must not masquerade as a
+    // construction card or accidentally start track/locomotive placement.
+    const auto rail_button = std::find_if(ui.buttons().begin(), ui.buttons().end(),
+        [](const UiButton& button) { return button.action == UiAction::open_railway_panel; });
+    require(rail_button != ui.buttons().end() && rail_button->label == "TRENS",
+            "railway toolbar button is separate from buildings");
+    const float rail_x = rail_button->bounds.x + rail_button->bounds.width / 2.0F;
+    const float rail_y = rail_button->bounds.y + rail_button->bounds.height / 2.0F;
+    const UiInputResult rail_click = ui.handle_mouse_button_down(rail_x, rail_y, true);
+    require(rail_click.consumed && rail_click.action &&
+                rail_click.action->action == UiAction::open_railway_panel,
+            "railway toolbar dispatches railway-only action");
+    ui.handle_mouse_button_up(rail_x, rail_y);
+    model.active_tool = UiTool::railways;
+    ui.update_layout(1280, 800, model);
+    const auto selected_rail = std::find_if(ui.buttons().begin(), ui.buttons().end(),
+        [](const UiButton& button) { return button.action == UiAction::open_railway_panel; });
+    require(selected_rail != ui.buttons().end() && selected_rail->active,
+            "railway category highlights independently");
     ui.handle_mouse_button_up(40, 765);
 
     model.build_panel_open = true;
