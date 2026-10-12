@@ -69,6 +69,66 @@ int main() {
         return fail("loaded station must recreate operational route");
     }
 
+
+    // Integration: persistent station markers A and B activate one shared
+    // 1+7-coach service. It must stop at B rather than reverse or overshoot.
+    RailPlacementGraph service_graph;
+    const auto service_root = service_graph.add_root({0.0F, 30.0F, 0.0F}, 0.0F);
+    if (!service_root) return fail("two-station service root");
+    RailPlacementNodeId service_cursor = *service_root;
+    RailPlacementPieceId service_a = kInvalidRailPlacementPieceId;
+    RailPlacementPieceId service_b = kInvalidRailPlacementPieceId;
+    for (int i = 0; i < 48; ++i) {
+        const auto part = service_graph.append_straight(service_cursor, 4.0F, 12);
+        if (!part) return fail("two-station service graph");
+        if (i == 11) service_a = service_graph.edges()[part->edge].piece_group;
+        if (i == 35) service_b = service_graph.edges()[part->edge].piece_group;
+        service_cursor = part->node;
+    }
+    RailPersistentState service_state;
+    service_state.nodes = service_graph.nodes();
+    service_state.edges = service_graph.edges();
+    service_state.stations = {{service_a, 0.3}, {service_b, 0.5}};
+    ch::rail_live_operation::LiveOperationController pair_controller;
+    if (!pair_controller.sync_from_persistent_state(service_state) ||
+        !pair_controller.operation_active() || !pair_controller.two_station_service_active()) {
+        return fail("two valid stations did not activate service");
+    }
+    const auto* service_route = pair_controller.operational_route();
+    const auto initial_pose = pair_controller.train_pose();
+    if (!service_route || service_route->stations.size() != 2U ||
+        !initial_pose || !initial_pose->station_piece ||
+        *initial_pose->station_piece != service_a ||
+        std::abs(initial_pose->distance_m - service_route->stations.front().distance_m) > 1e-4) {
+        return fail("train did not spawn at station A");
+    }
+    bool terminal_parked = false;
+    for (int i = 0; i < 1000; ++i) {
+        pair_controller.update(0.1);
+        if (!pair_controller.awaiting_terminal_maneuver()) continue;
+        const auto pose = pair_controller.train_pose();
+        if (!pose || pose->station_piece != service_b || pose->speed_mps != 0.0 ||
+            std::abs(pose->distance_m-service_route->stations.back().distance_m) > 1e-4) {
+            return fail("station B parking state invalid");
+        }
+        terminal_parked = true;
+        break;
+    }
+    if (!terminal_parked) return fail("A/B operation never reached station B");
+    if (!pair_controller.restart() || !pair_controller.two_station_service_active() ||
+        pair_controller.awaiting_terminal_maneuver() ||
+        !pair_controller.train_pose() ||
+        pair_controller.train_pose()->station_piece != service_a) {
+        return fail("A/B restart did not reset to station A");
+    }
+    // Reject very short platform approach without inventing off-map wagons.
+    service_state.stations = {{service_graph.edges()[1].piece_group,0.5},{service_b,0.5}};
+    ch::rail_live_operation::LiveOperationController short_controller;
+    if (short_controller.sync_from_persistent_state(service_state) &&
+        short_controller.two_station_service_active()) {
+        return fail("short platform approach incorrectly activated");
+    }
+
     if (graph.remove_piece(station_group) == 0U) return fail("station piece demolition setup");
     state.nodes = graph.nodes();
     state.edges = graph.edges();
