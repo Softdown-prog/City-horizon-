@@ -6,6 +6,8 @@ on:
       - feature/rail-turntable-runtime-20261012
     paths:
       - 'tools/ch_blender/jobs/rail.turntable.7m2.final.001.job.json'
+      - '.github/workflows/ch-rail-turntable-final-runtime.yml'
+      - 'tools/ch_blender/agent_worker.py'
   workflow_dispatch:
 
 permissions:
