@@ -91,8 +91,13 @@ struct Frame {
         x=0.5F*(x+static_cast<float>(tail.x));
         y=0.5F*(y+static_cast<float>(tail.y));
     }
-    camera.pan_x=-(x-y)*64.0F*camera.zoom;
-    camera.pan_y=-(x+y)*32.0F*camera.zoom;
+    // Project through the actual production camera contract. Hard-coded
+    // 64/32 multipliers may diverge from the engine's tile scale and rotate
+    // unexpectedly, forcing the turntable outside the recorded viewport.
+    const auto projected=ch::world_to_screen_point(
+        x,y,camera,static_cast<float>(W),static_cast<float>(H));
+    camera.pan_x=static_cast<float>(W)*0.5F-projected.x;
+    camera.pan_y=static_cast<float>(H)*0.5F-projected.y;
     return camera;
 }
 void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
