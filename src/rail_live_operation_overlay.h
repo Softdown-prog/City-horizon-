@@ -123,6 +123,50 @@ public:
     void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
     void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
     [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
+    // Click a placed rail station by its world-space projected center. This
+    // selects existing rail-station entities; it never edits track construction.
+    [[nodiscard]] std::optional<RailPlacementPieceId> select_station_at(
+        const float mouse_x, const float mouse_y,
+        const ch::CameraState& camera, const float viewport_width,
+        const float viewport_height) {
+        const auto persistent = rail_persistence::capture_runtime_state();
+        if (!persistent) return std::nullopt;
+        std::optional<RailPlacementPieceId> nearest;
+        float best = 1.0F;
+        const float zoom = std::max(0.35F, camera.zoom);
+        for (const RailPersistentStation& station : persistent->stations) {
+            const RailPlacementEdge* edge = detail::edge_for_group(*persistent, station.piece_group);
+            if (edge == nullptr) continue;
+            const RailWorldPoint3 middle = RailMeshBuilder::sample_cubic(edge->segment, 0.5F);
+            const float dx = edge->segment.end.x - edge->segment.start.x;
+            const float dy = edge->segment.end.y - edge->segment.start.y;
+            const float length = std::hypot(dx, dy);
+            const float nx = length > 0.0001F ? -dy / length : 0.0F;
+            const float ny = length > 0.0001F ? dx / length : 1.0F;
+            const ch::ScreenPoint center = ch::world_to_screen_point(
+                middle.x + 2.4F * nx, middle.y + 2.4F * ny, middle.z,
+                camera, viewport_width, viewport_height);
+            // Limit picking to the visible 5x3 station silhouette, rather
+            // than the entire large transparent PNG canvas.
+            const float radius_x = 52.0F * zoom;
+            const float radius_y = 32.0F * zoom;
+            const float u = (mouse_x - center.x) / radius_x;
+            const float v = (mouse_y - (center.y - 16.0F * zoom)) / radius_y;
+            const float score = u * u + v * v;
+            if (score < best) {
+                best = score;
+                nearest = station.piece_group;
+            }
+        }
+        selected_station_ = nearest;
+        return nearest;
+    }
+
+    void clear_station_selection() noexcept { selected_station_.reset(); }
+    [[nodiscard]] std::optional<RailPlacementPieceId> selected_station() const noexcept {
+        return selected_station_;
+    }
+
 
     // Single authoritative production frame. Never copy the whole rail graph
     // once per segment: hundreds of tracks would otherwise become quadratic.
@@ -235,6 +279,17 @@ private:
             const RailPlacementEdge* edge = detail::edge_for_group(state, station.piece_group);
             if (edge == nullptr) continue;
             const RailWorldPoint3 middle = RailMeshBuilder::sample_cubic(edge->segment, 0.5F);
+            if (selected_station_ == station.piece_group) {
+                const ch::ScreenPoint marker = ch::world_to_screen_point(
+                    middle.x, middle.y, middle.z + 0.16F,
+                    camera, viewport_width, viewport_height);
+                SDL_FRect outline{
+                    marker.x - 23.0F * zoom, marker.y - 12.0F * zoom,
+                    46.0F * zoom, 24.0F * zoom
+                };
+                SDL_SetRenderDrawColor(renderer, 255, 206, 70, 255);
+                (void)SDL_RenderRect(renderer, &outline);
+            }
             const ch::ScreenPoint screen = ch::world_to_screen_point(
                 middle.x, middle.y, middle.z + 0.05F,
                 camera, viewport_width, viewport_height);
@@ -341,6 +396,7 @@ private:
     bool state_ready_ = false;
     bool station_key_was_down_ = false;
     bool restart_key_was_down_ = false;
+    std::optional<RailPlacementPieceId> selected_station_{};
     bool production_sprites_ = false;
     bool simulation_running_ = true;
 };
