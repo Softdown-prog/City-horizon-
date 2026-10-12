@@ -78,7 +78,11 @@ namespace shunt_detail {
     const double run=siding.front_distance_m-b;
     const int steps=std::max(1,static_cast<int>(std::ceil(run/0.35)));
     for(int i=0;i<=steps;++i) {
-        const auto point=sample_operational_route_pose(route,b+run*i/steps);
+        // Distance sums are compiled independently from authored spline
+        // segments and their polyline samples. Clamp their ~1e-5 endpoint
+        // rounding difference rather than treating an in-map turnout as off-map.
+        const double distance=std::clamp(b+run*i/steps,0.0,route.length_m);
+        const auto point=sample_operational_route_pose(route,distance);
         if(!point || !shunt_detail::push(result,{point->x,point->y,point->z}))
             return reject("shunt-check-3");
     }
