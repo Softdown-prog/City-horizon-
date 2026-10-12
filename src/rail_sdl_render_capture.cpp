@@ -82,7 +82,7 @@ struct Frame {
     // Lock view to a locomotive, but keep the detached station-B consist in
     // background for actual pass-by verification.
     float x=static_cast<float>(locomotive.x),y=static_cast<float>(locomotive.y);
-    if(frame.sequence==3 && frame.units.size()==8U){
+    if(frame.coupled && frame.units.size()==8U){
         // During the return, centre on the WHOLE locomotive-plus-seven
         // consist. Keeping the camera locked to the engine sent the last
         // wagons beyond the right viewport edge and triggered black SDL
