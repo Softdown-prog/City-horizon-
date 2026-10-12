@@ -25,12 +25,20 @@ def font(size):
 
 def main(trace_path,outdir):
     data=json.loads(trace_path.read_text())
-    assert data["contract"]=="CH_RAIL_A_B_PROOF_V1"
+    assert data["contract"]=="CH_RAIL_A_B_RUNAROUND_PROOF_V2"
     frames=data["frames"]
-    assert len(frames)==640 and data["fps"]==FPS
+    assert len(frames)==1120 and data["fps"]==FPS
     checks=data["checks"]
-    assert checks["visits_a"]>=2 and checks["visits_b"]>=1 and checks["reversals"]>=2
-    assert checks["full_consist_frames"]==len(frames) and checks["max_coupler_gap_m"]<.75
+    assert checks["visits_a"]>=2 and checks["visits_b"]==1
+    assert checks["runaround_completed"]==1 and checks["turntable_completed"]==1
+    assert checks["recouplings"]==1 and checks["forward_return_frames"]>50
+    assert checks["max_locomotive_step_m"]<.75
+    assert checks["max_detached_coach_step_m"]<.00001
+    assert checks["max_coupler_error_m"]<.002
+    assert frames[-1]["phase"]=="DWELL_A"
+    assert all(len(f["units"])==8 for f in frames)
+    assert all(f["units"][0]["tx"]<-.99 for f in frames if f["phase"]=="B_TO_A")
+    assert all(f["units"][0]["tx"]>.99 for f in frames if f["phase"]=="A_TO_B")
     stations=data["stations"]
     assert [s["name"] for s in stations]==["A","B"]
     root=(ROOT/"assets"/"buildings"/"rail_terminal_station_b_5x3_01")
@@ -50,6 +58,8 @@ def main(trace_path,outdir):
             size=round(layout_for(role,view)[0]*ZOOM)
             sprites[(role,view)]=im.resize((size,size),Image.Resampling.LANCZOS)
     # Fixed camera keeps BOTH stations readable in one common rail map.
+    # Unlike the V1 proof, the locomotive actually enters a siding,
+    # rotates on the turntable and returns at the train's opposite end.
     mid_x=(stations[0]["x"]+stations[1]["x"])*.5
     mid_y=(stations[0]["y"]+stations[1]["y"])*.5
     shift_x=(mid_x-mid_y)*64*ZOOM
@@ -77,6 +87,29 @@ def main(trace_path,outdir):
             dx,dy=x1-x0,y1-y0;l=max(1,math.hypot(dx,dy))
             pts.append((x-sign*dy/l*4,y+sign*dx/l*4))
         canvas.line(pts,fill=(211,216,205),width=2)
+    # A separate, physically continuous railway path for the solo-locomotive
+    # run-around: two semicircular switches and one parallel passing siding.
+    bypass=[p(x,y) for x,y in data["shunt_track"]]
+    canvas.line(bypass,fill=(65,54,42),width=15,joint="curve")
+    canvas.line(bypass,fill=(147,124,96),width=11,joint="curve")
+    for i in range(2,len(bypass)-2,5):
+        ax,ay=bypass[i-1];bx,by=bypass[i+1]
+        dx,dy=bx-ax,by-ay
+        l=max(1.0,math.hypot(dx,dy))
+        nx,ny=-dy/l,dx/l
+        x,y=bypass[i]
+        canvas.line((x-nx*8,y-ny*8,x+nx*8,y+ny*8),fill=(74,51,34),width=3)
+    for sign in (-1,1):
+        pts=[]
+        for i,(x,y) in enumerate(bypass):
+            x0,y0=bypass[max(0,i-1)]
+            x1,y1=bypass[min(len(bypass)-1,i+1)]
+            dx,dy=x1-x0,y1-y0
+            l=max(1,math.hypot(dx,dy))
+            pts.append((x-sign*dy/l*4,y+sign*dx/l*4))
+        canvas.line(pts,fill=(209,216,205),width=2,joint="curve")
+    tx,ty=p(*data["turntable"])
+    canvas.ellipse((tx-28,ty-21,tx+28,ty+21),fill=(80,81,75),outline=(215,196,131),width=3)
     station_items=[]
     for station,view in zip(stations,("north","north")):
         x,y=p(station["x"],station["y"]+2.4)
@@ -91,6 +124,12 @@ def main(trace_path,outdir):
     try:
         for n,frame in enumerate(frames):
             im=base.copy()
+            # The turntable rotates a physical locomotive in place, 180 degrees.
+            # The train sprite heading is read from the native per-frame C++ trace.
+            dx,dy=frame["units"][0]["tx"],frame["units"][0]["ty"]
+            turn=ImageDraw.Draw(im)
+            turn.line((tx-dx*18,ty-dy*10,tx+dx*18,ty+dy*10),
+                      fill=(225,224,205),width=4)
             # Occlusion by ground contact order; station alpha comes from CH Blender.
             objects=[]
             for station,sprite,x,y in station_items:
@@ -112,13 +151,16 @@ def main(trace_path,outdir):
                 draw.rounded_rectangle((px-44,py+4,px+44,py+31),radius=5,fill=(30,43,37))
                 draw.text((px-36,py+7),"ESTAÇÃO "+station["name"],fill=(255,234,172),font=bodyfont)
             draw.rectangle((0,0,W,90),fill=(24,37,34))
-            draw.text((30,13),"CITY HORIZON  |  ESTAÇÕES A ↔ B",font=titlefont,fill=(242,237,209))
-            draw.text((31,57),"Duas instâncias do mesmo asset 5×3  •  poses reais do motor C++  •  trem + 7 vagões",
+            draw.text((30,13),"CITY HORIZON  |  ESTAÇÕES A ↔ B · MANOBRA REAL",font=titlefont,fill=(242,237,209))
+            draw.text((31,57),"Desengate • via de contorno • plataforma giratória • novo engate • retorno puxando 7 vagões",
                       font=bodyfont,fill=(197,216,202))
             draw.rectangle((0,H-65,W,H),fill=(24,37,34))
-            phase="PARADO NA ESTAÇÃO" if frame["dwelling"] else ("A → B" if frame["direction"]>0 else "B → A")
+            names={"A_TO_B":"A → B","DWELL_B":"PARADA NA B","RUNAROUND":"LOCOMOTIVA CONTORNANDO OS VAGÕES",
+                   "TURNTABLE":"PLATAFORMA GIRATÓRIA · 180°","RECOUPLE":"REENGATANDO O ÚLTIMO VAGÃO",
+                   "B_TO_A":"B → A · LOCOMOTIVA PUXANDO","DWELL_A":"CHEGADA À A"}
+            phase=names[frame["phase"]]
             draw.text((30,H-47),f"ESTADO: {phase}",font=bodyfont,fill=(241,219,144))
-            draw.text((520,H-47),f"Quadro {n+1}/640",font=bodyfont,fill=(230,235,222))
+            draw.text((520,H-47),f"Quadro {n+1}/{len(frames)}",font=bodyfont,fill=(230,235,222))
             draw.text((810,H-47),f"Tempo: {frame['time_s']:.1f}s",font=bodyfont,fill=(230,235,222))
             draw.text((28,H-20),"Prova por composição de dados C++ — não é captura da janela do jogo",
                       font=font(12),fill=(183,201,185))
