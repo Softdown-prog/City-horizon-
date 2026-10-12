@@ -6,6 +6,12 @@ on:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
       - "src/rail_train_sprite_render_adapter.h"
+      - "src/rail_turntable_sprite_runtime.h"
+      - "src/rail_turntable_return.h"
+      - "src/rail_live_operation_controller.h"
+      - "src/rail_live_operation_overlay.h"
+      - "assets/rail/turntable_7m2_01/**"
+      - "tools/rail_visual_proof/check_turntable_runtime_assets.py"
       - "src/rail_train_direction_math.h"
       - "src/rail_train_direction_math_test.cpp"
       - "src/economy_system.h"
@@ -35,6 +41,12 @@ on:
       - "src/main.cpp"
       - "src/main_runtime_impl.cpp"
       - "src/rail_train_sprite_render_adapter.h"
+      - "src/rail_turntable_sprite_runtime.h"
+      - "src/rail_turntable_return.h"
+      - "src/rail_live_operation_controller.h"
+      - "src/rail_live_operation_overlay.h"
+      - "assets/rail/turntable_7m2_01/**"
+      - "tools/rail_visual_proof/check_turntable_runtime_assets.py"
       - "src/rail_train_direction_math.h"
       - "src/rail_train_direction_math_test.cpp"
       - "src/economy_system.h"
@@ -93,6 +105,12 @@ jobs:
           set -euo pipefail
           python3 tools/rail_visual_proof/check_prerendered_track_assets.py
           grep -q "src/rail_2d_visual_catalog.cpp" CMakeLists.txt
+
+      - name: Check promoted CH Blender turntable completeness and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/rail_visual_proof/check_turntable_runtime_assets.py
 
       - name: Build live City Builder
         shell: bash
