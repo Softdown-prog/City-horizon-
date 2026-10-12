@@ -165,8 +165,28 @@ enum class View { south, east, north, west };
     SDL_Texture* bridge=get_texture(renderer,asset_path(*view,
                                             frame_index(rotation_radians),false));
     if(!base || !bridge)return false;
-    if(!SDL_RenderTexture(renderer,base,nullptr,&*base_dst))return false;
-    return SDL_RenderTexture(renderer,bridge,nullptr,&*bridge_dst);
+    // The software SDL review renderer can expose a black texture backing
+    // for partially offscreen 512/1024 RGBA turntable layers. Clip both axes
+    // in SOURCE and DESTINATION space before asking any SDL backend to draw.
+    // The actual city runtime uses the same compositor, so this also guards
+    // near-viewport construction during gameplay.
+    auto draw_visible=[&](SDL_Texture* texture,const SDL_FRect& dst)->bool {
+        if(!(dst.w>0.0F && dst.h>0.0F))return false;
+        const float left=std::max(0.0F,dst.x);
+        const float top=std::max(0.0F,dst.y);
+        const float right=std::min(viewport_w,dst.x+dst.w);
+        const float bottom=std::min(viewport_h,dst.y+dst.h);
+        if(right<=left || bottom<=top)return true; // safely out of view
+        float tw=0.0F,th=0.0F;
+        if(!SDL_GetTextureSize(texture,&tw,&th) || tw<=0 || th<=0)return false;
+        const SDL_FRect visible{left,top,right-left,bottom-top};
+        const SDL_FRect source{
+            (left-dst.x)*tw/dst.w,(top-dst.y)*th/dst.h,
+            visible.w*tw/dst.w,visible.h*th/dst.h};
+        return SDL_RenderTexture(renderer,texture,&source,&visible);
+    };
+    if(!draw_visible(base,*base_dst))return false;
+    return draw_visible(bridge,*bridge_dst);
 }
 
 } // namespace ch::rail_turntable_visual
