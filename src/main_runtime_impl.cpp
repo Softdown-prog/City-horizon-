@@ -3365,15 +3365,28 @@ int main() {
                     } else if (decoration_mode) {
                         status = "DECORATION: SELECT AN ITEM";
                     } else if (placement_definition_id.empty()) {
-                        const BuildingInstance* clicked = buildings.instance_at(clicked_tile.first, clicked_tile.second);
-                        if (clicked == nullptr) {
+                        const ch::CameraState station_camera{
+                            camera.pan_x, camera.pan_y, camera.zoom,
+                            static_cast<ch::CameraRotation>(camera.rotation)};
+                        const auto station = ch::rail_live_operation::overlay().select_station_at(
+                            event.button.x, event.button.y, station_camera,
+                            static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+                        if (station) {
                             selected_instance_id.reset();
-                        } else {
-                            selected_instance_id = clicked->instance_id;
-                            // Selection and its information panel are one action: one feedback sound only.
+                            status = "ESTACAO FERROVIARIA B SELECIONADA | ID " + std::to_string(*station) +
+                                     " | CONEXAO ENTRE ESTACOES EM DESENVOLVIMENTO";
                             (void)play_sound(SoundEvent::ui_select);
+                        } else {
+                            const BuildingInstance* clicked = buildings.instance_at(clicked_tile.first, clicked_tile.second);
+                            if (clicked == nullptr) {
+                                selected_instance_id.reset();
+                            } else {
+                                selected_instance_id = clicked->instance_id;
+                                // Selection and its information panel are one action: one feedback sound only.
+                                (void)play_sound(SoundEvent::ui_select);
+                            }
+                            status = clicked == nullptr ? "NO BUILDING ON THIS TILE" : "BUILDING SELECTED";
                         }
-                        status = clicked == nullptr ? "NO BUILDING ON THIS TILE" : "BUILDING SELECTED";
                     } else if (const BuildingDefinition* placement = catalog.find(placement_definition_id)) {
                         const BuildingPlacementValidation validation = validate_building_placement(
                             *placement, placement_rotation, clicked_tile.first, clicked_tile.second,
