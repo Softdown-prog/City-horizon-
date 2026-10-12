@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <string>
 
 namespace {
 [[nodiscard]] int fail(const char* message) {
@@ -56,6 +57,16 @@ int main() {
        link->front_junction!=*front_root ||
        link->bypass_edges[1]!=branch->edge)
         return fail("true connected siding not detected");
+
+    std::string narrow_diagnostic;
+    const auto rejected_shunt=ch::rail_operation::compile_detached_locomotive_shunt(
+        graph,route,*link,&narrow_diagnostic);
+    if(rejected_shunt) {
+        std::cerr<<"narrow siding unexpectedly dispatchable: B="
+                 <<route.stations.back().distance_m<<" headshunt="<<rejected_shunt->front_turnout_m
+                 <<" path="<<rejected_shunt->length_m<<'\n';
+        return fail("narrow siding allowed locomotive to overlap coaches");
+    }
 
     RailPersistentState state;
     state.nodes=graph.nodes();
