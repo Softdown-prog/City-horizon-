@@ -94,6 +94,33 @@ jobs:
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           test -s out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           cp out/rail-sdl-capture/frame_0050.png out/rail-sdl-capture/rail_sdl_review_preview.png
+      - name: Detect opaque black texture mattes in SDL recording
+        shell: bash
+        run: |
+          set -euo pipefail
+          for second in 2 26; do
+            ffmpeg -hide_banner -loglevel error -y -ss "$second" \
+              -i out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4 \
+              -frames:v 1 "out/rail-sdl-capture/matte_check_${second}.png"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          for path in sorted(Path("out/rail-sdl-capture").glob("matte_check_*.png")):
+              image=Image.open(path).convert("RGB")
+              # A legitimate wheel/rail shadow is not an opaque 24x24 square.
+              # Ignore the dark 52px text header; examine image content only.
+              for y in range(65,image.height-25,12):
+                  for x in range(0,image.width-25,12):
+                      patch=image.crop((x,y,x+24,y+24))
+                      opaque=sum(1 for r,g,b in patch.getdata()
+                                 if max(r,g,b)<22)
+                      if opaque>=540:
+                          raise AssertionError(
+                              f"SDL_OPAQUE_MATTE at {path.name} ({x},{y})")
+              print("NO_OPAQUE_MATTE:",path.name)
+          PY
+
       - name: Upload MP4, SDL screenshot and production review evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -104,6 +131,7 @@ jobs:
             out/rail-sdl-capture/rail_sdl_review_preview.png
             out/rail-sdl-capture/sprite_alpha_audit.json
             out/rail-sdl-capture/chronology.csv
+            out/rail-sdl-capture/matte_check_*.png
             assets/vehicles/steam_train_coach_01/steam_train_coach_north.png
           if-no-files-found: warn
           retention-days: 30
