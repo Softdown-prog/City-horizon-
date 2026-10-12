@@ -181,8 +181,43 @@ public:
     [[nodiscard]] bool set_route(OperationalRoute route) {
         if (!route.valid || !(route.length_m > 0.0)) return false;
         route_ = std::move(route);
+        terminal_pair_enabled_ = false;
         reset();
         return true;
+    }
+
+    // CH_RAIL_TWO_STATION_SERVICE_V1.
+    // Only a validated open two-station route may run in terminal mode.
+    // A locomotive with seven 3.9m coaches needs sufficient track behind A.
+    // This is NOT a turnaround: B is a safe parking state until an actually
+    // authored, connected siding/return path can be selected by the runtime.
+    [[nodiscard]] bool configure_terminal_pair() noexcept {
+        if (!route_.valid || route_.closed || route_.stations.size() != 2U) return false;
+        const StationStop& a = route_.stations[0];
+        const StationStop& b = route_.stations[1];
+        constexpr double locomotive_length_m = 5.2;
+        constexpr double coach_length_m = 3.9;
+        constexpr double coupler_gap_m = 0.42;
+        constexpr double trailing_coach_center_m = locomotive_length_m * 0.5 +
+            coupler_gap_m + coach_length_m * 0.5 +
+            6.0 * (coach_length_m + coupler_gap_m);
+        constexpr double trailing_clearance_m = trailing_coach_center_m + coach_length_m * 0.5;
+        constexpr double consist_length_m = locomotive_length_m +
+            7.0 * (coach_length_m + coupler_gap_m);
+        if (!std::isfinite(a.distance_m) || !std::isfinite(b.distance_m) ||
+            a.distance_m < trailing_clearance_m ||
+            b.distance_m - a.distance_m < consist_length_m ||
+            route_.length_m - b.distance_m < locomotive_length_m * 0.5) {
+            return false;
+        }
+        terminal_pair_enabled_ = true;
+        reset();
+        return true;
+    }
+
+    [[nodiscard]] bool terminal_pair_enabled() const noexcept { return terminal_pair_enabled_; }
+    [[nodiscard]] bool awaiting_terminal_maneuver() const noexcept {
+        return terminal_pair_enabled_ && stopped_ && next_station_index_ == route_.stations.size();
     }
 
     void reset() noexcept {
@@ -192,6 +227,12 @@ public:
         next_station_index_ = 0U;
         stopped_ = false;
         current_station_.reset();
+        if (terminal_pair_enabled_) {
+            distance_m_ = route_.stations.front().distance_m;
+            dwell_remaining_s_ = route_.stations.front().dwell_seconds;
+            current_station_ = route_.stations.front().piece_group;
+            next_station_index_ = 1U;
+        }
     }
 
     void set_cruise_speed_mps(const double speed) noexcept {
@@ -214,6 +255,12 @@ public:
             dwell_remaining_s_ = std::max(0.0, dwell_remaining_s_ - seconds);
             speed_mps_ = 0.0;
             if (dwell_remaining_s_ > 0.0) return;
+            if (terminal_pair_enabled_ && next_station_index_ >= route_.stations.size()) {
+                // The B platform is a real stop, not a point to overshoot.
+                // Remain here until a physical run-around route is supported.
+                stopped_ = true;
+                return;
+            }
             current_station_.reset();
             if (route_.closed && next_station_index_ >= route_.stations.size()) next_station_index_ = 0U;
         }
@@ -230,6 +277,10 @@ public:
                 dwell_remaining_s_ = stop.dwell_seconds;
                 current_station_ = stop.piece_group;
                 ++next_station_index_;
+                if (terminal_pair_enabled_ && next_station_index_ >= route_.stations.size() &&
+                    dwell_remaining_s_ <= 0.0) {
+                    stopped_ = true;
+                }
                 return;
             }
         }
@@ -311,6 +362,7 @@ private:
     double dwell_remaining_s_ = 0.0;
     std::size_t next_station_index_ = 0U;
     bool stopped_ = false;
+    bool terminal_pair_enabled_ = false;
     std::optional<RailPlacementPieceId> current_station_;
 };
 
