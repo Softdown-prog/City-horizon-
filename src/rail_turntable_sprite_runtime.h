@@ -156,6 +156,26 @@ enum class View { south, east, north, west };
     const auto view=authored_view(dx,dy,camera);
     if(!view)return false;
     const auto middle=RailMeshBuilder::sample_cubic(edge.segment,0.5F);
+    // The 1024px transparent canvas occupies much more space than the
+    // *physical* 7.2m circular deck. An offscreen platform must never submit
+    // its enormous transparent quad to SDL's software renderer: on the rail
+    // video runner its clipped RGBA backing appeared as an opaque black box.
+    // Compute conservative extents from the actual world-space radius, not
+    // from the image rectangle or the engine camera's cinematic zoom.
+    float lo_x=viewport_w,hi_x=0.0F,lo_y=viewport_h,hi_y=0.0F;
+    constexpr float radius_m=3.65F;
+    for(const auto [ox,oy]:std::array<std::array<float,2>,8>{{
+        {{-radius_m,-radius_m}},{{-radius_m,0}},{{-radius_m,radius_m}},
+        {{0,-radius_m}},{{0,radius_m}},{{radius_m,-radius_m}},
+        {{radius_m,0}},{{radius_m,radius_m}}
+    }}) {
+        const auto pixel=ch::world_to_screen_point(
+            middle.x+ox,middle.y+oy,middle.z,camera,viewport_w,viewport_h);
+        lo_x=std::min(lo_x,pixel.x);hi_x=std::max(hi_x,pixel.x);
+        lo_y=std::min(lo_y,pixel.y);hi_y=std::max(hi_y,pixel.y);
+    }
+    if(hi_x<0.0F || hi_y<0.0F || lo_x>viewport_w || lo_y>viewport_h)
+        return true; // successfully culled, neither layer drawn
     const auto base_dst=destination_rect(camera,viewport_w,viewport_h,
                            middle.x,middle.y,middle.z,kBaseResolution);
     const auto bridge_dst=destination_rect(camera,viewport_w,viewport_h,
