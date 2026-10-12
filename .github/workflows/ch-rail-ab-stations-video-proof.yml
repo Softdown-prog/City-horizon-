@@ -35,22 +35,32 @@ jobs:
           c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -Isrc \
             src/rail_system.cpp src/rail_ab_video_proof_export.cpp \
             -o out/station-ab/station_ab_export
-      - name: Validate A-B-A real movements and coupling
+      - name: Validate attached return, detached shunting, 180-degree turntable and coupling
         run: |
           out/station-ab/station_ab_export out/station-ab/native_station_ab_trace.json
           python - <<'PY'
           import json
           from pathlib import Path
           d=json.loads(Path('out/station-ab/native_station_ab_trace.json').read_text())
-          assert d['frame_count']==640 and d['fps']==16
+          assert d['contract']=='CH_RAIL_A_B_RUNAROUND_PROOF_V2'
+          assert d['frame_count']==1120 and d['fps']==16
           assert [s['name'] for s in d['stations']]==['A','B']
-          assert d['checks']['visits_a']>=2 and d['checks']['visits_b']>=1
-          assert d['checks']['reversals']>=2
-          assert d['checks']['full_consist_frames']==640
-          assert d['checks']['max_coupler_gap_m']<.75
+          assert d['checks']['visits_a']>=2 and d['checks']['visits_b']==1
+          assert d['checks']['runaround_completed']==1
+          assert d['checks']['turntable_completed']==1
+          assert d['checks']['recouplings']==1
+          assert d['checks']['forward_out_frames']>50
+          assert d['checks']['forward_return_frames']>50
+          assert d['checks']['max_locomotive_step_m']<.75
+          assert d['checks']['max_detached_coach_step_m']<.00001
+          assert d['checks']['max_coupler_error_m']<.002
+          assert d['frames'][-1]['phase']=='DWELL_A'
+          assert all(len(f['units'])==8 for f in d['frames'])
+          assert all(f['units'][0]['tx']<-.99 for f in d['frames'] if f['phase']=='B_TO_A')
+          assert all(f['units'][0]['tx']>.99 for f in d['frames'] if f['phase']=='A_TO_B')
           print('Station A ↔ B native motion verified:',d['checks'])
           PY
-      - name: Render 640 frames and encode station-to-station MP4
+      - name: Render 1120 frames and encode forward-facing station-to-station MP4
         run: |
           python tools/rail_visual_proof/render_station_ab_video.py \
             --trace out/station-ab/native_station_ab_trace.json \
