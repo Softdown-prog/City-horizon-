@@ -279,17 +279,6 @@ private:
             const RailPlacementEdge* edge = detail::edge_for_group(state, station.piece_group);
             if (edge == nullptr) continue;
             const RailWorldPoint3 middle = RailMeshBuilder::sample_cubic(edge->segment, 0.5F);
-            if (selected_station_ == station.piece_group) {
-                const ch::ScreenPoint marker = ch::world_to_screen_point(
-                    middle.x, middle.y, middle.z + 0.16F,
-                    camera, viewport_width, viewport_height);
-                SDL_FRect outline{
-                    marker.x - 23.0F * zoom, marker.y - 12.0F * zoom,
-                    46.0F * zoom, 24.0F * zoom
-                };
-                SDL_SetRenderDrawColor(renderer, 255, 206, 70, 255);
-                (void)SDL_RenderRect(renderer, &outline);
-            }
             const ch::ScreenPoint screen = ch::world_to_screen_point(
                 middle.x, middle.y, middle.z + 0.05F,
                 camera, viewport_width, viewport_height);
@@ -327,6 +316,19 @@ private:
                         }
                     }
                 }
+            }
+            if (selected_station_ == station.piece_group) {
+                const ch::ScreenPoint marker = ch::world_to_screen_point(
+                    middle.x, middle.y, middle.z + 0.16F,
+                    camera, viewport_width, viewport_height);
+                // Slightly wider than the station platform and drawn before
+                // its sprite; the ends remain visible as selection handles.
+                SDL_FRect outline{
+                    marker.x - 34.0F * zoom, marker.y - 16.0F * zoom,
+                    68.0F * zoom, 32.0F * zoom
+                };
+                SDL_SetRenderDrawColor(renderer, 255, 206, 70, 255);
+                (void)SDL_RenderRect(renderer, &outline);
             }
             if (station_texture) {
                 // The Blender model origin is centered on the 5x3 footprint.
