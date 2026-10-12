@@ -234,7 +234,7 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
     }
     if(frames.size()<60U || frames.size()>static_cast<std::size_t>(kMaxFrames))
         return 4;
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER,"software");
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER,"opengl");
     if(!SDL_Init(SDL_INIT_VIDEO)){std::cerr<<SDL_GetError()<<'\n';return 5;}
     SDL_Window* window=SDL_CreateWindow("City Horizon / SDL Railway Review",W,H,
         SDL_WINDOW_HIDDEN);
