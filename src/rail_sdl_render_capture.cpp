@@ -70,7 +70,10 @@ struct Frame {
 }
 [[nodiscard]] ch::CameraState follow(const Frame& frame) {
     ch::CameraState camera{};
-    camera.zoom=0.44F;
+    // Review capture: frame the complete return consist and avoid aggressive
+    // locomotive-locked zoom that clips 5+ of 7 coaches from the screen.
+    // Gameplay zoom remains player-controlled and is untouched.
+    camera.zoom=(frame.sequence==3)?0.27F:0.36F;
     camera.rotation=ch::CameraRotation::r0;
     const auto& locomotive=frame.units.front().pose;
     // Lock view to a locomotive, but keep the detached station-B consist in
@@ -172,6 +175,7 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
             const Frame& frame=frames[std::min(frames.size()-1,
                (frames.size()-1)*static_cast<std::size_t>(n)/(frames_per_phase-1))];
             const auto camera=follow(frame);
+            SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer,72,105,90,255);
             SDL_RenderClear(renderer);
             draw_tracks(renderer,state,camera);
@@ -197,6 +201,24 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
             for(const auto* unit:sorted)
                 ch::rail_train_visual::render_unit(renderer,*unit,camera,
                     static_cast<float>(W),static_cast<float>(H),texture_provider);
+            // Explicit slate for every editorial cut: selected operational
+            // stages are *not* adjacent simulation ticks. The captured clip
+            // must not falsely imply a train teleported between locations.
+            SDL_FRect caption_background{0.0F,0.0F,static_cast<float>(W),52.0F};
+            SDL_SetRenderDrawColor(renderer,14,22,24,220);
+            SDL_RenderFillRect(renderer,&caption_background);
+            SDL_SetRenderDrawColor(renderer,255,241,200,255);
+            SDL_RenderDebugText(renderer,16.0F,10.0F,
+                                "CITY HORIZON / RAIL SDL VISUAL VALIDATION");
+            SDL_RenderDebugText(renderer,16.0F,29.0F,frame.label);
+            // Show a visible cut to mark the four selected chronological
+            // chapters; the game itself never makes these editor jump cuts.
+            if(n<3 || n>20) {
+                const int edge=std::min(n,23-n);
+                const Uint8 opacity=static_cast<Uint8>((3-edge)*65);
+                SDL_SetRenderDrawColor(renderer,0,0,0,opacity);
+                SDL_RenderFillRect(renderer,nullptr);
+            }
             SDL_RenderPresent(renderer);
             SDL_Surface* pixels=SDL_RenderReadPixels(renderer,nullptr);
             if(!pixels){std::cerr<<"SDL_RenderReadPixels: "<<SDL_GetError()<<'\n';return 8;}
