@@ -276,7 +276,7 @@ bool is_primary_tool_action(UiAction action) {
     return action == UiAction::open_build_panel || action == UiAction::activate_roads ||
            action == UiAction::activate_sidewalks || action == UiAction::activate_land ||
            action == UiAction::activate_remove || action == UiAction::open_agriculture_panel ||
-           action == UiAction::activate_decoration;
+           action == UiAction::activate_decoration || action == UiAction::open_railway_panel;
 }
 
 const char* icon_name_for(UiAction action) {
@@ -288,6 +288,7 @@ const char* icon_name_for(UiAction action) {
         case UiAction::activate_remove: return "demolish";
         case UiAction::open_agriculture_panel: return "agriculture";
         case UiAction::activate_decoration: return "decoration";
+        case UiAction::open_railway_panel: return nullptr; // text-only until approved rail icon
         case UiAction::toggle_pause: return "pause";
         case UiAction::open_settings: return "settings";
         case UiAction::close_selection: return "close";
@@ -561,7 +562,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     const float context_width = std::clamp(toolbar_width * 0.25F, 190.0F, 330.0F);
     const float context_x = kMargin + toolbar_width - context_width;
     const float tools_width = std::max(1.0F, toolbar_width - context_width - 8.0F);
-    const float tool_width = tools_width / 7.0F;
+    const float tool_width = tools_width / 8.0F;
     add_panel({kMargin, toolbar_y, toolbar_width, kToolbarHeight});
     const float tool_y = toolbar_y + 11.0F;
     constexpr float tool_height = 52.0F;
@@ -572,6 +573,7 @@ void GameplayUi::update_layout(int viewport_width, int viewport_height, const Ga
     add_button({kMargin + 4.0F + tool_width * 4.0F, tool_y, tool_width - 6.0F, tool_height}, "DEMOLIR", UiAction::activate_remove, true, model.active_tool == UiTool::remove);
     add_button({kMargin + 4.0F + tool_width * 5.0F, tool_y, tool_width - 6.0F, tool_height}, "AGRICULTURA", UiAction::open_agriculture_panel, true, model.active_tool == UiTool::agriculture);
     add_button({kMargin + 4.0F + tool_width * 6.0F, tool_y, tool_width - 6.0F, tool_height}, "DECORACAO", UiAction::activate_decoration, true, model.active_tool == UiTool::decoration);
+    add_button({kMargin + 4.0F + tool_width * 7.0F, tool_y, tool_width - 6.0F, tool_height}, "TRENS", UiAction::open_railway_panel, true, model.active_tool == UiTool::railways);
 
     if (model.active_tool == UiTool::sidewalks) {
         const float button_y = toolbar_y + 39.0F;
@@ -1045,6 +1047,7 @@ void GameplayUi::render(SDL_Renderer* renderer) const {
             case UiTool::remove: title = "MODO DEMOLIR"; description = "ARRASTE PARA REMOVER UMA AREA"; break;
             case UiTool::agriculture: title = "MODO AGRICULTURA"; description = "PREPARE O SOLO OU PLANTE UMA CULTURA"; break;
             case UiTool::decoration: title = "MODO DECORACAO"; description = "EM BREVE"; break;
+            case UiTool::railways: title = "FERROVIAS"; description = "LOCOMOTIVA A VAPOR | EM BREVE"; break;
             case UiTool::none: break;
         }
         draw_text_fit(renderer, context_x + 6.0F, toolbar.y + 11.0F,
