@@ -141,9 +141,19 @@ int main() {
         narrow,na->edge,{{narrow.edges()[nb->edge].piece_group,0.0},
                           {narrow.edges()[middle->primary_edge].piece_group,0.5}});
     const auto narrow_siding=ch::rail_operation::find_connected_siding(narrow,narrow_route);
-    if(!narrow_siding ||
-       ch::rail_operation::compile_detached_locomotive_shunt(narrow,narrow_route,*narrow_siding))
-        return fail("unsafe near-overlapping siding was accepted");
+    if(!narrow_siding)return fail("second built siding not connected");
+    // The short-radius turnout is not automatically unsafe: its long
+    // tangent-controlled connector bows away from the parked train.
+    const auto actual_narrow=ch::rail_operation::compile_detached_locomotive_shunt(
+        narrow,narrow_route,*narrow_siding);
+    if(!actual_narrow)return fail("valid bowed siding failed real clearance gate");
+
+    // Deliberately insufficient room for the last of seven parked coaches.
+    // A stale/incorrectly inferred rear turnout must never dispatch.
+    auto blocked=*narrow_siding;
+    blocked.rear_distance_m=narrow_route.stations.back().distance_m-30.0;
+    if(ch::rail_operation::compile_detached_locomotive_shunt(narrow,narrow_route,blocked))
+        return fail("unsafe rear-point clearance was accepted");
     std::cout<<"CH_RAIL_DETACHED_LOCO_SHUNT_V1: PASS\n";
     return 0;
 }
