@@ -1,4 +1,5 @@
 #include "rail_live_operation_controller.h"
+#include "rail_placement_controller.h"
 #include "rail_siding_topology.h"
 
 #include <cmath>
