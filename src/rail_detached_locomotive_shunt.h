@@ -92,7 +92,18 @@ namespace shunt_detail {
         if(!forward && edge->to!=cursor)return std::nullopt;
         const auto destination=forward?edge->to:edge->from;
         if(destination>=placement.nodes().size())return std::nullopt;
-        constexpr int kCurveSamples=64;
+        const auto& curve=edge->segment;
+        const auto chord_length=[](const RailWorldPoint3& a,const RailWorldPoint3& b) {
+            return std::sqrt(static_cast<double>(a.x-b.x)*(a.x-b.x)+
+                             static_cast<double>(a.y-b.y)*(a.y-b.y)+
+                             static_cast<double>(a.z-b.z)*(a.z-b.z));
+        };
+        const double polygon=chord_length(curve.start,curve.control_a)+
+                             chord_length(curve.control_a,curve.control_b)+
+                             chord_length(curve.control_b,curve.end);
+        if (!std::isfinite(polygon) || !(polygon>0.0))return std::nullopt;
+        const int kCurveSamples=std::max(64,static_cast<int>(std::ceil(polygon/0.28)));
+        if (kCurveSamples>4096)return std::nullopt;
         for(int i=0;i<=kCurveSamples;++i) {
             const float t=static_cast<float>(i)/static_cast<float>(kCurveSamples);
             const auto position=RailMeshBuilder::sample_cubic(edge->segment,forward?t:1.0F-t);
@@ -188,9 +199,6 @@ public:
         std::size_t section=it==path_.cumulative_m.begin()?0U:
             static_cast<std::size_t>(it-path_.cumulative_m.begin()-1);
         section=std::min(section,path_.points.size()-2U);
-        // At the front turnout use the OUTBOUND tangent while stationary.
-        if((phase_==DetachedShuntPhase::gear_change) &&
-           section>0U) --section;
         const double begin=path_.cumulative_m[section];
         const double end=path_.cumulative_m[section+1U];
         if(!(end>begin))return std::nullopt;
