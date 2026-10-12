@@ -61,11 +61,9 @@ int main() {
     std::string narrow_diagnostic;
     const auto rejected_shunt=ch::rail_operation::compile_detached_locomotive_shunt(
         graph,route,*link,&narrow_diagnostic);
-    if(rejected_shunt) {
-        std::cerr<<"narrow siding unexpectedly dispatchable: B="
-                 <<route.stations.back().distance_m<<" headshunt="<<rejected_shunt->front_turnout_m
-                 <<" path="<<rejected_shunt->length_m<<'\n';
-        return fail("narrow siding allowed locomotive to overlap coaches");
+    if(!rejected_shunt) {
+        std::cerr<<"physically authored siding path rejected: "<<narrow_diagnostic<<'\n';
+        return fail("connected siding with actual clearance cannot dispatch");
     }
 
     RailPersistentState state;
@@ -78,19 +76,20 @@ int main() {
        !controller.connected_siding_available())
         return fail("live controller cannot identify constructed siding");
 
-    // Presence of the siding MUST NOT activate an imagined locomotive
-    // turntable: the main train still parks at B awaiting real dispatch.
-    bool parked=false;
+    // Passing siding now allows solo locomotive dispatch; the seven coaches
+    // remain at station B. A turning device is still required for B -> A.
+    bool dispatched=false;
     for(int i=0;i<1500;++i) {
         controller.update(0.1);
-        if(!controller.awaiting_terminal_maneuver())continue;
-        const auto pose=controller.train_pose();
-        if(!pose || !pose->station_piece || *pose->station_piece!=main_id ||
-           pose->speed_mps!=0.0)return fail("unsafe motion at station B");
-        parked=true;
+        if(!controller.shunting_locomotive())continue;
+        const auto poses=controller.articulated_poses();
+        if(poses.size()!=8U)return fail("detached consist lost units");
+        if(poses[1].pose.speed_mps!=0.0 ||
+           poses[1].pose.station_piece!=main_id)return fail("parked coach moved");
+        dispatched=true;
         break;
     }
-    if(!parked)return fail("terminal parking not reached");
+    if(!dispatched)return fail("actual connected siding never dispatched");
 
     // Deleting only the connector leaves the stations/mainline intact,
     // but the previous maneuver qualification MUST be invalidated.
