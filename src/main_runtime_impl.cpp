@@ -14,6 +14,7 @@
 #include "building_system.h"
 #include "coaster_runtime.h"
 #include "rail_train_sprite_render_adapter.h"
+#include "renderer_backend_diagnostics.h"
 #include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
 #include "economy_system.h"
@@ -1732,6 +1733,13 @@ int main() {
         SDL_Quit();
         return 1;
     }
+    // Record the actual runtime renderer (not the OpenGL backend used by
+    // the automated railway video). This deliberately does not force a GPU
+    // backend: SDL3 selects the working platform renderer by default.
+    ch::renderer_backend::report(renderer, std::cerr);
+    const std::string selected_backend = ch::renderer_backend::selected(renderer);
+    SDL_SetWindowTitle(window, (std::string("City Horizon | SDL: ") +
+        selected_backend + " | WASD: pan | Wheel: zoom | F5: save | F9: load").c_str());
     SDL_SetRenderVSync(renderer, 1);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 

@@ -137,6 +137,12 @@ add_executable(city_builder
 )
 target_link_libraries(city_builder PRIVATE ch_core ch_render SDL3::SDL3 SDL3_mixer::SDL3_mixer)
 
+# Small smoke executable proving detection of the renderer actually chosen by SDL3.
+add_executable(renderer_backend_diagnostics_test
+    src/renderer_backend_diagnostics_test.cpp
+)
+target_link_libraries(renderer_backend_diagnostics_test PRIVATE SDL3::SDL3)
+
 # Deterministic SDL raster capture of live rail operation using the same
 # production locomotive, wagon and CH Blender turntable renderer adapters.
 # Separate executable: does not introduce test controls into city_builder.
