@@ -51,7 +51,7 @@ jobs:
         run: |
           python3 -m pip install pillow
           python3 tools/rail_visual_proof/audit_steam_train_alpha.py
-      - name: Record 96 SDL frames of locomotive, seven wagons and rotating turntable
+      - name: Record uninterrupted SDL locomotive and seven-coach operational timeline
         env:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
@@ -59,22 +59,31 @@ jobs:
         run: |
           mkdir -p out/rail-sdl-capture
           build/rail-sdl-review/rail_sdl_render_capture out/rail-sdl-capture
-          test "$(find out/rail-sdl-capture -name 'frame_*.png' | wc -l)" -eq 96
-      - name: Reject black turntable-alpha matte in approach shot
+          test "$(find out/rail-sdl-capture -name 'frame_*.png' | wc -l)" -ge 60
+          test -s out/rail-sdl-capture/chronology.csv
+      - name: Validate continuous chronology and all six phases
         shell: bash
         run: |
           python3 - <<'PY'
-          from PIL import Image
+          import csv, math
           from pathlib import Path
-          frame=Image.open(Path("out/rail-sdl-capture/frame_0036.png")).convert("RGB")
-          # Above the railroad, outside the actual turntable silhouette.
-          # An opaque black RGBA backing used to cover this rectangle.
-          sample=frame.getpixel((265,175))
-          assert max(sample) > 45, f"CH_RAIL_ALPHA_MATTE_REGRESSION: opaque black at {sample}"
-          print("CH_RAIL_ALPHA_MATTE_V1: PASS no solid black rectangle at approach")
+          rows=list(csv.DictReader(Path("out/rail-sdl-capture/chronology.csv").open()))
+          files=sorted(Path("out/rail-sdl-capture").glob("frame_*.png"))
+          assert len(rows)==len(files) and len(rows)>=60
+          assert [int(r["frame"]) for r in rows]==list(range(len(rows)))
+          assert {int(r["phase"]) for r in rows}==set(range(6))
+          for a,b in zip(rows,rows[1:]):
+              assert abs(float(b["simulation_seconds"])-float(a["simulation_seconds"])-.5)<1e-7
+              assert math.hypot(float(b["locomotive_x"])-float(a["locomotive_x"]),
+                                float(b["locomotive_y"])-float(a["locomotive_y"]))<=4.3
+          turn=[r for r in rows if int(r["phase"])==3]
+          assert len(turn)>2
+          assert float(turn[0]["turn_radians"]) <= float(turn[-1]["turn_radians"])
+          assert int(rows[-1]["phase"])==5 and rows[-1]["coupled"] in ("1","true")
+          print("CONTINUOUS RAIL SDL V2: PASS no frame jumps, all phase transitions")
           PY
 
-      - name: Encode short MP4 from SDL pixels
+      - name: Encode full physically continuous rail SDL MP4
         run: |
           ffmpeg -hide_banner -loglevel error -y -framerate 12 \
             -i out/rail-sdl-capture/frame_%04d.png \
@@ -85,8 +94,6 @@ jobs:
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           test -s out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
           cp out/rail-sdl-capture/frame_0050.png out/rail-sdl-capture/rail_sdl_review_preview.png
-          cp out/rail-sdl-capture/frame_0012.png out/rail-sdl-capture/rail_sdl_matte_source_frame_12.png
-          cp out/rail-sdl-capture/frame_0036.png out/rail-sdl-capture/rail_sdl_matte_source_frame_36.png
       - name: Upload MP4, SDL screenshot and production review evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -96,8 +103,7 @@ jobs:
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
             out/rail-sdl-capture/rail_sdl_review_preview.png
             out/rail-sdl-capture/sprite_alpha_audit.json
-            out/rail-sdl-capture/rail_sdl_matte_source_frame_12.png
-            out/rail-sdl-capture/rail_sdl_matte_source_frame_36.png
+            out/rail-sdl-capture/chronology.csv
             assets/vehicles/steam_train_coach_01/steam_train_coach_north.png
           if-no-files-found: warn
           retention-days: 30

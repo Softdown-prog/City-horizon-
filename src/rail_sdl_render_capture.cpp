@@ -11,6 +11,8 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <fstream>
+#include <limits>
 #include <cmath>
 #include <filesystem>
 #include <iomanip>
@@ -31,6 +33,7 @@ struct Frame {
     double time_s=0.0;
     int sequence=0;
     const char* label="";
+    bool coupled=false;
 };
 [[nodiscard]] bool build_scene(RailPersistentState& state,
     ch::rail_live_operation::LiveOperationController& service,
@@ -73,13 +76,13 @@ struct Frame {
     // Review capture: frame the complete return consist and avoid aggressive
     // locomotive-locked zoom that clips 5+ of 7 coaches from the screen.
     // Gameplay zoom remains player-controlled and is untouched.
-    camera.zoom=(frame.sequence==3)?0.27F:0.36F;
+    camera.zoom=0.26F; // Must match the SDL draw camera exactly.
     camera.rotation=ch::CameraRotation::r0;
     const auto& locomotive=frame.units.front().pose;
     // Lock view to a locomotive, but keep the detached station-B consist in
     // background for actual pass-by verification.
     float x=static_cast<float>(locomotive.x),y=static_cast<float>(locomotive.y);
-    if(frame.sequence==3 && frame.units.size()==8U){
+    if(frame.coupled && frame.units.size()==8U){
         // During the return, centre on the WHOLE locomotive-plus-seven
         // consist. Keeping the camera locked to the engine sent the last
         // wagons beyond the right viewport edge and triggered black SDL
@@ -88,8 +91,13 @@ struct Frame {
         x=0.5F*(x+static_cast<float>(tail.x));
         y=0.5F*(y+static_cast<float>(tail.y));
     }
-    camera.pan_x=-(x-y)*64.0F*camera.zoom;
-    camera.pan_y=-(x+y)*32.0F*camera.zoom;
+    // Project through the actual production camera contract. Hard-coded
+    // 64/32 multipliers may diverge from the engine's tile scale and rotate
+    // unexpectedly, forcing the turntable outside the recorded viewport.
+    const auto projected=ch::world_to_screen_point(
+        x,y,camera,static_cast<float>(W),static_cast<float>(H));
+    camera.pan_x=static_cast<float>(W)*0.5F-projected.x;
+    camera.pan_y=static_cast<float>(H)*0.5F-projected.y;
     return camera;
 }
 void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
@@ -124,37 +132,81 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
         std::cerr<<"Rail screenshot fixture cannot compile the built track\n";
         return 2;
     }
-    std::array<std::vector<Frame>,4> phases;
-    const char* phase_names[]={"LOCOMOTIVE_ON_SIDING","APPROACH_TURNTABLE",
-                               "ROTATION_180","COUPLED_RETURN"};
-    bool saw_siding=false,saw_approach=false,saw_rotation=false,saw_return=false;
-    for(int tick=0;tick<8000;++tick) {
-        service.update(.1);
-        int stage=-1;
-        if(service.return_service_active()){
-            const auto p=service.return_phase();
-            if(p==ch::rail_operation::ReturnPhase::approach_turntable)stage=1;
-            if(p==ch::rail_operation::ReturnPhase::rotate_180)stage=2;
-            if(p==ch::rail_operation::ReturnPhase::coupled_return)stage=3;
-        } else if(service.shunting_locomotive() &&
-                  service.locomotive_shunt_phase() ==
-                    ch::rail_operation::DetachedShuntPhase::bypass_reverse)stage=0;
-        if(stage<0)continue;
-        if(tick%5!=0)continue;
+    // Continuous physical timeline, not a montage assembled from four
+    // unrelated clips. One output frame is one consecutive 0.5s update;
+    // no phase resampling, time reversal, teleports or omitted couplings.
+    constexpr double kSimulationSecondsPerFrame=0.5;
+    constexpr int kMaxFrames=1200;
+    std::vector<Frame> frames;
+    frames.reserve(600);
+    std::array<bool,6> saw_phase{};
+    bool shunt_seen=false,coach_held=false,rotation_seen=false;
+    bool recouple_seen=false,arrived_a=false;
+    int parked_tail_frames=0;
+    double previous_time=-1.0;
+    std::optional<std::array<std::pair<double,double>,7>> parked_coaches;
+    for(int tick=0;tick<kMaxFrames;++tick) {
+        service.update(kSimulationSecondsPerFrame);
         auto units=service.articulated_poses();
         if(units.size()!=8U){
             std::cerr<<"SDL scene lost a vehicle\n";return 3;
         }
-        phases[stage].push_back({std::move(units),service.return_phase(),
-            service.turntable_rotation_radians(),tick*.1,stage,phase_names[stage]});
-        if(stage==0)saw_siding=true;
-        if(stage==1)saw_approach=true;
-        if(stage==2)saw_rotation=true;
-        if(stage==3)saw_return=true;
+        const auto pose=service.train_pose();
+        if(!pose)return 3;
+        if(!std::isfinite(pose->x)||!std::isfinite(pose->y))return 3;
+        int stage=0;
+        const char* name="A TO B / TRAIN APPROACH";
+        if(service.return_service_active()){
+            const auto p=service.return_phase();
+            if(p==ch::rail_operation::ReturnPhase::approach_turntable){
+                stage=2;name="DETACHED / APPROACH TURNING DECK";
+            } else if(p==ch::rail_operation::ReturnPhase::rotate_180){
+                stage=3;name="LOCOMOTIVE STOPS / ROTATE 180";
+            } else if(p==ch::rail_operation::ReturnPhase::reverse_to_coach){
+                stage=4;name="TURN COMPLETE / MOVE TO COACHES";
+            } else if(p==ch::rail_operation::ReturnPhase::coupled_return){
+                stage=5;name="RECOUPLED / RETURN TO STATION A";
+            } else if(p==ch::rail_operation::ReturnPhase::parked_at_a){
+                stage=5;name="ARRIVED AT STATION A";
+                arrived_a=true;
+            }
+        } else if(service.shunting_locomotive()){
+            stage=1;name="STATION B / LOCOMOTIVE RUN-AROUND";
+            shunt_seen=true;
+        }
+        saw_phase[stage]=true;
+        if(service.shunting_locomotive()){
+            std::array<std::pair<double,double>,7> positions{};
+            for(std::size_t i=1;i<units.size();++i)
+                positions[i-1]={units[i].pose.x,units[i].pose.y};
+            if(!parked_coaches)parked_coaches=positions;
+            else for(std::size_t i=0;i<7;++i)
+                if(std::hypot(positions[i].first-(*parked_coaches)[i].first,
+                              positions[i].second-(*parked_coaches)[i].second)>0.03){
+                    std::cerr<<"Detached coach moved while locomotive shunted\n";return 4;
+                }
+            coach_held=true;
+        }
+        const double turn=service.turntable_rotation_radians();
+        if(stage==3){
+            rotation_seen=true;
+            if(service.return_coupled())return 4;
+        }
+        if(service.return_coupled())recouple_seen=true;
+        const double time=(tick+1)*kSimulationSecondsPerFrame;
+        if(time<=previous_time)return 4;
+        previous_time=time;
+        frames.push_back({std::move(units),service.return_phase(),
+            turn,time,stage,name,service.return_coupled()});
+        if(arrived_a && ++parked_tail_frames>=8)break;
     }
-    if(!saw_siding||!saw_approach||!saw_rotation||!saw_return){
-        std::cerr<<"Missing physical scene stage\n";return 4;
+    if(!arrived_a||!shunt_seen||!coach_held||!rotation_seen||
+       !recouple_seen||!std::all_of(saw_phase.begin(),saw_phase.end(),
+                                    [](bool flag){return flag;})){
+        std::cerr<<"Continuous rail cycle incomplete; refusing montage\n";return 4;
     }
+    if(frames.size()<60U || frames.size()>static_cast<std::size_t>(kMaxFrames))
+        return 4;
     SDL_SetHint(SDL_HINT_RENDER_DRIVER,"software");
     if(!SDL_Init(SDL_INIT_VIDEO)){std::cerr<<SDL_GetError()<<'\n';return 5;}
     SDL_Window* window=SDL_CreateWindow("City Horizon / SDL Railway Review",W,H,
@@ -175,79 +227,92 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
     };
     std::filesystem::create_directories(out);
     int index=0;
-    std::array<int,4> emitted{};
-    for(int stage=0;stage<4;++stage){
-        const auto& frames=phases[stage];
-        if(frames.empty())continue;
-        constexpr int frames_per_phase=24;
-        for(int n=0;n<frames_per_phase;++n){
-            const Frame& frame=frames[std::min(frames.size()-1,
-               (frames.size()-1)*static_cast<std::size_t>(n)/(frames_per_phase-1))];
-            const auto camera=follow(frame);
-            SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer,72,105,90,255);
-            SDL_RenderClear(renderer);
-            draw_tracks(renderer,state,camera);
-            // Render the same Blender 104-image compositor as the interactive
-            // game, and check every chosen asset has a valid render path.
-            for(const auto& edge:state.edges){
-                if(!edge.active || edge.piece_group!=table)continue;
-                const double angle=stage==2?frame.radians:
-                    stage==3?static_cast<double>(PI):0.0;
-                if(!ch::rail_turntable_visual::render(renderer,edge,angle,
-                       camera,static_cast<float>(W),static_cast<float>(H))){
-                    std::cerr<<"Turntable sprite renderer rejected approved asset\n";return 7;
-                }
-                break;
+    // The camera follows the ACTUAL service at a constant preview zoom.
+    // Its target is smoothly filtered; no abrupt editorial camera resets.
+    ch::CameraState camera{};
+    camera.zoom=0.26F;
+    camera.rotation=ch::CameraRotation::r0;
+    double previous_loco_x=std::numeric_limits<double>::quiet_NaN();
+    double previous_loco_y=std::numeric_limits<double>::quiet_NaN();
+    double previous_angle=0.0;
+    std::ofstream chronology(out/"chronology.csv");
+    chronology<<"frame,simulation_seconds,phase,coupled,locomotive_x,locomotive_y,turn_radians\n";
+    for(const Frame& frame:frames){
+        const auto& locomotive=frame.units.front().pose;
+        if(std::isfinite(previous_loco_x)){
+            // 3.25m/s at 0.5s per frame, plus a tolerance for short
+            // state-machine transitions; teleporting invalidates the proof.
+            const double distance=std::hypot(locomotive.x-previous_loco_x,
+                                              locomotive.y-previous_loco_y);
+            if(distance>4.25){
+                std::cerr<<"Rail visual discontinuity at "<<frame.time_s
+                         <<" seconds: "<<distance<<"m\n";
+                return 11;
             }
-            // Independent locomotive and 7 coached poses, identical production
-            // renderer, world depth and 8-view sprites (no synthetic chassis).
-            std::vector<const ch::rail_operation::ArticulatedUnitPose*> sorted;
-            for(const auto& unit:frame.units)sorted.push_back(&unit);
-            std::stable_sort(sorted.begin(),sorted.end(),[](auto* a,auto* b){
-                return a->pose.x+a->pose.y<b->pose.x+b->pose.y;
-            });
-            for(const auto* unit:sorted)
-                ch::rail_train_visual::render_unit(renderer,*unit,camera,
-                    static_cast<float>(W),static_cast<float>(H),texture_provider);
-            // Explicit slate for every editorial cut: selected operational
-            // stages are *not* adjacent simulation ticks. The captured clip
-            // must not falsely imply a train teleported between locations.
-            SDL_FRect caption_background{0.0F,0.0F,static_cast<float>(W),52.0F};
-            SDL_SetRenderDrawColor(renderer,14,22,24,220);
-            SDL_RenderFillRect(renderer,&caption_background);
-            SDL_SetRenderDrawColor(renderer,255,241,200,255);
-            SDL_RenderDebugText(renderer,16.0F,10.0F,
-                                "CITY HORIZON / RAIL SDL VISUAL VALIDATION");
-            SDL_RenderDebugText(renderer,16.0F,29.0F,frame.label);
-            // Show a visible cut to mark the four selected chronological
-            // chapters; the game itself never makes these editor jump cuts.
-            if(n<3 || n>20) {
-                const int edge=std::min(n,23-n);
-                const Uint8 opacity=static_cast<Uint8>((3-edge)*65);
-                SDL_SetRenderDrawColor(renderer,0,0,0,opacity);
-                SDL_RenderFillRect(renderer,nullptr);
-            }
-            SDL_RenderPresent(renderer);
-            SDL_Surface* pixels=SDL_RenderReadPixels(renderer,nullptr);
-            if(!pixels){std::cerr<<"SDL_RenderReadPixels: "<<SDL_GetError()<<'\n';return 8;}
-            std::ostringstream fname;
-            fname<<"frame_"<<std::setw(4)<<std::setfill('0')<<index++<<".png";
-            const auto path=out/fname.str();
-            const bool wrote=SDL_SavePNG(pixels,path.string().c_str());
-            SDL_DestroySurface(pixels);
-            if(!wrote){std::cerr<<"SDL_SavePNG: "<<SDL_GetError()<<'\n';return 9;}
-            ++emitted[stage];
         }
+        if(frame.radians+0.0001<previous_angle)return 11;
+        previous_angle=frame.radians;
+        previous_loco_x=locomotive.x;
+        previous_loco_y=locomotive.y;
+        chronology<<index<<","<<frame.time_s<<","<<frame.sequence<<","
+                  <<frame.coupled<<","<<locomotive.x<<","
+                  <<locomotive.y<<","<<frame.radians<<"\n";
+        const auto target=follow(frame);
+        if(index==0){camera.pan_x=target.pan_x;camera.pan_y=target.pan_y;}
+        else {
+            const float kFollow=0.17F;
+            camera.pan_x+=(target.pan_x-camera.pan_x)*kFollow;
+            camera.pan_y+=(target.pan_y-camera.pan_y)*kFollow;
+        }
+        SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer,72,105,90,255);
+        SDL_RenderClear(renderer);
+        draw_tracks(renderer,state,camera);
+        for(const auto& edge:state.edges){
+            if(!edge.active || edge.piece_group!=table)continue;
+            if(!ch::rail_turntable_visual::render(renderer,edge,frame.radians,
+                   camera,static_cast<float>(W),static_cast<float>(H))){
+                std::cerr<<"Turntable sprite renderer rejected approved asset\n";
+                return 7;
+            }
+            break;
+        }
+        std::vector<const ch::rail_operation::ArticulatedUnitPose*> sorted;
+        for(const auto& unit:frame.units)sorted.push_back(&unit);
+        std::stable_sort(sorted.begin(),sorted.end(),[&](auto* a,auto* b){
+            return ch::camera_depth_key(static_cast<float>(a->pose.x),
+                        static_cast<float>(a->pose.y),camera) <
+                   ch::camera_depth_key(static_cast<float>(b->pose.x),
+                        static_cast<float>(b->pose.y),camera);
+        });
+        for(const auto* unit:sorted)
+            ch::rail_train_visual::render_unit(renderer,*unit,camera,
+                static_cast<float>(W),static_cast<float>(H),texture_provider);
+        SDL_FRect caption_background{0.0F,0.0F,static_cast<float>(W),52.0F};
+        SDL_SetRenderDrawColor(renderer,14,22,24,220);
+        SDL_RenderFillRect(renderer,&caption_background);
+        SDL_SetRenderDrawColor(renderer,255,241,200,255);
+        SDL_RenderDebugText(renderer,16.0F,10.0F,
+                            "CITY HORIZON / CONTINUOUS SDL RAIL CYCLE");
+        SDL_RenderDebugText(renderer,16.0F,29.0F,frame.label);
+        SDL_RenderPresent(renderer);
+        SDL_Surface* pixels=SDL_RenderReadPixels(renderer,nullptr);
+        if(!pixels){std::cerr<<"SDL_RenderReadPixels: "<<SDL_GetError()<<'\n';return 8;}
+        std::ostringstream fname;
+        fname<<"frame_"<<std::setw(4)<<std::setfill('0')<<index++<<".png";
+        const bool wrote=SDL_SavePNG(pixels,(out/fname.str()).string().c_str());
+        SDL_DestroySurface(pixels);
+        if(!wrote){std::cerr<<"SDL_SavePNG: "<<SDL_GetError()<<'\n';return 9;}
     }
+    chronology.close();
     for(auto& [name,texture]:textures)if(texture)SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    if(index!=96)return 10;
-    std::cout<<"CH_RAIL_SDL_RENDER_CAPTURE_V1 PASS: "<<index
-             <<" frames, four operational phases, actual CH Blender sprites, "
-             <<"real 8-unit controller, SDL pixels\n";
+    if(index!=static_cast<int>(frames.size()))return 10;
+    std::cout<<"CH_RAIL_SDL_CONTINUOUS_CAPTURE_V2 PASS: "<<index
+             <<" contiguous frames, complete A to B to A operation, "
+             <<"real 8-unit controller, no simulated teleports, SDL pixels\n";
     return 0;
 }
 }
