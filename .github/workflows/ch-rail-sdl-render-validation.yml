@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - "src/rail_sdl_render_capture.cpp"
+      - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
   push:
     branches: [main]
     paths:
       - "src/rail_sdl_render_capture.cpp"
+      - "tools/rail_visual_proof/audit_steam_train_alpha.py"
       - "CMakeLists.txt"
       - ".github/workflows/ch-rail-sdl-render-validation.yml"
   workflow_dispatch:
@@ -41,6 +43,10 @@ jobs:
         run: |
           python3 tools/rail_visual_proof/check_turntable_runtime_assets.py
           python3 tools/rail_visual_proof/check_runtime_consist_integration.py
+      - name: Inspect alpha in approved source sprites
+        run: |
+          python3 -m pip install pillow
+          python3 tools/rail_visual_proof/audit_steam_train_alpha.py
       - name: Record 96 SDL frames of locomotive, seven wagons and rotating turntable
         env:
           SDL_VIDEODRIVER: dummy
@@ -69,5 +75,6 @@ jobs:
           path: |
             out/rail-sdl-capture/rail_sdl_actual_renderer_review.mp4
             out/rail-sdl-capture/rail_sdl_review_preview.png
+            out/rail-sdl-capture/sprite_alpha_audit.json
           if-no-files-found: warn
           retention-days: 30
