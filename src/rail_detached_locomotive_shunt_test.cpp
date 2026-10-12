@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <string>
 
 namespace {
 int fail(const char* message){std::cerr<<"Detached locomotive shunt: "<<message<<'\n';return 1;}
@@ -42,9 +43,12 @@ int main() {
     if(!route.valid || route.closed)return fail("main route compilation");
     const auto connected=ch::rail_operation::find_connected_siding(graph,route);
     if(!connected)return fail("passing siding topology");
-    const auto plan=ch::rail_operation::compile_detached_locomotive_shunt(graph,route,*connected);
-    if(!plan || !plan->valid || !(plan->length_m>plan->front_turnout_m+100))
+    std::string diagnostic;
+    const auto plan=ch::rail_operation::compile_detached_locomotive_shunt(graph,route,*connected,&diagnostic);
+    if(!plan || !plan->valid || !(plan->length_m>plan->front_turnout_m+100)) {
+        std::cerr<<"shunt path diagnostic="<<diagnostic<<'\n';
         return fail("safe shunt path from actual track");
+    }
     if(!near(plan->front_turnout_m,connected->front_distance_m-route.stations[1].distance_m,0.1))
         return fail("headshunt distance mismatch");
 
