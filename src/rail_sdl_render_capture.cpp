@@ -71,33 +71,60 @@ struct Frame {
            service.sync_from_persistent_state(state) &&
            service.turntable_return_available();
 }
-[[nodiscard]] ch::CameraState follow(const Frame& frame) {
-    ch::CameraState camera{};
-    // Review capture: frame the complete return consist and avoid aggressive
-    // locomotive-locked zoom that clips 5+ of 7 coaches from the screen.
-    // Gameplay zoom remains player-controlled and is untouched.
-    camera.zoom=0.26F; // Must match the SDL draw camera exactly.
+// CH_RAIL_REVIEW_CONTEXT_CAMERA_V3: frame the *action*, not merely the loco.
+// During a detached maneuver, keep the platform and nearby coaches visible;
+// when coupled, fit the whole eight-vehicle consist without chopping wagons.
+[[nodiscard]] ch::CameraState follow(const Frame& frame,
+                                   const ch::WorldPoint3& deck,
+                                   const ch::CameraState& current) {
+    ch::CameraState camera=current;
     camera.rotation=ch::CameraRotation::r0;
-    const auto& locomotive=frame.units.front().pose;
-    // Lock view to a locomotive, but keep the detached station-B consist in
-    // background for actual pass-by verification.
-    float x=static_cast<float>(locomotive.x),y=static_cast<float>(locomotive.y);
-    if(frame.coupled && frame.units.size()==8U){
-        // During the return, centre on the WHOLE locomotive-plus-seven
-        // consist. Keeping the camera locked to the engine sent the last
-        // wagons beyond the right viewport edge and triggered black SDL
-        // software clipping artifacts in the review capture.
-        const auto& tail=frame.units.back().pose;
-        x=0.5F*(x+static_cast<float>(tail.x));
-        y=0.5F*(y+static_cast<float>(tail.y));
+    std::vector<ch::WorldPoint3> subjects;
+    auto point=[](const auto& p)->ch::WorldPoint3 {
+        return {static_cast<float>(p.x),static_cast<float>(p.y),
+                static_cast<float>(p.z)};
+    };
+    const auto loco=point(frame.units.front().pose);
+    subjects.push_back(loco);
+    const bool with_coaches=frame.coupled || frame.sequence==0;
+    if(with_coaches) {
+        for(std::size_t i=1;i<frame.units.size();++i)
+            subjects.push_back(point(frame.units[i].pose));
+    } else {
+        const auto& nearest=frame.units[1].pose;
+        const double distance=std::hypot(nearest.x-loco.x,nearest.y-loco.y);
+        if(distance<45.0) {
+            for(std::size_t i=1;i<frame.units.size();++i)
+                subjects.push_back(point(frame.units[i].pose));
+        }
+        // Never lose the turning platform during approach, turning and
+        // departure. The actual city camera does not inherit this demo logic.
+        if(frame.sequence>=2 && frame.sequence<=4)subjects.push_back(deck);
     }
-    // Project through the actual production camera contract. Hard-coded
-    // 64/32 multipliers may diverge from the engine's tile scale and rotate
-    // unexpectedly, forcing the turntable outside the recorded viewport.
-    const auto projected=ch::world_to_screen_point(
-        x,y,camera,static_cast<float>(W),static_cast<float>(H));
-    camera.pan_x=static_cast<float>(W)*0.5F-projected.x;
-    camera.pan_y=static_cast<float>(H)*0.5F-projected.y;
+    // Get unpanned projection in REAL CH_CAMERA_V1 units.
+    ch::CameraState unit_camera=camera;
+    unit_camera.pan_x=0;unit_camera.pan_y=0;unit_camera.zoom=1.0F;
+    float minx=std::numeric_limits<float>::max(),maxx=-minx;
+    float miny=std::numeric_limits<float>::max(),maxy=-miny;
+    for(const auto& subject:subjects) {
+        const auto pixel=ch::world_to_screen_point(
+            subject,unit_camera,static_cast<float>(W),static_cast<float>(H));
+        minx=std::min(minx,pixel.x);maxx=std::max(maxx,pixel.x);
+        miny=std::min(miny,pixel.y);maxy=std::max(maxy,pixel.y);
+    }
+    // 170px side margins and 135px vertical margins (HUD + graphics).
+    // Avoid the giant black clipped sprites that appear at screen edges.
+    const float spanx=std::max(1.F,maxx-minx+2*20.F);
+    const float spany=std::max(1.F,maxy-miny+2*18.F);
+    const float desired_zoom=std::clamp(
+        std::min(660.F/spanx,330.F/spany),0.13F,0.42F);
+    camera.zoom=desired_zoom;
+    const float midx=0.5F*(minx+maxx);
+    const float midy=0.5F*(miny+maxy);
+    // unit_camera has the world origin centered by CH projection; the
+    // actual pan is applied in screen pixels, not world units.
+    camera.pan_x=(static_cast<float>(W)*0.5F-midx)*desired_zoom;
+    camera.pan_y=(static_cast<float>(H)*0.5F-midy)*desired_zoom;
     return camera;
 }
 void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
@@ -226,8 +253,17 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
         return texture;
     };
     std::filesystem::create_directories(out);
+    // Locate the physical turntable once; use the genuine persisted edge.
+    std::optional<ch::WorldPoint3> table_center;
+    for(const auto& edge:state.edges)
+        if(edge.active && edge.piece_group==table){
+            const auto center=RailMeshBuilder::sample_cubic(edge.segment,0.5F);
+            table_center=ch::WorldPoint3{center.x,center.y,center.z};
+            break;
+        }
+    if(!table_center)return 12;
     int index=0;
-    // The camera follows the ACTUAL service at a constant preview zoom.
+    // Smooth the recording camera while preserving consistent framing.
     // Its target is smoothly filtered; no abrupt editorial camera resets.
     ch::CameraState camera{};
     camera.zoom=0.26F;
@@ -257,10 +293,13 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
         chronology<<index<<","<<frame.time_s<<","<<frame.sequence<<","
                   <<frame.coupled<<","<<locomotive.x<<","
                   <<locomotive.y<<","<<frame.radians<<"\n";
-        const auto target=follow(frame);
-        if(index==0){camera.pan_x=target.pan_x;camera.pan_y=target.pan_y;}
+        const auto target=follow(frame,*table_center,camera);
+        if(index==0)camera=target;
         else {
-            const float kFollow=0.17F;
+            // Blend the desired zoom and screen pan together to prevent
+            // zoom jumps when coaches leave/enter the shunting area.
+            constexpr float kFollow=0.20F;
+            camera.zoom+=(target.zoom-camera.zoom)*kFollow;
             camera.pan_x+=(target.pan_x-camera.pan_x)*kFollow;
             camera.pan_y+=(target.pan_y-camera.pan_y)*kFollow;
         }
