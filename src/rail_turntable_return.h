@@ -19,6 +19,7 @@ struct TurntableReturnPlan {
     double recouple_locomotive_distance_m = 0.0;
     double station_a_distance_m = 0.0;
     RailPlacementPieceId station_a_piece = kInvalidRailPlacementPieceId;
+    RailPlacementPieceId turntable_piece_group = kInvalidRailPlacementPieceId;
     bool valid = false;
 };
 
@@ -87,7 +88,7 @@ struct TurntableReturnPlan {
         }
     }
     return TurntableReturnPlan{*table_at,rear,coupling,a,
-                               route.stations.front().piece_group,true};
+                               route.stations.front().piece_group,group,true};
 }
 
 enum class ReturnPhase { idle, approach_turntable, rotate_180, reverse_to_coach,
@@ -96,7 +97,8 @@ enum class ReturnPhase { idle, approach_turntable, rotate_180, reverse_to_coach,
 class TurntableReturnRuntime final {
 public:
     [[nodiscard]] bool start(const TurntableReturnPlan& plan) noexcept {
-        if(!plan.valid || !(plan.turntable_distance_m+4.0<plan.rear_junction_distance_m) ||
+        if(!plan.valid || plan.turntable_piece_group==kInvalidRailPlacementPieceId ||
+           !(plan.turntable_distance_m+4.0<plan.rear_junction_distance_m) ||
            !(plan.rear_junction_distance_m+8.0<plan.recouple_locomotive_distance_m) ||
            !(plan.station_a_distance_m<plan.recouple_locomotive_distance_m))return false;
         plan_=plan;
@@ -145,6 +147,9 @@ public:
     [[nodiscard]] ReturnPhase phase() const noexcept{return phase_;}
     [[nodiscard]] double distance_m() const noexcept{return current_distance_m_;}
     [[nodiscard]] double rotation_radians() const noexcept{return rotation_radians_;}
+    [[nodiscard]] RailPlacementPieceId turntable_piece_group() const noexcept {
+        return active()?plan_.turntable_piece_group:kInvalidRailPlacementPieceId;
+    }
     [[nodiscard]] double speed_mps() const noexcept{return speed_mps_;}
     [[nodiscard]] std::optional<TrainPose> locomotive_pose(const OperationalRoute& route) const noexcept {
         if(!active())return std::nullopt;
