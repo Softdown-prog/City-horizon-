@@ -178,6 +178,7 @@ void test_siding_connector_between_two_real_turnouts() {
     assert(built.graph.build_route({west_piece,0U}).ok());
     auto alternate=built.graph;
     assert(alternate.set_active_route(west_piece,1U));
+    assert(alternate.set_active_route(east_piece,1U));
     // Selected switch route must put the locomotive onto the REAL siding
     // and reach the opposite turnout via the shared topology graph.
     const auto bypass=alternate.build_route({west_piece,0U});
