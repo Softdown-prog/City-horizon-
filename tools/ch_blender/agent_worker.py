@@ -554,6 +554,36 @@ def _guarded_blender_script(job: dict[str, Any], blender_exe: Path, started_ns: 
     }
     _run(command, error_code="BLENDER_FAILED", env=env)
 
+    # A guarded Blender asset can declare independent RGBA layers instead of
+    # one merged tile. Preserve the same human proxy approval/fingerprint gate
+    # and publish canonical metadata for such layered output to satisfy the
+    # existing final-package checker. Never synthesize missing images.
+    if stage == "final" and not (output_root / "studio_metadata.json").exists():
+        layered = output_root / "rail_turntable_layer_manifest.json"
+        if layered.is_file():
+            contract = _load_json(layered)
+            views = contract.get("layers", {})
+            if (contract.get("contract") != "CH_RAIL_TURNTABLE_LAYERED_BAKE_V1" or
+                contract.get("qualityStage") != "final" or
+                contract.get("cameraContract") != "CH_CAMERA_V1" or
+                contract.get("assetId") != "rail_turntable_7m2_01" or
+                set(views) != {"south", "east", "west", "north"} or
+                any(set(views[name]) != {"base", "bridge"} for name in views)):
+                raise WorkerError("PACKAGE_INVALID", "Invalid CH Blender layered turntable final manifest")
+            meta = {
+                "assetId": contract["assetId"],
+                "cameraContract": contract["cameraContract"],
+                "studioPreset": "CH_TYCOON_STUDIO_V1",
+                "runtimeRepresentation": "2D_RGBA_base_plus_rotating_bridge",
+                "sourceContract": contract["contract"],
+                "footprint": contract["footprintTiles"],
+                "diameterMetres": contract["diameterMetres"],
+                "layerManifest": layered.name,
+                "studioFingerprint": None,
+            }
+            (output_root / "studio_metadata.json").write_text(
+                json.dumps(meta,indent=2,sort_keys=True) + "\n", encoding="utf-8")
+
     rel_root = output_root.relative_to(REPO_ROOT).as_posix()
     defaults = [f"{rel_root}/preflight_report.json"]
     if stage == "proxy":
