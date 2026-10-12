@@ -314,9 +314,14 @@ public:
         const float bz = target_is_end ? target.z - target_handle.z : target_handle.z - target.z;
         const float an = std::sqrt(ax * ax + ay * ay + az * az);
         const float bn = std::sqrt(bx * bx + by * by + bz * bz);
-        constexpr float kMinimumOppositionDot = -0.9990F;
+        const float dot = (ax * bx + ay * by + az * bz) / (an * bn);
+        // At an old edge's END: its travel direction opposes the new
+        // edge's arrival (two ends meet). At the old START: their travel
+        // tangents agree (the new end meets an old start).
+        constexpr float kAlignmentThreshold = 0.9990F;
         if (!(an > 1.0e-6F && bn > 1.0e-6F) ||
-            (ax * bx + ay * by + az * bz) / (an * bn) > kMinimumOppositionDot) {
+            (target_is_end ? dot > -kAlignmentThreshold
+                           : dot < kAlignmentThreshold)) {
             return EndpointJoinResult::rejected;
         }
 
