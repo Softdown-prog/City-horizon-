@@ -11,6 +11,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -118,19 +119,35 @@ inline void render_coupler_between(
     SDL_Renderer* renderer, const rail_operation::ArticulatedUnitPose& leading,
     const rail_operation::ArticulatedUnitPose& following,
     const CameraState& camera, float viewport_width, float viewport_height) {
-    const float front_length=leading.kind==rail_operation::ConsistUnitKind::locomotive
-        ? 5.2F : 3.9F;
-    constexpr float kHalfCoachLength=1.95F;
+    // Choose the closest CHASSIS ends, not a hardcoded leading/rear label.
+    // A run-around returns with wagon 7 nearest the west-facing locomotive,
+    // while each coach keeps its original physical heading (+track tangent).
+    const double left_length=leading.kind==rail_operation::ConsistUnitKind::locomotive?5.2:3.9;
+    const double right_length=following.kind==rail_operation::ConsistUnitKind::locomotive?5.2:3.9;
     constexpr float kCouplerElevation=0.22F;
+    auto endpoint=[](const rail_operation::TrainPose& pose,double length,int side){
+        return std::array<double,3>{
+            pose.x+pose.tangent_x*length*0.5*side,
+            pose.y+pose.tangent_y*length*0.5*side,
+            pose.z+pose.tangent_z*length*0.5*side};
+    };
+    std::array<double,3> first{},second{};
+    double best=std::numeric_limits<double>::infinity();
+    for(const int i:{-1,1})for(const int j:{-1,1}){
+        const auto l=endpoint(leading.pose,left_length,i);
+        const auto r=endpoint(following.pose,right_length,j);
+        const double dx=l[0]-r[0],dy=l[1]-r[1],dz=l[2]-r[2];
+        const double d=dx*dx+dy*dy+dz*dz;
+        if(d<best){best=d;first=l;second=r;}
+    }
+    if(!(best<4.0))return; // Coupled stock only; no across-yard links.
     const ScreenPoint a=world_to_screen_point(
-        static_cast<float>(leading.pose.x-leading.pose.tangent_x*front_length*0.5),
-        static_cast<float>(leading.pose.y-leading.pose.tangent_y*front_length*0.5),
-        static_cast<float>(leading.pose.z)+kCouplerElevation,
+        static_cast<float>(first[0]),static_cast<float>(first[1]),
+        static_cast<float>(first[2])+kCouplerElevation,
         camera,viewport_width,viewport_height);
     const ScreenPoint b=world_to_screen_point(
-        static_cast<float>(following.pose.x+following.pose.tangent_x*kHalfCoachLength),
-        static_cast<float>(following.pose.y+following.pose.tangent_y*kHalfCoachLength),
-        static_cast<float>(following.pose.z)+kCouplerElevation,
+        static_cast<float>(second[0]),static_cast<float>(second[1]),
+        static_cast<float>(second[2])+kCouplerElevation,
         camera,viewport_width,viewport_height);
     Uint8 old_r=255,old_g=255,old_b=255,old_a=255;
     (void)SDL_GetRenderDrawColor(renderer,&old_r,&old_g,&old_b,&old_a);
@@ -191,9 +208,10 @@ inline void render_articulated_train(
         // Never draw a giant elastic coupling from the parked coaches to
         // their detached locomotive on the passing siding.
         if (operation.shunting_locomotive() && i==1U) continue;
-        if (units[i].unit_index==units[i-1U].unit_index+1U)
-            render_coupler_between(renderer,units[i-1U],units[i],camera,
-                                   viewport_width,viewport_height);
+        // Unit adjacency is determined by physical return order from the
+        // controller. Indices intentionally remain stable wagon identities.
+        render_coupler_between(renderer,units[i-1U],units[i],camera,
+                               viewport_width,viewport_height);
     }
     // Draw from the rear of the isometric contact plane forward. This preserves
     // train-car occlusion within the consist without changing the world queue.
