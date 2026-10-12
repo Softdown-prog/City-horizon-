@@ -137,6 +137,9 @@ public:
     [[nodiscard]] double turntable_rotation_radians() const noexcept {
         return return_.rotation_radians();
     }
+    [[nodiscard]] RailPlacementPieceId rotating_turntable_group() const noexcept {
+        return return_.turntable_piece_group();
+    }
     [[nodiscard]] bool locomotive_awaiting_turning() const noexcept {
         return operation_active_ && shunt_.awaiting_turning() && !return_.active();
     }
