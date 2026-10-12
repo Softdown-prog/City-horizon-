@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_turntable_sprite_runtime.h"
 #include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
 
@@ -380,6 +381,13 @@ private:
         for(const auto& table:state.turntables) {
             const RailPlacementEdge* edge=detail::edge_for_group(state,table.piece_group);
             if(!edge || !edge->active || edge->kind!=RailPlacementEdgeKind::straight)continue;
+            // CH Blender approved layer pair takes priority only when the
+            // asset set is complete and this authored heading has a real view.
+            // Never pivot all devices when only one locomotive turns.
+            const double angle=controller_.rotating_turntable_group()==table.piece_group
+                ? controller_.turntable_rotation_radians():0.0;
+            if(ch::rail_turntable_visual::render(
+                    renderer,*edge,angle,camera,width,height))continue;
             const auto c=RailMeshBuilder::sample_cubic(edge->segment,0.5F);
             const ch::ScreenPoint middle=ch::world_to_screen_point(
                 c.x,c.y,c.z+0.02F,camera,width,height);
@@ -409,7 +417,7 @@ private:
             // The rotating steel bridge shares the locomotive's true
             // rotational phase. The PNG vehicle pivots at this very center.
             float turn=0.0F;
-            if(controller_.return_service_active()){
+            if(controller_.rotating_turntable_group()==table.piece_group){
                 turn=static_cast<float>(controller_.turntable_rotation_radians());
             }
             const float dx=edge->segment.end.x-edge->segment.start.x;
