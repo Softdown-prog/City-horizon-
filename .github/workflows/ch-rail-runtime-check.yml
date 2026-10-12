@@ -10,6 +10,7 @@ on:
       - "src/rail_turntable_return.h"
       - "src/rail_live_operation_controller.h"
       - "src/rail_live_operation_overlay.h"
+      - "tools/rail_visual_proof/check_runtime_consist_integration.py"
       - "assets/rail/turntable_7m2_01/**"
       - "tools/rail_visual_proof/check_turntable_runtime_assets.py"
       - "src/rail_train_direction_math.h"
@@ -45,6 +46,7 @@ on:
       - "src/rail_turntable_return.h"
       - "src/rail_live_operation_controller.h"
       - "src/rail_live_operation_overlay.h"
+      - "tools/rail_visual_proof/check_runtime_consist_integration.py"
       - "assets/rail/turntable_7m2_01/**"
       - "tools/rail_visual_proof/check_turntable_runtime_assets.py"
       - "src/rail_train_direction_math.h"
@@ -111,6 +113,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/rail_visual_proof/check_turntable_runtime_assets.py
+
+      - name: Verify production world-depth renderer uses detached coach world positions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/rail_visual_proof/check_runtime_consist_integration.py
 
       - name: Build live City Builder
         shell: bash

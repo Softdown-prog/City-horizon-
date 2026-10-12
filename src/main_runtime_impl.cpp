@@ -1216,16 +1216,18 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
     // This prevents a rear building/citizen from always covering the locomotive.
     std::vector<ch::rail_operation::ArticulatedUnitPose> rail_units;
     if (rail_controller != nullptr) {
-        const auto* route = rail_controller->operational_route();
-        const auto pose = rail_controller->train_pose();
-        if (route != nullptr && pose.has_value()) {
-            rail_units = ch::rail_operation::build_articulated_consist_poses(*route, *pose);
-            for (const auto& unit : rail_units) {
-                draws.push_back({EntityDraw::Kind::rail_unit,
-                    camera_depth_key(static_cast<float>(unit.pose.x),
-                                     static_cast<float>(unit.pose.y), camera),
-                    nullptr, nullptr, nullptr, &unit});
-            }
+        // CH_RAIL_WORLD_DEPTH_CONSIST_V1: do not reconstruct a permanently
+        // coupled train from its current locomotive pose. During the station
+        // B run-around that pose is on the siding, while seven separate
+        // coaches remain parked on the mainline; after turntable recoupling
+        // the order of their world positions reverses. The production
+        // controller is the single authority for all eight vehicles.
+        rail_units = rail_controller->articulated_poses();
+        for (const auto& unit : rail_units) {
+            draws.push_back({EntityDraw::Kind::rail_unit,
+                camera_depth_key(static_cast<float>(unit.pose.x),
+                                 static_cast<float>(unit.pose.y), camera),
+                nullptr, nullptr, nullptr, &unit});
         }
     }
 
