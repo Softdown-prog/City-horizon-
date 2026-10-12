@@ -19,12 +19,17 @@ int main() {
     // by 0.4 metres and cannot pass a locomotive next to parked coaches.
     RailPlacementGraph graph;
     const auto root=graph.add_root({0,0,0},0);
-    const auto approach=root?graph.append_straight(*root,40):std::nullopt;
-    const auto a=approach?graph.append_straight(approach->node,8):std::nullopt;
-    const auto rear=a?graph.append_turnout(a->node,96,kAngle,RailTurnDirection::left):std::nullopt;
+    if(!root)return fail("root");
+    const auto approach=graph.append_straight(*root,40);
+    if(!approach)return fail("approach");
+    const auto a=graph.append_straight(approach->node,8);
+    if(!a)return fail("station A");
+    const auto rear=graph.append_turnout(a->node,96,kAngle,RailTurnDirection::left);
+    if(!rear)return fail("rear turnout");
     const auto far_root=graph.add_root({240,0,0},kPi);
-    const auto front=far_root?graph.append_turnout(*far_root,96,kAngle,RailTurnDirection::right):std::nullopt;
-    if(!root || !approach || !a || !rear || !far_root || !front)return fail("basic track");
+    if(!far_root)return fail("far root");
+    const auto front=graph.append_turnout(*far_root,96,kAngle,RailTurnDirection::right);
+    if(!front)return fail("front turnout");
 
     RailPlacementController editor(graph);
     const float main_length=graph.nodes()[front->through_node].position.x-
@@ -124,12 +129,17 @@ int main() {
     // must fail the physical clearance gate, despite valid graph topology.
     RailPlacementGraph narrow;
     const auto nr=narrow.add_root({0,10,0},0);
-    const auto na=nr?narrow.append_straight(*nr,40):std::nullopt;
-    const auto nb=na?narrow.append_straight(na->node,8):std::nullopt;
-    const auto nw=nb?narrow.append_turnout(nb->node,12,kAngle,RailTurnDirection::left):std::nullopt;
+    if(!nr)return fail("second root");
+    const auto na=narrow.append_straight(*nr,40);
+    if(!na)return fail("second approach");
+    const auto nb=narrow.append_straight(na->node,8);
+    if(!nb)return fail("second station");
+    const auto nw=narrow.append_turnout(nb->node,12,kAngle,RailTurnDirection::left);
+    if(!nw)return fail("second rear turnout");
     const auto nf_root=narrow.add_root({200,10,0},kPi);
-    const auto nf=nf_root?narrow.append_turnout(*nf_root,12,kAngle,RailTurnDirection::right):std::nullopt;
-    if(!nr||!na||!nb||!nw||!nf_root||!nf)return fail("narrow setup");
+    if(!nf_root)return fail("second far root");
+    const auto nf=narrow.append_turnout(*nf_root,12,kAngle,RailTurnDirection::right);
+    if(!nf)return fail("second front turnout");
     RailPlacementController narrow_editor(narrow);
     if(!narrow_editor.begin(nw->through_node,RailPlacementMode::straight))return fail("narrow editor");
     const auto middle=narrow_editor.preview(
