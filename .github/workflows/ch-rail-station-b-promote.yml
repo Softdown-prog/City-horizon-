@@ -1,0 +1,85 @@
+name: Promote Station B Blender PNGs
+on:
+  push:
+    paths:
+      - ".github/workflows/ch-rail-station-b-promote.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Download reviewed four-direction final bake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 38186312498 --repo "${{ github.repository }}" --name CH-Blender-Agent-38186312498-1 --dir /tmp/station-final
+      - name: Verify transparent 1024px images and stage runtime asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check Pillow
+          python3 - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          from PIL import Image
+          source = Path("/tmp/station-final/rail.terminal_station_b.final.003")
+          dst = Path("assets/buildings/rail_terminal_station_b_5x3_01")
+          dst.mkdir(parents=True, exist_ok=True)
+          src_manifest = json.loads((source / "station_source_manifest.json").read_text())
+          assert src_manifest["assetId"] == "transport.rail_station.terminal_b.01"
+          assert src_manifest["footprint"] == "5x3"
+          sprites = {}
+          for direction in ("south", "west", "north", "east"):
+              src = source / f"rail_terminal_station_b_{direction}_source.png"
+              assert src.is_file(), f"Missing {src}"
+              with Image.open(src) as img:
+                  assert img.size == (1024, 1024) and img.mode == "RGBA", src
+                  assert img.getbbox() is not None, f"Empty PNG: {src}"
+              target = dst / f"rail_terminal_station_b_{direction}.png"
+              shutil.copyfile(src, target)
+              sprites[direction] = {"path": target.as_posix(),
+                                    "sha256": hashlib.sha256(target.read_bytes()).hexdigest()}
+          manifest = {
+              "contract": "CH_RAIL_TERMINAL_STATION_ASSET_V1",
+              "assetId": "transport.rail_station.terminal_b.01",
+              "sourceWorkflowRun": 38186312498,
+              "sourceArtifactId": 11719801754,
+              "footprint": {"widthTiles": 5, "depthTiles": 3},
+              "entryPortLocalWorld": src_manifest["entryPortLocalWorld"],
+              "terminalStopLocalWorld": src_manifest["terminalStopLocalWorld"],
+              "directionPolicy": src_manifest["directionPolicy"],
+              "frameSize": [1024, 1024],
+              "sprites": sprites,
+              "runtimeStatus": "art_staged_pending_station_placement_alignment"
+          }
+          (dst / "station_runtime_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          print("Verified and staged:", *sprites, sep="\n  ")
+          PY
+      - name: Commit verified assets onto main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/buildings/rail_terminal_station_b_5x3_01/
+          if git diff --cached --quiet; then
+            echo "Already staged; no changes"
+            exit 0
+          fi
+          git commit -m "assets(station): promote four Blender terminal station B directions"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 3
+          done
+          exit 1
