@@ -278,6 +278,15 @@ def main():
     for part in base+bridge:
         part.hide_render=False
     output_manifest(out,scene,stage=args.stage,records=records,recipe=args.recipe)
+    if args.stage == "proxy":
+        # The CH Blender agent's guarded proxy contract expects the canonical
+        # SOUTH review filename and machine-readable report even when the
+        # authoring tool also publishes the complete four-view comparison.
+        from shutil import copyfile
+        copyfile(out / "rail_turntable_assembly_south.png", out / "proxy_south.png")
+        (out / "proxy_report.json").write_text(
+            json.dumps(records["south"]["assembly"],indent=2,sort_keys=True) + "\n",
+            encoding="utf-8")
     if args.save_blend:
         dest=Path(args.save_blend).resolve()
         dest.parent.mkdir(parents=True,exist_ok=True)
