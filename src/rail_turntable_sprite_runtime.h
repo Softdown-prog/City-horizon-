@@ -162,7 +162,7 @@ enum class View { south, east, north, west };
     // video runner its clipped RGBA backing appeared as an opaque black box.
     // Compute conservative extents from the actual world-space radius, not
     // from the image rectangle or the engine camera's cinematic zoom.
-    float lo_x=viewport_w,hi_x=0.0F,lo_y=viewport_h,hi_y=0.0F;
+    float lo_x=1.0e9F,hi_x=-1.0e9F,lo_y=1.0e9F,hi_y=-1.0e9F;
     constexpr float radius_m=3.65F;
     for(const auto [ox,oy]:std::array<std::array<float,2>,8>{{
         {{-radius_m,-radius_m}},{{-radius_m,0}},{{-radius_m,radius_m}},
