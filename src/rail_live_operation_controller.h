@@ -3,6 +3,7 @@
 #include "rail_operation_runtime.h"
 #include "rail_siding_topology.h"
 #include "rail_detached_locomotive_shunt.h"
+#include "rail_turntable_return.h"
 #include "rail_persistence.h"
 
 #include <algorithm>
@@ -22,6 +23,7 @@ public:
         RailPlacementGraph replacement;
         if (!replacement.restore_snapshot(state.nodes, state.edges)) return false;
         graph_ = std::move(replacement);
+        turntables_=state.turntables;
 
         std::vector<rail_operation::StationDefinition> restored_stations;
         restored_stations.reserve(state.stations.size());
@@ -83,13 +85,19 @@ public:
 
     void update(const double seconds) noexcept {
         if (!operation_active_) return;
+        if(return_.active()){
+            return_.update(seconds);
+            return;
+        }
         if (shunt_.active()) {
             shunt_.update(seconds);
+            if(shunt_.awaiting_turning() && return_plan_) {
+                (void)return_.start(*return_plan_);
+            }
             return;
         }
         train_.update(seconds);
-        // B stop plus a fully validated, physically separated siding are
-        // mandatory. Without both, preserve the existing safe parked state.
+        // No route into invented sidings or turning platforms is allowed.
         if (train_.awaiting_terminal_maneuver() && shunt_path_) {
             (void)shunt_.start(*shunt_path_);
         }
@@ -105,15 +113,32 @@ public:
     }
     [[nodiscard]] std::optional<rail_operation::TrainPose> train_pose() const noexcept {
         if (!operation_active_) return std::nullopt;
+        if(return_.active())return return_.locomotive_pose(operational_route_);
         if (shunt_.active()) return shunt_.locomotive_pose();
         return train_.pose();
     }
 
     [[nodiscard]] bool shunting_locomotive() const noexcept {
-        return operation_active_ && shunt_.active();
+        return operation_active_ &&
+            (return_.active()? !return_.coupled():shunt_.active());
+    }
+    [[nodiscard]] bool return_service_active() const noexcept {
+        return operation_active_ && return_.active();
+    }
+    [[nodiscard]] bool return_coupled() const noexcept {
+        return operation_active_ && return_.coupled();
+    }
+    [[nodiscard]] rail_operation::ReturnPhase return_phase() const noexcept {
+        return return_.phase();
+    }
+    [[nodiscard]] bool turntable_return_available() const noexcept {
+        return operation_active_ && return_plan_.has_value();
+    }
+    [[nodiscard]] double turntable_rotation_radians() const noexcept {
+        return return_.rotation_radians();
     }
     [[nodiscard]] bool locomotive_awaiting_turning() const noexcept {
-        return operation_active_ && shunt_.awaiting_turning();
+        return operation_active_ && shunt_.awaiting_turning() && !return_.active();
     }
     [[nodiscard]] std::optional<rail_operation::DetachedShuntPhase> locomotive_shunt_phase() const noexcept {
         if(!shunting_locomotive())return std::nullopt;
@@ -124,11 +149,33 @@ public:
         const auto lead=train_.pose();
         if(!lead)return {};
         auto units=rail_operation::build_articulated_consist_poses(operational_route_,*lead);
-        if(shunt_.active() && units.size()==8U) {
+        if(units.size()!=8U)return {};
+        if(return_.active()){
+            const auto locomotive=return_.locomotive_pose(operational_route_);
+            if(!locomotive)return {};
+            units.front().pose=*locomotive;
+            units.front().route_distance_m=locomotive->distance_m;
+            if(return_.coupled()) {
+                // Seven persistent coach identities reverse their ORDER
+                // relative to the locomotive, not their existence.
+                // Loco (west) -> coach 7 -> coach 6 ... -> coach 1 (east).
+                constexpr double first=(5.2+3.9)*0.5+0.42;
+                constexpr double pitch=3.9+0.42;
+                for(std::size_t i=1;i<units.size();++i) {
+                    const double distance=return_.distance_m()+first+(7-i)*pitch;
+                    const auto coach=rail_operation::sample_operational_route_pose(
+                        operational_route_,distance,return_.speed_mps(),
+                        return_.phase()==rail_operation::ReturnPhase::parked_at_a);
+                    if(!coach)return {};
+                    units[i].pose=rail_operation::orient_train_unit_from_bogies(
+                        operational_route_,*coach,3.9);
+                    units[i].route_distance_m=distance;
+                }
+                std::reverse(units.begin()+1,units.end());
+            }
+        } else if(shunt_.active()){
             const auto locomotive=shunt_.locomotive_pose();
             if(!locomotive)return {};
-            // Only the locomotive moves on the bypass. Each coach retains
-            // its stable identity and world position on the B platform.
             units.front().pose=*locomotive;
         }
         return units;
@@ -137,7 +184,8 @@ public:
     // Exposed to the UI: a terminal train must never quietly reverse with a
     // backwards locomotive or leave station B before a track-based maneuver.
     [[nodiscard]] bool awaiting_terminal_maneuver() const noexcept {
-        return operation_active_ && train_.awaiting_terminal_maneuver() && !shunt_.active();
+        return operation_active_ && train_.awaiting_terminal_maneuver() &&
+            !shunt_.active() && !return_.active();
     }
     [[nodiscard]] bool two_station_service_active() const noexcept {
         return operation_active_ && train_.terminal_pair_enabled();
@@ -170,7 +218,9 @@ private:
         operational_route_ = {};
         connected_siding_.reset();
         shunt_path_.reset();
+        return_plan_.reset();
         shunt_=rail_operation::DetachedLocomotiveShunt{};
+        return_=rail_operation::TurntableReturnRuntime{};
         train_ = rail_operation::TrainRuntime{};
         if (stations_.empty()) return true;
 
@@ -194,6 +244,10 @@ private:
                 if (connected_siding_) {
                     shunt_path_ = rail_operation::compile_detached_locomotive_shunt(
                         graph_, route, *connected_siding_);
+                    if(shunt_path_){
+                        return_plan_ = rail_operation::compile_turntable_return(
+                            graph_,route,*connected_siding_,*shunt_path_,turntables_);
+                    }
                 }
             }
             operational_route_ = std::move(route);
@@ -210,7 +264,10 @@ private:
     rail_operation::OperationalRoute operational_route_{};
     std::optional<rail_operation::ConnectedSiding> connected_siding_{};
     std::optional<rail_operation::ShuntPath> shunt_path_{};
+    std::optional<rail_operation::TurntableReturnPlan> return_plan_{};
+    std::vector<RailPersistentTurntable> turntables_{};
     rail_operation::DetachedLocomotiveShunt shunt_{};
+    rail_operation::TurntableReturnRuntime return_{};
     rail_operation::TrainRuntime train_{};
     bool operation_active_ = false;
 };
