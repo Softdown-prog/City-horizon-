@@ -243,6 +243,78 @@ public:
         };
     }
 
+    // CH_RAIL_SIDING_CONNECTOR_V1. Join TWO authored and open rail ports
+    // without creating phantom nodes or arbitrary crossing junctions.
+    // Tangent-matched cubic is generated from actual existing rail geometry;
+    // full mesh curvature/budget rules remain authoritative.
+    [[nodiscard]] std::optional<RailPlacementAppendResult> append_smooth_connector(
+        const RailPlacementNodeId from, const RailPlacementNodeId to,
+        const int subdivisions = 64) {
+        if (from == to || from >= nodes_.size() || to >= nodes_.size() ||
+            !nodes_[from].active || !nodes_[to].active || subdivisions < profile_.min_subdivisions)
+            return std::nullopt;
+
+        auto port_outward = [&](RailPlacementNodeId id)->std::optional<RailWorldPoint3> {
+            const RailPlacementEdge* incident = nullptr;
+            for (const RailPlacementEdge& edge_value : edges_) {
+                if (!edge_value.active || (edge_value.from != id && edge_value.to != id))
+                    continue;
+                if (incident) return std::nullopt; // never infer a junction
+                incident = &edge_value;
+            }
+            if (!incident) return std::nullopt;
+            // The open port points away from the EXISTING section.
+            RailWorldPoint3 v{};
+            if (incident->to == id) {
+                v.x = incident->segment.end.x - incident->segment.control_b.x;
+                v.y = incident->segment.end.y - incident->segment.control_b.y;
+                v.z = incident->segment.end.z - incident->segment.control_b.z;
+            } else {
+                v.x = incident->segment.start.x - incident->segment.control_a.x;
+                v.y = incident->segment.start.y - incident->segment.control_a.y;
+                v.z = incident->segment.start.z - incident->segment.control_a.z;
+            }
+            const float magnitude = std::sqrt(v.x*v.x+v.y*v.y+v.z*v.z);
+            if (!(magnitude > 1.0e-6F))return std::nullopt;
+            v.x /= magnitude;v.y /= magnitude;v.z /= magnitude;
+            return v;
+        };
+        const auto outward_from=port_outward(from);
+        const auto outward_to=port_outward(to);
+        if (!outward_from || !outward_to) return std::nullopt;
+        const RailWorldPoint3& a=nodes_[from].position;
+        const RailWorldPoint3& b=nodes_[to].position;
+        const float dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+        const float span=std::sqrt(dx*dx+dy*dy+dz*dz);
+        if (!std::isfinite(span) || span < profile_.min_turn_radius*2.0F)
+            return std::nullopt;
+        // A valid connector must leave each free port, not double backwards
+        // through existing rails. Large same-position U-turns are not built here.
+        const float start_forward=(dx*outward_from->x+dy*outward_from->y+dz*outward_from->z)/span;
+        const float end_forward=(dx*outward_to->x+dy*outward_to->y+dz*outward_to->z)/span;
+        if (start_forward < 0.70F || end_forward > -0.70F) return std::nullopt;
+        const float handle=std::clamp(span*0.28F,2.5F,24.0F);
+        RailSplineSegment segment{};
+        segment.start=a;
+        segment.end=b;
+        segment.control_a={
+            a.x+outward_from->x*handle,
+            a.y+outward_from->y*handle,
+            a.z+outward_from->z*handle};
+        segment.control_b={
+            b.x+outward_to->x*handle,
+            b.y+outward_to->y*handle,
+            b.z+outward_to->z*handle};
+        segment.subdivisions=subdivisions;
+        if (!mesh_safe(segment))return std::nullopt;
+        if (edges_.size() >= static_cast<std::size_t>(std::numeric_limits<RailPlacementEdgeId>::max()))
+            return std::nullopt;
+        const auto id=static_cast<RailPlacementEdgeId>(edges_.size());
+        edges_.push_back({id,from,to,RailPlacementEdgeKind::curve,segment,
+                          static_cast<RailPlacementPieceId>(id),true});
+        return RailPlacementAppendResult{to,id};
+    }
+
     // CH_RAIL_ENDPOINT_JOIN_V1: bind the endpoint of an uncommitted
     // straight/curve to ONE existing, open rail port. A nearby pixel overlap
     // alone is never a valid railway connection.
