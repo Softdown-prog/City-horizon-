@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace ch::rail_operation {
@@ -55,7 +56,11 @@ namespace shunt_detail {
 
 [[nodiscard]] inline std::optional<ShuntPath> compile_detached_locomotive_shunt(
     const RailPlacementGraph& placement, const OperationalRoute& route,
-    const ConnectedSiding& siding) {
+    const ConnectedSiding& siding, std::string* diagnostic = nullptr) {
+    const auto reject=[&](const char* why)->std::optional<ShuntPath> {
+        if(diagnostic != nullptr)*diagnostic=why;
+        return std::nullopt;
+    };
     if(!route.valid || route.closed || route.stations.size()!=2U ||
        siding.bypass_edges.size()<3U || route.length_m<=0.0 ||
        siding.front_distance_m<=route.stations.back().distance_m+5.2 ||
@@ -63,10 +68,10 @@ namespace shunt_detail {
        siding.rear_distance_m>=route.stations.back().distance_m-41.0 ||
        siding.rear_junction>=placement.nodes().size() ||
        siding.front_junction>=placement.nodes().size())
-        return std::nullopt;
+        return reject("shunt-check-1");
 
     // The full graph, not only near-looking sprites, must be connected.
-    if(!ch::rail::build_track_graph(placement).valid)return std::nullopt;
+    if(!ch::rail::build_track_graph(placement).valid)return reject("shunt-check-2");
     ShuntPath result;
     const double b=route.stations.back().distance_m;
     result.station_b_distance_m=b;
@@ -75,11 +80,11 @@ namespace shunt_detail {
     for(int i=0;i<=steps;++i) {
         const auto point=sample_operational_route_pose(route,b+run*i/steps);
         if(!point || !shunt_detail::push(result,{point->x,point->y,point->z}))
-            return std::nullopt;
+            return reject("shunt-check-3");
     }
     const auto front=shunt_detail::at(placement.nodes()[siding.front_junction].position);
     if (!shunt_detail::near(result.points.back(),front,0.03))
-        return std::nullopt;
+        return reject("shunt-check-4");
     result.front_turnout_m=result.cumulative_m.back();
 
     // Existing saved siding sequence goes rear -> front. Traverse it in the
@@ -87,11 +92,11 @@ namespace shunt_detail {
     RailPlacementNodeId cursor=siding.front_junction;
     for(auto it=siding.bypass_edges.rbegin();it!=siding.bypass_edges.rend();++it) {
         const auto* edge=placement.edge(*it);
-        if(!edge || !edge->active)return std::nullopt;
+        if(!edge || !edge->active)return reject("shunt-check-5");
         const bool forward=edge->from==cursor;
-        if(!forward && edge->to!=cursor)return std::nullopt;
+        if(!forward && edge->to!=cursor)return reject("shunt-check-6");
         const auto destination=forward?edge->to:edge->from;
-        if(destination>=placement.nodes().size())return std::nullopt;
+        if(destination>=placement.nodes().size())return reject("shunt-check-7");
         const auto& curve=edge->segment;
         const auto chord_length=[](const RailWorldPoint3& a,const RailWorldPoint3& b) {
             return std::sqrt(static_cast<double>(a.x-b.x)*(a.x-b.x)+
@@ -101,42 +106,42 @@ namespace shunt_detail {
         const double polygon=chord_length(curve.start,curve.control_a)+
                              chord_length(curve.control_a,curve.control_b)+
                              chord_length(curve.control_b,curve.end);
-        if (!std::isfinite(polygon) || !(polygon>0.0))return std::nullopt;
+        if (!std::isfinite(polygon) || !(polygon>0.0))return reject("shunt-check-8");
         const int kCurveSamples=std::max(64,static_cast<int>(std::ceil(polygon/0.28)));
-        if (kCurveSamples>4096)return std::nullopt;
+        if (kCurveSamples>4096)return reject("shunt-check-9");
         for(int i=0;i<=kCurveSamples;++i) {
             const float t=static_cast<float>(i)/static_cast<float>(kCurveSamples);
             const auto position=RailMeshBuilder::sample_cubic(edge->segment,forward?t:1.0F-t);
             if(i==0 && !shunt_detail::near(result.points.back(),shunt_detail::at(position),0.03))
-                return std::nullopt;
-            if(!shunt_detail::push(result,shunt_detail::at(position)))return std::nullopt;
+                return reject("shunt-check-10");
+            if(!shunt_detail::push(result,shunt_detail::at(position)))return reject("shunt-check-11");
         }
         cursor=destination;
     }
     if(cursor!=siding.rear_junction ||
        !shunt_detail::near(result.points.back(),
                            shunt_detail::at(placement.nodes()[cursor].position),0.03))
-        return std::nullopt;
+        return reject("shunt-check-12");
 
     // Physical clearance for a 1+7 consist left at B. A visually connected
     // turnout with a 0.4m offset is NOT a passing siding: loco would intersect
     // the parked coaches. Ignore the initial B->front headshunt.
     const auto stopped_lead=sample_operational_route_pose(route,b);
-    if(!stopped_lead)return std::nullopt;
+    if(!stopped_lead)return reject("shunt-check-13");
     const auto coaches=build_articulated_consist_poses(route,*stopped_lead);
-    if(coaches.size()!=8U)return std::nullopt;
+    if(coaches.size()!=8U)return reject("shunt-check-14");
     constexpr double kMinLocoCoachCenterDistance=2.65;
     for(std::size_t i=0;i<result.points.size();++i) {
         if(result.cumulative_m[i]<=result.front_turnout_m+0.01)continue;
         for(std::size_t j=1;j<coaches.size();++j) {
             const ch::track::Point3 c{coaches[j].pose.x,coaches[j].pose.y,coaches[j].pose.z};
             if(detail::point_distance(result.points[i],c)<kMinLocoCoachCenterDistance)
-                return std::nullopt;
+                return reject("shunt-check-15");
         }
     }
     result.length_m=result.cumulative_m.back();
     if(!(result.length_m>result.front_turnout_m+10.0) ||
-       !std::isfinite(result.length_m))return std::nullopt;
+       !std::isfinite(result.length_m))return reject("shunt-check-16");
     result.valid=true;
     return result;
 }
