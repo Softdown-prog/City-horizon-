@@ -53,12 +53,12 @@ jobs:
           python3 tools/rail_visual_proof/audit_steam_train_alpha.py
       - name: Record uninterrupted SDL locomotive and seven-coach operational timeline
         env:
-          SDL_VIDEODRIVER: dummy
+          SDL_VIDEODRIVER: x11
           SDL_AUDIODRIVER: dummy
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           mkdir -p out/rail-sdl-capture
-          build/rail-sdl-review/rail_sdl_render_capture out/rail-sdl-capture
+          xvfb-run -a -s "-screen 0 1280x800x24" build/rail-sdl-review/rail_sdl_render_capture out/rail-sdl-capture
           test "$(find out/rail-sdl-capture -name 'frame_*.png' | wc -l)" -ge 60
           test -s out/rail-sdl-capture/chronology.csv
       - name: Validate continuous chronology and all six phases
