@@ -141,6 +141,102 @@ void test_crossing_preview_is_transactional() {
     assert(placement.edges().size() == before.edge_count + 2U);
 }
 
+void test_endpoint_join_is_real_connected_track() {
+    RailPlacementGraph placement;
+    const auto main_root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
+    assert(main_root);
+    const auto existing = placement.append_straight(*main_root, 4.0F);
+    assert(existing);
+    constexpr float kPi = 3.14159265358979323846F;
+    const auto incoming_root = placement.add_root({8.0F, 0.0F, 0.0F}, kPi);
+    assert(incoming_root);
+    RailPlacementController controller(placement);
+    const auto before = placement.checkpoint();
+
+    assert(controller.begin(*incoming_root, RailPlacementMode::straight));
+    const auto preview = controller.preview(4.0F);
+    assert(preview && preview->ok());
+    assert(preview->primary_node == existing->node);
+    assert(placement.edges()[preview->primary_edge].to == existing->node);
+    assert(placement.nodes().size() == before.node_count); // no ghost terminal
+    const auto topology = ch::rail::build_track_graph(placement);
+    assert(topology.valid);
+    const auto path = topology.graph.build_route({topology.edge_piece[existing->edge], 0U});
+    assert(path.ok());
+    assert(path.steps.size() == 2U);
+    assert(controller.cancel());
+    assert(placement.nodes().size() == before.node_count);
+    assert(placement.edges().size() == before.edge_count);
+
+    // A retried preview may be resized and committed without leaking nodes.
+    assert(controller.begin(*incoming_root, RailPlacementMode::straight));
+    const auto resized = controller.preview(3.0F);
+    assert(resized && resized->primary_node != existing->node);
+    assert(placement.nodes().size() == before.node_count + 1U);
+    const auto joined = controller.preview(4.0F);
+    assert(joined && joined->primary_node == existing->node);
+    assert(controller.commit());
+    const auto committed = ch::rail::build_track_graph(placement);
+    assert(committed.valid);
+    const auto saved_nodes = placement.nodes();
+    const auto saved_edges = placement.edges();
+    RailPlacementGraph restored;
+    assert(restored.restore_snapshot(saved_nodes, saved_edges));
+    assert(ch::rail::build_track_graph(restored).valid);
+}
+
+void test_endpoint_join_rejects_wrong_tangents_and_branching() {
+    RailPlacementGraph placement;
+    const auto root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
+    assert(root);
+    const auto existing = placement.append_straight(*root, 4.0F);
+    assert(existing);
+    constexpr float kHalfPi = 1.57079632679489661923F;
+    const auto cross_root = placement.add_root({4.0F, 4.0F, 0.0F}, -kHalfPi);
+    assert(cross_root);
+    RailPlacementController controller(placement);
+    const auto checkpoint = placement.checkpoint();
+    assert(controller.begin(*cross_root, RailPlacementMode::straight));
+    assert(!controller.preview(4.0F)); // identical position, wrong tangent
+    assert(placement.edges().size() == checkpoint.edge_count);
+    assert(placement.nodes().size() == checkpoint.node_count);
+    assert(controller.cancel());
+
+    // Joining a node already occupied by two committed edges must fail,
+    // even if the new edge is perfectly tangent.
+    constexpr float kPi = 3.14159265358979323846F;
+    const auto from_east = placement.add_root({8.0F,0.0F,0.0F}, kPi);
+    assert(from_east);
+    assert(controller.begin(*from_east, RailPlacementMode::straight));
+    assert(controller.preview(4.0F));
+    assert(controller.commit());
+    const auto north = placement.add_root({4.0F,4.0F,0.0F},-kHalfPi);
+    assert(north);
+    assert(controller.begin(*north, RailPlacementMode::straight));
+    assert(!controller.preview(4.0F));
+    assert(controller.cancel());
+}
+
+void test_endpoint_join_into_original_start() {
+    RailPlacementGraph placement;
+    const auto root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
+    assert(root);
+    const auto existing = placement.append_straight(*root, 4.0F);
+    assert(existing);
+    const auto earlier_root = placement.add_root({-4.0F,0.0F,0.0F},0.0F);
+    assert(earlier_root);
+    RailPlacementController controller(placement);
+    assert(controller.begin(*earlier_root, RailPlacementMode::straight));
+    const auto joined = controller.preview(4.0F);
+    assert(joined && joined->primary_node == *root);
+    assert(ch::rail::build_track_graph(placement).valid);
+    assert(controller.commit());
+    const auto built = ch::rail::build_track_graph(placement);
+    assert(built.valid);
+    const auto path = built.graph.build_route({built.edge_piece[joined->primary_edge], 0U});
+    assert(path.ok() && path.steps.size() == 2U);
+}
+
 void test_ambiguous_node_fails_closed() {
     RailPlacementGraph placement;
     const auto root = placement.add_root({0.0F, 0.0F, 0.0F}, 0.0F);
@@ -160,6 +256,9 @@ int main() {
     test_crossing_routes_are_independent_and_live();
     test_crossing_preview_is_transactional();
     test_ambiguous_node_fails_closed();
+    test_endpoint_join_is_real_connected_track();
+    test_endpoint_join_rejects_wrong_tangents_and_branching();
+    test_endpoint_join_into_original_start();
     std::cout << "CH_RAIL_PLACEMENT_TRACK_GRAPH_ADAPTER_V1: OK\n";
     return 0;
 }
