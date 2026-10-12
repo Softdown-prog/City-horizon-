@@ -187,9 +187,23 @@ inline void render_unit(SDL_Renderer* renderer, const rail_operation::Articulate
         origin.x - scale * layout.pivot_x_px / 1024.0F,
         origin.y - scale * layout.pivot_y_px / 1024.0F,
         scale, scale};
-    if (dst.x + dst.w < -64.0F || dst.y + dst.h < -64.0F ||
-        dst.x > viewport_width + 64.0F || dst.y > viewport_height + 64.0F) return;
-    (void)SDL_RenderTexture(renderer, texture, nullptr, &dst);
+    // SDL software capture exhibited rectangular black texels when an
+    // alpha-backed coach PNG intersected a viewport edge. Explicitly clip
+    // both the source and destination to their shared visible subrectangle,
+    // instead of asking the backend to clip a partly offscreen full image.
+    // This applies to the actual game renderer and the SDL review harness.
+    const float left = std::max(dst.x, 0.0F);
+    const float top = std::max(dst.y, 0.0F);
+    const float right = std::min(dst.x + dst.w, viewport_width);
+    const float bottom = std::min(dst.y + dst.h, viewport_height);
+    if (!(right > left && bottom > top) || dst.w<=0.0F || dst.h<=0.0F) return;
+    float tex_w=0.0F,tex_h=0.0F;
+    if(!SDL_GetTextureSize(texture,&tex_w,&tex_h) || tex_w<=0.0F || tex_h<=0.0F)return;
+    const SDL_FRect visible{left,top,right-left,bottom-top};
+    const SDL_FRect source{
+        (left-dst.x)*tex_w/dst.w,(top-dst.y)*tex_h/dst.h,
+        visible.w*tex_w/dst.w,visible.h*tex_h/dst.h};
+    (void)SDL_RenderTexture(renderer,texture,&source,&visible);
 }
 
 // Texture provider uses the engine's existing cache; this adapter never owns,
