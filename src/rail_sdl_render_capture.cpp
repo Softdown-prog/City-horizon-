@@ -76,7 +76,7 @@ struct Frame {
     // Review capture: frame the complete return consist and avoid aggressive
     // locomotive-locked zoom that clips 5+ of 7 coaches from the screen.
     // Gameplay zoom remains player-controlled and is untouched.
-    camera.zoom=(frame.sequence==3)?0.27F:0.36F;
+    camera.zoom=0.26F; // Must match the SDL draw camera exactly.
     camera.rotation=ch::CameraRotation::r0;
     const auto& locomotive=frame.units.front().pose;
     // Lock view to a locomotive, but keep the detached station-B consist in
