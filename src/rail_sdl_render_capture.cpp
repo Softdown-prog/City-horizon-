@@ -246,9 +246,17 @@ void draw_tracks(SDL_Renderer* renderer,const RailPersistentState& state,
         if(auto it=textures.find(name);it!=textures.end())return it->second;
         SDL_Surface* image=SDL_LoadPNG(name.c_str());
         if(!image){std::cerr<<"Missing approved PNG: "<<name<<'\n';return nullptr;}
-        SDL_Texture* texture=SDL_CreateTextureFromSurface(renderer,image);
+        // Avoid the backend-dependent palette/alpha upload path of a PNG
+        // surface. Convert explicitly to 32-bit RGBA before SDL uploads.
+        // This is a capture-side diagnostic first, not an asset rewrite.
+        SDL_Surface* rgba=SDL_ConvertSurface(image,SDL_PIXELFORMAT_RGBA32);
         SDL_DestroySurface(image);
-        if(texture)SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND);
+        if(!rgba){std::cerr<<"Failed RGBA conversion "<<name<<'\n';return nullptr;}
+        SDL_Texture* texture=SDL_CreateTextureFromSurface(renderer,rgba);
+        SDL_DestroySurface(rgba);
+        if(texture && !SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND)){
+            SDL_DestroyTexture(texture);texture=nullptr;
+        }
         textures.emplace(name,texture);
         return texture;
     };
