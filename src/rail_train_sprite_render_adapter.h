@@ -184,12 +184,13 @@ inline void render_articulated_train(
     const CameraState& camera, const float viewport_width, const float viewport_height,
     TextureProvider&& get_texture) {
     if (renderer == nullptr || viewport_width <= 0.0F || viewport_height <= 0.0F) return;
-    const auto* route = operation.operational_route();
-    const auto lead = operation.train_pose();
-    if (route == nullptr || !lead) return;
-    auto units = rail_operation::build_articulated_consist_poses(*route, *lead);
+    auto units = operation.articulated_poses();
+    if (units.empty()) return;
     // Connect adjacent cars before sorting, so links appear beneath chassis.
     for (std::size_t i=1U;i<units.size();++i) {
+        // Never draw a giant elastic coupling from the parked coaches to
+        // their detached locomotive on the passing siding.
+        if (operation.shunting_locomotive() && i==1U) continue;
         if (units[i].unit_index==units[i-1U].unit_index+1U)
             render_coupler_between(renderer,units[i-1U],units[i],camera,
                                    viewport_width,viewport_height);
