@@ -2409,7 +2409,7 @@ int main() {
         build_panel_open = false;
         railway_menu_mode = true;
         selected_instance_id.reset();
-        status = "FERROVIAS: TABELA DE PRECOS | ESTACAO NO MENU CONSTRUIR | T ATIVA TRILHOS";
+        status = "FERROVIAS: TECLA 7 MARCA PARADAS A1/B1/A2/B2 NOS TRILHOS | MENU TRENS COMPRA VEICULOS";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
     const auto select_railway_item = [&](const std::string& id) {
@@ -2915,7 +2915,13 @@ int main() {
                 const std::string stock = loco
                     ? (owned.locomotive_owned ? " | ADQUIRIDA 1/1" : " | DISPONIVEL 0/1")
                     : (coach ? " | ADQUIRIDOS " + std::to_string(owned.coach_count) + "/7" : "");
-                const std::string note = std::string(rail_item.note) + stock +
+                const bool station_building = id == "rail_terminal_station_01";
+                const std::size_t designated = ch::rail_persistence::runtime_stations().size();
+                const std::string station_note = station_building
+                    ? " | PARADAS LOGICAS " + std::to_string(designated) +
+                      "/4 | TECLA 7 MARCA A1,B1,A2,B2 SOBRE OS TRILHOS"
+                    : "";
+                const std::string note = std::string(rail_item.note) + stock + station_note +
                     (track_tool ? " | CLIQUE PARA DESENHAR | TECLAS 1-6 ALTERNAM" :
                      (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR/COMPRAR" : " | PRECO INFORMATIVO"));
                 model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
