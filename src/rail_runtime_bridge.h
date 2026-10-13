@@ -5,6 +5,7 @@
 #include "farming_system.h"
 #include "land_system.h"
 #include "rail_construction_economy.h"
+#include "rail_purchase_catalog.h"
 #include "rail_mapforge_input_adapter.h"
 #include "rail_persistence.h"
 #include "rail_placement_track_graph_adapter.h"
@@ -51,6 +52,16 @@ public:
 
     [[nodiscard]] bool tool_active() const noexcept { return tool_active_; }
     [[nodiscard]] RailPlacementMode selected_mode() const noexcept { return selected_mode_; }
+    [[nodiscard]] bool turntable_placement_mode() const noexcept { return turntable_placement_mode_; }
+    void activate_turntable_placement() {
+        if (gesture_active_) cancel_gesture(false);
+        connector_mode_ = false;
+        connector_from_.reset();
+        hovered_piece_.reset();
+        tool_active_ = true;
+        turntable_placement_mode_ = true;
+        refresh_status();
+    }
     // The catalog uses the same transactional placement state as number shortcuts.
     void activate_placement_mode(const RailPlacementMode mode) {
         tool_active_ = true;
@@ -86,6 +97,7 @@ public:
         committed_actions_ = state.actions;
         turntables_ = state.turntables;
         selected_mode_ = RailPlacementMode::straight;
+        turntable_placement_mode_ = false;
         connector_mode_ = false;
         connector_from_.reset();
         hovered_piece_.reset();
@@ -155,6 +167,7 @@ public:
                     toggle_turntable(context);
                     return true;
                 case SDL_SCANCODE_9:
+                    turntable_placement_mode_ = false;
                     if (gesture_active_) cancel_gesture(false);
                     connector_mode_ = !connector_mode_;
                     connector_from_.reset();
@@ -220,6 +233,11 @@ public:
         }
 
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (turntable_placement_mode_) {
+                update_hovered_piece(event.button.x, event.button.y, view);
+                toggle_turntable(context, false);
+                return true;
+            }
             if (connector_mode_) click_siding_port(event.button.x, event.button.y, view, context);
             else begin_gesture(event.button.x, event.button.y, view, context);
             return true;
@@ -302,6 +320,7 @@ private:
         connector_mode_ = false;
         connector_from_.reset();
         selected_mode_ = mode;
+        turntable_placement_mode_ = false;
         refresh_status();
     }
 
@@ -327,6 +346,12 @@ private:
     void refresh_status() {
         if (!tool_active_) {
             status_ = "RAIL MODE READY | T TOGGLE";
+            return;
+        }
+        if (turntable_placement_mode_) {
+            status_ = "PLATAFORMA GIRATORIA " + money_label(ch::rail_catalog::kTurntablePurchaseCost) +
+                " | CLIQUE NO TRILHO RETO >=8M | RMB CANCELA";
+            if (hovered_piece_) status_ += " | TRILHO " + std::to_string(*hovered_piece_);
             return;
         }
         if (connector_mode_) {
@@ -468,7 +493,7 @@ private:
     // Build a paid 7.2m rotating bridge centred over an existing straight.
     // The rail itself remains a normal graph edge; the persisted device alone
     // authorizes in-game locomotive rotation. No free hidden animation.
-    void toggle_turntable(const InteractionContext& context) {
+    void toggle_turntable(const InteractionContext& context, const bool allow_demolition = true) {
         if(!hovered_piece_) {
             status_="TURNTABLE: HOVER A LONG STRAIGHT TRACK FIRST";
             return;
@@ -479,10 +504,20 @@ private:
         CityEconomy* economy=CityEconomy::active_instance();
         if(economy==nullptr){status_="TURNTABLE: ECONOMY UNAVAILABLE";return;}
         if(found!=turntables_.end()){
+            if (!allow_demolition) {
+                status_ = "TURNTABLE: JA CONSTRUIDA | TECLA 0 PARA REMOVER";
+                return;
+            }
             economy->credit_infrastructure_refund(found->refund_value);
             turntables_.erase(found);
             status_="TURNTABLE DISMANTLED: ENGINE RETURN NOW REQUIRES RESTART";
             return;
+        }
+        for (const auto& station : rail_persistence::runtime_stations()) {
+            if (station.piece_group == group) {
+                status_ = "TURNTABLE: TRILHO JA USADO COMO ESTACAO";
+                return;
+            }
         }
         const RailPlacementEdge* target=nullptr;
         for(const auto& edge:graph_.edges()) {
@@ -540,13 +575,13 @@ private:
                 }
             }
         }
-        constexpr std::int64_t kPrice=3500;
+        constexpr std::int64_t kPrice=ch::rail_catalog::kTurntablePurchaseCost;
         if(!economy->can_afford(kPrice)||!economy->try_spend(kPrice)){
             status_="TURNTABLE: INSUFFICIENT FUNDS";
             return;
         }
         turntables_.push_back({group,kPrice,RailConstructionEconomy::demolition_refund(kPrice)});
-        status_="TURNTABLE BUILT: $3500 | SAVED WITH CITY";
+        status_="TURNTABLE BUILT: " + money_label(kPrice) + " | SAVED WITH CITY";
     }
 
     // Click-to-connect 2 authored, open rail nodes. This is a persistent,
@@ -879,6 +914,7 @@ private:
     RailMapForgeInputAdapter input_;
     RailPlacementMode selected_mode_ = RailPlacementMode::straight;
     bool connector_mode_ = false;
+    bool turntable_placement_mode_ = false;
     std::optional<RailPlacementNodeId> connector_from_{};
     RailPlacementCheckpoint gesture_checkpoint_{};
     std::vector<RailPersistentAction> committed_actions_;
