@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_two_service.h"
 #include "rail_turntable_sprite_runtime.h"
 #include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
@@ -67,6 +68,8 @@ namespace detail {
     // operation controller before rendering the newly purchased unit.
     hash = mix(hash, state.fleet.locomotive_owned ? 1U : 0U);
     hash = mix(hash, state.fleet.coach_count);
+    hash = mix(hash, state.secondary_fleet.locomotive_owned ? 1U : 0U);
+    hash = mix(hash, state.secondary_fleet.coach_count);
     hash = mix(hash,state.turntables.size());
     for(const RailPersistentTurntable& table:state.turntables){
         hash=mix(hash,table.piece_group);
@@ -135,6 +138,9 @@ public:
     void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
     void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
     [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
+    [[nodiscard]] const ch::rail_two_service::AuxiliaryService& secondary_controller() const noexcept {
+        return secondary_controller_;
+    }
     // Click a placed rail station by its world-space projected center. This
     // selects existing rail-station entities; it never edits track construction.
     [[nodiscard]] std::optional<RailPlacementPieceId> select_station_at(
@@ -190,7 +196,8 @@ public:
         if (!captured) return;
         const std::uint64_t signature = detail::state_signature(*captured);
         if (!state_ready_ || signature != state_signature_) {
-            if (!controller_.sync_from_persistent_state(*captured)) return;
+            if (!controller_.sync_from_persistent_state(*captured) ||
+                !secondary_controller_.sync_from_state(*captured)) return;
             const auto refreshed = rail_persistence::capture_runtime_state();
             state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
             state_ready_ = true;
@@ -280,7 +287,10 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        if (simulation_running_) controller_.update(elapsed);
+        if (simulation_running_) {
+            controller_.update(elapsed);
+            secondary_controller_.update(elapsed);
+        }
     }
 
     void render_stations(SDL_Renderer* renderer,
@@ -474,6 +484,7 @@ private:
     }
 
     LiveOperationController controller_{};
+    ch::rail_two_service::AuxiliaryService secondary_controller_{};
     std::uint64_t state_signature_ = 0U;
     std::uint64_t last_tick_ns_ = 0U;
     bool state_ready_ = false;
