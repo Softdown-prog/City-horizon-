@@ -15,7 +15,8 @@
 #include <utility>
 #include <vector>
 
-inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V3";
+inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V4";
+inline constexpr const char* kChRailPersistenceV3Contract = "CH_RAIL_PERSISTENCE_V3";
 inline constexpr const char* kChRailPersistenceV2Contract = "CH_RAIL_PERSISTENCE_V2";
 inline constexpr const char* kChRailPersistenceLegacyContract = "CH_RAIL_PERSISTENCE_V1";
 
@@ -39,12 +40,20 @@ struct RailPersistentTurntable {
     std::int64_t refund_value = 0;
 };
 
+// One authored passenger consist. Previous V1-V3 city saves retain the
+// original complimentary 1+7 train; newly started cities override with 0+0.
+struct RailPersistentFleet {
+    bool locomotive_owned = true;
+    std::uint32_t coach_count = 7U;
+};
+
 struct RailPersistentState {
     std::vector<RailPlacementNode> nodes;
     std::vector<RailPlacementEdge> edges;
     std::vector<RailPersistentAction> actions;
     std::vector<RailPersistentStation> stations;
     std::vector<RailPersistentTurntable> turntables;
+    RailPersistentFleet fleet{};
 };
 
 namespace ch::rail_persistence {
@@ -97,7 +106,8 @@ inline void clear_runtime_stations() noexcept {
 
 [[nodiscard]] inline bool restore_runtime_state(const RailPersistentState& state) {
     if (g_restore_runtime == nullptr) {
-        if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty() || !state.turntables.empty()) {
+        if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty() || !state.turntables.empty() ||
+            state.fleet.locomotive_owned || state.fleet.coach_count != 0U) {
             return false;
         }
         clear_runtime_stations();
@@ -118,6 +128,11 @@ inline void clear_runtime_stations() noexcept {
 }
 
 [[nodiscard]] inline bool validate(const RailPersistentState& state, std::string* error = nullptr) {
+    if (state.fleet.coach_count > 7U ||
+        (state.fleet.coach_count != 0U && !state.fleet.locomotive_owned)) {
+        if (error) *error = "rail fleet count invalid or coaches have no locomotive";
+        return false;
+    }
     RailPlacementGraph graph;
     if (!graph.restore_snapshot(state.nodes, state.edges)) {
         if (error) *error = "rail graph snapshot is structurally invalid";
@@ -235,6 +250,8 @@ inline void clear_runtime_stations() noexcept {
         output << "T " << table.piece_group << ' ' << table.build_cost << ' '
                << table.refund_value << '\n';
     }
+    output << "V " << (state.fleet.locomotive_owned ? 1 : 0) << ' '
+           << state.fleet.coach_count << '\n';
     return output.str();
 }
 
@@ -245,12 +262,15 @@ inline void clear_runtime_stations() noexcept {
     std::string header;
     if (!std::getline(input, header) ||
         (header != kChRailPersistenceContract &&
-         header != kChRailPersistenceV2Contract && header != kChRailPersistenceLegacyContract)) {
+         header != kChRailPersistenceV3Contract &&
+          header != kChRailPersistenceV2Contract && header != kChRailPersistenceLegacyContract)) {
         if (error) *error = "unsupported rail persistence payload";
         return false;
     }
     const bool legacy_v1 = header == kChRailPersistenceLegacyContract;
-    const bool v3 = header == kChRailPersistenceContract;
+    const bool v3 = header == kChRailPersistenceV3Contract || header == kChRailPersistenceContract;
+    const bool v4 = header == kChRailPersistenceContract;
+    bool fleet_seen = false;
 
     RailPersistentState parsed;
     std::string line;
@@ -310,6 +330,16 @@ inline void clear_runtime_stations() noexcept {
                 return false;
             }
             parsed.turntables.push_back(table);
+        } else if (kind == 'V' && v4 && !fleet_seen) {
+            int locomotive = -1;
+            std::uint32_t coaches = 0U;
+            if (!(row >> locomotive >> coaches) || (locomotive != 0 && locomotive != 1) ||
+                coaches > 7U || (locomotive == 0 && coaches != 0U)) {
+                if (error) *error = "invalid rail fleet row";
+                return false;
+            }
+            parsed.fleet = {locomotive == 1, coaches};
+            fleet_seen = true;
         } else {
             if (error) *error = "unknown rail persistence row";
             return false;
@@ -319,6 +349,16 @@ inline void clear_runtime_stations() noexcept {
             if (error) *error = "rail persistence row has trailing data";
             return false;
         }
+    }
+
+    if (v4 && !fleet_seen) {
+        if (error) *error = "rail V4 payload missing fleet row";
+        return false;
+    }
+    if (!v4) {
+        // Old saves rendered the full legacy train free of charge.
+        parsed.fleet = parsed.stations.empty() ? RailPersistentFleet{false, 0U}
+                                                : RailPersistentFleet{true, 7U};
     }
 
     std::string validation_error;
@@ -403,7 +443,8 @@ inline void clear_runtime_stations() noexcept {
                                                 std::string* error = nullptr) {
     const std::string payload = serialize_payload(state);
     if (payload.empty() && (!state.nodes.empty() || !state.edges.empty() ||
-                            !state.actions.empty() || !state.stations.empty() || !state.turntables.empty())) {
+                            !state.actions.empty() || !state.stations.empty() || !state.turntables.empty() ||
+                             state.fleet.locomotive_owned || state.fleet.coach_count != 0U)) {
         if (error) *error = "rail state failed validation before save";
         return false;
     }
