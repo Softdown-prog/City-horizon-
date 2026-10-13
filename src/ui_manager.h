@@ -55,6 +55,7 @@ enum class UiAction : std::uint8_t {
     select_farming_item,
     activate_decoration,
     open_railway_panel,
+    select_railway_item,
     rotate_left,
     rotate_right,
     close_tool_panel,
@@ -224,6 +225,7 @@ struct GameplayUiModel {
     std::string selected_farming_id;
     std::vector<UiBuildItem> farming_items;
     std::vector<UiBuildItem> railway_items;
+    std::string selected_railway_id;
     std::string farming_infrastructure;
     std::string farming_stock;
     std::string farming_tile_status;

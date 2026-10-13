@@ -2400,6 +2400,25 @@ int main() {
         status = "FERROVIAS: TABELA DE PRECOS | ESTACAO NO MENU CONSTRUIR | T ATIVA TRILHOS";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
+    const auto select_railway_item = [&](const std::string& id) {
+        if (id == "rail_terminal_station_01") {
+            begin_build_placement(id);
+            return;
+        }
+        RailPlacementMode mode;
+        if (id == "rail_track_straight") mode = RailPlacementMode::straight;
+        else if (id == "rail_track_curve") mode = RailPlacementMode::curve_left;
+        else if (id == "rail_track_turnout") mode = RailPlacementMode::turnout_left;
+        else if (id == "rail_track_crossing") mode = RailPlacementMode::crossing;
+        else {
+            status = "FERROVIAS: COMPRA DESTE ITEM AINDA NAO DISPONIVEL";
+            (void)play_sound(SoundEvent::ui_error);
+            return;
+        }
+        ch::rail_runtime::state().activate_placement_mode(mode);
+        status = ch::rail_runtime::status_text();
+        (void)play_sound(SoundEvent::ui_select);
+    };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
         build_panel_open = false;
@@ -2535,6 +2554,7 @@ int main() {
             case UiAction::select_farming_item: select_farming_item(action.payload); break;
             case UiAction::activate_decoration: begin_decoration_mode(); break;
             case UiAction::open_railway_panel: open_railway_panel(); break;
+            case UiAction::select_railway_item: select_railway_item(action.payload); break;
             case UiAction::rotate_left: rotate_placement(false); break;
             case UiAction::rotate_right: rotate_placement(true); break;
             case UiAction::close_tool_panel: close_tool_panel(); break;
@@ -2844,11 +2864,26 @@ int main() {
         model.active_tool = UiTool::none;
         if (railway_menu_mode) {
             model.active_tool = UiTool::railways;
+            switch (ch::rail_runtime::state().selected_mode()) {
+                case RailPlacementMode::straight: model.selected_railway_id = "rail_track_straight"; break;
+                case RailPlacementMode::curve_left:
+                case RailPlacementMode::curve_right: model.selected_railway_id = "rail_track_curve"; break;
+                case RailPlacementMode::turnout_left:
+                case RailPlacementMode::turnout_right: model.selected_railway_id = "rail_track_turnout"; break;
+                case RailPlacementMode::crossing: model.selected_railway_id = "rail_track_crossing"; break;
+            }
             for (const auto& rail_item : ch::rail_catalog::items) {
+                const bool track_tool = std::string(rail_item.id).rfind("rail_track_", 0) == 0;
                 const std::string note = std::string(rail_item.note) +
-                    (rail_item.purchase_implemented ? " | DISPONIVEL NO CATALOGO CONSTRUIR" : " | INFORMATIVO");
+                    (track_tool ? " | CLIQUE PARA DESENHAR | TECLAS 1-6 ALTERNAM" :
+                     (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR" : " | PRECO INFORMATIVO"));
                 model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
-                    format_money(rail_item.cost), false, "", "", note});
+                    format_money(rail_item.cost),
+                    rail_item.id == std::string("rail_terminal_station_01") ||
+                    rail_item.id == std::string("rail_track_straight") ||
+                    rail_item.id == std::string("rail_track_curve") ||
+                    rail_item.id == std::string("rail_track_turnout") ||
+                    rail_item.id == std::string("rail_track_crossing"), "", "", note});
             }
         } else if (decoration_mode) {
             model.active_tool = UiTool::decoration;
