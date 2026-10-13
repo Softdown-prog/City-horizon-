@@ -1171,6 +1171,7 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
                            const std::vector<MobileEntityRenderData>& mobile_entities,
                            const ch::coaster::TrainStepResult* coaster_train,
                            const ch::rail_live_operation::LiveOperationController* rail_controller,
+                           const ch::rail_two_service::AuxiliaryService* second_rail_controller,
                            const MobileAnimationCatalog& animations, TextureCache& textures,
                            const std::filesystem::path& root, const Camera& camera,
                            float viewport_width, float viewport_height, const ch::MapDocument* document) {
@@ -1184,7 +1185,7 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
     };
     std::vector<EntityDraw> draws;
     draws.reserve(buildings.instances().size() + mobile_entities.size() +
-                  ch::coaster::kCoasterTrainCarCount + 8U);
+                  ch::coaster::kCoasterTrainCarCount + 16U);
     for (const BuildingInstance& instance : buildings.instances()) {
         const BuildingDefinition* definition = building_catalog.find(instance.definition_id);
         if (definition == nullptr) continue;
@@ -1226,6 +1227,17 @@ void render_world_entities(SDL_Renderer* renderer, const BuildingManager& buildi
         // controller is the single authority for all eight vehicles.
         rail_units = rail_controller->articulated_poses();
         for (const auto& unit : rail_units) {
+            draws.push_back({EntityDraw::Kind::rail_unit,
+                camera_depth_key(static_cast<float>(unit.pose.x),
+                                 static_cast<float>(unit.pose.y), camera),
+                nullptr, nullptr, nullptr, &unit});
+        }
+    }
+    // Both train consists join the shared world depth sort.
+    std::vector<ch::rail_operation::ArticulatedUnitPose> second_rail_units;
+    if (second_rail_controller != nullptr) {
+        second_rail_units = second_rail_controller->articulated_poses();
+        for (const auto& unit : second_rail_units) {
             draws.push_back({EntityDraw::Kind::rail_unit,
                 camera_depth_key(static_cast<float>(unit.pose.x),
                                  static_cast<float>(unit.pose.y), camera),
@@ -2405,9 +2417,11 @@ int main() {
             begin_build_placement(id);
             return;
         }
-        if (id == "steam_train_locomotive_01" || id == "steam_train_coach_01") {
+        if (id == "steam_train_locomotive_01" || id == "steam_train_coach_01" ||
+            id == "steam_train_locomotive_02" || id == "steam_train_coach_02") {
             const bool purchased = ch::rail_runtime::state().purchase_rolling_stock(
-                id == "steam_train_locomotive_01");
+                id == "steam_train_locomotive_01" || id == "steam_train_locomotive_02",
+                (id == "steam_train_locomotive_02" || id == "steam_train_coach_02") ? 1U : 0U);
             status = ch::rail_runtime::status_text();
             (void)play_sound(purchased ? SoundEvent::ui_confirm : SoundEvent::ui_error);
             return;
@@ -2890,13 +2904,17 @@ int main() {
             for (const auto& rail_item : ch::rail_catalog::items) {
                 const bool track_tool = std::string(rail_item.id).rfind("rail_track_", 0) == 0;
                 const auto& fleet = ch::rail_runtime::state().fleet();
-                const bool loco = std::string(rail_item.id) == "steam_train_locomotive_01";
-                const bool coach = std::string(rail_item.id) == "steam_train_coach_01";
-                const bool available = loco ? !fleet.locomotive_owned :
-                    (coach ? fleet.locomotive_owned && fleet.coach_count < 7U : true);
+                const auto& fleet2 = ch::rail_runtime::state().secondary_fleet();
+                const std::string id = rail_item.id;
+                const bool loco = id == "steam_train_locomotive_01" || id == "steam_train_locomotive_02";
+                const bool coach = id == "steam_train_coach_01" || id == "steam_train_coach_02";
+                const bool second = id == "steam_train_locomotive_02" || id == "steam_train_coach_02";
+                const auto& owned = second ? fleet2 : fleet;
+                const bool available = loco ? !owned.locomotive_owned :
+                    (coach ? owned.locomotive_owned && owned.coach_count < 7U : true);
                 const std::string stock = loco
-                    ? (fleet.locomotive_owned ? " | ADQUIRIDA 1/1" : " | DISPONIVEL 0/1")
-                    : (coach ? " | ADQUIRIDOS " + std::to_string(fleet.coach_count) + "/7" : "");
+                    ? (owned.locomotive_owned ? " | ADQUIRIDA 1/1" : " | DISPONIVEL 0/1")
+                    : (coach ? " | ADQUIRIDOS " + std::to_string(owned.coach_count) + "/7" : "");
                 const std::string note = std::string(rail_item.note) + stock +
                     (track_tool ? " | CLIQUE PARA DESENHAR | TECLAS 1-6 ALTERNAM" :
                      (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR/COMPRAR" : " | PRECO INFORMATIVO"));
@@ -4340,7 +4358,9 @@ int main() {
         }
         render_world_entities(renderer, buildings, catalog, lands, mobile_entities,
                               coaster_train.valid ? &coaster_train : nullptr,
-                              &ch::rail_live_operation::overlay().controller(), mobile_animations, textures,
+                              &ch::rail_live_operation::overlay().controller(),
+                              &ch::rail_live_operation::overlay().secondary_controller(),
+                              mobile_animations, textures,
                               asset_root, camera, static_cast<float>(viewport_width), static_cast<float>(viewport_height),
                               active_map_doc ? &*active_map_doc : nullptr);
         if (seagull_pass_active) {
