@@ -73,5 +73,51 @@ int main() {
     if (!second.sync_from_state(city) || second.active() ||
         !second.articulated_poses().empty())
         return fail("unowned second locomotive spawned");
+    // Automatic station aspects must track occupied, approaching and clear
+    // positions, and fail safely while a train is shunting.
+    using ch::rail_signals::Aspect;
+    if (ch::rail_signals::station_aspect(true, 50.0, 50.0, 2U) != Aspect::stop ||
+        ch::rail_signals::station_aspect(true, 50.0, 35.0, 2U) != Aspect::approach ||
+        ch::rail_signals::station_aspect(true, 50.0, 10.0, 2U) != Aspect::clear ||
+        ch::rail_signals::station_aspect(false, 50.0, 10.0, 2U) != Aspect::stop ||
+        ch::rail_signals::station_aspect(true, 50.0, 10.0, 2U, true) != Aspect::stop)
+        return fail("automatic station signal aspect regression");
+
+    const ch::track::Point3 a{0,0,0}, b{20,0,0};
+    if (!ch::rail_signals::same_level_segment_conflict(a,b,{10,-10,0},{10,10,0}) ||
+        ch::rail_signals::same_level_segment_conflict(a,b,{10,-10,5},{10,10,5}) ||
+        ch::rail_signals::same_level_segment_conflict(a,b,{10,10,0},{10,20,0}))
+        return fail("same-level crossing, overpass or separated segment test");
+
+    // Crossing tracks can be separate topological pieces but still collide
+    // physically. A crossing on the same grade must remain unpurchasable until
+    // an actual track block dispatcher and railway crossing are authored.
+    RailPlacementGraph crossing_graph;
+    std::vector<RailPersistentStation> crossing_stops;
+    for (int line = 0; line != 2; ++line) {
+        const auto root = crossing_graph.add_root(
+            line == 0 ? RailWorldPoint3{0,0,0} : RailWorldPoint3{100,-100,0},
+            line == 0 ? 0.0F : 1.57079632679F);
+        if (!root) return fail("crossing test track root");
+        auto cursor = *root;
+        for (int i = 0; i < 48; ++i) {
+            const auto segment = crossing_graph.append_straight(cursor, 4.0F, 12);
+            if (!segment) return fail("crossing test track segment");
+            if (i == 11 || i == 35) crossing_stops.push_back({
+                crossing_graph.edges()[segment->edge].piece_group, 0.25});
+            cursor = segment->node;
+        }
+    }
+    const auto crossing_first = ch::rail_two_service::find_route(
+        crossing_graph, crossing_stops, 0U, 7U);
+    const auto crossing_second = ch::rail_two_service::find_route(
+        crossing_graph, crossing_stops, 2U, 2U);
+    if (!crossing_first || !crossing_second ||
+        ch::rail_two_service::routes_share_track(*crossing_first, *crossing_second) ||
+        !ch::rail_signals::routes_cross_at_grade(*crossing_first, *crossing_second) ||
+        ch::rail_two_service::second_route_safe(
+            crossing_graph, crossing_stops, 7U, 2U))
+        return fail("topologically independent at-grade crossing was not interlocked");
+
     std::cout << "CH_RAIL_TWO_INDEPENDENT_SERVICES_V1: PASS\n";
 }

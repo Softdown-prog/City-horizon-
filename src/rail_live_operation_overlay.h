@@ -408,6 +408,45 @@ private:
                 (void)SDL_RenderRect(renderer, &tag);
                 (void)SDL_RenderDebugText(renderer, screen.x - 8.0F, label_y,
                                           station_names[station_index]);
+                // Automatic block signal indication: red (occupied/fault),
+                // amber (approach), green (clear). Shared-route dispatch stays
+                // locked out; these lamps do not authorize unsafe movements.
+                const bool second_line = station_index >= 2U;
+                const auto* route = second_line ? secondary_controller_.route()
+                                               : controller_.operational_route();
+                const auto pose = second_line ? secondary_controller_.train_pose()
+                                              : controller_.train_pose();
+                const auto& fleet = second_line ? state.secondary_fleet : state.fleet;
+                ch::rail_signals::Aspect aspect = ch::rail_signals::Aspect::stop;
+                if (route != nullptr) {
+                    const auto it = std::find_if(route->stations.begin(), route->stations.end(),
+                        [&](const rail_operation::StationStop& stop) {
+                            return stop.piece_group == station.piece_group;
+                        });
+                    if (it != route->stations.end()) {
+                        const bool transfer = !second_line &&
+                            (controller_.shunting_locomotive() || controller_.return_service_active());
+                        aspect = ch::rail_signals::station_aspect(true, it->distance_m,
+                            pose ? std::optional<double>{pose->distance_m} : std::nullopt,
+                            fleet.coach_count, transfer);
+                    }
+                }
+                const float x = screen.x + 23.0F * zoom;
+                const float y = screen.y - 23.0F * zoom;
+                SDL_SetRenderDrawColor(renderer, 65, 69, 72, 255);
+                (void)SDL_RenderLine(renderer, x, y + 7.0F * zoom,
+                                     x, y - 7.0F * zoom);
+                SDL_FRect housing{x - 3.5F * zoom, y - 11.0F * zoom,
+                                  7.0F * zoom, 8.0F * zoom};
+                (void)SDL_RenderFillRect(renderer, &housing);
+                if (aspect == ch::rail_signals::Aspect::stop)
+                    SDL_SetRenderDrawColor(renderer, 231, 62, 55, 255);
+                else if (aspect == ch::rail_signals::Aspect::approach)
+                    SDL_SetRenderDrawColor(renderer, 243, 184, 45, 255);
+                else SDL_SetRenderDrawColor(renderer, 67, 203, 104, 255);
+                SDL_FRect lamp{x - 2.0F * zoom, y - 9.5F * zoom,
+                               4.0F * zoom, 4.0F * zoom};
+                (void)SDL_RenderFillRect(renderer, &lamp);
             }
         }
     }
