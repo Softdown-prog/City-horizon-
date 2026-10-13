@@ -43,8 +43,8 @@ struct RailPersistentTurntable {
 // One authored passenger consist. Previous V1-V3 city saves retain the
 // original complimentary 1+7 train; newly started cities override with 0+0.
 struct RailPersistentFleet {
-    bool locomotive_owned = true;
-    std::uint32_t coach_count = 7U;
+    bool locomotive_owned = false;
+    std::uint32_t coach_count = 0U;
 };
 
 struct RailPersistentState {
