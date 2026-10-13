@@ -22,6 +22,7 @@ int main() {
     RailPersistentState state;
     state.nodes = graph.nodes();
     state.edges = graph.edges();
+    state.fleet = {true, 7U};
 
     ch::rail_live_operation::LiveOperationController controller;
     if (!controller.sync_from_persistent_state(state)) return fail("initial graph sync");
@@ -89,6 +90,24 @@ int main() {
     service_state.nodes = service_graph.nodes();
     service_state.edges = service_graph.edges();
     service_state.stations = {{service_a, 0.3}, {service_b, 0.5}};
+    service_state.fleet = {true, 7U};
+    // A newly created city owns nothing, and individual coach purchases must
+    // show exactly the paid 1+N units, without exposing seven free carriages.
+    RailPersistentState new_city_line = service_state;
+    new_city_line.fleet = {false, 0U};
+    ch::rail_live_operation::LiveOperationController unowned_controller;
+    if (!unowned_controller.sync_from_persistent_state(new_city_line) ||
+        unowned_controller.operation_active() ||
+        !unowned_controller.articulated_poses().empty())
+        return fail("unowned rolling stock spawned");
+    new_city_line.fleet = {true, 2U};
+    ch::rail_live_operation::LiveOperationController two_coach_controller;
+    if (!two_coach_controller.sync_from_persistent_state(new_city_line) ||
+        !two_coach_controller.two_station_service_active() ||
+        two_coach_controller.articulated_poses().size() != 3U ||
+        two_coach_controller.connected_siding_available())
+        return fail("paid 1+2 consist incorrectly rendered or allowed seven-coach shunt");
+
     ch::rail_live_operation::LiveOperationController pair_controller;
     if (!pair_controller.sync_from_persistent_state(service_state) ||
         !pair_controller.operation_active() || !pair_controller.two_station_service_active()) {

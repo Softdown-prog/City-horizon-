@@ -41,6 +41,7 @@ int main() {
     if(!siding)return fail("connected siding");
 
     RailPersistentState state;
+    state.fleet = {true, 7U};
     state.nodes=graph.nodes();
     state.edges=graph.edges();
     const auto a_group=graph.edges()[a->edge].piece_group;

@@ -24,6 +24,9 @@ public:
         if (!replacement.restore_snapshot(state.nodes, state.edges)) return false;
         graph_ = std::move(replacement);
         turntables_=state.turntables;
+        fleet_ = state.fleet;
+        if (fleet_.coach_count > 7U || (fleet_.coach_count > 0U && !fleet_.locomotive_owned))
+            return false;
 
         std::vector<rail_operation::StationDefinition> restored_stations;
         restored_stations.reserve(state.stations.size());
@@ -155,11 +158,13 @@ public:
         return shunt_.phase();
     }
     [[nodiscard]] std::vector<rail_operation::ArticulatedUnitPose> articulated_poses() const {
-        if(!operation_active_ || !operational_route_.valid)return {};
+        if(!operation_active_ || !operational_route_.valid || !fleet_.locomotive_owned)return {};
         const auto lead=train_.pose();
         if(!lead)return {};
-        auto units=rail_operation::build_articulated_consist_poses(operational_route_,*lead);
-        if(units.size()!=8U)return {};
+        rail_operation::ArticulatedConsistSpec spec;
+        spec.coach_count = fleet_.coach_count;
+        auto units=rail_operation::build_articulated_consist_poses(operational_route_,*lead,spec);
+        if(units.size()!=fleet_.coach_count+1U)return {};
         if(return_.active()){
             const auto locomotive=return_.locomotive_pose(operational_route_);
             if(!locomotive)return {};
@@ -232,7 +237,7 @@ private:
         shunt_=rail_operation::DetachedLocomotiveShunt{};
         return_=rail_operation::TurntableReturnRuntime{};
         train_ = rail_operation::TrainRuntime{};
-        if (stations_.empty()) return true;
+        if (stations_.empty() || !fleet_.locomotive_owned) return true;
 
         for (const RailPlacementEdge& edge : graph_.edges()) {
             if (!edge.active) continue;
@@ -246,10 +251,13 @@ private:
             // the full 1+7 consist to fit and begin service at station A.
             // No imaginary siding is assumed or synthesized here.
             if (!route.closed && stations_.size() == 2U &&
-                !train_.configure_terminal_pair()) {
+                !train_.configure_terminal_pair(fleet_.coach_count)) {
                 continue;
             }
-            if (train_.terminal_pair_enabled()) {
+            // The existing physical shunt and turntable controller handles
+            // exactly seven distinct coaches. Shorter owned consists stop
+            // safely at B instead of inventing a turnaround movement.
+            if (train_.terminal_pair_enabled() && fleet_.coach_count == 7U) {
                 connected_siding_ = rail_operation::find_connected_siding(graph_, route);
                 if (connected_siding_) {
                     shunt_path_ = rail_operation::compile_detached_locomotive_shunt(
@@ -276,6 +284,7 @@ private:
     std::optional<rail_operation::ShuntPath> shunt_path_{};
     std::optional<rail_operation::TurntableReturnPlan> return_plan_{};
     std::vector<RailPersistentTurntable> turntables_{};
+    RailPersistentFleet fleet_{};
     rail_operation::DetachedLocomotiveShunt shunt_{};
     rail_operation::TurntableReturnRuntime return_{};
     rail_operation::TrainRuntime train_{};

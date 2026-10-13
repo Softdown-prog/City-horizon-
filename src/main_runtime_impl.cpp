@@ -2405,6 +2405,13 @@ int main() {
             begin_build_placement(id);
             return;
         }
+        if (id == "steam_train_locomotive_01" || id == "steam_train_coach_01") {
+            const bool purchased = ch::rail_runtime::state().purchase_rolling_stock(
+                id == "steam_train_locomotive_01");
+            status = ch::rail_runtime::status_text();
+            (void)play_sound(purchased ? SoundEvent::ui_confirm : SoundEvent::ui_error);
+            return;
+        }
         if (id == "rail_turntable_7m2_01") {
             ch::rail_runtime::state().activate_turntable_placement();
             status = ch::rail_runtime::status_text();
@@ -2882,17 +2889,19 @@ int main() {
             }
             for (const auto& rail_item : ch::rail_catalog::items) {
                 const bool track_tool = std::string(rail_item.id).rfind("rail_track_", 0) == 0;
-                const std::string note = std::string(rail_item.note) +
+                const auto& fleet = ch::rail_runtime::state().fleet();
+                const bool loco = std::string(rail_item.id) == "steam_train_locomotive_01";
+                const bool coach = std::string(rail_item.id) == "steam_train_coach_01";
+                const bool available = loco ? !fleet.locomotive_owned :
+                    (coach ? fleet.locomotive_owned && fleet.coach_count < 7U : true);
+                const std::string stock = loco
+                    ? (fleet.locomotive_owned ? " | ADQUIRIDA 1/1" : " | DISPONIVEL 0/1")
+                    : (coach ? " | ADQUIRIDOS " + std::to_string(fleet.coach_count) + "/7" : "");
+                const std::string note = std::string(rail_item.note) + stock +
                     (track_tool ? " | CLIQUE PARA DESENHAR | TECLAS 1-6 ALTERNAM" :
-                     (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR" : " | PRECO INFORMATIVO"));
+                     (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR/COMPRAR" : " | PRECO INFORMATIVO"));
                 model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
-                    format_money(rail_item.cost),
-                    rail_item.id == std::string("rail_turntable_7m2_01") ||
-                    rail_item.id == std::string("rail_terminal_station_01") ||
-                    rail_item.id == std::string("rail_track_straight") ||
-                    rail_item.id == std::string("rail_track_curve") ||
-                    rail_item.id == std::string("rail_track_turnout") ||
-                    rail_item.id == std::string("rail_track_crossing"), "", "", note});
+                    format_money(rail_item.cost), available, "", "", note});
             }
         } else if (decoration_mode) {
             model.active_tool = UiTool::decoration;

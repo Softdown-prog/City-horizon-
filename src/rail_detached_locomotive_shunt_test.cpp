@@ -58,6 +58,7 @@ int main() {
         return fail("headshunt distance mismatch");
 
     RailPersistentState state;
+    state.fleet={true,7U};
     state.nodes=graph.nodes();
     state.edges=graph.edges();
     state.stations={{a_group,0.25},{b_group,0.5}};

@@ -61,6 +61,7 @@ struct Frame {
     state.nodes=graph.nodes();
     state.edges=graph.edges();
     turntable_group=graph.edges()[approach->edge].piece_group;
+    state.fleet={true,7U};
     state.stations={{graph.edges()[station_a->edge].piece_group,.25},
                     {graph.edges()[main->primary_edge].piece_group,.5}};
     state.turntables={{turntable_group,3500,2275}};
