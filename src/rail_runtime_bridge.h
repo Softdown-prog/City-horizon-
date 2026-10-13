@@ -117,6 +117,7 @@ public:
         hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
+        turntable_placement_mode_ = false;
         connector_mode_ = false;
         connector_from_.reset();
         new_root_heading_radians_ = 0.0F;
@@ -133,6 +134,7 @@ public:
                 cancel_gesture(false);
                 hovered_piece_.reset();
                 tool_active_ = false;
+                turntable_placement_mode_ = false;
                 status_ = "RAIL MODE CLOSED BY MODAL";
             }
             return false;
@@ -146,6 +148,7 @@ public:
                     connector_mode_ = false;
                     connector_from_.reset();
                     tool_active_ = false;
+                    turntable_placement_mode_ = false;
                     status_ = "RAIL MODE CLOSED";
                 } else {
                     tool_active_ = true;
@@ -203,6 +206,7 @@ public:
                         connector_mode_ = false;
                         connector_from_.reset();
                         tool_active_ = false;
+                        turntable_placement_mode_ = false;
                         status_ = "RAIL MODE CLOSED";
                     }
                     return true;
@@ -227,6 +231,7 @@ public:
             } else {
                 hovered_piece_.reset();
                 tool_active_ = false;
+                turntable_placement_mode_ = false;
                 status_ = "RAIL MODE CLOSED";
             }
             return true;
