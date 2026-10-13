@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_placement_track_graph_adapter.h"
+#include "rail_station_network.h"
 
 #include <algorithm>
 #include <cmath>
@@ -172,6 +173,38 @@ namespace detail {
               [](const StationStop& a, const StationStop& b) { return a.distance_m < b.distance_m; });
     result.valid = true;
     return result;
+}
+
+// Bridge from stable station IDs to the existing operational route compiler.
+// This deliberately does not assume that the first two stations are A and B.
+// Current graph compiler still chooses its existing track traversal; a service
+// with branches requires explicit path selection before dispatch.
+[[nodiscard]] inline OperationalRoute compile_station_network_route(
+    const RailPlacementGraph& placement, RailPlacementEdgeId start_edge,
+    const ch::rail_network::StationRegistry& registry,
+    const ch::rail_network::Service& service) {
+    if (!registry.validate_service(placement, service)) return {};
+    std::vector<StationDefinition> definitions;
+    std::unordered_set<ch::rail_network::StationId> visited;
+    for (auto id : service.stops) {
+        if (!visited.insert(id).second) continue;
+        const auto* station = registry.find(id);
+        if (!station) return {};
+        definitions.push_back({station->piece_group, station->dwell_seconds});
+    }
+    OperationalRoute route = compile_route(placement, start_edge, definitions);
+    if (!route.valid || route.stations.size() != definitions.size()) return {};
+    // Fail closed if topology traversal cannot honor the requested stop order.
+    std::size_t stop = 0;
+    for (const auto& actual : route.stations) {
+        if (stop >= service.stops.size()) return {};
+        const auto* expected = registry.find(service.stops[stop]);
+        if (!expected || actual.piece_group != expected->piece_group) return {};
+        ++stop;
+    }
+    // A return to the origin needs a separately authored return path.
+    if (stop != service.stops.size()) return {};
+    return route;
 }
 
 class TrainRuntime final {
