@@ -817,9 +817,10 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
         build_panel_header_height_ = farming ? 60.0F : 42.0F;
         const std::vector<UiBuildItem>& items = railway ? runtime_model.railway_items :
             (farming ? runtime_model.farming_items : runtime_model.decor_items);
-        const UiAction action = railway ? UiAction::none :
+        const UiAction action = railway ? UiAction::select_railway_item :
             (farming ? UiAction::select_farming_item : UiAction::select_building);
-        const std::string& selected = farming ? runtime_model.selected_farming_id : runtime_model.selected_building_id;
+        const std::string& selected = railway ? runtime_model.selected_railway_id :
+            (farming ? runtime_model.selected_farming_id : runtime_model.selected_building_id);
 
         constexpr float card_height = 90.0F;
         constexpr float card_gap = 6.0F;
