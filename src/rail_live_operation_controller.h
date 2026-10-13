@@ -71,6 +71,10 @@ public:
             return true;
         }
 
+        // Until dispatch/signalling supports more services, a fifth marker
+        // would be unassigned and make the A1/B1/A2/B2 order ambiguous.
+        if (stations_.size() >= 4U) return false;
+
         // A paid rotating deck and a station marker cannot occupy the same
         // logical rail piece: such a state would fail city save validation.
         if (std::any_of(turntables_.begin(), turntables_.end(),
