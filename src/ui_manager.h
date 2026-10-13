@@ -223,6 +223,7 @@ struct GameplayUiModel {
     bool farming_panel_open = false;
     std::string selected_farming_id;
     std::vector<UiBuildItem> farming_items;
+    std::vector<UiBuildItem> railway_items;
     std::string farming_infrastructure;
     std::string farming_stock;
     std::string farming_tile_status;

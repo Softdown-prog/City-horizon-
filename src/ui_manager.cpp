@@ -802,7 +802,8 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
             card_y += card_height + card_gap;
         }
     } else if (runtime_model.overlay == UiOverlay::none &&
-               (runtime_model.farming_panel_open || runtime_model.active_tool == UiTool::decoration)) {
+               (runtime_model.farming_panel_open || runtime_model.active_tool == UiTool::decoration ||
+                runtime_model.active_tool == UiTool::railways)) {
         erase_legacy_catalog();
 
         const UiRect panel = {drawer_x, drawer_y, drawer_width, drawer_height};
@@ -812,9 +813,12 @@ void GameplayUi::update_layout(const int viewport_width, const int viewport_heig
                    "X", UiAction::close_tool_panel);
 
         const bool farming = runtime_model.farming_panel_open;
+        const bool railway = runtime_model.active_tool == UiTool::railways;
         build_panel_header_height_ = farming ? 60.0F : 42.0F;
-        const std::vector<UiBuildItem>& items = farming ? runtime_model.farming_items : runtime_model.decor_items;
-        const UiAction action = farming ? UiAction::select_farming_item : UiAction::select_building;
+        const std::vector<UiBuildItem>& items = railway ? runtime_model.railway_items :
+            (farming ? runtime_model.farming_items : runtime_model.decor_items);
+        const UiAction action = railway ? UiAction::none :
+            (farming ? UiAction::select_farming_item : UiAction::select_building);
         const std::string& selected = farming ? runtime_model.selected_farming_id : runtime_model.selected_building_id;
 
         constexpr float card_height = 90.0F;

@@ -14,6 +14,7 @@
 #include "building_system.h"
 #include "coaster_runtime.h"
 #include "rail_train_sprite_render_adapter.h"
+#include "rail_purchase_catalog.h"
 #include "renderer_backend_diagnostics.h"
 #include "coaster_sdl_renderer.h"
 #include "crosswalk_runtime.h"
@@ -2390,13 +2391,13 @@ int main() {
         record_terrain_paint(x, y, "grass");
         return true;
     };
-    // Reserved railway category: no track placement, purchase or game rules yet.
+    // Railway cost catalogue is informational until its purchase tools are wired.
     const auto open_railway_panel = [&]() {
         clear_map_modes();
         build_panel_open = false;
         railway_menu_mode = true;
         selected_instance_id.reset();
-        status = "FERROVIAS: LOCOMOTIVA A VAPOR | EM BREVE";
+        status = "FERROVIAS: TABELA DE PRECOS | ESTACAO NO MENU CONSTRUIR | T ATIVA TRILHOS";
         (void)play_sound(SoundEvent::ui_open_panel);
     };
     const auto begin_decoration_mode = [&]() {
@@ -2843,6 +2844,12 @@ int main() {
         model.active_tool = UiTool::none;
         if (railway_menu_mode) {
             model.active_tool = UiTool::railways;
+            for (const auto& rail_item : ch::rail_catalog::items) {
+                const std::string note = std::string(rail_item.note) +
+                    (rail_item.purchase_implemented ? " | DISPONIVEL NO CATALOGO CONSTRUIR" : " | INFORMATIVO");
+                model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
+                    format_money(rail_item.cost), false, "", "", note});
+            }
         } else if (decoration_mode) {
             model.active_tool = UiTool::decoration;
         } else if (land_mode) {
