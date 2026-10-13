@@ -3,6 +3,7 @@
 #include "rail_operation_runtime.h"
 #include "rail_articulated_consist.h"
 #include "rail_persistence.h"
+#include "rail_signal_interlocking.h"
 
 #include <array>
 #include <algorithm>
@@ -50,7 +51,8 @@ namespace ch::rail_two_service {
     if (stations.size() != 4U) return false;
     const auto first = find_route(graph, stations, 0U, first_coaches);
     const auto second = find_route(graph, stations, 2U, second_coaches);
-    return first && second && !routes_share_track(*first, *second);
+    return first && second && !routes_share_track(*first, *second) &&
+           !ch::rail_signals::routes_cross_at_grade(*first, *second);
 }
 
 class AuxiliaryService final {
@@ -76,6 +78,12 @@ public:
     }
     void update(const double elapsed) noexcept { if (active_) train_.update(elapsed); }
     [[nodiscard]] bool active() const noexcept { return active_; }
+    [[nodiscard]] const rail_operation::OperationalRoute* route() const noexcept {
+        return active_ ? &route_ : nullptr;
+    }
+    [[nodiscard]] std::optional<rail_operation::TrainPose> train_pose() const noexcept {
+        return active_ ? train_.pose() : std::nullopt;
+    }
     [[nodiscard]] std::vector<rail_operation::ArticulatedUnitPose> articulated_poses() const {
         if (!active_ || !route_.valid) return {};
         const auto lead = train_.pose();
