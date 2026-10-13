@@ -15,7 +15,8 @@
 #include <utility>
 #include <vector>
 
-inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V4";
+inline constexpr const char* kChRailPersistenceContract = "CH_RAIL_PERSISTENCE_V5";
+inline constexpr const char* kChRailPersistenceV4Contract = "CH_RAIL_PERSISTENCE_V4";
 inline constexpr const char* kChRailPersistenceV3Contract = "CH_RAIL_PERSISTENCE_V3";
 inline constexpr const char* kChRailPersistenceV2Contract = "CH_RAIL_PERSISTENCE_V2";
 inline constexpr const char* kChRailPersistenceLegacyContract = "CH_RAIL_PERSISTENCE_V1";
@@ -54,6 +55,7 @@ struct RailPersistentState {
     std::vector<RailPersistentStation> stations;
     std::vector<RailPersistentTurntable> turntables;
     RailPersistentFleet fleet{};
+    RailPersistentFleet secondary_fleet{};
 };
 
 namespace ch::rail_persistence {
@@ -107,7 +109,8 @@ inline void clear_runtime_stations() noexcept {
 [[nodiscard]] inline bool restore_runtime_state(const RailPersistentState& state) {
     if (g_restore_runtime == nullptr) {
         if (!state.nodes.empty() || !state.edges.empty() || !state.actions.empty() || !state.stations.empty() || !state.turntables.empty() ||
-            state.fleet.locomotive_owned || state.fleet.coach_count != 0U) {
+            state.fleet.locomotive_owned || state.fleet.coach_count != 0U ||
+            state.secondary_fleet.locomotive_owned || state.secondary_fleet.coach_count != 0U) {
             return false;
         }
         clear_runtime_stations();
@@ -129,7 +132,9 @@ inline void clear_runtime_stations() noexcept {
 
 [[nodiscard]] inline bool validate(const RailPersistentState& state, std::string* error = nullptr) {
     if (state.fleet.coach_count > 7U ||
-        (state.fleet.coach_count != 0U && !state.fleet.locomotive_owned)) {
+        (state.fleet.coach_count != 0U && !state.fleet.locomotive_owned) ||
+        state.secondary_fleet.coach_count > 7U ||
+        (state.secondary_fleet.coach_count != 0U && !state.secondary_fleet.locomotive_owned)) {
         if (error) *error = "rail fleet count invalid or coaches have no locomotive";
         return false;
     }
@@ -252,6 +257,8 @@ inline void clear_runtime_stations() noexcept {
     }
     output << "V " << (state.fleet.locomotive_owned ? 1 : 0) << ' '
            << state.fleet.coach_count << '\n';
+    output << "W " << (state.secondary_fleet.locomotive_owned ? 1 : 0) << ' '
+           << state.secondary_fleet.coach_count << '\n';
     return output.str();
 }
 
@@ -262,15 +269,18 @@ inline void clear_runtime_stations() noexcept {
     std::string header;
     if (!std::getline(input, header) ||
         (header != kChRailPersistenceContract &&
-         header != kChRailPersistenceV3Contract &&
+         header != kChRailPersistenceV4Contract &&
+          header != kChRailPersistenceV3Contract &&
           header != kChRailPersistenceV2Contract && header != kChRailPersistenceLegacyContract)) {
         if (error) *error = "unsupported rail persistence payload";
         return false;
     }
     const bool legacy_v1 = header == kChRailPersistenceLegacyContract;
-    const bool v3 = header == kChRailPersistenceV3Contract || header == kChRailPersistenceContract;
-    const bool v4 = header == kChRailPersistenceContract;
+    const bool v5 = header == kChRailPersistenceContract;
+    const bool v4 = v5 || header == kChRailPersistenceV4Contract;
+    const bool v3 = v4 || header == kChRailPersistenceV3Contract;
     bool fleet_seen = false;
+    bool secondary_seen = false;
 
     RailPersistentState parsed;
     std::string line;
@@ -340,6 +350,16 @@ inline void clear_runtime_stations() noexcept {
             }
             parsed.fleet = {locomotive == 1, coaches};
             fleet_seen = true;
+        } else if (kind == 'W' && v5 && !secondary_seen) {
+            int locomotive = -1;
+            std::uint32_t coaches = 0U;
+            if (!(row >> locomotive >> coaches) || (locomotive != 0 && locomotive != 1) ||
+                coaches > 7U || (locomotive == 0 && coaches != 0U)) {
+                if (error) *error = "invalid secondary rail fleet row";
+                return false;
+            }
+            parsed.secondary_fleet = {locomotive == 1, coaches};
+            secondary_seen = true;
         } else {
             if (error) *error = "unknown rail persistence row";
             return false;
@@ -351,7 +371,7 @@ inline void clear_runtime_stations() noexcept {
         }
     }
 
-    if (v4 && !fleet_seen) {
+    if ((v4 && !fleet_seen) || (v5 && !secondary_seen)) {
         if (error) *error = "rail V4 payload missing fleet row";
         return false;
     }
@@ -444,7 +464,8 @@ inline void clear_runtime_stations() noexcept {
     const std::string payload = serialize_payload(state);
     if (payload.empty() && (!state.nodes.empty() || !state.edges.empty() ||
                             !state.actions.empty() || !state.stations.empty() || !state.turntables.empty() ||
-                             state.fleet.locomotive_owned || state.fleet.coach_count != 0U)) {
+                             state.fleet.locomotive_owned || state.fleet.coach_count != 0U ||
+                             state.secondary_fleet.locomotive_owned || state.secondary_fleet.coach_count != 0U)) {
         if (error) *error = "rail state failed validation before save";
         return false;
     }

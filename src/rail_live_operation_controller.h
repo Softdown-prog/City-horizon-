@@ -71,6 +71,10 @@ public:
             return true;
         }
 
+        // Until dispatch/signalling supports more services, a fifth marker
+        // would be unassigned and make the A1/B1/A2/B2 order ambiguous.
+        if (stations_.size() >= 4U) return false;
+
         // A paid rotating deck and a station marker cannot occupy the same
         // logical rail piece: such a state would fail city save validation.
         if (std::any_of(turntables_.begin(), turntables_.end(),
@@ -238,11 +242,15 @@ private:
         return_=rail_operation::TurntableReturnRuntime{};
         train_ = rail_operation::TrainRuntime{};
         if (stations_.empty() || !fleet_.locomotive_owned) return true;
+        // The primary train owns the first station pair. Subsequent pairs
+        // belong to separately dispatched trains on disjoint tracks.
+        auto primary_stations = stations_;
+        if (primary_stations.size() > 2U) primary_stations.resize(2U);
 
         for (const RailPlacementEdge& edge : graph_.edges()) {
             if (!edge.active) continue;
             rail_operation::OperationalRoute route =
-                rail_operation::compile_route(graph_, edge.id, stations_);
+                rail_operation::compile_route(graph_, edge.id, primary_stations);
             if (!route.valid) continue;
             rail_operation::OperationalRoute runtime_route = route;
             if (!train_.set_route(std::move(runtime_route))) continue;
@@ -250,7 +258,7 @@ private:
             // station saves. For exactly two stations on an OPEN line, require
             // the full 1+7 consist to fit and begin service at station A.
             // No imaginary siding is assumed or synthesized here.
-            if (!route.closed && stations_.size() == 2U &&
+            if (!route.closed && primary_stations.size() == 2U &&
                 !train_.configure_terminal_pair(fleet_.coach_count)) {
                 continue;
             }

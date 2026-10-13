@@ -18,6 +18,8 @@ on:
       - "src/rail_train_direction_math.h"
       - "src/rail_train_direction_math_test.cpp"
       - "src/rail_articulated_consist_test.cpp"
+      - "src/rail_two_service.h"
+      - "src/rail_two_service_test.cpp"
       - "src/rail_live_operation_controller.h"
       - "src/rail_live_operation_controller_test.cpp"
       - "src/rail_live_operation_overlay.h"
@@ -140,6 +142,16 @@ jobs:
             src/rail_system.cpp src/rail_turntable_return_test.cpp \
             -o build/rail-operation/rail_turntable_return_test
           build/rail-operation/rail_turntable_return_test
+
+      - name: Compile and run two independently purchased rail services
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Isrc -I. \
+            src/rail_system.cpp src/rail_two_service_test.cpp \
+            -o build/rail-operation/rail_two_service_test
+          build/rail-operation/rail_two_service_test
 
       - name: Compile and run V1/V2/V3 railway save compatibility
         shell: bash

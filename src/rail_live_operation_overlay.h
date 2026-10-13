@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_two_service.h"
 #include "rail_turntable_sprite_runtime.h"
 #include "rail_articulated_consist.h"
 #include "src/ch_core/projection.h"
@@ -67,6 +68,8 @@ namespace detail {
     // operation controller before rendering the newly purchased unit.
     hash = mix(hash, state.fleet.locomotive_owned ? 1U : 0U);
     hash = mix(hash, state.fleet.coach_count);
+    hash = mix(hash, state.secondary_fleet.locomotive_owned ? 1U : 0U);
+    hash = mix(hash, state.secondary_fleet.coach_count);
     hash = mix(hash,state.turntables.size());
     for(const RailPersistentTurntable& table:state.turntables){
         hash=mix(hash,table.piece_group);
@@ -135,6 +138,9 @@ public:
     void use_production_sprites(const bool enabled) noexcept { production_sprites_ = enabled; }
     void set_simulation_running(const bool running) noexcept { simulation_running_ = running; }
     [[nodiscard]] const LiveOperationController& controller() const noexcept { return controller_; }
+    [[nodiscard]] const ch::rail_two_service::AuxiliaryService& secondary_controller() const noexcept {
+        return secondary_controller_;
+    }
     // Click a placed rail station by its world-space projected center. This
     // selects existing rail-station entities; it never edits track construction.
     [[nodiscard]] std::optional<RailPlacementPieceId> select_station_at(
@@ -190,7 +196,8 @@ public:
         if (!captured) return;
         const std::uint64_t signature = detail::state_signature(*captured);
         if (!state_ready_ || signature != state_signature_) {
-            if (!controller_.sync_from_persistent_state(*captured)) return;
+            if (!controller_.sync_from_persistent_state(*captured) ||
+                !secondary_controller_.sync_from_state(*captured)) return;
             const auto refreshed = rail_persistence::capture_runtime_state();
             state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
             state_ready_ = true;
@@ -217,8 +224,10 @@ public:
 
         const std::uint64_t signature = detail::state_signature(*captured);
         if (!state_ready_ || signature != state_signature_) {
-            if (!controller_.sync_from_persistent_state(*captured)) return;
-            state_signature_ = detail::state_signature(*rail_persistence::capture_runtime_state());
+            if (!controller_.sync_from_persistent_state(*captured) ||
+                !secondary_controller_.sync_from_state(*captured)) return;
+            const auto refreshed = rail_persistence::capture_runtime_state();
+            state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
             state_ready_ = true;
             last_tick_ns_ = SDL_GetTicksNS();
         }
@@ -255,9 +264,15 @@ private:
                 mouse_x, mouse_y, camera, viewport_width, viewport_height);
             const std::optional<RailPlacementPieceId> group =
                 detail::nearest_piece(state, world.x, world.y);
-            if (group) (void)controller_.toggle_station(*group, 3.0);
-            if (const std::optional<RailPersistentState> refreshed = rail_persistence::capture_runtime_state()) {
-                state_signature_ = detail::state_signature(*refreshed);
+            if (group && controller_.toggle_station(*group, 3.0)) {
+                if (const std::optional<RailPersistentState> refreshed =
+                        rail_persistence::capture_runtime_state()) {
+                    // The hotkey updates the primary controller directly. The
+                    // secondary service must see the new A2/B2 stations now,
+                    // before caching the new signature or it will stay stale.
+                    (void)secondary_controller_.sync_from_state(*refreshed);
+                    state_signature_ = detail::state_signature(*refreshed);
+                }
             }
             last_tick_ns_ = SDL_GetTicksNS();
         }
@@ -280,7 +295,10 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        if (simulation_running_) controller_.update(elapsed);
+        if (simulation_running_) {
+            controller_.update(elapsed);
+            secondary_controller_.update(elapsed);
+        }
     }
 
     void render_stations(SDL_Renderer* renderer,
@@ -289,7 +307,9 @@ private:
                          const float viewport_width,
                          const float viewport_height) const {
         const float zoom = std::max(0.35F, camera.zoom);
-        for (const rail_operation::StationDefinition& station : controller_.stations()) {
+        const auto& registered = controller_.stations();
+        for (std::size_t station_index = 0U; station_index < registered.size(); ++station_index) {
+            const rail_operation::StationDefinition& station = registered[station_index];
             const RailPlacementEdge* edge = detail::edge_for_group(state, station.piece_group);
             if (edge == nullptr) continue;
             const RailWorldPoint3 middle = RailMeshBuilder::sample_cubic(edge->segment, 0.5F);
@@ -344,6 +364,7 @@ private:
                 SDL_SetRenderDrawColor(renderer, 255, 206, 70, 255);
                 (void)SDL_RenderRect(renderer, &outline);
             }
+            bool station_sprite_drawn = false;
             if (station_texture) {
                 // The Blender model origin is centered on the 5x3 footprint.
                 // Its railway lane sits at local Y=-2.4 world units; translate
@@ -361,8 +382,9 @@ private:
                     1024.0F * image_scale,
                     1024.0F * image_scale
                 };
-                if (SDL_RenderTexture(renderer, station_texture, nullptr, &dst)) continue;
+                station_sprite_drawn = SDL_RenderTexture(renderer, station_texture, nullptr, &dst);
             }
+            if (!station_sprite_drawn) {
             SDL_FRect platform{
                 screen.x - 14.0F * zoom,
                 screen.y - 4.0F * zoom,
@@ -373,6 +395,20 @@ private:
             (void)SDL_RenderFillRect(renderer, &platform);
             SDL_SetRenderDrawColor(renderer, 235, 222, 175, 255);
             (void)SDL_RenderRect(renderer, &platform);
+            }
+            // The order of key-7 designations is the service identity. Make
+            // it visible in the world rather than forcing players to guess.
+            static constexpr const char* station_names[] = {"A1", "B1", "A2", "B2"};
+            if (station_index < 4U) {
+                const float label_y = screen.y - 28.0F * zoom;
+                SDL_SetRenderDrawColor(renderer, 26, 37, 51, 225);
+                const SDL_FRect tag{screen.x - 13.0F, label_y - 3.0F, 29.0F, 17.0F};
+                (void)SDL_RenderFillRect(renderer, &tag);
+                SDL_SetRenderDrawColor(renderer, 242, 210, 113, 255);
+                (void)SDL_RenderRect(renderer, &tag);
+                (void)SDL_RenderDebugText(renderer, screen.x - 8.0F, label_y,
+                                          station_names[station_index]);
+            }
         }
     }
 
@@ -474,6 +510,7 @@ private:
     }
 
     LiveOperationController controller_{};
+    ch::rail_two_service::AuxiliaryService secondary_controller_{};
     std::uint64_t state_signature_ = 0U;
     std::uint64_t last_tick_ns_ = 0U;
     bool state_ready_ = false;

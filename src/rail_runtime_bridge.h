@@ -7,6 +7,7 @@
 #include "rail_construction_economy.h"
 #include "rail_purchase_catalog.h"
 #include "rail_operation_runtime.h"
+#include "rail_two_service.h"
 #include "rail_mapforge_input_adapter.h"
 #include "rail_persistence.h"
 #include "rail_placement_track_graph_adapter.h"
@@ -71,42 +72,39 @@ public:
     [[nodiscard]] const std::string& status_text() const noexcept { return status_; }
     [[nodiscard]] const RailPlacementGraph& graph() const noexcept { return graph_; }
     [[nodiscard]] const RailPersistentFleet& fleet() const noexcept { return fleet_; }
+    [[nodiscard]] const RailPersistentFleet& secondary_fleet() const noexcept { return secondary_fleet_; }
 
     // Charge only when a real two-station route can fit the next consist.
     // The overlay then rebuilds this same saved fleet and renders it at station A.
-    [[nodiscard]] bool purchase_rolling_stock(const bool locomotive) {
+    [[nodiscard]] bool purchase_rolling_stock(const bool locomotive,
+                                              const std::size_t line = 0U) {
+        if (line > 1U) return false;
+        RailPersistentFleet& assigned = line == 0U ? fleet_ : secondary_fleet_;
+        if (locomotive ? assigned.locomotive_owned : !assigned.locomotive_owned) {
+            status_ = locomotive ? "FERROVIAS: LOCOMOTIVA JA ADQUIRIDA NESTA LINHA" :
+                                   "FERROVIAS: COMPRE LOCOMOTIVA DESTA LINHA PRIMEIRO";
+            return false;
+        }
+        if (!locomotive && assigned.coach_count >= 7U) {
+            status_ = "FERROVIAS: MAXIMO DE 7 VAGOES NESTA COMPOSICAO";
+            return false;
+        }
         const auto& stops = rail_persistence::runtime_stations();
-        if (locomotive ? fleet_.locomotive_owned : !fleet_.locomotive_owned) {
-            status_ = locomotive ? "FERROVIAS: LOCOMOTIVA JA ADQUIRIDA" :
-                                   "FERROVIAS: COMPRE UMA LOCOMOTIVA PRIMEIRO";
+        if ((line == 0U && stops.size() < 2U) ||
+            (line == 1U && (stops.size() != 4U || !fleet_.locomotive_owned))) {
+            status_ = "FERROVIAS: LINHA 1 EXIGE A1/B1; LINHA 2 EXIGE A2/B2 E TREM 1";
             return false;
         }
-        if (!locomotive && fleet_.coach_count >= 7U) {
-            status_ = "FERROVIAS: MAXIMO DE 7 VAGOES POR COMPOSICAO";
-            return false;
-        }
-        if (stops.size() != 2U) {
-            status_ = "FERROVIAS: DEFINA DUAS ESTACOES A/B NA LINHA (TECLA 7)";
-            return false;
-        }
-        std::vector<rail_operation::StationDefinition> stations;
-        stations.reserve(stops.size());
-        for (const auto& stop : stops) stations.push_back({stop.piece_group, stop.dwell_seconds});
-        const std::uint32_t new_coaches = fleet_.coach_count + (locomotive ? 0U : 1U);
+        const std::uint32_t next_coaches = assigned.coach_count + (locomotive ? 0U : 1U);
         bool route_ready = false;
-        for (const auto& edge : graph_.edges()) {
-            if (!edge.active) continue;
-            auto route = rail_operation::compile_route(graph_, edge.id, stations);
-            if (!route.valid || route.closed || route.stations.size() != 2U) continue;
-            rail_operation::TrainRuntime simulation;
-            if (simulation.set_route(std::move(route)) &&
-                simulation.configure_terminal_pair(new_coaches)) {
-                route_ready = true;
-                break;
-            }
+        if (line == 0U) {
+            route_ready = ch::rail_two_service::find_route(graph_, stops, 0U, next_coaches).has_value();
+        } else {
+            route_ready = ch::rail_two_service::second_route_safe(
+                graph_, stops, fleet_.coach_count, next_coaches);
         }
         if (!route_ready) {
-            status_ = "FERROVIAS: LINHA A/B INCOMPLETA OU SEM ESPACO PARA O TREM";
+            status_ = "FERROVIAS: LINHA INCOMPLETA OU COMPARTILHA TRILHOS COM OUTRO TREM";
             return false;
         }
         const std::int64_t price = locomotive ? ch::rail_catalog::kLocomotivePurchaseCost :
@@ -116,10 +114,11 @@ public:
             status_ = "FERROVIAS: SALDO INSUFICIENTE PARA A COMPRA";
             return false;
         }
-        if (locomotive) fleet_.locomotive_owned = true;
-        else ++fleet_.coach_count;
-        status_ = locomotive ? "LOCOMOTIVA COMPRADA: $9500 | POSICIONADA EM A" :
-                   "VAGAO COMPRADO: $1800 | TOTAL " + std::to_string(fleet_.coach_count) + "/7";
+        if (locomotive) assigned.locomotive_owned = true;
+        else ++assigned.coach_count;
+        status_ = "LINHA " + std::to_string(line + 1U) +
+            (locomotive ? " | LOCOMOTIVA COMPRADA: $9500" : " | VAGAO COMPRADO: $1800") +
+            " | VAGOES " + std::to_string(assigned.coach_count) + "/7";
         return true;
     }
 
@@ -130,6 +129,7 @@ public:
         state.actions = committed_actions_;
         state.turntables = turntables_;
         state.fleet = fleet_;
+        state.secondary_fleet = secondary_fleet_;
         // A save captures only authoritative construction. A live ghost is
         // append-only after gesture_checkpoint_ and is never persisted.
         if (gesture_active_) {
@@ -151,6 +151,7 @@ public:
         committed_actions_ = state.actions;
         turntables_ = state.turntables;
         fleet_ = state.fleet;
+        secondary_fleet_ = state.secondary_fleet;
         selected_mode_ = RailPlacementMode::straight;
         turntable_placement_mode_ = false;
         connector_mode_ = false;
@@ -170,6 +171,7 @@ public:
         committed_actions_.clear();
         turntables_.clear();
         fleet_ = {false, 0U};
+        secondary_fleet_ = {false, 0U};
         hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
@@ -981,6 +983,7 @@ private:
     std::vector<RailPersistentAction> committed_actions_;
     std::vector<RailPersistentTurntable> turntables_;
     RailPersistentFleet fleet_{false, 0U};
+    RailPersistentFleet secondary_fleet_{false, 0U};
     std::optional<RailPlacementPieceId> hovered_piece_;
     std::int64_t preview_cost_ = 0;
     float new_root_heading_radians_ = 0.0F;
