@@ -50,6 +50,12 @@ public:
     }
 
     [[nodiscard]] bool tool_active() const noexcept { return tool_active_; }
+    [[nodiscard]] RailPlacementMode selected_mode() const noexcept { return selected_mode_; }
+    // The catalog uses the same transactional placement state as number shortcuts.
+    void activate_placement_mode(const RailPlacementMode mode) {
+        tool_active_ = true;
+        select_mode(mode);
+    }
     [[nodiscard]] const std::string& status_text() const noexcept { return status_; }
     [[nodiscard]] const RailPlacementGraph& graph() const noexcept { return graph_; }
 
