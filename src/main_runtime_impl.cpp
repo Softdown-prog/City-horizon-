@@ -2873,8 +2873,10 @@ int main() {
                 case RailPlacementMode::crossing: model.selected_railway_id = "rail_track_crossing"; break;
             }
             for (const auto& rail_item : ch::rail_catalog::items) {
+                const bool track_tool = std::string(rail_item.id).rfind("rail_track_", 0) == 0;
                 const std::string note = std::string(rail_item.note) +
-                    (rail_item.purchase_implemented ? " | DISPONIVEL NO CATALOGO CONSTRUIR" : " | INFORMATIVO");
+                    (track_tool ? " | CLIQUE PARA DESENHAR | TECLAS 1-6 ALTERNAM" :
+                     (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR" : " | PRECO INFORMATIVO"));
                 model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
                     format_money(rail_item.cost),
                     rail_item.id == std::string("rail_terminal_station_01") ||
