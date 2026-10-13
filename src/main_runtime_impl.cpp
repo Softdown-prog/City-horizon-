@@ -2099,6 +2099,7 @@ int main() {
     std::string sidewalk_style = "dirt_path";
     std::string water_terrain_id;
     bool decoration_mode = false;
+    bool railway_menu_mode = false;
     bool agriculture_mode = false;
     bool agriculture_panel_open = false;
     std::string farming_selection_id;
@@ -2253,6 +2254,7 @@ int main() {
         agriculture_panel_open = false;
         farming_selection_id.clear();
         decoration_mode = false;
+        railway_menu_mode = false;
     };
     const auto open_build_panel = [&]() {
         clear_map_modes();
@@ -2388,6 +2390,15 @@ int main() {
         record_terrain_paint(x, y, "grass");
         return true;
     };
+    // Reserved railway category: no track placement, purchase or game rules yet.
+    const auto open_railway_panel = [&]() {
+        clear_map_modes();
+        build_panel_open = false;
+        railway_menu_mode = true;
+        selected_instance_id.reset();
+        status = "FERROVIAS: LOCOMOTIVA A VAPOR | EM BREVE";
+        (void)play_sound(SoundEvent::ui_open_panel);
+    };
     const auto begin_decoration_mode = [&]() {
         clear_map_modes();
         build_panel_open = false;
@@ -2522,6 +2533,7 @@ int main() {
             case UiAction::open_agriculture_panel: open_agriculture_panel(); break;
             case UiAction::select_farming_item: select_farming_item(action.payload); break;
             case UiAction::activate_decoration: begin_decoration_mode(); break;
+            case UiAction::open_railway_panel: open_railway_panel(); break;
             case UiAction::rotate_left: rotate_placement(false); break;
             case UiAction::rotate_right: rotate_placement(true); break;
             case UiAction::close_tool_panel: close_tool_panel(); break;
@@ -2829,7 +2841,9 @@ int main() {
             model.farming_tile_status = "SOBRE CAPACIDADE";
         }
         model.active_tool = UiTool::none;
-        if (decoration_mode) {
+        if (railway_menu_mode) {
+            model.active_tool = UiTool::railways;
+        } else if (decoration_mode) {
             model.active_tool = UiTool::decoration;
         } else if (land_mode) {
             model.active_tool = UiTool::land;

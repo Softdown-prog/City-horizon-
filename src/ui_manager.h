@@ -37,6 +37,7 @@ enum class UiTool : std::uint8_t {
     remove,
     agriculture,
     decoration,
+    railways,
 };
 
 enum class UiAction : std::uint8_t {
@@ -53,6 +54,7 @@ enum class UiAction : std::uint8_t {
     open_agriculture_panel,
     select_farming_item,
     activate_decoration,
+    open_railway_panel,
     rotate_left,
     rotate_right,
     close_tool_panel,
