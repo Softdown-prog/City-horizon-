@@ -119,6 +119,24 @@ int main() {
         return fail("new IDs must append after restored tombstones");
     }
 
+    // New cities can save an empty fleet; purchased rolling stock survives reload.
+    RailPersistentState paid = state;
+    paid.fleet = {true, 3U};
+    RailPersistentState loaded_paid;
+    if (!ch::rail_persistence::deserialize_payload(
+            ch::rail_persistence::serialize_payload(paid), loaded_paid) ||
+        !loaded_paid.fleet.locomotive_owned || loaded_paid.fleet.coach_count != 3U)
+        return fail("V4 rolling stock purchase roundtrip");
+    paid.fleet = {false, 0U};
+    if (!ch::rail_persistence::deserialize_payload(
+            ch::rail_persistence::serialize_payload(paid), loaded_paid) ||
+        loaded_paid.fleet.locomotive_owned || loaded_paid.fleet.coach_count != 0U)
+        return fail("V4 empty fleet roundtrip");
+    paid.fleet = {false, 1U};
+    if (ch::rail_persistence::validate(paid)) return fail("coaches without loco permitted");
+    paid.fleet = {true, 8U};
+    if (ch::rail_persistence::validate(paid)) return fail("more than seven coaches permitted");
+
     const std::string v2_payload = ch::rail_persistence::serialize_payload(state);
     const std::size_t first_newline = v2_payload.find('\n');
     if (first_newline == std::string::npos) return fail("V2 payload header");
@@ -129,6 +147,12 @@ int main() {
         const std::size_t station_end = v1_payload.find('\n', station_row + 1U);
         v1_payload.erase(station_row, station_end == std::string::npos
             ? std::string::npos : station_end - station_row);
+    }
+    const std::size_t old_fleet_row = v1_payload.find("\nV ");
+    if (old_fleet_row != std::string::npos) {
+        const std::size_t row_end = v1_payload.find('\n', old_fleet_row + 1U);
+        v1_payload.erase(old_fleet_row, row_end == std::string::npos
+            ? std::string::npos : row_end - old_fleet_row);
     }
     RailPersistentState loaded_v1;
     if (!ch::rail_persistence::deserialize_payload(v1_payload, loaded_v1) ||
@@ -153,7 +177,7 @@ int main() {
         return fail("V3 valid physical turntable state");
     const auto v3=ch::rail_persistence::serialize_payload(table_state);
     RailPersistentState v3_loaded;
-    if(v3.find("CH_RAIL_PERSISTENCE_V3")!=0 ||
+    if(v3.find("CH_RAIL_PERSISTENCE_V4")!=0 ||
        !ch::rail_persistence::deserialize_payload(v3,v3_loaded) ||
        v3_loaded.turntables.size()!=1U ||
        v3_loaded.turntables[0].build_cost!=3500 ||
@@ -206,10 +230,24 @@ int main() {
     const std::size_t table_row=version2.find("\nT ");
     if(table_row==std::string::npos)return fail("missing V3 T row");
     version2.erase(table_row,version2.find('\n',table_row+1)-table_row);
+    const std::size_t fleet_row = version2.find("\nV ");
+    if (fleet_row == std::string::npos) return fail("missing V4 fleet row");
+    version2.erase(fleet_row, version2.find('\n',fleet_row+1)-fleet_row);
     RailPersistentState old_v2;
     if(!ch::rail_persistence::deserialize_payload(version2,old_v2) ||
        !old_v2.turntables.empty() || old_v2.edges.size()!=table_state.edges.size())
         return fail("V2 old save backward compatibility");
+
+    // Earlier save versions owned a legacy 1+7 consist without any purchase row.
+    std::string legacy_v3 = std::string(kChRailPersistenceV3Contract) +
+        v2_payload.substr(v2_payload.find('\n'));
+    const auto legacy_fleet_row = legacy_v3.find("\nV ");
+    if (legacy_fleet_row == std::string::npos) return fail("V4 fleet row missing for legacy test");
+    legacy_v3.erase(legacy_fleet_row, legacy_v3.find('\n', legacy_fleet_row+1)-legacy_fleet_row);
+    RailPersistentState old_v3;
+    if (!ch::rail_persistence::deserialize_payload(legacy_v3, old_v3) ||
+        !old_v3.fleet.locomotive_owned || old_v3.fleet.coach_count != 7U)
+        return fail("V3 fleet compatibility missing complimentary original train");
 
     const ch::rail_persistence::ReadResult legacy = [&]() {
         const std::filesystem::path legacy_file = root_dir / "legacy.json";
