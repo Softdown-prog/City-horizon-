@@ -67,6 +67,7 @@ int main() {
     }
 
     RailPersistentState state;
+    state.fleet = {true, 7U};
     state.nodes=graph.nodes();
     state.edges=graph.edges();
     state.stations={{graph.edges()[a_piece->edge].piece_group,0.25},{main_id,0.5}};
