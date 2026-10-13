@@ -2405,6 +2405,12 @@ int main() {
             begin_build_placement(id);
             return;
         }
+        if (id == "rail_turntable_7m2_01") {
+            ch::rail_runtime::state().activate_turntable_placement();
+            status = ch::rail_runtime::status_text();
+            (void)play_sound(SoundEvent::ui_select);
+            return;
+        }
         RailPlacementMode mode;
         if (id == "rail_track_straight") mode = RailPlacementMode::straight;
         else if (id == "rail_track_curve") mode = RailPlacementMode::curve_left;
@@ -2864,7 +2870,9 @@ int main() {
         model.active_tool = UiTool::none;
         if (railway_menu_mode) {
             model.active_tool = UiTool::railways;
-            switch (ch::rail_runtime::state().selected_mode()) {
+            if (ch::rail_runtime::state().turntable_placement_mode()) {
+                model.selected_railway_id = "rail_turntable_7m2_01";
+            } else switch (ch::rail_runtime::state().selected_mode()) {
                 case RailPlacementMode::straight: model.selected_railway_id = "rail_track_straight"; break;
                 case RailPlacementMode::curve_left:
                 case RailPlacementMode::curve_right: model.selected_railway_id = "rail_track_curve"; break;
@@ -2879,6 +2887,7 @@ int main() {
                      (rail_item.purchase_implemented ? " | CLIQUE PARA CONSTRUIR" : " | PRECO INFORMATIVO"));
                 model.railway_items.push_back({rail_item.id, rail_item.name, rail_item.category,
                     format_money(rail_item.cost),
+                    rail_item.id == std::string("rail_turntable_7m2_01") ||
                     rail_item.id == std::string("rail_terminal_station_01") ||
                     rail_item.id == std::string("rail_track_straight") ||
                     rail_item.id == std::string("rail_track_curve") ||
