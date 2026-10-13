@@ -1,0 +1,29 @@
+{
+  "id": "rail_terminal_station_01",
+  "name": "Estação ferroviária",
+  "description": "Terminal ferroviário de passageiros. Construa duas estações e conecte-as com trilhos para criar uma rota entre os pontos A e B.",
+  "category": "transport",
+  "texture": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_south.png",
+  "sprites": {
+    "0": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_south.png",
+    "1": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_west.png",
+    "2": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_north.png",
+    "3": "assets/buildings/rail_terminal_station_b_5x3_01/rail_terminal_station_b_east.png"
+  },
+  "rotatable": true,
+  "requiresRoadAccess": false,
+  "requiresRoadOrPathAccess": false,
+  "roadAccessMode": "any_perimeter",
+  "footprint": {
+    "width": 5,
+    "height": 3
+  },
+  "buildCost": 7500,
+  "maintenancePerMonth": 125,
+  "taxRevenuePerMonth": 0,
+  "powerConsumption": 0,
+  "artScale": 1,
+  "playerBuildable": true,
+  "productionStatus": "rail_station_buildable_pending_route_link",
+  "runtimeManifest": "assets/buildings/rail_terminal_station_b_5x3_01/station_runtime_manifest.json"
+}
