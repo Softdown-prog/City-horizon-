@@ -1,4 +1,5 @@
 #include "rail_persistence.h"
+#include "rail_purchase_catalog.h"
 #include "rail_placement_track_graph_adapter.h"
 
 #include <filesystem>
@@ -158,6 +159,18 @@ int main() {
        v3_loaded.turntables[0].build_cost!=3500 ||
        v3_loaded.turntables[0].refund_value!=2275)
         return fail("paid turntable V3 roundtrip");
+    // New purchases must use the shared catalog price; historical $3500 saves
+    // above remain valid and keep their original refund amounts.
+    table_state.turntables[0] = {group, ch::rail_catalog::kTurntablePurchaseCost,
+        ch::rail_catalog::kTurntablePurchaseCost * 65 / 100};
+    RailPersistentState new_price_roundtrip;
+    if (ch::rail_catalog::kTurntablePurchaseCost != 4200 ||
+        !ch::rail_persistence::deserialize_payload(
+            ch::rail_persistence::serialize_payload(table_state), new_price_roundtrip) ||
+        new_price_roundtrip.turntables.size() != 1U ||
+        new_price_roundtrip.turntables[0].build_cost != 4200 ||
+        new_price_roundtrip.turntables[0].refund_value != 2730)
+        return fail("catalog-priced paid turntable persistence");
     RailPersistentState invalid_table=table_state;
     invalid_table.turntables[0].piece_group=9999;
     if(ch::rail_persistence::validate(invalid_table))
