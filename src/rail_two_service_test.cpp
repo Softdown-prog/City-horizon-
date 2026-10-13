@@ -41,6 +41,11 @@ int main() {
         first.articulated_poses().size() != 8U ||
         second.articulated_poses().size() != 3U)
         return fail("both purchased consists not visible");
+    // Four named stops are the supported dispatch boundary. A fifth would
+    // silently become an unassigned station and confuse the purchase order.
+    if (first.toggle_station(graph.edges()[5].piece_group, 0.5))
+        return fail("a fifth station marker was accepted");
+
     const auto initial = second.articulated_poses();
     for (int t = 0; t < 120; ++t) {
         first.update(0.1);
