@@ -6,6 +6,7 @@
 #include "land_system.h"
 #include "rail_construction_economy.h"
 #include "rail_purchase_catalog.h"
+#include "rail_operation_runtime.h"
 #include "rail_mapforge_input_adapter.h"
 #include "rail_persistence.h"
 #include "rail_placement_track_graph_adapter.h"
@@ -69,6 +70,58 @@ public:
     }
     [[nodiscard]] const std::string& status_text() const noexcept { return status_; }
     [[nodiscard]] const RailPlacementGraph& graph() const noexcept { return graph_; }
+    [[nodiscard]] const RailPersistentFleet& fleet() const noexcept { return fleet_; }
+
+    // Charge only when a real two-station route can fit the next consist.
+    // The overlay then rebuilds this same saved fleet and renders it at station A.
+    [[nodiscard]] bool purchase_rolling_stock(const bool locomotive) {
+        const auto& stops = rail_persistence::runtime_stations();
+        if (locomotive ? fleet_.locomotive_owned : !fleet_.locomotive_owned) {
+            status_ = locomotive ? "FERROVIAS: LOCOMOTIVA JA ADQUIRIDA" :
+                                   "FERROVIAS: COMPRE UMA LOCOMOTIVA PRIMEIRO";
+            return false;
+        }
+        if (!locomotive && fleet_.coach_count >= 7U) {
+            status_ = "FERROVIAS: MAXIMO DE 7 VAGOES POR COMPOSICAO";
+            return false;
+        }
+        if (stops.size() != 2U) {
+            status_ = "FERROVIAS: DEFINA DUAS ESTACOES A/B NA LINHA (TECLA 7)";
+            return false;
+        }
+        std::vector<rail_operation::StationDefinition> stations;
+        stations.reserve(stops.size());
+        for (const auto& stop : stops) stations.push_back({stop.piece_group, stop.dwell_seconds});
+        const std::uint32_t new_coaches = fleet_.coach_count + (locomotive ? 0U : 1U);
+        bool route_ready = false;
+        for (const auto& edge : graph_.edges()) {
+            if (!edge.active) continue;
+            auto route = rail_operation::compile_route(graph_, edge.id, stations);
+            if (!route.valid || route.closed || route.stations.size() != 2U) continue;
+            rail_operation::TrainRuntime simulation;
+            if (simulation.set_route(std::move(route)) &&
+                simulation.configure_terminal_pair(new_coaches)) {
+                route_ready = true;
+                break;
+            }
+        }
+        if (!route_ready) {
+            status_ = "FERROVIAS: LINHA A/B INCOMPLETA OU SEM ESPACO PARA O TREM";
+            return false;
+        }
+        const std::int64_t price = locomotive ? ch::rail_catalog::kLocomotivePurchaseCost :
+                                                  ch::rail_catalog::kCoachPurchaseCost;
+        CityEconomy* economy = CityEconomy::active_instance();
+        if (!economy || !economy->try_spend(price)) {
+            status_ = "FERROVIAS: SALDO INSUFICIENTE PARA A COMPRA";
+            return false;
+        }
+        if (locomotive) fleet_.locomotive_owned = true;
+        else ++fleet_.coach_count;
+        status_ = locomotive ? "LOCOMOTIVA COMPRADA: $9500 | POSICIONADA EM A" :
+                   "VAGAO COMPRADO: $1800 | TOTAL " + std::to_string(fleet_.coach_count) + "/7";
+        return true;
+    }
 
     [[nodiscard]] RailPersistentState persistent_state() const {
         RailPersistentState state;
@@ -76,6 +129,7 @@ public:
         state.edges = graph_.edges();
         state.actions = committed_actions_;
         state.turntables = turntables_;
+        state.fleet = fleet_;
         // A save captures only authoritative construction. A live ghost is
         // append-only after gesture_checkpoint_ and is never persisted.
         if (gesture_active_) {
@@ -96,6 +150,7 @@ public:
         if (!graph_.restore_snapshot(state.nodes, state.edges)) return false;
         committed_actions_ = state.actions;
         turntables_ = state.turntables;
+        fleet_ = state.fleet;
         selected_mode_ = RailPlacementMode::straight;
         turntable_placement_mode_ = false;
         connector_mode_ = false;
@@ -114,6 +169,7 @@ public:
         graph_.clear();
         committed_actions_.clear();
         turntables_.clear();
+        fleet_ = {false, 0U};
         hovered_piece_.reset();
         tool_active_ = false;
         selected_mode_ = RailPlacementMode::straight;
@@ -924,6 +980,7 @@ private:
     RailPlacementCheckpoint gesture_checkpoint_{};
     std::vector<RailPersistentAction> committed_actions_;
     std::vector<RailPersistentTurntable> turntables_;
+    RailPersistentFleet fleet_{false, 0U};
     std::optional<RailPlacementPieceId> hovered_piece_;
     std::int64_t preview_cost_ = 0;
     float new_root_heading_radians_ = 0.0F;
