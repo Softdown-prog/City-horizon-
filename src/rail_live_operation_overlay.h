@@ -63,6 +63,10 @@ namespace detail {
         hash = mix(hash, static_cast<std::uint64_t>(
             static_cast<std::int64_t>(std::llround(station.dwell_seconds * 1000.0))));
     }
+    // Buying a vehicle is an authoritative change: refresh the existing
+    // operation controller before rendering the newly purchased unit.
+    hash = mix(hash, state.fleet.locomotive_owned ? 1U : 0U);
+    hash = mix(hash, state.fleet.coach_count);
     hash = mix(hash,state.turntables.size());
     for(const RailPersistentTurntable& table:state.turntables){
         hash=mix(hash,table.piece_group);
