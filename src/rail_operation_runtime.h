@@ -224,19 +224,19 @@ public:
     // A locomotive with seven 3.9m coaches needs sufficient track behind A.
     // This is NOT a turnaround: B is a safe parking state until an actually
     // authored, connected siding/return path can be selected by the runtime.
-    [[nodiscard]] bool configure_terminal_pair() noexcept {
-        if (!route_.valid || route_.closed || route_.stations.size() != 2U) return false;
+    [[nodiscard]] bool configure_terminal_pair(const std::size_t coach_count = 7U) noexcept {
+        if (!route_.valid || route_.closed || route_.stations.size() != 2U ||
+            coach_count > 7U) return false;
         const StationStop& a = route_.stations[0];
         const StationStop& b = route_.stations[1];
         constexpr double locomotive_length_m = 5.2;
         constexpr double coach_length_m = 3.9;
         constexpr double coupler_gap_m = 0.42;
-        constexpr double trailing_coach_center_m = locomotive_length_m * 0.5 +
-            coupler_gap_m + coach_length_m * 0.5 +
-            6.0 * (coach_length_m + coupler_gap_m);
-        constexpr double trailing_clearance_m = trailing_coach_center_m + coach_length_m * 0.5;
-        constexpr double consist_length_m = locomotive_length_m +
-            7.0 * (coach_length_m + coupler_gap_m);
+        const double trailing_clearance_m = coach_count == 0U ? locomotive_length_m * 0.5 :
+            locomotive_length_m * 0.5 + coupler_gap_m + coach_length_m +
+            static_cast<double>(coach_count - 1U) * (coach_length_m + coupler_gap_m);
+        const double consist_length_m = locomotive_length_m +
+            static_cast<double>(coach_count) * (coach_length_m + coupler_gap_m);
         if (!std::isfinite(a.distance_m) || !std::isfinite(b.distance_m) ||
             a.distance_m < trailing_clearance_m ||
             b.distance_m - a.distance_m < consist_length_m ||
