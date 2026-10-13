@@ -137,6 +137,18 @@ int main() {
     paid.fleet = {true, 8U};
     if (ch::rail_persistence::validate(paid)) return fail("more than seven coaches permitted");
 
+    RailPersistentState two_fleets = state;
+    two_fleets.secondary_fleet = {true, 2U};
+    RailPersistentState restored_two;
+    if (!ch::rail_persistence::deserialize_payload(
+            ch::rail_persistence::serialize_payload(two_fleets), restored_two) ||
+        !restored_two.secondary_fleet.locomotive_owned ||
+        restored_two.secondary_fleet.coach_count != 2U)
+        return fail("V5 second fleet did not survive round trip");
+    two_fleets.secondary_fleet = {false, 1U};
+    if (ch::rail_persistence::validate(two_fleets))
+        return fail("V5 allowed second-line wagons without locomotive");
+
     const std::string v2_payload = ch::rail_persistence::serialize_payload(state);
     const std::size_t first_newline = v2_payload.find('\n');
     if (first_newline == std::string::npos) return fail("V2 payload header");
@@ -153,6 +165,12 @@ int main() {
         const std::size_t row_end = v1_payload.find('\n', old_fleet_row + 1U);
         v1_payload.erase(old_fleet_row, row_end == std::string::npos
             ? std::string::npos : row_end - old_fleet_row);
+    }
+    const std::size_t old_secondary_row = v1_payload.find("\nW ");
+    if (old_secondary_row != std::string::npos) {
+        const std::size_t row_end = v1_payload.find('\n', old_secondary_row + 1U);
+        v1_payload.erase(old_secondary_row, row_end == std::string::npos
+            ? std::string::npos : row_end - old_secondary_row);
     }
     RailPersistentState loaded_v1;
     if (!ch::rail_persistence::deserialize_payload(v1_payload, loaded_v1) ||
@@ -177,7 +195,7 @@ int main() {
         return fail("V3 valid physical turntable state");
     const auto v3=ch::rail_persistence::serialize_payload(table_state);
     RailPersistentState v3_loaded;
-    if(v3.find("CH_RAIL_PERSISTENCE_V4")!=0 ||
+    if(v3.find("CH_RAIL_PERSISTENCE_V5")!=0 ||
        !ch::rail_persistence::deserialize_payload(v3,v3_loaded) ||
        v3_loaded.turntables.size()!=1U ||
        v3_loaded.turntables[0].build_cost!=3500 ||
@@ -233,6 +251,9 @@ int main() {
     const std::size_t fleet_row = version2.find("\nV ");
     if (fleet_row == std::string::npos) return fail("missing V4 fleet row");
     version2.erase(fleet_row, version2.find('\n',fleet_row+1)-fleet_row);
+    const std::size_t auxiliary_row = version2.find("\nW ");
+    if (auxiliary_row == std::string::npos) return fail("missing V5 second fleet row");
+    version2.erase(auxiliary_row, version2.find('\n', auxiliary_row+1)-auxiliary_row);
     RailPersistentState old_v2;
     if(!ch::rail_persistence::deserialize_payload(version2,old_v2) ||
        !old_v2.turntables.empty() || old_v2.edges.size()!=table_state.edges.size())
@@ -244,10 +265,24 @@ int main() {
     const auto legacy_fleet_row = legacy_v3.find("\nV ");
     if (legacy_fleet_row == std::string::npos) return fail("V4 fleet row missing for legacy test");
     legacy_v3.erase(legacy_fleet_row, legacy_v3.find('\n', legacy_fleet_row+1)-legacy_fleet_row);
+    const auto v3_second_row = legacy_v3.find("\nW ");
+    if (v3_second_row == std::string::npos) return fail("missing V5 row before V3 migration");
+    legacy_v3.erase(v3_second_row, legacy_v3.find('\n',v3_second_row+1)-v3_second_row);
     RailPersistentState old_v3;
     if (!ch::rail_persistence::deserialize_payload(legacy_v3, old_v3) ||
         !old_v3.fleet.locomotive_owned || old_v3.fleet.coach_count != 7U)
         return fail("V3 fleet compatibility missing complimentary original train");
+
+    std::string legacy_v4 = std::string(kChRailPersistenceV4Contract) +
+        v2_payload.substr(v2_payload.find('\n'));
+    const auto v4_second_row = legacy_v4.find("\nW ");
+    if (v4_second_row == std::string::npos) return fail("missing V5 row before V4 migration");
+    legacy_v4.erase(v4_second_row, legacy_v4.find('\n',v4_second_row+1)-v4_second_row);
+    RailPersistentState old_v4;
+    if (!ch::rail_persistence::deserialize_payload(legacy_v4, old_v4) ||
+        old_v4.secondary_fleet.locomotive_owned ||
+        old_v4.secondary_fleet.coach_count != 0U)
+        return fail("V4 migration unexpectedly created second train");
 
     const ch::rail_persistence::ReadResult legacy = [&]() {
         const std::filesystem::path legacy_file = root_dir / "legacy.json";
