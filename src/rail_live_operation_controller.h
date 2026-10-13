@@ -68,6 +68,13 @@ public:
             return true;
         }
 
+        // A paid rotating deck and a station marker cannot occupy the same
+        // logical rail piece: such a state would fail city save validation.
+        if (std::any_of(turntables_.begin(), turntables_.end(),
+                        [piece_group](const RailPersistentTurntable& table) {
+                            return table.piece_group == piece_group;
+                        })) return false;
+
         const auto previous = stations_;
         stations_.push_back({piece_group, dwell_seconds});
         if (!rebuild()) {

@@ -68,6 +68,8 @@ int main() {
     if(!service.sync_from_persistent_state(restored) ||
        !service.operation_active() || !service.two_station_service_active() ||
        !service.turntable_return_available())return fail("turntable return qualification");
+    if (service.toggle_station(table_group, 3.0))
+        return fail("paid turntable cannot also be marked as a station");
 
     std::array<ch::track::Point3,7> parked{};
     bool fixed_coaches=false,headshunt=false,siding_seen=false,approach_seen=false;
