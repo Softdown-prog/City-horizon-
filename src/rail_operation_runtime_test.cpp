@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 namespace {
 
@@ -165,6 +166,69 @@ int main() {
             return fail("terminal consist did not brake progressively");
     }
 
+
+    // Red signal: brake toward an absolute authority limit, remain stopped,
+    // and resume only after the dispatcher clears that limit. The same logic
+    // must work for short and full consists without moving backwards.
+    for (const std::size_t coaches : {0U, 2U, 7U}) {
+        ch::rail_operation::TrainRuntime signalled;
+        if (!signalled.set_route(ab_route) ||
+            !signalled.configure_terminal_pair(coaches))
+            return fail("signal test route missing");
+        signalled.set_cruise_speed_mps(3.25);
+        signalled.set_acceleration_mps2(1.25);
+        signalled.set_service_braking_mps2(0.8);
+        const double stop_line = ab_route.stations.front().distance_m + 44.0;
+        if (!signalled.set_signal_stop_m(stop_line) ||
+            signalled.set_signal_stop_m(-1.0) ||
+            signalled.set_signal_stop_m(std::numeric_limits<double>::quiet_NaN()) ||
+            signalled.signal_stop_m() != std::optional<double>(stop_line))
+            return fail("invalid signal authority altered braking target");
+        double previous = 0.0;
+        int brake_frames = 0;
+        bool saw_wait = false;
+        for (int frame = 0; frame < 2200; ++frame) {
+            signalled.update(0.1);
+            const double speed = signalled.speed_mps();
+            if (signalled.distance_m() > stop_line + 1.0e-6)
+                return fail("train crossed reserved red-signal boundary");
+            const double remaining = stop_line - signalled.distance_m();
+            if (remaining > 0.2 && remaining < 11.0 &&
+                speed + 0.001 < previous) {
+                ++brake_frames;
+                if (previous - speed > 0.081)
+                    return fail("dynamic red brake exceeded service deceleration");
+            }
+            if (signalled.waiting_at_signal()) {
+                saw_wait = true;
+                if (!near(signalled.distance_m(), stop_line, 0.021) ||
+                    signalled.speed_mps() != 0.0 || signalled.stopped())
+                    return fail("red signal wait not a stable recoverable stop");
+                break;
+            }
+            previous = speed;
+        }
+        if (!saw_wait || brake_frames < 8)
+            return fail("dynamic red did not brake progressively");
+        for (int frame = 0; frame < 20; ++frame) {
+            signalled.update(0.1);
+            if (!signalled.waiting_at_signal() ||
+                signalled.speed_mps() != 0.0 ||
+                signalled.distance_m() > stop_line + 1.0e-6)
+                return fail("train moved against held red signal");
+        }
+        if (!signalled.set_signal_stop_m(std::nullopt) ||
+            signalled.waiting_at_signal())
+            return fail("signal clearance failed");
+        const double old_distance = signalled.distance_m();
+        for (int frame = 0; frame < 40; ++frame) signalled.update(0.1);
+        if (!(signalled.distance_m() > old_distance + 0.5) ||
+            signalled.waiting_at_signal())
+            return fail("train failed to resume after receiving movement authority");
+        signalled.reset();
+        if (signalled.signal_stop_m().has_value() || signalled.waiting_at_signal())
+            return fail("stale signal restriction leaked across reset");
+    }
 
     // Reject configurations that cannot fit all seven coaches behind A.
     RailPlacementGraph short_graph;
