@@ -53,7 +53,7 @@ int main() {
     const double at_first_a = first_route->stations.front().distance_m;
     const double at_second_a = second_route->stations.front().distance_m;
     const auto first_block = first_route->graph_route.steps.front().piece;
-    const auto second_block = second_route->graph_route.steps.front().piece;
+    const auto second_block = second_route->graph_route.steps.at(10U).piece;
     if (!dispatcher.acquire(1U, *first_route, at_first_a, 7U) ||
         !dispatcher.acquire(2U, *second_route, at_second_a, 2U) ||
         dispatcher.reserved_count(1U) == 0U ||
