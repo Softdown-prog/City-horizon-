@@ -40,6 +40,9 @@ public:
             lead_distance_m < 0.0 || lead_distance_m > route.length_m + 0.1 ||
             coaches > 7U || !std::isfinite(lookahead_m) || lookahead_m < 0.0)
             return false;
+        // Closed legacy circuits have no simple terminal to release behind.
+        // Hold the entire circuit rather than risk an unmodelled closing span.
+        if (route.closed) return acquire_entire_route(train, route);
         const double rear = std::max(0.0, lead_distance_m -
             consist_length_m(coaches) - kTailMarginM);
         const double ahead = std::min(route.length_m, lead_distance_m + lookahead_m);
@@ -95,12 +98,14 @@ private:
                 piece->descriptor.routes[step.route]);
             if (!(length > 0.0) || !std::isfinite(length)) return false;
             // Touching either boundary conservatively reserves both sections.
-            if (cursor <= ahead + 1e-6 && cursor + length >= rear - 1e-6)
+            if (route.closed ||
+                (cursor <= ahead + 1e-6 && cursor + length >= rear - 1e-6))
                 wanted.insert(step.piece);
             cursor += length;
         }
         if (wanted.empty() || !std::isfinite(cursor) ||
-            std::abs(cursor - route.length_m) > std::max(1.0, route.length_m * 0.02))
+            (!route.closed &&
+             std::abs(cursor - route.length_m) > std::max(1.0, route.length_m * 0.02)))
             return false;
 
         // Check ALL requested blocks before changing any lease.
