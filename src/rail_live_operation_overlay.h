@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rail_live_operation_controller.h"
+#include "rail_block_dispatcher.h"
 #include "rail_two_service.h"
 #include "rail_turntable_sprite_runtime.h"
 #include "rail_articulated_consist.h"
@@ -201,6 +202,9 @@ public:
             const auto refreshed = rail_persistence::capture_runtime_state();
             state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
             state_ready_ = true;
+            dispatcher_.clear();
+            first_authority_ = false;
+            second_authority_ = false;
             last_tick_ns_ = SDL_GetTicksNS();
         }
         if (hotkeys_allowed) handle_hotkeys(*captured, camera, viewport_width, viewport_height);
@@ -229,6 +233,9 @@ public:
             const auto refreshed = rail_persistence::capture_runtime_state();
             state_signature_ = refreshed ? detail::state_signature(*refreshed) : signature;
             state_ready_ = true;
+            dispatcher_.clear();
+            first_authority_ = false;
+            second_authority_ = false;
             last_tick_ns_ = SDL_GetTicksNS();
         }
 
@@ -271,6 +278,9 @@ private:
                     // secondary service must see the new A2/B2 stations now,
                     // before caching the new signature or it will stay stale.
                     (void)secondary_controller_.sync_from_state(*refreshed);
+                    dispatcher_.clear();
+                    first_authority_ = false;
+                    second_authority_ = false;
                     state_signature_ = detail::state_signature(*refreshed);
                 }
             }
@@ -278,6 +288,9 @@ private:
         }
         if (restart_down && !restart_key_was_down_) {
             (void)controller_.restart();
+            dispatcher_.clear();
+            first_authority_ = false;
+            second_authority_ = false;
             last_tick_ns_ = SDL_GetTicksNS();
         }
         station_key_was_down_ = station_down;
@@ -295,9 +308,48 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        if (simulation_running_) {
-            controller_.update(elapsed);
-            secondary_controller_.update(elapsed);
+        // Both services must obtain authority before either train advances.
+        // No lease can transfer to another train until the last carriage has
+        // cleared the physical piece. A denied request freezes that train,
+        // not the whole simulation.
+        const auto* first_route = controller_.operational_route();
+        const auto primary_pose = controller_.train_pose();
+        const bool shunting = controller_.shunting_locomotive() ||
+                              controller_.return_service_active();
+        if (first_route && primary_pose) {
+            first_authority_ = shunting
+                ? dispatcher_.acquire_entire_route(1U, *first_route)
+                : dispatcher_.acquire(1U, *first_route, primary_pose->distance_m,
+                                      controller_.coach_count());
+        } else {
+            dispatcher_.release(1U);
+            first_authority_ = false;
+        }
+        const auto* second_route = secondary_controller_.route();
+        const auto secondary_pose = secondary_controller_.train_pose();
+        if (second_route && secondary_pose) {
+            second_authority_ = dispatcher_.acquire(
+                2U, *second_route, secondary_pose->distance_m,
+                secondary_controller_.coach_count());
+        } else {
+            dispatcher_.release(2U);
+            second_authority_ = false;
+        }
+        if (simulation_running_ && elapsed > 0.0) {
+            if (first_authority_) controller_.update(elapsed);
+            if (second_authority_) secondary_controller_.update(elapsed);
+            // Releasing the old rear blocks happens only after movement.
+            // The lookahead already covered the largest 0.1s train step.
+            if (first_authority_ && !shunting) {
+                const auto moved = controller_.train_pose();
+                if (moved) first_authority_ = dispatcher_.acquire(
+                    1U, *first_route, moved->distance_m, controller_.coach_count());
+            }
+            if (second_authority_) {
+                const auto moved = secondary_controller_.train_pose();
+                if (moved) second_authority_ = dispatcher_.acquire(
+                    2U, *second_route, moved->distance_m, secondary_controller_.coach_count());
+            }
         }
     }
 
@@ -426,7 +478,9 @@ private:
                     if (it != route->stations.end()) {
                         const bool transfer = !second_line &&
                             (controller_.shunting_locomotive() || controller_.return_service_active());
-                        aspect = ch::rail_signals::station_aspect(true, it->distance_m,
+                        aspect = ch::rail_signals::station_aspect(
+                            second_line ? second_authority_ : first_authority_,
+                            it->distance_m,
                             pose ? std::optional<double>{pose->distance_m} : std::nullopt,
                             fleet.coach_count, transfer);
                     }
@@ -550,6 +604,9 @@ private:
 
     LiveOperationController controller_{};
     ch::rail_two_service::AuxiliaryService secondary_controller_{};
+    ch::rail_dispatch::BlockDispatcher dispatcher_{};
+    bool first_authority_ = false;
+    bool second_authority_ = false;
     std::uint64_t state_signature_ = 0U;
     std::uint64_t last_tick_ns_ = 0U;
     bool state_ready_ = false;

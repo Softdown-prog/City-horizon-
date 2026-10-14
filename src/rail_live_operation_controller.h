@@ -118,6 +118,7 @@ public:
     }
 
     [[nodiscard]] bool operation_active() const noexcept { return operation_active_; }
+    [[nodiscard]] std::uint32_t coach_count() const noexcept { return fleet_.coach_count; }
     [[nodiscard]] const std::vector<rail_operation::StationDefinition>& stations() const noexcept {
         return stations_;
     }
