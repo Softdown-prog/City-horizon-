@@ -127,6 +127,45 @@ int main() {
     if (!near(ab_train.distance_m(), ab_route.stations[0].distance_m) ||
         ab_train.awaiting_terminal_maneuver()) return fail("terminal restart at A");
 
+    // A paid terminal consist must progressively brake before B: several
+    // speed reductions, no sudden cruise-to-zero jump, exact stopping point.
+    for (const std::size_t coaches : {0U, 2U, 7U}) {
+        ch::rail_operation::TrainRuntime braking_train;
+        if (!braking_train.set_route(ab_route) ||
+            !braking_train.configure_terminal_pair(coaches))
+            return fail("braking test A/B clearance");
+        braking_train.set_cruise_speed_mps(3.25);
+        braking_train.set_acceleration_mps2(1.25);
+        braking_train.set_service_braking_mps2(0.8);
+        double previous_speed = 0.0;
+        int decelerating_frames = 0;
+        bool reached_terminal = false;
+        for (int frame = 0; frame < 2200; ++frame) {
+            braking_train.update(0.1);
+            const double speed = braking_train.speed_mps();
+            const double remaining = ab_route.stations[1].distance_m -
+                                     braking_train.distance_m();
+            if (remaining < -1.0e-4) return fail("progressive brake overshot B");
+            if (remaining > 0.2 && remaining < 12.0 &&
+                speed < previous_speed - 0.001) {
+                ++decelerating_frames;
+                if (previous_speed - speed > 0.081)
+                    return fail("service brake exceeded configured deceleration");
+            }
+            if (braking_train.awaiting_terminal_maneuver()) {
+                reached_terminal = true;
+                if (speed != 0.0 ||
+                    !near(braking_train.distance_m(), ab_route.stations[1].distance_m))
+                    return fail("progressive brake did not park precisely at B");
+                break;
+            }
+            previous_speed = speed;
+        }
+        if (!reached_terminal || decelerating_frames < 8)
+            return fail("terminal consist did not brake progressively");
+    }
+
+
     // Reject configurations that cannot fit all seven coaches behind A.
     RailPlacementGraph short_graph;
     const auto short_root = short_graph.add_root({0.0F, 20.0F, 0.0F}, 0.0F);
