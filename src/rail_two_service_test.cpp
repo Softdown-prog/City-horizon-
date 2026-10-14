@@ -87,6 +87,98 @@ int main() {
     if (dispatcher.reserved_count(2U) != 0U)
         return fail("block leases leaked across city reset");
 
+    // Dynamic red: train #1 owns a block farther down the same compiled
+    // route. Train #2 receives an upstream movement limit, brakes smoothly,
+    // waits, and resumes after release. Production still disallows same-line
+    // purchases; this tests the future dispatch safety primitive in isolation.
+    ch::rail_dispatch::BlockDispatcher conflict_dispatcher;
+    if (!conflict_dispatcher.acquire(1U, *first_route, 110.0, 0U, 12.0))
+        return fail("blocking locomotive reservation rejected");
+    ch::rail_operation::TrainRuntime following;
+    if (!following.set_route(*first_route) ||
+        !following.configure_terminal_pair(0U))
+        return fail("following locomotive unavailable");
+    following.set_cruise_speed_mps(3.25);
+    following.set_acceleration_mps2(1.25);
+    following.set_service_braking_mps2(0.8);
+    bool saw_red = false;
+    bool waited = false;
+    int gradual_brake_frames = 0;
+    double prior_speed = 0.0;
+    double stop_boundary = 0.0;
+    for (int frame = 0; frame < 2400; ++frame) {
+        const auto pose = following.pose();
+        if (!pose) return fail("following locomotive lost pose");
+        const auto authority = conflict_dispatcher.authorize(
+            2U, *first_route, pose->distance_m, pose->speed_mps, 0U);
+        if (!authority.granted ||
+            !following.set_signal_stop_m(authority.signal_stop_m))
+            return fail("safe upstream authority was not granted");
+        if (authority.signal_stop_m) {
+            saw_red = true;
+            stop_boundary = *authority.signal_stop_m;
+        }
+        following.update(0.1);
+        const auto moved = following.pose();
+        if (!moved) return fail("following locomotive lost motion");
+        if (saw_red && moved->distance_m > stop_boundary + 0.00001)
+            return fail("locomotive trespassed beyond protected red signal");
+        if (saw_red && moved->distance_m < stop_boundary - 0.2 &&
+            moved->speed_mps < prior_speed - 0.001) {
+            ++gradual_brake_frames;
+            if (prior_speed - moved->speed_mps > 0.081)
+                return fail("block-triggered braking exceeded service rate");
+        }
+        if (following.waiting_at_signal()) {
+            waited = true;
+            if (moved->speed_mps != 0.0 ||
+                std::abs(moved->distance_m - stop_boundary) > 0.025)
+                return fail("train failed to park at reserved block limit");
+            break;
+        }
+        prior_speed = moved->speed_mps;
+    }
+    if (!saw_red || !waited || gradual_brake_frames < 7)
+        return fail("train never decelerated and waited before occupied block");
+    const double at_signal = following.distance_m();
+    for (int frame = 0; frame < 50; ++frame) {
+        const auto pose = following.pose();
+        const auto authority = conflict_dispatcher.authorize(
+            2U, *first_route, pose->distance_m, pose->speed_mps, 0U);
+        if (!authority.granted ||
+            !following.set_signal_stop_m(authority.signal_stop_m))
+            return fail("signal wait lost block authority");
+        following.update(0.1);
+        if (!following.waiting_at_signal() ||
+            std::abs(following.distance_m() - at_signal) > 0.00001)
+            return fail("red signal did not hold train");
+    }
+    conflict_dispatcher.release(1U);
+    bool accelerated = false;
+    for (int frame = 0; frame < 90; ++frame) {
+        const auto pose = following.pose();
+        const auto authority = conflict_dispatcher.authorize(
+            2U, *first_route, pose->distance_m, pose->speed_mps, 0U);
+        if (!authority.granted || authority.signal_stop_m ||
+            !following.set_signal_stop_m(authority.signal_stop_m))
+            return fail("green signal did not return authority");
+        following.update(0.1);
+        if (following.distance_m() > at_signal + 2.0) {
+            accelerated = true;
+            break;
+        }
+    }
+    if (!accelerated || following.waiting_at_signal())
+        return fail("train failed to restart after protected block released");
+
+    // If a conflict appears inside the physical stopping distance, do not
+    // change leases or pretend normal service braking could avoid collision.
+    ch::rail_dispatch::BlockDispatcher emergency_dispatcher;
+    if (!emergency_dispatcher.acquire(1U, *first_route, 110.0, 0U, 12.0))
+        return fail("emergency test blocking reservation");
+    if (emergency_dispatcher.authorize(2U, *first_route, 100.0, 3.25, 0U).granted)
+        return fail("unsafe too-late red signal incorrectly granted movement");
+
     // Four named stops are the supported dispatch boundary. A fifth would
     // silently become an unassigned station and confuse the purchase order.
     if (first.toggle_station(graph.edges()[5].piece_group, 0.5))

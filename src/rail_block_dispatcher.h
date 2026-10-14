@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -19,12 +20,23 @@ namespace ch::rail_dispatch {
 using BlockId = ch::track::PieceInstanceId;
 using TrainId = std::uint8_t;
 
+// Movement permission and the first safe stopping location when a downstream
+// piece belongs to another train. Only the dispatcher may grant movement.
+struct MovementAuthority {
+    bool granted = false;
+    std::optional<double> signal_stop_m;
+};
+
 class BlockDispatcher final {
 public:
     static constexpr double kLocomotiveLengthM = 5.2;
     static constexpr double kCoachPitchM = 3.9 + 0.42;
     static constexpr double kTailMarginM = 2.0;
     static constexpr double kLookAheadM = 12.0;
+    static constexpr double kSignalScanM = 30.0;
+    static constexpr double kSignalClearanceM = 2.0;
+    static constexpr double kServiceBrakeMps2 = 0.8;
+    static constexpr double kMaxTickS = 0.1;
 
     [[nodiscard]] static double consist_length_m(const std::uint32_t coaches) noexcept {
         return kLocomotiveLengthM + static_cast<double>(coaches) * kCoachPitchM;
@@ -49,6 +61,76 @@ public:
         return acquire_range(train, route, rear, ahead);
     }
 
+    // Look forward far enough for the train to brake *before* it reaches a
+    // conflicting piece. Reserve only the unobstructed prefix. Never grant an
+    // authority if its stopping point is inside the stopping distance.
+    // Routes in a closed circuit hold every block until released, as before.
+    [[nodiscard]] MovementAuthority authorize(
+        const TrainId train, const rail_operation::OperationalRoute& route,
+        const double lead_distance_m, const double speed_mps,
+        const std::uint32_t coaches) {
+        if (train == 0U || !route.valid || route.graph_route.steps.empty() ||
+            !(route.length_m > 0.0) || !std::isfinite(lead_distance_m) ||
+            lead_distance_m < 0.0 || lead_distance_m > route.length_m + 0.1 ||
+            !std::isfinite(speed_mps) || speed_mps < 0.0 || coaches > 7U)
+            return {};
+
+        if (route.closed) {
+            const bool granted = acquire_entire_route(train, route);
+            if (granted) active_signal_stops_.erase(train);
+            return {granted, std::nullopt};
+        }
+        const double rear = std::max(0.0, lead_distance_m -
+            consist_length_m(coaches) - kTailMarginM);
+        const double search_end = std::min(route.length_m, lead_distance_m + kSignalScanM);
+        double cursor = 0.0;
+        std::optional<double> stop_at;
+        for (const auto& step : route.graph_route.steps) {
+            const auto* piece = route.topology.piece(step.piece);
+            if (!piece || step.route >= piece->descriptor.routes.size()) return {};
+            const double length = rail_operation::detail::route_length(
+                piece->descriptor.routes[step.route]);
+            if (!std::isfinite(length) || length <= 0.0) return {};
+            const auto owner = owners_.find(step.piece);
+            if (cursor <= search_end + 1e-6 && cursor + length >= rear - 1e-6 &&
+                owner != owners_.end() && owner->second != train) {
+                stop_at = std::max(0.0, cursor - kSignalClearanceM);
+                break;
+            }
+            cursor += length;
+        }
+        if (stop_at) {
+            const double remaining = *stop_at - lead_distance_m;
+            const double physical_braking_distance =
+                speed_mps * speed_mps / (2.0 * kServiceBrakeMps2);
+            const auto prior = active_signal_stops_.find(train);
+            const bool continuing_brake = prior != active_signal_stops_.end() &&
+                std::abs(prior->second - *stop_at) < 1.0e-5;
+            if (continuing_brake) {
+                // A train that already accepted the distant red continues to
+                // brake toward that SAME stop line. Do not apply a new driver
+                // reaction-time margin each frame, which would freeze the
+                // train midway through a valid deceleration.
+                if (remaining < -0.025 ||
+                    physical_braking_distance > remaining + 0.35) return {};
+            } else {
+                // Newly detected red: the train must still have its full
+                // physical braking + one-frame reaction + buffer distance.
+                if (remaining < physical_braking_distance +
+                    speed_mps * kMaxTickS + 0.25) return {};
+            }
+            const double forward = std::max(0.0, remaining);
+            if (!acquire(train, route, lead_distance_m, coaches, forward))
+                return {};
+            active_signal_stops_[train] = *stop_at;
+            return {true, stop_at};
+        }
+        const bool granted = acquire(train, route, lead_distance_m,
+                                     coaches, kSignalScanM);
+        if (granted) active_signal_stops_.erase(train);
+        return {granted, std::nullopt};
+    }
+
     // During locomotive decoupling and return, the main line cannot be
     // partially released: the parked coaches and detached engine must stay
     // protected until the maneuver is over.
@@ -59,13 +141,17 @@ public:
     }
 
     void release(const TrainId train) {
+        active_signal_stops_.erase(train);
         for (auto it = owners_.begin(); it != owners_.end();) {
             if (it->second == train) it = owners_.erase(it);
             else ++it;
         }
     }
 
-    void clear() noexcept { owners_.clear(); }
+    void clear() noexcept {
+        owners_.clear();
+        active_signal_stops_.clear();
+    }
 
     [[nodiscard]] bool owned_by(const TrainId train, const BlockId block) const {
         const auto it = owners_.find(block);
@@ -124,5 +210,6 @@ private:
     }
 
     std::unordered_map<BlockId, TrainId> owners_{};
+    std::unordered_map<TrainId, double> active_signal_stops_{};
 };
 } // namespace ch::rail_dispatch

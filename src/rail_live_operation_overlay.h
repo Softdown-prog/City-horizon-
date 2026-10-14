@@ -308,47 +308,66 @@ private:
             0.0,
             0.1);
         last_tick_ns_ = now;
-        // Both services must obtain authority before either train advances.
-        // No lease can transfer to another train until the last carriage has
-        // cleared the physical piece. A denied request freezes that train,
-        // not the whole simulation.
+        // Scan the occupied blocks ahead, reserve a safe free prefix, and
+        // set the real TrainRuntime braking target before moving either train.
         const auto* first_route = controller_.operational_route();
         const auto primary_pose = controller_.train_pose();
         const bool shunting = controller_.shunting_locomotive() ||
                               controller_.return_service_active();
         if (first_route && primary_pose) {
-            first_authority_ = shunting
-                ? dispatcher_.acquire_entire_route(1U, *first_route)
-                : dispatcher_.acquire(1U, *first_route, primary_pose->distance_m,
-                                      controller_.coach_count());
+            if (shunting) {
+                first_authority_ = dispatcher_.acquire_entire_route(1U, *first_route);
+                (void)controller_.set_dispatch_signal_stop(std::nullopt);
+            } else {
+                const auto authority = dispatcher_.authorize(
+                    1U, *first_route, primary_pose->distance_m,
+                    std::max(0.0, primary_pose->speed_mps), controller_.coach_count());
+                first_authority_ = authority.granted &&
+                    controller_.set_dispatch_signal_stop(authority.signal_stop_m);
+            }
         } else {
             dispatcher_.release(1U);
             first_authority_ = false;
+            (void)controller_.set_dispatch_signal_stop(std::nullopt);
         }
         const auto* second_route = secondary_controller_.route();
         const auto secondary_pose = secondary_controller_.train_pose();
         if (second_route && secondary_pose) {
-            second_authority_ = dispatcher_.acquire(
+            const auto authority = dispatcher_.authorize(
                 2U, *second_route, secondary_pose->distance_m,
+                std::max(0.0, secondary_pose->speed_mps),
                 secondary_controller_.coach_count());
+            second_authority_ = authority.granted &&
+                secondary_controller_.set_dispatch_signal_stop(authority.signal_stop_m);
         } else {
             dispatcher_.release(2U);
             second_authority_ = false;
+            (void)secondary_controller_.set_dispatch_signal_stop(std::nullopt);
         }
         if (simulation_running_ && elapsed > 0.0) {
             if (first_authority_) controller_.update(elapsed);
             if (second_authority_) secondary_controller_.update(elapsed);
-            // Releasing the old rear blocks happens only after movement.
-            // The lookahead already covered the largest 0.1s train step.
+            // Only release rail pieces AFTER the last coach cleared them;
+            // the previous lease protected every step of the elapsed frame.
             if (first_authority_ && !shunting) {
                 const auto moved = controller_.train_pose();
-                if (moved) first_authority_ = dispatcher_.acquire(
-                    1U, *first_route, moved->distance_m, controller_.coach_count());
+                if (moved) {
+                    const auto renewed = dispatcher_.authorize(
+                        1U, *first_route, moved->distance_m,
+                        std::max(0.0, moved->speed_mps), controller_.coach_count());
+                    first_authority_ = renewed.granted &&
+                        controller_.set_dispatch_signal_stop(renewed.signal_stop_m);
+                }
             }
             if (second_authority_) {
                 const auto moved = secondary_controller_.train_pose();
-                if (moved) second_authority_ = dispatcher_.acquire(
-                    2U, *second_route, moved->distance_m, secondary_controller_.coach_count());
+                if (moved) {
+                    const auto renewed = dispatcher_.authorize(
+                        2U, *second_route, moved->distance_m,
+                        std::max(0.0, moved->speed_mps), secondary_controller_.coach_count());
+                    second_authority_ = renewed.granted &&
+                        secondary_controller_.set_dispatch_signal_stop(renewed.signal_stop_m);
+                }
             }
         }
     }
@@ -478,8 +497,12 @@ private:
                     if (it != route->stations.end()) {
                         const bool transfer = !second_line &&
                             (controller_.shunting_locomotive() || controller_.return_service_active());
+                        const bool signal_restricted = second_line
+                            ? secondary_controller_.dispatch_signal_restricted()
+                            : controller_.dispatch_signal_restricted();
                         aspect = ch::rail_signals::station_aspect(
-                            second_line ? second_authority_ : first_authority_,
+                            (second_line ? second_authority_ : first_authority_) &&
+                            !signal_restricted,
                             it->distance_m,
                             pose ? std::optional<double>{pose->distance_m} : std::nullopt,
                             fleet.coach_count, transfer);
