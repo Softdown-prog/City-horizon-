@@ -259,6 +259,8 @@ public:
         dwell_remaining_s_ = 0.0;
         next_station_index_ = 0U;
         stopped_ = false;
+        signal_waiting_ = false;
+        signal_stop_m_.reset();
         current_station_.reset();
         if (terminal_pair_enabled_) {
             distance_m_ = route_.stations.front().distance_m;
@@ -283,6 +285,20 @@ public:
             service_braking_mps2_ = deceleration;
     }
 
+    // A signal authority boundary is an absolute distance on this compiled
+    // route (after the signal's safety offset). A null boundary means clear.
+    // Denied blocks must never be represented by a negative or NaN distance.
+    [[nodiscard]] bool set_signal_stop_m(const std::optional<double> stop_m) noexcept {
+        if (stop_m && (!route_.valid || !std::isfinite(*stop_m) ||
+                       *stop_m < 0.0 || *stop_m > route_.length_m))
+            return false;
+        signal_stop_m_ = stop_m;
+        if (!stop_m) signal_waiting_ = false;
+        return true;
+    }
+    [[nodiscard]] bool waiting_at_signal() const noexcept { return signal_waiting_; }
+    [[nodiscard]] std::optional<double> signal_stop_m() const noexcept { return signal_stop_m_; }
+
     [[nodiscard]] bool valid() const noexcept { return route_.valid; }
     [[nodiscard]] bool stopped() const noexcept { return stopped_; }
     [[nodiscard]] double distance_m() const noexcept { return distance_m_; }
@@ -305,12 +321,27 @@ public:
             if (route_.closed && next_station_index_ >= route_.stations.size()) next_station_index_ = 0U;
         }
 
-        if (terminal_pair_enabled_ && next_station_index_ < route_.stations.size()) {
-            // v² <= 2*a*distance leaves enough track for a smooth stop. The
-            // speed reduction is bounded by the service brake per tick.
-            // Legacy one-stop or closed circuits keep their original physics.
-            const double remaining = std::max(0.0,
-                route_.stations[next_station_index_].distance_m - distance_m_);
+        // A denied block becomes a *stopping target* ahead of the locomotive.
+        // The usual A->B service brake and the signal brake share the same
+        // deceleration envelope; whichever is closer controls the speed.
+        const double station_target = terminal_pair_enabled_ &&
+            next_station_index_ < route_.stations.size()
+            ? route_.stations[next_station_index_].distance_m
+            : route_.length_m;
+        const bool signal_first = signal_stop_m_ &&
+            *signal_stop_m_ < station_target - 0.02;
+        if (signal_first && *signal_stop_m_ <= distance_m_ + 0.02) {
+            speed_mps_ = 0.0;
+            signal_waiting_ = true;
+            return;
+        }
+        signal_waiting_ = false;
+        if (signal_first || (terminal_pair_enabled_ &&
+                            next_station_index_ < route_.stations.size())) {
+            // v² <= 2*a*distance, with the acceleration/deceleration bounded
+            // per tick. A dynamic signal cannot require a backwards teleport.
+            const double target = signal_first ? *signal_stop_m_ : station_target;
+            const double remaining = std::max(0.0, target - distance_m_);
             const double safe_speed = std::sqrt(2.0 * service_braking_mps2_ * remaining);
             const double target_speed = std::min(cruise_speed_mps_, safe_speed);
             if (speed_mps_ > target_speed) {
@@ -325,6 +356,14 @@ public:
                                   acceleration_mps2_ * seconds);
         }
         const double proposed = distance_m_ + speed_mps_ * seconds;
+        if (signal_first &&
+            (proposed >= *signal_stop_m_ - kDistanceEpsilon ||
+             *signal_stop_m_ - distance_m_ <= 0.02)) {
+            distance_m_ = std::max(distance_m_, *signal_stop_m_);
+            speed_mps_ = 0.0;
+            signal_waiting_ = true;
+            return;
+        }
 
         if (next_station_index_ < route_.stations.size()) {
             const StationStop& stop = route_.stations[next_station_index_];
@@ -419,6 +458,8 @@ private:
     double cruise_speed_mps_ = 4.0;
     double acceleration_mps2_ = 1.5;
     double service_braking_mps2_ = 0.8;
+    std::optional<double> signal_stop_m_;
+    bool signal_waiting_ = false;
     double dwell_remaining_s_ = 0.0;
     std::size_t next_station_index_ = 0U;
     bool stopped_ = false;
