@@ -60,8 +60,11 @@ int main() {
         dispatcher.reserved_count(2U) == 0U)
         return fail("two disjoint consists not granted authority");
     const std::size_t previous = dispatcher.reserved_count(1U);
+    const std::size_t second_previous = dispatcher.reserved_count(2U);
     if (dispatcher.acquire(2U, *first_route, at_first_a, 2U) ||
         dispatcher.reserved_count(1U) != previous ||
+        dispatcher.reserved_count(2U) != second_previous ||
+        !dispatcher.owned_by(2U, second_block) ||
         dispatcher.acquire(1U, *first_route, -1.0, 7U))
         return fail("conflicting or invalid block grant changed ownership");
 
@@ -78,7 +81,7 @@ int main() {
     if (dispatcher.reserved_count(1U) != 0U ||
         !dispatcher.acquire(2U, *first_route, at_first_a, 2U) ||
         !dispatcher.owned_by(2U, first_block) ||
-        !dispatcher.reserved(second_block))
+        dispatcher.reserved(second_block))
         return fail("old authority not transferred atomically after release");
     dispatcher.clear();
     if (dispatcher.reserved_count(2U) != 0U)
