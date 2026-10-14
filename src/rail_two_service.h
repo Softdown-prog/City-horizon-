@@ -78,6 +78,7 @@ public:
     }
     void update(const double elapsed) noexcept { if (active_) train_.update(elapsed); }
     [[nodiscard]] bool active() const noexcept { return active_; }
+    [[nodiscard]] std::uint32_t coach_count() const noexcept { return coach_count_; }
     [[nodiscard]] const rail_operation::OperationalRoute* route() const noexcept {
         return active_ ? &route_ : nullptr;
     }
