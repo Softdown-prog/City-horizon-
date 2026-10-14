@@ -276,6 +276,13 @@ public:
         if (std::isfinite(acceleration) && acceleration > 0.0) acceleration_mps2_ = acceleration;
     }
 
+    // Physical, gradual braking ahead of terminal B rather than snapping
+    // directly from cruising speed to zero at the platform midpoint.
+    void set_service_braking_mps2(const double deceleration) noexcept {
+        if (std::isfinite(deceleration) && deceleration > 0.0)
+            service_braking_mps2_ = deceleration;
+    }
+
     [[nodiscard]] bool valid() const noexcept { return route_.valid; }
     [[nodiscard]] bool stopped() const noexcept { return stopped_; }
     [[nodiscard]] double distance_m() const noexcept { return distance_m_; }
@@ -298,13 +305,32 @@ public:
             if (route_.closed && next_station_index_ >= route_.stations.size()) next_station_index_ = 0U;
         }
 
-        speed_mps_ = std::min(cruise_speed_mps_, speed_mps_ + acceleration_mps2_ * seconds);
+        if (terminal_pair_enabled_ && next_station_index_ < route_.stations.size()) {
+            // v² <= 2*a*distance leaves enough track for a smooth stop. The
+            // speed reduction is bounded by the service brake per tick.
+            // Legacy one-stop or closed circuits keep their original physics.
+            const double remaining = std::max(0.0,
+                route_.stations[next_station_index_].distance_m - distance_m_);
+            const double safe_speed = std::sqrt(2.0 * service_braking_mps2_ * remaining);
+            const double target_speed = std::min(cruise_speed_mps_, safe_speed);
+            if (speed_mps_ > target_speed) {
+                speed_mps_ = std::max(target_speed,
+                    speed_mps_ - service_braking_mps2_ * seconds);
+            } else {
+                speed_mps_ = std::min(target_speed,
+                    speed_mps_ + acceleration_mps2_ * seconds);
+            }
+        } else {
+            speed_mps_ = std::min(cruise_speed_mps_, speed_mps_ +
+                                  acceleration_mps2_ * seconds);
+        }
         const double proposed = distance_m_ + speed_mps_ * seconds;
 
         if (next_station_index_ < route_.stations.size()) {
             const StationStop& stop = route_.stations[next_station_index_];
             if (stop.distance_m > distance_m_ + kDistanceEpsilon &&
-                stop.distance_m <= proposed + kDistanceEpsilon) {
+                (stop.distance_m <= proposed + kDistanceEpsilon ||
+                 (terminal_pair_enabled_ && stop.distance_m - distance_m_ <= 0.02))) {
                 distance_m_ = stop.distance_m;
                 speed_mps_ = 0.0;
                 dwell_remaining_s_ = stop.dwell_seconds;
@@ -392,6 +418,7 @@ private:
     double speed_mps_ = 0.0;
     double cruise_speed_mps_ = 4.0;
     double acceleration_mps2_ = 1.5;
+    double service_braking_mps2_ = 0.8;
     double dwell_remaining_s_ = 0.0;
     std::size_t next_station_index_ = 0U;
     bool stopped_ = false;
