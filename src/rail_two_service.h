@@ -77,6 +77,12 @@ public:
         return true;
     }
     void update(const double elapsed) noexcept { if (active_) train_.update(elapsed); }
+    [[nodiscard]] bool set_dispatch_signal_stop(const std::optional<double> stop_m) noexcept {
+        return active_ ? train_.set_signal_stop_m(stop_m) : !stop_m.has_value();
+    }
+    [[nodiscard]] bool waiting_at_dispatch_signal() const noexcept {
+        return active_ && train_.waiting_at_signal();
+    }
     [[nodiscard]] bool active() const noexcept { return active_; }
     [[nodiscard]] std::uint32_t coach_count() const noexcept { return coach_count_; }
     [[nodiscard]] const rail_operation::OperationalRoute* route() const noexcept {
