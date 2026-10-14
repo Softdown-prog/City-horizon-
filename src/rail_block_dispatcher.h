@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -19,12 +20,23 @@ namespace ch::rail_dispatch {
 using BlockId = ch::track::PieceInstanceId;
 using TrainId = std::uint8_t;
 
+// Movement permission and the first safe stopping location when a downstream
+// piece belongs to another train. Only the dispatcher may grant movement.
+struct MovementAuthority {
+    bool granted = false;
+    std::optional<double> signal_stop_m;
+};
+
 class BlockDispatcher final {
 public:
     static constexpr double kLocomotiveLengthM = 5.2;
     static constexpr double kCoachPitchM = 3.9 + 0.42;
     static constexpr double kTailMarginM = 2.0;
     static constexpr double kLookAheadM = 12.0;
+    static constexpr double kSignalScanM = 30.0;
+    static constexpr double kSignalClearanceM = 2.0;
+    static constexpr double kServiceBrakeMps2 = 0.8;
+    static constexpr double kMaxTickS = 0.1;
 
     [[nodiscard]] static double consist_length_m(const std::uint32_t coaches) noexcept {
         return kLocomotiveLengthM + static_cast<double>(coaches) * kCoachPitchM;
@@ -47,6 +59,53 @@ public:
             consist_length_m(coaches) - kTailMarginM);
         const double ahead = std::min(route.length_m, lead_distance_m + lookahead_m);
         return acquire_range(train, route, rear, ahead);
+    }
+
+    // Look forward far enough for the train to brake *before* it reaches a
+    // conflicting piece. Reserve only the unobstructed prefix. Never grant an
+    // authority if its stopping point is inside the stopping distance.
+    // Routes in a closed circuit hold every block until released, as before.
+    [[nodiscard]] MovementAuthority authorize(
+        const TrainId train, const rail_operation::OperationalRoute& route,
+        const double lead_distance_m, const double speed_mps,
+        const std::uint32_t coaches) {
+        if (train == 0U || !route.valid || route.graph_route.steps.empty() ||
+            !(route.length_m > 0.0) || !std::isfinite(lead_distance_m) ||
+            lead_distance_m < 0.0 || lead_distance_m > route.length_m + 0.1 ||
+            !std::isfinite(speed_mps) || speed_mps < 0.0 || coaches > 7U)
+            return {};
+
+        if (route.closed) return {acquire_entire_route(train, route), std::nullopt};
+        const double rear = std::max(0.0, lead_distance_m -
+            consist_length_m(coaches) - kTailMarginM);
+        const double search_end = std::min(route.length_m, lead_distance_m + kSignalScanM);
+        double cursor = 0.0;
+        std::optional<double> stop_at;
+        for (const auto& step : route.graph_route.steps) {
+            const auto* piece = route.topology.piece(step.piece);
+            if (!piece || step.route >= piece->descriptor.routes.size()) return {};
+            const double length = rail_operation::detail::route_length(
+                piece->descriptor.routes[step.route]);
+            if (!std::isfinite(length) || length <= 0.0) return {};
+            const auto owner = owners_.find(step.piece);
+            if (cursor <= search_end + 1e-6 && cursor + length >= rear - 1e-6 &&
+                owner != owners_.end() && owner->second != train) {
+                stop_at = std::max(0.0, cursor - kSignalClearanceM);
+                break;
+            }
+            cursor += length;
+        }
+        if (stop_at) {
+            const double braking_distance = speed_mps * speed_mps /
+                (2.0 * kServiceBrakeMps2) + speed_mps * kMaxTickS + 0.25;
+            // A conflict behind/under the locomotive or a newly appeared red
+            // too close to brake safely denies movement without changing leases.
+            if (*stop_at < lead_distance_m + braking_distance) return {};
+            const double forward = std::max(0.0, *stop_at - lead_distance_m);
+            return {acquire(train, route, lead_distance_m, coaches, forward), stop_at};
+        }
+        return {acquire(train, route, lead_distance_m, coaches, kSignalScanM),
+                std::nullopt};
     }
 
     // During locomotive decoupling and return, the main line cannot be
