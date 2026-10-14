@@ -127,6 +127,10 @@ public:
     [[nodiscard]] bool waiting_at_dispatch_signal() const noexcept {
         return operation_active_ && train_.waiting_at_signal();
     }
+    [[nodiscard]] bool dispatch_signal_restricted() const noexcept {
+        return operation_active_ && !shunt_.active() && !return_.active() &&
+               train_.signal_stop_m().has_value();
+    }
     [[nodiscard]] bool operation_active() const noexcept { return operation_active_; }
     [[nodiscard]] std::uint32_t coach_count() const noexcept { return fleet_.coach_count; }
     [[nodiscard]] const std::vector<rail_operation::StationDefinition>& stations() const noexcept {
