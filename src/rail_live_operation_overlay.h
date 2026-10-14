@@ -498,8 +498,8 @@ private:
                         const bool transfer = !second_line &&
                             (controller_.shunting_locomotive() || controller_.return_service_active());
                         const bool signal_restricted = second_line
-                            ? secondary_controller_.waiting_at_dispatch_signal()
-                            : controller_.waiting_at_dispatch_signal();
+                            ? secondary_controller_.dispatch_signal_restricted()
+                            : controller_.dispatch_signal_restricted();
                         aspect = ch::rail_signals::station_aspect(
                             (second_line ? second_authority_ : first_authority_) &&
                             !signal_restricted,
