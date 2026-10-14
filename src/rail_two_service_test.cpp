@@ -1,5 +1,6 @@
 #include "rail_two_service.h"
 #include "rail_live_operation_controller.h"
+#include "rail_block_dispatcher.h"
 
 #include <cmath>
 #include <iostream>
@@ -41,6 +42,48 @@ int main() {
         first.articulated_poses().size() != 8U ||
         second.articulated_poses().size() != 3U)
         return fail("both purchased consists not visible");
+    // The dispatcher leases every piece under the train and ahead of its
+    // locomotive; a second train must never take even one conflicting block.
+    const auto first_route = ch::rail_two_service::find_route(
+        graph, city.stations, 0U, city.fleet.coach_count);
+    const auto second_route = ch::rail_two_service::find_route(
+        graph, city.stations, 2U, city.secondary_fleet.coach_count);
+    if (!first_route || !second_route) return fail("dispatcher routes unavailable");
+    ch::rail_dispatch::BlockDispatcher dispatcher;
+    const double at_first_a = first_route->stations.front().distance_m;
+    const double at_second_a = second_route->stations.front().distance_m;
+    const auto first_block = first_route->graph_route.steps.front().piece;
+    const auto second_block = second_route->graph_route.steps.front().piece;
+    if (!dispatcher.acquire(1U, *first_route, at_first_a, 7U) ||
+        !dispatcher.acquire(2U, *second_route, at_second_a, 2U) ||
+        dispatcher.reserved_count(1U) == 0U ||
+        dispatcher.reserved_count(2U) == 0U)
+        return fail("two disjoint consists not granted authority");
+    const std::size_t previous = dispatcher.reserved_count(1U);
+    if (dispatcher.acquire(2U, *first_route, at_first_a, 2U) ||
+        dispatcher.reserved_count(1U) != previous ||
+        dispatcher.acquire(1U, *first_route, -1.0, 7U))
+        return fail("conflicting or invalid block grant changed ownership");
+
+    // The old A-section is only released once the tail passes it. Other
+    // vehicles can then acquire that section without evicting train 1.
+    if (!dispatcher.acquire(1U, *first_route, 175.0, 7U) ||
+        dispatcher.owned_by(1U, first_block))
+        return fail("occupied sections not released after last coach");
+    if (!dispatcher.acquire_entire_route(1U, *first_route) ||
+        !dispatcher.owned_by(1U, first_block) ||
+        dispatcher.acquire(2U, *first_route, at_first_a, 2U))
+        return fail("decoupling failed to protect full main-line route");
+    dispatcher.release(1U);
+    if (dispatcher.reserved_count(1U) != 0U ||
+        !dispatcher.acquire(2U, *first_route, at_first_a, 2U) ||
+        !dispatcher.owned_by(2U, first_block) ||
+        !dispatcher.reserved(second_block))
+        return fail("old authority not transferred atomically after release");
+    dispatcher.clear();
+    if (dispatcher.reserved_count(2U) != 0U)
+        return fail("block leases leaked across city reset");
+
     // Four named stops are the supported dispatch boundary. A fifth would
     // silently become an unassigned station and confuse the purchase order.
     if (first.toggle_station(graph.edges()[5].piece_group, 0.5))
